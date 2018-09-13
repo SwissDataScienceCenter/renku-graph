@@ -1,0 +1,981 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "commit": {
+        "sha1": "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": ".gitignore",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        ".gitignore"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": ".gitlab-ci.yml",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        ".gitlab-ci.yml"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "Dockerfile",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        "Dockerfile"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "README.md",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "latest": "84cc905f50b0e48f0d8476506c3eb4ef2cff4800",
+      "_need_update": [
+        [
+          "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+          "README.md"
+        ]
+      ],
+      "id": [
+        "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        "README.md"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "requirements.txt",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "latest": "fb13008a7894ff576e119ed71050ecf843d207b3",
+      "_need_update": [
+        [
+          "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+          "requirements.txt"
+        ]
+      ],
+      "id": [
+        "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        "requirements.txt"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": ".renku/metadata.yml",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "8ed6a5d395b1bcb5d68705059645fba3a6230105",
+        ".renku/metadata.yml"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "84cc905f50b0e48f0d8476506c3eb4ef2cff4800",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "README.md",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "84cc905f50b0e48f0d8476506c3eb4ef2cff4800",
+        "README.md"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "data/preprocessed/zhbikes.parquet",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        "data/preprocessed/zhbikes.parquet"
+      ]
+    },
+    {
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "commit": {
+        "sha1": "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": ".renku/workflow/08e08333b8304e3d90c168d47a64a82f_python.cwl",
+      "tool": {
+        "requirements": [
+          {
+            "class": "InlineJavascriptRequirement"
+          },
+          {
+            "class": "InitialWorkDirRequirement",
+            "listing": [
+              {
+                "entry": "$({\"listing\": [], \"class\": \"Directory\"})",
+                "entryname": "data/preprocessed",
+                "writable": true
+              }
+            ]
+          }
+        ],
+        "hints": [],
+        "label": null,
+        "doc": null,
+        "cwlVersion": "v1.0",
+        "baseCommand": [
+          "python"
+        ],
+        "arguments": [],
+        "stdin": null,
+        "stdout": null,
+        "stderr": null,
+        "inputs": {
+          "input_1": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "default": {
+              "path": "../../src/clean_data.py",
+              "class": "File"
+            },
+            "inputBinding": {
+              "position": 1,
+              "prefix": null,
+              "separate": true,
+              "itemSeparator": null,
+              "valueFrom": null,
+              "shellQuote": true
+            }
+          },
+          "input_2": {
+            "streamable": false,
+            "type": "Directory",
+            "description": null,
+            "default": {
+              "path": "../../data/zhbikes",
+              "listing": [],
+              "class": "Directory"
+            },
+            "inputBinding": {
+              "position": 2,
+              "prefix": null,
+              "separate": true,
+              "itemSeparator": null,
+              "valueFrom": null,
+              "shellQuote": true
+            }
+          },
+          "input_3": {
+            "streamable": false,
+            "type": "string",
+            "description": null,
+            "default": "data/preprocessed/zhbikes.parquet",
+            "inputBinding": {
+              "position": 3,
+              "prefix": null,
+              "separate": true,
+              "itemSeparator": null,
+              "valueFrom": null,
+              "shellQuote": true
+            }
+          }
+        },
+        "outputs": {
+          "output_0": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "format": null,
+            "outputBinding": {
+              "glob": "$(inputs.input_3)"
+            }
+          }
+        },
+        "successCodes": [],
+        "temporaryFailCodes": [],
+        "permanentFailCodes": [],
+        "class": "CommandLineTool"
+      },
+      "submodule": [],
+      "_need_update": [],
+      "id": [
+        "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        ".renku/workflow/08e08333b8304e3d90c168d47a64a82f_python.cwl"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "01f169f0beac20c7b3646b48df4010a15787adf8",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "src/clean_data.py",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "01f169f0beac20c7b3646b48df4010a15787adf8",
+        "src/clean_data.py"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "data/zhbikes",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+        "data/zhbikes"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": ".gitattributes",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "latest": "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+      "_need_update": [
+        [
+          "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+          ".gitattributes"
+        ]
+      ],
+      "id": [
+        "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+        ".gitattributes"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "data/zhbikes/2016_verkehrszaehlungen_werte_fussgaenger_velo.csv",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+        "data/zhbikes/2016_verkehrszaehlungen_werte_fussgaenger_velo.csv"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "data/zhbikes/metadata.yml",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+        "data/zhbikes/metadata.yml"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "01f169f0beac20c7b3646b48df4010a15787adf8",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "src/plot_data.py",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "latest": "9a4e994e1e7fe8f19255f9dc46c5c88ca213a5d6",
+      "_need_update": [
+        [
+          "01f169f0beac20c7b3646b48df4010a15787adf8",
+          "src/plot_data.py"
+        ]
+      ],
+      "id": [
+        "01f169f0beac20c7b3646b48df4010a15787adf8",
+        "src/plot_data.py"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "2123a51db32a2d3fb3589143a1692f1f3bc14219",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": ".gitattributes",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "latest": "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+      "_need_update": [
+        [
+          "2123a51db32a2d3fb3589143a1692f1f3bc14219",
+          ".gitattributes"
+        ]
+      ],
+      "id": [
+        "2123a51db32a2d3fb3589143a1692f1f3bc14219",
+        ".gitattributes"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "2123a51db32a2d3fb3589143a1692f1f3bc14219",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "data/zhbikes/2017_verkehrszaehlungen_werte_fussgaenger_velo.csv",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "2123a51db32a2d3fb3589143a1692f1f3bc14219",
+        "data/zhbikes/2017_verkehrszaehlungen_werte_fussgaenger_velo.csv"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "2123a51db32a2d3fb3589143a1692f1f3bc14219",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "data/zhbikes/metadata.yml",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "latest": "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+      "_need_update": [
+        [
+          "2123a51db32a2d3fb3589143a1692f1f3bc14219",
+          "data/zhbikes/metadata.yml"
+        ]
+      ],
+      "id": [
+        "2123a51db32a2d3fb3589143a1692f1f3bc14219",
+        "data/zhbikes/metadata.yml"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "72a14cfd07176ae8182dab621a19449043cf3f82",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "figs/grid_plot.png",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "latest": "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+      "_need_update": [
+        [
+          "72a14cfd07176ae8182dab621a19449043cf3f82",
+          "figs/grid_plot.png"
+        ]
+      ],
+      "id": [
+        "72a14cfd07176ae8182dab621a19449043cf3f82",
+        "figs/grid_plot.png"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "72a14cfd07176ae8182dab621a19449043cf3f82",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "figs/cumulative.png",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "72a14cfd07176ae8182dab621a19449043cf3f82",
+        "figs/cumulative.png"
+      ]
+    },
+    {
+      "path": ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl",
+      "commit": {
+        "sha1": "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "tool": {
+        "requirements": [
+          {
+            "class": "InlineJavascriptRequirement"
+          },
+          {
+            "class": "InitialWorkDirRequirement",
+            "listing": [
+              {
+                "entry": "$({\"listing\": [], \"class\": \"Directory\"})",
+                "entryname": "figs",
+                "writable": true
+              }
+            ]
+          }
+        ],
+        "hints": [],
+        "label": null,
+        "doc": null,
+        "cwlVersion": "v1.0",
+        "baseCommand": [
+          "python"
+        ],
+        "arguments": [],
+        "stdin": null,
+        "stdout": null,
+        "stderr": null,
+        "inputs": {
+          "input_1": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "default": {
+              "path": "../../src/plot_data.py",
+              "class": "File"
+            },
+            "inputBinding": {
+              "position": 1,
+              "prefix": null,
+              "separate": true,
+              "itemSeparator": null,
+              "valueFrom": null,
+              "shellQuote": true
+            }
+          },
+          "input_2": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "default": {
+              "path": "../../data/preprocessed/zhbikes.parquet",
+              "class": "File"
+            },
+            "inputBinding": {
+              "position": 2,
+              "prefix": null,
+              "separate": true,
+              "itemSeparator": null,
+              "valueFrom": null,
+              "shellQuote": true
+            }
+          }
+        },
+        "outputs": {
+          "output_0": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "format": null,
+            "outputBinding": {
+              "glob": "figs/grid_plot.png"
+            }
+          },
+          "output_1": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "format": null,
+            "outputBinding": {
+              "glob": "figs/cumulative.png"
+            }
+          }
+        },
+        "successCodes": [],
+        "temporaryFailCodes": [],
+        "permanentFailCodes": [],
+        "class": "CommandLineTool"
+      },
+      "workflow_path": "cd438bad0d9b4968b744721500d5d4f2.cwl#steps/step_1",
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "workflow": {
+        "inputs": {
+          "input_1": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "default": {
+              "path": "../../src/plot_data.py",
+              "class": "File"
+            },
+            "inputBinding": null
+          },
+          "input_2": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "default": {
+              "path": "../../data/preprocessed/zhbikes.parquet",
+              "class": "File"
+            },
+            "inputBinding": null
+          }
+        },
+        "requirements": [],
+        "hints": [],
+        "label": null,
+        "doc": null,
+        "cwlVersion": "v1.0",
+        "outputs": {
+          "output_0": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "format": null,
+            "outputBinding": null,
+            "outputSource": "step_1/output_0"
+          },
+          "output_1": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "format": null,
+            "outputBinding": null,
+            "outputSource": "step_1/output_1"
+          }
+        },
+        "steps": {
+          "step_1": {
+            "run": "77e7717945f449328cb276adfc69a06e_python.cwl",
+            "in": {
+              "input_1": "input_1",
+              "input_2": "input_2"
+            },
+            "out": [
+              "output_0",
+              "output_1"
+            ]
+          }
+        },
+        "class": "Workflow"
+      },
+      "submodule": [],
+      "_need_update": [],
+      "id": [
+        "72a14cfd07176ae8182dab621a19449043cf3f82",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "9a4e994e1e7fe8f19255f9dc46c5c88ca213a5d6",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "src/plot_data.py",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "9a4e994e1e7fe8f19255f9dc46c5c88ca213a5d6",
+        "src/plot_data.py"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "figs/grid_plot.png",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [
+        [
+          "01f169f0beac20c7b3646b48df4010a15787adf8",
+          "src/plot_data.py"
+        ],
+        [
+          "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+          ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+        ],
+        [
+          "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+          "figs/grid_plot.png"
+        ]
+      ],
+      "id": [
+        "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        "figs/grid_plot.png"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "figs/cumulative.png",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "latest": "72a14cfd07176ae8182dab621a19449043cf3f82",
+      "_need_update": [
+        [
+          "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+          "figs/cumulative.png"
+        ],
+        [
+          "01f169f0beac20c7b3646b48df4010a15787adf8",
+          "src/plot_data.py"
+        ],
+        [
+          "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+          ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+        ]
+      ],
+      "id": [
+        "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        "figs/cumulative.png"
+      ]
+    },
+    {
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "commit": {
+        "sha1": "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl",
+      "tool": {
+        "requirements": [
+          {
+            "class": "InlineJavascriptRequirement"
+          },
+          {
+            "class": "InitialWorkDirRequirement",
+            "listing": [
+              {
+                "entry": "$({\"listing\": [], \"class\": \"Directory\"})",
+                "entryname": "figs",
+                "writable": true
+              }
+            ]
+          }
+        ],
+        "hints": [],
+        "label": null,
+        "doc": null,
+        "cwlVersion": "v1.0",
+        "baseCommand": [
+          "python"
+        ],
+        "arguments": [],
+        "stdin": null,
+        "stdout": null,
+        "stderr": null,
+        "inputs": {
+          "input_1": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "default": {
+              "path": "../../src/plot_data.py",
+              "class": "File"
+            },
+            "inputBinding": {
+              "position": 1,
+              "prefix": null,
+              "separate": true,
+              "itemSeparator": null,
+              "valueFrom": null,
+              "shellQuote": true
+            }
+          },
+          "input_2": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "default": {
+              "path": "../../data/preprocessed/zhbikes.parquet",
+              "class": "File"
+            },
+            "inputBinding": {
+              "position": 2,
+              "prefix": null,
+              "separate": true,
+              "itemSeparator": null,
+              "valueFrom": null,
+              "shellQuote": true
+            }
+          }
+        },
+        "outputs": {
+          "output_0": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "format": null,
+            "outputBinding": {
+              "glob": "figs/grid_plot.png"
+            }
+          },
+          "output_1": {
+            "streamable": false,
+            "type": "File",
+            "description": null,
+            "format": null,
+            "outputBinding": {
+              "glob": "figs/cumulative.png"
+            }
+          }
+        },
+        "successCodes": [],
+        "temporaryFailCodes": [],
+        "permanentFailCodes": [],
+        "class": "CommandLineTool"
+      },
+      "submodule": [],
+      "_need_update": [
+        [
+          "01f169f0beac20c7b3646b48df4010a15787adf8",
+          "src/plot_data.py"
+        ],
+        [
+          "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+          ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+        ]
+      ],
+      "id": [
+        "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "11e45e04fa6e9bfaec2c3ad8cb693e15a7c48bde",
+        "author": "Julien Eberle <julien.eberle@epfl.ch>",
+        "committer": "Julien Eberle <julien.eberle@epfl.ch>"
+      },
+      "path": "notebooks/DataPreprocess.ipynb",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "11e45e04fa6e9bfaec2c3ad8cb693e15a7c48bde",
+        "notebooks/DataPreprocess.ipynb"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "ded71eca9ae69a2cdb39ce9c793e1350d429f08b",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "notebooks/DataPreprocess.ipynb",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "latest": "11e45e04fa6e9bfaec2c3ad8cb693e15a7c48bde",
+      "_need_update": [
+        [
+          "ded71eca9ae69a2cdb39ce9c793e1350d429f08b",
+          "notebooks/DataPreprocess.ipynb"
+        ]
+      ],
+      "id": [
+        "ded71eca9ae69a2cdb39ce9c793e1350d429f08b",
+        "notebooks/DataPreprocess.ipynb"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "ded71eca9ae69a2cdb39ce9c793e1350d429f08b",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "notebooks/Explore.ipynb",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "ded71eca9ae69a2cdb39ce9c793e1350d429f08b",
+        "notebooks/Explore.ipynb"
+      ]
+    },
+    {
+      "commit": {
+        "sha1": "fb13008a7894ff576e119ed71050ecf843d207b3",
+        "author": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>",
+        "committer": "Johann-Michael Thiebaut <johann-michael.thiebaut@epfl.ch>"
+      },
+      "path": "requirements.txt",
+      "submodule": [],
+      "client": "LocalClient(path=PosixPath('/tmp/tmpqfa54__y/renku-project'), renku_home='.renku', renku_path=PosixPath('/tmp/tmpqfa54__y/renku-project/.renku'), git=<git.Repo \"/tmp/tmpqfa54__y/renku-project/.git\">, parent=None, datadir='data')",
+      "_need_update": [],
+      "id": [
+        "fb13008a7894ff576e119ed71050ecf843d207b3",
+        "requirements.txt"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "id": "input_2",
+      "source": [
+        "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        "data/preprocessed/zhbikes.parquet"
+      ],
+      "target": [
+        "72a14cfd07176ae8182dab621a19449043cf3f82",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ]
+    },
+    {
+      "id": "input_2",
+      "source": [
+        "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        "data/preprocessed/zhbikes.parquet"
+      ],
+      "target": [
+        "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ]
+    },
+    {
+      "id": "output_0",
+      "source": [
+        "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        ".renku/workflow/08e08333b8304e3d90c168d47a64a82f_python.cwl"
+      ],
+      "target": [
+        "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        "data/preprocessed/zhbikes.parquet"
+      ]
+    },
+    {
+      "id": "input_1",
+      "source": [
+        "01f169f0beac20c7b3646b48df4010a15787adf8",
+        "src/clean_data.py"
+      ],
+      "target": [
+        "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        ".renku/workflow/08e08333b8304e3d90c168d47a64a82f_python.cwl"
+      ]
+    },
+    {
+      "id": "input_2",
+      "source": [
+        "dda09be8bc7e60201298ad576aa72c5f9ff16bc8",
+        "data/zhbikes"
+      ],
+      "target": [
+        "07b64b6cd153cf7988e2f9cca41c58e296f57b75",
+        ".renku/workflow/08e08333b8304e3d90c168d47a64a82f_python.cwl"
+      ]
+    },
+    {
+      "id": "input_1",
+      "source": [
+        "01f169f0beac20c7b3646b48df4010a15787adf8",
+        "src/plot_data.py"
+      ],
+      "target": [
+        "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ]
+    },
+    {
+      "id": "output_0",
+      "source": [
+        "72a14cfd07176ae8182dab621a19449043cf3f82",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ],
+      "target": [
+        "72a14cfd07176ae8182dab621a19449043cf3f82",
+        "figs/grid_plot.png"
+      ]
+    },
+    {
+      "id": "output_1",
+      "source": [
+        "72a14cfd07176ae8182dab621a19449043cf3f82",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ],
+      "target": [
+        "72a14cfd07176ae8182dab621a19449043cf3f82",
+        "figs/cumulative.png"
+      ]
+    },
+    {
+      "id": "input_1",
+      "source": [
+        "9a4e994e1e7fe8f19255f9dc46c5c88ca213a5d6",
+        "src/plot_data.py"
+      ],
+      "target": [
+        "72a14cfd07176ae8182dab621a19449043cf3f82",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ]
+    },
+    {
+      "id": "output_0",
+      "source": [
+        "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ],
+      "target": [
+        "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        "figs/grid_plot.png"
+      ]
+    },
+    {
+      "id": "output_1",
+      "source": [
+        "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      ],
+      "target": [
+        "90c458fceb7fa2f267c797ca44c29d93aba046f6",
+        "figs/cumulative.png"
+      ]
+    }
+  ]
+}

@@ -25,5 +25,12 @@ enablePlugins(
   PlayScala,
 )
 
+// Play framework added dependencies
 libraryDependencies += filters
 libraryDependencies += guice
+
+// Sangria, to have a graphql endpoint
+libraryDependencies += "org.sangria-graphql" %% "sangria" % "1.4.2"
+
+// ScalaTest + Play
+libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test
