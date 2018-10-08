@@ -31,6 +31,10 @@ libraryDependencies += guice
 
 // Sangria, to have a graphql endpoint
 libraryDependencies += "org.sangria-graphql" %% "sangria" % "1.4.2"
+libraryDependencies += "org.sangria-graphql" %% "sangria-play-json" % "1.0.5"
+
+// Play-Json
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10"
 
 // ScalaTest + Play
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test
