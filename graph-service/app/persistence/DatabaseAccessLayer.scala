@@ -33,6 +33,13 @@ class DatabaseAccessLayer @Inject() (
       that.activities.findById( id ).result
     }
 
+    def findActivitiesGenerating( entityId: String ): DBIO[Seq[Activity]] = {
+      ( for {
+        edges <- that.generations.findByEntity( entityId ).extract
+        activity <- edges.activity
+      } yield activity ).result
+    }
+
     def allEntities: DBIO[Seq[Entity]] = {
       that.entities.result
     }
@@ -47,6 +54,14 @@ class DatabaseAccessLayer @Inject() (
         entity <- edges.entity
       } yield entity ).result
     }
+
+    def findGenerationEdgesByActivity( activityId: String ): DBIO[Seq[GenerationEdge]] = {
+      that.generations.findByActivity( activityId ).result
+    }
+
+    def findGenerationEdgesByEntity( entityId: String ): DBIO[Seq[GenerationEdge]] = {
+      that.generations.findByEntity( entityId ).result
+    }
   }
 
   object highLevel {
@@ -57,6 +72,15 @@ class DatabaseAccessLayer @Inject() (
     def activities( ids: Seq[String] ): Future[Seq[Activity]] = {
       val dbio = for {
         seq <- DBIO.sequence( for { id <- ids } yield lowLevel.findActivity( id ) )
+      } yield seq.flatten
+      db.run( dbio )
+    }
+
+    def activitiesGenerating( entityIds: Seq[String] ): Future[Seq[Activity]] = {
+      val dbio = for {
+        seq <- DBIO.sequence(
+          for { id <- entityIds } yield lowLevel.findActivitiesGenerating( id )
+        )
       } yield seq.flatten
       db.run( dbio )
     }
@@ -77,6 +101,20 @@ class DatabaseAccessLayer @Inject() (
         seq <- DBIO.sequence(
           for { id <- activityIds } yield lowLevel.findEntitiesGeneratedBy( id )
         )
+      } yield seq.flatten
+      db.run( dbio )
+    }
+
+    def generationEdgesByActivities( activityIds: Seq[String] ): Future[Seq[GenerationEdge]] = {
+      val dbio = for {
+        seq <- DBIO.sequence( for { id <- activityIds } yield lowLevel.findGenerationEdgesByActivity( id ) )
+      } yield seq.flatten
+      db.run( dbio )
+    }
+
+    def generationEdgesByEntities( entityId: Seq[String] ): Future[Seq[GenerationEdge]] = {
+      val dbio = for {
+        seq <- DBIO.sequence( for { id <- entityId } yield lowLevel.findGenerationEdgesByEntity( id ) )
       } yield seq.flatten
       db.run( dbio )
     }
