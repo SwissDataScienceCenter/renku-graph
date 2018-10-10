@@ -6,5 +6,5 @@ case class AssociationEdge(
     // to
     agentId: String,
     // plan:
-    planId: String,
+    planId: String
 )

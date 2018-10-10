@@ -19,5 +19,5 @@
 // The Play plugin
 addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.6.18")
 
-// The scalafmt plugin
-addSbtPlugin("com.geirsson" % "sbt-scalafmt" % "1.5.1")
+// The Scalariform plugin
+addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.8.2")

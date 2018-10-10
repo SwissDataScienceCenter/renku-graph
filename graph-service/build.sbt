@@ -36,5 +36,53 @@ libraryDependencies += "org.sangria-graphql" %% "sangria-play-json" % "1.0.5"
 // Play-Json
 libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10"
 
+// Slick for database persistence
+libraryDependencies += "com.typesafe.slick" %% "slick" % "3.2.3"
+libraryDependencies += "com.typesafe.slick" %% "slick-hikaricp" % "3.2.3"
+
+// Slick integration for Play
+libraryDependencies += "com.typesafe.play" %% "play-slick" % "3.0.0"
+
+// H2 Database
+libraryDependencies += "com.h2database" % "h2" % "1.4.197"
+libraryDependencies += "org.postgresql" % "postgresql" % "42.2.2"
+
+
 // ScalaTest + Play
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test
+
+// Source code formatting
+import com.typesafe.sbt.SbtScalariform
+import com.typesafe.sbt.SbtScalariform.ScalariformKeys
+import scalariform.formatter.preferences._
+
+val preferences =
+  ScalariformKeys.preferences := ScalariformKeys.preferences.value
+    .setPreference( AlignArguments,                               true  )
+    .setPreference( AlignParameters,                              true  )
+    .setPreference( AlignSingleLineCaseStatements,                true  )
+    .setPreference( AlignSingleLineCaseStatements.MaxArrowIndent, 40    )
+    .setPreference( CompactControlReadability,                    true  )
+    .setPreference( CompactStringConcatenation,                   false )
+    .setPreference( DanglingCloseParenthesis,                     Force )
+    .setPreference( DoubleIndentConstructorArguments,             true  )
+    .setPreference( DoubleIndentMethodDeclaration,                true  )
+    .setPreference( FirstArgumentOnNewline,                       Force )
+    .setPreference( FirstParameterOnNewline,                      Force )
+    .setPreference( FormatXml,                                    true  )
+    .setPreference( IndentPackageBlocks,                          true  )
+    .setPreference( IndentSpaces,                                 2     )
+    .setPreference( IndentWithTabs,                               false )
+    .setPreference( MultilineScaladocCommentsStartOnFirstLine,    false )
+    .setPreference( NewlineAtEndOfFile,                           true  )
+    .setPreference( PlaceScaladocAsterisksBeneathSecondAsterisk,  false )
+    .setPreference( PreserveSpaceBeforeArguments,                 false )
+    .setPreference( RewriteArrowSymbols,                          false )
+    .setPreference( SpaceBeforeColon,                             false )
+    .setPreference( SpaceBeforeContextColon,                      true  )
+    .setPreference( SpaceInsideBrackets,                          false )
+    .setPreference( SpaceInsideParentheses,                       true  )
+    .setPreference( SpacesAroundMultiImports,                     true  )
+    .setPreference( SpacesWithinPatternBinders,                   false )
+
+SbtScalariform.scalariformSettings ++ Seq(preferences)
