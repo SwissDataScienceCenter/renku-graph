@@ -1,7 +1,6 @@
 import java.time.format.DateTimeFormatter
 import java.time.{ Instant, ZoneId }
 
-import persistence.DatabaseAccessLayer
 import sangria.execution.deferred.DeferredResolver
 import sangria.schema.{ Field, ListType, ObjectType, ScalarType, Schema, fields }
 import sangria.validation.ValueCoercionViolation
@@ -9,27 +8,27 @@ import sangria.validation.ValueCoercionViolation
 import scala.util.{ Failure, Success, Try }
 
 package object graphql {
-  lazy val QueryType: ObjectType[DatabaseAccessLayer, Unit] = ObjectType(
+  lazy val QueryType: ObjectType[UserContext, Unit] = ObjectType(
     "Query",
-    fields[DatabaseAccessLayer, Unit](
+    fields[UserContext, Unit](
       Field(
         "activities",
         ListType( ActivityType.ActivityType ),
         description = Some( "Returns a list of all activities" ),
-        resolve = _.ctx.highLevel.activities
+        resolve = _.ctx.dal.highLevel.activities
       ),
       Field(
         "entities",
         ListType( EntityType.EntityType ),
         description = Some( "Returns a list of all entities" ),
-        resolve = _.ctx.highLevel.entities
+        resolve = _.ctx.dal.highLevel.entities
       )
     )
   )
 
-  lazy val schema: Schema[DatabaseAccessLayer, Unit] = Schema( QueryType )
+  lazy val schema: Schema[UserContext, Unit] = Schema( QueryType )
 
-  lazy val resolver: DeferredResolver[DatabaseAccessLayer] = {
+  lazy val resolver: DeferredResolver[UserContext] = {
     DeferredResolver.fetchers(
       ActivityType.activities,
       EntityType.entities,

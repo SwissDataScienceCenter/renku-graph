@@ -1,7 +1,6 @@
 package graphql
 
 import models.GenerationEdge
-import persistence.DatabaseAccessLayer
 import sangria.execution.deferred.{ Fetcher, HasId, Relation, RelationIds }
 import sangria.macros.derive._
 import sangria.schema.{ Field, ObjectType }
@@ -20,12 +19,12 @@ object GenerationEdgeType {
     )
   }
 
-  lazy val generationEdges: Fetcher[DatabaseAccessLayer, GenerationEdge, GenerationEdge, ( String, String )] = Fetcher.relOnly(
-    ( repo: DatabaseAccessLayer, ids: RelationIds[GenerationEdge] ) => {
-      implicit val ec: ExecutionContext = repo.ec
+  lazy val generationEdges: Fetcher[UserContext, GenerationEdge, GenerationEdge, ( String, String )] = Fetcher.relOnly(
+    ( ctx: UserContext, ids: RelationIds[GenerationEdge] ) => {
+      implicit val ec: ExecutionContext = ctx.dal.ec
       for {
-        seq1 <- repo.highLevel.generationEdgesByActivities( ids( byGeneratingActivity ) )
-        seq2 <- repo.highLevel.generationEdgesByEntities( ids( byGeneratedEntity ) )
+        seq1 <- ctx.dal.highLevel.generationEdgesByActivities( ids( byGeneratingActivity ) )
+        seq2 <- ctx.dal.highLevel.generationEdgesByEntities( ids( byGeneratedEntity ) )
       } yield seq1 ++ seq2
     }
   )( HasId( ( edge: GenerationEdge ) => ( edge.entityId, edge.activityId ) ) )

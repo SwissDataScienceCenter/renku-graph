@@ -41,7 +41,7 @@ class QuerySpec extends AsyncBaseSpec {
         json <- Executor.execute(
           graphql.schema,
           query,
-          userContext      = dal,
+          userContext      = UserContext( dal ),
           deferredResolver = graphql.resolver
         ): Future[JsValue]
       } yield {

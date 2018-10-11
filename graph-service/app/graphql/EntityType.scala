@@ -1,12 +1,9 @@
 package graphql
 
-import models.{ Activity, Entity }
-import persistence.DatabaseAccessLayer
+import models.Entity
 import sangria.execution.deferred.{ Fetcher, HasId }
 import sangria.macros.derive._
 import sangria.schema.{ Field, ListType, ObjectType }
-import sangria.schema.fields
-import sangria.schema.StringType
 
 object EntityType {
 
@@ -23,8 +20,8 @@ object EntityType {
     )
   }
 
-  lazy val entities: Fetcher[DatabaseAccessLayer, Entity, Entity, String] =
-    Fetcher( ( ctx: DatabaseAccessLayer, ids: Seq[String] ) =>
-      ctx.highLevel.entities( ids ) )( HasId( _.id ) )
+  lazy val entities: Fetcher[UserContext, Entity, Entity, String] =
+    Fetcher( ( ctx: UserContext, ids: Seq[String] ) =>
+      ctx.dal.highLevel.entities( ids ) )( HasId( _.id ) )
 
 }
