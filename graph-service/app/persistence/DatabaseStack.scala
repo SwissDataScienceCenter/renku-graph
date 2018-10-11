@@ -10,5 +10,8 @@ abstract class DatabaseStack(
   with SchemasComponent
   with ImplicitsComponent
   with ActivityComponent
+  with AssociationComponent
   with EntityComponent
   with GenerationComponent
+  with PersonComponent
+  with UsageComponent

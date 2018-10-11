@@ -34,7 +34,7 @@ trait GenerationComponent {
     def idxEntity: Index =
       index( "IDX_GENERATION_ENTITY", entityId, unique = true )
     def idxActivity: Index =
-      index( "IDX_GENERATION_ACTIVITY", entityId, unique = false )
+      index( "IDX_GENERATION_ACTIVITY", activityId, unique = false )
 
     // *
     def * : ProvenShape[GenerationEdge] =
