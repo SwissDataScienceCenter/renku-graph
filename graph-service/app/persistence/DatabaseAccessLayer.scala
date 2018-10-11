@@ -120,16 +120,16 @@ class DatabaseAccessLayer @Inject() (
     }
   }
 
-  init()
+  def init: Future[Done] = _init
 
-  def init(): Future[Done] = {
+  protected val _init: Future[Done] = {
     for {
       _ <- initTables()
       _ <- initData()
     } yield Done
   }
 
-  def initTables(): Future[Seq[Throwable]] = {
+  protected def initTables(): Future[Seq[Throwable]] = {
     val createFutures = for {
       schema <- this.schemas
     } yield db.run( schema.create ).transform( x => Try( x.toEither ) )
@@ -142,7 +142,7 @@ class DatabaseAccessLayer @Inject() (
     } yield either.left.get
   }
 
-  def initData(): Future[Done] = {
+  protected def initData(): Future[Done] = {
     val activitiesObjects = Utils
       .loadJsonData[Activity]( "/site-data/tutorial-zhbikes/activities.json" )
       .get
