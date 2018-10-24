@@ -23,9 +23,9 @@ object GenerationEdgeType {
     ( ctx: UserContext, ids: RelationIds[GenerationEdge] ) => {
       implicit val ec: ExecutionContext = ctx.dal.ec
       for {
-        seq1 <- ctx.dal.highLevel.generationEdgesByActivities( ids( byGeneratingActivity ) )
-        seq2 <- ctx.dal.highLevel.generationEdgesByEntities( ids( byGeneratedEntity ) )
-      } yield seq1 ++ seq2
+        seq1 <- ctx.dal.generations.api.findByActivity( ids( byGeneratingActivity ) )
+        seq2 <- ctx.dal.generations.api.findByEntity( ids( byGeneratedEntity ) )
+      } yield seq1.map( _._1 ) ++ seq2.map( _._1 )
     }
   )( HasId( ( edge: GenerationEdge ) => ( edge.entityId, edge.activityId ) ) )
 

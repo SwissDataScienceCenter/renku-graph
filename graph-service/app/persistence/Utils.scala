@@ -1,4 +1,5 @@
-package graphql
+package persistence
+
 import java.io.InputStream
 
 import play.api.libs.json.{ JsResult, Json, Reads }

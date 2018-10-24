@@ -5,8 +5,10 @@ import play.api.db.slick.HasDatabaseConfig
 import slick.jdbc.JdbcProfile
 import slick.lifted.{ ForeignKeyQuery, Index, ProvenShape }
 
+import scala.concurrent.Future
+
 trait GenerationComponent {
-  this: HasDatabaseConfig[JdbcProfile] with SchemasComponent with ActivityComponent with EntityComponent =>
+  this: HasDatabaseConfig[JdbcProfile] with SchemasComponent with ExecutionContextComponent with ActivityComponent with EntityComponent =>
 
   import profile.api._
 
@@ -42,8 +44,45 @@ trait GenerationComponent {
   }
 
   object generations extends TableQuery( new Generations( _ ) ) {
-    val findByEntity = this.findBy( _.entityId )
-    val findByActivity = this.findBy( _.activityId )
+    val findByEntity = Compiled { entityId: Rep[String] =>
+      for {
+        edge <- this.findBy( _.entityId ).extract.apply( entityId )
+        activity <- edge.activity
+      } yield ( edge, activity )
+    }
+
+    val findByActivity = Compiled { activityId: Rep[String] =>
+      for {
+        edge <- this.findBy( _.activityId ).extract.apply( activityId )
+        entity <- edge.entity
+      } yield ( edge, entity )
+    }
+
+    object lowLevelApi {
+      def findByEntity( entityId: String ): DBIO[Seq[( GenerationEdge, Activity )]] = {
+        generations.findByEntity( entityId ).result
+      }
+
+      def findByActivity( activityId: String ): DBIO[Seq[( GenerationEdge, Entity )]] = {
+        generations.findByActivity( activityId ).result
+      }
+    }
+
+    object api {
+      def findByEntity( entityIds: Seq[String] ): Future[Seq[( GenerationEdge, Activity )]] = {
+        val dbio = for {
+          seq <- DBIO.sequence( for { entityId <- entityIds } yield lowLevelApi.findByEntity( entityId ) )
+        } yield seq.flatten
+        db.run( dbio )
+      }
+
+      def findByActivity( activityIds: Seq[String] ): Future[Seq[( GenerationEdge, Entity )]] = {
+        val dbio = for {
+          seq <- DBIO.sequence( for { activityId <- activityIds } yield lowLevelApi.findByActivity( activityId ) )
+        } yield seq.flatten
+        db.run( dbio )
+      }
+    }
   }
 
   _schemas += generations.schema

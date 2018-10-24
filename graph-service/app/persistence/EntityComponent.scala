@@ -7,8 +7,10 @@ import play.api.db.slick.HasDatabaseConfig
 import slick.jdbc.JdbcProfile
 import slick.lifted.ProvenShape
 
+import scala.concurrent.Future
+
 trait EntityComponent {
-  this: HasDatabaseConfig[JdbcProfile] with SchemasComponent =>
+  this: HasDatabaseConfig[JdbcProfile] with SchemasComponent with ExecutionContextComponent =>
 
   import profile.api._
 
@@ -26,6 +28,29 @@ trait EntityComponent {
 
   object entities extends TableQuery( new Entities( _ ) ) {
     val findById = this.findBy( _.id )
+
+    object lowLevelApi {
+      def all: DBIO[Seq[Entity]] = {
+        entities.result
+      }
+
+      def find( id: String ): DBIO[Seq[Entity]] = {
+        entities.findById( id ).result
+      }
+    }
+
+    object api {
+      def all: Future[Seq[Entity]] = {
+        db.run( lowLevelApi.all )
+      }
+
+      def find( ids: Seq[String] ): Future[Seq[Entity]] = {
+        val dbio = for {
+          seq <- DBIO.sequence( for { id <- ids } yield lowLevelApi.find( id ) )
+        } yield seq.flatten
+        db.run( dbio )
+      }
+    }
   }
 
   _schemas += entities.schema

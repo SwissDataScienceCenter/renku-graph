@@ -1,12 +1,14 @@
 package persistence
 
-import models.{ Activity, Entity, AssociationEdge, Person }
+import models.{ Activity, AssociationEdge, Entity, Person }
 import play.api.db.slick.HasDatabaseConfig
 import slick.jdbc.JdbcProfile
 import slick.lifted.{ ForeignKeyQuery, Index, ProvenShape }
 
+import scala.concurrent.Future
+
 trait AssociationComponent {
-  this: HasDatabaseConfig[JdbcProfile] with SchemasComponent with ActivityComponent with EntityComponent with PersonComponent =>
+  this: HasDatabaseConfig[JdbcProfile] with SchemasComponent with ExecutionContextComponent with ActivityComponent with EntityComponent with PersonComponent =>
 
   import profile.api._
 
@@ -49,8 +51,47 @@ trait AssociationComponent {
   }
 
   object associations extends TableQuery( new Associations( _ ) ) {
-    val findByActivity = this.findBy( _.activityId )
-    val findByAgent = this.findBy( _.agentId )
+    val findByActivity = Compiled { activityId: Rep[String] =>
+      for {
+        edge <- this.findBy( _.activityId ).extract.apply( activityId )
+        agent <- edge.agent
+        plan <- edge.plan
+      } yield ( edge, agent, plan )
+    }
+
+    val findByAgent = Compiled { agentId: Rep[String] =>
+      for {
+        edge <- this.findBy( _.agentId ).extract.apply( agentId )
+        activity <- edge.activity
+        plan <- edge.plan
+      } yield ( edge, activity, plan )
+    }
+
+    object lowLevelApi {
+      def findByActivity( activityId: String ): DBIO[Seq[( AssociationEdge, Person, Entity )]] = {
+        associations.findByActivity( activityId ).result
+      }
+
+      def findByAgent( agentId: String ): DBIO[Seq[( AssociationEdge, Activity, Entity )]] = {
+        associations.findByAgent( agentId ).result
+      }
+    }
+
+    object api {
+      def findByActivity( activityIds: Seq[String] ): Future[Seq[( AssociationEdge, Person, Entity )]] = {
+        val dbio = for {
+          seq <- DBIO.sequence( for { activityId <- activityIds } yield lowLevelApi.findByActivity( activityId ) )
+        } yield seq.flatten
+        db.run( dbio )
+      }
+
+      def findByAgent( agentIds: Seq[String] ): Future[Seq[( AssociationEdge, Activity, Entity )]] = {
+        val dbio = for {
+          seq <- DBIO.sequence( for { agentId <- agentIds } yield lowLevelApi.findByAgent( agentId ) )
+        } yield seq.flatten
+        db.run( dbio )
+      }
+    }
   }
 
   _schemas += associations.schema

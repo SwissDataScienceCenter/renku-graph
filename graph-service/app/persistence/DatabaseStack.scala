@@ -8,6 +8,7 @@ abstract class DatabaseStack(
     protected val dbConfig: DatabaseConfig[JdbcProfile]
 ) extends HasDatabaseConfig[JdbcProfile]
   with SchemasComponent
+  with ExecutionContextComponent
   with ImplicitsComponent
   with ActivityComponent
   with AssociationComponent

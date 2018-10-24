@@ -22,15 +22,33 @@ class QuerySpec extends AsyncBaseSpec {
 
   "sangria" should {
     "resolve a graphql query" in {
+      //      val query = gql"""
+      //        query Entities {
+      //          entities {
+      //            path
+      //            commit_sha1
+      //            generationEdges {
+      //              activity {
+      //                label
+      //              }
+      //            }
+      //          }
+      //        }
+      //      """
+
       val query = gql"""
         query Entities {
           entities {
             path
             commit_sha1
-            generationEdges {
+            qualifiedGeneration {
+              activityId
               activity {
                 label
               }
+            }
+            wasGeneratedBy {
+              label
             }
           }
         }

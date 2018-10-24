@@ -1,47 +1,46 @@
 package persistence
 
-import models.Person
+import models.Project
 import play.api.db.slick.HasDatabaseConfig
 import slick.jdbc.JdbcProfile
 import slick.lifted.ProvenShape
 
 import scala.concurrent.Future
 
-trait PersonComponent {
+trait ProjectComponent {
   this: HasDatabaseConfig[JdbcProfile] with SchemasComponent with ExecutionContextComponent =>
 
   import profile.api._
 
-  class Persons( tag: Tag ) extends Table[Person]( tag, "PERSONS" ) {
+  class Projects( tag: Tag ) extends Table[Project]( tag, "PROJECTS" ) {
     // Columns
     def id: Rep[String] = column[String]( "ID", O.PrimaryKey )
-    def name: Rep[String] = column[String]( "NAME" )
-    def email: Rep[String] = column[String]( "EMAIL" )
+    def url: Rep[String] = column[String]( "URL" )
 
     // *
-    def * : ProvenShape[Person] =
-      ( id, name, email ) <> ( ( Person.apply _ ).tupled, Person.unapply )
+    def * : ProvenShape[Project] =
+      ( id, url ) <> ( ( Project.apply _ ).tupled, Project.unapply )
   }
 
-  object persons extends TableQuery( new Persons( _ ) ) {
+  object projects extends TableQuery( new Projects( _ ) ) {
     val findById = this.findBy( _.id )
 
     object lowLevelApi {
-      def all: DBIO[Seq[Person]] = {
-        persons.result
+      def all: DBIO[Seq[Project]] = {
+        projects.result
       }
 
-      def find( id: String ): DBIO[Seq[Person]] = {
-        persons.findById( id ).result
+      def find( id: String ): DBIO[Seq[Project]] = {
+        projects.findById( id ).result
       }
     }
 
     object api {
-      def all: Future[Seq[Person]] = {
+      def all: Future[Seq[Project]] = {
         db.run( lowLevelApi.all )
       }
 
-      def find( ids: Seq[String] ): Future[Seq[Person]] = {
+      def find( ids: Seq[String] ): Future[Seq[Project]] = {
         val dbio = for {
           seq <- DBIO.sequence( for { id <- ids } yield lowLevelApi.find( id ) )
         } yield seq.flatten
@@ -50,5 +49,5 @@ trait PersonComponent {
     }
   }
 
-  _schemas += persons.schema
+  _schemas += projects.schema
 }

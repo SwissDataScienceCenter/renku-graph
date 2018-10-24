@@ -12,9 +12,14 @@ object EntityType {
       ObjectTypeDescription( "A renku entity" ),
       AddFields(
         Field(
-          "generationEdges",
+          "qualifiedGeneration",
           ListType( GenerationEdgeType.GenerationEdgeType ),
           resolve = c => GenerationEdgeType.generationEdges.deferRelSeq( GenerationEdgeType.byGeneratedEntity, c.value.id )
+        ),
+        Field(
+          "wasGeneratedBy",
+          ListType( ActivityType.ActivityType ),
+          resolve = c => ActivityType.activitiesFromGeneration.deferRelSeq( ActivityType.byGeneratedEntity, c.value.id )
         )
       )
     )
@@ -22,6 +27,6 @@ object EntityType {
 
   lazy val entities: Fetcher[UserContext, Entity, Entity, String] =
     Fetcher( ( ctx: UserContext, ids: Seq[String] ) =>
-      ctx.dal.highLevel.entities( ids ) )( HasId( _.id ) )
+      ctx.dal.entities.api.find( ids ) )( HasId( _.id ) )
 
 }

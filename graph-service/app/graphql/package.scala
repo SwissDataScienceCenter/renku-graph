@@ -15,13 +15,13 @@ package object graphql {
         "activities",
         ListType( ActivityType.ActivityType ),
         description = Some( "Returns a list of all activities" ),
-        resolve = _.ctx.dal.highLevel.activities
+        resolve = _.ctx.dal.activities.api.all
       ),
       Field(
         "entities",
         ListType( EntityType.EntityType ),
         description = Some( "Returns a list of all entities" ),
-        resolve = _.ctx.dal.highLevel.entities
+        resolve = _.ctx.dal.entities.api.all
       )
     )
   )
@@ -31,6 +31,7 @@ package object graphql {
   lazy val resolver: DeferredResolver[UserContext] = {
     DeferredResolver.fetchers(
       ActivityType.activities,
+      ActivityType.activitiesFromGeneration,
       EntityType.entities,
       GenerationEdgeType.generationEdges
     )

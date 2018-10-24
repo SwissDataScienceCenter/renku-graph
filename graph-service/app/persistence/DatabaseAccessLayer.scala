@@ -1,7 +1,6 @@
 package persistence
 
 import akka.Done
-import graphql.Utils
 import javax.inject.{ Inject, Singleton }
 import models.{ Activity, Entity, GenerationEdge }
 import play.api.Logger
@@ -23,102 +22,6 @@ class DatabaseAccessLayer @Inject() (
   lazy val logger: Logger = Logger(
     "application.persistence.DatabaseAccessLayer"
   )
-
-  object lowLevel {
-    def allActivities: DBIO[Seq[Activity]] = {
-      that.activities.result
-    }
-
-    def findActivity( id: String ): DBIO[Seq[Activity]] = {
-      that.activities.findById( id ).result
-    }
-
-    def findActivitiesGenerating( entityId: String ): DBIO[Seq[Activity]] = {
-      ( for {
-        edges <- that.generations.findByEntity( entityId ).extract
-        activity <- edges.activity
-      } yield activity ).result
-    }
-
-    def allEntities: DBIO[Seq[Entity]] = {
-      that.entities.result
-    }
-
-    def findEntity( id: String ): DBIO[Seq[Entity]] = {
-      that.entities.findById( id ).result
-    }
-
-    def findEntitiesGeneratedBy( activityId: String ): DBIO[Seq[Entity]] = {
-      ( for {
-        edges <- that.generations.findByActivity( activityId ).extract
-        entity <- edges.entity
-      } yield entity ).result
-    }
-
-    def findGenerationEdgesByActivity( activityId: String ): DBIO[Seq[GenerationEdge]] = {
-      that.generations.findByActivity( activityId ).result
-    }
-
-    def findGenerationEdgesByEntity( entityId: String ): DBIO[Seq[GenerationEdge]] = {
-      that.generations.findByEntity( entityId ).result
-    }
-  }
-
-  object highLevel {
-    def activities: Future[Seq[Activity]] = {
-      db.run( lowLevel.allActivities )
-    }
-
-    def activities( ids: Seq[String] ): Future[Seq[Activity]] = {
-      val dbio = for {
-        seq <- DBIO.sequence( for { id <- ids } yield lowLevel.findActivity( id ) )
-      } yield seq.flatten
-      db.run( dbio )
-    }
-
-    def activitiesGenerating( entityIds: Seq[String] ): Future[Seq[Activity]] = {
-      val dbio = for {
-        seq <- DBIO.sequence(
-          for { id <- entityIds } yield lowLevel.findActivitiesGenerating( id )
-        )
-      } yield seq.flatten
-      db.run( dbio )
-    }
-
-    def entities: Future[Seq[Entity]] = {
-      db.run( lowLevel.allEntities )
-    }
-
-    def entities( ids: Seq[String] ): Future[Seq[Entity]] = {
-      val dbio = for {
-        seq <- DBIO.sequence( for { id <- ids } yield lowLevel.findEntity( id ) )
-      } yield seq.flatten
-      db.run( dbio )
-    }
-
-    def entitiesGeneratedBy( activityIds: Seq[String] ): Future[Seq[Entity]] = {
-      val dbio = for {
-        seq <- DBIO.sequence(
-          for { id <- activityIds } yield lowLevel.findEntitiesGeneratedBy( id )
-        )
-      } yield seq.flatten
-      db.run( dbio )
-    }
-
-    def generationEdgesByActivities( activityIds: Seq[String] ): Future[Seq[GenerationEdge]] = {
-      val dbio = for {
-        seq <- DBIO.sequence( for { id <- activityIds } yield lowLevel.findGenerationEdgesByActivity( id ) )
-      } yield seq.flatten
-      db.run( dbio )
-    }
-
-    def generationEdgesByEntities( entityId: Seq[String] ): Future[Seq[GenerationEdge]] = {
-      val dbio = for {
-        seq <- DBIO.sequence( for { id <- entityId } yield lowLevel.findGenerationEdgesByEntity( id ) )
-      } yield seq.flatten
-      db.run( dbio )
-    }
-  }
 
   def init: Future[Done] = _init
 
