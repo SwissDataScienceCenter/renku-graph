@@ -13,15 +13,21 @@ package object graphql {
     fields[UserContext, Unit](
       Field(
         "activities",
-        ListType( ActivityType.ActivityType ),
+        ListType( ActivityRepo.ActivityType ),
         description = Some( "Returns a list of all activities" ),
         resolve = _.ctx.dal.activities.api.all
       ),
       Field(
         "entities",
-        ListType( EntityType.EntityType ),
+        ListType( EntityRepo.EntityType ),
         description = Some( "Returns a list of all entities" ),
         resolve = _.ctx.dal.entities.api.all
+      ),
+      Field(
+        "users",
+        ListType( PersonRepo.PersonType ),
+        description = Some( "Returns a list of all users" ),
+        resolve = _.ctx.dal.persons.api.all
       )
     )
   )
@@ -30,10 +36,19 @@ package object graphql {
 
   lazy val resolver: DeferredResolver[UserContext] = {
     DeferredResolver.fetchers(
-      ActivityType.activities,
-      ActivityType.activitiesFromGeneration,
-      EntityType.entities,
-      GenerationEdgeType.generationEdges
+      ActivityRepo.activities,
+      ActivityRepo.activitiesFromAssociation,
+      ActivityRepo.activitiesFromGeneration,
+      ActivityRepo.activitiesFromUsage,
+      EntityRepo.entities,
+      EntityRepo.entitiesFromAssociation,
+      EntityRepo.entitiesFromGeneration,
+      EntityRepo.entitiesFromUsage,
+      PersonRepo.persons,
+      PersonRepo.personsFromAssociation,
+      AssociationEdgeRepo.associationEdges,
+      GenerationEdgeRepo.generationEdges,
+      UsageEdgeRepo.usageEdges
     )
   }
 

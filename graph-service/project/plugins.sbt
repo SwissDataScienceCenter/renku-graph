@@ -21,3 +21,6 @@ addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.6.18")
 
 // The Scalariform plugin
 addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.8.2")
+
+// The SBT native packager plugin
+addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "x.y.z")

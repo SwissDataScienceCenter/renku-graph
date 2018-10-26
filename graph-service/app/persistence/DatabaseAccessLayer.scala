@@ -2,7 +2,7 @@ package persistence
 
 import akka.Done
 import javax.inject.{ Inject, Singleton }
-import models.{ Activity, Entity, GenerationEdge }
+import models.{ Activity, AssociationEdge, Entity, GenerationEdge, Person, Project, UsageEdge }
 import play.api.Logger
 import play.api.db.slick.{ DatabaseConfigProvider, HasDatabaseConfig }
 import slick.basic.{ BasicProfile, DatabaseConfig }
@@ -46,27 +46,38 @@ class DatabaseAccessLayer @Inject() (
   }
 
   protected def initData(): Future[Done] = {
-    val activitiesObjects = Utils
-      .loadJsonData[Activity]( "/site-data/tutorial-zhbikes/activities.json" )
-      .get
+    val activitiesObjects = Utils.loadJsonData[Activity]( "/site-data/tutorial-zhbikes/activities.json" ).get
     val addActivities = ( this.activities ++= activitiesObjects )
 
-    val entitiesObjects =
-      Utils
-        .loadJsonData[Entity]( "/site-data/tutorial-zhbikes/entities.json" )
-        .get
+    val entitiesObjects = Utils.loadJsonData[Entity]( "/site-data/tutorial-zhbikes/entities.json" ).get
     val addEntities = ( this.entities ++= entitiesObjects )
 
-    val generationsObjects = Utils
-      .loadJsonData[GenerationEdge](
-        "/site-data/tutorial-zhbikes/generations.json"
-      )
-      .get
+    val personsObjects = Utils.loadJsonData[Person]( "/site-data/tutorial-zhbikes/persons.json" ).get
+    val addPersons = ( this.persons ++= personsObjects )
+
+    val projectsObjects = Utils.loadJsonData[Project]( "/site-data/tutorial-zhbikes/projects.json" ).get
+    val addProjects = ( this.projects ++= projectsObjects )
+
+    val associationsObjects = Utils.loadJsonData[AssociationEdge]( "/site-data/tutorial-zhbikes/associations.json" ).get
+    val addAssociations = ( this.associations ++= associationsObjects )
+
+    val generationsObjects = Utils.loadJsonData[GenerationEdge]( "/site-data/tutorial-zhbikes/generations.json" ).get
     val addGenerations = ( this.generations ++= generationsObjects )
+
+    val usagesObjects = Utils.loadJsonData[UsageEdge]( "/site-data/tutorial-zhbikes/usages.json" ).get
+    val addUsages = ( this.usages ++= usagesObjects )
 
     for {
       _ <- db.run(
-        DBIO.sequence( List( addActivities, addEntities, addGenerations ) )
+        DBIO.sequence( List(
+          addActivities,
+          addEntities,
+          addPersons,
+          addProjects,
+          addAssociations,
+          addGenerations,
+          addUsages
+        ) )
       )
     } yield Done
   }

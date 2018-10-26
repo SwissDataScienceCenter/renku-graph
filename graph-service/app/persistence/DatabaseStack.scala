@@ -15,4 +15,5 @@ abstract class DatabaseStack(
   with EntityComponent
   with GenerationComponent
   with PersonComponent
+  with ProjectComponent
   with UsageComponent

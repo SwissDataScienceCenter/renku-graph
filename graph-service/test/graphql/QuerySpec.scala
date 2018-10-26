@@ -6,6 +6,7 @@ import play.api.libs.json.JsValue
 import sangria.execution._
 import sangria.macros._
 import sangria.marshalling.playJson._
+import sangria.renderer.SchemaRenderer
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 import utils.AsyncBaseSpec
@@ -21,33 +22,30 @@ class QuerySpec extends AsyncBaseSpec {
   val dal = DatabaseAccessLayer( dbConfig )
 
   "sangria" should {
-    "resolve a graphql query" in {
-      //      val query = gql"""
-      //        query Entities {
-      //          entities {
-      //            path
-      //            commit_sha1
-      //            generationEdges {
-      //              activity {
-      //                label
-      //              }
-      //            }
-      //          }
-      //        }
-      //      """
+    "render the query schema" in {
+      val rendered = SchemaRenderer.renderSchema( graphql.schema )
+      logger.info( s"GraphQL schema:\n$rendered" )
+      true shouldBe true
+    }
 
+    "resolve a graphql query" in {
       val query = gql"""
         query Entities {
           entities {
             path
             commit_sha1
-            qualifiedGeneration {
-              activityId
-              activity {
-                label
+            wasGeneratedBy {
+              id
+              label
+              used {
+                path
+                commit_sha1
+              }
+              qualifiedAssociationPlan {
+                path
               }
             }
-            wasGeneratedBy {
+            invUsed {
               label
             }
           }

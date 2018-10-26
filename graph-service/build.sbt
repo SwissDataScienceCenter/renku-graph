@@ -23,7 +23,10 @@ name := "renku-graph-service"
 
 enablePlugins(
   PlayScala,
+  LinuxPlugin
 )
+
+resolvers += Resolver.sonatypeRepo("snapshots")
 
 // Play framework added dependencies
 libraryDependencies += filters
@@ -47,6 +50,8 @@ libraryDependencies += "com.typesafe.play" %% "play-slick" % "3.0.0"
 libraryDependencies += "com.h2database" % "h2" % "1.4.197"
 libraryDependencies += "org.postgresql" % "postgresql" % "42.2.2"
 
+// renku-commons
+libraryDependencies += "ch.datascience" %% "renku-commons" % "0.2.0-SNAPSHOT"
 
 // ScalaTest + Play
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test

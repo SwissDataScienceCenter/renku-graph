@@ -44,6 +44,8 @@ trait AssociationComponent {
       index( "IDX_ASSOCIATION_ACTIVITY", activityId, unique = false )
     def idxAgent: Index =
       index( "IDX_ASSOCIATION_AGENT", agentId, unique = false )
+    def idxPlan: Index =
+      index( "IDX_ASSOCIATION_PLAN", planId, unique = false )
 
     // *
     def * : ProvenShape[AssociationEdge] =
@@ -67,6 +69,14 @@ trait AssociationComponent {
       } yield ( edge, activity, plan )
     }
 
+    val findByPlan = Compiled { planId: Rep[String] =>
+      for {
+        edge <- this.findBy( _.planId ).extract.apply( planId )
+        activity <- edge.activity
+        agent <- edge.agent
+      } yield ( edge, activity, agent )
+    }
+
     object lowLevelApi {
       def findByActivity( activityId: String ): DBIO[Seq[( AssociationEdge, Person, Entity )]] = {
         associations.findByActivity( activityId ).result
@@ -74,6 +84,10 @@ trait AssociationComponent {
 
       def findByAgent( agentId: String ): DBIO[Seq[( AssociationEdge, Activity, Entity )]] = {
         associations.findByAgent( agentId ).result
+      }
+
+      def findByPlan( planId: String ): DBIO[Seq[( AssociationEdge, Activity, Person )]] = {
+        associations.findByPlan( planId ).result
       }
     }
 
@@ -88,6 +102,13 @@ trait AssociationComponent {
       def findByAgent( agentIds: Seq[String] ): Future[Seq[( AssociationEdge, Activity, Entity )]] = {
         val dbio = for {
           seq <- DBIO.sequence( for { agentId <- agentIds } yield lowLevelApi.findByAgent( agentId ) )
+        } yield seq.flatten
+        db.run( dbio )
+      }
+
+      def findByPlan( planIds: Seq[String] ): Future[Seq[( AssociationEdge, Activity, Person )]] = {
+        val dbio = for {
+          seq <- DBIO.sequence( for { planId <- planIds } yield lowLevelApi.findByPlan( planId ) )
         } yield seq.flatten
         db.run( dbio )
       }
