@@ -1,0 +1,1 @@
+libraryDependencies +=  "org.postgresql" % "postgresql" % "9.3-1102-jdbc41"
