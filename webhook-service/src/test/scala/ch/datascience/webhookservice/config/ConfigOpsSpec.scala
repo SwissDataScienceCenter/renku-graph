@@ -1,8 +1,8 @@
 package ch.datascience.webhookservice.config
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
-import org.scalatest.WordSpec
 import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
 import scala.collection.JavaConverters._
 
