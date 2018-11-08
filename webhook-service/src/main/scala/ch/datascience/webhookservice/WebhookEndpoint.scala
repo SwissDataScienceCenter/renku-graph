@@ -14,7 +14,6 @@ class WebhookEndpoint(logger: LoggingAdapter) extends Directives {
     path("webhook-event") {
       (post & entity(as[PushEvent])) {
         pushEvent =>
-          println(pushEvent)
           complete(HttpResponse(status = Accepted))
       }
     }
@@ -34,8 +33,7 @@ object WebhookEndpoint {
       case Seq(JsString(before), JsString(after), JsNumber(projectId)) =>
         PushEvent(CommitBefore(before), CommitAfter(after), ProjectId(projectId.toLong))
       case _                                                           =>
-        throw DeserializationException("Color expected")
+        throw DeserializationException(s"Could not deserialize push event from ${json.prettyPrint}")
     }
   }
-
 }
