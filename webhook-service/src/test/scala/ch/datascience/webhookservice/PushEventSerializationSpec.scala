@@ -10,10 +10,11 @@ class PushEventSerializationSpec extends WordSpec {
 
   "JSON deserializer for PushEvent" should {
 
-    "be able to translate a valid JSON to an object" in {
+    "be able to translate a valid JSON to a PushEvent object" in {
       pushEventJson.parseJson.convertTo[PushEvent] shouldBe PushEvent(
         CommitBefore("95790bf891e76fee5e1747ab589903a6a1f80f22"),
-        CommitAfter("da1560886d4f094c3e6c9ef40349f7d38b5d27d7")
+        CommitAfter("da1560886d4f094c3e6c9ef40349f7d38b5d27d7"),
+        ProjectId(15)
       )
     }
   }

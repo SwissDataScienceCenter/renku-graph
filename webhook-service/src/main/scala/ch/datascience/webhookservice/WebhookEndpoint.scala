@@ -4,7 +4,7 @@ import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.Accepted
 import akka.http.scaladsl.server.{Directives, Route}
-import spray.json.{JsString, JsValue, RootJsonFormat}
+import spray.json.{DeserializationException, JsNumber, JsString, JsValue, RootJsonReader}
 
 class WebhookEndpoint(logger: LoggingAdapter) extends Directives {
 
@@ -29,32 +29,13 @@ object WebhookEndpoint {
 
   private[webhookservice] object JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
-    private implicit val commitBeforeFormat: RootJsonFormat[CommitBefore] = new RootJsonFormat[CommitBefore] {
-
-      import spray.json.deserializationError
-
-      override def write(commitBefore: CommitBefore): JsValue =
-        JsString(commitBefore.value)
-
-      override def read(json: JsValue): CommitBefore = json match {
-        case JsString(value) => CommitBefore(value)
-        case other           => deserializationError(s"$other is not valid value for CommitBefore")
-      }
+    implicit val pushEventFormat: RootJsonReader[PushEvent] = (json: JsValue) => json.asJsObject
+      .getFields("before", "after", "project_id") match {
+      case Seq(JsString(before), JsString(after), JsNumber(projectId)) =>
+        PushEvent(CommitBefore(before), CommitAfter(after), ProjectId(projectId.toLong))
+      case _                                                           =>
+        throw DeserializationException("Color expected")
     }
-
-    private implicit val commitAfterFormat: RootJsonFormat[CommitAfter] = new RootJsonFormat[CommitAfter] {
-
-      import spray.json.deserializationError
-
-      override def write(commitAfter: CommitAfter): JsValue =
-        JsString(commitAfter.value)
-
-      override def read(json: JsValue): CommitAfter = json match {
-        case JsString(value) => CommitAfter(value)
-        case other           => deserializationError(s"$other is not valid value for CommitAfter")
-      }
-    }
-
-    implicit val pushEventFormat: RootJsonFormat[PushEvent] = jsonFormat2(PushEvent.apply)
   }
+
 }
