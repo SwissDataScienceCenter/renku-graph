@@ -30,7 +30,7 @@ object WebhookEndpoint {
 
     implicit val pushEventFormat: RootJsonReader[PushEvent] = (json: JsValue) => json.asJsObject
       .getFields("before", "after", "project_id") match {
-      case Seq(JsString(before), JsString(after), JsNumber(projectId)) =>
+      case JsString(before) +: JsString(after) +: JsNumber(projectId) +: Nil =>
         PushEvent(CommitBefore(before), CommitAfter(after), ProjectId(projectId.toLong))
       case _                                                           =>
         throw DeserializationException(s"Could not deserialize push event from ${json.prettyPrint}")
