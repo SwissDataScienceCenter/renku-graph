@@ -3,7 +3,7 @@ This module reads the events table from the gitlab instance and publishes the pu
  */
 package GitlabMiner
 
-import GitlabMiner.helperFunctions.{Event, GitSingleCommit, SingleCommit}
+import GitlabMiner.helperFunctions.{Event, GitSingleCommit}
 import java.sql.{DriverManager, ResultSet}
 import spray.json.DefaultJsonProtocol._
 import spray.json.RootJsonFormat
