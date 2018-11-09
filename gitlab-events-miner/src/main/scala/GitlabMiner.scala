@@ -48,28 +48,48 @@ object Main extends App {
       allevents += t
 
     }
+    allevents.map(x => getCommit(x.project_id, getBytes(x.commit_to),
+      getBytes(x.commit_from), x.commit_count, 1, List.empty)
+    )
+  }
+
+  def getBytes(commit_hash: Option[Array[Byte]]): String = commit_hash match {
+    case Some(x) => x.map("%02x".format(_)).mkString
+    case None => ""
   }
 
   def getAllCommits(project_id: Int, commit_to : String, commit_from: String, commit_count: Int, singlecommit: GitSingleCommit, count: Int, list: List[GitSingleCommit]): List[GitSingleCommit] = {
     println(commit_count)
 
     if (commit_count == 1 ||  commit_count == count ||
-      (singlecommit.parent_ids.length == 1 && (commit_from == singlecommit.parent_ids.head)))  {
+      (singlecommit.parent_ids.length == 1) && (commit_from == singlecommit.parent_ids.head))
+    {
       list:+singlecommit
     }
-
     else {
-      getCommit(project_id, singlecommit.parent_ids.head, commit_from, commit_count, count+1, list:+singlecommit)
+      if (singlecommit.parent_ids.length == 1){
+        getCommit(project_id, singlecommit.parent_ids.head, commit_from, commit_count, count+1, list:+singlecommit)
+      }
+      else {
+        getCommit(project_id, singlecommit.parent_ids.head, commit_from, commit_count, count+1, list:+singlecommit)
+        getCommit(project_id, singlecommit.parent_ids(2), commit_from, commit_count, count+1, list:+singlecommit)
+      }
     }
   }
 
-  def getCommit(project_id: Int, commit_to : String, commit_from: String, commit_count: Int, count: Int, list: List[GitSingleCommit]): List[GitSingleCommit] = {
-    // print(commit_to)
+  def getCommit(project_id: Int, commit_to: String, commit_from: String, commit_count: Int, count: Int, list: List[GitSingleCommit]): List[GitSingleCommit] = {
     val response: HttpResponse[String] =
       Http("https://testing.datascience.ch/api/v4/projects/"+ project_id + "/repository/commits/" +
         commit_to).asString
-    val firstCommit = ((response.body).parseJson).convertTo[GitSingleCommit]
-    return getAllCommits(project_id, commit_to : String, commit_from: String, commit_count: Int, firstCommit, count, list: List[GitSingleCommit])
+    if (response.code==200) {
+      val firstCommit = (response.body).parseJson.convertTo[GitSingleCommit]
+
+      getAllCommits(project_id, commit_to, commit_from, commit_count, firstCommit, count, list)
+    }
+    else{
+      println("Response code ", response.code, "Project with", project_id, " not found")
+      List.empty
+    }
 
   }
 
