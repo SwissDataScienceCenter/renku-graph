@@ -32,25 +32,10 @@ object Main extends App {
     val result = prep.executeQuery
     while ( result.next() ) {
       val t = (Event.apply _).tupled(helperFunctions.getresult(result) )
-      // get the amount of commits: start from commit_to until commit_from loop over parents
-      // count how we many commits we go back, in case of merge req
-
-      //GET /projects/:id/repository/commits/:sha
-      val response: HttpResponse[String] = Http("https://testing.datascience.ch/api/v4/projects/22/repository/commits/b8bc9bf560921c6dc027529393c57134b5619b44").asString
-      val commit_count = t.commit_count
-
-      //if commit_count = 1 get
-    /*  val response: HttpResponse[Map[String,String]] = Http("https://testing.datascience.ch/api/v4/projects/22/repository/commits/b8bc9bf560921c6dc027529393c57134b5619b44").execute(parser = {inputStream =>
-        Json.parse[Map[String,String]](inputStream)
-      })*/
-
-      print((response.body).parseJson)
       allevents += t
+      }
+    allevents.map(x => getCommit(x.project_id, getBytes(x.commit_to),getBytes(x.commit_from), x.commit_count, 1, List.empty))
 
-    }
-    allevents.map(x => getCommit(x.project_id, getBytes(x.commit_to),
-      getBytes(x.commit_from), x.commit_count, 1, List.empty)
-    )
   }
 
   def getBytes(commit_hash: Option[Array[Byte]]): String = commit_hash match {
@@ -58,42 +43,38 @@ object Main extends App {
     case None => ""
   }
 
-  def getAllCommits(project_id: Int, commit_to : String, commit_from: String, commit_count: Int, singlecommit: GitSingleCommit, count: Int, list: List[GitSingleCommit]): List[GitSingleCommit] = {
-    println(commit_count)
-
-    if (commit_count == 1 ||  commit_count == count ||
-      (singlecommit.parent_ids.length == 1) && (commit_from == singlecommit.parent_ids.head))
-    {
-      list:+singlecommit
-    }
-    else {
-      if (singlecommit.parent_ids.length == 1){
-        getCommit(project_id, singlecommit.parent_ids.head, commit_from, commit_count, count+1, list:+singlecommit)
-      }
-      else {
-        getCommit(project_id, singlecommit.parent_ids.head, commit_from, commit_count, count+1, list:+singlecommit)
-        getCommit(project_id, singlecommit.parent_ids(2), commit_from, commit_count, count+1, list:+singlecommit)
-      }
-    }
-  }
-
   def getCommit(project_id: Int, commit_to: String, commit_from: String, commit_count: Int, count: Int, list: List[GitSingleCommit]): List[GitSingleCommit] = {
     val response: HttpResponse[String] =
       Http("https://testing.datascience.ch/api/v4/projects/"+ project_id + "/repository/commits/" +
         commit_to).asString
-    if (response.code==200) {
-      val firstCommit = (response.body).parseJson.convertTo[GitSingleCommit]
 
-      getAllCommits(project_id, commit_to, commit_from, commit_count, firstCommit, count, list)
+    if (response.code==200) {
+      val firstCommit = ((response.body).parseJson).convertTo[GitSingleCommit]
+
+      if (commit_count == 1 ||  commit_count == count ||
+        (firstCommit.parent_ids.length == 1 && commit_from == firstCommit.parent_ids.head)
+      )
+      {
+        list:+firstCommit
+      } else {
+        firstCommit.parent_ids.length match {
+          case 1 => getCommit(project_id, firstCommit.parent_ids.head, commit_from, commit_count, count+1, list:+firstCommit)
+          case 2 => {
+            getCommit(project_id, firstCommit.parent_ids.head, commit_from, commit_count, count+1, list:+firstCommit)
+            //      getCommit(project_id, firstCommit.parent_ids(2), commit_from, commit_count, count+1, list:+firstCommit)
+          }
+        }
+
+      }
     }
     else{
-      println("Response code ", response.code, "Project with", project_id, " not found")
-      List.empty
+      println("Response code ", response.code)
+      list
     }
-
   }
 
-  implicit val gitsingleCommitFormat: RootJsonFormat[GitSingleCommit] = jsonFormat12(GitSingleCommit.apply)
+
+    implicit val gitsingleCommitFormat: RootJsonFormat[GitSingleCommit] = jsonFormat12(GitSingleCommit.apply)
 
   conn.close()
 
