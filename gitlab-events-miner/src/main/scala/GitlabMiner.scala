@@ -22,18 +22,18 @@ object Main extends App {
 
   // Continuous poll
   val allevents = new ListBuffer[Event]()
+  val allcommits = new ListBuffer[GitSingleCommit]()
+  while (1==1) {
 
-  for (i <- 1 to 3) {
-    //while (1==1) {
-    val id =  if (allevents.isEmpty){150} else { allevents.last.id }
+    val id = if (allevents.isEmpty){0} else { allevents.last.id }
     val prep = conn.prepareStatement(s"select * from events as e, push_event_payloads as p where p.event_id = e.id and e.id >$id;")
     val result = prep.executeQuery
     while ( result.next() ) {
-      val t = (Event.apply _).tupled(helperFunctions.getresult(result) )
-      allevents += t
+      val event = (Event.apply _).tupled(helperFunctions.getresult(result) )
+      allevents += event
+      val commit =  getCommit(event.project_id, getBytes(event.commit_to), getBytes(event.commit_from), event.commit_count, 1, List.empty)
+      println(commit)
       }
-    allevents.map(x => getCommit(x.project_id, getBytes(x.commit_to), getBytes(x.commit_from), x.commit_count, 1, List.empty))
-
   }
 
   def getBytes(commit_hash: Option[Array[Byte]]): String = commit_hash match {
