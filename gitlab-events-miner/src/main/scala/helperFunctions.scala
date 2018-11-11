@@ -1,7 +1,8 @@
 package GitlabMiner
 
 import java.sql.ResultSet
-
+import spray.json.DefaultJsonProtocol._
+import spray.json.RootJsonFormat
 object helperFunctions {
 
   // Probably ok to just have the columns, if they change other stuff will break too
@@ -23,7 +24,9 @@ object helperFunctions {
                    created_at: java.sql.Timestamp, updated_at: java.sql.Timestamp, actionE: Int, target_type: String,
                    commit_count: Int, event_id: Int, actionP: Int, ref_type: Int, commit_from: Option[Array[Byte]],
                    commit_to : Option[Array[Byte]], ref: String, commit_title: String)
+
   object Event extends Function16[Int, Int, Int, Int, java.sql.Timestamp, java.sql.Timestamp, Int, String, Int, Int, Int, Int, Option[Array[Byte]], Option[Array[Byte]], String, String, Event]
+
   case class GitSingleCommit(id: String, short_id: String, title: String, author_name: String,
                              author_email: String, committer_name: String, committer_email: String,
                              created_at: String, message: String, committed_date: String,
@@ -31,6 +34,6 @@ object helperFunctions {
                             )
 
 
-
+  implicit val GitSingleCommitFormat: RootJsonFormat[GitSingleCommit] = jsonFormat12(GitSingleCommit.apply)
 
 }
