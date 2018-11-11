@@ -4,9 +4,7 @@ This module reads the events table from the gitlab instance and publishes the pu
 package GitlabMiner
 
 import GitlabMiner.helperFunctions.{Event, GitSingleCommit}
-import java.sql.{DriverManager, ResultSet}
-import spray.json.DefaultJsonProtocol._
-import spray.json.RootJsonFormat
+import java.sql.{DriverManager}
 import scala.collection.mutable.ListBuffer
 import com.typesafe.config.{Config, ConfigFactory}
 import scalaj.http._
@@ -34,7 +32,7 @@ object Main extends App {
       val t = (Event.apply _).tupled(helperFunctions.getresult(result) )
       allevents += t
       }
-    allevents.map(x => getCommit(x.project_id, getBytes(x.commit_to),getBytes(x.commit_from), x.commit_count, 1, List.empty))
+    allevents.map(x => getCommit(x.project_id, getBytes(x.commit_to), getBytes(x.commit_from), x.commit_count, 1, List.empty))
 
   }
 
@@ -43,7 +41,7 @@ object Main extends App {
     case None => ""
   }
 
-  def getCommit(project_id: Int, commit_to: String, commit_from: String, commit_count: Int, count: Int, list: List[GitSingleCommit]): List[GitSingleCommit] = {
+  def getCommit(project_id: Int, commit_to: String, commit_from: String, commit_count: Int, count: Int, list: List[GitSingleCommit]):  List[GitSingleCommit] = {
     val response: HttpResponse[String] =
       Http("https://testing.datascience.ch/api/v4/projects/"+ project_id + "/repository/commits/" +
         commit_to).asString
@@ -52,29 +50,24 @@ object Main extends App {
       val firstCommit = ((response.body).parseJson).convertTo[GitSingleCommit]
 
       if (commit_count == 1 ||  commit_count == count ||
-        (firstCommit.parent_ids.length == 1 && commit_from == firstCommit.parent_ids.head)
-      )
-      {
-        list:+firstCommit
-      } else {
+        (firstCommit.parent_ids.length == 1 && commit_from == firstCommit.parent_ids.head)) {
+              list:+firstCommit
+      }
+      else {
         firstCommit.parent_ids.length match {
           case 1 => getCommit(project_id, firstCommit.parent_ids.head, commit_from, commit_count, count+1, list:+firstCommit)
           case 2 => {
             getCommit(project_id, firstCommit.parent_ids.head, commit_from, commit_count, count+1, list:+firstCommit)
-            //      getCommit(project_id, firstCommit.parent_ids(2), commit_from, commit_count, count+1, list:+firstCommit)
+            getCommit(project_id, firstCommit.parent_ids(1), commit_from, commit_count, count+1, list:+firstCommit)
           }
         }
 
       }
-    }
-    else{
-      println("Response code ", response.code)
+    } else{
+      println("Response code", response.code)
       list
-    }
+          }
   }
-
-
-    implicit val gitsingleCommitFormat: RootJsonFormat[GitSingleCommit] = jsonFormat12(GitSingleCommit.apply)
 
   conn.close()
 
