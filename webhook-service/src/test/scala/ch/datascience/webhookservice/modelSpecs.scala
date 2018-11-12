@@ -1,14 +1,14 @@
 package ch.datascience.webhookservice
 
-import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.StringValue
 import ch.datascience.tinytypes.constraints.NonBlank
-import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
 
 class FilePathSpec extends WordSpec with PropertyChecks {
+
+  import ch.datascience.generators.Generators._
 
   "FilePath" should {
 
@@ -20,7 +20,7 @@ class FilePathSpec extends WordSpec with PropertyChecks {
     }
 
     "be instantiable when value is a relative path" in {
-      forAll(paths) { path =>
+      forAll(relativePaths) { path =>
         FilePath(path).toString shouldBe path
       }
     }
@@ -31,11 +31,6 @@ class FilePathSpec extends WordSpec with PropertyChecks {
       }.getMessage shouldBe "'/abc' is not a valid FilePath"
     }
   }
-
-  private val paths: Gen[String] = for {
-    partsNumber <- Gen.choose(1, 10)
-    parts <- Gen.listOfN(partsNumber, nonEmptyStrings())
-  } yield parts.mkString("/")
 }
 
 class GitRefSpec extends WordSpec with PropertyChecks {

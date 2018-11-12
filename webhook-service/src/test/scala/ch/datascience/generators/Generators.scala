@@ -16,6 +16,11 @@ object Generators {
     } yield chars.mkString("")
   }
 
+  val relativePaths: Gen[String] = for {
+    partsNumber <- Gen.choose(1, 10)
+    parts <- Gen.listOfN(partsNumber, nonEmptyStrings())
+  } yield parts.mkString("/")
+
   object Implicits {
 
     implicit class GenOps[T](generator: Gen[T]) {
