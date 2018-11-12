@@ -20,9 +20,8 @@ class WebhookEndpointSpec extends WordSpec with ScalatestRouteTest with MockFact
       val payload = HttpEntity(
         contentType = `application/json`,
         JsObject(
-          "before" -> JsString("95790bf891e76fee5e1747ab589903a6a1f80f22"),
-          "after" -> JsString("da1560886d4f094c3e6c9ef40349f7d38b5d27d7"),
-          "project_id" -> JsNumber(1)
+          "checkout_sha" -> JsString("95790bf891e76fee5e1747ab589903a6a1f80f22"),
+          "repository" -> JsObject("git_http_url" -> JsString("http://example.com/mike/repo.git"))
         ).prettyPrint
       )
 

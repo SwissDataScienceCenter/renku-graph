@@ -1,13 +1,11 @@
 package ch.datascience.webhookservice
 
-import ch.datascience.tinytypes.TinyType
+import ch.datascience.tinytypes.StringValue
+import ch.datascience.tinytypes.constraints.NonBlank
 
-case class PushEvent(before: CommitBefore,
-                     after: CommitAfter,
-                     projectId: ProjectId)
+case class PushEvent(checkoutSha: CheckoutSha,
+                     repositoryGitUrl: RepositoryGitUrl)
 
-case class CommitBefore(value: String) extends GitSha
+case class CheckoutSha(value: String) extends GitSha
 
-case class CommitAfter(value: String) extends GitSha
-
-case class ProjectId(value: Long) extends TinyType[Long]
+case class RepositoryGitUrl(value: String) extends StringValue with NonBlank
