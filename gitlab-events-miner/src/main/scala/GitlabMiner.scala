@@ -56,7 +56,7 @@ object Main extends App {
         firstCommit.parent_ids.length match {
           case 1 => getCommit(project_id, firstCommit.parent_ids.head, commit_from, commit_count, count+1, list:+firstCommit)
           case 2 => {
-            getCommit(project_id, firstCommit.parent_ids.head, commit_from, commit_count, count+1, list:+firstCommit)
+            getCommit(project_id, firstCommit.parent_ids.head, commit_from, commit_count, count+1, list:+firstCommit) :::
             getCommit(project_id, firstCommit.parent_ids(1), commit_from, commit_count, count+1, list:+firstCommit)
           }
         }
