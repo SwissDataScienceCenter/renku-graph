@@ -4,7 +4,7 @@ Reads events from the gitlab events database (currently on testing.datascience) 
 
 Open issues:
  - commit_count = 0 (deleted branches) is ignored
- - merge request: not all commits are properly returned
+ - merge request: returns additional commits
 
 To run: 
 sbt run
