@@ -22,7 +22,6 @@ object Main extends App {
 
   // Continuous poll
   val allevents = new ListBuffer[Event]()
-  val allcommits = new ListBuffer[GitSingleCommit]()
   while (1==1) {
 
     val id = if (allevents.isEmpty){0} else { allevents.last.id }
@@ -45,9 +44,9 @@ object Main extends App {
     val response: HttpResponse[String] =
       Http("https://testing.datascience.ch/api/v4/projects/"+ project_id + "/repository/commits/" +
         commit_to).asString
-
-    if (response.code==200) {
-      val firstCommit = ((response.body).parseJson).convertTo[GitSingleCommit]
+    //TODO how to handle deleted branches?
+    if (response.code==200  && commit_count>0 ) {
+      val firstCommit = (response.body).parseJson.convertTo[GitSingleCommit]
 
       if (commit_count == 1 ||  commit_count == count ||
         (firstCommit.parent_ids.length == 1 && commit_from == firstCommit.parent_ids.head)) {
@@ -72,4 +71,3 @@ object Main extends App {
   conn.close()
 
 }
-
