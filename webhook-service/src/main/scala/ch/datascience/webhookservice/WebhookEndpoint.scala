@@ -2,19 +2,36 @@ package ch.datascience.webhookservice
 
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.model.StatusCodes.Accepted
+import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.{Directives, Route}
+import akka.stream.QueueOfferResult
 import spray.json.{JsString, JsValue, JsonReader, RootJsonReader, deserializationError}
 
-class WebhookEndpoint(logger: LoggingAdapter) extends Directives {
+import scala.concurrent.ExecutionContext
+
+class WebhookEndpoint(logger: LoggingAdapter,
+                      pushEventFlow: PushEventFlow)
+                     (implicit executionContext: ExecutionContext) extends Directives {
 
   import ch.datascience.webhookservice.WebhookEndpoint.JsonSupport._
 
   val routes: Route =
     path("webhook-event") {
-      (post & entity(as[PushEvent])) {
-        pushEvent =>
-          complete(HttpResponse(status = Accepted))
+      (post & entity(as[PushEvent])) { pushEvent =>
+        extractExecutionContext { implicit executionContext =>
+          complete {
+            pushEventFlow
+              .offer(pushEvent)
+              .map {
+                case QueueOfferResult.Enqueued ⇒
+                  logger.info(s"'$pushEvent' enqueued")
+                  HttpResponse(status = Accepted)
+                case other                     ⇒
+                  logger.error(s"'$pushEvent' enqueueing problem: $other")
+                  HttpResponse(status = InternalServerError)
+              }
+          }
+        }
       }
     }
 }
@@ -24,7 +41,9 @@ object WebhookEndpoint {
   import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
   import spray.json.DefaultJsonProtocol
 
-  def apply(logger: LoggingAdapter): WebhookEndpoint = new WebhookEndpoint(logger)
+  def apply(logger: LoggingAdapter,
+            pushEventFlow: PushEventFlow)
+           (implicit executionContext: ExecutionContext): WebhookEndpoint = new WebhookEndpoint(logger, pushEventFlow)
 
   private[webhookservice] object JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
