@@ -13,10 +13,12 @@ libraryDependencies ++= {
   val akkaVersion = "2.5.12"
 
   Seq(
+    "com.lihaoyi"       %% "ammonite-ops"         % "1.4.2",
     "com.typesafe.akka" %% "akka-http"            % akkaHttpVersion,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
     "com.typesafe.akka" %% "akka-slf4j"           % akkaVersion,
     "com.typesafe.akka" %% "akka-stream"          % akkaVersion,
+    "org.typelevel"     %% "cats-core"            % "1.4.0",
 
     "com.typesafe.akka" %% "akka-http-testkit"    % akkaHttpVersion % Test,
     "org.scalacheck"    %% "scalacheck"           % "1.14.0"        % Test,

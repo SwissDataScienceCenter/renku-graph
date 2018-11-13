@@ -13,7 +13,7 @@ class PushEventSerializationSpec extends WordSpec {
     "be able to translate a valid JSON to a PushEvent object" in {
       pushEventJson.parseJson.convertTo[PushEvent] shouldBe PushEvent(
         CheckoutSha("da1560886d4f094c3e6c9ef40349f7d38b5d27d7"),
-        RepositoryGitUrl("http://example.com/mike/diaspora.git")
+        GitRepositoryUrl("http://example.com/mike/diaspora.git")
       )
     }
   }

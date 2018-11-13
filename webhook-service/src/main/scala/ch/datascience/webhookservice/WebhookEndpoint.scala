@@ -28,8 +28,8 @@ object WebhookEndpoint {
 
   private[webhookservice] object JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
-    private implicit val projectGitUrlReads: JsonReader[RepositoryGitUrl] = {
-      case JsString(value) => RepositoryGitUrl(value)
+    private implicit val projectGitUrlReads: JsonReader[GitRepositoryUrl] = {
+      case JsString(value) => GitRepositoryUrl(value)
       case other           => deserializationError(s"'$other' is not a valid ProjectGitUrl")
     }
     private implicit val checkoutShaReads: JsonReader[CheckoutSha] = {
@@ -40,7 +40,7 @@ object WebhookEndpoint {
     implicit val pushEventFormat: RootJsonReader[PushEvent] = (json: JsValue) =>
       PushEvent(
         (json / "checkout_sha").as[CheckoutSha],
-        (json / "repository" / "git_http_url").as[RepositoryGitUrl]
+        (json / "repository" / "git_http_url").as[GitRepositoryUrl]
       )
 
     private implicit class JsValueOps(jsValue: JsValue) {
