@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.ContentTypes.`application/json`
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.RejectionHandler
 import akka.stream.ActorMaterializer
-import ch.datascience.webhookservice.config.BufferSize
+import ch.datascience.webhookservice.config.{BufferSize, TriplesFinderThreads}
 import ch.datascience.webhookservice.config.ConfigOps.Implicits._
 import ch.datascience.webhookservice.triplets.TripletsFinder
 import com.typesafe.config.ConfigFactory
@@ -24,7 +24,7 @@ object Microservice extends App {
   private val logger = Logging(system, getClass)
   private val pushEventFlow = new PushEventFlow(
     TripletsFinder(),
-    bufferSize = config.get[BufferSize]("queue.buffer-size")
+    QueueConfig(config.get[BufferSize]("queue.buffer-size"), config.get[TriplesFinderThreads]("queue.triples-finder-threads"))
   )
   private val webhookEndpoint = WebhookEndpoint(logger, pushEventFlow)
 

@@ -11,3 +11,12 @@ object BufferSize {
     override def apply(config: Config): String => BufferSize = key => BufferSize(config.getInt(key))
   }
 }
+
+case class TriplesFinderThreads(value: Int) extends TinyType[Int]
+
+object TriplesFinderThreads {
+
+  implicit object TriplesFinderThreadsFinder extends (Config => String => TriplesFinderThreads) {
+    override def apply(config: Config): String => TriplesFinderThreads = key => TriplesFinderThreads(config.getInt(key))
+  }
+}
