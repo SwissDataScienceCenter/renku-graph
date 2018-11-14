@@ -7,8 +7,6 @@ case class FilePath(value: String) extends StringValue with NonBlank {
   verify(!value.startsWith("/"), s"'$value' is not a valid $typeName")
 }
 
-case class GitRef(value: String) extends GitSha
-
 trait GitSha extends StringValue with NonBlank {
 
   import GitSha.validationRegex

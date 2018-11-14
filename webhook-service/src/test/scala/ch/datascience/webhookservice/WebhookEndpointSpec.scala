@@ -6,8 +6,8 @@ import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
+import akka.stream.QueueOfferResult
 import akka.stream.QueueOfferResult.Enqueued
-import akka.stream.{ActorMaterializer, Materializer, QueueOfferResult}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators
 import org.scalamock.scalatest.MockFactory
@@ -84,8 +84,6 @@ class WebhookEndpointSpec extends WordSpec with ScalatestRouteTest with MockFact
 
 
   private trait TestCase {
-    private implicit val materializer: Materializer = ActorMaterializer()
-
     val checkoutSha: CheckoutSha = ServiceTypesGenerators.checkoutShas.generateOne
     val repositoryUrl = GitRepositoryUrl("http://example.com/mike/repo.git")
 

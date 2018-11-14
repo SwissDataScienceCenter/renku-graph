@@ -1,7 +1,7 @@
 package ch.datascience.webhookservice.generators
 
 import ch.datascience.generators.Generators._
-import ch.datascience.webhookservice.{CheckoutSha, FilePath, GitRef}
+import ch.datascience.webhookservice.{CheckoutSha, FilePath, GitRepositoryUrl, PushEvent}
 import org.scalacheck.Gen
 
 object ServiceTypesGenerators {
@@ -12,7 +12,6 @@ object ServiceTypesGenerators {
   } yield chars.mkString("")
 
   implicit val filePaths: Gen[FilePath] = relativePaths map FilePath
-  implicit val gitRefs: Gen[GitRef] = shas map GitRef
   implicit val checkoutShas: Gen[CheckoutSha] = shas map CheckoutSha
   implicit val rawTriplets: Gen[String] = {
     val tripletPartsGen = for {
@@ -30,4 +29,15 @@ object ServiceTypesGenerators {
         }.mkString("")
     }
   }
+
+  implicit val gitRepositoryUrls: Gen[GitRepositoryUrl] =
+    nonEmptyStrings()
+      .map { repoName =>
+        GitRepositoryUrl(s"http://host/$repoName.git")
+      }
+
+  implicit val pushEvents: Gen[PushEvent] = for {
+    sha <- checkoutShas
+    repositoryUrl <- gitRepositoryUrls
+  } yield PushEvent(sha, repositoryUrl)
 }

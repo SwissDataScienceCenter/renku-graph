@@ -33,18 +33,6 @@ class FilePathSpec extends WordSpec with PropertyChecks {
   }
 }
 
-class GitRefSpec extends WordSpec with PropertyChecks {
-
-  import ch.datascience.generators.Generators.Implicits._
-  import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-
-  "GitRef" should {
-    "be a GitSha" in {
-      GitRef(shas.generateOne) shouldBe a[GitSha]
-    }
-  }
-}
-
 class GitShaSpec extends WordSpec with PropertyChecks {
 
   import ch.datascience.generators.Generators.Implicits._

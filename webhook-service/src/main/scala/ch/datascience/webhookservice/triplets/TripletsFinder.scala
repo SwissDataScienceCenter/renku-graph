@@ -9,10 +9,10 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.util.Try
 
-class TripletsFinder private[triplets](file: Commands.File,
-                                       git: Commands.Git,
-                                       renku: Commands.Renku,
-                                       randomLong: () => Long) {
+class TripletsFinder(file: Commands.File,
+                     git: Commands.Git,
+                     renku: Commands.Renku,
+                     randomLong: () => Long) {
 
   import TripletsFinder._
   import file._
