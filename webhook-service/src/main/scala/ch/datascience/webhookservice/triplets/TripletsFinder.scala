@@ -105,7 +105,7 @@ private object Commands {
   class Renku {
 
     def log(destinationDirectory: Path): InputStream =
-      %%('renku, 'log, "--format nt")(destinationDirectory).out.toInputStream
+      %%('renku, 'log, "--format", "nt")(destinationDirectory).out.toInputStream
 
     implicit private class StreamValueOps(streamValue: StreamValue) {
       lazy val toInputStream: InputStream =
