@@ -22,14 +22,17 @@ object Microservice extends App {
 
   private val config = ConfigFactory.load()
   private val logger = Logging(system, getClass)
-  private val pushEventFlow = new PushEventFlow(TripletsFinder(), config.get[BufferSize]("queue.buffer-size"))
+  private val pushEventFlow = new PushEventFlow(
+    TripletsFinder(),
+    bufferSize = config.get[BufferSize]("queue.buffer-size")
+  )
   private val webhookEndpoint = WebhookEndpoint(logger, pushEventFlow)
 
   private implicit val rejectionHandler: RejectionHandler =
     RejectionHandler
       .default
       .mapRejectionResponse {
-        case response @ HttpResponse(_, _, entity: HttpEntity.Strict, _) =>
+        case response@HttpResponse(_, _, entity: HttpEntity.Strict, _) =>
           val message = entity.data.utf8String.replaceAll("\"", """\"""")
           response.copy(
             entity = HttpEntity(
@@ -37,7 +40,7 @@ object Microservice extends App {
               JsObject("rejection" -> JsString(message)).prettyPrint
             )
           )
-        case response                                                    => response
+        case response                                                  => response
       }
 
   Http().bindAndHandle(

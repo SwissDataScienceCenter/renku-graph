@@ -13,6 +13,7 @@ class TripletsFinder private[triplets](file: Commands.File,
                                        git: Commands.Git,
                                        renku: Commands.Renku,
                                        randomLong: () => Long) {
+
   import TripletsFinder._
   import file._
 

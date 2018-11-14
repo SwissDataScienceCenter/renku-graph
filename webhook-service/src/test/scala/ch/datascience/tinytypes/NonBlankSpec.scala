@@ -1,10 +1,10 @@
 package ch.datascience.tinytypes
 
+import ch.datascience.generators.Generators._
+import ch.datascience.tinytypes.constraints.NonBlank
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
-import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.constraints.NonBlank
 
 class NonBlankSpec extends WordSpec with PropertyChecks {
 
