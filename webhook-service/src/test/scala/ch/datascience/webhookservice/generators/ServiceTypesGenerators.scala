@@ -12,23 +12,8 @@ object ServiceTypesGenerators {
   } yield chars.mkString("")
 
   implicit val filePaths: Gen[FilePath] = relativePaths map FilePath
-  implicit val checkoutShas: Gen[CheckoutSha] = shas map CheckoutSha
-  implicit val rawTriplets: Gen[String] = {
-    val tripletPartsGen = for {
-      sha <- shas
-      filePath <- relativePaths
-    } yield sha -> filePath
 
-    for {
-      tripletsNumber <- Gen.choose(1, 20)
-      tripletsParts <- Gen.listOfN(tripletsNumber, tripletPartsGen)
-    } yield {
-      tripletsParts
-        .map {
-          case (sha, filePath) => s"@  $sha $filePath"
-        }.mkString("")
-    }
-  }
+  implicit val checkoutShas: Gen[CheckoutSha] = shas map CheckoutSha
 
   implicit val gitRepositoryUrls: Gen[GitRepositoryUrl] =
     nonEmptyStrings()

@@ -1,9 +1,12 @@
 package ch.datascience.webhookservice.triplets
 
+import java.io.{ByteArrayInputStream, InputStream}
 import java.security.SecureRandom
 
 import ch.datascience.webhookservice.triplets.Commands.{File, Git, Renku}
 import ch.datascience.webhookservice.{CheckoutSha, GitRepositoryUrl}
+import org.w3.banana.io.{NTriples, NTriplesReader, RDFReader}
+import org.w3.banana.jena.Jena
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
@@ -12,28 +15,30 @@ import scala.util.Try
 class TripletsFinder(file: Commands.File,
                      git: Commands.Git,
                      renku: Commands.Renku,
-                     randomLong: () => Long) {
+                     randomLong: () => Long,
+                     tripletsReader: RDFReader[Jena, Try, NTriples]) {
 
   import TripletsFinder._
   import file._
 
-  def findTriplets(gitRepositoryUrl: GitRepositoryUrl,
+  def findRdfGraph(gitRepositoryUrl: GitRepositoryUrl,
                    checkoutSha: CheckoutSha)
-                  (implicit executionContext: ExecutionContext): Future[Either[Throwable, String]] = Future {
+                  (implicit executionContext: ExecutionContext): Future[Either[Throwable, Jena#Graph]] = Future {
 
     val repositoryDirectory = tempDirectoryName(repositoryDirName(gitRepositoryUrl))
 
-    val maybeTriplets = for {
-      _ <- Try(mkdir(repositoryDirectory))
+    val maybeRdfGraph = for {
+      _ <- pure(mkdir(repositoryDirectory))
       _ <- pure(git cloneRepo(gitRepositoryUrl, repositoryDirectory, workDirectory))
       _ <- pure(git checkout(checkoutSha, repositoryDirectory))
-      tripletsAsString <- pure(renku log repositoryDirectory)
-      _ <- pure(safeRemove(repositoryDirectory))
-    } yield tripletsAsString
+      tripletsStream <- pure(renku log repositoryDirectory)
+      rdfGraph <- tripletsReader.read(tripletsStream, "")
+      _ <- pure(removeSilently(repositoryDirectory))
+    } yield rdfGraph
 
-    maybeTriplets.fold(
+    maybeRdfGraph.fold(
       exception => {
-        safeRemove(repositoryDirectory)
+        removeSilently(repositoryDirectory)
         Left(exception)
       },
       tripletAsString => Right(tripletAsString)
@@ -62,7 +67,8 @@ object TripletsFinder {
     file = new File(),
     git = new Git(),
     renku = new Renku(),
-    randomLong = new SecureRandom().nextLong
+    randomLong = new SecureRandom().nextLong,
+    tripletsReader = new NTriplesReader
   )
 }
 
@@ -76,7 +82,7 @@ private object Commands {
 
     def mkdir(newDir: Path): Unit = ops.mkdir ! newDir
 
-    def safeRemove(repositoryDirectory: Path): Unit = Try {
+    def removeSilently(repositoryDirectory: Path): Unit = Try {
       ops.rm ! repositoryDirectory
     } fold(
       _ => (),
@@ -98,7 +104,12 @@ private object Commands {
 
   class Renku {
 
-    def log(destinationDirectory: Path): String =
-      %%('renku, 'log)(destinationDirectory).out.string
+    def log(destinationDirectory: Path): InputStream =
+      %%('renku, 'log, "--format nt")(destinationDirectory).out.toInputStream
+
+    implicit private class StreamValueOps(streamValue: StreamValue) {
+      lazy val toInputStream: InputStream =
+        new ByteArrayInputStream(streamValue.chunks.flatMap(_.array).toArray)
+    }
   }
 }

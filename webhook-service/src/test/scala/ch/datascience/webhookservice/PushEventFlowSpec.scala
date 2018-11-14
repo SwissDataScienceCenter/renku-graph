@@ -6,6 +6,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.config.BufferSize
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.triplets.TripletsFinder
+import org.apache.jena.graph.Graph
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -18,9 +19,9 @@ class PushEventFlowSpec extends WordSpec with MockFactory with ScalatestRouteTes
   "offer" should {
 
     "return Enqueued when the given PushEvent is accepted and find the triplets for it" in new TestCase {
-      (tripletsFinder.findTriplets(_: GitRepositoryUrl, _: CheckoutSha)(_: ExecutionContext))
+      (tripletsFinder.findRdfGraph(_: GitRepositoryUrl, _: CheckoutSha)(_: ExecutionContext))
         .expects(pushEvent.gitRepositoryUrl, pushEvent.checkoutSha, implicitly[ExecutionContext])
-        .returning(Future.successful(Right(rawTriplets.generateOne)))
+        .returning(Future.successful(Right(mock[Graph])))
 
       pushEventFlow.offer(pushEvent).futureValue shouldBe Enqueued
     }
