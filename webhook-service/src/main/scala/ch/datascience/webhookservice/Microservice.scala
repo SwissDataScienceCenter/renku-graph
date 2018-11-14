@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.ContentTypes.`application/json`
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.RejectionHandler
 import akka.stream.ActorMaterializer
+import ch.datascience.webhookservice.config.BufferSize
 import ch.datascience.webhookservice.config.ConfigOps.Implicits._
 import ch.datascience.webhookservice.triplets.TripletsFinder
 import com.typesafe.config.ConfigFactory
@@ -21,10 +22,12 @@ object Microservice extends App {
 
   private val config = ConfigFactory.load()
   private val logger = Logging(system, getClass)
-  private val webhookEndpoint = WebhookEndpoint(logger, new PushEventFlow(TripletsFinder()))
+  private val pushEventFlow = new PushEventFlow(TripletsFinder(), config.get[BufferSize]("queue.buffer-size"))
+  private val webhookEndpoint = WebhookEndpoint(logger, pushEventFlow)
 
-  private implicit val myRejectionHandler: RejectionHandler =
-    RejectionHandler.default
+  private implicit val rejectionHandler: RejectionHandler =
+    RejectionHandler
+      .default
       .mapRejectionResponse {
         case response @ HttpResponse(_, _, entity: HttpEntity.Strict, _) =>
           val message = entity.data.utf8String.replaceAll("\"", """\"""")
