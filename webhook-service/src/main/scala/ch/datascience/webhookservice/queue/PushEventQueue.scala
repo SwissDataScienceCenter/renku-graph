@@ -1,11 +1,12 @@
 package ch.datascience.webhookservice.queue
 
-import akka.{Done, NotUsed}
 import akka.event.LoggingAdapter
 import akka.stream.OverflowStrategy.backpressure
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{Materializer, QueueOfferResult}
+import akka.{Done, NotUsed}
 import ch.datascience.webhookservice.PushEvent
+import com.typesafe.config.Config
 import org.apache.jena.graph.Graph
 import org.w3.banana.jena.Jena
 
@@ -42,4 +43,11 @@ class PushEventQueue(tripletsFinder: TripletsFinder, queueConfig: QueueConfig, l
   private val sink: Sink[Graph, Future[Done]] = Sink.foreach[Graph](g =>
     println(g)
   )
+}
+
+object PushEventQueue {
+
+  def apply(config: Config, logger: LoggingAdapter)
+           (implicit executionContext: ExecutionContext, materializer: Materializer): PushEventQueue =
+    new PushEventQueue(TripletsFinder(), QueueConfig(config), logger)
 }

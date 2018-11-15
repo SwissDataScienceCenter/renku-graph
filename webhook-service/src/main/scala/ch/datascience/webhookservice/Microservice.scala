@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.RejectionHandler
 import akka.stream.ActorMaterializer
 import ch.datascience.config.ConfigOps.Implicits._
-import ch.datascience.webhookservice.queue.{PushEventQueue, QueueConfig, TripletsFinder}
+import ch.datascience.webhookservice.queue.PushEventQueue
 import com.typesafe.config.ConfigFactory
 import spray.json.{JsObject, JsString}
 
@@ -21,11 +21,7 @@ object Microservice extends App {
 
   private val config = ConfigFactory.load()
   private val logger = Logging(system, getClass)
-  private val pushEventQueue = new PushEventQueue(
-    TripletsFinder(),
-    QueueConfig(config),
-    logger
-  )
+  private val pushEventQueue = PushEventQueue(config, logger)
   private val webhookEndpoint = WebhookEndpoint(logger, pushEventQueue)
 
   private implicit val rejectionHandler: RejectionHandler =

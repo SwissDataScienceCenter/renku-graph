@@ -12,7 +12,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.util.Try
 
-class TripletsFinder(file: Commands.File,
+private class TripletsFinder(file: Commands.File,
                      git: Commands.Git,
                      renku: Commands.Renku,
                      randomLong: () => Long,
@@ -56,7 +56,7 @@ class TripletsFinder(file: Commands.File,
     Try(maybeValue)
 }
 
-object TripletsFinder {
+private object TripletsFinder {
 
   import ammonite.ops.{Path, root}
 
