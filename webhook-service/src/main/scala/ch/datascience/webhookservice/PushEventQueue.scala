@@ -10,8 +10,8 @@ import org.w3.banana.jena.Jena
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class PushEventFlow(tripletsFinder: TripletsFinder, queueConfig: QueueConfig)
-                   (implicit executionContext: ExecutionContext, materializer: Materializer) {
+class PushEventQueue(tripletsFinder: TripletsFinder, queueConfig: QueueConfig)
+                    (implicit executionContext: ExecutionContext, materializer: Materializer) {
 
   import queueConfig._
 

@@ -31,7 +31,7 @@ class WebhookEndpointSpec extends WordSpec with ScalatestRouteTest with MockFact
       )
 
       val pushEvent = PushEvent(checkoutSha, repositoryUrl)
-      (pushEventFlow.offer(_: PushEvent))
+      (pushEventQueue.offer(_: PushEvent))
         .expects(pushEvent)
         .returning(Future.successful(Enqueued))
 
@@ -55,7 +55,7 @@ class WebhookEndpointSpec extends WordSpec with ScalatestRouteTest with MockFact
         )
 
         val pushEvent = PushEvent(checkoutSha, repositoryUrl)
-        (pushEventFlow.offer(_: PushEvent))
+        (pushEventQueue.offer(_: PushEvent))
           .expects(pushEvent)
           .returning(Future.successful(queueOfferResult))
 
@@ -87,8 +87,8 @@ class WebhookEndpointSpec extends WordSpec with ScalatestRouteTest with MockFact
     val checkoutSha: CheckoutSha = ServiceTypesGenerators.checkoutShas.generateOne
     val repositoryUrl = GitRepositoryUrl("http://example.com/mike/repo.git")
 
-    val pushEventFlow: PushEventFlow = mock[PushEventFlow]
+    val pushEventQueue: PushEventQueue = mock[PushEventQueue]
     val logger: LoggingAdapter = mock[LoggingAdapter]
-    val routes: Route = new WebhookEndpoint(logger, pushEventFlow).routes
+    val routes: Route = new WebhookEndpoint(logger, pushEventQueue).routes
   }
 }

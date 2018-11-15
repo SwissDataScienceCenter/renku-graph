@@ -14,7 +14,7 @@ import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class PushEventFlowSpec extends WordSpec with MockFactory with ScalatestRouteTest with ScalaFutures {
+class PushEventQueueSpec extends WordSpec with MockFactory with ScalatestRouteTest with ScalaFutures {
 
   "offer" should {
 
@@ -23,7 +23,7 @@ class PushEventFlowSpec extends WordSpec with MockFactory with ScalatestRouteTes
         .expects(pushEvent.gitRepositoryUrl, pushEvent.checkoutSha, implicitly[ExecutionContext])
         .returning(Future.successful(Right(mock[Graph])))
 
-      pushEventFlow.offer(pushEvent).futureValue shouldBe Enqueued
+      pushEventQueue.offer(pushEvent).futureValue shouldBe Enqueued
     }
   }
 
@@ -31,7 +31,7 @@ class PushEventFlowSpec extends WordSpec with MockFactory with ScalatestRouteTes
     val pushEvent: PushEvent = pushEvents.generateOne
 
     val tripletsFinder: TripletsFinder = mock[TripletsFinder]
-    val pushEventFlow = new PushEventFlow(
+    val pushEventQueue = new PushEventQueue(
       tripletsFinder,
       QueueConfig(BufferSize(1), TriplesFinderThreads(1))
     )

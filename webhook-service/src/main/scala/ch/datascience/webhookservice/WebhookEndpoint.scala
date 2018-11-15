@@ -10,7 +10,7 @@ import spray.json.{JsString, JsValue, JsonReader, RootJsonReader, deserializatio
 import scala.concurrent.ExecutionContext
 
 class WebhookEndpoint(logger: LoggingAdapter,
-                      pushEventFlow: PushEventFlow)
+                      pushEventQueue: PushEventQueue)
                      (implicit executionContext: ExecutionContext) extends Directives {
 
   import ch.datascience.webhookservice.WebhookEndpoint.JsonSupport._
@@ -20,7 +20,7 @@ class WebhookEndpoint(logger: LoggingAdapter,
       (post & entity(as[PushEvent])) { pushEvent =>
         extractExecutionContext { implicit executionContext =>
           complete {
-            pushEventFlow
+            pushEventQueue
               .offer(pushEvent)
               .map {
                 case QueueOfferResult.Enqueued ⇒
@@ -42,8 +42,8 @@ object WebhookEndpoint {
   import spray.json.DefaultJsonProtocol
 
   def apply(logger: LoggingAdapter,
-            pushEventFlow: PushEventFlow)
-           (implicit executionContext: ExecutionContext): WebhookEndpoint = new WebhookEndpoint(logger, pushEventFlow)
+            pushEventQueue: PushEventQueue)
+           (implicit executionContext: ExecutionContext): WebhookEndpoint = new WebhookEndpoint(logger, pushEventQueue)
 
   private[webhookservice] object JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 

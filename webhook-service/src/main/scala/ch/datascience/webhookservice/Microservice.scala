@@ -22,11 +22,11 @@ object Microservice extends App {
 
   private val config = ConfigFactory.load()
   private val logger = Logging(system, getClass)
-  private val pushEventFlow = new PushEventFlow(
+  private val pushEventQueue = new PushEventQueue(
     TripletsFinder(),
     QueueConfig(config.get[BufferSize]("queue.buffer-size"), config.get[TriplesFinderThreads]("queue.triples-finder-threads"))
   )
-  private val webhookEndpoint = WebhookEndpoint(logger, pushEventFlow)
+  private val webhookEndpoint = WebhookEndpoint(logger, pushEventQueue)
 
   private implicit val rejectionHandler: RejectionHandler =
     RejectionHandler
