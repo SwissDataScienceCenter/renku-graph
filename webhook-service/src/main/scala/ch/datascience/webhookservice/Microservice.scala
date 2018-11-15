@@ -23,7 +23,8 @@ object Microservice extends App {
   private val logger = Logging(system, getClass)
   private val pushEventQueue = new PushEventQueue(
     TripletsFinder(),
-    QueueConfig(config)
+    QueueConfig(config),
+    logger
   )
   private val webhookEndpoint = WebhookEndpoint(logger, pushEventQueue)
 
