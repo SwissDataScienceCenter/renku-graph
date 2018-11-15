@@ -1,11 +1,11 @@
-package ch.datascience.webhookservice.triplets
+package ch.datascience.webhookservice.queue
 
 import java.io.InputStream
 
 import ammonite.ops._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.triplets.Commands.{File, Git, Renku}
+import ch.datascience.webhookservice.queue.Commands.{File, Git, Renku}
 import ch.datascience.webhookservice.{CheckoutSha, GitRepositoryUrl}
 import org.apache.jena.graph.Graph
 import org.scalacheck.Gen

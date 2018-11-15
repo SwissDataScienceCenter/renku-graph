@@ -1,4 +1,4 @@
-package ch.datascience.webhookservice.config
+package ch.datascience.config
 
 import com.typesafe.config.Config
 

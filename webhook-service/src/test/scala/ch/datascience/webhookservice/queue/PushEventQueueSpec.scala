@@ -1,11 +1,10 @@
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.queue
 
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import akka.stream.QueueOfferResult.{Enqueued, Failure}
+import akka.stream.QueueOfferResult.Enqueued
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.config.{BufferSize, TriplesFinderThreads}
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.triplets.TripletsFinder
+import ch.datascience.webhookservice.{CheckoutSha, GitRepositoryUrl, PushEvent}
 import org.apache.jena.graph.Graph
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -33,7 +32,7 @@ class PushEventQueueSpec extends WordSpec with MockFactory with ScalatestRouteTe
     val tripletsFinder: TripletsFinder = mock[TripletsFinder]
     val pushEventQueue = new PushEventQueue(
       tripletsFinder,
-      QueueConfig(BufferSize(1), TriplesFinderThreads(1))
+      QueueConfig(BufferSize(1), TripletsFinderThreads(1))
     )
   }
 }

@@ -1,11 +1,10 @@
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.queue
 
 import akka.Done
 import akka.stream.OverflowStrategy.backpressure
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{Materializer, QueueOfferResult}
-import ch.datascience.webhookservice.config.{BufferSize, TriplesFinderThreads}
-import ch.datascience.webhookservice.triplets.TripletsFinder
+import ch.datascience.webhookservice.PushEvent
 import org.w3.banana.jena.Jena
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -22,7 +21,7 @@ class PushEventQueue(tripletsFinder: TripletsFinder, queueConfig: QueueConfig)
   private lazy val queue = Source.queue[PushEvent](
     bufferSize.value,
     overflowStrategy = backpressure
-  ).mapAsync(triplesFinderThreads.value) { event =>
+  ).mapAsync(tripletsFinderThreads.value) { event =>
     tripletsFinder.findRdfGraph(event.gitRepositoryUrl, event.checkoutSha)
   }.toMat(sink)(Keep.left)
     .run()
@@ -30,6 +29,3 @@ class PushEventQueue(tripletsFinder: TripletsFinder, queueConfig: QueueConfig)
   def offer(pushEvent: PushEvent): Future[QueueOfferResult] =
     queue.offer(pushEvent)
 }
-
-case class QueueConfig(bufferSize: BufferSize,
-                       triplesFinderThreads: TriplesFinderThreads)

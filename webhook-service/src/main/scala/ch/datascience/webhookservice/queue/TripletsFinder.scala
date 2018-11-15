@@ -1,9 +1,9 @@
-package ch.datascience.webhookservice.triplets
+package ch.datascience.webhookservice.queue
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.security.SecureRandom
 
-import ch.datascience.webhookservice.triplets.Commands.{File, Git, Renku}
+import ch.datascience.webhookservice.queue.Commands.{File, Git, Renku}
 import ch.datascience.webhookservice.{CheckoutSha, GitRepositoryUrl}
 import org.w3.banana.io.{NTriples, NTriplesReader, RDFReader}
 import org.w3.banana.jena.Jena

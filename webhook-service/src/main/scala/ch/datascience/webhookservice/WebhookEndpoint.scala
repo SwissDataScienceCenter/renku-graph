@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.stream.QueueOfferResult
+import ch.datascience.webhookservice.queue.PushEventQueue
 import spray.json.{JsString, JsValue, JsonReader, RootJsonReader, deserializationError}
 
 import scala.concurrent.ExecutionContext
