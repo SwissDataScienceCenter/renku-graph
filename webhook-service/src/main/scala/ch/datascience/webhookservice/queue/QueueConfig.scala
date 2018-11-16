@@ -14,19 +14,19 @@ private object BufferSize {
   }
 }
 
-private case class TripletsFinderThreads(value: Int) extends TinyType[Int] {
+private case class TriplesFinderThreads(value: Int) extends TinyType[Int] {
   verify(value > 0, s"'$value' is not > 0")
 }
 
-private object TripletsFinderThreads {
+private object TriplesFinderThreads {
 
-  implicit object TriplesFinderThreadsFinder extends (Config => String => TripletsFinderThreads) {
-    override def apply(config: Config): String => TripletsFinderThreads = key => TripletsFinderThreads(config.getInt(key))
+  implicit object TriplesFinderThreadsFinder extends (Config => String => TriplesFinderThreads) {
+    override def apply(config: Config): String => TriplesFinderThreads = key => TriplesFinderThreads(config.getInt(key))
   }
 }
 
 private case class QueueConfig(bufferSize: BufferSize,
-                               tripletsFinderThreads: TripletsFinderThreads)
+                               triplesFinderThreads: TriplesFinderThreads)
 
 private object QueueConfig {
 
@@ -34,6 +34,6 @@ private object QueueConfig {
 
   def apply(config: Config): QueueConfig = QueueConfig(
     config.get[BufferSize]("queue.buffer-size"),
-    config.get[TripletsFinderThreads]("queue.triplets-finder-threads")
+    config.get[TriplesFinderThreads]("queue.triples-finder-threads")
   )
 }

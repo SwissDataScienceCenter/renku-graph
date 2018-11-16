@@ -47,7 +47,7 @@ class PushEventQueueSpec
       pushEventQueue.offer(pushEvent).futureValue shouldBe Enqueued
 
       eventually {
-        verifyGeneratingTripletsError(pushEvent, exception)
+        verifyGeneratingTriplesError(pushEvent, exception)
 
         (fusekiConnector.uploadFile(_: TriplesFile, _: ProjectName)(_: ExecutionContext))
           .verify(*, *, *)
@@ -102,7 +102,7 @@ class PushEventQueueSpec
       eventually {
         verifyTriplesFileUpload(triplesFile1, pushEvent1.projectName)
 
-        verifyGeneratingTripletsError(pushEvent2, exception2)
+        verifyGeneratingTriplesError(pushEvent2, exception2)
 
         verifyUploadingTriplesFileError(pushEvent3, exception3)
 
@@ -112,19 +112,19 @@ class PushEventQueueSpec
   }
 
   private trait TestCase {
-    val tripletsFinder: TripletsFinder = mock[TripletsFinder]
+    val triplesFinder: TriplesFinder = mock[TriplesFinder]
     val fusekiConnector: FusekiConnector = stub[FusekiConnector]
     val logger: LoggingAdapter = stub[LoggingAdapter]
     val pushEventQueue = new PushEventQueue(
-      tripletsFinder,
+      triplesFinder,
       fusekiConnector,
-      QueueConfig(BufferSize(1), TripletsFinderThreads(1)),
+      QueueConfig(BufferSize(1), TriplesFinderThreads(1)),
       logger
     )
 
     def givenGenerateTriples(event: PushEvent) = new {
       def returning(outcome: Future[Either[Exception, TriplesFile]]) =
-        (tripletsFinder.generateTriples(_: GitRepositoryUrl, _: CheckoutSha)(_: ExecutionContext))
+        (triplesFinder.generateTriples(_: GitRepositoryUrl, _: CheckoutSha)(_: ExecutionContext))
           .expects(event.gitRepositoryUrl, event.checkoutSha, implicitly[ExecutionContext])
           .returning(outcome)
     }
@@ -136,7 +136,7 @@ class PushEventQueueSpec
           .returning(outcome)
     }
 
-    def verifyGeneratingTripletsError(pushEvent: PushEvent, exception: Exception) =
+    def verifyGeneratingTriplesError(pushEvent: PushEvent, exception: Exception) =
       (logger.error(_: String))
         .verify(s"Generating triples for $pushEvent failed: ${exception.getMessage}")
 

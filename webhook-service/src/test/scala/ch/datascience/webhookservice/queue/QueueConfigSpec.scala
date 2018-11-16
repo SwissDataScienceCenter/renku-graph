@@ -15,20 +15,20 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
 
   "apply" should {
 
-    "read 'queue.buffer-size' and 'queue.triplets-finder-threads' to instantiate the QueueConfig" in {
-      forAll(positiveInts, positiveInts) { (bufferSizeValue, tripletsFinderThreadsValue) =>
+    "read 'queue.buffer-size' and 'queue.triples-finder-threads' to instantiate the QueueConfig" in {
+      forAll(positiveInts, positiveInts) { (bufferSizeValue, triplesFinderThreadsValue) =>
         val config = ConfigFactory.parseMap(
           Map("queue" ->
             Map(
               "buffer-size" -> bufferSizeValue,
-              "triplets-finder-threads" -> tripletsFinderThreadsValue
+              "triples-finder-threads" -> triplesFinderThreadsValue
             ).asJava
           ).asJava
         )
 
         QueueConfig(config) shouldBe QueueConfig(
           BufferSize(bufferSizeValue),
-          TripletsFinderThreads(tripletsFinderThreadsValue)
+          TriplesFinderThreads(triplesFinderThreadsValue)
         )
       }
     }
@@ -38,7 +38,7 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
         Map("queue" ->
           Map(
             "buffer-size" -> 0,
-            "triplets-finder-threads" -> positiveInts.generateOne
+            "triples-finder-threads" -> positiveInts.generateOne
           ).asJava
         ).asJava
       )
@@ -46,12 +46,12 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
       an[IllegalArgumentException] should be thrownBy QueueConfig(config)
     }
 
-    "throw an IllegalArgumentException if triplets-finder-threads is <= 0" in {
+    "throw an IllegalArgumentException if triples-finder-threads is <= 0" in {
       val config = ConfigFactory.parseMap(
         Map("queue" ->
           Map(
             "buffer-size" -> positiveInts.generateOne,
-            "triplets-finder-threads" -> 0
+            "triples-finder-threads" -> 0
           ).asJava
         ).asJava
       )

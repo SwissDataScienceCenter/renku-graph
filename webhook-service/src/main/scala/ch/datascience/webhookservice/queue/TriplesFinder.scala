@@ -11,12 +11,12 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.util.Try
 
-private class TripletsFinder(file: Commands.File,
-                             git: Commands.Git,
-                             renku: Commands.Renku,
-                             randomLong: () => Long) {
+private class TriplesFinder(file: Commands.File,
+                            git: Commands.Git,
+                            renku: Commands.Renku,
+                            randomLong: () => Long) {
 
-  import TripletsFinder._
+  import TriplesFinder._
   import file._
 
   def generateTriples(gitRepositoryUrl: GitRepositoryUrl,
@@ -52,14 +52,14 @@ private class TripletsFinder(file: Commands.File,
     Try(maybeValue)
 }
 
-private object TripletsFinder {
+private object TriplesFinder {
 
   import ammonite.ops.{Path, root}
 
   private val workDirectory: Path = root / "tmp"
   private val repositoryDirectoryFinder = ".*/(.*).git$".r
 
-  def apply(): TripletsFinder = new TripletsFinder(
+  def apply(): TriplesFinder = new TriplesFinder(
     file = new File(),
     git = new Git(),
     renku = new Renku(),

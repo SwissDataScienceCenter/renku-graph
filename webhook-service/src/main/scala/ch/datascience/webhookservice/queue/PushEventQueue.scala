@@ -10,7 +10,7 @@ import com.typesafe.config.Config
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class PushEventQueue(tripletsFinder: TripletsFinder,
+class PushEventQueue(triplesFinder: TriplesFinder,
                      jenaConnector: FusekiConnector,
                      queueConfig: QueueConfig,
                      logger: LoggingAdapter)
@@ -24,13 +24,13 @@ class PushEventQueue(tripletsFinder: TripletsFinder,
   private lazy val queue = Source.queue[PushEvent](
     bufferSize.value,
     overflowStrategy = backpressure
-  ).mapAsync(tripletsFinderThreads.value)(pushEventToTriples)
+  ).mapAsync(triplesFinderThreads.value)(pushEventToTriples)
     .flatMapConcat(logAndSkipErrors)
     .toMat(fusekiSink)(Keep.left)
     .run()
 
   private def pushEventToTriples(pushEvent: PushEvent): Future[(PushEvent, Either[Throwable, TriplesFile])] =
-    tripletsFinder.generateTriples(pushEvent.gitRepositoryUrl, pushEvent.checkoutSha)
+    triplesFinder.generateTriples(pushEvent.gitRepositoryUrl, pushEvent.checkoutSha)
       .map(maybeTriplesFile => pushEvent -> maybeTriplesFile)
 
   private lazy val logAndSkipErrors: ((PushEvent, Either[Throwable, TriplesFile])) => Source[(PushEvent, TriplesFile), NotUsed] = {
@@ -60,5 +60,5 @@ object PushEventQueue {
 
   def apply(config: Config, logger: LoggingAdapter)
            (implicit executionContext: ExecutionContext, materializer: Materializer): PushEventQueue =
-    new PushEventQueue(TripletsFinder(), FusekiConnector(config), QueueConfig(config), logger)
+    new PushEventQueue(TriplesFinder(), FusekiConnector(config), QueueConfig(config), logger)
 }
