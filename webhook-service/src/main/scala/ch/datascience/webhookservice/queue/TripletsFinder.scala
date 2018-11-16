@@ -1,47 +1,43 @@
 package ch.datascience.webhookservice.queue
 
 import java.io.{ByteArrayInputStream, InputStream}
+import java.nio.file.Files.copy
 import java.security.SecureRandom
 
 import ch.datascience.webhookservice.queue.Commands.{File, Git, Renku}
 import ch.datascience.webhookservice.{CheckoutSha, GitRepositoryUrl}
-import org.w3.banana.io.{NTriples, NTriplesReader, RDFReader}
-import org.w3.banana.jena.Jena
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.util.Try
 
 private class TripletsFinder(file: Commands.File,
-                     git: Commands.Git,
-                     renku: Commands.Renku,
-                     randomLong: () => Long,
-                     tripletsReader: RDFReader[Jena, Try, NTriples]) {
+                             git: Commands.Git,
+                             renku: Commands.Renku,
+                             randomLong: () => Long) {
 
   import TripletsFinder._
   import file._
 
-  def findRdfGraph(gitRepositoryUrl: GitRepositoryUrl,
-                   checkoutSha: CheckoutSha)
-                  (implicit executionContext: ExecutionContext): Future[Either[Throwable, Jena#Graph]] = Future {
+  def generateTriples(gitRepositoryUrl: GitRepositoryUrl,
+                      checkoutSha: CheckoutSha)
+                     (implicit executionContext: ExecutionContext): Future[Either[Throwable, TriplesFile]] = Future {
 
     val repositoryDirectory = tempDirectoryName(repositoryDirName(gitRepositoryUrl))
 
-    val maybeRdfGraph = for {
+    val maybeTriplesFile = for {
       _ <- pure(mkdir(repositoryDirectory))
       _ <- pure(git cloneRepo(gitRepositoryUrl, repositoryDirectory, workDirectory))
       _ <- pure(git checkout(checkoutSha, repositoryDirectory))
-      tripletsStream <- pure(renku log repositoryDirectory)
-      rdfGraph <- tripletsReader.read(tripletsStream, "")
-      _ <- pure(removeSilently(repositoryDirectory))
-    } yield rdfGraph
+      triplesFile <- pure(renku logToFile repositoryDirectory)
+    } yield triplesFile
 
-    maybeRdfGraph.fold(
+    maybeTriplesFile.fold(
       exception => {
         removeSilently(repositoryDirectory)
         Left(exception)
       },
-      tripletAsString => Right(tripletAsString)
+      triplesFile => Right(triplesFile)
     )
   }
 
@@ -67,8 +63,7 @@ private object TripletsFinder {
     file = new File(),
     git = new Git(),
     renku = new Renku(),
-    randomLong = new SecureRandom().nextLong,
-    tripletsReader = new NTriplesReader
+    randomLong = new SecureRandom().nextLong
   )
 }
 
@@ -104,8 +99,14 @@ private object Commands {
 
   class Renku {
 
-    def log(destinationDirectory: Path): InputStream =
-      %%('renku, 'log, "--format", "nt")(destinationDirectory).out.toInputStream
+    private val triplesFileName = "triples.rdf"
+
+    def logToFile(destinationDirectory: Path): TriplesFile = {
+      val triplesStream = %%('renku, 'log, "--format", "rdf")(destinationDirectory).out.toInputStream
+      val triplesFile = destinationDirectory / triplesFileName
+      copy(triplesStream, triplesFile.toNIO)
+      TriplesFile(triplesFile.toString())
+    }
 
     implicit private class StreamValueOps(streamValue: StreamValue) {
       lazy val toInputStream: InputStream =

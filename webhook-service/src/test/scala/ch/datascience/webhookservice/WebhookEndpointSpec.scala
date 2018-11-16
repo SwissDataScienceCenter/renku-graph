@@ -9,7 +9,7 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.stream.QueueOfferResult
 import akka.stream.QueueOfferResult.Enqueued
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.queue.PushEventQueue
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -27,11 +27,12 @@ class WebhookEndpointSpec extends WordSpec with ScalatestRouteTest with MockFact
         contentType = `application/json`,
         JsObject(
           "checkout_sha" -> JsString(checkoutSha.value),
-          "repository" -> JsObject("git_http_url" -> JsString(repositoryUrl.value))
+          "repository" -> JsObject("git_http_url" -> JsString(repositoryUrl.value)),
+          "project" -> JsObject("name" -> JsString(projectName.value))
         ).prettyPrint
       )
 
-      val pushEvent = PushEvent(checkoutSha, repositoryUrl)
+      val pushEvent = PushEvent(checkoutSha, repositoryUrl, projectName)
       (pushEventQueue.offer(_: PushEvent))
         .expects(pushEvent)
         .returning(Future.successful(Enqueued))
@@ -51,11 +52,12 @@ class WebhookEndpointSpec extends WordSpec with ScalatestRouteTest with MockFact
           contentType = `application/json`,
           JsObject(
             "checkout_sha" -> JsString(checkoutSha.value),
-            "repository" -> JsObject("git_http_url" -> JsString(repositoryUrl.value))
+            "repository" -> JsObject("git_http_url" -> JsString(repositoryUrl.value)),
+            "project" -> JsObject("name" -> JsString(projectName.value))
           ).prettyPrint
         )
 
-        val pushEvent = PushEvent(checkoutSha, repositoryUrl)
+        val pushEvent = PushEvent(checkoutSha, repositoryUrl, projectName)
         (pushEventQueue.offer(_: PushEvent))
           .expects(pushEvent)
           .returning(Future.successful(queueOfferResult))
@@ -85,8 +87,9 @@ class WebhookEndpointSpec extends WordSpec with ScalatestRouteTest with MockFact
 
 
   private trait TestCase {
-    val checkoutSha: CheckoutSha = ServiceTypesGenerators.checkoutShas.generateOne
+    val checkoutSha: CheckoutSha = checkoutShas.generateOne
     val repositoryUrl = GitRepositoryUrl("http://example.com/mike/repo.git")
+    val projectName: ProjectName = projectNames.generateOne
 
     val pushEventQueue: PushEventQueue = mock[PushEventQueue]
     val logger: LoggingAdapter = mock[LoggingAdapter]

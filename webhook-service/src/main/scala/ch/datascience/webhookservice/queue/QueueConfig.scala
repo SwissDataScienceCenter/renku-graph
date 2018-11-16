@@ -26,7 +26,7 @@ private object TripletsFinderThreads {
 }
 
 private case class QueueConfig(bufferSize: BufferSize,
-                       tripletsFinderThreads: TripletsFinderThreads)
+                               tripletsFinderThreads: TripletsFinderThreads)
 
 private object QueueConfig {
 

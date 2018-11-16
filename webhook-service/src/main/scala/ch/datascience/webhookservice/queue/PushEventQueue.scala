@@ -7,12 +7,11 @@ import akka.stream.{Materializer, QueueOfferResult}
 import akka.{Done, NotUsed}
 import ch.datascience.webhookservice.PushEvent
 import com.typesafe.config.Config
-import org.apache.jena.graph.Graph
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class PushEventQueue(tripletsFinder: TripletsFinder,
-                     jenaConnector: JenaConnector,
+                     jenaConnector: FusekiConnector,
                      queueConfig: QueueConfig,
                      logger: LoggingAdapter)
                     (implicit executionContext: ExecutionContext, materializer: Materializer) {
@@ -25,32 +24,32 @@ class PushEventQueue(tripletsFinder: TripletsFinder,
   private lazy val queue = Source.queue[PushEvent](
     bufferSize.value,
     overflowStrategy = backpressure
-  ).mapAsync(tripletsFinderThreads.value)(pushEventToTriplets)
+  ).mapAsync(tripletsFinderThreads.value)(pushEventToTriples)
     .flatMapConcat(logAndSkipErrors)
-    .toMat(jenaSink)(Keep.left)
+    .toMat(fusekiSink)(Keep.left)
     .run()
 
-  private def pushEventToTriplets(pushEvent: PushEvent): Future[(PushEvent, Either[Throwable, Graph])] =
-    tripletsFinder.findRdfGraph(pushEvent.gitRepositoryUrl, pushEvent.checkoutSha)
-      .map(maybeTriplets => pushEvent -> maybeTriplets)
+  private def pushEventToTriples(pushEvent: PushEvent): Future[(PushEvent, Either[Throwable, TriplesFile])] =
+    tripletsFinder.generateTriples(pushEvent.gitRepositoryUrl, pushEvent.checkoutSha)
+      .map(maybeTriplesFile => pushEvent -> maybeTriplesFile)
 
-  private lazy val logAndSkipErrors: ((PushEvent, Either[Throwable, Graph])) => Source[(PushEvent, Graph), NotUsed] = {
-    case (event, Left(exception)) =>
-      logger.error(s"Finding triplets for $event failed: ${exception.getMessage}")
-      Source.empty[(PushEvent, Graph)]
-    case (event, Right(graph))    =>
-      Source.single(event -> graph)
+  private lazy val logAndSkipErrors: ((PushEvent, Either[Throwable, TriplesFile])) => Source[(PushEvent, TriplesFile), NotUsed] = {
+    case (event, Left(exception))    =>
+      logger.error(s"Generating triples for $event failed: ${exception.getMessage}")
+      Source.empty[(PushEvent, TriplesFile)]
+    case (event, Right(triplesFile)) =>
+      Source.single(event -> triplesFile)
   }
 
-  private val jenaSink: Sink[(PushEvent, Graph), Future[Done]] =
-    Flow[(PushEvent, Graph)]
+  private val fusekiSink: Sink[(PushEvent, TriplesFile), Future[Done]] =
+    Flow[(PushEvent, TriplesFile)]
       .mapAsyncUnordered(1) {
-        case (event, graph) =>
+        case (event, triplesFile) =>
           jenaConnector
-            .persist(graph)
+            .uploadFile(triplesFile, event.projectName)
             .recover {
               case exception =>
-                logger.error(s"Persisting triplets for $event failed: ${exception.getMessage}")
+                logger.error(s"Uploading triples for $event failed: ${exception.getMessage}")
                 Done
             }
       }
@@ -61,5 +60,5 @@ object PushEventQueue {
 
   def apply(config: Config, logger: LoggingAdapter)
            (implicit executionContext: ExecutionContext, materializer: Materializer): PushEventQueue =
-    new PushEventQueue(TripletsFinder(), new JenaConnector, QueueConfig(config), logger)
+    new PushEventQueue(TripletsFinder(), FusekiConnector(config), QueueConfig(config), logger)
 }

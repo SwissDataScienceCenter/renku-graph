@@ -56,11 +56,16 @@ object WebhookEndpoint {
       case JsString(value) => CheckoutSha(value)
       case other           => deserializationError(s"'$other' is not a valid CheckoutSha")
     }
+    private implicit val projectNameReads: JsonReader[ProjectName] = {
+      case JsString(value) => ProjectName(value)
+      case other           => deserializationError(s"'$other' is not a valid ProjectName")
+    }
 
     implicit val pushEventFormat: RootJsonReader[PushEvent] = (json: JsValue) =>
       PushEvent(
         (json / "checkout_sha").as[CheckoutSha],
-        (json / "repository" / "git_http_url").as[GitRepositoryUrl]
+        (json / "repository" / "git_http_url").as[GitRepositoryUrl],
+        (json / "project" / "name").as[ProjectName]
       )
 
     private implicit class JsValueOps(jsValue: JsValue) {

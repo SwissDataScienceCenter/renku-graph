@@ -1,7 +1,8 @@
 package ch.datascience.webhookservice.generators
 
 import ch.datascience.generators.Generators._
-import ch.datascience.webhookservice.{CheckoutSha, FilePath, GitRepositoryUrl, PushEvent}
+import ch.datascience.webhookservice._
+import ch.datascience.webhookservice.queue.TriplesFile
 import org.scalacheck.Gen
 
 object ServiceTypesGenerators {
@@ -21,8 +22,13 @@ object ServiceTypesGenerators {
         GitRepositoryUrl(s"http://host/$repoName.git")
       }
 
+  implicit val projectNames: Gen[ProjectName] = nonEmptyStrings() map ProjectName
+
   implicit val pushEvents: Gen[PushEvent] = for {
     sha <- checkoutShas
     repositoryUrl <- gitRepositoryUrls
-  } yield PushEvent(sha, repositoryUrl)
+    projectName <- projectNames
+  } yield PushEvent(sha, repositoryUrl, projectName)
+
+  implicit val triplesFiles: Gen[TriplesFile] = relativePaths map TriplesFile
 }
