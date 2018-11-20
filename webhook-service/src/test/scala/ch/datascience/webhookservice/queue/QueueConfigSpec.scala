@@ -15,20 +15,22 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
 
   "apply" should {
 
-    "read 'queue.buffer-size' and 'queue.triples-finder-threads' to instantiate the QueueConfig" in {
-      forAll(positiveInts, positiveInts) { (bufferSizeValue, triplesFinderThreadsValue) =>
+    "read 'queue.buffer-size', 'queue.triples-finder-threads' and 'queue.fuseki-upload-threads' to instantiate the QueueConfig" in {
+      forAll(positiveInts, positiveInts, positiveInts) { (bufferSizeValue, triplesFinderThreadsValue, fusekiUploadThreads) =>
         val config = ConfigFactory.parseMap(
           Map("queue" ->
             Map(
               "buffer-size" -> bufferSizeValue,
-              "triples-finder-threads" -> triplesFinderThreadsValue
+              "triples-finder-threads" -> triplesFinderThreadsValue,
+              "fuseki-upload-threads" -> fusekiUploadThreads
             ).asJava
           ).asJava
         )
 
         QueueConfig(config) shouldBe QueueConfig(
           BufferSize(bufferSizeValue),
-          TriplesFinderThreads(triplesFinderThreadsValue)
+          TriplesFinderThreads(triplesFinderThreadsValue),
+          FusekiUploadThreads(fusekiUploadThreads)
         )
       }
     }
@@ -38,7 +40,8 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
         Map("queue" ->
           Map(
             "buffer-size" -> 0,
-            "triples-finder-threads" -> positiveInts.generateOne
+            "triples-finder-threads" -> positiveInts.generateOne,
+            "fuseki-upload-threads" -> positiveInts.generateOne
           ).asJava
         ).asJava
       )
@@ -51,7 +54,22 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
         Map("queue" ->
           Map(
             "buffer-size" -> positiveInts.generateOne,
-            "triples-finder-threads" -> 0
+            "triples-finder-threads" -> 0,
+            "fuseki-upload-threads" -> positiveInts.generateOne
+          ).asJava
+        ).asJava
+      )
+
+      an[IllegalArgumentException] should be thrownBy QueueConfig(config)
+    }
+
+    "throw an IllegalArgumentException if fuseki-upload-threads is <= 0" in {
+      val config = ConfigFactory.parseMap(
+        Map("queue" ->
+          Map(
+            "buffer-size" -> positiveInts.generateOne,
+            "triples-finder-threads" -> positiveInts.generateOne,
+            "fuseki-upload-threads" -> 0
           ).asJava
         ).asJava
       )

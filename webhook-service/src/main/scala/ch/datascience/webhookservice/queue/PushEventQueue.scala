@@ -28,7 +28,7 @@ class PushEventQueue(triplesFinder: TriplesFinder,
     overflowStrategy = backpressure
   ).mapAsync(triplesFinderThreads.value)(pushEventToTriples)
     .flatMapConcat(logAndSkipErrors)
-    .mapAsync(1)(toFuseki)
+    .mapAsync(fusekiUploadThreads.value)(toFuseki)
     .map(deleteTriplesFile)
     .toMat(Sink.ignore)(Keep.left)
     .run()
