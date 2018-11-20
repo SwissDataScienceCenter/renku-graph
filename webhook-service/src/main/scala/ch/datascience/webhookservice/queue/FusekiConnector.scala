@@ -22,7 +22,7 @@ private class FusekiConnector(fusekiBaseUrl: FusekiUrl,
     Try {
       connection = Some(fusekiConnectionBuilder(fusekiBaseUrl / datasetName))
       connection foreach { conn =>
-        conn.load(triplesFile.value)
+        conn.load(triplesFile.value.toAbsolutePath.toString)
         conn.close()
       }
     } match {

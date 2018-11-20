@@ -2,17 +2,19 @@ package ch.datascience.webhookservice.queue
 
 import akka.event.LoggingAdapter
 import akka.stream.OverflowStrategy.backpressure
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{Materializer, QueueOfferResult}
 import akka.{Done, NotUsed}
 import ch.datascience.webhookservice.PushEvent
 import com.typesafe.config.Config
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
 class PushEventQueue(triplesFinder: TriplesFinder,
                      jenaConnector: FusekiConnector,
                      queueConfig: QueueConfig,
+                     fileCommands: Commands.File,
                      logger: LoggingAdapter)
                     (implicit executionContext: ExecutionContext, materializer: Materializer) {
 
@@ -26,7 +28,9 @@ class PushEventQueue(triplesFinder: TriplesFinder,
     overflowStrategy = backpressure
   ).mapAsync(triplesFinderThreads.value)(pushEventToTriples)
     .flatMapConcat(logAndSkipErrors)
-    .toMat(fusekiSink)(Keep.left)
+    .mapAsync(1)(toFuseki)
+    .map(deleteTriplesFile)
+    .toMat(Sink.ignore)(Keep.left)
     .run()
 
   private def pushEventToTriples(pushEvent: PushEvent): Future[(PushEvent, Either[Throwable, TriplesFile])] =
@@ -41,24 +45,27 @@ class PushEventQueue(triplesFinder: TriplesFinder,
       Source.single(event -> triplesFile)
   }
 
-  private val fusekiSink: Sink[(PushEvent, TriplesFile), Future[Done]] =
-    Flow[(PushEvent, TriplesFile)]
-      .mapAsyncUnordered(1) {
-        case (event, triplesFile) =>
-          jenaConnector
-            .uploadFile(triplesFile)
-            .recover {
-              case exception =>
-                logger.error(s"Uploading triples for $event failed: ${exception.getMessage}")
-                Done
-            }
-      }
-      .toMat(Sink.ignore)(Keep.right)
+  private val toFuseki: ((PushEvent, TriplesFile)) => Future[TriplesFile] = {
+    case (event, triplesFile) =>
+      jenaConnector
+        .uploadFile(triplesFile)
+        .map(_ => triplesFile)
+        .recover {
+          case NonFatal(exception: Exception) =>
+            logger.error(s"Uploading triples for $event failed: ${exception.getMessage}")
+            triplesFile
+        }
+  }
+
+  private def deleteTriplesFile(triplesFile: TriplesFile): Done = {
+    fileCommands.removeSilently(triplesFile.value)
+    Done
+  }
 }
 
 object PushEventQueue {
 
   def apply(config: Config, logger: LoggingAdapter)
            (implicit executionContext: ExecutionContext, materializer: Materializer): PushEventQueue =
-    new PushEventQueue(TriplesFinder(), FusekiConnector(config), QueueConfig(config), logger)
+    new PushEventQueue(TriplesFinder(), FusekiConnector(config), QueueConfig(config), new Commands.File, logger)
 }

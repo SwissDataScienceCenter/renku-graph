@@ -1,11 +1,13 @@
 package ch.datascience.webhookservice.queue
 
+import java.nio.file.Path
+
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.stream.QueueOfferResult.Enqueued
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.{CheckoutSha, GitRepositoryUrl, ProjectName, PushEvent}
+import ch.datascience.webhookservice.{CheckoutSha, GitRepositoryUrl, PushEvent}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -23,7 +25,7 @@ class PushEventQueueSpec
 
   "offer" should {
 
-    "return Enqueued and generating the triples and uploading them to Fuseki is triggered" in new TestCase {
+    "return Enqueued and trigger triples generation and upload to Fuseki" in new TestCase {
       val pushEvent: PushEvent = pushEvents.generateOne
       val triplesFile: TriplesFile = triplesFiles.generateOne
 
@@ -34,6 +36,7 @@ class PushEventQueueSpec
 
       eventually {
         verifyTriplesFileUpload(triplesFile)
+        verifyTriplesFileRemoval(triplesFile)
       }
     }
 
@@ -51,6 +54,10 @@ class PushEventQueueSpec
 
         (fusekiConnector.uploadFile(_: TriplesFile)(_: ExecutionContext))
           .verify(*, *)
+          .never()
+
+        (fileCommands.removeSilently(_: Path))
+          .verify(*)
           .never()
       }
     }
@@ -70,6 +77,7 @@ class PushEventQueueSpec
       eventually {
         verifyTriplesFileUpload(triplesFile)
         verifyUploadingTriplesFileError(pushEvent, exception)
+        verifyTriplesFileRemoval(triplesFile)
       }
     }
 
@@ -107,6 +115,10 @@ class PushEventQueueSpec
         verifyUploadingTriplesFileError(pushEvent3, exception3)
 
         verifyTriplesFileUpload(triplesFile4)
+
+        verifyTriplesFileRemoval(triplesFile1)
+        verifyTriplesFileRemoval(triplesFile3)
+        verifyTriplesFileRemoval(triplesFile4)
       }
     }
   }
@@ -115,10 +127,12 @@ class PushEventQueueSpec
     val triplesFinder: TriplesFinder = mock[TriplesFinder]
     val fusekiConnector: FusekiConnector = stub[FusekiConnector]
     val logger: LoggingAdapter = stub[LoggingAdapter]
+    val fileCommands: Commands.File = stub[Commands.File]
     val pushEventQueue = new PushEventQueue(
       triplesFinder,
       fusekiConnector,
       QueueConfig(BufferSize(1), TriplesFinderThreads(1)),
+      fileCommands,
       logger
     )
 
@@ -147,5 +161,9 @@ class PushEventQueueSpec
     def verifyTriplesFileUpload(triplesFile: TriplesFile) =
       (fusekiConnector.uploadFile(_: TriplesFile)(_: ExecutionContext))
         .verify(triplesFile, implicitly[ExecutionContext])
+
+    def verifyTriplesFileRemoval(triplesFile: TriplesFile) =
+      (fileCommands.removeSilently(_: Path))
+        .verify(triplesFile.value)
   }
 }

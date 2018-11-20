@@ -1,6 +1,7 @@
 package ch.datascience.webhookservice.queue
 
-import ch.datascience.tinytypes.StringValue
-import ch.datascience.tinytypes.constraints.NonBlank
+import java.nio.file.Path
 
-case class TriplesFile(value: String) extends StringValue with NonBlank
+import ch.datascience.tinytypes.TinyType
+
+case class TriplesFile(value: Path) extends TinyType[Path]

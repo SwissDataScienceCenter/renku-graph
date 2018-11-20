@@ -2,11 +2,9 @@ package ch.datascience.webhookservice.queue
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
-import ch.datascience.webhookservice.ProjectName
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.queue.FusekiConnector.{DatasetName, FusekiUrl}
 import org.apache.jena.rdfconnection.RDFConnection
-import org.scalacheck.Gen
 import org.scalamock.function.MockFunction1
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -29,7 +27,7 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
         .returning(fusekiConnection)
 
       (fusekiConnection.load(_: String))
-        .expects(triplesFile.value)
+        .expects(triplesFileAsString)
 
       (fusekiConnection.close _)
         .expects()
@@ -45,7 +43,7 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
 
       val exception: Exception = new Exception("message")
       (fusekiConnection.load(_: String))
-        .expects(triplesFile.value)
+        .expects(triplesFileAsString)
         .throwing(exception)
 
       (fusekiConnection.close _)
@@ -75,7 +73,7 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
         .returning(fusekiConnection)
 
       (fusekiConnection.load(_: String))
-        .expects(triplesFile.value)
+        .expects(triplesFileAsString)
 
       val exception: Exception = new Exception("message")
       (fusekiConnection.close _)
@@ -91,6 +89,7 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
   private trait TestCase {
 
     val triplesFile: TriplesFile = triplesFiles.generateOne
+    val triplesFileAsString: String = triplesFile.value.toAbsolutePath.toString
 
     val fusekiConnectionBuilder: MockFunction1[FusekiUrl, RDFConnection] = mockFunction[FusekiUrl, RDFConnection]
     val fusekiConnection: RDFConnection = mock[RDFConnection]

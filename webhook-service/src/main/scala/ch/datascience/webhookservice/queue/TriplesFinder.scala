@@ -5,7 +5,7 @@ import java.nio.file.Files.copy
 import java.security.SecureRandom
 
 import ch.datascience.webhookservice.queue.Commands.{File, Git, Renku}
-import ch.datascience.webhookservice.{CheckoutSha, GitRepositoryUrl}
+import ch.datascience.webhookservice.{CheckoutSha, GitRepositoryUrl, queue}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
@@ -23,13 +23,17 @@ private class TriplesFinder(file: Commands.File,
                       checkoutSha: CheckoutSha)
                      (implicit executionContext: ExecutionContext): Future[Either[Throwable, TriplesFile]] = Future {
 
-    val repositoryDirectory = tempDirectoryName(repositoryDirName(gitRepositoryUrl))
+    val pathDifferentiator = randomLong()
+    val repositoryName = extractRepositoryName(gitRepositoryUrl)
+    val repositoryDirectory = tempDirectoryName(repositoryName, pathDifferentiator)
+    val triplesFile = composeTriplesFileName(repositoryName, pathDifferentiator)
 
     val maybeTriplesFile = for {
       _ <- pure(mkdir(repositoryDirectory))
       _ <- pure(git cloneRepo(gitRepositoryUrl, repositoryDirectory, workDirectory))
       _ <- pure(git checkout(checkoutSha, repositoryDirectory))
-      triplesFile <- pure(renku logToFile repositoryDirectory)
+      _ <- pure(renku.logToFile(triplesFile, repositoryDirectory))
+      _ <- pure(removeSilently(repositoryDirectory))
     } yield triplesFile
 
     maybeTriplesFile.fold(
@@ -41,12 +45,15 @@ private class TriplesFinder(file: Commands.File,
     )
   }
 
-  private def tempDirectoryName(repositoryName: String) =
-    workDirectory / s"$repositoryName-${randomLong()}"
-
-  private def repositoryDirName(gitRepositoryUrl: GitRepositoryUrl): String = gitRepositoryUrl.value match {
+  private def extractRepositoryName(gitRepositoryUrl: GitRepositoryUrl): String = gitRepositoryUrl.value match {
     case repositoryDirectoryFinder(folderName) => folderName
   }
+
+  private def tempDirectoryName(repositoryName: String, pathDifferentiator: Long) =
+    workDirectory / s"$repositoryName-$pathDifferentiator"
+
+  private def composeTriplesFileName(repositoryName: String, pathDifferentiator: Long) =
+    queue.TriplesFile((workDirectory / s"$repositoryName-$pathDifferentiator.rdf").toNIO)
 
   private implicit def pure[V](maybeValue: => V): Try[V] =
     Try(maybeValue)
@@ -74,8 +81,10 @@ private object Commands {
 
   class File {
 
-
     def mkdir(newDir: Path): Unit = ops.mkdir ! newDir
+
+    def removeSilently(path: java.nio.file.Path): Unit =
+      removeSilently(Path(path))
 
     def removeSilently(repositoryDirectory: Path): Unit = Try {
       ops.rm ! repositoryDirectory
@@ -99,13 +108,9 @@ private object Commands {
 
   class Renku {
 
-    private val triplesFileName = "triples.rdf"
-
-    def logToFile(destinationDirectory: Path): TriplesFile = {
+    def logToFile(triplesFile: TriplesFile, destinationDirectory: Path): Unit = {
       val triplesStream = %%('renku, 'log, "--format", "rdf")(destinationDirectory).out.toInputStream
-      val triplesFile = destinationDirectory / triplesFileName
-      copy(triplesStream, triplesFile.toNIO)
-      TriplesFile(triplesFile.toString())
+      copy(triplesStream, triplesFile.value)
     }
 
     implicit private class StreamValueOps(streamValue: StreamValue) {
