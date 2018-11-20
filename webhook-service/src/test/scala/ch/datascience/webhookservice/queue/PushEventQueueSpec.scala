@@ -131,7 +131,7 @@ class PushEventQueueSpec
     val pushEventQueue = new PushEventQueue(
       triplesFinder,
       fusekiConnector,
-      QueueConfig(BufferSize(1), TriplesFinderThreads(1)),
+      QueueConfig(BufferSize(1), TriplesFinderThreads(1), FusekiUploadThreads(1)),
       fileCommands,
       logger
     )
