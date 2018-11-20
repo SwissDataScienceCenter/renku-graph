@@ -1,0 +1,594 @@
+[
+  {
+    "@id": "/01f169f0beac20c7b3646b48df4010a15787adf8#",
+    "@type": [
+      "http://www.w3.org/ns/prov#Activity"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "added refactored scripts"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#endedAtTime": [
+      {
+        "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+        "@value": "2018-09-04T10:38:32"
+      }
+    ],
+    "http://www.w3.org/ns/prov#startedAtTime": [
+      {
+        "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+        "@value": "2018-09-04T10:38:32"
+      }
+    ]
+  },
+  {
+    "@id": "/01f169f0beac20c7b3646b48df4010a15787adf8/src/clean_data.py",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "src/clean_data.py@01f169f0beac20c7b3646b48df4010a15787adf8"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedGeneration": [
+      {
+        "@id": "_:b6"
+      }
+    ]
+  },
+  {
+    "@id": "/01f169f0beac20c7b3646b48df4010a15787adf8/src/plot_data.py",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "src/plot_data.py@01f169f0beac20c7b3646b48df4010a15787adf8"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedGeneration": [
+      {
+        "@id": "_:b5"
+      }
+    ]
+  },
+  {
+    "@id": "/07b64b6cd153cf7988e2f9cca41c58e296f57b75#",
+    "@type": [
+      "http://www.w3.org/ns/prov#Activity",
+      "http://purl.org/wf4ever/wfprov#ProcessRun"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#endedAtTime": [
+      {
+        "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+        "@value": "2018-09-04T10:40:25"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedAssociation": [
+      {
+        "@id": "_:b8"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedUsage": [
+      {
+        "@id": "_:b9"
+      },
+      {
+        "@id": "_:b10"
+      }
+    ],
+    "http://www.w3.org/ns/prov#startedAtTime": [
+      {
+        "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+        "@value": "2018-09-04T10:40:25"
+      }
+    ]
+  },
+  {
+    "@id": "/07b64b6cd153cf7988e2f9cca41c58e296f57b75/.renku/workflow/08e08333b8304e3d90c168d47a64a82f_python.cwl",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://www.w3.org/ns/prov#Plan",
+      "http://purl.org/wf4ever/wfdesc#Process"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": ".renku/workflow/08e08333b8304e3d90c168d47a64a82f_python.cwl@07b64b6cd153cf7988e2f9cca41c58e296f57b75"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ]
+  },
+  {
+    "@id": "/07b64b6cd153cf7988e2f9cca41c58e296f57b75/data/preprocessed/zhbikes.parquet",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "data/preprocessed/zhbikes.parquet@07b64b6cd153cf7988e2f9cca41c58e296f57b75"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedGeneration": [
+      {
+        "@id": "_:b7"
+      }
+    ]
+  },
+  {
+    "@id": "/90c458fceb7fa2f267c797ca44c29d93aba046f6#",
+    "@type": [
+      "http://www.w3.org/ns/prov#Activity",
+      "http://purl.org/wf4ever/wfprov#ProcessRun"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "renku run python src/plot_data.py data/preprocessed/zhbikes.parquet"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#endedAtTime": [
+      {
+        "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+        "@value": "2018-09-04T10:41:02"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedAssociation": [
+      {
+        "@id": "_:b2"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedUsage": [
+      {
+        "@id": "_:b3"
+      },
+      {
+        "@id": "_:b4"
+      }
+    ],
+    "http://www.w3.org/ns/prov#startedAtTime": [
+      {
+        "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+        "@value": "2018-09-04T10:41:02"
+      }
+    ]
+  },
+  {
+    "@id": "/90c458fceb7fa2f267c797ca44c29d93aba046f6/.renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://www.w3.org/ns/prov#Plan",
+      "http://purl.org/wf4ever/wfdesc#Process"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": ".renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl@90c458fceb7fa2f267c797ca44c29d93aba046f6"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ]
+  },
+  {
+    "@id": "/90c458fceb7fa2f267c797ca44c29d93aba046f6/figs/cumulative.png",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "figs/cumulative.png@90c458fceb7fa2f267c797ca44c29d93aba046f6"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedGeneration": [
+      {
+        "@id": "_:b1"
+      }
+    ]
+  },
+  {
+    "@id": "/90c458fceb7fa2f267c797ca44c29d93aba046f6/figs/grid_plot.png",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "figs/grid_plot.png@90c458fceb7fa2f267c797ca44c29d93aba046f6"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedGeneration": [
+      {
+        "@id": "_:b0"
+      }
+    ]
+  },
+  {
+    "@id": "/dda09be8bc7e60201298ad576aa72c5f9ff16bc8#",
+    "@type": [
+      "http://www.w3.org/ns/prov#Activity"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "renku dataset add zhbikes https://data.stadt-zuerich.ch/dataset/verkehrszaehlungen_werte_fussgaenger_velo/resource/ed354dde-c0f9-43b3-b05b-08c5f4c3f65a/download/2016_verkehrszaehlungen_werte_fussgaenger_velo.csv"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#endedAtTime": [
+      {
+        "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+        "@value": "2018-08-24T19:45:36"
+      }
+    ],
+    "http://www.w3.org/ns/prov#startedAtTime": [
+      {
+        "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+        "@value": "2018-08-24T19:45:36"
+      }
+    ]
+  },
+  {
+    "@id": "/dda09be8bc7e60201298ad576aa72c5f9ff16bc8/.gitattributes",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": ".gitattributes@dda09be8bc7e60201298ad576aa72c5f9ff16bc8"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedGeneration": [
+      {
+        "@id": "_:b11"
+      }
+    ]
+  },
+  {
+    "@id": "/dda09be8bc7e60201298ad576aa72c5f9ff16bc8/data/zhbikes",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "data/zhbikes@dda09be8bc7e60201298ad576aa72c5f9ff16bc8"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ]
+  },
+  {
+    "@id": "/dda09be8bc7e60201298ad576aa72c5f9ff16bc8/data/zhbikes/2016_verkehrszaehlungen_werte_fussgaenger_velo.csv",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "data/zhbikes/2016_verkehrszaehlungen_werte_fussgaenger_velo.csv@dda09be8bc7e60201298ad576aa72c5f9ff16bc8"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedGeneration": [
+      {
+        "@id": "_:b12"
+      }
+    ]
+  },
+  {
+    "@id": "/dda09be8bc7e60201298ad576aa72c5f9ff16bc8/data/zhbikes/metadata.yml",
+    "@type": [
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label": [
+      {
+        "@value": "data/zhbikes/metadata.yml@dda09be8bc7e60201298ad576aa72c5f9ff16bc8"
+      }
+    ],
+    "http://www.w3.org/ns/prov#atLocation": [
+      {
+        "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#qualifiedGeneration": [
+      {
+        "@id": "_:b13"
+      }
+    ]
+  },
+  {
+    "@id": "_:b0",
+    "@type": [
+      "http://www.w3.org/ns/prov#Generation"
+    ],
+    "http://www.w3.org/ns/prov#hadRole": [
+      {
+        "@value": "output_0"
+      }
+    ],
+    "http://www.w3.org/ns/prov#activity": [
+      {
+        "@id": "/90c458fceb7fa2f267c797ca44c29d93aba046f6#"
+      }
+    ]
+  },
+  {
+    "@id": "_:b1",
+    "@type": [
+      "http://www.w3.org/ns/prov#Generation"
+    ],
+    "http://www.w3.org/ns/prov#hadRole": [
+      {
+        "@value": "output_1"
+      }
+    ],
+    "http://www.w3.org/ns/prov#activity": [
+      {
+        "@id": "/90c458fceb7fa2f267c797ca44c29d93aba046f6#"
+      }
+    ]
+  },
+  {
+    "@id": "_:b10",
+    "@type": [
+      "http://www.w3.org/ns/prov#Usage"
+    ],
+    "http://www.w3.org/ns/prov#entity": [
+      {
+        "@id": "/dda09be8bc7e60201298ad576aa72c5f9ff16bc8/data/zhbikes"
+      }
+    ],
+    "http://www.w3.org/ns/prov#hadRole": [
+      {
+        "@value": "input_2"
+      }
+    ]
+  },
+  {
+    "@id": "_:b11",
+    "@type": [
+      "http://www.w3.org/ns/prov#Generation"
+    ],
+    "http://www.w3.org/ns/prov#activity": [
+      {
+        "@id": "/dda09be8bc7e60201298ad576aa72c5f9ff16bc8#"
+      }
+    ]
+  },
+  {
+    "@id": "_:b12",
+    "@type": [
+      "http://www.w3.org/ns/prov#Generation"
+    ],
+    "http://www.w3.org/ns/prov#activity": [
+      {
+        "@id": "/dda09be8bc7e60201298ad576aa72c5f9ff16bc8#"
+      }
+    ]
+  },
+  {
+    "@id": "_:b13",
+    "@type": [
+      "http://www.w3.org/ns/prov#Generation"
+    ],
+    "http://www.w3.org/ns/prov#activity": [
+      {
+        "@id": "/dda09be8bc7e60201298ad576aa72c5f9ff16bc8#"
+      }
+    ]
+  },
+  {
+    "@id": "_:b2",
+    "@type": [
+      "http://www.w3.org/ns/prov#Association"
+    ],
+    "http://www.w3.org/ns/prov#agent": [
+      {
+        "@id": "mailto:johann-michael.thiebaut@epfl.ch"
+      }
+    ],
+    "http://www.w3.org/ns/prov#hadPlan": [
+      {
+        "@id": "/90c458fceb7fa2f267c797ca44c29d93aba046f6/.renku/workflow/77e7717945f449328cb276adfc69a06e_python.cwl"
+      }
+    ]
+  },
+  {
+    "@id": "_:b3",
+    "@type": [
+      "http://www.w3.org/ns/prov#Usage"
+    ],
+    "http://www.w3.org/ns/prov#entity": [
+      {
+        "@id": "/01f169f0beac20c7b3646b48df4010a15787adf8/src/plot_data.py"
+      }
+    ],
+    "http://www.w3.org/ns/prov#hadRole": [
+      {
+        "@value": "input_1"
+      }
+    ]
+  },
+  {
+    "@id": "_:b4",
+    "@type": [
+      "http://www.w3.org/ns/prov#Usage"
+    ],
+    "http://www.w3.org/ns/prov#entity": [
+      {
+        "@id": "/07b64b6cd153cf7988e2f9cca41c58e296f57b75/data/preprocessed/zhbikes.parquet"
+      }
+    ],
+    "http://www.w3.org/ns/prov#hadRole": [
+      {
+        "@value": "input_2"
+      }
+    ]
+  },
+  {
+    "@id": "_:b5",
+    "@type": [
+      "http://www.w3.org/ns/prov#Generation"
+    ],
+    "http://www.w3.org/ns/prov#activity": [
+      {
+        "@id": "/01f169f0beac20c7b3646b48df4010a15787adf8#"
+      }
+    ]
+  },
+  {
+    "@id": "_:b6",
+    "@type": [
+      "http://www.w3.org/ns/prov#Generation"
+    ],
+    "http://www.w3.org/ns/prov#activity": [
+      {
+        "@id": "/01f169f0beac20c7b3646b48df4010a15787adf8#"
+      }
+    ]
+  },
+  {
+    "@id": "_:b7",
+    "@type": [
+      "http://www.w3.org/ns/prov#Generation"
+    ],
+    "http://www.w3.org/ns/prov#hadRole": [
+      {
+        "@value": "output_0"
+      }
+    ],
+    "http://www.w3.org/ns/prov#activity": [
+      {
+        "@id": "/07b64b6cd153cf7988e2f9cca41c58e296f57b75#"
+      }
+    ]
+  },
+  {
+    "@id": "_:b8",
+    "@type": [
+      "http://www.w3.org/ns/prov#Association"
+    ],
+    "http://www.w3.org/ns/prov#agent": [
+      {
+        "@id": "mailto:johann-michael.thiebaut@epfl.ch"
+      }
+    ],
+    "http://www.w3.org/ns/prov#hadPlan": [
+      {
+        "@id": "/07b64b6cd153cf7988e2f9cca41c58e296f57b75/.renku/workflow/08e08333b8304e3d90c168d47a64a82f_python.cwl"
+      }
+    ]
+  },
+  {
+    "@id": "_:b9",
+    "@type": [
+      "http://www.w3.org/ns/prov#Usage"
+    ],
+    "http://www.w3.org/ns/prov#entity": [
+      {
+        "@id": "/01f169f0beac20c7b3646b48df4010a15787adf8/src/clean_data.py"
+      }
+    ],
+    "http://www.w3.org/ns/prov#hadRole": [
+      {
+        "@value": "input_1"
+      }
+    ]
+  },
+  {
+    "@id": "https://renkulab.io/johann-michael.thiebaut/tutorial-zhbikes",
+    "@type": [
+      "http://xmlns.com/foaf/0.1/Project",
+      "http://purl.org/dc/terms/Location"
+    ]
+  },
+  {
+    "@id": "mailto:johann-michael.thiebaut@epfl.ch",
+    "@type": [
+      "http://purl.org/dc/terms/Person",
+      "http://xmlns.com/foaf/0.1/Person"
+    ],
+    "http://xmlns.com/foaf/0.1/mbox": [
+      {
+        "@id": "mailto:johann-michael.thiebaut@epfl.ch"
+      }
+    ],
+    "http://xmlns.com/foaf/0.1/name": [
+      {
+        "@value": "Johann-Michael Thiebaut"
+      }
+    ]
+  }
+]
