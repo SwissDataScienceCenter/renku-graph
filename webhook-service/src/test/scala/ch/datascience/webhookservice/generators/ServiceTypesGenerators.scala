@@ -1,5 +1,7 @@
 package ch.datascience.webhookservice.generators
 
+import java.nio.file.Paths
+
 import ch.datascience.generators.Generators._
 import ch.datascience.webhookservice._
 import ch.datascience.webhookservice.queue.TriplesFile
@@ -30,5 +32,8 @@ object ServiceTypesGenerators {
     projectName <- projectNames
   } yield PushEvent(sha, repositoryUrl, projectName)
 
-  implicit val triplesFiles: Gen[TriplesFile] = relativePaths map TriplesFile
+  implicit val triplesFiles: Gen[TriplesFile] =
+    relativePaths
+      .map(stringPath => Paths.get(stringPath))
+      .map(TriplesFile)
 }
