@@ -28,12 +28,12 @@ class PushEventQueueSpec
       val triplesFile: TriplesFile = triplesFiles.generateOne
 
       givenGenerateTriples(pushEvent) returning Future.successful(Right(triplesFile))
-      givenTriplesFileUpload(triplesFile, pushEvent.projectName) returning Future.successful()
+      givenTriplesFileUpload(triplesFile) returning Future.successful()
 
       pushEventQueue.offer(pushEvent).futureValue shouldBe Enqueued
 
       eventually {
-        verifyTriplesFileUpload(triplesFile, pushEvent.projectName)
+        verifyTriplesFileUpload(triplesFile)
       }
     }
 
@@ -49,8 +49,8 @@ class PushEventQueueSpec
       eventually {
         verifyGeneratingTriplesError(pushEvent, exception)
 
-        (fusekiConnector.uploadFile(_: TriplesFile, _: ProjectName)(_: ExecutionContext))
-          .verify(*, *, *)
+        (fusekiConnector.uploadFile(_: TriplesFile)(_: ExecutionContext))
+          .verify(*, *)
           .never()
       }
     }
@@ -63,12 +63,12 @@ class PushEventQueueSpec
       givenGenerateTriples(pushEvent) returning Future.successful(Right(triplesFile))
 
       val exception = new Exception("error")
-      givenTriplesFileUpload(triplesFile, pushEvent.projectName) returning Future.failed(exception)
+      givenTriplesFileUpload(triplesFile) returning Future.failed(exception)
 
       pushEventQueue.offer(pushEvent).futureValue shouldBe Enqueued
 
       eventually {
-        verifyTriplesFileUpload(triplesFile, pushEvent.projectName)
+        verifyTriplesFileUpload(triplesFile)
         verifyUploadingTriplesFileError(pushEvent, exception)
       }
     }
@@ -77,7 +77,7 @@ class PushEventQueueSpec
       val pushEvent1: PushEvent = pushEvents.generateOne
       val triplesFile1: TriplesFile = triplesFiles.generateOne
       givenGenerateTriples(pushEvent1) returning Future.successful(Right(triplesFile1))
-      givenTriplesFileUpload(triplesFile1, pushEvent1.projectName) returning Future.successful()
+      givenTriplesFileUpload(triplesFile1) returning Future.successful()
 
       val pushEvent2: PushEvent = pushEvents.generateOne
       val exception2 = new Exception("error 2")
@@ -87,12 +87,12 @@ class PushEventQueueSpec
       val triplesFile3: TriplesFile = triplesFiles.generateOne
       val exception3 = new Exception("error 3")
       givenGenerateTriples(pushEvent3) returning Future.successful(Right(triplesFile3))
-      givenTriplesFileUpload(triplesFile3, pushEvent3.projectName) returning Future.failed(exception3)
+      givenTriplesFileUpload(triplesFile3) returning Future.failed(exception3)
 
       val pushEvent4: PushEvent = pushEvents.generateOne
       val triplesFile4: TriplesFile = triplesFiles.generateOne
       givenGenerateTriples(pushEvent4) returning Future.successful(Right(triplesFile4))
-      givenTriplesFileUpload(triplesFile4, pushEvent4.projectName) returning Future.successful()
+      givenTriplesFileUpload(triplesFile4) returning Future.successful()
 
       pushEventQueue.offer(pushEvent1).futureValue shouldBe Enqueued
       pushEventQueue.offer(pushEvent2).futureValue shouldBe Enqueued
@@ -100,13 +100,13 @@ class PushEventQueueSpec
       pushEventQueue.offer(pushEvent4).futureValue shouldBe Enqueued
 
       eventually {
-        verifyTriplesFileUpload(triplesFile1, pushEvent1.projectName)
+        verifyTriplesFileUpload(triplesFile1)
 
         verifyGeneratingTriplesError(pushEvent2, exception2)
 
         verifyUploadingTriplesFileError(pushEvent3, exception3)
 
-        verifyTriplesFileUpload(triplesFile4, pushEvent4.projectName)
+        verifyTriplesFileUpload(triplesFile4)
       }
     }
   }
@@ -129,10 +129,10 @@ class PushEventQueueSpec
           .returning(outcome)
     }
 
-    def givenTriplesFileUpload(triplesFile: TriplesFile, projectName: ProjectName) = new {
+    def givenTriplesFileUpload(triplesFile: TriplesFile) = new {
       def returning(outcome: Future[Unit]) =
-        (fusekiConnector.uploadFile(_: TriplesFile, _: ProjectName)(_: ExecutionContext))
-          .when(triplesFile, projectName, implicitly[ExecutionContext])
+        (fusekiConnector.uploadFile(_: TriplesFile)(_: ExecutionContext))
+          .when(triplesFile, implicitly[ExecutionContext])
           .returning(outcome)
     }
 
@@ -144,8 +144,8 @@ class PushEventQueueSpec
       (logger.error(_: String))
         .verify(s"Uploading triples for $pushEvent failed: ${exception.getMessage}")
 
-    def verifyTriplesFileUpload(triplesFile: TriplesFile, projectName: ProjectName) =
-      (fusekiConnector.uploadFile(_: TriplesFile, _: ProjectName)(_: ExecutionContext))
-        .verify(triplesFile, projectName, implicitly[ExecutionContext])
+    def verifyTriplesFileUpload(triplesFile: TriplesFile) =
+      (fusekiConnector.uploadFile(_: TriplesFile)(_: ExecutionContext))
+        .verify(triplesFile, implicitly[ExecutionContext])
   }
 }

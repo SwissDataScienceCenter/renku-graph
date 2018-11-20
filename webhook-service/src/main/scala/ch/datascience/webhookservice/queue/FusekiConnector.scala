@@ -2,9 +2,9 @@ package ch.datascience.webhookservice.queue
 
 import java.net.URL
 
-import ch.datascience.tinytypes.TinyType
-import ch.datascience.webhookservice.ProjectName
-import ch.datascience.webhookservice.queue.FusekiConnector.FusekiUrl
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringValue, TinyType}
+import ch.datascience.webhookservice.queue.FusekiConnector.{DatasetName, FusekiUrl}
 import com.typesafe.config.Config
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 
@@ -13,14 +13,14 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 private class FusekiConnector(fusekiBaseUrl: FusekiUrl,
+                              datasetName: DatasetName,
                               fusekiConnectionBuilder: FusekiUrl => RDFConnection) {
 
-  def uploadFile(triplesFile: TriplesFile,
-                 projectName: ProjectName)
+  def uploadFile(triplesFile: TriplesFile)
                 (implicit executionContext: ExecutionContext): Future[Unit] = Future {
     var connection = Option.empty[RDFConnection]
     Try {
-      connection = Some(fusekiConnectionBuilder(fusekiBaseUrl / projectName))
+      connection = Some(fusekiConnectionBuilder(fusekiBaseUrl / datasetName))
       connection foreach { conn =>
         conn.load(triplesFile.value)
         conn.close()
@@ -37,6 +37,15 @@ private class FusekiConnector(fusekiBaseUrl: FusekiUrl,
 private object FusekiConnector {
 
   import ch.datascience.config.ConfigOps.Implicits._
+
+  case class DatasetName(value: String) extends StringValue with NonBlank
+
+  object DatasetName {
+
+    implicit object DatasetNameFinder extends (Config => String => DatasetName) {
+      override def apply(config: Config): String => DatasetName = key => DatasetName(config.getString(key))
+    }
+  }
 
   case class FusekiUrl(value: URL) extends TinyType[URL]
 
@@ -56,7 +65,8 @@ private object FusekiConnector {
   }
 
   def apply(config: Config): FusekiConnector = {
-    val fusekiBaseUrl = config.get[FusekiUrl]("services.fuseki-url")
+    val datasetName = config.get[DatasetName]("services.fuseki.dataset-name")
+    val fusekiBaseUrl = config.get[FusekiUrl]("services.fuseki.url")
     val connectionBuilder: FusekiUrl => RDFConnection =
       fusekiUrl =>
         RDFConnectionFuseki
@@ -64,6 +74,6 @@ private object FusekiConnector {
           .destination(fusekiUrl.value.toString)
           .build()
 
-    new FusekiConnector(fusekiBaseUrl, connectionBuilder)
+    new FusekiConnector(fusekiBaseUrl, datasetName, connectionBuilder)
   }
 }

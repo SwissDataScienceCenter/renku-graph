@@ -46,7 +46,7 @@ class PushEventQueue(triplesFinder: TriplesFinder,
       .mapAsyncUnordered(1) {
         case (event, triplesFile) =>
           jenaConnector
-            .uploadFile(triplesFile, event.projectName)
+            .uploadFile(triplesFile)
             .recover {
               case exception =>
                 logger.error(s"Uploading triples for $event failed: ${exception.getMessage}")
