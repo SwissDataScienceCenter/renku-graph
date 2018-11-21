@@ -1,31 +1,52 @@
-enablePlugins(JavaAppPackaging)
-
 organization := "ch.datascience"
 name := "webhook-service"
-version := "0.1.0"
+version := "0.1.0-SNAPSHOT"
 
 scalaVersion := "2.12.7"
 
-fork in runMain := true
+enablePlugins(PlayScala, JavaAppPackaging)
 
-resolvers += "bblfish-snapshots" at "http://bblfish.net/work/repo/releases"
+resolvers += Resolver.sonatypeRepo("snapshots")
 
-libraryDependencies ++= {
-  val akkaHttpVersion = "10.1.5"
-  val akkaVersion = "2.5.12"
+libraryDependencies += "ch.datascience" %% "renku-commons" % "0.2.0-SNAPSHOT"
 
-  Seq(
-    "com.lihaoyi"       %% "ammonite-ops"         % "1.4.2",
-    "org.typelevel"     %% "cats-core"            % "1.4.0",
-    "com.typesafe.akka" %% "akka-http"            % akkaHttpVersion,
-    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
-    "com.typesafe.akka" %% "akka-slf4j"           % akkaVersion,
-    "com.typesafe.akka" %% "akka-stream"          % akkaVersion,
-    "org.apache.jena"   %  "jena-rdfconnection"   % "3.9.0",
-    
-    "com.typesafe.akka" %% "akka-http-testkit"    % akkaHttpVersion % Test,
-    "org.scalacheck"    %% "scalacheck"           % "1.14.0"        % Test,
-    "org.scalamock"     %% "scalamock"            % "4.1.0"         % Test,
-    "org.scalatest"     %% "scalatest"            % "3.0.5"         % Test
-  )
-}
+libraryDependencies += "com.lihaoyi" %% "ammonite-ops" % "1.4.2"
+
+libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % "3.9.0"
+
+libraryDependencies += "org.typelevel" %% "cats-core" % "1.4.0"
+
+//Test dependencies
+libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
+libraryDependencies += "org.scalamock" %% "scalamock" % "4.1.0" % Test
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test
+
+import scalariform.formatter.preferences._
+
+scalariformPreferences := scalariformPreferences.value
+    .setPreference( AlignArguments,                               true  )
+    .setPreference( AlignParameters,                              true  )
+    .setPreference( AlignSingleLineCaseStatements,                true  )
+    .setPreference( AlignSingleLineCaseStatements.MaxArrowIndent, 40    )
+    .setPreference( CompactControlReadability,                    true  )
+    .setPreference( CompactStringConcatenation,                   false )
+    .setPreference( DanglingCloseParenthesis,                     Force )
+    .setPreference( DoubleIndentConstructorArguments,             true  )
+    .setPreference( DoubleIndentMethodDeclaration,                true  )
+    .setPreference( FirstArgumentOnNewline,                       Force )
+    .setPreference( FirstParameterOnNewline,                      Force )
+    .setPreference( FormatXml,                                    true  )
+    .setPreference( IndentPackageBlocks,                          true  )
+    .setPreference( IndentSpaces,                                 2     )
+    .setPreference( IndentWithTabs,                               false )
+    .setPreference( MultilineScaladocCommentsStartOnFirstLine,    false )
+    .setPreference( NewlineAtEndOfFile,                           true  )
+    .setPreference( PlaceScaladocAsterisksBeneathSecondAsterisk,  false )
+    .setPreference( PreserveSpaceBeforeArguments,                 false )
+    .setPreference( RewriteArrowSymbols,                          false )
+    .setPreference( SpaceBeforeColon,                             false )
+    .setPreference( SpaceBeforeContextColon,                      true  )
+    .setPreference( SpaceInsideBrackets,                          false )
+    .setPreference( SpaceInsideParentheses,                       true  )
+    .setPreference( SpacesAroundMultiImports,                     true  )
+    .setPreference( SpacesWithinPatternBinders,                   false )

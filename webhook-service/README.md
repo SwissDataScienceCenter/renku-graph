@@ -16,7 +16,7 @@ docker build -t webhook-service .
 - run the service
 
 ```bash
-docker run --rm -p 9000:9000 webhook-service
+docker run --rm -e 'PLAY_APPLICATION_SECRET=tLm_qFcq]L2>s>s`xd6iu6R[BHfK]>hgd/=HOx][][Yldf@kQIvrh:;C6P08?Fmh' -e 'FUSEKI_BASE_URL=<fuseki-url>' -p 9000:9000 webhook-service
 ```
 
 - play with the endpoint

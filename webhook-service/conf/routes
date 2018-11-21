@@ -1,0 +1,1 @@
+POST    /webhook-event        ch.datascience.webhookservice.WebhookController.processWebhookEvent
