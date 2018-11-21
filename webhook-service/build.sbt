@@ -4,7 +4,11 @@ version := "0.1.0-SNAPSHOT"
 
 scalaVersion := "2.12.7"
 
-enablePlugins(PlayScala, JavaAppPackaging)
+organizationName := "Swiss Data Science Center (SDSC)\nA partnership between École Polytechnique Fédérale de Lausanne (EPFL) and\nEidgenössische Technische Hochschule Zürich (ETHZ)."
+startYear := Some(java.time.LocalDate.now().getYear)
+licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
+
+enablePlugins(PlayScala, JavaAppPackaging, AutomateHeaderPlugin)
 
 resolvers += Resolver.sonatypeRepo("snapshots")
 
