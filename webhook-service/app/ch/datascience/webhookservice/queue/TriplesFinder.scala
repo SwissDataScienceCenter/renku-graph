@@ -22,12 +22,14 @@ import java.io.{ ByteArrayInputStream, InputStream }
 import java.nio.file.Files.copy
 import java.security.SecureRandom
 
+import cats.implicits._
 import ch.datascience.webhookservice.{ CheckoutSha, GitRepositoryUrl, queue }
 import javax.inject.{ Inject, Singleton }
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.language.implicitConversions
 import scala.util.Try
+import scala.util.control.NonFatal
 
 @Singleton
 private class TriplesFinder(
@@ -67,13 +69,12 @@ private class TriplesFinder(
       _ <- pure( removeSilently( repositoryDirectory ) )
     } yield triplesFile
 
-    maybeTriplesFile.fold(
-      exception => {
+    maybeTriplesFile.toEither.leftMap {
+      case NonFatal( exception ) =>
         removeSilently( repositoryDirectory )
-        Left( exception )
-      },
-      triplesFile => Right( triplesFile )
-    )
+        exception
+      case other => throw other
+    }
   }
 
   private def extractRepositoryName( gitRepositoryUrl: GitRepositoryUrl ): String = gitRepositoryUrl.value match {
