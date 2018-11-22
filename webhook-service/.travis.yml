@@ -1,7 +1,5 @@
-branches:
-  only:
-  - master
 language: scala
+jdk: openjdk8
 scala:
 - 2.12.7
 script:
