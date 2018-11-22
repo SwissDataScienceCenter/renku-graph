@@ -1,3 +1,6 @@
+branches:
+  only:
+  - master
 language: scala
 jdk: openjdk8
 scala:
