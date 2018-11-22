@@ -26,7 +26,6 @@ import play.api.mvc.{ AbstractController, ControllerComponents }
 import play.api.{ Logger, LoggerLike }
 
 import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.Try
 
 @Singleton
 class WebhookController(
@@ -65,33 +64,14 @@ class WebhookController(
 
 object WebhookController {
 
+  import ch.datascience.tinytypes.json._
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._
   import play.api.libs.json._
 
-  private implicit val gitRepositoryUrlReads: Reads[GitRepositoryUrl] = Reads[GitRepositoryUrl] {
-    case JsString( value ) => Try( GitRepositoryUrl( value ) ).fold(
-      error => JsError( error.getMessage ),
-      value => JsSuccess( value )
-    )
-    case other => JsError( s"$other is not a valid GitRepositoryUrl" )
-  }
-
-  private implicit val checkoutShaReads: Reads[CheckoutSha] = Reads[CheckoutSha] {
-    case JsString( value ) => Try( CheckoutSha( value ) ).fold(
-      error => JsError( error.getMessage ),
-      value => JsSuccess( value )
-    )
-    case other => JsError( s"$other is not a valid CheckoutSha" )
-  }
-
-  private implicit val projectNameReads: Reads[ProjectName] = Reads[ProjectName] {
-    case JsString( value ) => Try( ProjectName( value ) ).fold(
-      error => JsError( error.getMessage ),
-      value => JsSuccess( value )
-    )
-    case other => JsError( s"$other is not a valid ProjectName" )
-  }
+  private implicit val gitRepositoryUrlReads: Reads[GitRepositoryUrl] = TinyTypeReads( GitRepositoryUrl )
+  private implicit val checkoutShaReads: Reads[CheckoutSha] = TinyTypeReads( CheckoutSha )
+  private implicit val projectNameReads: Reads[ProjectName] = TinyTypeReads( ProjectName )
 
   private[webhookservice] implicit val pushEventReads: Reads[PushEvent] = (
     ( __ \ "checkout_sha" ).read[CheckoutSha] and
