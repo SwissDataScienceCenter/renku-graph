@@ -18,11 +18,10 @@
 
 package ch.datascience.webhookservice.generators
 
-import java.nio.file.Paths
-
 import ch.datascience.generators.Generators._
 import ch.datascience.webhookservice._
-import ch.datascience.webhookservice.queue.TriplesFile
+import ch.datascience.webhookservice.queue.RDFTriples
+import org.apache.jena.rdf.model.ModelFactory
 import org.scalacheck.Gen
 
 object ServiceTypesGenerators {
@@ -50,8 +49,14 @@ object ServiceTypesGenerators {
     projectName <- projectNames
   } yield PushEvent( sha, repositoryUrl, projectName )
 
-  implicit val triplesFiles: Gen[TriplesFile] =
-    relativePaths
-      .map( stringPath => Paths.get( stringPath ) )
-      .map( TriplesFile )
+  implicit val rdfTriplesSets: Gen[RDFTriples] = for {
+    model <- Gen.uuid.map( _ => ModelFactory.createDefaultModel() )
+    subject <- nonEmptyStrings() map model.createResource
+    predicate <- nonEmptyStrings() map model.createProperty
+  } yield {
+    val `object` = model.createResource
+    model.add( subject, predicate, `object` )
+    RDFTriples( model )
+  }
+
 }

@@ -21,6 +21,7 @@ package ch.datascience.webhookservice.queue
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import org.apache.jena.rdf.model.Model
 import org.apache.jena.rdfconnection.RDFConnection
 import org.scalamock.function.MockFunction1
 import org.scalamock.scalatest.MockFactory
@@ -43,13 +44,13 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
         .expects( FusekiUrl( s"$fusekiBaseUrl/$datasetName" ) )
         .returning( fusekiConnection )
 
-      ( fusekiConnection.load( _: String ) )
-        .expects( triplesFileAsString )
+      ( fusekiConnection.load( _: Model ) )
+        .expects( rdfTriples.value )
 
       ( fusekiConnection.close _ )
         .expects()
 
-      fusekiConnector.uploadFile( triplesFile ).futureValue
+      fusekiConnector.uploadFile( rdfTriples ).futureValue
     }
 
     "return failure if upload to Jena Fuseki fails" in new TestCase {
@@ -59,15 +60,15 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
         .returning( fusekiConnection )
 
       val exception: Exception = new Exception( "message" )
-      ( fusekiConnection.load( _: String ) )
-        .expects( triplesFileAsString )
+      ( fusekiConnection.load( _: Model ) )
+        .expects( rdfTriples.value )
         .throwing( exception )
 
       ( fusekiConnection.close _ )
         .expects()
 
       intercept[Exception] {
-        Await.result( fusekiConnector.uploadFile( triplesFile ), 1 second )
+        Await.result( fusekiConnector.uploadFile( rdfTriples ), 1 second )
       } shouldBe exception
     }
 
@@ -79,7 +80,7 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
         .throwing( exception )
 
       intercept[Exception] {
-        Await.result( fusekiConnector.uploadFile( triplesFile ), 1 second )
+        Await.result( fusekiConnector.uploadFile( rdfTriples ), 1 second )
       } shouldBe exception
     }
 
@@ -89,8 +90,8 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
         .expects( FusekiUrl( s"$fusekiBaseUrl/$datasetName" ) )
         .returning( fusekiConnection )
 
-      ( fusekiConnection.load( _: String ) )
-        .expects( triplesFileAsString )
+      ( fusekiConnection.load( _: Model ) )
+        .expects( rdfTriples.value )
 
       val exception: Exception = new Exception( "message" )
       ( fusekiConnection.close _ )
@@ -98,15 +99,14 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
         .throwing( exception )
 
       intercept[Exception] {
-        Await.result( fusekiConnector.uploadFile( triplesFile ), 1 second )
+        Await.result( fusekiConnector.uploadFile( rdfTriples ), 1 second )
       } shouldBe exception
     }
   }
 
   private trait TestCase {
 
-    val triplesFile: TriplesFile = triplesFiles.generateOne
-    val triplesFileAsString: String = triplesFile.value.toAbsolutePath.toString
+    val rdfTriples: RDFTriples = rdfTriplesSets.generateOne
 
     val fusekiConnectionBuilder: MockFunction1[FusekiUrl, RDFConnection] = mockFunction[FusekiUrl, RDFConnection]
     val fusekiConnection: RDFConnection = mock[RDFConnection]

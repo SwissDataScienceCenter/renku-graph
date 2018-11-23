@@ -18,12 +18,15 @@
 
 package ch.datascience.webhookservice.queue
 
+import java.io.InputStream
+
 import ammonite.ops.root
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.{ CheckoutSha, GitRepositoryUrl }
 import org.scalacheck.Gen
+import org.scalamock.function.{ MockFunction0, MockFunction1 }
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -39,7 +42,8 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
     "create a temp directory, " +
       "clone the repo into it, " +
       "check out the commit, " +
-      "call 'renku log' and saves the result in a file and " +
+      "call 'renku log', " +
+      "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
         ( file.mkdir( _: Path ) )
           .expects( repositoryDirectory )
@@ -50,13 +54,18 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
         ( git.checkout( _: CheckoutSha, _: Path ) )
           .expects( checkoutSha, repositoryDirectory )
 
-        ( renku.logToFile( _: TriplesFile, _: Path ) )
-          .expects( triplesFile, repositoryDirectory )
+        ( renku.log( _: Path ) )
+          .expects( repositoryDirectory )
+          .returning( rdfTriplesStream )
+
+        toRdfTriples
+          .expects( rdfTriplesStream )
+          .returning( rdfTriples )
 
         ( file.removeSilently( _: Path ) )
           .expects( repositoryDirectory )
 
-        triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Right( triplesFile )
+        triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Right( rdfTriples )
       }
 
     "return an error if create a temp directory fails" in new TestCase {
@@ -115,8 +124,33 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
         .expects( checkoutSha, repositoryDirectory )
 
       val exception = new Exception( "message" )
-      ( renku.logToFile( _: TriplesFile, _: Path ) )
-        .expects( triplesFile, repositoryDirectory )
+      ( renku.log( _: Path ) )
+        .expects( repositoryDirectory )
+        .throwing( exception )
+
+      ( file.removeSilently( _: Path ) )
+        .expects( repositoryDirectory )
+
+      triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Left( exception )
+    }
+
+    "return an error if converting the rdf triples stream to rdf triples fails" in new TestCase {
+      ( file.mkdir( _: Path ) )
+        .expects( repositoryDirectory )
+
+      ( git.cloneRepo( _: GitRepositoryUrl, _: Path, _: Path ) )
+        .expects( gitRepositoryUrl, repositoryDirectory, workDirectory )
+
+      ( git.checkout( _: CheckoutSha, _: Path ) )
+        .expects( checkoutSha, repositoryDirectory )
+
+      ( renku.log( _: Path ) )
+        .expects( repositoryDirectory )
+        .returning( rdfTriplesStream )
+
+      val exception = new Exception( "message" )
+      toRdfTriples
+        .expects( rdfTriplesStream )
         .throwing( exception )
 
       ( file.removeSilently( _: Path ) )
@@ -135,8 +169,13 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
       ( git.checkout( _: CheckoutSha, _: Path ) )
         .expects( checkoutSha, repositoryDirectory )
 
-      ( renku.logToFile( _: TriplesFile, _: Path ) )
-        .expects( triplesFile, repositoryDirectory )
+      ( renku.log( _: Path ) )
+        .expects( repositoryDirectory )
+        .returning( rdfTriplesStream )
+
+      toRdfTriples
+        .expects( rdfTriplesStream )
+        .returning( rdfTriples )
 
       val exception = new Exception( "message" )
       ( file.removeSilently( _: Path ) )
@@ -158,13 +197,15 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
 
     val workDirectory = root / "tmp"
     val repositoryDirectory = workDirectory / s"$repositoryName-$pathDifferentiator"
-    val triplesFile = TriplesFile( ( workDirectory / s"$repositoryName-$pathDifferentiator.rdf" ).toNIO )
+    val rdfTriplesStream = mock[InputStream]
+    val rdfTriples = rdfTriplesSets.generateOne
 
-    val file = mock[Commands.File]
-    val git = mock[Commands.Git]
-    val renku = mock[Commands.Renku]
-    val randomLong = mockFunction[Long]
+    val file: Commands.File = mock[Commands.File]
+    val git: Commands.Git = mock[Commands.Git]
+    val renku: Commands.Renku = mock[Commands.Renku]
+    val randomLong: MockFunction0[Long] = mockFunction[Long]
+    val toRdfTriples: MockFunction1[InputStream, RDFTriples] = mockFunction[InputStream, RDFTriples]
     randomLong.expects().returning( pathDifferentiator )
-    val triplesFinder = new TriplesFinder( file, git, renku, randomLong )
+    val triplesFinder = new TriplesFinder( file, git, renku, toRdfTriples, randomLong )
   }
 }

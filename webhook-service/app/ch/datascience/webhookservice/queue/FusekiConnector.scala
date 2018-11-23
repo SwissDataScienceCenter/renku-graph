@@ -74,12 +74,12 @@ private class FusekiConnector(
         .build()
   )
 
-  def uploadFile( triplesFile: TriplesFile )( implicit executionContext: ExecutionContext ): Future[Unit] = Future {
+  def uploadFile( rdfTriples: RDFTriples )( implicit executionContext: ExecutionContext ): Future[Unit] = Future {
     var connection = Option.empty[RDFConnection]
     Try {
       connection = Some( fusekiConnectionBuilder( fusekiBaseUrl / datasetName ) )
       connection foreach { conn =>
-        conn.load( triplesFile.value.toAbsolutePath.toString )
+        conn.load( rdfTriples.value )
         conn.close()
       }
     } match {

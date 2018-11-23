@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.queue
 
 import akka.stream.OverflowStrategy.backpressure
-import akka.stream.scaladsl.{ Keep, Sink, Source }
+import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
 import akka.stream.{ Materializer, QueueOfferResult }
 import akka.{ Done, NotUsed }
 import ch.datascience.webhookservice.PushEvent
@@ -27,24 +27,21 @@ import javax.inject.{ Inject, Singleton }
 import play.api.{ Logger, LoggerLike }
 
 import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.control.NonFatal
 
 @Singleton
 class PushEventQueue(
     triplesFinder:   TriplesFinder,
     fusekiConnector: FusekiConnector,
     queueConfig:     QueueConfig,
-    fileCommands:    Commands.File,
     logger:          LoggerLike
 )( implicit executionContext: ExecutionContext, materializer: Materializer ) {
 
   @Inject() def this(
       triplesFinder:   TriplesFinder,
       fusekiConnector: FusekiConnector,
-      queueConfig:     QueueConfig,
-      fileCommands:    Commands.File
+      queueConfig:     QueueConfig
   )( implicit executionContext: ExecutionContext, materializer: Materializer ) =
-    this( triplesFinder, fusekiConnector, queueConfig, fileCommands, Logger )
+    this( triplesFinder, fusekiConnector, queueConfig, Logger )
 
   import queueConfig._
 
@@ -54,39 +51,34 @@ class PushEventQueue(
   private lazy val queue = Source.queue[PushEvent](
     bufferSize.value,
     overflowStrategy = backpressure
-  ).mapAsync( triplesFinderThreads.value )( pushEventToTriples )
+  ).mapAsync( triplesFinderThreads.value )( pushEventToRdfTriples )
     .flatMapConcat( logAndSkipErrors )
-    .mapAsync( fusekiUploadThreads.value )( toFuseki )
-    .map( deleteTriplesFile )
-    .toMat( Sink.ignore )( Keep.left )
+    .toMat( fusekiSink )( Keep.left )
     .run()
 
-  private def pushEventToTriples( pushEvent: PushEvent ): Future[( PushEvent, Either[Throwable, TriplesFile] )] =
+  private def pushEventToRdfTriples( pushEvent: PushEvent ): Future[( PushEvent, Either[Throwable, RDFTriples] )] =
     triplesFinder.generateTriples( pushEvent.gitRepositoryUrl, pushEvent.checkoutSha )
       .map( maybeTriplesFile => pushEvent -> maybeTriplesFile )
 
-  private lazy val logAndSkipErrors: ( ( PushEvent, Either[Throwable, TriplesFile] ) ) => Source[( PushEvent, TriplesFile ), NotUsed] = {
+  private lazy val logAndSkipErrors: ( ( PushEvent, Either[Throwable, RDFTriples] ) ) => Source[( PushEvent, RDFTriples ), NotUsed] = {
     case ( event, Left( exception ) ) =>
       logger.error( s"Generating triples for $event failed: ${exception.getMessage}" )
-      Source.empty[( PushEvent, TriplesFile )]
+      Source.empty[( PushEvent, RDFTriples )]
     case ( event, Right( triplesFile ) ) =>
       Source.single( event -> triplesFile )
   }
 
-  private val toFuseki: ( ( PushEvent, TriplesFile ) ) => Future[TriplesFile] = {
-    case ( event, triplesFile ) =>
-      fusekiConnector
-        .uploadFile( triplesFile )
-        .map( _ => triplesFile )
-        .recover {
-          case NonFatal( exception: Exception ) =>
-            logger.error( s"Uploading triples for $event failed: ${exception.getMessage}" )
-            triplesFile
-        }
-  }
-
-  private def deleteTriplesFile( triplesFile: TriplesFile ): Done = {
-    fileCommands.removeSilently( triplesFile.value )
-    Done
-  }
+  private lazy val fusekiSink: Sink[( PushEvent, RDFTriples ), Future[Done]] =
+    Flow[( PushEvent, RDFTriples )]
+      .mapAsync( fusekiUploadThreads.value ) {
+        case ( event, triplesFile ) =>
+          fusekiConnector
+            .uploadFile( triplesFile )
+            .recover {
+              case exception =>
+                logger.error( s"Uploading triples for $event failed: ${exception.getMessage}" )
+                Done
+            }
+      }
+      .toMat( Sink.ignore )( Keep.right )
 }

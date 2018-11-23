@@ -18,8 +18,7 @@
 
 package ch.datascience.webhookservice.queue
 
-import java.nio.file.Path
-
 import ch.datascience.tinytypes.TinyType
+import org.apache.jena.rdf.model.Model
 
-case class TriplesFile( value: Path ) extends TinyType[Path]
+case class RDFTriples( value: Model ) extends TinyType[Model]
