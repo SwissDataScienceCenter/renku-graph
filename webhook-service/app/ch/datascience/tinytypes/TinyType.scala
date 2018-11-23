@@ -18,19 +18,46 @@
 
 package ch.datascience.tinytypes
 
-trait TinyType[T] extends ConstraintCheck with TypeName {
+trait TinyType[T] extends Any {
+
   def value: T
 
-  override lazy val toString: String = value.toString
+  override def toString: String = value.toString
 }
 
-trait ConstraintCheck {
-  protected[this] def verify( requirement: Boolean, message: => String ): Unit =
-    if ( !requirement ) throw new IllegalArgumentException( message )
+abstract class TinyTypeFactory[V, TT <: TinyType[V]]( instantiate: V => TT )
+  extends Constraints[V]
+  with TypeName {
+
+  final def apply( value: V ): TT = {
+    verify( value )
+    instantiate( value )
+  }
+
+  final def unapply( sha: TT ): Option[V] = Some( sha.value )
+
+  private def verify( value: V ): Unit = {
+    val maybeErrors = validateConstraints( value )
+    if ( maybeErrors.nonEmpty ) throw new IllegalArgumentException( maybeErrors.mkString( "; " ) )
+  }
+}
+
+trait Constraints[V] extends TypeName {
+
+  private val constraints: collection.mutable.ListBuffer[Constraint] = collection.mutable.ListBuffer.empty
+
+  def addConstraint( check: V => Boolean, message: V => String ): Unit =
+    constraints += Constraint( check, message )
+
+  private case class Constraint( check: V => Boolean, message: V => String )
+
+  protected def validateConstraints( value: V ): Seq[String] = constraints.foldLeft( Seq.empty[String] ) {
+    case ( errors, constraint ) =>
+      if ( !constraint.check( value ) ) errors :+ constraint.message( value )
+      else errors
+  }
 }
 
 trait TypeName {
-  protected[this] lazy val typeName: String = getClass.getSimpleName
+  protected[this] lazy val typeName: String = getClass.getSimpleName.replace( "$", "" )
 }
-
-trait StringValue extends TinyType[String]

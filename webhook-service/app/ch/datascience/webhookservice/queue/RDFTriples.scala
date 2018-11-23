@@ -18,7 +18,10 @@
 
 package ch.datascience.webhookservice.queue
 
-import ch.datascience.tinytypes.TinyType
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import org.apache.jena.rdf.model.Model
 
-case class RDFTriples( value: Model ) extends TinyType[Model]
+class RDFTriples private ( val value: Model ) extends TinyType[Model]
+
+object RDFTriples
+  extends TinyTypeFactory[Model, RDFTriples]( instantiate = new RDFTriples( _ ) )

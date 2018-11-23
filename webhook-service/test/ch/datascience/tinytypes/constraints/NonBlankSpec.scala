@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes
+package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
@@ -44,4 +44,8 @@ class NonBlankSpec extends WordSpec with PropertyChecks {
   }
 }
 
-private case class NonBlankString( value: String ) extends StringValue with NonBlank
+private class NonBlankString private ( val value: String ) extends AnyVal with TinyType[String]
+
+private object NonBlankString
+  extends TinyTypeFactory[String, NonBlankString]( new NonBlankString( _ ) )
+  with NonBlank

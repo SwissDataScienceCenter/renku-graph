@@ -36,3 +36,40 @@ class TinyTypeSpec extends WordSpec {
     }
   }
 }
+
+class TinyTypeFactorySpec extends WordSpec {
+
+  "apply" should {
+
+    "instantiate object of the relevant type" in {
+      TinyTypeTest( "def" ).value shouldBe "def"
+    }
+
+    "throw an IllegalArgument exception if the first type constraint is not met" in {
+      intercept[IllegalArgumentException] {
+        TinyTypeTest( "abc" )
+      }.getMessage shouldBe "TinyTypeTest cannot have 'abc' value"
+    }
+
+    "throw an IllegalArgument exception if one of defined type constraints is not met" in {
+      intercept[IllegalArgumentException] {
+        TinyTypeTest( "def!" )
+      }.getMessage shouldBe "! is not allowed"
+    }
+  }
+}
+
+private class TinyTypeTest private ( val value: String ) extends AnyVal with TinyType[String]
+
+private object TinyTypeTest extends TinyTypeFactory[String, TinyTypeTest]( new TinyTypeTest( _ ) ) {
+
+  addConstraint(
+    check   = !_.contains( "abc" ),
+    message = ( value: String ) => s"$typeName cannot have '$value' value"
+  )
+
+  addConstraint(
+    check   = !_.contains( "!" ),
+    message = ( value: String ) => "! is not allowed"
+  )
+}

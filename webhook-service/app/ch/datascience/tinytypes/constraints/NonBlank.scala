@@ -18,9 +18,11 @@
 
 package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes.StringValue
+import ch.datascience.tinytypes.Constraints
 
-trait NonBlank {
-  self: StringValue =>
-  verify( value.trim.nonEmpty, s"$typeName cannot be blank" )
+trait NonBlank extends Constraints[String] {
+  addConstraint(
+    check = _.trim.nonEmpty,
+    message = ( _: String ) => s"$typeName cannot be blank"
+  )
 }

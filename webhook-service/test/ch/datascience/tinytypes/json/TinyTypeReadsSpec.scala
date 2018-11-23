@@ -18,14 +18,14 @@
 
 package ch.datascience.tinytypes.json
 
-import ch.datascience.tinytypes.TinyType
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import play.api.libs.json._
 
 class TinyTypeReadsSpec extends WordSpec {
 
-  private implicit val reads: Reads[StringTinyType] = TinyTypeReads( StringTinyType )
+  private implicit val reads: Reads[StringTinyType] = TinyTypeReads( StringTinyType.apply )
 
   "apply" should {
 
@@ -46,8 +46,15 @@ class TinyTypeReadsSpec extends WordSpec {
       pathErrors.head.message shouldBe "some message"
     }
   }
+}
 
-  case class StringTinyType( value: String ) extends TinyType[String] {
-    verify( value.length < 5, "some message" )
-  }
+private class StringTinyType private ( val value: String ) extends AnyVal with TinyType[String]
+
+private object StringTinyType
+  extends TinyTypeFactory[String, StringTinyType]( new StringTinyType( _ ) ) {
+
+  addConstraint(
+    check = _.length < 5,
+    message = _ => "some message"
+  )
 }

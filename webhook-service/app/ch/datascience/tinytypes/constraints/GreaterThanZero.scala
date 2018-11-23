@@ -16,22 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes.StringValue
-import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.Constraints
 
-case class FilePath( value: String ) extends StringValue with NonBlank {
-  verify( !value.startsWith( "/" ), s"'$value' is not a valid $typeName" )
-}
-
-trait GitSha extends StringValue with NonBlank {
-
-  import GitSha.validationRegex
-
-  verify( value.matches( validationRegex ), s"'$value' is not a valid Git sha" )
-}
-
-object GitSha {
-  private val validationRegex: String = "[0-9a-f]{5,40}"
+trait GreaterThanZero extends Constraints[Int] {
+  addConstraint(
+    check = _ > 0,
+    message = ( value: Int ) => s"$typeName cannot be <= 0"
+  )
 }

@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.queue
 import java.net.URL
 
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{ StringValue, TinyType }
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import com.typesafe.config.Config
 import javax.inject.{ Inject, Singleton }
 import org.apache.jena.rdfconnection.{ RDFConnection, RDFConnectionFuseki }
@@ -31,18 +31,20 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success, Try }
 
-case class DatasetName( value: String ) extends StringValue with NonBlank
+class DatasetName private ( val value: String ) extends AnyVal with TinyType[String]
 
-object DatasetName {
+object DatasetName
+  extends TinyTypeFactory[String, DatasetName]( new DatasetName( _ ) )
+  with NonBlank {
 
   implicit object DatasetNameFinder extends ConfigLoader[DatasetName] {
     override def load( config: Config, path: String ): DatasetName = DatasetName( config.getString( path ) )
   }
 }
 
-case class FusekiUrl( value: URL ) extends TinyType[URL]
+class FusekiUrl private ( val value: URL ) extends AnyVal with TinyType[URL]
 
-object FusekiUrl {
+object FusekiUrl extends TinyTypeFactory[URL, FusekiUrl]( new FusekiUrl( _ ) ) {
 
   def apply( url: String ): FusekiUrl = FusekiUrl( new URL( url ) )
 

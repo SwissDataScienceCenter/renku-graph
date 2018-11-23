@@ -18,38 +18,36 @@
 
 package ch.datascience.webhookservice.queue
 
-import ch.datascience.tinytypes.TinyType
+import ch.datascience.tinytypes.constraints.GreaterThanZero
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import com.typesafe.config.Config
 import javax.inject.{ Inject, Singleton }
 import play.api.{ ConfigLoader, Configuration }
 
-private case class BufferSize( value: Int ) extends TinyType[Int] {
-  verify( value > 0, s"'$value' is not > 0" )
-}
-
-private object BufferSize {
+private class BufferSize private ( val value: Int ) extends AnyVal with TinyType[Int]
+private object BufferSize
+  extends TinyTypeFactory[Int, BufferSize]( new BufferSize( _ ) )
+  with GreaterThanZero {
 
   implicit object BufferSizeFinder extends ConfigLoader[BufferSize] {
     override def load( config: Config, path: String ): BufferSize = BufferSize( config.getInt( path ) )
   }
 }
 
-private case class TriplesFinderThreads( value: Int ) extends TinyType[Int] {
-  verify( value > 0, s"'$value' is not > 0" )
-}
-
-private object TriplesFinderThreads {
+private case class TriplesFinderThreads private ( value: Int ) extends AnyVal with TinyType[Int]
+private object TriplesFinderThreads
+  extends TinyTypeFactory[Int, TriplesFinderThreads]( new TriplesFinderThreads( _ ) )
+  with GreaterThanZero {
 
   implicit object TriplesFinderThreadsFinder extends ConfigLoader[TriplesFinderThreads] {
     override def load( config: Config, path: String ): TriplesFinderThreads = TriplesFinderThreads( config.getInt( path ) )
   }
 }
 
-private case class FusekiUploadThreads( value: Int ) extends TinyType[Int] {
-  verify( value > 0, s"'$value' is not > 0" )
-}
-
-private object FusekiUploadThreads {
+private case class FusekiUploadThreads private ( value: Int ) extends AnyVal with TinyType[Int]
+private object FusekiUploadThreads
+  extends TinyTypeFactory[Int, FusekiUploadThreads]( new FusekiUploadThreads( _ ) )
+  with GreaterThanZero {
 
   implicit object FusekiUploadThreadsFinder extends ConfigLoader[FusekiUploadThreads] {
     override def load( config: Config, path: String ): FusekiUploadThreads = FusekiUploadThreads( config.getInt( path ) )

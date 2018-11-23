@@ -16,41 +16,36 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.tinytypes.constraints
 
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
 
-class GitShaSpec extends WordSpec with PropertyChecks {
+class GreaterThanZeroSpec extends WordSpec with PropertyChecks {
 
-  import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+  "GreaterThanZero" should {
 
-  "GitSha" should {
-
-    "be instantiatable for a valid sha" in {
-      forAll( shas ) { sha =>
-        SomeGitSha( sha ).toString shouldBe sha
+    "be instantiatable when values are greater than zero" in {
+      forAll( Gen.choose( 1, 100000 ) ) { someValue =>
+        GreaterThanZeroInt( someValue ).value shouldBe someValue
       }
     }
 
-    "throw an IllegalArgumentException for non-sha values" in {
-      intercept[IllegalArgumentException] {
-        SomeGitSha( "abc" )
-      }.getMessage shouldBe "'abc' is not a valid Git sha"
+    "throw an IllegalArgumentException for 0" in {
+      intercept[IllegalArgumentException]( GreaterThanZeroInt( 0 ) ).getMessage shouldBe "GreaterThanZeroInt cannot be <= 0"
     }
 
-    "throw an IllegalArgumentException for a blank value" in {
-      intercept[IllegalArgumentException] {
-        SomeGitSha( "   " )
-      }.getMessage shouldBe "'   ' is not a valid Git sha"
+    "throw an IllegalArgumentException for negative value" in {
+      intercept[IllegalArgumentException]( GreaterThanZeroInt( -1 ) ).getMessage shouldBe "GreaterThanZeroInt cannot be <= 0"
     }
   }
 }
 
-private class SomeGitSha private ( val value: String ) extends AnyVal with TinyType[String]
+private class GreaterThanZeroInt private ( val value: Int ) extends AnyVal with TinyType[Int]
 
-private object SomeGitSha
-  extends TinyTypeFactory[String, SomeGitSha]( new SomeGitSha( _ ) )
-  with GitSha
+private object GreaterThanZeroInt
+  extends TinyTypeFactory[Int, GreaterThanZeroInt]( new GreaterThanZeroInt( _ ) )
+  with GreaterThanZero

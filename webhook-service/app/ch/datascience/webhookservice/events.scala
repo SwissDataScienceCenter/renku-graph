@@ -18,8 +18,8 @@
 
 package ch.datascience.webhookservice
 
-import ch.datascience.tinytypes.StringValue
 import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{ Constraints, TinyType, TinyTypeFactory }
 
 case class PushEvent(
     checkoutSha:      CheckoutSha,
@@ -27,8 +27,27 @@ case class PushEvent(
     projectName:      ProjectName
 )
 
-case class CheckoutSha( value: String ) extends GitSha
+class CheckoutSha private ( val value: String ) extends AnyVal with TinyType[String]
+object CheckoutSha
+  extends TinyTypeFactory[String, CheckoutSha]( new CheckoutSha( _ ) )
+  with GitSha
 
-case class GitRepositoryUrl( value: String ) extends StringValue with NonBlank
+class GitRepositoryUrl private ( val value: String ) extends AnyVal with TinyType[String]
+object GitRepositoryUrl
+  extends TinyTypeFactory[String, GitRepositoryUrl]( new GitRepositoryUrl( _ ) )
+  with NonBlank
 
-case class ProjectName( value: String ) extends StringValue with NonBlank
+class ProjectName private ( val value: String ) extends AnyVal with TinyType[String]
+object ProjectName
+  extends TinyTypeFactory[String, ProjectName]( new ProjectName( _ ) )
+  with NonBlank
+
+trait GitSha extends Constraints[String] {
+
+  private val validationRegex: String = "[0-9a-f]{5,40}"
+
+  addConstraint(
+    check = _.matches( validationRegex ),
+    message = ( value: String ) => s"'$value' is not a valid Git sha"
+  )
+}

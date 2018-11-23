@@ -18,13 +18,12 @@
 
 package ch.datascience.webhookservice
 
-import ch.datascience.tinytypes.StringValue
 import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import play.api.libs.json.{ JsError, JsValue, Json, Writes }
 
-case class ErrorResponse( value: String ) extends StringValue with NonBlank
-
-object ErrorResponse {
+class ErrorResponse private ( val value: String ) extends AnyVal with TinyType[String]
+object ErrorResponse extends TinyTypeFactory[String, ErrorResponse]( new ErrorResponse( _ ) ) with NonBlank {
 
   implicit val errorResponseWrites: Writes[ErrorResponse] = Writes[ErrorResponse] {
     case ErrorResponse( message ) => Json.obj( "error" -> message )

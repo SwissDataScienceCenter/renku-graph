@@ -18,8 +18,8 @@
 
 package ch.datascience.tinytypes.json
 
-import org.scalatest.WordSpec
 import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 import play.api.libs.json._
 
 class ValueReadsSpec extends WordSpec {

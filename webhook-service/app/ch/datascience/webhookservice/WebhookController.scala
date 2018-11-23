@@ -69,9 +69,9 @@ object WebhookController {
   import play.api.libs.json.Reads._
   import play.api.libs.json._
 
-  private implicit val gitRepositoryUrlReads: Reads[GitRepositoryUrl] = TinyTypeReads( GitRepositoryUrl )
-  private implicit val checkoutShaReads: Reads[CheckoutSha] = TinyTypeReads( CheckoutSha )
-  private implicit val projectNameReads: Reads[ProjectName] = TinyTypeReads( ProjectName )
+  private implicit val gitRepositoryUrlReads: Reads[GitRepositoryUrl] = TinyTypeReads( GitRepositoryUrl.apply )
+  private implicit val checkoutShaReads: Reads[CheckoutSha] = TinyTypeReads( CheckoutSha.apply )
+  private implicit val projectNameReads: Reads[ProjectName] = TinyTypeReads( ProjectName.apply )
 
   private[webhookservice] implicit val pushEventReads: Reads[PushEvent] = (
     ( __ \ "checkout_sha" ).read[CheckoutSha] and
