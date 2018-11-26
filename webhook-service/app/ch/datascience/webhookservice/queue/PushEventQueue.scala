@@ -46,7 +46,7 @@ class PushEventQueue(
   import queueConfig._
 
   def offer( pushEvent: PushEvent ): Future[QueueOfferResult] =
-    queue.offer( pushEvent )
+    queue offer pushEvent
 
   private lazy val queue = Source.queue[PushEvent](
     bufferSize.value,
