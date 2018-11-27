@@ -18,7 +18,7 @@
 
 package ch.datascience.generators
 
-import org.scalacheck.Gen
+import org.scalacheck.{ Arbitrary, Gen }
 import org.scalacheck.Gen._
 
 import scala.language.implicitConversions
@@ -34,10 +34,21 @@ object Generators {
     } yield chars.mkString( "" )
   }
 
+  implicit def positiveInts( max: Int = 1000 ): Gen[Int] = choose( 1, max )
+
   val relativePaths: Gen[String] = for {
     partsNumber <- Gen.choose( 1, 10 )
     parts <- Gen.listOfN( partsNumber, nonEmptyStrings() )
   } yield parts.mkString( "/" )
+
+  val httpUrls = for {
+    protocol <- Arbitrary.arbBool.arbitrary map {
+      case true  => "http"
+      case false => "https"
+    }
+    port <- positiveInts( max = 9999 )
+    host <- nonEmptyStrings()
+  } yield s"$protocol://$host:$port"
 
   object Implicits {
 

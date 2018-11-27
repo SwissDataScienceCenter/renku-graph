@@ -19,11 +19,10 @@
 package ch.datascience.webhookservice.queue
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.webhookservice.config.FusekiUrl
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import org.apache.jena.rdf.model.Model
 import org.apache.jena.rdfconnection.RDFConnection
-import org.scalamock.function.MockFunction1
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -40,8 +39,8 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
 
     "upload the content of the given file to Jena Fuseki" in new TestCase {
 
-      fusekiConnectionBuilder
-        .expects( FusekiUrl( s"$fusekiBaseUrl/$datasetName" ) )
+      createConnection
+        .expects( fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName )
         .returning( fusekiConnection )
 
       ( fusekiConnection.load( _: Model ) )
@@ -55,8 +54,8 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
 
     "return failure if upload to Jena Fuseki fails" in new TestCase {
 
-      fusekiConnectionBuilder
-        .expects( FusekiUrl( s"$fusekiBaseUrl/$datasetName" ) )
+      createConnection
+        .expects( fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName )
         .returning( fusekiConnection )
 
       val exception: Exception = new Exception( "message" )
@@ -75,8 +74,8 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
     "return failure if creating an url to fuseki fails" in new TestCase {
 
       val exception: Exception = new Exception( "message" )
-      fusekiConnectionBuilder
-        .expects( FusekiUrl( s"$fusekiBaseUrl/$datasetName" ) )
+      createConnection
+        .expects( fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName )
         .throwing( exception )
 
       intercept[Exception] {
@@ -86,8 +85,8 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
 
     "return failure if closing connection to fuseki fails" in new TestCase {
 
-      fusekiConnectionBuilder
-        .expects( FusekiUrl( s"$fusekiBaseUrl/$datasetName" ) )
+      createConnection
+        .expects( fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName )
         .returning( fusekiConnection )
 
       ( fusekiConnection.load( _: Model ) )
@@ -108,10 +107,11 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
 
     val rdfTriples: RDFTriples = rdfTriplesSets.generateOne
 
-    val fusekiConnectionBuilder: MockFunction1[FusekiUrl, RDFConnection] = mockFunction[FusekiUrl, RDFConnection]
+    val createConnection = mockFunction[FusekiUrl, RDFConnection]
     val fusekiConnection: RDFConnection = mock[RDFConnection]
-    val fusekiBaseUrl = FusekiUrl( "http://localhost:3030" )
-    val datasetName: DatasetName = ( nonEmptyStrings() map DatasetName.apply ).generateOne
-    val fusekiConnector = new FusekiConnector( fusekiBaseUrl, datasetName, fusekiConnectionBuilder )
+
+    val fusekiConfig = fusekiConfigs.generateOne
+
+    val fusekiConnector = new FusekiConnector( fusekiConfig, createConnection )
   }
 }

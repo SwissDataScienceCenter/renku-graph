@@ -67,11 +67,11 @@ private class TriplesFinder(
 
     val maybeTriplesFile = for {
       _ <- pure( mkdir( repositoryDirectory ) )
-      _ <- pure( git cloneRepo ( gitRepositoryUrl, repositoryDirectory, workDirectory ) )
-      _ <- pure( git checkout ( checkoutSha, repositoryDirectory ) )
-      triplesStream <- pure( renku log repositoryDirectory )
-      rdfTriples <- pure( toRdfTriples( triplesStream ) )
-      _ <- pure( removeSilently( repositoryDirectory ) )
+      _ <- git cloneRepo ( gitRepositoryUrl, repositoryDirectory, workDirectory )
+      _ <- git checkout ( checkoutSha, repositoryDirectory )
+      triplesStream <- renku log repositoryDirectory
+      rdfTriples <- toRdfTriples( triplesStream )
+      _ <- removeSilently( repositoryDirectory )
     } yield rdfTriples
 
     maybeTriplesFile.toEither.leftMap {

@@ -30,6 +30,8 @@ enablePlugins(PlayScala, JavaAppPackaging, AutomateHeaderPlugin)
 
 resolvers += Resolver.sonatypeRepo("snapshots")
 
+libraryDependencies += ws
+
 libraryDependencies += "ch.datascience" %% "renku-commons" % "0.2.0"
 
 libraryDependencies += "com.lihaoyi" %% "ammonite-ops" % "1.4.2"

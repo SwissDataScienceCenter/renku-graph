@@ -18,68 +18,34 @@
 
 package ch.datascience.webhookservice.queue
 
-import java.net.URL
-
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
-import com.typesafe.config.Config
+import ch.datascience.webhookservice.config.{ FusekiConfig, FusekiUrl }
 import javax.inject.{ Inject, Singleton }
-import org.apache.jena.rdfconnection.{ RDFConnection, RDFConnectionFuseki }
-import play.api.{ ConfigLoader, Configuration }
+import org.apache.jena.rdfconnection.{ RDFConnection, RDFConnectionFuseki, RDFConnectionRemoteBuilder }
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success, Try }
 
-class DatasetName private ( val value: String ) extends AnyVal with TinyType[String]
-
-object DatasetName
-  extends TinyTypeFactory[String, DatasetName]( new DatasetName( _ ) )
-  with NonBlank {
-
-  implicit object DatasetNameFinder extends ConfigLoader[DatasetName] {
-    override def load( config: Config, path: String ): DatasetName = DatasetName( config.getString( path ) )
-  }
-}
-
-class FusekiUrl private ( val value: URL ) extends AnyVal with TinyType[URL]
-
-object FusekiUrl extends TinyTypeFactory[URL, FusekiUrl]( new FusekiUrl( _ ) ) {
-
-  def apply( url: String ): FusekiUrl = FusekiUrl( new URL( url ) )
-
-  implicit object FusekiUrlFinder extends ConfigLoader[FusekiUrl] {
-    override def load( config: Config, path: String ): FusekiUrl = FusekiUrl( config.getString( path ) )
-  }
-
-  implicit class FusekiUrlOps( fusekiUrl: FusekiUrl ) {
-    def /( value: Any ): FusekiUrl = FusekiUrl(
-      new URL( s"$fusekiUrl/$value" )
-    )
-  }
-}
-
 @Singleton
 private class FusekiConnector(
-    fusekiBaseUrl:           FusekiUrl,
-    datasetName:             DatasetName,
+    fusekiConfig:            FusekiConfig,
     fusekiConnectionBuilder: FusekiUrl => RDFConnection
 ) {
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[FusekiUrl]( "services.fuseki.url" ),
-    configuration.get[DatasetName]( "services.fuseki.dataset-name" ),
-    ( fusekiUrl: FusekiUrl ) =>
-      RDFConnectionFuseki
-        .create()
-        .destination( fusekiUrl.value.toString )
-        .build()
+  import fusekiConfig._
+
+  @Inject() def this( fusekiConfig: FusekiConfig ) = this(
+    fusekiConfig,
+    ( fusekiUrl: FusekiUrl ) => RDFConnectionFuseki
+      .create()
+      .destination( fusekiUrl.toString )
+      .build()
   )
 
   def uploadFile( rdfTriples: RDFTriples )( implicit executionContext: ExecutionContext ): Future[Unit] = Future {
     var connection = Option.empty[RDFConnection]
     Try {
-      connection = Some( fusekiConnectionBuilder( fusekiBaseUrl / datasetName ) )
+      connection = Some( newConnection )
       connection foreach { conn =>
         conn.load( rdfTriples.value )
         conn.close()
@@ -91,4 +57,7 @@ private class FusekiConnector(
         throw exception
     }
   }
+
+  private def newConnection: RDFConnection =
+    fusekiConnectionBuilder( fusekiBaseUrl / datasetName )
 }
