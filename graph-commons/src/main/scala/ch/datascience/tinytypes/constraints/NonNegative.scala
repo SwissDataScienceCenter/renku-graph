@@ -16,25 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes
+package ch.datascience.tinytypes.constraints
 
-import play.api.libs.json._
+import ch.datascience.tinytypes.Constraints
 
-import scala.language.implicitConversions
-
-package object json {
-
-  implicit def jsStringReads( jsValue: JsValue ): JsResult[String] = jsValue.validate[String].fold(
-    _ => JsError( s"Expected String but got '$jsValue'" ),
-    value => JsSuccess( value )
+trait NonNegative extends Constraints[Int] {
+  addConstraint(
+    check = _ >= 0,
+    message = ( _: Int ) => s"$typeName cannot be < 0"
   )
-
-  implicit val stringToJson: String => JsValue = JsString
-
-  implicit def jsIntNumberReads( jsValue: JsValue ): JsResult[Int] = jsValue.validate[Int].fold(
-    _ => JsError( s"Expected Int but got '$jsValue'" ),
-    value => JsSuccess( value )
-  )
-
-  implicit val intToJson: Int => JsValue = JsNumber( _ )
 }

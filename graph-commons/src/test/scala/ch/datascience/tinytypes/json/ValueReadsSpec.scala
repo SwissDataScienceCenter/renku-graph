@@ -36,4 +36,33 @@ class ValueReadsSpec extends WordSpec {
       reads( JsNumber( 1 ) ) shouldBe JsError( s"Expected String but got '1'" )
     }
   }
+
+  "stringToJson" should {
+    val writes = implicitly[String => JsValue]
+
+    "convert String to JsString" in {
+      writes( "abc" ) shouldBe JsString( "abc" )
+    }
+  }
+
+  "jsIntNumberReads" should {
+
+    val reads = implicitly[JsValue => JsResult[Int]]
+
+    "return value for JsNumber" in {
+      reads( JsNumber( 1 ) ) shouldBe JsSuccess( 1 )
+    }
+
+    "return a JsError if value is not an Int" in {
+      reads( JsString( "1" ) ) shouldBe JsError( s"""Expected Int but got '"1"'""" )
+    }
+  }
+
+  "intToJson" should {
+    val writes = implicitly[Int => JsValue]
+
+    "convert Int to JsNumber" in {
+      writes( 1 ) shouldBe JsNumber( 1 )
+    }
+  }
 }

@@ -16,28 +16,33 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.graph.events
+
+import java.time.Instant
 
 import ch.datascience.tinytypes.constraints.{ GitSha, NonBlank }
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 
-case class PushEvent(
-    checkoutSha:      CheckoutSha,
-    gitRepositoryUrl: GitRepositoryUrl,
-    projectName:      ProjectName
+case class CommitEvent(
+    id:        CommitId,
+    message:   String,
+    timestamp: Instant,
+    pushUser:  PushUser,
+    author:    User,
+    committer: User,
+    parents:   Seq[CommitId],
+    project:   Project,
+    added:     Seq[GitFile],
+    modified:  Seq[GitFile],
+    removed:   Seq[GitFile]
 )
 
-class CheckoutSha private ( val value: String ) extends AnyVal with TinyType[String]
-object CheckoutSha
-  extends TinyTypeFactory[String, CheckoutSha]( new CheckoutSha( _ ) )
+class CommitId private ( val value: String ) extends AnyVal with TinyType[String]
+object CommitId
+  extends TinyTypeFactory[String, CommitId]( new CommitId( _ ) )
   with GitSha
 
-class GitRepositoryUrl private ( val value: String ) extends AnyVal with TinyType[String]
-object GitRepositoryUrl
-  extends TinyTypeFactory[String, GitRepositoryUrl]( new GitRepositoryUrl( _ ) )
-  with NonBlank
-
-class ProjectName private ( val value: String ) extends AnyVal with TinyType[String]
-object ProjectName
-  extends TinyTypeFactory[String, ProjectName]( new ProjectName( _ ) )
+class GitFile private ( val value: String ) extends AnyVal with TinyType[String]
+object GitFile
+  extends TinyTypeFactory[String, GitFile]( new GitFile( _ ) )
   with NonBlank

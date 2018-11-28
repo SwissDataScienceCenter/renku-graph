@@ -16,16 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph
+package ch.datascience.tinytypes.constraints
 
-import java.time.Instant
+import ch.datascience.tinytypes.Constraints
 
-case class CommitEvent(
-    sha1:      Array[Byte],
-    message:   String,
-    timestamp: Instant,
-    pushUser:  User,
-    author:    User,
-    committer: User,
-    parents:   Iterable[Array[Byte]]
-)
+trait GitSha extends Constraints[String] {
+
+  private val validationRegex: String = "[0-9a-f]{5,40}"
+
+  addConstraint(
+    check = _.matches( validationRegex ),
+    message = ( value: String ) => s"'$value' is not a valid Git sha"
+  )
+}

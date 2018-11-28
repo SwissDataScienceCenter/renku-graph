@@ -16,21 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph
+package ch.datascience.graph.events
 
-import play.api.libs.json.{ JsPath, OFormat }
-import play.api.libs.functional.syntax._
+import ch.datascience.tinytypes.constraints.{ NonBlank, NonNegative }
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 
-case class User(
-    username: String,
-    email:    String,
-    gitlabId: Option[Int]
+case class Project(
+    id:   ProjectId,
+    path: ProjectPath
 )
 
-object User {
-  implicit lazy val format: OFormat[User] = (
-    ( JsPath \ 'username ).format[String] and
-    ( JsPath \ 'email ).format[String] and
-    ( JsPath \ 'gitlabId ).formatNullable[Int]
-  )( User.apply, unlift( User.unapply ) )
-}
+class ProjectId private ( val value: Int ) extends AnyVal with TinyType[Int]
+object ProjectId
+  extends TinyTypeFactory[Int, ProjectId]( new ProjectId( _ ) )
+  with NonNegative
+
+class ProjectPath private ( val value: String ) extends AnyVal with TinyType[String]
+object ProjectPath
+  extends TinyTypeFactory[String, ProjectPath]( new ProjectPath( _ ) )
+  with NonBlank

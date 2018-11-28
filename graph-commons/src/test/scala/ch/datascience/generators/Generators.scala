@@ -18,8 +18,8 @@
 
 package ch.datascience.generators
 
-import org.scalacheck.{ Arbitrary, Gen }
 import org.scalacheck.Gen._
+import org.scalacheck.{ Arbitrary, Gen }
 
 import scala.language.implicitConversions
 
@@ -36,6 +36,8 @@ object Generators {
 
   implicit def positiveInts( max: Int = 1000 ): Gen[Int] = choose( 1, max )
 
+  implicit def nonNegativeInts( max: Int = 1000 ): Gen[Int] = choose( 0, max )
+
   val relativePaths: Gen[String] = for {
     partsNumber <- Gen.choose( 1, 10 )
     parts <- Gen.listOfN( partsNumber, nonEmptyStrings() )
@@ -49,6 +51,11 @@ object Generators {
     port <- positiveInts( max = 9999 )
     host <- nonEmptyStrings()
   } yield s"$protocol://$host:$port"
+
+  val shas: Gen[String] = for {
+    length <- Gen.choose( 5, 40 )
+    chars <- Gen.listOfN( length, Gen.oneOf( ( 0 to 9 ).map( _.toString ) ++ ( 'a' to 'f' ).map( _.toString ) ) )
+  } yield chars.mkString( "" )
 
   object Implicits {
 

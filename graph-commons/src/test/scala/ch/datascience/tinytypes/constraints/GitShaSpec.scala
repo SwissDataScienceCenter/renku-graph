@@ -16,16 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.tinytypes.constraints
 
+import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
 
 class GitShaSpec extends WordSpec with PropertyChecks {
-
-  import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 
   "GitSha" should {
 
