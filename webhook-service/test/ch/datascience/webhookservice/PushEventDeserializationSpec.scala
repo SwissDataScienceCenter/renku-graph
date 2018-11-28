@@ -18,6 +18,7 @@
 
 package ch.datascience.webhookservice
 
+import ch.datascience.webhookservice.queues.pushevent.{ CheckoutSha, GitRepositoryUrl, ProjectName, PushEvent }
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import play.api.libs.json.Json

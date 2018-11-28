@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queue
+package ch.datascience.webhookservice.queues.pushevent
 
 import akka.stream.OverflowStrategy.backpressure
 import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
 import akka.stream.{ Materializer, QueueOfferResult }
 import akka.{ Done, NotUsed }
-import ch.datascience.webhookservice.PushEvent
 import javax.inject.{ Inject, Singleton }
 import play.api.{ Logger, LoggerLike }
 

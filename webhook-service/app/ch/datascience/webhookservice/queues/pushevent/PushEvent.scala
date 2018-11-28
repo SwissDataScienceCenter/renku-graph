@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.queues.pushevent
 
 import ch.datascience.tinytypes.constraints.{ GitSha, NonBlank }
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }

@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice
 
 import akka.stream.QueueOfferResult
-import ch.datascience.webhookservice.queue.PushEventQueue
+import ch.datascience.webhookservice.queues.pushevent._
 import javax.inject.{ Inject, Singleton }
 import play.api.libs.json.{ JsError, JsSuccess }
 import play.api.mvc.{ AbstractController, ControllerComponents }

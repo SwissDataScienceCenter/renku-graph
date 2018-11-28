@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queue
+package ch.datascience.webhookservice.queues.pushevent
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.QueueOfferResult.Enqueued
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.{ CheckoutSha, GitRepositoryUrl, PushEvent }
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

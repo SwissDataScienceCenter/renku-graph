@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queue
+package ch.datascience.webhookservice.queues.pushevent
 
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import org.apache.jena.rdf.model.Model

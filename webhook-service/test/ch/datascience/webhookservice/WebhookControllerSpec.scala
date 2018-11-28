@@ -22,7 +22,7 @@ import akka.stream.QueueOfferResult
 import akka.stream.QueueOfferResult.Enqueued
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.queue.PushEventQueue
+import ch.datascience.webhookservice.queues.pushevent._
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

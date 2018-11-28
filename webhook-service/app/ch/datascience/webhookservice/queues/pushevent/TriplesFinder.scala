@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queue
+package ch.datascience.webhookservice.queues.pushevent
 
 import java.io.{ ByteArrayInputStream, InputStream }
 import java.security.SecureRandom
 
 import cats.implicits._
-import ch.datascience.webhookservice.{ CheckoutSha, GitRepositoryUrl }
 import javax.inject.{ Inject, Singleton }
 import org.apache.jena.rdf.model.ModelFactory
 

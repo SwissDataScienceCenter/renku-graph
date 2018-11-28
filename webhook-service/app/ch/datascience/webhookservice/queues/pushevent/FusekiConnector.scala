@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queue
+package ch.datascience.webhookservice.queues.pushevent
 
 import ch.datascience.webhookservice.config.{ FusekiConfig, FusekiUrl }
 import javax.inject.{ Inject, Singleton }
-import org.apache.jena.rdfconnection.{ RDFConnection, RDFConnectionFuseki, RDFConnectionRemoteBuilder }
+import org.apache.jena.rdfconnection.{ RDFConnection, RDFConnectionFuseki }
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.control.NonFatal

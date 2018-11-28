@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queue
+package ch.datascience.webhookservice.queues.pushevent
 
 import java.io.InputStream
 
@@ -24,7 +24,6 @@ import ammonite.ops.root
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.{ CheckoutSha, GitRepositoryUrl }
 import org.scalacheck.Gen
 import org.scalamock.function.{ MockFunction0, MockFunction1 }
 import org.scalamock.scalatest.MockFactory

@@ -19,10 +19,9 @@
 package ch.datascience.webhookservice.generators
 
 import ch.datascience.generators.Generators._
-import ch.datascience.webhookservice._
 import ch.datascience.webhookservice.config.DatasetType.{ Mem, TDB }
 import ch.datascience.webhookservice.config._
-import ch.datascience.webhookservice.queue.RDFTriples
+import ch.datascience.webhookservice.queues.pushevent._
 import org.apache.jena.rdf.model.ModelFactory
 import org.scalacheck.Gen
 
@@ -54,7 +53,7 @@ object ServiceTypesGenerators {
     RDFTriples( model )
   }
 
-  implicit val fusekiConfigs = for {
+  implicit val fusekiConfigs: Gen[FusekiConfig] = for {
     fusekiUrl <- httpUrls map FusekiUrl.apply
     datasetName <- nonEmptyStrings() map DatasetName.apply
     datasetType <- Gen.oneOf( Mem, TDB )
