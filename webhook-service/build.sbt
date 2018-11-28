@@ -20,8 +20,6 @@ organization := "ch.datascience"
 name := "webhook-service"
 version := "0.1.0-SNAPSHOT"
 
-scalaVersion := "2.12.7"
-
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies += ws

@@ -21,6 +21,7 @@ package ch.datascience.tinytypes.json
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import play.api.libs.json.Json.toJson
 import play.api.libs.json._
 
 class TinyTypeReadsSpec extends WordSpec {
@@ -46,6 +47,35 @@ class TinyTypeReadsSpec extends WordSpec {
       pathErrors.head.message shouldBe "some message"
     }
   }
+}
+
+class TinyTypeWritesSpec extends WordSpec {
+
+  private implicit val writes: Writes[StringTinyType] = TinyTypeWrites[String, StringTinyType]
+
+  "apply" should {
+
+    "create a Writes to serialize a tiny type to JSON" in {
+      toJson( StringTinyType( "abc" ) ) shouldBe JsString( "abc" )
+    }
+  }
+}
+
+class TinyTypeFormatSpec extends WordSpec {
+
+  private implicit val format: Format[StringTinyType] = TinyTypeFormat( StringTinyType.apply )
+
+  "apply" should {
+
+    "create a Format to allow serialization to JSON" in {
+      toJson( StringTinyType( "abc" ) ) shouldBe JsString( "abc" )
+    }
+
+    "create a Format to allow deserialization from JSON" in {
+      JsString( "abc" ).as[StringTinyType] shouldBe StringTinyType( "abc" )
+    }
+  }
+
 }
 
 private class StringTinyType private ( val value: String ) extends AnyVal with TinyType[String]

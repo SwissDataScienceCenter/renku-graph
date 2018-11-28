@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes
 
-import play.api.libs.json.{ JsError, JsResult, JsSuccess, JsValue }
+import play.api.libs.json._
 
 import scala.language.implicitConversions
 
@@ -29,4 +29,5 @@ package object json {
     value => JsSuccess( value )
   )
 
+  implicit val stringToJson: String => JsValue = JsString
 }

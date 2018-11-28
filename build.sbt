@@ -29,7 +29,8 @@ lazy val webhookService = Project(
 ).settings(
   commonSettings
 ).dependsOn(
-  graphCommons
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
 ).enablePlugins(
   PlayScala, 
   JavaAppPackaging, 
