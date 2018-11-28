@@ -24,6 +24,15 @@ name := "renku-graph-commons"
 // Play JSON library
 libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10"
 
+// Akka Streams library
+libraryDependencies += "com.typesafe.akka" %% "akka-stream" % "2.5.18"
+
+// ScalaTest
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test
+
+// Akka Streams test kit
+libraryDependencies += "com.typesafe.akka" %% "akka-stream-testkit" % "2.5.18" % Test
+
 // Source code formatting
 import com.typesafe.sbt.SbtScalariform
 import com.typesafe.sbt.SbtScalariform.ScalariformKeys
