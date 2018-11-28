@@ -56,7 +56,7 @@ class PushEventQueue(
     .run()
 
   private def pushEventToRdfTriples( pushEvent: PushEvent ): Future[( PushEvent, Either[Throwable, RDFTriples] )] =
-    triplesFinder.generateTriples( pushEvent.gitRepositoryUrl, pushEvent.checkoutSha )
+    triplesFinder.generateTriples( pushEvent.project.path, pushEvent.before )
       .map( maybeTriplesFile => pushEvent -> maybeTriplesFile )
 
   private lazy val logAndSkipErrors: ( ( PushEvent, Either[Throwable, RDFTriples] ) ) => Source[( PushEvent, RDFTriples ), NotUsed] = {

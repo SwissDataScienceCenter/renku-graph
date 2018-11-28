@@ -18,26 +18,11 @@
 
 package ch.datascience.webhookservice.queues.pushevent
 
-import ch.datascience.tinytypes.constraints.{ GitSha, NonBlank }
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import ch.datascience.graph.events.{ CommitId, Project, PushUser }
 
 case class PushEvent(
-    checkoutSha:      CheckoutSha,
-    gitRepositoryUrl: GitRepositoryUrl,
-    projectName:      ProjectName
+    before:   CommitId,
+    after:    CommitId,
+    pushUser: PushUser,
+    project:  Project
 )
-
-class CheckoutSha private ( val value: String ) extends AnyVal with TinyType[String]
-object CheckoutSha
-  extends TinyTypeFactory[String, CheckoutSha]( new CheckoutSha( _ ) )
-  with GitSha
-
-class GitRepositoryUrl private ( val value: String ) extends AnyVal with TinyType[String]
-object GitRepositoryUrl
-  extends TinyTypeFactory[String, GitRepositoryUrl]( new GitRepositoryUrl( _ ) )
-  with NonBlank
-
-class ProjectName private ( val value: String ) extends AnyVal with TinyType[String]
-object ProjectName
-  extends TinyTypeFactory[String, ProjectName]( new ProjectName( _ ) )
-  with NonBlank

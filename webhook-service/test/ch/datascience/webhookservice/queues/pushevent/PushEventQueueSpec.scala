@@ -22,6 +22,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.QueueOfferResult.Enqueued
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.events.{ CommitId, ProjectPath }
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._
@@ -140,8 +141,8 @@ class PushEventQueueSpec
 
     def givenGenerateTriples( event: PushEvent ) = new {
       def returning( outcome: Future[Either[Exception, RDFTriples]] ) =
-        ( triplesFinder.generateTriples( _: GitRepositoryUrl, _: CheckoutSha )( _: ExecutionContext ) )
-          .expects( event.gitRepositoryUrl, event.checkoutSha, implicitly[ExecutionContext] )
+        ( triplesFinder.generateTriples( _: ProjectPath, _: CommitId )( _: ExecutionContext ) )
+          .expects( event.project.path, event.before, implicitly[ExecutionContext] )
           .returning( outcome )
     }
 

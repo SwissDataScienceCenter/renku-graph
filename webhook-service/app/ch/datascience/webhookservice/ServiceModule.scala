@@ -18,23 +18,34 @@
 
 package ch.datascience.webhookservice
 
+import java.net.URL
 import java.nio.charset.Charset
 
 import akka.Done
 import akka.stream.Materializer
-import ch.datascience.webhookservice.config.FusekiConfig
+import ch.datascience.webhookservice.config.{ FusekiConfig, ServiceUrl }
 import com.google.inject.AbstractModule
+import com.google.inject.name.Names
 import javax.inject.{ Inject, Singleton }
 import play.api.libs.ws.{ WSAuthScheme, WSClient, WSResponse }
 import play.api.test.Helpers.CONTENT_TYPE
-import play.api.{ Logger, LoggerLike }
+import play.api.{ Configuration, Environment, Logger, LoggerLike }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-class ServiceModule extends AbstractModule {
+class ServiceModule(
+    environment:   Environment,
+    configuration: Configuration
+) extends AbstractModule {
 
   override def configure(): Unit = {
-    bind( classOf[FusekiDatasetVerifier] ).asEagerSingleton()
+
+    bind( classOf[FusekiDatasetVerifier] )
+      .asEagerSingleton()
+
+    bind( classOf[URL] )
+      .annotatedWith( Names.named( "gitlabUrl" ) )
+      .toInstance( configuration.get[ServiceUrl]( "services.gitlab.url" ).value )
   }
 }
 

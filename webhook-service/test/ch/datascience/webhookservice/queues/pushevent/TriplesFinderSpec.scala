@@ -23,6 +23,9 @@ import java.io.InputStream
 import ammonite.ops.root
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.graph.events.{ CommitId, ProjectPath }
+import ch.datascience.webhookservice.config.ServiceUrl
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import org.scalacheck.Gen
 import org.scalamock.function.{ MockFunction0, MockFunction1 }
@@ -47,11 +50,11 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
         ( file.mkdir( _: Path ) )
           .expects( repositoryDirectory )
 
-        ( git.cloneRepo( _: GitRepositoryUrl, _: Path, _: Path ) )
+        ( git.cloneRepo( _: ServiceUrl, _: Path, _: Path ) )
           .expects( gitRepositoryUrl, repositoryDirectory, workDirectory )
 
-        ( git.checkout( _: CheckoutSha, _: Path ) )
-          .expects( checkoutSha, repositoryDirectory )
+        ( git.checkout( _: CommitId, _: Path ) )
+          .expects( commitId, repositoryDirectory )
 
         ( renku.log( _: Path ) )
           .expects( repositoryDirectory )
@@ -64,7 +67,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
         ( file.removeSilently( _: Path ) )
           .expects( repositoryDirectory )
 
-        triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Right( rdfTriples )
+        triplesFinder.generateTriples( projectPath, commitId ).futureValue shouldBe Right( rdfTriples )
       }
 
     "return an error if create a temp directory fails" in new TestCase {
@@ -76,7 +79,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
       ( file.removeSilently( _: Path ) )
         .expects( repositoryDirectory )
 
-      triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Left( exception )
+      triplesFinder.generateTriples( projectPath, commitId ).futureValue shouldBe Left( exception )
     }
 
     "return an error if cloning the repo fails" in new TestCase {
@@ -84,43 +87,43 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
         .expects( repositoryDirectory )
 
       val exception = new Exception( "message" )
-      ( git.cloneRepo( _: GitRepositoryUrl, _: Path, _: Path ) )
+      ( git.cloneRepo( _: ServiceUrl, _: Path, _: Path ) )
         .expects( gitRepositoryUrl, repositoryDirectory, workDirectory )
         .throwing( exception )
 
       ( file.removeSilently( _: Path ) )
         .expects( repositoryDirectory )
 
-      triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Left( exception )
+      triplesFinder.generateTriples( projectPath, commitId ).futureValue shouldBe Left( exception )
     }
 
     "return an error if checking out the sha fails" in new TestCase {
       ( file.mkdir( _: Path ) )
         .expects( repositoryDirectory )
 
-      ( git.cloneRepo( _: GitRepositoryUrl, _: Path, _: Path ) )
+      ( git.cloneRepo( _: ServiceUrl, _: Path, _: Path ) )
         .expects( gitRepositoryUrl, repositoryDirectory, workDirectory )
 
       val exception = new Exception( "message" )
-      ( git.checkout( _: CheckoutSha, _: Path ) )
-        .expects( checkoutSha, repositoryDirectory )
+      ( git.checkout( _: CommitId, _: Path ) )
+        .expects( commitId, repositoryDirectory )
         .throwing( exception )
 
       ( file.removeSilently( _: Path ) )
         .expects( repositoryDirectory )
 
-      triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Left( exception )
+      triplesFinder.generateTriples( projectPath, commitId ).futureValue shouldBe Left( exception )
     }
 
     "return an error if calling 'renku log' fails" in new TestCase {
       ( file.mkdir( _: Path ) )
         .expects( repositoryDirectory )
 
-      ( git.cloneRepo( _: GitRepositoryUrl, _: Path, _: Path ) )
+      ( git.cloneRepo( _: ServiceUrl, _: Path, _: Path ) )
         .expects( gitRepositoryUrl, repositoryDirectory, workDirectory )
 
-      ( git.checkout( _: CheckoutSha, _: Path ) )
-        .expects( checkoutSha, repositoryDirectory )
+      ( git.checkout( _: CommitId, _: Path ) )
+        .expects( commitId, repositoryDirectory )
 
       val exception = new Exception( "message" )
       ( renku.log( _: Path ) )
@@ -130,18 +133,18 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
       ( file.removeSilently( _: Path ) )
         .expects( repositoryDirectory )
 
-      triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Left( exception )
+      triplesFinder.generateTriples( projectPath, commitId ).futureValue shouldBe Left( exception )
     }
 
     "return an error if converting the rdf triples stream to rdf triples fails" in new TestCase {
       ( file.mkdir( _: Path ) )
         .expects( repositoryDirectory )
 
-      ( git.cloneRepo( _: GitRepositoryUrl, _: Path, _: Path ) )
+      ( git.cloneRepo( _: ServiceUrl, _: Path, _: Path ) )
         .expects( gitRepositoryUrl, repositoryDirectory, workDirectory )
 
-      ( git.checkout( _: CheckoutSha, _: Path ) )
-        .expects( checkoutSha, repositoryDirectory )
+      ( git.checkout( _: CommitId, _: Path ) )
+        .expects( commitId, repositoryDirectory )
 
       ( renku.log( _: Path ) )
         .expects( repositoryDirectory )
@@ -155,18 +158,18 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
       ( file.removeSilently( _: Path ) )
         .expects( repositoryDirectory )
 
-      triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Left( exception )
+      triplesFinder.generateTriples( projectPath, commitId ).futureValue shouldBe Left( exception )
     }
 
     "return an error if removing the temp folder fails" in new TestCase {
       ( file.mkdir( _: Path ) )
         .expects( repositoryDirectory )
 
-      ( git.cloneRepo( _: GitRepositoryUrl, _: Path, _: Path ) )
+      ( git.cloneRepo( _: ServiceUrl, _: Path, _: Path ) )
         .expects( gitRepositoryUrl, repositoryDirectory, workDirectory )
 
-      ( git.checkout( _: CheckoutSha, _: Path ) )
-        .expects( checkoutSha, repositoryDirectory )
+      ( git.checkout( _: CommitId, _: Path ) )
+        .expects( commitId, repositoryDirectory )
 
       ( renku.log( _: Path ) )
         .expects( repositoryDirectory )
@@ -184,20 +187,22 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
       ( file.removeSilently( _: Path ) )
         .expects( repositoryDirectory )
 
-      triplesFinder.generateTriples( gitRepositoryUrl, checkoutSha ).futureValue shouldBe Left( exception )
+      triplesFinder.generateTriples( projectPath, commitId ).futureValue shouldBe Left( exception )
     }
   }
 
   private trait TestCase {
-    val repositoryName = nonEmptyStrings().generateOne
-    val gitRepositoryUrl = GitRepositoryUrl( s"http://host/$repositoryName.git" )
-    val checkoutSha = checkoutShas.generateOne
-    val pathDifferentiator = Gen.choose( 1, 100 ).generateOne
+    val gitLabUrl: ServiceUrl = serviceUrls.generateOne
+    val repositoryName: String = nonEmptyStrings().generateOne
+    val projectPath: ProjectPath = ProjectPath( s"user/$repositoryName" )
+    val gitRepositoryUrl: ServiceUrl = gitLabUrl / s"$projectPath.git"
+    val commitId: CommitId = commitIds.generateOne
+    val pathDifferentiator: Int = Gen.choose( 1, 100 ).generateOne
 
-    val workDirectory = root / "tmp"
-    val repositoryDirectory = workDirectory / s"$repositoryName-$pathDifferentiator"
-    val rdfTriplesStream = mock[InputStream]
-    val rdfTriples = rdfTriplesSets.generateOne
+    val workDirectory: Path = root / "tmp"
+    val repositoryDirectory: Path = workDirectory / s"$repositoryName-$pathDifferentiator"
+    val rdfTriplesStream: InputStream = mock[InputStream]
+    val rdfTriples: RDFTriples = rdfTriplesSets.generateOne
 
     val file: Commands.File = mock[Commands.File]
     val git: Commands.Git = mock[Commands.Git]
@@ -205,6 +210,6 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
     val randomLong: MockFunction0[Long] = mockFunction[Long]
     val toRdfTriples: MockFunction1[InputStream, RDFTriples] = mockFunction[InputStream, RDFTriples]
     randomLong.expects().returning( pathDifferentiator )
-    val triplesFinder = new TriplesFinder( file, git, renku, toRdfTriples, randomLong )
+    val triplesFinder = new TriplesFinder( file, git, renku, gitLabUrl, toRdfTriples, randomLong )
   }
 }

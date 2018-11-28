@@ -19,7 +19,9 @@
 package ch.datascience.graph.events
 
 import ch.datascience.tinytypes.constraints.{ NonBlank, NonNegative }
+import ch.datascience.tinytypes.json._
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import play.api.libs.json.Format
 
 case class Project(
     id:   ProjectId,
@@ -29,9 +31,15 @@ case class Project(
 class ProjectId private ( val value: Int ) extends AnyVal with TinyType[Int]
 object ProjectId
   extends TinyTypeFactory[Int, ProjectId]( new ProjectId( _ ) )
-  with NonNegative
+  with NonNegative {
+
+  implicit lazy val projectIdFormat: Format[ProjectId] = TinyTypeFormat( ProjectId.apply )
+}
 
 class ProjectPath private ( val value: String ) extends AnyVal with TinyType[String]
 object ProjectPath
   extends TinyTypeFactory[String, ProjectPath]( new ProjectPath( _ ) )
-  with NonBlank
+  with NonBlank {
+
+  implicit lazy val projectPathFormat: Format[ProjectPath] = TinyTypeFormat( ProjectPath.apply )
+}

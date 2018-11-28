@@ -24,9 +24,9 @@ import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import play.api.libs.json.Format
 
 case class PushUser(
+    userId:   UserId,
     username: Username,
-    email:    Email,
-    userId:   UserId
+    email:    Email
 )
 
 case class User(
@@ -34,12 +34,20 @@ case class User(
     email:    Email
 )
 
+class UserId private ( val value: Int ) extends AnyVal with TinyType[Int]
+object UserId
+  extends TinyTypeFactory[Int, UserId]( new UserId( _ ) )
+  with NonNegative {
+
+  implicit lazy val userIdFormat: Format[UserId] = TinyTypeFormat( UserId.apply )
+}
+
 class Username private ( val value: String ) extends AnyVal with TinyType[String]
 object Username
   extends TinyTypeFactory[String, Username]( new Username( _ ) )
   with NonBlank {
 
-  implicit lazy val userIdFormat: Format[UserId] = TinyTypeFormat( UserId.apply )
+  implicit lazy val usernameFormat: Format[Username] = TinyTypeFormat( Username.apply )
 }
 
 class Email private ( val value: String ) extends AnyVal with TinyType[String]
@@ -48,12 +56,4 @@ object Email
   with NonBlank {
 
   implicit lazy val emailFormat: Format[Email] = TinyTypeFormat( Email.apply )
-}
-
-class UserId private ( val value: Int ) extends AnyVal with TinyType[Int]
-object UserId
-  extends TinyTypeFactory[Int, UserId]( new UserId( _ ) )
-  with NonNegative {
-
-  implicit lazy val usernameFormat: Format[Username] = TinyTypeFormat( Username.apply )
 }

@@ -21,7 +21,9 @@ package ch.datascience.graph.events
 import java.time.Instant
 
 import ch.datascience.tinytypes.constraints.{ GitSha, NonBlank }
+import ch.datascience.tinytypes.json._
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import play.api.libs.json.Format
 
 case class CommitEvent(
     id:        CommitId,
@@ -40,7 +42,10 @@ case class CommitEvent(
 class CommitId private ( val value: String ) extends AnyVal with TinyType[String]
 object CommitId
   extends TinyTypeFactory[String, CommitId]( new CommitId( _ ) )
-  with GitSha
+  with GitSha {
+
+  implicit lazy val commitIdFormat: Format[CommitId] = TinyTypeFormat( CommitId.apply )
+}
 
 class GitFile private ( val value: String ) extends AnyVal with TinyType[String]
 object GitFile

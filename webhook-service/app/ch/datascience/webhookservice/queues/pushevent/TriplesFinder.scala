@@ -19,10 +19,13 @@
 package ch.datascience.webhookservice.queues.pushevent
 
 import java.io.{ ByteArrayInputStream, InputStream }
+import java.net.URL
 import java.security.SecureRandom
 
 import cats.implicits._
-import javax.inject.{ Inject, Singleton }
+import ch.datascience.graph.events.{ CommitId, ProjectPath }
+import ch.datascience.webhookservice.config.ServiceUrl
+import javax.inject.{ Inject, Named, Singleton }
 import org.apache.jena.rdf.model.ModelFactory
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -35,18 +38,21 @@ private class TriplesFinder(
     file:         Commands.File,
     git:          Commands.Git,
     renku:        Commands.Renku,
+    gitLabUrl:    ServiceUrl,
     toRdfTriples: InputStream => RDFTriples,
     randomLong:   () => Long
 ) {
 
   @Inject() def this(
-      file:  Commands.File,
-      git:   Commands.Git,
-      renku: Commands.Renku
+      file:                          Commands.File,
+      git:                           Commands.Git,
+      renku:                         Commands.Renku,
+      @Named( "gitlabUrl" ) gitlabUrl:URL
   ) = this(
     file,
     git,
     renku,
+    ServiceUrl( gitlabUrl ),
     ( inputStream: InputStream ) => RDFTriples( ModelFactory.createDefaultModel.read( inputStream, "" ) ),
     new SecureRandom().nextLong _
   )
@@ -55,14 +61,15 @@ private class TriplesFinder(
   import file._
 
   private val workDirectory: Path = root / "tmp"
-  private val repositoryDirectoryFinder = ".*/(.*).git$".r
+  private val repositoryDirectoryFinder = ".*/(.*)$".r
 
   def generateTriples(
-      gitRepositoryUrl: GitRepositoryUrl,
-      checkoutSha:      CheckoutSha
+      projectPath: ProjectPath,
+      checkoutSha: CommitId
   )( implicit executionContext: ExecutionContext ): Future[Either[Throwable, RDFTriples]] = Future {
 
-    val repositoryDirectory = tempDirectoryName( repositoryNameFrom( gitRepositoryUrl ) )
+    val repositoryDirectory = tempDirectoryName( repositoryNameFrom( projectPath ) )
+    val gitRepositoryUrl = gitLabUrl / s"$projectPath.git"
 
     val maybeTriplesFile = for {
       _ <- pure( mkdir( repositoryDirectory ) )
@@ -84,7 +91,7 @@ private class TriplesFinder(
   private def tempDirectoryName( repositoryName: String ) =
     workDirectory / s"$repositoryName-${randomLong()}"
 
-  private def repositoryNameFrom( gitRepositoryUrl: GitRepositoryUrl ): String = gitRepositoryUrl.value match {
+  private def repositoryNameFrom( projectPath: ProjectPath ): String = projectPath.value match {
     case repositoryDirectoryFinder( folderName ) => folderName
   }
 
@@ -117,17 +124,17 @@ private object Commands {
   class Git {
 
     def cloneRepo(
-        repositoryUrl:        GitRepositoryUrl,
+        repositoryUrl:        ServiceUrl,
         destinationDirectory: Path,
         workDirectory:        Path
     ): CommandResult =
-      %%( 'git, 'clone, repositoryUrl.value, destinationDirectory.toString )( workDirectory )
+      %%( 'git, 'clone, repositoryUrl.toString, destinationDirectory.toString )( workDirectory )
 
     def checkout(
-        sha:                 CheckoutSha,
+        commitId:            CommitId,
         repositoryDirectory: Path
     ): CommandResult =
-      %%( 'git, 'checkout, sha.value )( repositoryDirectory )
+      %%( 'git, 'checkout, commitId.value )( repositoryDirectory )
   }
 
   @Singleton

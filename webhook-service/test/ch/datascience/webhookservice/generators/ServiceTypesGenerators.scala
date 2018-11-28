@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice.generators
 
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.webhookservice.config.DatasetType.{ Mem, TDB }
 import ch.datascience.webhookservice.config._
 import ch.datascience.webhookservice.queues.pushevent._
@@ -27,21 +28,12 @@ import org.scalacheck.Gen
 
 object ServiceTypesGenerators {
 
-  implicit val checkoutShas: Gen[CheckoutSha] = shas map CheckoutSha.apply
-
-  implicit val gitRepositoryUrls: Gen[GitRepositoryUrl] =
-    nonEmptyStrings()
-      .map { repoName =>
-        GitRepositoryUrl( s"http://host/$repoName.git" )
-      }
-
-  implicit val projectNames: Gen[ProjectName] = nonEmptyStrings() map ProjectName.apply
-
   implicit val pushEvents: Gen[PushEvent] = for {
-    sha <- checkoutShas
-    repositoryUrl <- gitRepositoryUrls
-    projectName <- projectNames
-  } yield PushEvent( sha, repositoryUrl, projectName )
+    before <- commitIds
+    after <- commitIds
+    pushUser <- pushUsers
+    project <- projects
+  } yield PushEvent( before, after, pushUser, project )
 
   implicit val rdfTriplesSets: Gen[RDFTriples] = for {
     model <- Gen.uuid.map( _ => ModelFactory.createDefaultModel() )
@@ -53,8 +45,10 @@ object ServiceTypesGenerators {
     RDFTriples( model )
   }
 
+  implicit val serviceUrls: Gen[ServiceUrl] = httpUrls map ServiceUrl.apply
+
   implicit val fusekiConfigs: Gen[FusekiConfig] = for {
-    fusekiUrl <- httpUrls map FusekiUrl.apply
+    fusekiUrl <- serviceUrls
     datasetName <- nonEmptyStrings() map DatasetName.apply
     datasetType <- Gen.oneOf( Mem, TDB )
     username <- nonEmptyStrings() map Username.apply

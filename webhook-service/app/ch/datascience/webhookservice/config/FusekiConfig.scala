@@ -60,25 +60,6 @@ object DatasetType {
   }
 }
 
-class FusekiUrl private ( val value: URL ) extends AnyVal with TinyType[URL]
-
-object FusekiUrl extends TinyTypeFactory[URL, FusekiUrl]( new FusekiUrl( _ ) ) {
-
-  def apply( url: String ): FusekiUrl = FusekiUrl( new URL( url ) )
-
-  implicit object FusekiUrlFinder extends ConfigLoader[FusekiUrl] {
-    override def load( config: Config, path: String ): FusekiUrl = FusekiUrl( config.getString( path ) )
-  }
-
-  implicit class FusekiUrlOps( fusekiUrl: FusekiUrl ) {
-    def /( value: Any ): FusekiUrl = FusekiUrl(
-      new URL( s"$fusekiUrl/$value" )
-    )
-  }
-
-  implicit def asString( fusekiUrl: FusekiUrl ): String = fusekiUrl.toString
-}
-
 class Username private ( val value: String ) extends AnyVal with TinyType[String]
 
 object Username
@@ -103,7 +84,7 @@ object Password
 
 @Singleton
 case class FusekiConfig(
-    fusekiBaseUrl: FusekiUrl,
+    fusekiBaseUrl: ServiceUrl,
     datasetName:   DatasetName,
     datasetType:   DatasetType,
     username:      Username,
@@ -111,7 +92,7 @@ case class FusekiConfig(
 ) {
 
   @Inject def this( configuration: Configuration ) = this(
-    configuration.get[FusekiUrl]( "services.fuseki.url" ),
+    configuration.get[ServiceUrl]( "services.fuseki.url" ),
     configuration.get[DatasetName]( "services.fuseki.dataset-name" ),
     configuration.get[DatasetType]( "services.fuseki.dataset-type" ),
     configuration.get[Username]( "services.fuseki.username" ),

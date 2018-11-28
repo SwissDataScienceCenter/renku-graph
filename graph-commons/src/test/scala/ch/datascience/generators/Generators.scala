@@ -43,7 +43,7 @@ object Generators {
     parts <- Gen.listOfN( partsNumber, nonEmptyStrings() )
   } yield parts.mkString( "/" )
 
-  val httpUrls = for {
+  val httpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
       case true  => "http"
       case false => "https"

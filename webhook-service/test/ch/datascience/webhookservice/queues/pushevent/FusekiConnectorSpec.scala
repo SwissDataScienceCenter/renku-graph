@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.queues.pushevent
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.config.FusekiUrl
+import ch.datascience.webhookservice.config.ServiceUrl
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import org.apache.jena.rdf.model.Model
 import org.apache.jena.rdfconnection.RDFConnection
@@ -107,7 +107,7 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
 
     val rdfTriples: RDFTriples = rdfTriplesSets.generateOne
 
-    val createConnection = mockFunction[FusekiUrl, RDFConnection]
+    val createConnection = mockFunction[ServiceUrl, RDFConnection]
     val fusekiConnection: RDFConnection = mock[RDFConnection]
 
     val fusekiConfig = fusekiConfigs.generateOne

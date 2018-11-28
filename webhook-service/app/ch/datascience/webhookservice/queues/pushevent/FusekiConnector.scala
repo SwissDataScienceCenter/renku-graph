@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.queues.pushevent
 
-import ch.datascience.webhookservice.config.{ FusekiConfig, FusekiUrl }
+import ch.datascience.webhookservice.config.{ FusekiConfig, ServiceUrl }
 import javax.inject.{ Inject, Singleton }
 import org.apache.jena.rdfconnection.{ RDFConnection, RDFConnectionFuseki }
 
@@ -29,14 +29,14 @@ import scala.util.{ Failure, Success, Try }
 @Singleton
 private class FusekiConnector(
     fusekiConfig:            FusekiConfig,
-    fusekiConnectionBuilder: FusekiUrl => RDFConnection
+    fusekiConnectionBuilder: ServiceUrl => RDFConnection
 ) {
 
   import fusekiConfig._
 
   @Inject() def this( fusekiConfig: FusekiConfig ) = this(
     fusekiConfig,
-    ( fusekiUrl: FusekiUrl ) => RDFConnectionFuseki
+    ( fusekiUrl: ServiceUrl ) => RDFConnectionFuseki
       .create()
       .destination( fusekiUrl.toString )
       .build()
