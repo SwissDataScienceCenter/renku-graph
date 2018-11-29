@@ -16,13 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.log
+package ch.datascience.webhookservice.queues.commitevent
 
-import java.nio.file.{ FileSystems, OpenOption, Path, StandardOpenOption }
+import java.nio.file._
 
 import akka.stream.IOResult
 import akka.stream.scaladsl.{ FileIO, Flow, Keep, Sink }
 import akka.util.ByteString
+import ch.datascience.graph.events.{ CommitEvent, Project, PushUser, User }
+import javax.inject.Provider
 import play.api.libs.json.{ Json, Writes }
 
 import scala.concurrent.Future
@@ -51,5 +53,23 @@ object FileSink {
     val writer = implicitly[Writes[T]]
     val byteArray = Json.toBytes( writer.writes( obj ) )
     ByteString( byteArray ) ++ ByteString( "\n" )
+  }
+}
+
+class FileEventLogSinkProvider extends Provider[Sink[CommitEvent, Future[IOResult]]] {
+
+  private implicit val userWrites: Writes[User] = Json.writes[User]
+  private implicit val pushUserWrites: Writes[PushUser] = Json.writes[PushUser]
+  private implicit val projectWrites: Writes[Project] = Json.writes[Project]
+  implicit val commitEventWrites: Writes[CommitEvent] = Json.writes[CommitEvent]
+
+  val temporaryEventLogFile: Path = {
+    val file = Files.createTempFile( "event", "log" )
+    file.toFile.deleteOnExit()
+    file
+  }
+
+  override def get(): Sink[CommitEvent, Future[IOResult]] = {
+    FileSink( temporaryEventLogFile.toAbsolutePath.toString )
   }
 }

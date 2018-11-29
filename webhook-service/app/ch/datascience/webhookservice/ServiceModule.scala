@@ -22,8 +22,11 @@ import java.net.URL
 import java.nio.charset.Charset
 
 import akka.Done
-import akka.stream.Materializer
+import akka.stream.scaladsl.Sink
+import akka.stream.{ IOResult, Materializer }
+import ch.datascience.graph.events.CommitEvent
 import ch.datascience.webhookservice.config.{ FusekiConfig, ServiceUrl }
+import ch.datascience.webhookservice.queues.commitevent.FileEventLogSinkProvider
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
 import javax.inject.{ Inject, Singleton }
@@ -46,6 +49,9 @@ class ServiceModule(
     bind( classOf[URL] )
       .annotatedWith( Names.named( "gitlabUrl" ) )
       .toInstance( configuration.get[ServiceUrl]( "services.gitlab.url" ).value )
+
+    bind( classOf[Sink[CommitEvent, Future[IOResult]]] )
+      .toProvider( classOf[FileEventLogSinkProvider] )
   }
 }
 

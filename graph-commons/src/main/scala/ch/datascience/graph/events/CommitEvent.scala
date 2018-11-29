@@ -50,4 +50,7 @@ object CommitId
 class GitFile private ( val value: String ) extends AnyVal with TinyType[String]
 object GitFile
   extends TinyTypeFactory[String, GitFile]( new GitFile( _ ) )
-  with NonBlank
+  with NonBlank {
+
+  implicit lazy val gitFileFormat: Format[GitFile] = TinyTypeFormat( GitFile.apply )
+}

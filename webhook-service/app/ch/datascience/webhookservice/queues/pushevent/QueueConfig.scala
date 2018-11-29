@@ -20,19 +20,10 @@ package ch.datascience.webhookservice.queues.pushevent
 
 import ch.datascience.tinytypes.constraints.GreaterThanZero
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import ch.datascience.webhookservice.config.BufferSize
 import com.typesafe.config.Config
 import javax.inject.{ Inject, Singleton }
 import play.api.{ ConfigLoader, Configuration }
-
-private class BufferSize private ( val value: Int ) extends AnyVal with TinyType[Int]
-private object BufferSize
-  extends TinyTypeFactory[Int, BufferSize]( new BufferSize( _ ) )
-  with GreaterThanZero {
-
-  implicit object BufferSizeFinder extends ConfigLoader[BufferSize] {
-    override def load( config: Config, path: String ): BufferSize = BufferSize( config.getInt( path ) )
-  }
-}
 
 private case class TriplesFinderThreads private ( value: Int ) extends AnyVal with TinyType[Int]
 private object TriplesFinderThreads
@@ -62,9 +53,9 @@ private case class QueueConfig(
 ) {
 
   @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "queue.buffer-size" ),
-    configuration.get[TriplesFinderThreads]( "queue.triples-finder-threads" ),
-    configuration.get[FusekiUploadThreads]( "queue.fuseki-upload-threads" )
+    configuration.get[BufferSize]( "push-events-queue.buffer-size" ),
+    configuration.get[TriplesFinderThreads]( "push-events-queue.triples-finder-threads" ),
+    configuration.get[FusekiUploadThreads]( "push-events-queue.fuseki-upload-threads" )
   )
 
 }

@@ -37,6 +37,11 @@ object EventsGenerators {
     email <- emails
   } yield PushUser( userId, username, email )
 
+  implicit val users: Gen[User] = for {
+    username <- usernames
+    email <- emails
+  } yield User( username, email )
+
   implicit val projectIds: Gen[ProjectId] = nonNegativeInts() map ProjectId.apply
   implicit val projectPath: Gen[ProjectPath] = relativePaths map ProjectPath.apply
 
@@ -44,4 +49,16 @@ object EventsGenerators {
     projectId <- projectIds
     path <- projectPath
   } yield Project( projectId, path )
+
+  implicit val commitEvents: Gen[CommitEvent] = for {
+    commitId <- commitIds
+    message <- nonEmptyStrings()
+    timestamp <- timestampsInThePast
+    pushUser <- pushUsers
+    author <- users
+    committer <- users
+    commitsNumber <- positiveInts( 3 )
+    parents <- Gen.listOfN( commitsNumber, commitIds )
+    project <- projects
+  } yield CommitEvent( commitId, message, timestamp, pushUser, author, committer, parents, project, Nil, Nil, Nil )
 }

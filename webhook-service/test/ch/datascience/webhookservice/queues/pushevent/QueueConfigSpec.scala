@@ -19,7 +19,8 @@
 package ch.datascience.webhookservice.queues.pushevent
 
 import ch.datascience.generators.Generators.Implicits._
-import org.scalacheck.Gen
+import ch.datascience.generators.Generators._
+import ch.datascience.webhookservice.config.BufferSize
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
@@ -27,14 +28,12 @@ import play.api.Configuration
 
 class QueueConfigSpec extends WordSpec with PropertyChecks {
 
-  private val positiveInts = Gen.choose( 1, 1000 )
-
   "apply" should {
 
-    "read 'queue.buffer-size', 'queue.triples-finder-threads' and 'queue.fuseki-upload-threads' to instantiate the QueueConfig" in {
-      forAll( positiveInts, positiveInts, positiveInts ) { ( bufferSizeValue, triplesFinderThreadsValue, fusekiUploadThreads ) =>
+    "read 'push-events-queue.buffer-size', 'push-events-queue.triples-finder-threads' and 'push-events-queue.fuseki-upload-threads' to instantiate the QueueConfig" in {
+      forAll( positiveInts(), positiveInts(), positiveInts() ) { ( bufferSizeValue, triplesFinderThreadsValue, fusekiUploadThreads ) =>
         val config = Configuration.from(
-          Map( "queue" -> Map(
+          Map( "push-events-queue" -> Map(
             "buffer-size" -> bufferSizeValue,
             "triples-finder-threads" -> triplesFinderThreadsValue,
             "fuseki-upload-threads" -> fusekiUploadThreads
@@ -51,10 +50,10 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
 
     "throw an IllegalArgumentException if buffer-size is <= 0" in {
       val config = Configuration.from(
-        Map( "queue" -> Map(
+        Map( "push-events-queue" -> Map(
           "buffer-size" -> 0,
-          "triples-finder-threads" -> positiveInts.generateOne,
-          "fuseki-upload-threads" -> positiveInts.generateOne
+          "triples-finder-threads" -> positiveInts().generateOne,
+          "fuseki-upload-threads" -> positiveInts().generateOne
         ) )
       )
 
@@ -63,10 +62,10 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
 
     "throw an IllegalArgumentException if triples-finder-threads is <= 0" in {
       val config = Configuration.from(
-        Map( "queue" -> Map(
-          "buffer-size" -> positiveInts.generateOne,
+        Map( "push-events-queue" -> Map(
+          "buffer-size" -> positiveInts().generateOne,
           "triples-finder-threads" -> 0,
-          "fuseki-upload-threads" -> positiveInts.generateOne
+          "fuseki-upload-threads" -> positiveInts().generateOne
         ) )
       )
 
@@ -75,9 +74,9 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
 
     "throw an IllegalArgumentException if fuseki-upload-threads is <= 0" in {
       val config = Configuration.from(
-        Map( "queue" -> Map(
-          "buffer-size" -> positiveInts.generateOne,
-          "triples-finder-threads" -> positiveInts.generateOne,
+        Map( "push-events-queue" -> Map(
+          "buffer-size" -> positiveInts().generateOne,
+          "triples-finder-threads" -> positiveInts().generateOne,
           "fuseki-upload-threads" -> 0
         ) )
       )

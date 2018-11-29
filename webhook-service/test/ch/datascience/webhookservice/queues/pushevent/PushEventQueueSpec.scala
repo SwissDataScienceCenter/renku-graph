@@ -23,6 +23,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.QueueOfferResult.Enqueued
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.{ CommitId, ProjectPath }
+import ch.datascience.webhookservice.config.BufferSize
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._

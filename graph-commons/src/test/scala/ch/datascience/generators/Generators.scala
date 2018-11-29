@@ -18,6 +18,8 @@
 
 package ch.datascience.generators
 
+import java.time.Instant
+
 import org.scalacheck.Gen._
 import org.scalacheck.{ Arbitrary, Gen }
 
@@ -56,6 +58,10 @@ object Generators {
     length <- Gen.choose( 5, 40 )
     chars <- Gen.listOfN( length, Gen.oneOf( ( 0 to 9 ).map( _.toString ) ++ ( 'a' to 'f' ).map( _.toString ) ) )
   } yield chars.mkString( "" )
+
+  val timestampsInThePast: Gen[Instant] =
+    Gen.choose( Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli )
+      .map( Instant.ofEpochMilli )
 
   object Implicits {
 
