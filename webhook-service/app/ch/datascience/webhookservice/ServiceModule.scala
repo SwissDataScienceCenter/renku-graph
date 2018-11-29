@@ -20,6 +20,7 @@ package ch.datascience.webhookservice
 
 import java.net.URL
 import java.nio.charset.Charset
+import java.nio.file.Path
 
 import akka.Done
 import akka.stream.scaladsl.Sink
@@ -27,6 +28,7 @@ import akka.stream.{ IOResult, Materializer }
 import ch.datascience.graph.events.CommitEvent
 import ch.datascience.webhookservice.config.{ FusekiConfig, ServiceUrl }
 import ch.datascience.webhookservice.queues.commitevent.FileEventLogSinkProvider
+import ch.datascience.webhookservice.queues.logevent.{ EventLogSourceProvider, FileEventLogSourceProvider, LogEventQueue }
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
 import javax.inject.{ Inject, Singleton }
@@ -50,8 +52,24 @@ class ServiceModule(
       .annotatedWith( Names.named( "gitlabUrl" ) )
       .toInstance( configuration.get[ServiceUrl]( "services.gitlab.url" ).value )
 
+    bind( classOf[Path] )
+      .annotatedWith( Names.named( "event-log-file-path" ) )
+      .toInstance {
+        import java.nio.file._
+        val path = FileSystems.getDefault.getPath( "/tmp/renku-event.log" )
+        val file = Files.createFile( path )
+        file.toFile.deleteOnExit()
+        path
+      }
+
     bind( classOf[Sink[CommitEvent, Future[IOResult]]] )
       .toProvider( classOf[FileEventLogSinkProvider] )
+
+    bind( classOf[EventLogSourceProvider] )
+      .to( classOf[FileEventLogSourceProvider] )
+
+    bind( classOf[LogEventQueue] )
+      .asEagerSingleton()
   }
 }
 

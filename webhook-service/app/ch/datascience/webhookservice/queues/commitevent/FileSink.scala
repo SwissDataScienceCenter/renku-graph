@@ -24,7 +24,7 @@ import akka.stream.IOResult
 import akka.stream.scaladsl.{ FileIO, Flow, Keep, Sink }
 import akka.util.ByteString
 import ch.datascience.graph.events.{ CommitEvent, Project, PushUser, User }
-import javax.inject.Provider
+import javax.inject.{ Inject, Named, Provider }
 import play.api.libs.json.{ Json, Writes }
 
 import scala.concurrent.Future
@@ -56,20 +56,21 @@ object FileSink {
   }
 }
 
-class FileEventLogSinkProvider extends Provider[Sink[CommitEvent, Future[IOResult]]] {
+class FileEventLogSinkProvider @Inject() ( @Named( "event-log-file-path" ) eventLogFilePath:Path )
+  extends Provider[Sink[CommitEvent, Future[IOResult]]] {
+
+  import FileEventLogSinkProvider._
+
+  override def get(): Sink[CommitEvent, Future[IOResult]] = {
+    FileSink( eventLogFilePath.toAbsolutePath.toString )
+  }
+}
+
+object FileEventLogSinkProvider {
 
   private implicit val userWrites: Writes[User] = Json.writes[User]
   private implicit val pushUserWrites: Writes[PushUser] = Json.writes[PushUser]
   private implicit val projectWrites: Writes[Project] = Json.writes[Project]
   implicit val commitEventWrites: Writes[CommitEvent] = Json.writes[CommitEvent]
 
-  val temporaryEventLogFile: Path = {
-    val file = Files.createTempFile( "event", "log" )
-    file.toFile.deleteOnExit()
-    file
-  }
-
-  override def get(): Sink[CommitEvent, Future[IOResult]] = {
-    FileSink( temporaryEventLogFile.toAbsolutePath.toString )
-  }
 }

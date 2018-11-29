@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.log
+package ch.datascience.webhookservice.queues.logevent
 
 import java.nio.file.{ FileSystems, Files, Path }
 
@@ -25,10 +25,11 @@ import akka.stream.scaladsl.Source
 import akka.stream.stage._
 import akka.stream.{ Attributes, Outlet, SourceShape }
 import akka.util.ByteString
+import javax.inject.{ Inject, Named, Provider }
 import play.api.libs.json.{ JsValue, Json }
 
 import scala.concurrent.{ Future, Promise }
-import scala.util.{ Failure, Success, Try }
+import scala.util.Try
 
 object FileSource {
   def apply( path: String ): Source[Try[JsValue], Future[Done]] = {
@@ -82,5 +83,11 @@ object FileSource {
       ( logic, promise.future )
     }
   }
+}
 
+class FileEventLogSourceProvider @Inject() ( @Named( "event-log-file-path" ) eventLogFilePath:Path )
+  extends EventLogSourceProvider {
+
+  override def get: Source[Try[JsValue], Future[Done]] =
+    FileSource( eventLogFilePath.toAbsolutePath.toString )
 }

@@ -48,20 +48,20 @@ class CommitEventsQueueSpec
   with PropertyChecks
   with IntegrationPatience {
 
+  import FileEventLogSinkProvider._
+
   "offer" should {
 
     "return Enqueued and trigger pushing offered CommitEvents to the Event Log" in new TestCase {
 
-      import eventLogSinkProvider._
-
-      val commitEventsList = commitEventsLists.generateOne
+      val commitEventsList: List[CommitEvent] = commitEventsLists.generateOne
 
       commitEventsList.map { commitEvent =>
         commitEventsQueue.offer( commitEvent ).futureValue shouldBe Enqueued
       }
 
       eventually {
-        sinkedEvents should contain allElementsOf commitEventsList.map( toJson[CommitEvent] )
+        sunkEvents should contain allElementsOf commitEventsList.map( toJson[CommitEvent] )
       }
     }
   }
@@ -70,15 +70,21 @@ class CommitEventsQueueSpec
     private implicit val system: ActorSystem = ActorSystem( "MyTest" )
     private implicit val materializer: Materializer = ActorMaterializer()
 
-    val eventLogSinkProvider = new FileEventLogSinkProvider()
-    val tempEventLogPath: Path = eventLogSinkProvider.temporaryEventLogFile
+    val tempEventLogPath: Path = {
+      import java.nio.file._
+      val path = FileSystems.getDefault.getPath( "/tmp/renku-event.log" )
+      Files.createFile( path ).toFile.deleteOnExit()
+      path
+    }
+
+    val eventLogSinkProvider = new FileEventLogSinkProvider( tempEventLogPath )
 
     val commitEventsQueue = new CommitEventsQueue(
       QueueConfig( BufferSize( 1 ) ),
       eventLogSinkProvider.get()
     )
 
-    def sinkedEvents: Stream[JsValue] =
+    def sunkEvents: Stream[JsValue] =
       Source
         .fromFile( tempEventLogPath.toFile )
         .getLines()
