@@ -16,22 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.logevent
+package ch.datascience.webhookservice.config
 
-import ch.datascience.webhookservice.config.{ AsyncParallelism, BufferSize }
-import javax.inject.{ Inject, Singleton }
-import play.api.Configuration
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import ch.datascience.tinytypes.constraints.GreaterThanZero
+import com.typesafe.config.Config
+import play.api.ConfigLoader
 
-@Singleton
-private case class QueueConfig(
-    bufferSize:           BufferSize,
-    triplesFinderThreads: AsyncParallelism,
-    fusekiUploadThreads:  AsyncParallelism
-) {
+case class AsyncParallelism private ( value: Int ) extends AnyVal with TinyType[Int]
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "log-events-queue.buffer-size" ),
-    configuration.get[AsyncParallelism]( "log-events-queue.triples-finder-parallelism" ),
-    configuration.get[AsyncParallelism]( "log-events-queue.fuseki-upload-parallelism" )
-  )
+object AsyncParallelism
+  extends TinyTypeFactory[Int, AsyncParallelism]( new AsyncParallelism( _ ) )
+  with GreaterThanZero {
+
+  implicit object TriplesFinderThreadsFinder extends ConfigLoader[AsyncParallelism] {
+    override def load( config: Config, path: String ): AsyncParallelism = AsyncParallelism( config.getInt( path ) )
+  }
 }

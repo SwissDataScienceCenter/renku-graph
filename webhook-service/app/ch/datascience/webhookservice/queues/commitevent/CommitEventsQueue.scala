@@ -27,19 +27,30 @@ import javax.inject.{ Inject, Singleton }
 import scala.concurrent.{ ExecutionContext, Future }
 
 @Singleton
-class CommitEventsQueue @Inject() (
+class CommitEventsQueue(
     queueConfig:  QueueConfig,
     eventLogSink: Sink[CommitEvent, Future[IOResult]]
 )( implicit executionContext: ExecutionContext, materializer: Materializer ) {
+
+  @Inject() def this(
+      queueConfig:          QueueConfig,
+      eventLogSinkProvider: EventLogSinkProvider
+  )( implicit executionContext: ExecutionContext, materializer: Materializer ) = this(
+    queueConfig,
+    eventLogSinkProvider.get
+  )
 
   import queueConfig._
 
   def offer( commitEvent: CommitEvent ): Future[QueueOfferResult] =
     queue offer commitEvent
 
-  private lazy val queue = Source.queue[CommitEvent](
-    bufferSize.value,
-    overflowStrategy = backpressure
-  ).toMat( eventLogSink )( Keep.left )
+  private lazy val queue = Source
+    .queue[CommitEvent]( bufferSize.value, overflowStrategy = backpressure )
+    .toMat( eventLogSink )( Keep.left )
     .run()
+}
+
+trait EventLogSinkProvider {
+  def get: Sink[CommitEvent, Future[IOResult]]
 }

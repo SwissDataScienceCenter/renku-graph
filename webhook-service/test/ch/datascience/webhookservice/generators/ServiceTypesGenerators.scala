@@ -22,6 +22,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.webhookservice.config.DatasetType.{ Mem, TDB }
 import ch.datascience.webhookservice.config._
+import ch.datascience.webhookservice.queues.logevent.RDFTriples
 import ch.datascience.webhookservice.queues.pushevent._
 import org.apache.jena.rdf.model.ModelFactory
 import org.scalacheck.Gen

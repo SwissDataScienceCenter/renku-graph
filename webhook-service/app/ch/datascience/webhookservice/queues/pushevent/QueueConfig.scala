@@ -18,44 +18,19 @@
 
 package ch.datascience.webhookservice.queues.pushevent
 
-import ch.datascience.tinytypes.constraints.GreaterThanZero
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
-import ch.datascience.webhookservice.config.BufferSize
-import com.typesafe.config.Config
+import ch.datascience.webhookservice.config.{ AsyncParallelism, BufferSize }
 import javax.inject.{ Inject, Singleton }
-import play.api.{ ConfigLoader, Configuration }
-
-private case class TriplesFinderThreads private ( value: Int ) extends AnyVal with TinyType[Int]
-private object TriplesFinderThreads
-  extends TinyTypeFactory[Int, TriplesFinderThreads]( new TriplesFinderThreads( _ ) )
-  with GreaterThanZero {
-
-  implicit object TriplesFinderThreadsFinder extends ConfigLoader[TriplesFinderThreads] {
-    override def load( config: Config, path: String ): TriplesFinderThreads = TriplesFinderThreads( config.getInt( path ) )
-  }
-}
-
-private case class FusekiUploadThreads private ( value: Int ) extends AnyVal with TinyType[Int]
-private object FusekiUploadThreads
-  extends TinyTypeFactory[Int, FusekiUploadThreads]( new FusekiUploadThreads( _ ) )
-  with GreaterThanZero {
-
-  implicit object FusekiUploadThreadsFinder extends ConfigLoader[FusekiUploadThreads] {
-    override def load( config: Config, path: String ): FusekiUploadThreads = FusekiUploadThreads( config.getInt( path ) )
-  }
-}
+import play.api.Configuration
 
 @Singleton
 private case class QueueConfig(
-    bufferSize:           BufferSize,
-    triplesFinderThreads: TriplesFinderThreads,
-    fusekiUploadThreads:  FusekiUploadThreads
+    bufferSize:               BufferSize,
+    commitDetailsParallelism: AsyncParallelism
 ) {
 
   @Inject() def this( configuration: Configuration ) = this(
     configuration.get[BufferSize]( "push-events-queue.buffer-size" ),
-    configuration.get[TriplesFinderThreads]( "push-events-queue.triples-finder-threads" ),
-    configuration.get[FusekiUploadThreads]( "push-events-queue.fuseki-upload-threads" )
+    configuration.get[AsyncParallelism]( "push-events-queue.commit-details-parallelism" )
   )
 
 }

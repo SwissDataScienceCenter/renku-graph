@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.pushevent
+package ch.datascience.webhookservice.queues.logevent
 
 import java.io.{ ByteArrayInputStream, InputStream }
 import java.net.URL

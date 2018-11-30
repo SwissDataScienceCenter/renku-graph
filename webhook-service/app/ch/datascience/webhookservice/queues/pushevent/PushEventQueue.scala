@@ -18,10 +18,14 @@
 
 package ch.datascience.webhookservice.queues.pushevent
 
+import java.time.Instant
+
 import akka.stream.OverflowStrategy.backpressure
 import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
 import akka.stream.{ Materializer, QueueOfferResult }
 import akka.{ Done, NotUsed }
+import ch.datascience.graph.events.{ CommitEvent, User }
+import ch.datascience.webhookservice.queues.commitevent.CommitEventsQueue
 import javax.inject.{ Inject, Singleton }
 import play.api.{ Logger, LoggerLike }
 
@@ -29,55 +33,67 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 @Singleton
 class PushEventQueue(
-    triplesFinder:   TriplesFinder,
-    fusekiConnector: FusekiConnector,
-    queueConfig:     QueueConfig,
-    logger:          LoggerLike
+    queueConfig:       QueueConfig,
+    commitsEventQueue: CommitEventsQueue,
+    logger:            LoggerLike
 )( implicit executionContext: ExecutionContext, materializer: Materializer ) {
 
   @Inject() def this(
-      triplesFinder:   TriplesFinder,
-      fusekiConnector: FusekiConnector,
-      queueConfig:     QueueConfig
+      queueConfig:       QueueConfig,
+      commitsEventQueue: CommitEventsQueue
   )( implicit executionContext: ExecutionContext, materializer: Materializer ) =
-    this( triplesFinder, fusekiConnector, queueConfig, Logger )
+    this( queueConfig, commitsEventQueue, Logger )
 
   import queueConfig._
 
   def offer( pushEvent: PushEvent ): Future[QueueOfferResult] =
     queue offer pushEvent
 
-  private lazy val queue = Source.queue[PushEvent](
-    bufferSize.value,
-    overflowStrategy = backpressure
-  ).mapAsync( triplesFinderThreads.value )( pushEventToRdfTriples )
-    .flatMapConcat( logAndSkipErrors )
-    .toMat( fusekiSink )( Keep.left )
-    .run()
+  private lazy val queue =
+    Source
+      .queue[PushEvent]( bufferSize.value, overflowStrategy = backpressure )
+      .mapAsync( commitDetailsParallelism.value )( pushEventToCommitEvent )
+      .flatMapConcat( logAndSkipCommitEventErrors )
+      .toMat( commitEventsQueue )( Keep.left )
+      .run()
 
-  private def pushEventToRdfTriples( pushEvent: PushEvent ): Future[( PushEvent, Either[Throwable, RDFTriples] )] =
-    triplesFinder.generateTriples( pushEvent.project.path, pushEvent.before )
-      .map( maybeTriplesFile => pushEvent -> maybeTriplesFile )
-
-  private lazy val logAndSkipErrors: ( ( PushEvent, Either[Throwable, RDFTriples] ) ) => Source[( PushEvent, RDFTriples ), NotUsed] = {
-    case ( event, Left( exception ) ) =>
-      logger.error( s"Generating triples for $event failed: ${exception.getMessage}" )
-      Source.empty[( PushEvent, RDFTriples )]
-    case ( event, Right( triplesFile ) ) =>
-      Source.single( event -> triplesFile )
+  private def pushEventToCommitEvent( pushEvent: PushEvent ): Future[( PushEvent, Either[Throwable, CommitEvent] )] = Future {
+    pushEvent -> Right(
+      CommitEvent(
+        pushEvent.after,
+        "",
+        Instant.EPOCH,
+        pushEvent.pushUser,
+        author    = User( pushEvent.pushUser.username, pushEvent.pushUser.email ),
+        committer = User( pushEvent.pushUser.username, pushEvent.pushUser.email ),
+        parents   = Seq( pushEvent.before ),
+        project   = pushEvent.project,
+        added     = Nil,
+        modified  = Nil,
+        removed   = Nil
+      )
+    )
   }
 
-  private lazy val fusekiSink: Sink[( PushEvent, RDFTriples ), Future[Done]] =
-    Flow[( PushEvent, RDFTriples )]
-      .mapAsync( fusekiUploadThreads.value ) {
-        case ( event, triplesFile ) =>
-          fusekiConnector
-            .uploadFile( triplesFile )
-            .recover {
-              case exception =>
-                logger.error( s"Uploading triples for $event failed: ${exception.getMessage}" )
-                Done
-            }
+  private lazy val logAndSkipCommitEventErrors: ( ( PushEvent, Either[Throwable, CommitEvent] ) ) => Source[CommitEvent, NotUsed] = {
+    case ( pushEvent, Left( exception ) ) =>
+      logger.error( s"Generating CommitEvent for $pushEvent failed", exception )
+      Source.empty[CommitEvent]
+    case ( _, Right( commitEvent ) ) =>
+      Source.single( commitEvent )
+  }
+
+  private lazy val commitEventsQueue: Sink[CommitEvent, Future[Done]] =
+    Flow[CommitEvent]
+      .mapAsync( commitDetailsParallelism.value ) { commitEvent =>
+        commitsEventQueue
+          .offer( commitEvent )
+          .map( _ => logger.info( s"$commitEvent enqueued" ) )
+          .recover {
+            case exception =>
+              logger.error( s"Enqueueing CommitEvent failed: $commitEvent", exception )
+              Done
+          }
       }
       .toMat( Sink.ignore )( Keep.right )
 }

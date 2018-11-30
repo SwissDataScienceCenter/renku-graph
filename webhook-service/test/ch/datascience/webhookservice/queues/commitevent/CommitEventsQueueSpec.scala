@@ -81,7 +81,7 @@ class CommitEventsQueueSpec
 
     val commitEventsQueue = new CommitEventsQueue(
       QueueConfig( BufferSize( 1 ) ),
-      eventLogSinkProvider.get()
+      eventLogSinkProvider.get
     )
 
     def sunkEvents: Stream[JsValue] =

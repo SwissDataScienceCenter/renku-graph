@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.pushevent
+package ch.datascience.webhookservice.queues.logevent
 
 import ch.datascience.webhookservice.config.{ FusekiConfig, ServiceUrl }
 import javax.inject.{ Inject, Singleton }
@@ -42,7 +42,7 @@ private class FusekiConnector(
       .build()
   )
 
-  def uploadFile( rdfTriples: RDFTriples )( implicit executionContext: ExecutionContext ): Future[Unit] = Future {
+  def upload( rdfTriples: RDFTriples )( implicit executionContext: ExecutionContext ): Future[Unit] = Future {
     var connection = Option.empty[RDFConnection]
     Try {
       connection = Some( newConnection )

@@ -16,22 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.logevent
+package ch.datascience.tools
 
-import ch.datascience.webhookservice.config.{ AsyncParallelism, BufferSize }
-import javax.inject.{ Inject, Singleton }
-import play.api.Configuration
+import org.scalatest.Matchers._
+import org.scalatest.concurrent.Eventually.{ PatienceConfig, eventually }
 
-@Singleton
-private case class QueueConfig(
-    bufferSize:           BufferSize,
-    triplesFinderThreads: AsyncParallelism,
-    fusekiUploadThreads:  AsyncParallelism
-) {
+trait AsyncTestCase {
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "log-events-queue.buffer-size" ),
-    configuration.get[AsyncParallelism]( "log-events-queue.triples-finder-parallelism" ),
-    configuration.get[AsyncParallelism]( "log-events-queue.fuseki-upload-parallelism" )
-  )
+  private sealed trait ProcessingStatus
+  private case object NotProcessed extends ProcessingStatus
+  private case object Processed extends ProcessingStatus
+  private var eventProcessingStatus: ProcessingStatus = NotProcessed
+
+  protected def asyncProcessFinished(): Unit = eventProcessingStatus = Processed
+
+  protected def waitForAsyncProcess( implicit patienceConfig: PatienceConfig ): Unit = eventually {
+    eventProcessingStatus shouldBe Processed
+  }
 }

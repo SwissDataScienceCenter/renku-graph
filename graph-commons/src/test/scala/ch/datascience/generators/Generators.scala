@@ -63,6 +63,9 @@ object Generators {
     Gen.choose( Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli )
       .map( Instant.ofEpochMilli )
 
+  val exceptions: Gen[Exception] =
+    nonEmptyStrings( 20 ).map( new Exception( _ ) )
+
   object Implicits {
 
     implicit class GenOps[T]( generator: Gen[T] ) {

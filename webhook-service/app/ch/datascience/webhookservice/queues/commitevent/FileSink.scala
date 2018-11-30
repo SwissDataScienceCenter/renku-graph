@@ -57,11 +57,11 @@ object FileSink {
 }
 
 class FileEventLogSinkProvider @Inject() ( @Named( "event-log-file-path" ) eventLogFilePath:Path )
-  extends Provider[Sink[CommitEvent, Future[IOResult]]] {
+  extends EventLogSinkProvider {
 
   import FileEventLogSinkProvider._
 
-  override def get(): Sink[CommitEvent, Future[IOResult]] = {
+  override def get: Sink[CommitEvent, Future[IOResult]] = {
     FileSink( eventLogFilePath.toAbsolutePath.toString )
   }
 }

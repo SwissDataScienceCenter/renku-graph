@@ -18,158 +18,112 @@
 
 package ch.datascience.webhookservice.queues.pushevent
 
+import java.time.Instant
+
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import akka.stream.QueueOfferResult.Enqueued
+import akka.stream.{ ActorMaterializer, QueueOfferResult }
+import ch.datascience.generators.Generators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.{ CommitId, ProjectPath }
-import ch.datascience.webhookservice.config.BufferSize
+import ch.datascience.graph.events.{ CommitEvent, _ }
+import ch.datascience.tools.AsyncTestCase
+import ch.datascience.webhookservice.config.{ AsyncParallelism, BufferSize }
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import org.scalamock.scalatest.MixedMockFactory
+import ch.datascience.webhookservice.queues.commitevent.CommitEventsQueue
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.concurrent.{ Eventually, IntegrationPatience, ScalaFutures }
-import play.api.LoggerLike
+import play.api.Logger
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.Future
 
 class PushEventQueueSpec
   extends WordSpec
-  with MixedMockFactory
+  with MockFactory
   with Eventually
   with ScalaFutures
   with IntegrationPatience {
 
   "offer" should {
 
-    "return Enqueued and trigger triples generation and upload to Fuseki" in new TestCase {
+    "return Enqueued and trigger conversion to CommitEvent and offer to the CommitEvent queue" in new TestCase {
       val pushEvent: PushEvent = pushEvents.generateOne
-      val rdfTriples: RDFTriples = rdfTriplesSets.generateOne
+      val commitEvent: CommitEvent = toCommitEvent( pushEvent )
 
-      givenGenerateTriples( pushEvent ) returning Future.successful( Right( rdfTriples ) )
-      givenTriplesFileUpload( rdfTriples ) returning Future.successful( () )
+      givenCommitEventOffer( commitEvent ) returningAndFinishingTest Future( Enqueued )
 
       pushEventQueue.offer( pushEvent ).futureValue shouldBe Enqueued
 
-      eventually {
-        verifyTriplesFileUpload( rdfTriples )
-      }
+      waitForAsyncProcess
     }
-
-    "return Enqueued and log an error " +
-      "when generating the triples returns an error" in new TestCase {
-        val pushEvent: PushEvent = pushEvents.generateOne
-        val exception = new Exception( "error" )
-
-        givenGenerateTriples( pushEvent ) returning Future.successful( Left( exception ) )
-
-        pushEventQueue.offer( pushEvent ).futureValue shouldBe Enqueued
-
-        eventually {
-          verifyGeneratingTriplesError( pushEvent, exception )
-
-          ( fusekiConnector.uploadFile( _: RDFTriples )( _: ExecutionContext ) )
-            .verify( *, * )
-            .never()
-        }
-      }
-
-    "return Enqueued and log an error " +
-      "when uploading the triples returns an error" in new TestCase {
-        val pushEvent: PushEvent = pushEvents.generateOne
-        val rdfTriples: RDFTriples = rdfTriplesSets.generateOne
-
-        givenGenerateTriples( pushEvent ) returning Future.successful( Right( rdfTriples ) )
-
-        val exception = new Exception( "error" )
-        givenTriplesFileUpload( rdfTriples ) returning Future.failed( exception )
-
-        pushEventQueue.offer( pushEvent ).futureValue shouldBe Enqueued
-
-        eventually {
-          verifyTriplesFileUpload( rdfTriples )
-          verifyUploadingTriplesFileError( pushEvent, exception )
-        }
-      }
 
     "not kill the queue when multiple events are offered and some of them fail" in new TestCase {
       val pushEvent1: PushEvent = pushEvents.generateOne
-      val rdfTriples1: RDFTriples = rdfTriplesSets.generateOne
-      givenGenerateTriples( pushEvent1 ) returning Future.successful( Right( rdfTriples1 ) )
-      givenTriplesFileUpload( rdfTriples1 ) returning Future.successful( () )
+      val commitEvent1: CommitEvent = toCommitEvent( pushEvent1 )
+      givenCommitEventOffer( commitEvent1 ) returning Future( Enqueued )
 
       val pushEvent2: PushEvent = pushEvents.generateOne
-      val exception2 = new Exception( "error 2" )
-      givenGenerateTriples( pushEvent2 ) returning Future.successful( Left( exception2 ) )
+      val commitEvent2: CommitEvent = toCommitEvent( pushEvent2 )
+      val exception2 = exceptions.generateOne
+      givenCommitEventOffer( commitEvent2 ) returning Future.failed( exception2 )
 
       val pushEvent3: PushEvent = pushEvents.generateOne
-      val rdfTriples3: RDFTriples = rdfTriplesSets.generateOne
-      val exception3 = new Exception( "error 3" )
-      givenGenerateTriples( pushEvent3 ) returning Future.successful( Right( rdfTriples3 ) )
-      givenTriplesFileUpload( rdfTriples3 ) returning Future.failed( exception3 )
-
-      val pushEvent4: PushEvent = pushEvents.generateOne
-      val rdfTriples4: RDFTriples = rdfTriplesSets.generateOne
-      givenGenerateTriples( pushEvent4 ) returning Future.successful( Right( rdfTriples4 ) )
-      givenTriplesFileUpload( rdfTriples4 ) returning Future.successful( () )
+      val commitEvent3: CommitEvent = toCommitEvent( pushEvent3 )
+      givenCommitEventOffer( commitEvent3 ) returningAndFinishingTest Future( Enqueued )
 
       pushEventQueue.offer( pushEvent1 ).futureValue shouldBe Enqueued
       pushEventQueue.offer( pushEvent2 ).futureValue shouldBe Enqueued
       pushEventQueue.offer( pushEvent3 ).futureValue shouldBe Enqueued
-      pushEventQueue.offer( pushEvent4 ).futureValue shouldBe Enqueued
 
-      eventually {
-        verifyTriplesFileUpload( rdfTriples1 )
-        verifyTriplesFileUpload( rdfTriples4 )
-      }
+      waitForAsyncProcess
     }
   }
 
-  private trait TestCase {
+  private trait TestCase extends AsyncTestCase {
     private implicit val system = ActorSystem( "MyTest" )
     private implicit val materializer = ActorMaterializer()
 
-    val triplesFinder: TriplesFinder = mock[TriplesFinder]
-    val fusekiConnector: FusekiConnector = stub[FusekiConnector]
-    val logger = Proxy.stub[LoggerLike]
+    val commitsEventQueue = mock[CommitEventsQueue]
     val pushEventQueue = new PushEventQueue(
-      triplesFinder,
-      fusekiConnector,
-      QueueConfig( BufferSize( 1 ), TriplesFinderThreads( 1 ), FusekiUploadThreads( 1 ) ),
-      logger
+      QueueConfig(
+        bufferSize               = BufferSize( 1 ),
+        commitDetailsParallelism = AsyncParallelism( 1 )
+      ),
+      commitsEventQueue,
+      Logger
     )
 
-    def givenGenerateTriples( event: PushEvent ) = new {
-      def returning( outcome: Future[Either[Exception, RDFTriples]] ) =
-        ( triplesFinder.generateTriples( _: ProjectPath, _: CommitId )( _: ExecutionContext ) )
-          .expects( event.project.path, event.before, implicitly[ExecutionContext] )
+    def givenCommitEventOffer( commitEvent: CommitEvent ) = new {
+      private val stubbing =
+        ( commitsEventQueue.offer( _: CommitEvent ) )
+          .expects( commitEvent )
+
+      def returning( outcome: Future[QueueOfferResult] ): Unit =
+        stubbing.returning( outcome )
+
+      def returningAndFinishingTest( outcome: Future[QueueOfferResult] ): Unit =
+        stubbing
           .returning( outcome )
+          .onCall { _: CommitEvent =>
+            asyncProcessFinished()
+            outcome
+          }
     }
 
-    def givenTriplesFileUpload( rdfTriples: RDFTriples ) = new {
-      def returning( outcome: Future[Unit] ) =
-        ( fusekiConnector.uploadFile( _: RDFTriples )( _: ExecutionContext ) )
-          .when( rdfTriples, implicitly[ExecutionContext] )
-          .returning( outcome )
-    }
-
-    def verifyGeneratingTriplesError( pushEvent: PushEvent, exception: Exception ) =
-      logger.verify( 'error )(
-        argAssert { ( message: () => String ) =>
-          message() shouldBe s"Generating triples for $pushEvent failed: ${exception.getMessage}"
-        }, *
-      )
-
-    def verifyUploadingTriplesFileError( pushEvent: PushEvent, exception: Exception ) =
-      logger.verify( 'error )(
-        argAssert { ( message: () => String ) =>
-          message() shouldBe s"Uploading triples for $pushEvent failed: ${exception.getMessage}"
-        }, *
-      )
-
-    def verifyTriplesFileUpload( rdfTriples: RDFTriples ) =
-      ( fusekiConnector.uploadFile( _: RDFTriples )( _: ExecutionContext ) )
-        .verify( rdfTriples, implicitly[ExecutionContext] )
+    def toCommitEvent( pushEvent: PushEvent ) = CommitEvent(
+      pushEvent.after,
+      "",
+      Instant.EPOCH,
+      pushEvent.pushUser,
+      author    = User( pushEvent.pushUser.username, pushEvent.pushUser.email ),
+      committer = User( pushEvent.pushUser.username, pushEvent.pushUser.email ),
+      parents   = Seq( pushEvent.before ),
+      project   = pushEvent.project,
+      added     = Nil,
+      modified  = Nil,
+      removed   = Nil
+    )
   }
 }

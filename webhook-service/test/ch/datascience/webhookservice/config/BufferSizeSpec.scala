@@ -16,32 +16,35 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.pushevent
+package ch.datascience.webhookservice.config
 
-import ch.datascience.generators.Generators._
-import ch.datascience.webhookservice.config.{ AsyncParallelism, BufferSize }
-import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatest.Matchers._
 import org.scalatest.prop.PropertyChecks
 import play.api.Configuration
+import ch.datascience.generators.Generators._
+import org.scalacheck.Gen
 
-class QueueConfigSpec extends WordSpec with PropertyChecks {
+class BufferSizeSpec extends WordSpec with PropertyChecks {
 
-  "apply" should {
+  "instantiation" should {
 
-    "read 'push-events-queue.buffer-size' and 'push-events-queue.commit-details-parallelism' to instantiate the QueueConfig" in {
-      forAll( positiveInts(), positiveInts() ) { ( bufferSizeValue, commitDetailsParallelism ) =>
+    "successfully read BufferSize from config for values less than 1" in {
+      forAll( positiveInts() ) { positiveInt =>
         val config = Configuration.from(
-          Map( "push-events-queue" -> Map(
-            "buffer-size" -> bufferSizeValue,
-            "commit-details-parallelism" -> commitDetailsParallelism
-          ) )
+          Map( "buffer-size" -> positiveInt )
         )
 
-        val queueConfig = new QueueConfig( config )
+        config.get[BufferSize]( "buffer-size" ) shouldBe BufferSize( positiveInt )
+      }
+    }
+    "fail for values less than 1" in {
+      forAll( Gen.choose( -1000, 0 ) ) { nonPositiveInt =>
+        val config = Configuration.from(
+          Map( "buffer-size" -> nonPositiveInt )
+        )
 
-        queueConfig.bufferSize shouldBe BufferSize( bufferSizeValue )
-        queueConfig.commitDetailsParallelism shouldBe AsyncParallelism( commitDetailsParallelism )
+        an[IllegalArgumentException] should be thrownBy config.get[BufferSize]( "buffer-size" )
       }
     }
   }
