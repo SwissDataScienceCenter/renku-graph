@@ -57,8 +57,8 @@ object EventsGenerators {
     pushUser <- pushUsers
     author <- users
     committer <- users
-    commitsNumber <- positiveInts( 3 )
-    parents <- Gen.listOfN( commitsNumber, commitIds )
+    parentCommitsNumber <- nonNegativeInts( 4 )
+    parents <- Gen.listOfN( parentCommitsNumber, commitIds )
     project <- projects
   } yield CommitEvent( commitId, message, timestamp, pushUser, author, committer, parents, project, Nil, Nil, Nil )
 }

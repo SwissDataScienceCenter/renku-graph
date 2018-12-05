@@ -43,8 +43,9 @@ class ServiceModule(
       .toInstance {
         import java.nio.file._
         val path = FileSystems.getDefault.getPath( "/tmp/renku-event.log" )
-        val validatedPath = if ( !Files.exists( path ) ) Files.createFile( path )
-        else path
+        val validatedPath =
+          if ( !Files.exists( path ) ) Files.createFile( path )
+          else path
         validatedPath.toFile.deleteOnExit()
         path
       }

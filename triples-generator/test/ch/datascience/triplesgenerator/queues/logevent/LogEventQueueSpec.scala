@@ -29,6 +29,7 @@ import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.tools.AsyncTestCase
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -53,11 +54,13 @@ class LogEventQueueSpec
   "LogEventQueue" should {
 
     "offer an event from the source to the queue " +
-      "and trigger triples generation and upload to Fuseki" in new TestCase {
+      "and trigger triples generation and upload to Fuseki " +
+      "when there are no parent commits" in new TestCase {
 
-        val ( commitEventJson, commitInfo, rdfTriples ) = generateData
+        val ( commitEventJson, oneParentCommit, rdfTriples ) = commitAndTriples
 
-        givenGenerateTriples( commitInfo ) returning Future.successful( Right( rdfTriples ) )
+        givenGenerateTriples( oneParentCommit ) returning Future.successful( Right( rdfTriples ) )
+
         givenTriplesUpload( rdfTriples ) returningAndFinishingTest Future.successful( () )
 
         sendToLogEventQueue( Success( commitEventJson ) )
@@ -67,13 +70,37 @@ class LogEventQueueSpec
         waitForAsyncProcess( implicitly[PatienceConfig] )
       }
 
+    "offer an event from the source to the queue " +
+      "and trigger triples generation and upload to Fuseki " +
+      "when there's more than one parent commit" in new TestCase {
+
+        val ( commitEventJson, oneParentCommits, rdfTriplesSeq ) = commitsAndTriples( withAtLeastOneParent ).generateOne
+
+        oneParentCommits.zip( rdfTriplesSeq ) foreach {
+          case ( oneParentCommit, rdfTriples ) =>
+
+            givenGenerateTriples( oneParentCommit ) returning Future.successful( Right( rdfTriples ) )
+
+            if ( rdfTriples != rdfTriplesSeq.last )
+              givenTriplesUpload( rdfTriples ) returning Future.successful( () )
+            else
+              givenTriplesUpload( rdfTriples ) returningAndFinishingTest Future.successful( () )
+        }
+
+        sendToLogEventQueue( Success( commitEventJson ) )
+
+        rdfTriplesSeq foreach verifyTriplesUpload
+
+        waitForAsyncProcess( implicitly[PatienceConfig] )
+      }
+
     "offer an event from the source to the queue and log an error " +
       "when generating the triples returns an error" in new TestCase {
 
-        val ( commitEventJson, commitInfo, rdfTriples ) = generateData
+        val ( commitEventJson, oneParentCommit, rdfTriples ) = commitAndTriples
 
         val exception: Exception = exceptions.generateOne
-        givenGenerateTriples( commitInfo ) returningAndFinishingTest Future.successful( Left( exception ) )
+        givenGenerateTriples( oneParentCommit ) returningAndFinishingTest Future.successful( Left( exception ) )
 
         sendToLogEventQueue( Success( commitEventJson ) )
 
@@ -87,9 +114,9 @@ class LogEventQueueSpec
     "offer an event from the source to the queue and log an error " +
       "when uploading the triples returns an error" in new TestCase {
 
-        val ( commitEventJson, commitInfo, rdfTriples ) = generateData
+        val ( commitEventJson, oneParentCommit, rdfTriples ) = commitAndTriples
 
-        givenGenerateTriples( commitInfo ) returning Future.successful( Right( rdfTriples ) )
+        givenGenerateTriples( oneParentCommit ) returning Future.successful( Right( rdfTriples ) )
 
         val exception: Exception = exceptions.generateOne
         givenTriplesUpload( rdfTriples ) returningAndFinishingTest Future.failed( exception )
@@ -115,23 +142,23 @@ class LogEventQueueSpec
     }
 
     "not kill the queue when multiple events are offered and some of them fail" in new TestCase {
-      val ( commitEventJson1, commitInfo1, rdfTriples1 ) = generateData
-      givenGenerateTriples( commitInfo1 ) returning Future.successful( Right( rdfTriples1 ) )
+      val ( commitEventJson1, oneParentCommit1, rdfTriples1 ) = commitAndTriples
+      givenGenerateTriples( oneParentCommit1 ) returning Future.successful( Right( rdfTriples1 ) )
       givenTriplesUpload( rdfTriples1 ) returning Future.successful( () )
 
-      val ( commitEventJson2, commitInfo2, _ ) = generateData
+      val ( commitEventJson2, oneParentCommit2, _ ) = commitAndTriples
       val exception2: Exception = exceptions.generateOne
-      givenGenerateTriples( commitInfo2 ) returning Future.successful( Left( exception2 ) )
+      givenGenerateTriples( oneParentCommit2 ) returning Future.successful( Left( exception2 ) )
 
-      val ( commitEventJson3, commitInfo3, rdfTriples3 ) = generateData
+      val ( commitEventJson3, oneParentCommit3, rdfTriples3 ) = commitAndTriples
       val exception3: Exception = exceptions.generateOne
-      givenGenerateTriples( commitInfo3 ) returning Future.successful( Right( rdfTriples3 ) )
+      givenGenerateTriples( oneParentCommit3 ) returning Future.successful( Right( rdfTriples3 ) )
       givenTriplesUpload( rdfTriples3 ) returning Future.failed( exception3 )
 
       val exception4: Exception = exceptions.generateOne
 
-      val ( commitEventJson5, commitInfo5, rdfTriples5 ) = generateData
-      givenGenerateTriples( commitInfo5 ) returning Future.successful( Right( rdfTriples5 ) )
+      val ( commitEventJson5, oneParentCommit5, rdfTriples5 ) = commitAndTriples
+      givenGenerateTriples( oneParentCommit5 ) returning Future.successful( Right( rdfTriples5 ) )
       givenTriplesUpload( rdfTriples5 ) returningAndFinishingTest Future.successful( () )
 
       sendToLogEventQueue(
@@ -176,21 +203,44 @@ class LogEventQueueSpec
       )
     }
 
-    def generateData = {
-      val commitEvent: CommitEvent = commitEvents.generateOne
-      val commitEventJson: JsValue = toJson( commitEvent )
-      val commitInfo: CommitInfo = CommitInfo(
+    def commitsAndTriples( parentsGen: Gen[List[CommitId]] ) = {
+      def toOneParentCommit( commitEvent: CommitEvent, parent: Option[CommitId] ) = OneParentCommit(
         commitEvent.id,
-        commitEvent.project.path
+        commitEvent.project.path,
+        parent
       )
-      val rdfTriples: RDFTriples = rdfTriplesSets.generateOne
-      ( commitEventJson, commitInfo, rdfTriples )
+
+      for {
+        parentIds <- parentsGen
+        commitEvent <- commitEvents.map( event => event.copy( parents = parentIds ) )
+        commitEventJson = toJson( commitEvent )
+
+        oneParentCommits = commitEvent.parents match {
+          case Nil     => Seq( toOneParentCommit( commitEvent, parent = None ) )
+          case parents => parents.map( parent => toOneParentCommit( commitEvent, parent = Some( parent ) ) )
+        }
+
+        rdfTriplesSeq <- Gen.listOfN( oneParentCommits.size, rdfTriplesSets )
+      } yield ( commitEventJson, oneParentCommits, rdfTriplesSeq )
     }
 
-    def givenGenerateTriples( commitInfo: CommitInfo ) = new {
+    def commitAndTriples = {
+      val ( commitEventJson, oneParentCommits, rdfTriplesSeq ) = commitsAndTriples( withNoParents ).generateOne
+      val ( oneParentCommit, rdfTriples ) :: Nil = oneParentCommits.zip( rdfTriplesSeq )
+      ( commitEventJson, oneParentCommit, rdfTriples )
+    }
+
+    val withAtLeastOneParent: Gen[List[CommitId]] = for {
+      parentCommitsNumber <- nonNegativeInts( 4 )
+      parents <- Gen.listOfN( parentCommitsNumber, commitIds )
+    } yield parents
+
+    val withNoParents: Gen[List[CommitId]] = Gen.const( Nil )
+
+    def givenGenerateTriples( oneParentCommit: OneParentCommit ) = new {
       private val stubbing =
         ( triplesFinder.generateTriples( _: ProjectPath, _: CommitId )( _: ExecutionContext ) )
-          .expects( commitInfo.projectPath, commitInfo.id, implicitly[ExecutionContext] )
+          .expects( oneParentCommit.projectPath, oneParentCommit.id, implicitly[ExecutionContext] )
 
       def returning( outcome: Future[Either[Exception, RDFTriples]] ): Unit =
         stubbing

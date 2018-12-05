@@ -53,6 +53,7 @@ class LogEventQueue(
   )
 
   import LogEventQueue._
+  import OneParentCommit._
   import queueConfig._
 
   logEventsSource
@@ -68,55 +69,56 @@ class LogEventQueue(
 
   private lazy val queue = Source
     .queue[JsValue]( bufferSize.value, overflowStrategy = backpressure )
-    .map( toCommitInfo )
+    .map( toOneParentCommits )
     .flatMapConcat( logAndSkipJsonErrors )
-    .mapAsync( triplesFinderThreads.value )( pushEventToRdfTriples )
+    .mapAsync( triplesFinderThreads.value )( oneParentCommitToRdfTriples )
     .flatMapConcat( logAndSkipTriplesErrors )
     .toMat( fusekiSink )( Keep.left )
     .run()
 
-  private def toCommitInfo( jsValue: JsValue ): Either[Throwable, CommitInfo] = jsValue.validate[CommitInfo] match {
-    case JsSuccess( commitInfo, _ ) => Right( commitInfo )
-    case JsError( errors ) => Left(
-      new RuntimeException(
-        errors.foldLeft( "Json deserialization error(s):" ) {
-          case ( message, ( path, pathErrors ) ) =>
-            s"$message\n $path -> ${pathErrors.map( _.message ).mkString( "; " )}"
-        }
+  private def toOneParentCommits( jsValue: JsValue ): Either[Throwable, List[OneParentCommit]] =
+    jsValue.validate[List[OneParentCommit]] match {
+      case JsSuccess( oneParentCommit, _ ) => Right( oneParentCommit )
+      case JsError( errors ) => Left(
+        new RuntimeException(
+          errors.foldLeft( "Json deserialization error(s):" ) {
+            case ( message, ( path, pathErrors ) ) =>
+              s"$message\n $path -> ${pathErrors.map( _.message ).mkString( "; " )}"
+          }
+        )
       )
-    )
-  }
+    }
 
-  private lazy val logAndSkipJsonErrors: Either[Throwable, CommitInfo] => Source[CommitInfo, NotUsed] = {
+  private lazy val logAndSkipJsonErrors: Either[Throwable, List[OneParentCommit]] => Source[OneParentCommit, NotUsed] = {
     case Left( exception ) =>
       logger.error( s"Invalid event data received from Event Log: ${exception.getMessage}" )
-      Source.empty[CommitInfo]
-    case Right( commitInfo ) =>
-      Source.single( commitInfo )
+      Source.empty[OneParentCommit]
+    case Right( oneParentCommits ) =>
+      Source[OneParentCommit]( oneParentCommits )
   }
 
-  private def pushEventToRdfTriples( commitInfo: CommitInfo ): Future[( CommitInfo, Either[Throwable, RDFTriples] )] =
-    triplesFinder.generateTriples( commitInfo.projectPath, commitInfo.id )
-      .map( maybeTriplesFile => commitInfo -> maybeTriplesFile )
+  private def oneParentCommitToRdfTriples( oneParentCommit: OneParentCommit ): Future[( OneParentCommit, Either[Throwable, RDFTriples] )] =
+    triplesFinder.generateTriples( oneParentCommit.projectPath, oneParentCommit.id )
+      .map( maybeTriplesFile => oneParentCommit -> maybeTriplesFile )
 
-  private lazy val logAndSkipTriplesErrors: ( ( CommitInfo, Either[Throwable, RDFTriples] ) ) => Source[( CommitInfo, RDFTriples ), NotUsed] = {
-    case ( commitInfo, Left( exception ) ) =>
-      logger.error( s"Generating triples for $commitInfo failed", exception )
-      Source.empty[( CommitInfo, RDFTriples )]
-    case ( commitInfo, Right( triples ) ) =>
-      Source.single( commitInfo -> triples )
+  private lazy val logAndSkipTriplesErrors: ( ( OneParentCommit, Either[Throwable, RDFTriples] ) ) => Source[( OneParentCommit, RDFTriples ), NotUsed] = {
+    case ( oneParentCommit, Left( exception ) ) =>
+      logger.error( s"Generating triples for $oneParentCommit failed", exception )
+      Source.empty[( OneParentCommit, RDFTriples )]
+    case ( oneParentCommit, Right( triples ) ) =>
+      Source.single( oneParentCommit -> triples )
   }
 
-  private lazy val fusekiSink: Sink[( CommitInfo, RDFTriples ), Future[Done]] =
-    Flow[( CommitInfo, RDFTriples )]
+  private lazy val fusekiSink: Sink[( OneParentCommit, RDFTriples ), Future[Done]] =
+    Flow[( OneParentCommit, RDFTriples )]
       .mapAsync( fusekiUploadThreads.value ) {
-        case ( commitInfo, triplesFile ) =>
+        case ( oneParentCommit, triplesFile ) =>
           fusekiConnector
             .upload( triplesFile )
-            .map( _ => logger.info( s"Triples for $commitInfo uploaded to triples store" ) )
+            .map( _ => logger.info( s"Triples for $oneParentCommit uploaded to triples store" ) )
             .recover {
               case exception =>
-                logger.error( s"Uploading triples for $commitInfo failed", exception )
+                logger.error( s"Uploading triples for $oneParentCommit failed", exception )
                 Done
             }
       }
@@ -125,21 +127,33 @@ class LogEventQueue(
 
 private object LogEventQueue {
 
-  private[logevent] case class CommitInfo(
-      id:          CommitId,
-      projectPath: ProjectPath
+  private[logevent] case class OneParentCommit(
+      id:            CommitId,
+      projectPath:   ProjectPath,
+      maybeParentId: Option[CommitId]
   )
 
-  private[logevent] object CommitInfo {
+  private[logevent] object OneParentCommit {
 
     import play.api.libs.functional.syntax._
     import play.api.libs.json.Reads._
     import play.api.libs.json._
 
-    implicit val commitInfoReads: Reads[CommitInfo] = (
+    implicit val oneParentCommitsReads: Reads[List[OneParentCommit]] = (
       ( __ \ "id" ).read[CommitId] and
-      ( __ \ "project" \ "path" ).read[ProjectPath]
-    )( CommitInfo.apply _ )
+      ( __ \ "project" \ "path" ).read[ProjectPath] and
+      ( __ \ "parents" ).read[Seq[CommitId]]
+    )( oneParentCommits _ )
+
+    private def oneParentCommits( commitId: CommitId, projectPath: ProjectPath, parents: Seq[CommitId] ) =
+      parents match {
+        case Nil =>
+          List( OneParentCommit( commitId, projectPath, maybeParentId = None ) )
+        case someParents =>
+          someParents
+            .map( parent => OneParentCommit( commitId, projectPath, maybeParentId = Some( parent ) ) )
+            .toList
+      }
   }
 }
 
