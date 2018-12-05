@@ -25,6 +25,7 @@ import java.security.SecureRandom
 import cats.implicits._
 import ch.datascience.config.ServiceUrl
 import ch.datascience.graph.events.{ CommitId, ProjectPath }
+import ch.datascience.triplesgenerator.queues.logevent.LogEventQueue.{ Commit, CommitWithParent, CommitWithoutParent }
 import javax.inject.{ Inject, Named, Singleton }
 import org.apache.jena.rdf.model.ModelFactory
 
@@ -63,19 +64,15 @@ private class TriplesFinder(
   private val workDirectory: Path = root / "tmp"
   private val repositoryDirectoryFinder = ".*/(.*)$".r
 
-  def generateTriples(
-      projectPath: ProjectPath,
-      checkoutSha: CommitId
-  )( implicit executionContext: ExecutionContext ): Future[Either[Throwable, RDFTriples]] = Future {
-
-    val repositoryDirectory = tempDirectoryName( repositoryNameFrom( projectPath ) )
-    val gitRepositoryUrl = gitLabUrl / s"$projectPath.git"
+  def generateTriples( commit: Commit )( implicit executionContext: ExecutionContext ): Future[Either[Throwable, RDFTriples]] = Future {
+    val repositoryDirectory = tempDirectoryName( repositoryNameFrom( commit.projectPath ) )
+    val gitRepositoryUrl = gitLabUrl / s"${commit.projectPath}.git"
 
     val maybeTriplesFile = for {
       _ <- pure( mkdir( repositoryDirectory ) )
       _ <- git cloneRepo ( gitRepositoryUrl, repositoryDirectory, workDirectory )
-      _ <- git checkout ( checkoutSha, repositoryDirectory )
-      triplesStream <- renku log repositoryDirectory
+      _ <- git checkout ( commit.id, repositoryDirectory )
+      triplesStream <- findTriplesStream( commit, repositoryDirectory )
       rdfTriples <- toRdfTriples( triplesStream )
       _ <- removeSilently( repositoryDirectory )
     } yield rdfTriples
@@ -93,6 +90,15 @@ private class TriplesFinder(
 
   private def repositoryNameFrom( projectPath: ProjectPath ): String = projectPath.value match {
     case repositoryDirectoryFinder( folderName ) => folderName
+  }
+
+  private def findTriplesStream( commit: Commit, repositoryDirectory: Path ): InputStream = {
+    import renku._
+
+    commit match {
+      case withParent: CommitWithParent       => renku.log( withParent, repositoryDirectory )
+      case withoutParent: CommitWithoutParent => renku.log( withoutParent, repositoryDirectory )
+    }
   }
 
   private implicit def pure[V]( maybeValue: => V ): Try[V] =
@@ -140,8 +146,26 @@ private object Commands {
   @Singleton
   class Renku {
 
-    def log( destinationDirectory: Path ): InputStream =
-      %%( 'renku, 'log, "--format", "rdf" )( destinationDirectory ).out.toInputStream
+    def log[T <: Commit]( commit: T, destinationDirectory: Path )( implicit generateTriples: ( T, Path ) => CommandResult ): InputStream =
+      generateTriples( commit, destinationDirectory ).out.toInputStream
+
+    implicit val commitWithoutParentTriplesFinder: ( CommitWithoutParent, Path ) => CommandResult = {
+      case ( _, destinationDirectory ) =>
+        %%( 'renku, 'log, "--format", "rdf" )( destinationDirectory )
+    }
+
+    implicit val commitWithParentTriplesFinder: ( CommitWithParent, Path ) => CommandResult = {
+      case ( commit, destinationDirectory ) =>
+        val changedFiles = %%(
+          'git, 'diff, "--name-only", s"${commit.parentId}..${commit.id}"
+        )( destinationDirectory ).out.lines.mkString( "\n" )
+
+        %%(
+          'renku, 'log,
+          "--format", "rdf",
+          "--revision", s"${commit.parentId}..${commit.id}", changedFiles
+        )( destinationDirectory )
+    }
 
     implicit private class StreamValueOps( streamValue: StreamValue ) {
       lazy val toInputStream: InputStream =

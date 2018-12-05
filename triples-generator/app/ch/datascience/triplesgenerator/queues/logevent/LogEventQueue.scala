@@ -20,15 +20,15 @@ package ch.datascience.triplesgenerator.queues.logevent
 
 import akka.stream.Materializer
 import akka.stream.OverflowStrategy.backpressure
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.{Done, NotUsed}
-import ch.datascience.graph.events.{CommitId, ProjectPath}
-import javax.inject.{Inject, Singleton}
-import play.api.libs.json.{JsError, JsSuccess, JsValue}
-import play.api.{Logger, LoggerLike}
+import akka.stream.scaladsl.{ Flow, Keep, Sink, Source }
+import akka.{ Done, NotUsed }
+import ch.datascience.graph.events.{ CommitId, ProjectPath }
+import javax.inject.{ Inject, Singleton }
+import play.api.libs.json.{ JsError, JsSuccess, JsValue }
+import play.api.{ Logger, LoggerLike }
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.util.{ Failure, Success, Try }
 
 @Singleton
 class LogEventQueue(
@@ -76,10 +76,10 @@ class LogEventQueue(
     .toMat( fusekiSink )( Keep.left )
     .run()
 
-  private def toCommits(jsValue: JsValue ): Either[Throwable, List[Commit]] =
+  private def toCommits( jsValue: JsValue ): Either[Throwable, List[Commit]] =
     jsValue.validate[List[Commit]] match {
       case JsSuccess( commit, _ ) => Right( commit )
-      case JsError( errors )      => Left(
+      case JsError( errors ) => Left(
         new RuntimeException(
           errors.foldLeft( "Json deserialization error(s):" ) {
             case ( message, ( path, pathErrors ) ) =>
@@ -93,19 +93,20 @@ class LogEventQueue(
     case Left( exception ) =>
       logger.error( s"Invalid event data received from Event Log: ${exception.getMessage}" )
       Source.empty[Commit]
-    case Right( commits )  =>
+    case Right( commits ) =>
       Source[Commit]( commits )
   }
 
-  private def commitToRdfTriples(commit: Commit ): Future[( Commit, Either[Throwable, RDFTriples] )] =
-    triplesFinder.generateTriples( commit.projectPath, commit.id )
-      .map( maybeTriplesFile => commit -> maybeTriplesFile )
+  private def commitToRdfTriples( commit: Commit ): Future[( Commit, Either[Throwable, RDFTriples] )] =
+    for {
+      maybeTriplesFile <- triplesFinder.generateTriples( commit )
+    } yield commit -> maybeTriplesFile
 
   private lazy val logAndSkipTriplesErrors: ( ( Commit, Either[Throwable, RDFTriples] ) ) => Source[( Commit, RDFTriples ), NotUsed] = {
     case ( commit, Left( exception ) ) =>
       logger.error( s"Generating triples for $commit failed", exception )
       Source.empty[( Commit, RDFTriples )]
-    case ( commit, Right( triples ) )  =>
+    case ( commit, Right( triples ) ) =>
       Source.single( commit -> triples )
   }
 
@@ -127,20 +128,20 @@ class LogEventQueue(
 
 private object LogEventQueue {
 
-  private[logevent] trait Commit {
-    val id:            CommitId
-    val projectPath:   ProjectPath
+  private[logevent] sealed trait Commit {
+    val id: CommitId
+    val projectPath: ProjectPath
   }
 
   private[logevent] case class CommitWithParent(
-      id:            CommitId,
-      parentId: CommitId,
-      projectPath:   ProjectPath
+      id:          CommitId,
+      parentId:    CommitId,
+      projectPath: ProjectPath
   ) extends Commit
 
   private[logevent] case class CommitWithoutParent(
-      id:            CommitId,
-      projectPath:   ProjectPath
+      id:          CommitId,
+      projectPath: ProjectPath
   ) extends Commit
 
   private[logevent] object Commit {
@@ -161,7 +162,7 @@ private object LogEventQueue {
           List( CommitWithoutParent( commitId, projectPath ) )
         case someParents =>
           someParents
-            .map( CommitWithParent( commitId, _, projectPath) )
+            .map( CommitWithParent( commitId, _, projectPath ) )
             .toList
       }
   }
