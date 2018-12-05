@@ -23,7 +23,7 @@ import akka.stream.QueueOfferResult.Enqueued
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.{ CommitId, Project, PushUser }
-import ch.datascience.webhookservice.queues.pushevent._
+import ch.datascience.webhookservice.queues.pushevent.{ PushEvent, PushEventQueue }
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

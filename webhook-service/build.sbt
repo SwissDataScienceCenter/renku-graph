@@ -20,15 +20,13 @@ organization := "ch.datascience"
 name := "webhook-service"
 version := "0.1.0-SNAPSHOT"
 
+PlayKeys.playDefaultPort := 9001
+
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies += ws
 
 libraryDependencies += "ch.datascience" %% "renku-commons" % "0.2.0"
-
-libraryDependencies += "com.lihaoyi" %% "ammonite-ops" % "1.4.2"
-
-libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % "3.9.0"
 
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.4.0"
 

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.pushevent
+package ch.datascience.triplesgenerator.queues.logevent
 
 import ch.datascience.config.{ AsyncParallelism, BufferSize }
 import ch.datascience.generators.Generators._
@@ -29,19 +29,21 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
 
   "apply" should {
 
-    "read 'push-events-queue.buffer-size' and 'push-events-queue.commit-details-parallelism' to instantiate the QueueConfig" in {
-      forAll( positiveInts(), positiveInts() ) { ( bufferSizeValue, commitDetailsParallelism ) =>
+    "read 'log-events-queue.buffer-size', 'log-events-queue.triples-finder-parallelism' and 'log-events-queue.fuseki-upload-parallelism' to instantiate the QueueConfig" in {
+      forAll( positiveInts(), positiveInts(), positiveInts() ) { ( bufferSizeValue, triplesFinderThreadsValue, fusekiUploadThreads ) =>
         val config = Configuration.from(
-          Map( "push-events-queue" -> Map(
+          Map( "log-events-queue" -> Map(
             "buffer-size" -> bufferSizeValue,
-            "commit-details-parallelism" -> commitDetailsParallelism
+            "triples-finder-parallelism" -> triplesFinderThreadsValue,
+            "fuseki-upload-parallelism" -> fusekiUploadThreads
           ) )
         )
 
         val queueConfig = new QueueConfig( config )
 
         queueConfig.bufferSize shouldBe BufferSize( bufferSizeValue )
-        queueConfig.commitDetailsParallelism shouldBe AsyncParallelism( commitDetailsParallelism )
+        queueConfig.triplesFinderThreads shouldBe AsyncParallelism( triplesFinderThreadsValue )
+        queueConfig.fusekiUploadThreads shouldBe AsyncParallelism( fusekiUploadThreads )
       }
     }
   }

@@ -23,11 +23,11 @@ import java.time.Instant
 import akka.actor.ActorSystem
 import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.{ ActorMaterializer, QueueOfferResult }
-import ch.datascience.generators.Generators._
+import ch.datascience.config.{ AsyncParallelism, BufferSize }
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.{ CommitEvent, _ }
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.events._
 import ch.datascience.tools.AsyncTestCase
-import ch.datascience.webhookservice.config.{ AsyncParallelism, BufferSize }
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.queues.commitevent.CommitEventsQueue
 import org.scalamock.scalatest.MockFactory

@@ -20,6 +20,7 @@ package ch.datascience.generators
 
 import java.time.Instant
 
+import ch.datascience.config.ServiceUrl
 import org.scalacheck.Gen._
 import org.scalacheck.{ Arbitrary, Gen }
 
@@ -27,7 +28,7 @@ import scala.language.implicitConversions
 
 object Generators {
 
-  implicit def nonEmptyStrings( maxLength: Int = 10 ): Gen[String] = {
+  def nonEmptyStrings( maxLength: Int = 10 ): Gen[String] = {
     require( maxLength > 0 )
 
     for {
@@ -36,9 +37,9 @@ object Generators {
     } yield chars.mkString( "" )
   }
 
-  implicit def positiveInts( max: Int = 1000 ): Gen[Int] = choose( 1, max )
+  def positiveInts( max: Int = 1000 ): Gen[Int] = choose( 1, max )
 
-  implicit def nonNegativeInts( max: Int = 1000 ): Gen[Int] = choose( 0, max )
+  def nonNegativeInts( max: Int = 1000 ): Gen[Int] = choose( 0, max )
 
   val relativePaths: Gen[String] = for {
     partsNumber <- Gen.choose( 1, 10 )
@@ -63,8 +64,11 @@ object Generators {
     Gen.choose( Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli )
       .map( Instant.ofEpochMilli )
 
-  val exceptions: Gen[Exception] =
+  implicit val exceptions: Gen[Exception] =
     nonEmptyStrings( 20 ).map( new Exception( _ ) )
+
+  implicit val serviceUrls: Gen[ServiceUrl] =
+    httpUrls.map( ServiceUrl.apply )
 
   object Implicits {
 

@@ -16,19 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.commitevent
+package ch.datascience.triplesgenerator.queues.logevent
 
-import ch.datascience.config.BufferSize
+import ch.datascience.config.{ AsyncParallelism, BufferSize }
 import javax.inject.{ Inject, Singleton }
 import play.api.Configuration
 
 @Singleton
 private case class QueueConfig(
-    bufferSize: BufferSize
+    bufferSize:           BufferSize,
+    triplesFinderThreads: AsyncParallelism,
+    fusekiUploadThreads:  AsyncParallelism
 ) {
 
   @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "commit-events-queue.buffer-size" )
+    configuration.get[BufferSize]( "log-events-queue.buffer-size" ),
+    configuration.get[AsyncParallelism]( "log-events-queue.triples-finder-parallelism" ),
+    configuration.get[AsyncParallelism]( "log-events-queue.fuseki-upload-parallelism" )
   )
-
 }

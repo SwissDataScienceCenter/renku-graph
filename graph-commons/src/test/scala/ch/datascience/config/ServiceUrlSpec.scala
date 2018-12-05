@@ -16,33 +16,38 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.pushevent
+package ch.datascience.config
 
-import ch.datascience.config.{ AsyncParallelism, BufferSize }
+import java.net.MalformedURLException
+
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
-import play.api.Configuration
 
-class QueueConfigSpec extends WordSpec with PropertyChecks {
+class ServiceUrlSpec extends WordSpec with PropertyChecks {
 
   "apply" should {
 
-    "read 'push-events-queue.buffer-size' and 'push-events-queue.commit-details-parallelism' to instantiate the QueueConfig" in {
-      forAll( positiveInts(), positiveInts() ) { ( bufferSizeValue, commitDetailsParallelism ) =>
-        val config = Configuration.from(
-          Map( "push-events-queue" -> Map(
-            "buffer-size" -> bufferSizeValue,
-            "commit-details-parallelism" -> commitDetailsParallelism
-          ) )
-        )
-
-        val queueConfig = new QueueConfig( config )
-
-        queueConfig.bufferSize shouldBe BufferSize( bufferSizeValue )
-        queueConfig.commitDetailsParallelism shouldBe AsyncParallelism( commitDetailsParallelism )
+    "be successful for valid urls" in {
+      forAll( httpUrls ) { url =>
+        ServiceUrl( url ).toString shouldBe url
       }
+    }
+
+    "fail for invalid urls" in {
+      an[MalformedURLException] should be thrownBy {
+        ServiceUrl( "invalid url" )
+      }
+    }
+  }
+
+  "/" should {
+
+    "allow to add next path part" in {
+      val url = serviceUrls.generateOne
+      ( url / "path" ).toString shouldBe s"$url/path"
     }
   }
 }

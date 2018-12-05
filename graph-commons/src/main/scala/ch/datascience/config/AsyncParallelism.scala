@@ -16,19 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.commitevent
+package ch.datascience.config
 
-import ch.datascience.config.BufferSize
-import javax.inject.{ Inject, Singleton }
-import play.api.Configuration
+import ch.datascience.tinytypes.constraints.GreaterThanZero
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import com.typesafe.config.Config
+import play.api.ConfigLoader
 
-@Singleton
-private case class QueueConfig(
-    bufferSize: BufferSize
-) {
+case class AsyncParallelism private ( value: Int ) extends AnyVal with TinyType[Int]
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "commit-events-queue.buffer-size" )
-  )
+object AsyncParallelism
+  extends TinyTypeFactory[Int, AsyncParallelism]( new AsyncParallelism( _ ) )
+  with GreaterThanZero {
 
+  implicit object TriplesFinderThreadsFinder extends ConfigLoader[AsyncParallelism] {
+    override def load( config: Config, path: String ): AsyncParallelism = AsyncParallelism( config.getInt( path ) )
+  }
 }

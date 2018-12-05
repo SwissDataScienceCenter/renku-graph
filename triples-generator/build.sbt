@@ -16,19 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.commitevent
+organization := "ch.datascience"
+name := "triples-generator"
+version := "0.1.0-SNAPSHOT"
 
-import ch.datascience.config.BufferSize
-import javax.inject.{ Inject, Singleton }
-import play.api.Configuration
+PlayKeys.playDefaultPort := 9002
 
-@Singleton
-private case class QueueConfig(
-    bufferSize: BufferSize
-) {
+resolvers += Resolver.sonatypeRepo("snapshots")
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "commit-events-queue.buffer-size" )
-  )
+libraryDependencies += ws
 
-}
+libraryDependencies += "ch.datascience" %% "renku-commons" % "0.2.0"
+
+libraryDependencies += "com.lihaoyi" %% "ammonite-ops" % "1.4.2"
+
+libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % "3.9.0"
+
+libraryDependencies += "org.typelevel" %% "cats-core" % "1.4.0"
+
+//Test dependencies
+libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
+libraryDependencies += "org.scalamock" %% "scalamock" % "4.1.0" % Test
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test

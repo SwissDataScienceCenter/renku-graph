@@ -23,7 +23,7 @@ import java.time.Instant
 import ch.datascience.tinytypes.constraints.{ GitSha, NonBlank }
 import ch.datascience.tinytypes.json._
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
-import play.api.libs.json.Format
+import play.api.libs.json.{ Format, Json, Writes }
 
 case class CommitEvent(
     id:        CommitId,
@@ -38,6 +38,13 @@ case class CommitEvent(
     modified:  Seq[GitFile],
     removed:   Seq[GitFile]
 )
+
+object CommitEvent {
+  private implicit val userWrites: Writes[User] = Json.writes[User]
+  private implicit val pushUserWrites: Writes[PushUser] = Json.writes[PushUser]
+  private implicit val projectWrites: Writes[Project] = Json.writes[Project]
+  implicit val commitEventWrites: Writes[CommitEvent] = Json.writes[CommitEvent]
+}
 
 class CommitId private ( val value: String ) extends AnyVal with TinyType[String]
 object CommitId

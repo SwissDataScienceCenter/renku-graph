@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.queues.pushevent
 
-import ch.datascience.webhookservice.config.{ AsyncParallelism, BufferSize }
+import ch.datascience.config.{ AsyncParallelism, BufferSize }
 import javax.inject.{ Inject, Singleton }
 import play.api.Configuration
 

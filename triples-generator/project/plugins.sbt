@@ -15,20 +15,3 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package ch.datascience.webhookservice.queues.commitevent
-
-import ch.datascience.config.BufferSize
-import javax.inject.{ Inject, Singleton }
-import play.api.Configuration
-
-@Singleton
-private case class QueueConfig(
-    bufferSize: BufferSize
-) {
-
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "commit-events-queue.buffer-size" )
-  )
-
-}

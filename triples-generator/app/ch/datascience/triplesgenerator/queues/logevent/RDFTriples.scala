@@ -16,19 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.commitevent
+package ch.datascience.triplesgenerator.queues.logevent
 
-import ch.datascience.config.BufferSize
-import javax.inject.{ Inject, Singleton }
-import play.api.Configuration
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import org.apache.jena.rdf.model.Model
 
-@Singleton
-private case class QueueConfig(
-    bufferSize: BufferSize
-) {
+class RDFTriples private ( val value: Model ) extends TinyType[Model]
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "commit-events-queue.buffer-size" )
-  )
-
-}
+object RDFTriples
+  extends TinyTypeFactory[Model, RDFTriples]( instantiate = new RDFTriples( _ ) )

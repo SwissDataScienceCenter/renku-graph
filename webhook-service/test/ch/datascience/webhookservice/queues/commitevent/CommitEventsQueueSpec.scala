@@ -23,11 +23,11 @@ import java.nio.file.Path
 import akka.actor.ActorSystem
 import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.{ ActorMaterializer, Materializer }
+import ch.datascience.config.BufferSize
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.CommitEvent
 import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.webhookservice.config.BufferSize
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._
@@ -47,8 +47,6 @@ class CommitEventsQueueSpec
   with ScalaFutures
   with PropertyChecks
   with IntegrationPatience {
-
-  import FileEventLogSinkProvider._
 
   "offer" should {
 

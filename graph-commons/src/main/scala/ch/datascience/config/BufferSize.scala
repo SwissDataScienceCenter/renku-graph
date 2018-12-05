@@ -16,19 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.commitevent
+package ch.datascience.config
 
-import ch.datascience.config.BufferSize
-import javax.inject.{ Inject, Singleton }
-import play.api.Configuration
+import ch.datascience.tinytypes.constraints.GreaterThanZero
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import com.typesafe.config.Config
+import play.api.ConfigLoader
 
-@Singleton
-private case class QueueConfig(
-    bufferSize: BufferSize
-) {
+class BufferSize private ( val value: Int ) extends AnyVal with TinyType[Int]
+object BufferSize
+  extends TinyTypeFactory[Int, BufferSize]( new BufferSize( _ ) )
+  with GreaterThanZero {
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "commit-events-queue.buffer-size" )
-  )
-
+  implicit object BufferSizeFinder extends ConfigLoader[BufferSize] {
+    override def load( config: Config, path: String ): BufferSize = BufferSize( config.getInt( path ) )
+  }
 }
