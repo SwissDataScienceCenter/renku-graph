@@ -7,9 +7,9 @@ This is a microservice which:
 
 ## API
 
-| Method | Path                               | Description                                        |
-|--------|------------------------------------|----------------------------------------------------|
-|  POST  | ```/webhook-event```               | Consumes a push event sent from GitLab.           |
+| Method | Path                               | Description                                      |
+|--------|------------------------------------|--------------------------------------------------|
+|  POST  | ```/webhook-event```               | Consumes push events sent from GitLab.           |
 
 #### POST /webhook-event
 
@@ -33,11 +33,11 @@ Consumes a Push Event.
 
 **Response**
 
-|Status               |Description                             |
-|---------------------|----------------------------------------|
-|ACCEPTED             | For valid payloads.                    |
-|BAD REQUEST          | When payload is invalid.               |
-|INTERNAL SERVER ERROR| When queue is not accepting new events.|
+| Status                     | Description                            |
+|----------------------------|----------------------------------------|
+| ACCEPTED (202)             | For valid payloads.                    |
+| BAD REQUEST (400)          | When payload is invalid.               |
+| INTERNAL SERVER ERROR (500)| When queue is not accepting new events.|
 
 ## Trying out
 
@@ -57,6 +57,6 @@ docker run --rm -e 'PLAY_APPLICATION_SECRET=tLm_qFcq]L2>s>s`xd6iu6R[BHfK]>hgd/=H
 
 ```bash
 curl -X POST --header "Content-Type: application/json" \
-  --data '{"before": "<commit_id>", "after": "<commit_id>", "user_id": <user-id>, "user_username": "<user-name>", "user_email": "<user-email>", "project": { "id": <project-id>, "path_with_namespace":"<org-name>/<project-name>" }"repository": {"git_http_url": "<repo-url>"}, "project": {"name": "<project-name>"}}' \
+  --data '{"before": "<commit_id>", "after": "<commit_id>", "user_id": <user-id>, "user_username": "<user-name>", "user_email": "<user-email>", "project": {"id": <project-id>, "path_with_namespace": "<org-name>/<project-name>"}}' \
   http://localhost:9000/webhook-event
 ```
