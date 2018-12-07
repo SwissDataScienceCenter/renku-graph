@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package ch.datascience.config
+package ch.datascience.triplesgenerator.config
 
+import ch.datascience.config.ServiceUrl
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
 import com.typesafe.config.Config

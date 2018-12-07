@@ -19,10 +19,8 @@
 package ch.datascience.webhookservice
 
 import java.net.URL
-import java.nio.file.Path
 
 import ch.datascience.config.ServiceUrl
-import ch.datascience.webhookservice.queues.commitevent.{ EventLogSinkProvider, FileEventLogSinkProvider }
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
 import play.api.{ Configuration, Environment }
@@ -33,24 +31,8 @@ class ServiceModule(
 ) extends AbstractModule {
 
   override def configure(): Unit = {
-
     bind( classOf[URL] )
       .annotatedWith( Names.named( "gitlabUrl" ) )
       .toInstance( configuration.get[ServiceUrl]( "services.gitlab.url" ).value )
-
-    bind( classOf[Path] )
-      .annotatedWith( Names.named( "event-log-file-path" ) )
-      .toInstance {
-        import java.nio.file._
-        val path = FileSystems.getDefault.getPath( "/tmp/renku-event.log" )
-        val validatedPath =
-          if ( !Files.exists( path ) ) Files.createFile( path )
-          else path
-        validatedPath.toFile.deleteOnExit()
-        path
-      }
-
-    bind( classOf[EventLogSinkProvider] )
-      .to( classOf[FileEventLogSinkProvider] )
   }
 }

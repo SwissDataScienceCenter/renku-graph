@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.config
+package ch.datascience.triplesgenerator.config
 
 import java.net.MalformedURLException
 

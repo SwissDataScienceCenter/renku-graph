@@ -70,9 +70,7 @@ class CommitEventsQueueSpec
 
     val tempEventLogPath: Path = {
       import java.nio.file._
-      val path = FileSystems.getDefault.getPath( "/tmp/renku-event.log" )
-      Files.createFile( path ).toFile.deleteOnExit()
-      path
+      Files.createTempFile( "renku-event", "log" )
     }
 
     val eventLogSinkProvider = new FileEventLogSinkProvider( tempEventLogPath )

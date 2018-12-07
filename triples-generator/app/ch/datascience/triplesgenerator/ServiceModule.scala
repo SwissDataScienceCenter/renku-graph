@@ -19,21 +19,12 @@
 package ch.datascience.triplesgenerator
 
 import java.net.URL
-import java.nio.charset.Charset
-import java.nio.file.Path
 
-import akka.Done
-import akka.stream.Materializer
-import ch.datascience.config.{ FusekiConfig, ServiceUrl }
-import ch.datascience.triplesgenerator.queues.logevent.{ EventLogSourceProvider, FileEventLogSourceProvider, LogEventQueue }
+import ch.datascience.config.ServiceUrl
+import ch.datascience.triplesgenerator.queues.logevent.LogEventQueue
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
-import javax.inject.{ Inject, Singleton }
-import play.api.libs.ws.{ WSAuthScheme, WSClient, WSResponse }
-import play.api.test.Helpers.CONTENT_TYPE
-import play.api.{ Configuration, Environment, Logger, LoggerLike }
-
-import scala.concurrent.{ ExecutionContext, Future }
+import play.api.{ Configuration, Environment }
 
 class ServiceModule(
     environment:   Environment,
@@ -49,91 +40,7 @@ class ServiceModule(
       .annotatedWith( Names.named( "gitlabUrl" ) )
       .toInstance( configuration.get[ServiceUrl]( "services.gitlab.url" ).value )
 
-    bind( classOf[Path] )
-      .annotatedWith( Names.named( "event-log-file-path" ) )
-      .toInstance {
-        import java.nio.file._
-        val path = FileSystems.getDefault.getPath( "/tmp/renku-event.log" )
-        val validatedPath =
-          if ( !Files.exists( path ) ) Files.createFile( path )
-          else path
-        validatedPath.toFile.deleteOnExit()
-        path
-      }
-
-    bind( classOf[EventLogSourceProvider] )
-      .to( classOf[FileEventLogSourceProvider] )
-
     bind( classOf[LogEventQueue] )
       .asEagerSingleton()
-  }
-}
-
-@Singleton
-private class FusekiDatasetVerifier(
-    fusekiConfig: FusekiConfig,
-    httpClient:   WSClient,
-    logger:       LoggerLike
-)( implicit executionContext: ExecutionContext, materializer: Materializer ) {
-
-  @Inject() def this(
-      fusekiConfig: FusekiConfig,
-      httpClient:   WSClient
-  )( implicit executionContext: ExecutionContext, materializer: Materializer ) =
-    this( fusekiConfig, httpClient, Logger )
-
-  import fusekiConfig._
-  import play.api.http.Status._
-
-  val assureDatasetExists: Future[Done] = {
-    checkDatasetExists()
-      .flatMap {
-        case true  => Future.successful( Done )
-        case false => createDataset()
-      }
-  }
-
-  private def checkDatasetExists(): Future[Boolean] =
-    httpClient
-      .url( fusekiBaseUrl / "$" / "datasets" / datasetName )
-      .withAuth( username.toString, password.toString, WSAuthScheme.BASIC )
-      .get()
-      .map( response => response.status -> response )
-      .map {
-        case ( OK, _ ) =>
-          logger.info( s"'$datasetName' dataset exists in Jena; No action needed." )
-          true
-        case ( NOT_FOUND, _ ) =>
-          logger.info( s"'$datasetName' dataset does not exist in Jena." )
-          false
-        case ( other, response ) =>
-          val message = s"'$datasetName' dataset existence check failed with $other and message: ${response.bodyAsString}"
-          logger.error( message )
-          throw new RuntimeException( message )
-      }
-
-  private def createDataset(): Future[Done] =
-    httpClient
-      .url( fusekiBaseUrl / "$" / "datasets" )
-      .withHttpHeaders( CONTENT_TYPE -> "application/x-www-form-urlencoded" )
-      .withAuth( username.toString, password.toString, WSAuthScheme.BASIC )
-      .post( Map( "dbName" -> datasetName.toString, "dbType" -> datasetType.toString ) )
-      .map( response => response.status -> response )
-      .map {
-        case ( OK, _ ) =>
-          logger.info( s"'$datasetName' created in Jena." )
-          Done
-        case ( other, response ) =>
-          val message = s"'$datasetName' dataset creation failed with $other and message: ${response.bodyAsString}"
-          logger.error( message )
-          throw new RuntimeException( message )
-      }
-
-  private implicit class ResponseOps( response: WSResponse ) {
-
-    lazy val bodyAsString: String =
-      response
-        .bodyAsBytes
-        .decodeString( Charset.forName( "utf-8" ) )
   }
 }

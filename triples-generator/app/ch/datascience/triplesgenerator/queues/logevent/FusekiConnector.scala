@@ -18,7 +18,8 @@
 
 package ch.datascience.triplesgenerator.queues.logevent
 
-import ch.datascience.config.{ FusekiConfig, ServiceUrl }
+import ch.datascience.config.ServiceUrl
+import ch.datascience.triplesgenerator.config.FusekiConfig
 import javax.inject.{ Inject, Singleton }
 import org.apache.jena.rdfconnection.{ RDFConnection, RDFConnectionFuseki }
 

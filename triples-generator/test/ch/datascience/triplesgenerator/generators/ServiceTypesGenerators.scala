@@ -18,8 +18,8 @@
 
 package ch.datascience.triplesgenerator.generators
 
-import ch.datascience.config.DatasetType.{ Mem, TDB }
-import ch.datascience.config._
+import ch.datascience.triplesgenerator.config.DatasetType.{ Mem, TDB }
+import ch.datascience.triplesgenerator.config._
 import ch.datascience.generators.Generators._
 import ch.datascience.triplesgenerator.queues.logevent.RDFTriples
 import org.apache.jena.rdf.model.ModelFactory
