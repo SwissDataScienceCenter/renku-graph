@@ -5,7 +5,41 @@ This is a microservice which:
 - translate them to commit events,
 - uploads the events to the Event Log
 
-### Trying out
+## API
+
+| Method | Path                               | Description                                        |
+|--------|------------------------------------|----------------------------------------------------|
+|  POST  | ```/webhook-event```               | Consumes a push event sent from GitLab.           |
+
+#### POST /webhook-event
+
+Consumes a Push Event.
+
+**Request format** (for more details look at [GitLab documentation](https://docs.gitlab.com/ee/user/project/integrations/webhooks.html#push-events))
+
+```
+{
+  "after": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "before": "f307326be71b17b90db5caaf47bcd44710fe119f",
+  "user_id": 4,
+  "user_username": "jsmith",
+  "user_email": "john@example.com",
+  "project": {
+    "id": 15,
+    "path_with_namespace":"mike/diaspora"
+  }
+}
+```
+
+**Response**
+
+|Status               |Description                             |
+|---------------------|----------------------------------------|
+|ACCEPTED             | For valid payloads.                    |
+|BAD REQUEST          | When payload is invalid.               |
+|INTERNAL SERVER ERROR| When queue is not accepting new events.|
+
+## Trying out
 
 - build the docker image
 
