@@ -19,7 +19,8 @@
 package ch.datascience.webhookservice
 
 import akka.stream.QueueOfferResult
-import ch.datascience.webhookservice.queue.PushEventQueue
+import ch.datascience.graph.events._
+import ch.datascience.webhookservice.queues.pushevent.{ PushEvent, PushEventQueue }
 import javax.inject.{ Inject, Singleton }
 import play.api.libs.json.{ JsError, JsSuccess }
 import play.api.mvc.{ AbstractController, ControllerComponents }
@@ -64,18 +65,32 @@ class WebhookController(
 
 object WebhookController {
 
-  import ch.datascience.tinytypes.json._
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._
   import play.api.libs.json._
 
-  private implicit val gitRepositoryUrlReads: Reads[GitRepositoryUrl] = TinyTypeReads( GitRepositoryUrl.apply )
-  private implicit val checkoutShaReads: Reads[CheckoutSha] = TinyTypeReads( CheckoutSha.apply )
-  private implicit val projectNameReads: Reads[ProjectName] = TinyTypeReads( ProjectName.apply )
+  private implicit val projectReads: Reads[Project] = (
+    ( __ \ "id" ).read[ProjectId] and
+    ( __ \ "path_with_namespace" ).read[ProjectPath]
+  )( Project.apply _ )
 
   private[webhookservice] implicit val pushEventReads: Reads[PushEvent] = (
-    ( __ \ "checkout_sha" ).read[CheckoutSha] and
-    ( __ \ "repository" \ "git_http_url" ).read[GitRepositoryUrl] and
-    ( __ \ "project" \ "name" ).read[ProjectName]
-  )( PushEvent.apply _ )
+    ( __ \ "before" ).read[CommitId] and
+    ( __ \ "after" ).read[CommitId] and
+    ( __ \ "user_id" ).read[UserId] and
+    ( __ \ "user_username" ).read[Username] and
+    ( __ \ "user_email" ).read[Email] and
+    ( __ \ "project" ).read[Project]
+  )( toPushEvent _ )
+
+  private def toPushEvent(
+      before:   CommitId,
+      after:    CommitId,
+      userId:   UserId,
+      username: Username,
+      email:    Email,
+      project:  Project
+  ): PushEvent = PushEvent(
+    before, after, PushUser( userId, username, email ), project
+  )
 }

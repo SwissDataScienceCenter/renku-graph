@@ -11,13 +11,15 @@ lazy val root = Project(
   base = file(".")
 ).aggregate(
   graphCommons, 
-  webhookService
+  webhookService,
+  triplesGenerator
 )
 
 lazy val graphCommons = Project(
   id   = "graph-commons",
   base = file("graph-commons")
 ).settings(
+  libraryDependencies += playCore,
   commonSettings
 ).enablePlugins(
   AutomateHeaderPlugin
@@ -29,7 +31,22 @@ lazy val webhookService = Project(
 ).settings(
   commonSettings
 ).dependsOn(
-  graphCommons
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
+  PlayScala, 
+  JavaAppPackaging, 
+  AutomateHeaderPlugin
+)
+
+lazy val triplesGenerator = Project(
+  id   = "triples-generator",
+  base = file("triples-generator")
+).settings(
+  commonSettings
+).dependsOn(
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
 ).enablePlugins(
   PlayScala, 
   JavaAppPackaging, 

@@ -21,8 +21,9 @@ package ch.datascience.webhookservice
 import akka.stream.QueueOfferResult
 import akka.stream.QueueOfferResult.Enqueued
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.queue.PushEventQueue
+import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.graph.events.{ CommitId, Project, PushUser }
+import ch.datascience.webhookservice.queues.pushevent.{ PushEvent, PushEventQueue }
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -40,12 +41,19 @@ class WebhookControllerSpec extends WordSpec with MixedMockFactory {
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
       val payload: JsValue = Json.obj(
-        "checkout_sha" -> checkoutSha.value,
-        "repository" -> Json.obj( "git_http_url" -> repositoryUrl.value ),
-        "project" -> Json.obj( "name" -> projectName.value )
+        "before" -> commitIdBefore.value,
+        "after" -> commitIdAfter.value,
+        "user_id" -> pushUser.userId.value,
+        "user_username" -> pushUser.username.value,
+        "user_email" -> pushUser.email.value,
+        "project" -> Json.obj(
+          "id" -> project.id.value,
+          "path_with_namespace" -> project.path.value
+        )
       )
 
-      val pushEvent = PushEvent( checkoutSha, repositoryUrl, projectName )
+      val pushEvent = PushEvent( commitIdBefore, commitIdAfter, pushUser, project )
+
       ( pushEventQueue.offer( _: PushEvent ) )
         .expects( pushEvent )
         .returning( Future.successful( Enqueued ) )
@@ -65,12 +73,19 @@ class WebhookControllerSpec extends WordSpec with MixedMockFactory {
     QueueOfferResult.Dropped +: QueueOfferResult.QueueClosed +: QueueOfferResult.Failure( new Exception( "message" ) ) +: Nil foreach { queueOfferResult =>
       s"return INTERNAL_SERVER_ERROR for valid push event payload and queue offer result as $queueOfferResult" in new TestCase {
         val payload: JsValue = Json.obj(
-          "checkout_sha" -> checkoutSha.value,
-          "repository" -> Json.obj( "git_http_url" -> repositoryUrl.value ),
-          "project" -> Json.obj( "name" -> projectName.value )
+          "before" -> commitIdBefore.value,
+          "after" -> commitIdAfter.value,
+          "user_id" -> pushUser.userId.value,
+          "user_username" -> pushUser.username.value,
+          "user_email" -> pushUser.email.value,
+          "project" -> Json.obj(
+            "id" -> project.id.value,
+            "path_with_namespace" -> project.path.value
+          )
         )
 
-        val pushEvent = PushEvent( checkoutSha, repositoryUrl, projectName )
+        val pushEvent = PushEvent( commitIdBefore, commitIdAfter, pushUser, project )
+
         ( pushEventQueue.offer( _: PushEvent ) )
           .expects( pushEvent )
           .returning( Future.successful( queueOfferResult ) )
@@ -100,9 +115,10 @@ class WebhookControllerSpec extends WordSpec with MixedMockFactory {
   }
 
   private trait TestCase {
-    val checkoutSha: CheckoutSha = checkoutShas.generateOne
-    val repositoryUrl = GitRepositoryUrl( "http://example.com/mike/repo.git" )
-    val projectName: ProjectName = projectNames.generateOne
+    val commitIdBefore: CommitId = commitIds.generateOne
+    val commitIdAfter: CommitId = commitIds.generateOne
+    val pushUser: PushUser = pushUsers.generateOne
+    val project: Project = projects.generateOne
 
     val pushEventQueue: PushEventQueue = mock[PushEventQueue]
     val logger = Proxy.stub[LoggerLike]

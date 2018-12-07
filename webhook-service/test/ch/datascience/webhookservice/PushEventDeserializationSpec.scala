@@ -18,6 +18,8 @@
 
 package ch.datascience.webhookservice
 
+import ch.datascience.graph.events._
+import ch.datascience.webhookservice.queues.pushevent.PushEvent
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import play.api.libs.json.Json
@@ -30,9 +32,17 @@ class PushEventDeserializationSpec extends WordSpec {
 
     "be able to translate a valid JSON to a PushEvent object" in {
       Json.parse( pushEventJson ).as[PushEvent] shouldBe PushEvent(
-        CheckoutSha( "da1560886d4f094c3e6c9ef40349f7d38b5d27d7" ),
-        GitRepositoryUrl( "http://example.com/mike/diaspora.git" ),
-        ProjectName( "Diaspora" )
+        before   = CommitId( "95790bf891e76fee5e1747ab589903a6a1f80f22" ),
+        after    = CommitId( "da1560886d4f094c3e6c9ef40349f7d38b5d27d7" ),
+        pushUser = PushUser(
+          UserId( 4 ),
+          Username( "jsmith" ),
+          Email( "john@example.com" )
+        ),
+        project  = Project(
+          ProjectId( 15 ),
+          ProjectPath( "mike/diaspora" )
+        )
       )
     }
   }
