@@ -2,3 +2,8 @@ jena:
   admin:
     password: YjJ7OT8B0R6PJu9
 
+webhookService:
+  play:
+    secret: cx0GU>c/tlS[Haa3_ArAn2V>p@aZZvi;QH]dRzONQjz@h28XlPcqJTdCDCDtnG<l
+  gitlab:
+    url: https://renkulab.io/gitlab

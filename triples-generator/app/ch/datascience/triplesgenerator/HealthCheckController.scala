@@ -15,3 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package ch.datascience.triplesgenerator
+
+import javax.inject.{ Inject, Singleton }
+import play.api.mvc.{ AbstractController, ControllerComponents }
+
+@Singleton
+class HealthCheckController @Inject() ( cc: ControllerComponents ) extends AbstractController( cc ) {
+
+  val ping = Action { _ =>
+    Ok( "pong" )
+  }
+}

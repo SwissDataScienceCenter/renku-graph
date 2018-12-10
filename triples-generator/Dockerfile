@@ -15,14 +15,16 @@ WORKDIR /work
 # Get dependencies first, rebuilds will reuse these layers
 COPY project project
 COPY build.sbt .
+COPY triples-generator/project triples-generator/project
+COPY triples-generator/build.sbt triples-generator/
 RUN set -e \
-  ; sbt "stage" \
+  ; sbt  "project triples-generator" "stage" \
   ;
 
 # Stage artifacts
 COPY . .
 RUN set -e \
-  ; sbt "stage" \
+  ; sbt  "project triples-generator" "stage" \
   ;
 
 FROM openjdk:8-jre
@@ -30,7 +32,7 @@ FROM openjdk:8-jre
 WORKDIR /opt/triples-generator
 
 # Add artifacts from builder
-COPY --from=builder /work/target/universal/stage .
+COPY --from=builder /work/triples-generator/target/universal/stage .
 
 # Adding initial tooling
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8

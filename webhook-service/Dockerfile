@@ -15,14 +15,16 @@ WORKDIR /work
 # Get dependencies first, rebuilds will reuse these layers
 COPY project project
 COPY build.sbt .
+COPY webhook-service/project webhook-service/project
+COPY webhook-service/build.sbt webhook-service/
 RUN set -e \
-  ; sbt "stage" \
+  ; sbt  "project webhook-service" "stage" \
   ;
 
 # Stage artifacts
 COPY . .
 RUN set -e \
-  ; sbt "stage" \
+  ; sbt  "project webhook-service" "stage" \
   ;
 
 FROM openjdk:8-jre
@@ -30,7 +32,7 @@ FROM openjdk:8-jre
 WORKDIR /opt/webhook-service
 
 # Add artifacts from builder
-COPY --from=builder /work/target/universal/stage .
+COPY --from=builder /work/webhook-service/target/universal/stage .
 
 # Adding initial tooling
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8

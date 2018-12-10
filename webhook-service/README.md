@@ -7,9 +7,21 @@ This is a microservice which:
 
 ## API
 
-| Method | Path                               | Description                                      |
-|--------|------------------------------------|--------------------------------------------------|
-|  POST  | ```/webhook-event```               | Consumes push events sent from GitLab.           |
+| Method | Path                               | Description                           |
+|--------|------------------------------------|---------------------------------------|
+|  GET   | ```/ping```                        | To check if service is healthy        |
+|  POST  | ```/webhook-event```               | Consumes push events sent from GitLab |
+
+#### GET /ping
+
+Verifies service health.
+
+**Response**
+
+| Status                     | Description             |
+|----------------------------|-------------------------|
+| OK (200)                   | If service is healthy   |
+| INTERNAL SERVER ERROR (500)| Otherwise               |
 
 #### POST /webhook-event
 
@@ -35,22 +47,24 @@ Consumes a Push Event.
 
 | Status                     | Description                            |
 |----------------------------|----------------------------------------|
-| ACCEPTED (202)             | For valid payloads.                    |
-| BAD REQUEST (400)          | When payload is invalid.               |
-| INTERNAL SERVER ERROR (500)| When queue is not accepting new events.|
+| ACCEPTED (202)             | For valid payloads                     |
+| BAD REQUEST (400)          | When payload is invalid                |
+| INTERNAL SERVER ERROR (500)| When queue is not accepting new events |
 
 ## Trying out
+
+The webhook-service is a part of multi-module sbt project thus it has to be built from the root level.
 
 - build the docker image
 
 ```bash
-docker build -t webhook-service .
+docker build -f webhook-service/Dockerfile -t webhook-service .
 ```
 
 - run the service
 
 ```bash
-docker run --rm -e 'PLAY_APPLICATION_SECRET=tLm_qFcq]L2>s>s`xd6iu6R[BHfK]>hgd/=HOx][][Yldf@kQIvrh:;C6P08?Fmh' -e 'GITLAB_BASE_URL=<gitlab-url>' -p 9001:9001 webhook-service
+docker run --rm -e 'PLAY_APPLICATION_SECRET=tLm_qFcq]L2>s>s`xd6iu6R[BHfK]>hgd/=HOx][][Yldf@kQIvrh:;C6P08?Fmh' -e 'GITLAB_BASE_URL=<gitlab-url>' -p 9001:9000 webhook-service
 ```
 
 - play with the endpoint
@@ -58,5 +72,5 @@ docker run --rm -e 'PLAY_APPLICATION_SECRET=tLm_qFcq]L2>s>s`xd6iu6R[BHfK]>hgd/=H
 ```bash
 curl -X POST --header "Content-Type: application/json" \
   --data '{"before": "<commit_id>", "after": "<commit_id>", "user_id": <user-id>, "user_username": "<user-name>", "user_email": "<user-email>", "project": {"id": <project-id>, "path_with_namespace": "<org-name>/<project-name>"}}' \
-  http://localhost:9000/webhook-event
+  http://localhost:9001/webhook-event
 ```

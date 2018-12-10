@@ -1,6 +1,7 @@
-# incubator-renku-graph
+# renku-graph
 
 Repository structure
 
 - `helm-chart` helm chart, published using chartpress
-- `graph-service` sources for the graph service
+- `webhook-service` webhook service module
+- `triples-generator` triples generator service module
