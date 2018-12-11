@@ -1,27 +1,46 @@
-# Default values for webhook-service.
+# Default values for graph-services.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 1
+triplesGenerator:
+  image:
+    repository: triples-generator
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
 
-image:
-  repository: webhook-service
-  tag: 0.1.0
-  pullPolicy: IfNotPresent
+webhookService:
+  image:
+    repository: webhook-service
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
 
 nameOverride: ""
 fullnameOverride: ""
 
-service:
-  type: ClusterIP
-  port: 80
+persistence:
+  enabled: true
+
+  ## A manually managed Persistent Volume and Claim
+  ## Requires persistence.enabled: true
+  ## If defined, PVC must be created manually before volume will be bound
+  # existingClaim:
+
+  # storageClass: "-"
+  accessMode: ReadWriteOnce
+  size: 2Gi
 
 ingress:
   enabled: false
   annotations: {}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
-  path: /
+  paths: []
   hosts:
     - chart-example.local
   tls: []
@@ -46,5 +65,3 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-
-webhookService: {}

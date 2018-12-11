@@ -2,18 +2,13 @@ jena:
   admin:
     password: YjJ7OT8B0R6PJu9
 
+gitlab:
+  url: https://renkulab.io/gitlab
+
 webhookService:
   play:
     secret: cx0GU>c/tlS[Haa3_ArAn2V>p@aZZvi;QH]dRzONQjz@h28XlPcqJTdCDCDtnG<l
-  gitlab:
-    url: https://renkulab.io/gitlab
 
 triplesGenerator:
   play:
     secret: :X6zw>0x_2Am1>y_0i^0loWHoZinTc0/JSDSC24nHrZHVu8LO_Z:<m/7@EKM/RPg
-  gitlab:
-    url: https://renkulab.io/gitlab
-  jena:
-    url: https://renkulab.io/gitlab
-    admin:
-      password: YjJ7OT8B0R6PJu9
