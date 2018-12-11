@@ -1,10 +1,10 @@
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
-  name: {{ include "webhook-service.fullname" . }}
+  name: {{ include "triples-generator.fullname" . }}
   labels:
-    app: {{ template "webhook-service.name" . }}
-    chart: {{ template "webhook-service.chart" . }}
+    app: {{ template "triples-generator.name" . }}
+    chart: {{ template "triples-generator.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
@@ -13,12 +13,12 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: {{ include "webhook-service.name" . }}
+      app: {{ include "triples-generator.name" . }}
       release: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: {{ include "webhook-service.name" . }}
+        app: {{ include "triples-generator.name" . }}
         release: {{ .Release.Name }}
     spec:
       containers:
@@ -29,10 +29,17 @@ spec:
             - name: PLAY_APPLICATION_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "webhook-service.fullname" . }}
-                  key: webhookService-play-secret
+                  name: {{ template "triples-generator.fullname" . }}
+                  key: triplesGenerator-play-secret
             - name: GITLAB_BASE_URL
-              value: {{ .Values.webhookService.gitlab.url }}
+              value: {{ .Values.triplesGenerator.gitlab.url }}
+            - name: JENA_BASE_URL
+              value: {{ .Values.triplesGenerator.jena.url }}
+            - name: JENA_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "triples-generator.fullname" . }}
+                  key: jena-admin-password
           ports:
             - name: http
               containerPort: 9000
