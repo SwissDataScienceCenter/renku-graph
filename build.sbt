@@ -1,7 +1,7 @@
 organization := "ch.datascience"
 name := "renku-graph"
 version := "0.0.1-SNAPSHOT"
-scalaVersion := "2.12.7"
+scalaVersion := "2.12.8"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
@@ -57,7 +57,7 @@ import scalariform.formatter.preferences._
 
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
-  scalaVersion := "2.12.7",
+  scalaVersion := "2.12.8",
 
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),

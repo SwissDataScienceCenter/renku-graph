@@ -4,7 +4,7 @@ branches:
 language: scala
 jdk: openjdk8
 scala:
-- 2.12.7
+- 2.12.8
 script:
 - sbt ++$TRAVIS_SCALA_VERSION test && bash ./.travis/check-code-formatting.sh
 cache:
