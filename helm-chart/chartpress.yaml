@@ -1,0 +1,21 @@
+charts:
+  - name: graph-services
+    imagePrefix: renku/
+    repo:
+      git: SwissDataScienceCenter/helm-charts
+      published: https://swissdatasciencecenter.github.io/helm-charts
+    paths:
+      - ..
+    images:
+      webhook-service:
+        # Context to send to docker build for use by the Dockerfile
+        contextPath: ..
+        # Dockerfile path relative to chartpress.yaml
+        dockerfilePath: ../webhook-service/Dockerfile
+        valuesPath: webhookService.image
+      triples-generator:
+        # Context to send to docker build for use by the Dockerfile
+        contextPath: ..
+        # Dockerfile path relative to chartpress.yaml
+        dockerfilePath: ../triples-generator/Dockerfile
+        valuesPath: triplesGenerator.image

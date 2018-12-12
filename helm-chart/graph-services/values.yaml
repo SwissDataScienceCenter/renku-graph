@@ -20,8 +20,8 @@ webhookService:
     type: ClusterIP
     port: 80
 
-nameOverride: ""
-fullnameOverride: ""
+nameOverride: ''
+fullnameOverride: ''
 
 persistence:
   enabled: true

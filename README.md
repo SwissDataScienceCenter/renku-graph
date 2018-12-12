@@ -1,7 +1,14 @@
 # renku-graph
 
-Repository structure
+#### Repository structure
 
 - `helm-chart` helm chart, published using chartpress
+- `graph-commons` common classes for all the services
 - `webhook-service` webhook service module
 - `triples-generator` triples generator service module
+
+#### Running the tests
+
+```bash
+sbt clean test
+```
