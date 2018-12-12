@@ -1,3 +1,4 @@
+dist: xenial
 branches:
   only:
   - master
@@ -21,6 +22,25 @@ env:
     - HELM_TGZ=helm-v2.8.2-linux-amd64.tar.gz
 git:
   depth: false
+addons:
+  apt:
+    packages:
+      - python3
+      - python3-pip
+before_install:
+  - sudo add-apt-repository ppa:deadsnakes/ppa -y
+  - sudo apt-get update
+  - sudo apt-get install python3.6 -y
+  - sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.5 1
+  - sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.6 2
+install:
+  - travis_retry sudo pip3 install -U pip
+  - travis_retry sudo pip3 install "chartpress>=0.2.1" "ruamel.yaml==0.15.54"
+  # Installing Helm
+  - wget -q ${HELM_URL}/${HELM_TGZ}
+  - tar xzfv ${HELM_TGZ}
+  - PATH=`pwd`/linux-amd64/:$PATH
+  - helm init --client-only
 script:
 - sbt ++$TRAVIS_SCALA_VERSION test && bash ./.travis/check-code-formatting.sh
 deploy:

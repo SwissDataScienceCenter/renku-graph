@@ -18,12 +18,16 @@
 
 set -e
 
-# generate ssh key to use for docker hub login
-openssl enc -nosalt -aes-256-cbc -base64 -K "${encrypted_5c6845b5ee69_key}" -iv "${encrypted_5c6845b5ee69_iv}" -in github_deploy_key.enc -out github_deploy_key -d
-chmod 600 github_deploy_key
-eval $(ssh-agent -s)
-ssh-add github_deploy_key
 make login
+
+docker pull renku/webhook-service:latest
+docker pull renku/triples-generator:latest
+
+# decrypt ssh key to use for docker hub login
+openssl aes-256-cbc -K $encrypted_b7eb5d86688a_key -iv $encrypted_b7eb5d86688a_iv -in deploy_rsa.enc -out deploy_rsa -d
+chmod 600 deploy_rsa
+eval $(ssh-agent -s)
+ssh-add deploy_rsa
 
 # build charts/images and push
 cd helm-chart
