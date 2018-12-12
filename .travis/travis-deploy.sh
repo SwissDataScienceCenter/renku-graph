@@ -19,7 +19,7 @@
 set -e
 
 # generate ssh key to use for docker hub login
-openssl aes-256-cbc -K "${encrypted_5c6845b5ee69_key}" -iv "${encrypted_5c6845b5ee69_iv}" -in github_deploy_key.enc -out github_deploy_key -d
+openssl enc -nosalt -aes-256-cbc -base64 -K "${encrypted_5c6845b5ee69_key}" -iv "${encrypted_5c6845b5ee69_iv}" -in github_deploy_key.enc -out github_deploy_key -d
 chmod 600 github_deploy_key
 eval $(ssh-agent -s)
 ssh-add github_deploy_key
