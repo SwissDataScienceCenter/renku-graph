@@ -26,14 +26,14 @@ import org.apache.jena.rdfconnection.RDFConnection
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{ IntegrationPatience, ScalaFutures }
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.{ global => executionContext }
 import scala.concurrent.duration._
 import scala.language.{ implicitConversions, postfixOps }
 
-class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures {
+class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures with IntegrationPatience {
 
   "upload" should {
 
