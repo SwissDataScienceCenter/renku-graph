@@ -1,1 +1,3 @@
+GET     /ping                 ch.datascience.webhookservice.HealthCheckController.ping
+
 POST    /webhook-event        ch.datascience.webhookservice.WebhookController.processWebhookEvent

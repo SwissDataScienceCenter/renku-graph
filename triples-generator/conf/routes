@@ -1,0 +1,1 @@
+GET     /ping                 ch.datascience.triplesgenerator.HealthCheckController.ping

@@ -1,0 +1,37 @@
+branches:
+  only:
+  - master
+language: scala
+jdk: openjdk8
+scala:
+- 2.12.8
+cache:
+  directories:
+  - "$HOME/.ivy2/cache"
+  - "$HOME/.sbt"
+before_cache:
+- find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
+- find $HOME/.sbt        -name "*.lock"               -print -delete
+env:
+  global:
+    - DOCKER_LABEL=$TRAVIS_BRANCH
+    - DOCKER_PUSH_LATEST=true
+    - DOCKER_REPOSITORY=renku/
+    - HELM_URL=https://storage.googleapis.com/kubernetes-helm
+    - HELM_TGZ=helm-v2.8.2-linux-amd64.tar.gz
+git:
+  depth: false
+script:
+- sbt ++$TRAVIS_SCALA_VERSION test && bash ./.travis/check-code-formatting.sh
+deploy:
+  - &script
+    provider: script
+    skip_cleanup: true
+    script: bash ./.travis/travis-deploy.sh
+    on: &script_on
+      branch: master
+      repo: SwissDataScienceCenter/renku-graph
+  - <<: *script
+    on:
+      <<: *script_on
+      tags: true
