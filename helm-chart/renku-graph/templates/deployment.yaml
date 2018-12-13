@@ -1,10 +1,10 @@
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
-  name: {{ include "graph-services.fullname" . }}
+  name: {{ include "graph.fullname" . }}
   labels:
-    app: {{ template "graph-services.name" . }}
-    chart: {{ template "graph-services.chart" . }}
+    app: {{ template "graph.name" . }}
+    chart: {{ template "graph.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
@@ -13,12 +13,12 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: {{ include "graph-services.name" . }}
+      app: {{ include "graph.name" . }}
       release: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: {{ include "graph-services.name" . }}
+        app: {{ include "graph.name" . }}
         release: {{ .Release.Name }}
     spec:
       containers:
@@ -31,7 +31,7 @@ spec:
             - name: PLAY_APPLICATION_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "graph-services.fullname" . }}
+                  name: {{ template "graph.fullname" . }}
                   key: triplesGenerator-play-secret
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
@@ -68,7 +68,7 @@ spec:
             - name: PLAY_APPLICATION_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "graph-services.fullname" . }}
+                  name: {{ template "graph.fullname" . }}
                   key: webhookService-play-secret
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
@@ -96,7 +96,7 @@ spec:
         - name: file-event-log
         {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ .Values.persistence.existingClaim | default (include "graph-services.fullname" .) }}
+            claimName: {{ .Values.persistence.existingClaim | default (include "graph.fullname" .) }}
         {{- else }}
           emptyDir: {}
         {{- end }}

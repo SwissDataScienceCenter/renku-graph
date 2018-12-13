@@ -1,11 +1,11 @@
-# Default values for graph-services.
+# Default values for renku-graph.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
 triplesGenerator:
   image:
     repository: renku/triples-generator
-    tag: 'latest'
+    tag: '0.0-unclean-d893ed7'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -14,7 +14,7 @@ triplesGenerator:
 webhookService:
   image:
     repository: renku/webhook-service
-    tag: 'latest'
+    tag: '0.0-unclean-d893ed7'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
