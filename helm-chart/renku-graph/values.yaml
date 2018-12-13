@@ -4,8 +4,8 @@
 
 triplesGenerator:
   image:
-    repository: triples-generator
-    tag: 0.1.0
+    repository: renku/triples-generator
+    tag: 'latest'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -13,8 +13,8 @@ triplesGenerator:
 
 webhookService:
   image:
-    repository: webhook-service
-    tag: 0.1.0
+    repository: renku/webhook-service
+    tag: 'latest'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP

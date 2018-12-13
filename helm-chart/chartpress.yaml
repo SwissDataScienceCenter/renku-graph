@@ -1,5 +1,5 @@
 charts:
-  - name: graph-services
+  - name: renku-graph
     imagePrefix: renku/
     repo:
       git: SwissDataScienceCenter/helm-charts
