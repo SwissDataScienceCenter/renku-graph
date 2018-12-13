@@ -5,7 +5,7 @@
 triplesGenerator:
   image:
     repository: renku/triples-generator
-    tag: 'latest'
+    tag: 'dbf543a'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -14,7 +14,7 @@ triplesGenerator:
 webhookService:
   image:
     repository: renku/webhook-service
-    tag: 'latest'
+    tag: 'dbf543a'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
