@@ -1,4 +1,0 @@
-dependencies:
-- name: jena
-  repository: "https://swissdatasciencecenter.github.io/helm-charts/"
-  version: 0.1.0-ccd54ee
