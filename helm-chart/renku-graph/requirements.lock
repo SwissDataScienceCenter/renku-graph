@@ -1,6 +1,6 @@
 dependencies:
 - name: jena
   repository: https://swissdatasciencecenter.github.io/helm-charts/
-  version: 0.1.0-dbf543a
-digest: sha256:4473273cebff6c8daaabed3b8be870d4f6ca01dad65910f3c49a98175391dcdf
-generated: 2018-12-13T15:55:48.68127+01:00
+  version: 0.1.0-ccd54ee
+digest: sha256:de7c59cb2c3cc7fd737787116d8fa0cb3c80c88fb5934f9edaa01baa90ba2ed7
+generated: 2018-12-14T00:33:43.215029+01:00
