@@ -34,3 +34,4 @@ libraryDependencies += "org.typelevel" %% "cats-core" % "1.4.0"
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
 libraryDependencies += "org.scalamock" %% "scalamock" % "4.1.0" % Test
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test
+libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test

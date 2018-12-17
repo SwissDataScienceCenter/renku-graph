@@ -18,8 +18,10 @@
 
 package ch.datascience.webhookservice
 
-import akka.stream.QueueOfferResult
 import akka.stream.QueueOfferResult.Enqueued
+import akka.stream.{ Materializer, QueueOfferResult }
+import ch.datascience.controllers.ErrorMessage
+import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.{ CommitId, Project, PushUser }
@@ -27,14 +29,16 @@ import ch.datascience.webhookservice.queues.pushevent.{ PushEvent, PushEventQueu
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.LoggerLike
 import play.api.libs.json.{ JsError, JsValue, Json }
-import play.api.test.FakeRequest
+import play.api.mvc.ControllerComponents
 import play.api.test.Helpers._
+import play.api.test.{ FakeRequest, Injecting }
 
 import scala.concurrent.Future
 
-class WebhookControllerSpec extends WordSpec with MixedMockFactory {
+class PushEventConsumerSpec extends WordSpec with MixedMockFactory with GuiceOneAppPerTest with Injecting {
 
   "POST /webhook-event" should {
 
@@ -58,7 +62,7 @@ class WebhookControllerSpec extends WordSpec with MixedMockFactory {
         .expects( pushEvent )
         .returning( Future.successful( Enqueued ) )
 
-      val response = processWebhookEvent( FakeRequest().withBody( payload ) )
+      val response = call( processPushEvent, request.withBody( payload ) )
 
       status( response ) shouldBe ACCEPTED
       contentAsString( response ) shouldBe ""
@@ -90,10 +94,10 @@ class WebhookControllerSpec extends WordSpec with MixedMockFactory {
           .expects( pushEvent )
           .returning( Future.successful( queueOfferResult ) )
 
-        val response = processWebhookEvent( FakeRequest().withBody( payload ) )
+        val response = call( processPushEvent, request.withBody( payload ) )
 
         status( response ) shouldBe INTERNAL_SERVER_ERROR
-        contentAsJson( response ) shouldBe ErrorResponse( s"'$pushEvent' enqueueing problem: $queueOfferResult" ).toJson
+        contentAsJson( response ) shouldBe ErrorMessage( s"'$pushEvent' enqueueing problem: $queueOfferResult" ).toJson
 
         logger.verify( 'error )(
           argAssert { ( message: () => String ) =>
@@ -104,17 +108,19 @@ class WebhookControllerSpec extends WordSpec with MixedMockFactory {
     }
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
-      import WebhookController.pushEventReads
       val payload: JsValue = Json.obj()
 
-      val response = processWebhookEvent( FakeRequest().withBody( payload ) )
+      val response = call( processPushEvent, request.withBody( payload ) )
 
       status( response ) shouldBe BAD_REQUEST
-      contentAsJson( response ) shouldBe ErrorResponse( JsError( payload.validate[PushEvent].asEither.left.get ) ).toJson
+      contentAsJson( response ) shouldBe a[JsValue]
     }
   }
 
   private trait TestCase {
+    implicit val materializer: Materializer = app.materializer
+
+    val request = FakeRequest().withHeaders( CONTENT_TYPE -> JSON )
     val commitIdBefore: CommitId = commitIds.generateOne
     val commitIdAfter: CommitId = commitIds.generateOne
     val pushUser: PushUser = pushUsers.generateOne
@@ -122,6 +128,6 @@ class WebhookControllerSpec extends WordSpec with MixedMockFactory {
 
     val pushEventQueue: PushEventQueue = mock[PushEventQueue]
     val logger = Proxy.stub[LoggerLike]
-    val processWebhookEvent = new WebhookController( stubControllerComponents(), logger, pushEventQueue ).processWebhookEvent
+    val processPushEvent = new PushEventConsumer( inject[ControllerComponents], logger, pushEventQueue ).processPushEvent
   }
 }

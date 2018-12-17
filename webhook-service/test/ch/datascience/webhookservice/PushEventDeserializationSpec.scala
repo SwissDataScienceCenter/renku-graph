@@ -26,7 +26,7 @@ import play.api.libs.json.Json
 
 class PushEventDeserializationSpec extends WordSpec {
 
-  import WebhookController.pushEventReads
+  import PushEventConsumer.pushEventReads
 
   "JSON deserializer for PushEvent" should {
 

@@ -19,51 +19,48 @@
 package ch.datascience.webhookservice
 
 import akka.stream.QueueOfferResult
+import ch.datascience.controllers.ErrorMessage
+import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.queues.pushevent.{ PushEvent, PushEventQueue }
 import javax.inject.{ Inject, Singleton }
-import play.api.libs.json.{ JsError, JsSuccess }
-import play.api.mvc.{ AbstractController, ControllerComponents }
+import play.api.mvc._
 import play.api.{ Logger, LoggerLike }
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.ExecutionContext
 
 @Singleton
-class WebhookController(
+class PushEventConsumer(
     cc:             ControllerComponents,
     logger:         LoggerLike,
     pushEventQueue: PushEventQueue
 ) extends AbstractController( cc ) {
 
-  @Inject def this( cc: ControllerComponents, pushEventQueue: PushEventQueue ) = this( cc, Logger, pushEventQueue )
+  @Inject def this(
+      cc:             ControllerComponents,
+      pushEventQueue: PushEventQueue
+  ) = this( cc, Logger, pushEventQueue )
 
-  private implicit val executionContext: ExecutionContext = cc.executionContext
+  private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
-  import WebhookController.pushEventReads
+  import PushEventConsumer._
 
-  val processWebhookEvent = Action.async( cc.parsers.json ) { implicit request =>
-    request.body.validate[PushEvent] match {
-      case jsError@JsError( _ ) =>
-        val errorResponse = ErrorResponse( jsError )
-        logger.error( errorResponse.toString )
-        Future.successful( BadRequest( errorResponse.toJson ) )
-      case JsSuccess( pushEvent, _ ) =>
-        pushEventQueue
-          .offer( pushEvent )
-          .map {
-            case QueueOfferResult.Enqueued ⇒
-              logger.info( s"'$pushEvent' enqueued" )
-              Accepted
-            case other ⇒
-              val errorResponse = ErrorResponse( s"'$pushEvent' enqueueing problem: $other" )
-              logger.error( errorResponse.toString )
-              InternalServerError( errorResponse.toJson )
-          }
-    }
+  val processPushEvent: Action[PushEvent] = Action.async( parse.json[PushEvent] ) { implicit request =>
+    pushEventQueue
+      .offer( request.body )
+      .map {
+        case QueueOfferResult.Enqueued ⇒
+          logger.info( s"'${request.body}' enqueued" )
+          Accepted
+        case other ⇒
+          val errorResponse = ErrorMessage( s"'${request.body}' enqueueing problem: $other" )
+          logger.error( errorResponse.toString )
+          InternalServerError( errorResponse.toJson )
+      }
   }
 }
 
-object WebhookController {
+object PushEventConsumer {
 
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._

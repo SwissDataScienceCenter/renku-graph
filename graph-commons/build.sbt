@@ -20,18 +20,11 @@ organization := "ch.datascience"
 version := "0.1.0-SNAPSHOT"
 name := "renku-graph-commons"
 
-// Play JSON library
-libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10"
+val playVersion = "2.6.10"
+libraryDependencies += "com.typesafe.play" %% "play-json" % playVersion
+libraryDependencies += "eu.timepit" %% "refined" % "0.9.3"
 
-val akkaStreamsVersion = "2.5.17"
-
-// Akka Streams library
-libraryDependencies += "com.typesafe.akka" %% "akka-stream" % akkaStreamsVersion
-
-// ScalaTest
+// Test dependencies
+libraryDependencies += "com.typesafe.play" %% "play-test" % playVersion
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test
-
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
-
-// Akka Streams test kit
-libraryDependencies += "com.typesafe.akka" %% "akka-stream-testkit" % akkaStreamsVersion % Test
