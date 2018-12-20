@@ -36,6 +36,12 @@ abstract class TinyTypeFactory[V, TT <: TinyType[V]]( instantiate: V => TT )
 
   final def unapply( sha: TT ): Option[V] = Some( sha.value )
 
+  final def from( value: V ): Either[String, TT] = {
+    val maybeErrors = validateConstraints( value )
+    if ( maybeErrors.isEmpty ) Right( instantiate( value ) )
+    else Left( maybeErrors.mkString( "; " ) )
+  }
+
   private def verify( value: V ): Unit = {
     val maybeErrors = validateConstraints( value )
     if ( maybeErrors.nonEmpty ) throw new IllegalArgumentException( maybeErrors.mkString( "; " ) )

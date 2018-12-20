@@ -57,6 +57,17 @@ class TinyTypeFactorySpec extends WordSpec {
       }.getMessage shouldBe "! is not allowed"
     }
   }
+
+  "from" should {
+
+    "return Right with instantiated object for valid values" in {
+      TinyTypeTest.from( "def" ).map( _.value ) shouldBe Right( "def" )
+    }
+
+    "left with the errors if the type constraints are not met" in {
+      TinyTypeTest.from( "abc" ) shouldBe Left( "TinyTypeTest cannot have 'abc' value" )
+    }
+  }
 }
 
 private class TinyTypeTest private ( val value: String ) extends AnyVal with TinyType[String]

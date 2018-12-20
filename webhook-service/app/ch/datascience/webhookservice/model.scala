@@ -16,25 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.generators
+package ch.datascience.webhookservice
 
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.webhookservice.model.GitLabAuthToken
-import ch.datascience.webhookservice.queues.pushevent.PushEvent
-import org.scalacheck.Gen
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.json._
+import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import play.api.libs.json.Format
 
-object ServiceTypesGenerators {
+object model {
 
-  implicit val pushEvents: Gen[PushEvent] = for {
-    before <- commitIds
-    after <- commitIds
-    pushUser <- pushUsers
-    project <- projects
-  } yield PushEvent( before, after, pushUser, project )
+  class GitLabAuthToken private ( val value: String ) extends AnyVal with TinyType[String]
 
-  implicit val gitLabAuthTokens: Gen[GitLabAuthToken] = for {
-    length <- Gen.choose( 5, 40 )
-    chars <- Gen.listOfN( length, Gen.oneOf( ( 0 to 9 ).map( _.toString ) ++ ( 'a' to 'z' ).map( _.toString ) ) )
-  } yield GitLabAuthToken( chars.mkString( "" ) )
+  object GitLabAuthToken
+    extends TinyTypeFactory[String, GitLabAuthToken]( new GitLabAuthToken( _ ) )
+    with NonBlank {
 
+    implicit lazy val authTokenFormat: Format[GitLabAuthToken] = TinyTypeFormat( GitLabAuthToken.apply )
+  }
 }

@@ -20,9 +20,19 @@ organization := "ch.datascience"
 version := "0.1.0-SNAPSHOT"
 name := "renku-graph-commons"
 
+val pureConfigVersion = "0.10.1"
+libraryDependencies += "com.github.pureconfig" %% "pureconfig" % pureConfigVersion
+libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats-effect" % pureConfigVersion
 val playVersion = "2.6.10"
 libraryDependencies += "com.typesafe.play" %% "play-json" % playVersion
-libraryDependencies += "eu.timepit" %% "refined" % "0.9.3"
+val refinedVersion = "0.9.3"
+libraryDependencies += "eu.timepit" %% "refined" % refinedVersion
+libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
+val log4CatsVersion = "0.2.0"
+libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % log4CatsVersion
+libraryDependencies += "io.chrisdavenport" %% "log4cats-extras" % log4CatsVersion
+libraryDependencies += "io.chrisdavenport" %% "log4cats-slf4j" % log4CatsVersion
+libraryDependencies += "org.typelevel" %% "cats-core" % "1.5.0"
 
 // Test dependencies
 libraryDependencies += "com.typesafe.play" %% "play-test" % playVersion

@@ -22,13 +22,18 @@ version := "0.1.0-SNAPSHOT"
 
 PlayKeys.playDefaultPort := 9001
 
+routesImport += "ch.datascience.graph.events.ProjectId"
+routesImport += "ch.datascience.webhookservice.hookcreation.ProjectIdPathBinder._"
+
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies += ws
-
 libraryDependencies += "ch.datascience" %% "renku-commons" % "0.2.0"
-
-libraryDependencies += "org.typelevel" %% "cats-core" % "1.4.0"
+val http4sVersion = "0.19.0"
+libraryDependencies += "org.http4s" %% "http4s-blaze-client" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-blaze-server" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-circe" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-dsl" % http4sVersion
 
 //Test dependencies
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test

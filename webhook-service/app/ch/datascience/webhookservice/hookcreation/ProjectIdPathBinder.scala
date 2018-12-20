@@ -16,25 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.generators
+package ch.datascience.webhookservice.hookcreation
 
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.webhookservice.model.GitLabAuthToken
-import ch.datascience.webhookservice.queues.pushevent.PushEvent
-import org.scalacheck.Gen
+import ch.datascience.graph.events.ProjectId
+import play.api.mvc.PathBindable
 
-object ServiceTypesGenerators {
+object ProjectIdPathBinder {
 
-  implicit val pushEvents: Gen[PushEvent] = for {
-    before <- commitIds
-    after <- commitIds
-    pushUser <- pushUsers
-    project <- projects
-  } yield PushEvent( before, after, pushUser, project )
+  implicit def pathBinder( implicit intBinder: PathBindable[Int] ): PathBindable[ProjectId] = new PathBindable[ProjectId] {
 
-  implicit val gitLabAuthTokens: Gen[GitLabAuthToken] = for {
-    length <- Gen.choose( 5, 40 )
-    chars <- Gen.listOfN( length, Gen.oneOf( ( 0 to 9 ).map( _.toString ) ++ ( 'a' to 'z' ).map( _.toString ) ) )
-  } yield GitLabAuthToken( chars.mkString( "" ) )
+    override def bind( key: String, value: String ): Either[String, ProjectId] =
+      for {
+        id <- intBinder.bind( key, value )
+        projectId <- ProjectId.from( id )
+      } yield projectId
 
+    override def unbind( key: String, projectId: ProjectId ): String =
+      projectId.toString
+  }
 }
