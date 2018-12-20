@@ -18,9 +18,9 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.{ConcurrentEffect, IO}
-import cats.implicits._
+import cats.effect.IO
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.webhookservice.hookcreation.GitLabHookCreation.UnauthorizedException
 import ch.datascience.webhookservice.model.GitLabAuthToken
 import ch.datascience.webhookservice.routes.PushEventConsumer
 import io.circe.Json
@@ -31,14 +31,29 @@ import org.http4s.circe._
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.{Header, Headers, Request, Uri}
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.higherKinds
 
-private class GitLabHookCreation[Interpretation[_]](configProvider: HookCreationConfigProvider[Interpretation]) {
+private abstract class GitLabHookCreation[Interpretation[_]] {
+  def createHook(projectId: ProjectId, authToken: GitLabAuthToken): Interpretation[Unit]
+}
 
-  import GitLabHookCreation._
+private object GitLabHookCreation {
+  final case object UnauthorizedException extends RuntimeException("Unauthorized")
+}
 
-  def createHook( projectId: ProjectId, authToken: GitLabAuthToken )( implicit F: ConcurrentEffect[Interpretation] ): Interpretation[Unit] = for {
+@Singleton
+private class IOGitLabHookCreation @Inject()(configProvider: IOHookCreationConfigProvider)
+                                            (implicit executionContext: ExecutionContext)
+  extends GitLabHookCreation[IO] {
+
+  import cats.effect._
+
+  private implicit val cs: ContextShift[IO] = IO.contextShift( executionContext )
+  private val F = implicitly[ConcurrentEffect[IO]]
+
+  def createHook( projectId: ProjectId, authToken: GitLabAuthToken ): IO[Unit] = for {
     config <- configProvider.get()
     payload = Json.obj(
       "id" -> Json.fromInt( projectId.value ),
@@ -46,13 +61,13 @@ private class GitLabHookCreation[Interpretation[_]](configProvider: HookCreation
       "push_events" -> Json.fromBoolean( true )
     )
     uri <- F.fromEither(Uri.fromString( s"${config.gitLabUrl}/api/v4/projects/$projectId/hooks" ))
-    request = Request[Interpretation](
+    request = Request[IO](
       method = POST,
       uri    = uri,
       headers = Headers(Header("PRIVATE-TOKEN", authToken.value)),
     ).withEntity( payload )
 
-    result <- BlazeClientBuilder[Interpretation]( global ).resource.use { httpClient =>
+    result <- BlazeClientBuilder[IO]( global ).resource.use { httpClient =>
       httpClient.fetch[Unit]( request ) { response =>
         response.status match {
           case Created => F.pure( () )
@@ -66,11 +81,3 @@ private class GitLabHookCreation[Interpretation[_]](configProvider: HookCreation
     }
   } yield result
 }
-
-private object GitLabHookCreation {
-  final case object UnauthorizedException extends RuntimeException("Unauthorized")
-}
-
-@Singleton
-private class IOGitLabHookCreation @Inject()(configProvider: IOHookCreationConfigProvider)
-  extends GitLabHookCreation[IO](configProvider)

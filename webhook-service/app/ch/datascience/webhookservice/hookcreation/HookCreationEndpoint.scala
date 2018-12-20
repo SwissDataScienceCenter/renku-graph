@@ -35,10 +35,7 @@ class HookCreationEndpoint @Inject() (
     hookCreator: IOHookCreation
 ) extends AbstractController( cc ) {
 
-  import cats.effect._
-
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
-  private implicit val cs: ContextShift[IO] = IO.contextShift( executionContext )
 
   def createHook( projectId: ProjectId ) = Action.async( parse.json[GitLabAuthToken] ) { implicit request =>
     hookCreator

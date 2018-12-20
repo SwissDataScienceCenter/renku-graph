@@ -18,7 +18,8 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.Id
+import cats._
+import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators.projectIds
@@ -36,54 +37,41 @@ import scala.util.Try
 
 class HookCreationSpec extends WordSpec with MockFactory {
 
-//  "create" should {
-//
-//    "log success and return right if creation of the hook in GitLab was successful" in new HappyTestCase {
-//
-//      (gitLabHookCreation.createHook(_: ProjectId, _: GitLabAuthToken))
-//        .expects(projectId, authToken)
-//
-//      hookCreation.createHook(projectId, authToken) shouldBe ((): Unit)
-//
-//      logger.loggedOnly(Info, s"Hook created for project with id $projectId")
-//    }
-//
-//    "log an error and return left if creation of the hook in GitLab was unsuccessful" in new ErrorTestCase {
-//
-//      val error = context.raiseError(exceptions.generateOne)
-//      (gitLabHookCreation.createHook(_: ProjectId, _: GitLabAuthToken))
-//        .expects(projectId, authToken)
-//        .returning(error)
-//
-//      hookCreation.createHook(projectId, authToken) shouldBe error
-//
-//      logger.expectNoLogs()
-//    }
-//  }
-//
-//  private trait TestCase {
-//
-//    val projectId = projectIds.generateOne
-//    val authToken = gitLabAuthTokens.generateOne
-//
-//  }
-//
-//  private trait HappyTestCase extends TestCase {
-//
-//    val logger = TestLogger[Id]()
-//    val gitLabHookCreation = mock[GitLabHookCreation[Id]]
-//    val hookCreation = new HookCreation[Id](gitLabHookCreation, logger)
-//  }
-//
-//  private trait ErrorTestCase extends TestCase {
-//
-//    import cats._
-//    import cats.implicits._
-//
-//    val context = MonadError[Try, Throwable]
-//
-//    val logger = TestLogger[Try]()
-//    val gitLabHookCreation = mock[GitLabHookCreation[Try]]
-//    val hookCreation = new HookCreation[Try](gitLabHookCreation, logger)
-//  }
+  "create" should {
+
+    "log success and return right if creation of the hook in GitLab was successful" in new TestCase {
+
+      ( gitLabHookCreation.createHook( _: ProjectId, _: GitLabAuthToken ) )
+        .expects( projectId, authToken )
+        .returning( context.pure( () ) )
+
+      hookCreation.createHook( projectId, authToken ) shouldBe context.pure( () )
+
+      logger.loggedOnly( Info, s"Hook created for project with id $projectId" )
+    }
+
+    "log an error and return left if creation of the hook in GitLab was unsuccessful" in new TestCase {
+
+      val exception: Exception = exceptions.generateOne
+      val error: Try[Nothing] = context.raiseError( exception )
+      ( gitLabHookCreation.createHook( _: ProjectId, _: GitLabAuthToken ) )
+        .expects( projectId, authToken )
+        .returning( error )
+
+      hookCreation.createHook( projectId, authToken ) shouldBe error
+
+      logger.loggedOnly( Error, s"Hook creation failed for project with id $projectId", exception )
+    }
+  }
+
+  private trait TestCase {
+    val projectId = projectIds.generateOne
+    val authToken = gitLabAuthTokens.generateOne
+
+    val context = MonadError[Try, Throwable]
+
+    val logger = TestLogger[Try]()
+    val gitLabHookCreation = mock[GitLabHookCreation[Try]]
+    val hookCreation = new HookCreation[Try]( gitLabHookCreation, logger )
+  }
 }

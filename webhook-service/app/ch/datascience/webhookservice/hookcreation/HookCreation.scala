@@ -18,9 +18,9 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.Monad
-import cats.effect.{ ConcurrentEffect, IO }
+import cats.effect._
 import cats.implicits._
+import cats.{ Monad, MonadError }
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.model.GitLabAuthToken
 import io.chrisdavenport.log4cats.Logger
@@ -31,17 +31,16 @@ import scala.util.control.NonFatal
 
 private class HookCreation[Interpretation[_] : Monad]( gitLabHookCreation: GitLabHookCreation[Interpretation], logger: Logger[Interpretation] ) {
 
-  def createHook( projectId: ProjectId, authToken: GitLabAuthToken )( implicit F: ConcurrentEffect[Interpretation] ): Interpretation[Unit] = (
+  def createHook( projectId: ProjectId, authToken: GitLabAuthToken )( implicit ME: MonadError[Interpretation, Throwable] ): Interpretation[Unit] = {
     for {
-      result <- gitLabHookCreation.createHook( projectId, authToken )
+      _ <- gitLabHookCreation.createHook( projectId, authToken )
       _ <- logger.info( s"Hook created for project with id $projectId" )
-    } yield result
-  )
-    .recoverWith {
-      case NonFatal( exception ) =>
-        logger.error( exception )( "Hook creation failed" )
-        F.raiseError( exception )
-    }
+    } yield ()
+  }.recoverWith {
+    case NonFatal( exception ) =>
+      logger.error( exception )( s"Hook creation failed for project with id $projectId" )
+      ME.raiseError( exception )
+  }
 }
 
 @Singleton

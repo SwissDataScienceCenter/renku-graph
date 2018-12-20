@@ -30,8 +30,6 @@ libraryDependencies += "eu.timepit" %% "refined" % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 val log4CatsVersion = "0.2.0"
 libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % log4CatsVersion
-libraryDependencies += "io.chrisdavenport" %% "log4cats-extras" % log4CatsVersion
-libraryDependencies += "io.chrisdavenport" %% "log4cats-slf4j" % log4CatsVersion
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.5.0"
 
 // Test dependencies
