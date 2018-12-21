@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import akka.stream.Materializer
 import cats.MonadError
-import cats.effect.{ ConcurrentEffect, ContextShift, IO }
+import cats.effect.{ContextShift, IO}
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
@@ -28,17 +28,17 @@ import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
-import ch.datascience.webhookservice.model.GitLabAuthToken
+import ch.datascience.webhookservice.model.UserAuthToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.http.MimeTypes.JSON
 import play.api.libs.json.Json.toJson
-import play.api.libs.json.{ JsValue, Json }
+import play.api.libs.json.{JsValue, Json}
 import play.api.mvc.ControllerComponents
 import play.api.test.Helpers._
-import play.api.test.{ FakeRequest, Injecting }
+import play.api.test.{FakeRequest, Injecting}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -48,7 +48,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
     "return CREATED when a webhook is created" in new TestCase {
 
-      ( hookCreator.createHook( _: ProjectId, _: GitLabAuthToken )( _: MonadError[IO, Throwable] ) )
+      ( hookCreator.createHook( _: ProjectId, _: UserAuthToken )( _: MonadError[IO, Throwable] ) )
         .expects( projectId, authToken, * )
         .returning( IO.pure( () ) )
 
@@ -70,7 +70,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     "return BAD_GATEWAY when there was an error during hook creation" in new TestCase {
 
       val errorMessage = ErrorMessage( "some error" )
-      ( hookCreator.createHook( _: ProjectId, _: GitLabAuthToken )( _: MonadError[IO, Throwable] ) )
+      ( hookCreator.createHook( _: ProjectId, _: UserAuthToken )( _: MonadError[IO, Throwable] ) )
         .expects( projectId, authToken, * )
         .returning( IO.raiseError( new Exception( errorMessage.toString() ) ) )
 
@@ -84,7 +84,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     "return UNAUTHORIZED when there was an UnauthorizedExcetion thrown during hook creation" in new TestCase {
 
       val errorMessage = ErrorMessage( "some error" )
-      ( hookCreator.createHook( _: ProjectId, _: GitLabAuthToken )( _: MonadError[IO, Throwable] ) )
+      ( hookCreator.createHook( _: ProjectId, _: UserAuthToken )( _: MonadError[IO, Throwable] ) )
         .expects( projectId, authToken, * )
         .returning( IO.raiseError( UnauthorizedException ) )
 
@@ -102,7 +102,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
     val request = FakeRequest().withHeaders( CONTENT_TYPE -> JSON )
     val projectId = projectIds.generateOne
-    val authToken = gitLabAuthTokens.generateOne
+    val authToken = userAuthTokens.generateOne
 
     val hookCreator = mock[IOHookCreator]
     val createHook = new HookCreationEndpoint( inject[ControllerComponents], hookCreator ).createHook _

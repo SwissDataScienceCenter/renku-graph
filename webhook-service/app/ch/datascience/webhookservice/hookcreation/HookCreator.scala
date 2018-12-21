@@ -23,7 +23,7 @@ import cats.implicits._
 import cats.{ Monad, MonadError }
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
-import ch.datascience.webhookservice.model.GitLabAuthToken
+import ch.datascience.webhookservice.model.UserAuthToken
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{ Inject, Singleton }
 
@@ -32,7 +32,7 @@ import scala.util.control.NonFatal
 
 private class HookCreator[Interpretation[_] : Monad]( gitLabHookCreation: HookCreationRequestSender[Interpretation], logger: Logger[Interpretation] ) {
 
-  def createHook( projectId: ProjectId, authToken: GitLabAuthToken )( implicit ME: MonadError[Interpretation, Throwable] ): Interpretation[Unit] = {
+  def createHook( projectId: ProjectId, authToken: UserAuthToken )( implicit ME: MonadError[Interpretation, Throwable] ): Interpretation[Unit] = {
     for {
       _ <- gitLabHookCreation.createHook( projectId, authToken )
       _ <- logger.info( s"Hook created for project with id $projectId" )

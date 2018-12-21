@@ -25,12 +25,12 @@ import play.api.libs.json.Format
 
 object model {
 
-  class GitLabAuthToken private ( val value: String ) extends AnyVal with TinyType[String]
+  class UserAuthToken private ( val value: String ) extends AnyVal with TinyType[String]
 
-  object GitLabAuthToken
-    extends TinyTypeFactory[String, GitLabAuthToken]( new GitLabAuthToken( _ ) )
+  object UserAuthToken
+    extends TinyTypeFactory[String, UserAuthToken]( new UserAuthToken( _ ) )
     with NonBlank {
 
-    implicit lazy val authTokenFormat: Format[GitLabAuthToken] = TinyTypeFormat( GitLabAuthToken.apply )
+    implicit lazy val authTokenFormat: Format[UserAuthToken] = TinyTypeFormat( UserAuthToken.apply )
   }
 }

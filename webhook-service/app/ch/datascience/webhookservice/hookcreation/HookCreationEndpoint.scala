@@ -22,7 +22,7 @@ import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
-import ch.datascience.webhookservice.model.GitLabAuthToken
+import ch.datascience.webhookservice.model.UserAuthToken
 import javax.inject.{ Inject, Singleton }
 import play.api.mvc.{ AbstractController, ControllerComponents, Result }
 
@@ -37,7 +37,7 @@ class HookCreationEndpoint @Inject() (
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
-  def createHook( projectId: ProjectId ) = Action.async( parse.json[GitLabAuthToken] ) { implicit request =>
+  def createHook( projectId: ProjectId ) = Action.async( parse.json[UserAuthToken] ) { implicit request =>
     hookCreator
       .createHook( projectId, request.body )
       .map( _ => Created )

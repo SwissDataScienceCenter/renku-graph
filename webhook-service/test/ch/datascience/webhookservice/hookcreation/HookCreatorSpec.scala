@@ -26,8 +26,8 @@ import ch.datascience.graph.events.EventsGenerators.projectIds
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators.gitLabAuthTokens
-import ch.datascience.webhookservice.model.GitLabAuthToken
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators.userAuthTokens
+import ch.datascience.webhookservice.model.UserAuthToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -41,7 +41,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     "log success and return right if creation of the hook in GitLab was successful" in new TestCase {
 
-      ( gitLabHookCreation.createHook( _: ProjectId, _: GitLabAuthToken ) )
+      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken ) )
         .expects( projectId, authToken )
         .returning( context.pure( () ) )
 
@@ -54,7 +54,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val exception: Exception = exceptions.generateOne
       val error: Try[Nothing] = context.raiseError( exception )
-      ( gitLabHookCreation.createHook( _: ProjectId, _: GitLabAuthToken ) )
+      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken ) )
         .expects( projectId, authToken )
         .returning( error )
 
@@ -66,7 +66,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
   private trait TestCase {
     val projectId = projectIds.generateOne
-    val authToken = gitLabAuthTokens.generateOne
+    val authToken = userAuthTokens.generateOne
 
     val context = MonadError[Try, Throwable]
 

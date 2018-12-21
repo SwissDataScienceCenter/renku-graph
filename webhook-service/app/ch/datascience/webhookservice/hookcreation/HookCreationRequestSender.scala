@@ -21,57 +21,55 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.IO
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
-import ch.datascience.webhookservice.model.GitLabAuthToken
+import ch.datascience.webhookservice.model.UserAuthToken
 import ch.datascience.webhookservice.routes.PushEventConsumer
-import io.circe.Json
-import javax.inject.{Inject, Singleton}
-import org.http4s.Method.POST
-import org.http4s.Status.{Created, Unauthorized}
-import org.http4s.circe._
-import org.http4s.client.blaze.BlazeClientBuilder
-import org.http4s.{Header, Headers, Request, Uri}
+import javax.inject.{ Inject, Singleton }
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.higherKinds
 
 private abstract class HookCreationRequestSender[Interpretation[_]] {
-  def createHook(projectId: ProjectId, authToken: GitLabAuthToken): Interpretation[Unit]
+  def createHook( projectId: ProjectId, authToken: UserAuthToken ): Interpretation[Unit]
 }
 
 private object HookCreationRequestSender {
-  final case object UnauthorizedException extends RuntimeException("Unauthorized")
+  final case object UnauthorizedException extends RuntimeException( "Unauthorized" )
 }
 
 @Singleton
-private class IOHookCreationRequestSender @Inject()(configProvider: IOHookCreationConfigProvider)
-                                                   (implicit executionContext: ExecutionContext)
+private class IOHookCreationRequestSender @Inject() ( configProvider: IOHookCreationConfigProvider )( implicit executionContext: ExecutionContext )
   extends HookCreationRequestSender[IO] {
 
   import cats.effect._
+  import io.circe.Json
+  import org.http4s.Method.POST
+  import org.http4s.Status.{ Created, Unauthorized }
+  import org.http4s.circe._
+  import org.http4s.client.blaze.BlazeClientBuilder
+  import org.http4s.{ Header, Headers, Request, Uri }
 
   private implicit val cs: ContextShift[IO] = IO.contextShift( executionContext )
   private val F = implicitly[ConcurrentEffect[IO]]
 
-  def createHook( projectId: ProjectId, authToken: GitLabAuthToken ): IO[Unit] = for {
+  def createHook( projectId: ProjectId, authToken: UserAuthToken ): IO[Unit] = for {
     config <- configProvider.get()
     payload = Json.obj(
       "id" -> Json.fromInt( projectId.value ),
       "url" -> Json.fromString( s"${config.selfUrl}${PushEventConsumer.processPushEvent().url}" ),
       "push_events" -> Json.fromBoolean( true )
     )
-    uri <- F.fromEither(Uri.fromString( s"${config.gitLabUrl}/api/v4/projects/$projectId/hooks" ))
+    uri <- F.fromEither( Uri.fromString( s"${config.gitLabUrl}/api/v4/projects/$projectId/hooks" ) )
     request = Request[IO](
-      method = POST,
-      uri    = uri,
-      headers = Headers(Header("PRIVATE-TOKEN", authToken.value)),
+      method  = POST,
+      uri     = uri,
+      headers = Headers( Header( "PRIVATE-TOKEN", authToken.value ) )
     ).withEntity( payload )
 
-    result <- BlazeClientBuilder[IO]( global ).resource.use { httpClient =>
+    result <- BlazeClientBuilder[IO]( executionContext ).resource.use { httpClient =>
       httpClient.fetch[Unit]( request ) { response =>
         response.status match {
-          case Created => F.pure( () )
-          case Unauthorized => F.raiseError(UnauthorizedException)
+          case Created      => F.pure( () )
+          case Unauthorized => F.raiseError( UnauthorizedException )
           case other =>
             F.flatMap( response.as[String] ) { bodyAsString =>
               F.raiseError( new RuntimeException( s"${request.method} ${request.uri} returned $other; body: ${bodyAsString.split( '\n' ).map( _.trim.filter( _ >= ' ' ) ).mkString}" ) )

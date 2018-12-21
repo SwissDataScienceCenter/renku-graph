@@ -21,6 +21,8 @@ package ch.datascience.generators
 import java.time.Instant
 
 import ch.datascience.config.ServiceUrl
+import eu.timepit.refined.api.{ RefType, Refined }
+import eu.timepit.refined.string.Url
 import org.scalacheck.Gen._
 import org.scalacheck.{ Arbitrary, Gen }
 
@@ -54,6 +56,13 @@ object Generators {
     port <- positiveInts( max = 9999 )
     host <- nonEmptyStrings()
   } yield s"$protocol://$host:$port"
+
+  val validatedUrls: Gen[String Refined Url] = httpUrls
+    .map { value =>
+      RefType
+        .applyRef[String Refined Url]( value )
+        .getOrElse( throw new IllegalArgumentException( "Invalid url value" ) )
+    }
 
   val shas: Gen[String] = for {
     length <- Gen.choose( 5, 40 )

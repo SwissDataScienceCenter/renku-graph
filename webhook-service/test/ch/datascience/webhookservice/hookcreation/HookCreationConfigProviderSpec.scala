@@ -19,8 +19,8 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
-import eu.timepit.refined.api.{ RefType, Refined }
-import eu.timepit.refined.string.Url
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import play.api.Configuration
@@ -30,22 +30,24 @@ class HookCreationConfigProviderSpec extends WordSpec {
   "get" should {
 
     "return HookCreationConfig object with proper values" in {
+      val gitLabUrl = validatedUrls.generateOne
+      val selfUrl = validatedUrls.generateOne
       val config = Configuration.from(
         Map(
           "services" -> Map(
             "gitlab" -> Map(
-              "url" -> "http://gitlab:1100"
+              "url" -> gitLabUrl.toString()
             ),
             "self" -> Map(
-              "url" -> "http://self:9001"
+              "url" -> selfUrl.toString()
             )
           )
         )
       )
 
       new HookCreationConfigProvider[IO]( config ).get().unsafeRunSync() shouldBe HookCreationConfig(
-        url( "http://gitlab:1100" ),
-        url( "http://self:9001" )
+        gitLabUrl,
+        selfUrl
       )
     }
 
@@ -55,9 +57,4 @@ class HookCreationConfigProviderSpec extends WordSpec {
       a[RuntimeException] should be thrownBy new HookCreationConfigProvider[IO]( config ).get().unsafeRunSync()
     }
   }
-
-  private def url( value: String ) =
-    RefType
-      .applyRef[String Refined Url]( value )
-      .getOrElse( throw new IllegalArgumentException( "Invalid IPv4 value" ) )
 }

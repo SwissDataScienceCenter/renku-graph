@@ -33,7 +33,7 @@ libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % log4CatsVersion
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.5.0"
 
 // Test dependencies
-libraryDependencies += "com.typesafe.play" %% "play-test" % playVersion
+libraryDependencies += component("play-test") % Test
 libraryDependencies += "org.scalamock" %% "scalamock" % "4.1.0" % Test
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test

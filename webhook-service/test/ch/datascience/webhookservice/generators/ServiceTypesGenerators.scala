@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.generators
 
 import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.webhookservice.model.GitLabAuthToken
+import ch.datascience.webhookservice.model.UserAuthToken
 import ch.datascience.webhookservice.queues.pushevent.PushEvent
 import org.scalacheck.Gen
 
@@ -32,9 +32,8 @@ object ServiceTypesGenerators {
     project <- projects
   } yield PushEvent( before, after, pushUser, project )
 
-  implicit val gitLabAuthTokens: Gen[GitLabAuthToken] = for {
+  implicit val userAuthTokens: Gen[UserAuthToken] = for {
     length <- Gen.choose( 5, 40 )
     chars <- Gen.listOfN( length, Gen.oneOf( ( 0 to 9 ).map( _.toString ) ++ ( 'a' to 'z' ).map( _.toString ) ) )
-  } yield GitLabAuthToken( chars.mkString( "" ) )
-
+  } yield UserAuthToken( chars.mkString( "" ) )
 }
