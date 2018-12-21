@@ -22,7 +22,7 @@ import cats.effect.{ IO, Sync }
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators.projectIds
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators.userAuthTokens
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators.{ hookAuthTokens, userAuthTokens }
 import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.routes.PushEventConsumer
 import com.github.tomakehurst.wiremock.WireMockServer
@@ -31,10 +31,10 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{ RefType, Refined }
 import eu.timepit.refined.string.Url
 import io.circe.Json
+import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.{ BeforeAndAfterAll, BeforeAndAfterEach, WordSpec }
-import org.http4s.Status
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -47,12 +47,12 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Bef
 
       stubFor {
         post( s"/api/v4/projects/$projectId/hooks" )
-          .withHeader( "PRIVATE-TOKEN", equalTo( authToken.toString ) )
+          .withHeader( "PRIVATE-TOKEN", equalTo( userAuthToken.toString ) )
           .withRequestBody( equalToJson( expectedBody ) )
           .willReturn( created() )
       }
 
-      sender.createHook( projectId, authToken ).unsafeRunSync() shouldBe ( (): Unit )
+      sender.createHook( projectId, userAuthToken, hookAuthToken ).unsafeRunSync() shouldBe ( (): Unit )
     }
 
     "return an error if config cannot be read" in new TestCase {
@@ -60,7 +60,7 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Bef
       expectConfigProvider( returning = IO.raiseError( exception ) )
 
       intercept[Exception] {
-        sender.createHook( projectId, authToken ).unsafeRunSync()
+        sender.createHook( projectId, userAuthToken, hookAuthToken ).unsafeRunSync()
       } shouldBe exception
     }
 
@@ -69,13 +69,13 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Bef
 
       stubFor {
         post( s"/api/v4/projects/$projectId/hooks" )
-          .withHeader( "PRIVATE-TOKEN", equalTo( authToken.toString ) )
+          .withHeader( "PRIVATE-TOKEN", equalTo( userAuthToken.toString ) )
           .withRequestBody( equalToJson( expectedBody ) )
           .willReturn( unauthorized() )
       }
 
       intercept[Exception] {
-        sender.createHook( projectId, authToken ).unsafeRunSync()
+        sender.createHook( projectId, userAuthToken, hookAuthToken ).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -84,20 +84,21 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Bef
 
       stubFor {
         post( s"/api/v4/projects/$projectId/hooks" )
-          .withHeader( "PRIVATE-TOKEN", equalTo( authToken.toString ) )
+          .withHeader( "PRIVATE-TOKEN", equalTo( userAuthToken.toString ) )
           .withRequestBody( equalToJson( expectedBody ) )
           .willReturn( badRequest().withBody( "some message" ) )
       }
 
       intercept[Exception] {
-        sender.createHook( projectId, authToken ).unsafeRunSync()
+        sender.createHook( projectId, userAuthToken, hookAuthToken ).unsafeRunSync()
       }.getMessage shouldBe s"POST $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.BadRequest}; body: some message"
     }
   }
 
   private trait TestCase {
     val projectId = projectIds.generateOne
-    val authToken = userAuthTokens.generateOne
+    val userAuthToken = userAuthTokens.generateOne
+    val hookAuthToken = hookAuthTokens.generateOne
     val gitLabUrl = url( s"http://localhost:$port" )
     val selfUrl = validatedUrls.generateOne
     val hookCreationConfig = HookCreationConfig( gitLabUrl, selfUrl )
@@ -105,7 +106,8 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Bef
     lazy val expectedBody = Json.obj(
       "id" -> Json.fromInt( projectId.value ),
       "url" -> Json.fromString( s"$selfUrl${PushEventConsumer.processPushEvent().url}" ),
-      "push_events" -> Json.fromBoolean( true )
+      "push_events" -> Json.fromBoolean( true ),
+      "token" -> Json.fromString( hookAuthToken.value )
     ).toString()
 
     val configProvider = mock[IOHookCreationConfigProvider]

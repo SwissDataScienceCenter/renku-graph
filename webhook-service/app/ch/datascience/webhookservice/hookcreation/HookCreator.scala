@@ -23,6 +23,7 @@ import cats.implicits._
 import cats.{ Monad, MonadError }
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
+import ch.datascience.webhookservice.crypto.{ AESCrypto, IOAESCrypto }
 import ch.datascience.webhookservice.model.UserAuthToken
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{ Inject, Singleton }
@@ -30,11 +31,16 @@ import javax.inject.{ Inject, Singleton }
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private class HookCreator[Interpretation[_] : Monad]( gitLabHookCreation: HookCreationRequestSender[Interpretation], logger: Logger[Interpretation] ) {
+private class HookCreator[Interpretation[_] : Monad](
+    gitLabHookCreation: HookCreationRequestSender[Interpretation],
+    logger:             Logger[Interpretation],
+    aesCrypto:          AESCrypto[Interpretation]
+) {
 
-  def createHook( projectId: ProjectId, authToken: UserAuthToken )( implicit ME: MonadError[Interpretation, Throwable] ): Interpretation[Unit] = {
+  def createHook( projectId: ProjectId, userAuthToken: UserAuthToken )( implicit ME: MonadError[Interpretation, Throwable] ): Interpretation[Unit] = {
     for {
-      _ <- gitLabHookCreation.createHook( projectId, authToken )
+      hookAuthToken <- aesCrypto.encrypt( projectId.toString )
+      _ <- gitLabHookCreation.createHook( projectId, userAuthToken, hookAuthToken )
       _ <- logger.info( s"Hook created for project with id $projectId" )
     } yield ()
   }.recoverWith {
@@ -45,5 +51,9 @@ private class HookCreator[Interpretation[_] : Monad]( gitLabHookCreation: HookCr
 }
 
 @Singleton
-private class IOHookCreator @Inject() ( gitLabHookCreation: IOHookCreationRequestSender, logger: IOLogger )
-  extends HookCreator[IO]( gitLabHookCreation, logger )
+private class IOHookCreator @Inject() (
+    gitLabHookCreation: IOHookCreationRequestSender,
+    logger:             IOLogger,
+    aesCrypto:          IOAESCrypto
+)
+  extends HookCreator[IO]( gitLabHookCreation, logger, aesCrypto )

@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import akka.stream.Materializer
 import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ ContextShift, IO }
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
@@ -35,10 +35,10 @@ import org.scalatest.WordSpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.http.MimeTypes.JSON
 import play.api.libs.json.Json.toJson
-import play.api.libs.json.{JsValue, Json}
+import play.api.libs.json.{ JsValue, Json }
 import play.api.mvc.ControllerComponents
 import play.api.test.Helpers._
-import play.api.test.{FakeRequest, Injecting}
+import play.api.test.{ FakeRequest, Injecting }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 

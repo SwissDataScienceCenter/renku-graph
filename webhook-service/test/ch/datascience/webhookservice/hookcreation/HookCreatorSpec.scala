@@ -26,7 +26,9 @@ import ch.datascience.graph.events.EventsGenerators.projectIds
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators.userAuthTokens
+import ch.datascience.webhookservice.crypto.AESCrypto
+import ch.datascience.webhookservice.crypto.AESCrypto.{ Message, Secret }
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.model.UserAuthToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -41,8 +43,12 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     "log success and return right if creation of the hook in GitLab was successful" in new TestCase {
 
-      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken ) )
-        .expects( projectId, authToken )
+      ( aesCrypto.encrypt( _: String ) )
+        .expects( projectId.toString )
+        .returning( context.pure( hookAuthToken ) )
+
+      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken, _: Message ) )
+        .expects( projectId, authToken, hookAuthToken )
         .returning( context.pure( () ) )
 
       hookCreation.createHook( projectId, authToken ) shouldBe context.pure( () )
@@ -50,12 +56,29 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly( Info, s"Hook created for project with id $projectId" )
     }
 
-    "log an error and return left if creation of the hook in GitLab was unsuccessful" in new TestCase {
+    "log an error and return left if encryption of the hook auth token was unsuccessful" in new TestCase {
 
       val exception: Exception = exceptions.generateOne
       val error: Try[Nothing] = context.raiseError( exception )
-      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken ) )
-        .expects( projectId, authToken )
+      ( aesCrypto.encrypt( _: String ) )
+        .expects( projectId.toString )
+        .returning( error )
+
+      hookCreation.createHook( projectId, authToken ) shouldBe error
+
+      logger.loggedOnly( Error, s"Hook creation failed for project with id $projectId", exception )
+    }
+
+    "log an error and return left if creation of the hook in GitLab was unsuccessful" in new TestCase {
+
+      ( aesCrypto.encrypt( _: String ) )
+        .expects( projectId.toString )
+        .returning( context.pure( hookAuthToken ) )
+
+      val exception: Exception = exceptions.generateOne
+      val error: Try[Nothing] = context.raiseError( exception )
+      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken, _: Message ) )
+        .expects( projectId, authToken, hookAuthToken )
         .returning( error )
 
       hookCreation.createHook( projectId, authToken ) shouldBe error
@@ -67,11 +90,16 @@ class HookCreatorSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val projectId = projectIds.generateOne
     val authToken = userAuthTokens.generateOne
+    val hookAuthToken = hookAuthTokens.generateOne
 
     val context = MonadError[Try, Throwable]
 
     val logger = TestLogger[Try]()
     val gitLabHookCreation = mock[HookCreationRequestSender[Try]]
-    val hookCreation = new HookCreator[Try]( gitLabHookCreation, logger )
+
+    class TryAESCrypt( secret: Secret ) extends AESCrypto[Try]( secret )
+    val aesCrypto = mock[TryAESCrypt]
+
+    val hookCreation = new HookCreator[Try]( gitLabHookCreation, logger, aesCrypto )
   }
 }

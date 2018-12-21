@@ -20,16 +20,18 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.webhookservice.crypto.AESCrypto.Message
 import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.model.UserAuthToken
 import ch.datascience.webhookservice.routes.PushEventConsumer
 import javax.inject.{ Inject, Singleton }
+import org.http4s.Response
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private abstract class HookCreationRequestSender[Interpretation[_]] {
-  def createHook( projectId: ProjectId, authToken: UserAuthToken ): Interpretation[Unit]
+  def createHook( projectId: ProjectId, authToken: UserAuthToken, hookAuthToken: Message ): Interpretation[Unit]
 }
 
 private object HookCreationRequestSender {
@@ -51,12 +53,13 @@ private class IOHookCreationRequestSender @Inject() ( configProvider: IOHookCrea
   private implicit val cs: ContextShift[IO] = IO.contextShift( executionContext )
   private val F = implicitly[ConcurrentEffect[IO]]
 
-  def createHook( projectId: ProjectId, authToken: UserAuthToken ): IO[Unit] = for {
+  def createHook( projectId: ProjectId, authToken: UserAuthToken, hookAuthToken: Message ): IO[Unit] = for {
     config <- configProvider.get()
     payload = Json.obj(
       "id" -> Json.fromInt( projectId.value ),
       "url" -> Json.fromString( s"${config.selfUrl}${PushEventConsumer.processPushEvent().url}" ),
-      "push_events" -> Json.fromBoolean( true )
+      "push_events" -> Json.fromBoolean( true ),
+      "token" -> Json.fromString( hookAuthToken.value )
     )
     uri <- F.fromEither( Uri.fromString( s"${config.gitLabUrl}/api/v4/projects/$projectId/hooks" ) )
     request = Request[IO](
@@ -70,12 +73,16 @@ private class IOHookCreationRequestSender @Inject() ( configProvider: IOHookCrea
         response.status match {
           case Created      => F.pure( () )
           case Unauthorized => F.raiseError( UnauthorizedException )
-          case other =>
-            F.flatMap( response.as[String] ) { bodyAsString =>
-              F.raiseError( new RuntimeException( s"${request.method} ${request.uri} returned $other; body: ${bodyAsString.split( '\n' ).map( _.trim.filter( _ >= ' ' ) ).mkString}" ) )
-            }
+          case _            => raiseError( request, response )
         }
       }
     }
   } yield result
+
+  private def raiseError( request: Request[IO], response: Response[IO] ): IO[Unit] = for {
+    bodyAsString <- response.as[String]
+    _ <- F.raiseError {
+      new RuntimeException( s"${request.method} ${request.uri} returned ${response.status}; body: ${bodyAsString.split( '\n' ).map( _.trim.filter( _ >= ' ' ) ).mkString}" )
+    }
+  } yield ()
 }
