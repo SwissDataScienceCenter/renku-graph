@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookcreation
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
-import ch.datascience.webhookservice.hookcreation.GitLabHookCreation.UnauthorizedException
+import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.model.GitLabAuthToken
 import javax.inject.{ Inject, Singleton }
 import play.api.mvc.{ AbstractController, ControllerComponents, Result }
@@ -32,7 +32,7 @@ import scala.util.control.NonFatal
 @Singleton
 class HookCreationEndpoint @Inject() (
     cc:          ControllerComponents,
-    hookCreator: IOHookCreation
+    hookCreator: IOHookCreator
 ) extends AbstractController( cc ) {
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext

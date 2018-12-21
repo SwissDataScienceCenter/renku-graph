@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.logging
 
 import cats.effect._
 import io.chrisdavenport.log4cats.Logger

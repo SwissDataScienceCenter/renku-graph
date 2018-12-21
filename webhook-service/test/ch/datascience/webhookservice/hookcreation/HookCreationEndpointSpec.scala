@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.hookcreation.GitLabHookCreation.UnauthorizedException
+import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.model.GitLabAuthToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -104,7 +104,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     val projectId = projectIds.generateOne
     val authToken = gitLabAuthTokens.generateOne
 
-    val hookCreator = mock[IOHookCreation]
+    val hookCreator = mock[IOHookCreator]
     val createHook = new HookCreationEndpoint( inject[ControllerComponents], hookCreator ).createHook _
   }
 }

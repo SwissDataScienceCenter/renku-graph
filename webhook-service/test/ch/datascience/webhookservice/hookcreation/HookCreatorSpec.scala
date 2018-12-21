@@ -35,7 +35,7 @@ import org.scalatest.WordSpec
 import scala.language.higherKinds
 import scala.util.Try
 
-class HookCreationSpec extends WordSpec with MockFactory {
+class HookCreatorSpec extends WordSpec with MockFactory {
 
   "create" should {
 
@@ -71,7 +71,7 @@ class HookCreationSpec extends WordSpec with MockFactory {
     val context = MonadError[Try, Throwable]
 
     val logger = TestLogger[Try]()
-    val gitLabHookCreation = mock[GitLabHookCreation[Try]]
-    val hookCreation = new HookCreation[Try]( gitLabHookCreation, logger )
+    val gitLabHookCreation = mock[HookCreationRequestSender[Try]]
+    val hookCreation = new HookCreator[Try]( gitLabHookCreation, logger )
   }
 }

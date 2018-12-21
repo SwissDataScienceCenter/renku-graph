@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
 import ch.datascience.graph.events.ProjectId
-import ch.datascience.webhookservice.hookcreation.GitLabHookCreation.UnauthorizedException
+import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.model.GitLabAuthToken
 import ch.datascience.webhookservice.routes.PushEventConsumer
 import io.circe.Json
@@ -35,18 +35,18 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.higherKinds
 
-private abstract class GitLabHookCreation[Interpretation[_]] {
+private abstract class HookCreationRequestSender[Interpretation[_]] {
   def createHook(projectId: ProjectId, authToken: GitLabAuthToken): Interpretation[Unit]
 }
 
-private object GitLabHookCreation {
+private object HookCreationRequestSender {
   final case object UnauthorizedException extends RuntimeException("Unauthorized")
 }
 
 @Singleton
-private class IOGitLabHookCreation @Inject()(configProvider: IOHookCreationConfigProvider)
-                                            (implicit executionContext: ExecutionContext)
-  extends GitLabHookCreation[IO] {
+private class IOHookCreationRequestSender @Inject()(configProvider: IOHookCreationConfigProvider)
+                                                   (implicit executionContext: ExecutionContext)
+  extends HookCreationRequestSender[IO] {
 
   import cats.effect._
 

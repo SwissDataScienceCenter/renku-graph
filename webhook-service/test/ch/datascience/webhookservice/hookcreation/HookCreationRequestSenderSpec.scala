@@ -27,7 +27,7 @@ import org.http4s.Status.Ok
 import org.http4s.client.blaze.Http1Client
 import org.scalatest.WordSpec
 
-class GitLabHookCreationSpec extends WordSpec {
+class HookCreationRequestSenderSpec extends WordSpec {
 
   //  val request = Request[IO](method = Method.GET, uri = Uri.uri("http://localhost:9001/pingd"))
   //  val result = for {

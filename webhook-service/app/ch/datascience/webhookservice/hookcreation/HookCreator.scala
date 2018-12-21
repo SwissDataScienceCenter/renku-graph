@@ -22,6 +22,7 @@ import cats.effect._
 import cats.implicits._
 import cats.{ Monad, MonadError }
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.model.GitLabAuthToken
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{ Inject, Singleton }
@@ -29,7 +30,7 @@ import javax.inject.{ Inject, Singleton }
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private class HookCreation[Interpretation[_] : Monad]( gitLabHookCreation: GitLabHookCreation[Interpretation], logger: Logger[Interpretation] ) {
+private class HookCreator[Interpretation[_] : Monad]( gitLabHookCreation: HookCreationRequestSender[Interpretation], logger: Logger[Interpretation] ) {
 
   def createHook( projectId: ProjectId, authToken: GitLabAuthToken )( implicit ME: MonadError[Interpretation, Throwable] ): Interpretation[Unit] = {
     for {
@@ -44,5 +45,5 @@ private class HookCreation[Interpretation[_] : Monad]( gitLabHookCreation: GitLa
 }
 
 @Singleton
-private class IOHookCreation @Inject() ( gitLabHookCreation: IOGitLabHookCreation, logger: IOLogger )
-  extends HookCreation[IO]( gitLabHookCreation, logger )
+private class IOHookCreator @Inject() ( gitLabHookCreation: IOHookCreationRequestSender, logger: IOLogger )
+  extends HookCreator[IO]( gitLabHookCreation, logger )
