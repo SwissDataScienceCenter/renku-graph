@@ -55,29 +55,34 @@ private class IOHookCreationRequestSender @Inject() ( configProvider: IOHookCrea
 
   def createHook( projectId: ProjectId, userAuthToken: UserAuthToken, hookAuthToken: Message ): IO[Unit] = for {
     config <- configProvider.get()
-    payload = Json.obj(
-      "id" -> Json.fromInt( projectId.value ),
-      "url" -> Json.fromString( s"${config.selfUrl}${PushEventConsumer.processPushEvent().url}" ),
-      "push_events" -> Json.fromBoolean( true ),
-      "token" -> Json.fromString( hookAuthToken.value )
-    )
     uri <- F.fromEither( Uri.fromString( s"${config.gitLabUrl}/api/v4/projects/$projectId/hooks" ) )
-    request = Request[IO](
-      method  = POST,
-      uri     = uri,
-      headers = Headers( Header( "PRIVATE-TOKEN", userAuthToken.value ) )
-    ).withEntity( payload )
+    payload = createPayload( projectId, hookAuthToken, config.selfUrl )
+    request = createRequest( uri, userAuthToken, payload )
+    result <- send( request )
+  } yield result
 
-    result <- BlazeClientBuilder[IO]( executionContext ).resource.use { httpClient =>
-      httpClient.fetch[Unit]( request ) { response =>
-        response.status match {
-          case Created      => F.pure( () )
-          case Unauthorized => F.raiseError( UnauthorizedException )
-          case _            => raiseError( request, response )
-        }
+  private def createPayload( projectId: ProjectId, hookAuthToken: Message, selfUrl: HookCreationConfig.HostUrl ) = Json.obj(
+    "id" -> Json.fromInt( projectId.value ),
+    "url" -> Json.fromString( s"$selfUrl${PushEventConsumer.processPushEvent().url}" ),
+    "push_events" -> Json.fromBoolean( true ),
+    "token" -> Json.fromString( hookAuthToken.value )
+  )
+
+  private def createRequest( uri: Uri, userAuthToken: UserAuthToken, payload: Json ) = Request[IO](
+    method  = POST,
+    uri     = uri,
+    headers = Headers( Header( "PRIVATE-TOKEN", userAuthToken.value ) )
+  ).withEntity( payload )
+
+  private def send( request: Request[IO] ) = BlazeClientBuilder[IO]( executionContext ).resource.use { httpClient =>
+    httpClient.fetch[Unit]( request ) { response =>
+      response.status match {
+        case Created      => F.pure( () )
+        case Unauthorized => F.raiseError( UnauthorizedException )
+        case _            => raiseError( request, response )
       }
     }
-  } yield result
+  }
 
   private def raiseError( request: Request[IO], response: Response[IO] ): IO[Unit] = for {
     bodyAsString <- response.as[String]
