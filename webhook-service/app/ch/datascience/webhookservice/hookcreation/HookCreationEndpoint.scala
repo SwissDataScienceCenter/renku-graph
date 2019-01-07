@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2019 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,13 +18,15 @@
 
 package ch.datascience.webhookservice.hookcreation
 
+import cats.effect.IO
+import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.model.UserAuthToken
 import javax.inject.{ Inject, Singleton }
-import play.api.mvc.{ AbstractController, ControllerComponents, Result }
+import play.api.mvc.{ AbstractController, ControllerComponents, Request, Result }
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -37,12 +39,22 @@ class HookCreationEndpoint @Inject() (
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
-  def createHook( projectId: ProjectId ) = Action.async( parse.json[UserAuthToken] ) { implicit request =>
-    hookCreator
-      .createHook( projectId, request.body )
-      .map( _ => Created )
+  def createHook( projectId: ProjectId ) = Action.async { implicit request =>
+    ( for {
+      userAuthToken <- findUserAuthToken( request )
+      createdResult <- hookCreator
+        .createHook( projectId, userAuthToken )
+        .map( _ => Created )
+    } yield createdResult )
       .unsafeToFuture()
       .recover( toResult )
+  }
+
+  private def findUserAuthToken( request: Request[_] ): IO[UserAuthToken] = IO.fromEither {
+    request.headers.get( "PRIVATE-TOKEN" ) match {
+      case None             => Left( UnauthorizedException )
+      case Some( rawToken ) => UserAuthToken.from( rawToken ).leftMap( _ => UnauthorizedException )
+    }
   }
 
   private val toResult: PartialFunction[Throwable, Result] = {

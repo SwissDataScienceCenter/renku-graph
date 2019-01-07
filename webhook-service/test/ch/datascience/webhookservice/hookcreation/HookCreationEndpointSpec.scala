@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2019 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,8 +34,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.http.MimeTypes.JSON
-import play.api.libs.json.Json.toJson
-import play.api.libs.json.{ JsValue, Json }
+import play.api.libs.json.JsValue
 import play.api.mvc.ControllerComponents
 import play.api.test.Helpers._
 import play.api.test.{ FakeRequest, Injecting }
@@ -46,23 +45,33 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
   "POST /projects/:id/hooks" should {
 
-    "return CREATED when a webhook is created" in new TestCase {
+    "return CREATED when a valid PRIVATE-TOKEN is present in the header " +
+      "and webhook is successfully created for project with the given id in in GitLab" in new TestCase {
 
-      ( hookCreator.createHook( _: ProjectId, _: UserAuthToken )( _: MonadError[IO, Throwable] ) )
-        .expects( projectId, authToken, * )
-        .returning( IO.pure( () ) )
+        ( hookCreator.createHook( _: ProjectId, _: UserAuthToken )( _: MonadError[IO, Throwable] ) )
+          .expects( projectId, authToken, * )
+          .returning( IO.pure( () ) )
 
-      val response = call( createHook( projectId ), request.withBody( toJson( authToken ) ) )
+        val response = call( createHook( projectId ), request.withHeaders( "PRIVATE-TOKEN" -> authToken.toString ) )
 
-      status( response ) shouldBe CREATED
-      contentAsString( response ) shouldBe ""
+        status( response ) shouldBe CREATED
+        contentAsString( response ) shouldBe ""
+      }
+
+    "return UNAUTHORIZED when user PRIVATE-TOKEN is not present" in new TestCase {
+
+      val response = call( createHook( projectId ), request )
+
+      status( response ) shouldBe UNAUTHORIZED
+      contentType( response ) shouldBe Some( JSON )
+      contentAsJson( response ) shouldBe a[JsValue]
     }
 
-    "return BAD_REQUEST when auth token is invalid" in new TestCase {
+    "return UNAUTHORIZED when user PRIVATE-TOKEN is invalid" in new TestCase {
 
-      val response = call( createHook( projectId ), request.withBody( Json.obj() ) )
+      val response = call( createHook( projectId ), request.withHeaders( "PRIVATE-TOKEN" -> "" ) )
 
-      status( response ) shouldBe BAD_REQUEST
+      status( response ) shouldBe UNAUTHORIZED
       contentType( response ) shouldBe Some( JSON )
       contentAsJson( response ) shouldBe a[JsValue]
     }
@@ -74,7 +83,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
         .expects( projectId, authToken, * )
         .returning( IO.raiseError( new Exception( errorMessage.toString() ) ) )
 
-      val response = call( createHook( projectId ), request.withBody( toJson( authToken ) ) )
+      val response = call( createHook( projectId ), request.withHeaders( "PRIVATE-TOKEN" -> authToken.toString ) )
 
       status( response ) shouldBe BAD_GATEWAY
       contentType( response ) shouldBe Some( JSON )
@@ -88,7 +97,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
         .expects( projectId, authToken, * )
         .returning( IO.raiseError( UnauthorizedException ) )
 
-      val response = call( createHook( projectId ), request.withBody( toJson( authToken ) ) )
+      val response = call( createHook( projectId ), request.withHeaders( "PRIVATE-TOKEN" -> authToken.toString ) )
 
       status( response ) shouldBe UNAUTHORIZED
       contentType( response ) shouldBe Some( JSON )

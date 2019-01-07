@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2019 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -53,7 +53,7 @@ private class IOHookCreationRequestSender @Inject() ( configProvider: IOHookCrea
   private implicit val cs: ContextShift[IO] = IO.contextShift( executionContext )
   private val F = implicitly[ConcurrentEffect[IO]]
 
-  def createHook( projectId: ProjectId, authToken: UserAuthToken, hookAuthToken: Message ): IO[Unit] = for {
+  def createHook( projectId: ProjectId, userAuthToken: UserAuthToken, hookAuthToken: Message ): IO[Unit] = for {
     config <- configProvider.get()
     payload = Json.obj(
       "id" -> Json.fromInt( projectId.value ),
@@ -65,7 +65,7 @@ private class IOHookCreationRequestSender @Inject() ( configProvider: IOHookCrea
     request = Request[IO](
       method  = POST,
       uri     = uri,
-      headers = Headers( Header( "PRIVATE-TOKEN", authToken.value ) )
+      headers = Headers( Header( "PRIVATE-TOKEN", userAuthToken.value ) )
     ).withEntity( payload )
 
     result <- BlazeClientBuilder[IO]( executionContext ).resource.use { httpClient =>
