@@ -2,10 +2,10 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: {{ template "graph-services.fullname" . }}
+  name: {{ template "graph.fullname" . }}
   labels:
-    app: {{ template "graph-services.name" . }}
-    chart: {{ template "graph-services.chart" . }}
+    app: {{ template "graph.name" . }}
+    chart: {{ template "graph.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 {{- if .Values.persistence.annotations }}

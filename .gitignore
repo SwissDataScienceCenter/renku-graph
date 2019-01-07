@@ -102,3 +102,5 @@ project/plugins/project/
 *.log
 
 # End of https://www.gitignore.io/api/sbt,scala,intellij+all
+
+helm-chart/renku-graph/charts/*tgz

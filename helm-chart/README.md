@@ -7,5 +7,5 @@ Provides a basic chart to deploy Renku Graph services.
 To be executed in the `helm-chart` directory:
 
 ```bash
-helm upgrade --install -f minikube-values.yaml graph-services graph-services
+helm upgrade --install -f minikube-values.yaml renku-graph renku-graph
 ```
