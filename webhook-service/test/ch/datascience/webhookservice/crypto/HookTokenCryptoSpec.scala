@@ -22,14 +22,14 @@ import java.util.Base64
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.webhookservice.crypto.AESCrypto.Secret
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.Secret
 import eu.timepit.refined.api.RefType
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.util.{ Failure, Success, Try }
 
-class AESCryptoSpec extends WordSpec {
+class HookTokenCryptoSpec extends WordSpec {
 
   "encrypt/decrypt" should {
 
@@ -65,7 +65,7 @@ class AESCryptoSpec extends WordSpec {
     import cats.implicits._
 
     private val secret = new String( Base64.getEncoder.encode( "1234567890123456".getBytes( "utf-8" ) ), "utf-8" )
-    val aesCrypto = new AESCrypto[Try](
+    val aesCrypto = new HookTokenCrypto[Try](
       RefType.applyRef[Secret]( secret )
         .getOrElse( throw new IllegalArgumentException( "Wrong secret" ) )
     )

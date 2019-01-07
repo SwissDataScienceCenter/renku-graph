@@ -23,7 +23,7 @@ import cats.implicits._
 import cats.{ Monad, MonadError }
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
-import ch.datascience.webhookservice.crypto.{ AESCrypto, IOAESCrypto }
+import ch.datascience.webhookservice.crypto.{ HookTokenCrypto, IOHookTokenCrypto }
 import ch.datascience.webhookservice.model.UserAuthToken
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{ Inject, Singleton }
@@ -34,12 +34,12 @@ import scala.util.control.NonFatal
 private class HookCreator[Interpretation[_] : Monad](
     gitLabHookCreation: HookCreationRequestSender[Interpretation],
     logger:             Logger[Interpretation],
-    aesCrypto:          AESCrypto[Interpretation]
+    hookTokenCrypto:    HookTokenCrypto[Interpretation]
 ) {
 
   def createHook( projectId: ProjectId, userAuthToken: UserAuthToken )( implicit ME: MonadError[Interpretation, Throwable] ): Interpretation[Unit] = {
     for {
-      hookAuthToken <- aesCrypto.encrypt( projectId.toString )
+      hookAuthToken <- hookTokenCrypto.encrypt( projectId.toString )
       _ <- gitLabHookCreation.createHook( projectId, userAuthToken, hookAuthToken )
       _ <- logger.info( s"Hook created for project with id $projectId" )
     } yield ()
@@ -54,6 +54,6 @@ private class HookCreator[Interpretation[_] : Monad](
 private class IOHookCreator @Inject() (
     gitLabHookCreation: IOHookCreationRequestSender,
     logger:             IOLogger,
-    aesCrypto:          IOAESCrypto
+    hookTokenCrypto:    IOHookTokenCrypto
 )
-  extends HookCreator[IO]( gitLabHookCreation, logger, aesCrypto )
+  extends HookCreator[IO]( gitLabHookCreation, logger, hookTokenCrypto )

@@ -24,7 +24,7 @@ import java.util.Base64
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.webhookservice.crypto.AESCrypto.{ Message, Secret }
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.{ HookAuthToken, Secret }
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{ RefType, Refined }
 import eu.timepit.refined.collection.MinSize
@@ -38,7 +38,7 @@ import pureconfig.error.ConfigReaderException
 
 import scala.language.{ higherKinds, implicitConversions }
 
-class AESCrypto[Interpretation[_]]( secret: Secret )( implicit ME: MonadError[Interpretation, Throwable] ) {
+class HookTokenCrypto[Interpretation[_]]( secret: Secret )( implicit ME: MonadError[Interpretation, Throwable] ) {
 
   private lazy val base64Decoder = Base64.getDecoder
   private lazy val base64Encoder = Base64.getEncoder
@@ -47,7 +47,7 @@ class AESCrypto[Interpretation[_]]( secret: Secret )( implicit ME: MonadError[In
   private lazy val ivSpec = new IvParameterSpec( new Array[Byte]( 16 ) )
   private lazy val charset = "utf-8"
 
-  def encrypt( message: String ): Interpretation[Message] = for {
+  def encrypt( message: String ): Interpretation[HookAuthToken] = for {
     validatedMessage <- validate( message )
     cipher <- pure {
       val c = Cipher.getInstance( algorithm )
@@ -60,7 +60,7 @@ class AESCrypto[Interpretation[_]]( secret: Secret )( implicit ME: MonadError[In
     validatedDecoded <- validate( encoded )
   } yield validatedDecoded
 
-  def decrypt( message: String ): Interpretation[Message] = for {
+  def decrypt( message: String ): Interpretation[HookAuthToken] = for {
     validatedMessage <- validate( message )
     cipher <- pure {
       val c = Cipher.getInstance( algorithm )
@@ -73,10 +73,10 @@ class AESCrypto[Interpretation[_]]( secret: Secret )( implicit ME: MonadError[In
     validatedDecoded <- validate( decoded )
   } yield validatedDecoded
 
-  private def validate( string: String ): Interpretation[Message] =
-    ME.fromEither[Message] {
+  private def validate( string: String ): Interpretation[HookAuthToken] =
+    ME.fromEither[HookAuthToken] {
       RefType
-        .applyRef[Message]( string )
+        .applyRef[HookAuthToken]( string )
         .leftMap( _ => new IllegalArgumentException( "Message for encryption/decryption cannot be blank" ) )
     }
 
@@ -84,13 +84,13 @@ class AESCrypto[Interpretation[_]]( secret: Secret )( implicit ME: MonadError[In
     ME.pure( value )
 }
 
-object AESCrypto {
+object HookTokenCrypto {
   type Secret = String Refined MinSize[W.`16`.T]
-  type Message = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+  type HookAuthToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 }
 
 @Singleton
-class IOAESCrypto( secret: Secret ) extends AESCrypto[IO]( secret ) {
+class IOHookTokenCrypto( secret: Secret ) extends HookTokenCrypto[IO]( secret ) {
 
   @Inject def this( configuration: Configuration ) = this(
     loadConfig[Secret]( configuration.underlying, "services.gitlab.secret-token-secret" ).fold(

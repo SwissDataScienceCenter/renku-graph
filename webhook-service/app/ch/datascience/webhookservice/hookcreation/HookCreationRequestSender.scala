@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
 import ch.datascience.graph.events.ProjectId
-import ch.datascience.webhookservice.crypto.AESCrypto.Message
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
 import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.model.UserAuthToken
 import ch.datascience.webhookservice.routes.PushEventConsumer
@@ -31,7 +31,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private abstract class HookCreationRequestSender[Interpretation[_]] {
-  def createHook( projectId: ProjectId, authToken: UserAuthToken, hookAuthToken: Message ): Interpretation[Unit]
+  def createHook( projectId: ProjectId, authToken: UserAuthToken, hookAuthToken: HookAuthToken ): Interpretation[Unit]
 }
 
 private object HookCreationRequestSender {
@@ -53,7 +53,7 @@ private class IOHookCreationRequestSender @Inject() ( configProvider: IOHookCrea
   private implicit val cs: ContextShift[IO] = IO.contextShift( executionContext )
   private val F = implicitly[ConcurrentEffect[IO]]
 
-  def createHook( projectId: ProjectId, userAuthToken: UserAuthToken, hookAuthToken: Message ): IO[Unit] = for {
+  def createHook( projectId: ProjectId, userAuthToken: UserAuthToken, hookAuthToken: HookAuthToken ): IO[Unit] = for {
     config <- configProvider.get()
     uri <- F.fromEither( Uri.fromString( s"${config.gitLabUrl}/api/v4/projects/$projectId/hooks" ) )
     payload = createPayload( projectId, hookAuthToken, config.selfUrl )
@@ -61,7 +61,7 @@ private class IOHookCreationRequestSender @Inject() ( configProvider: IOHookCrea
     result <- send( request )
   } yield result
 
-  private def createPayload( projectId: ProjectId, hookAuthToken: Message, selfUrl: HookCreationConfig.HostUrl ) = Json.obj(
+  private def createPayload( projectId: ProjectId, hookAuthToken: HookAuthToken, selfUrl: HookCreationConfig.HostUrl ) = Json.obj(
     "id" -> Json.fromInt( projectId.value ),
     "url" -> Json.fromString( s"$selfUrl${PushEventConsumer.processPushEvent().url}" ),
     "push_events" -> Json.fromBoolean( true ),

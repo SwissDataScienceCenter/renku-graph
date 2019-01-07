@@ -26,8 +26,8 @@ import ch.datascience.graph.events.EventsGenerators.projectIds
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
-import ch.datascience.webhookservice.crypto.AESCrypto
-import ch.datascience.webhookservice.crypto.AESCrypto.{ Message, Secret }
+import ch.datascience.webhookservice.crypto.HookTokenCrypto
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.{ HookAuthToken, Secret }
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.model.UserAuthToken
 import org.scalamock.scalatest.MockFactory
@@ -43,11 +43,11 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     "log success and return right if creation of the hook in GitLab was successful" in new TestCase {
 
-      ( aesCrypto.encrypt( _: String ) )
+      ( hookTokenCrypto.encrypt( _: String ) )
         .expects( projectId.toString )
         .returning( context.pure( hookAuthToken ) )
 
-      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken, _: Message ) )
+      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken, _: HookAuthToken ) )
         .expects( projectId, authToken, hookAuthToken )
         .returning( context.pure( () ) )
 
@@ -60,7 +60,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val exception: Exception = exceptions.generateOne
       val error: Try[Nothing] = context.raiseError( exception )
-      ( aesCrypto.encrypt( _: String ) )
+      ( hookTokenCrypto.encrypt( _: String ) )
         .expects( projectId.toString )
         .returning( error )
 
@@ -71,13 +71,13 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     "log an error and return left if creation of the hook in GitLab was unsuccessful" in new TestCase {
 
-      ( aesCrypto.encrypt( _: String ) )
+      ( hookTokenCrypto.encrypt( _: String ) )
         .expects( projectId.toString )
         .returning( context.pure( hookAuthToken ) )
 
       val exception: Exception = exceptions.generateOne
       val error: Try[Nothing] = context.raiseError( exception )
-      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken, _: Message ) )
+      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken, _: HookAuthToken ) )
         .expects( projectId, authToken, hookAuthToken )
         .returning( error )
 
@@ -97,9 +97,9 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     val logger = TestLogger[Try]()
     val gitLabHookCreation = mock[HookCreationRequestSender[Try]]
 
-    class TryAESCrypt( secret: Secret ) extends AESCrypto[Try]( secret )
-    val aesCrypto = mock[TryAESCrypt]
+    class TryHookTokenCrypt( secret: Secret ) extends HookTokenCrypto[Try]( secret )
+    val hookTokenCrypto = mock[TryHookTokenCrypt]
 
-    val hookCreation = new HookCreator[Try]( gitLabHookCreation, logger, aesCrypto )
+    val hookCreation = new HookCreator[Try]( gitLabHookCreation, logger, hookTokenCrypto )
   }
 }
