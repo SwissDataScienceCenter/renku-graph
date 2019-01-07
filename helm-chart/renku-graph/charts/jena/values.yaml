@@ -7,9 +7,6 @@ image:
   tag: 3.7.0
   pullPolicy: IfNotPresent
 
-nameOverride: ""
-fullnameOverride: ""
-
 persistence:
   enabled: true
 
@@ -24,7 +21,7 @@ persistence:
 
 service:
   type: ClusterIP
-  port: 80
+  port: 3030
 
 ingress:
   enabled: false
