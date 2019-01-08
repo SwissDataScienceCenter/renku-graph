@@ -78,6 +78,12 @@ spec:
                   key: webhookService-play-secret
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
+            - name: SELF_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SELF_URL
+              value: "{{ printf "http://$(SELF_IP):9001" }}"
           command:
             - bin/webhook-service
             - -Dhttp.port=9001
