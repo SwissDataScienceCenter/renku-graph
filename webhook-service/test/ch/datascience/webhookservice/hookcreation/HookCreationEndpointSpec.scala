@@ -26,8 +26,8 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events._
+import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.model.UserAuthToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

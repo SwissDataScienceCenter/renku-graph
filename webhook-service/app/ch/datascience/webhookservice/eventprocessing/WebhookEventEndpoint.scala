@@ -19,44 +19,83 @@
 package ch.datascience.webhookservice.eventprocessing
 
 import akka.stream.QueueOfferResult
+import cats.effect.IO
+import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events._
+import ch.datascience.logging.IOLogger
+import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
+import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.queues.pushevent.{PushEvent, PushEventQueue}
+import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 import play.api.mvc._
-import play.api.{Logger, LoggerLike}
 
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 @Singleton
 class WebhookEventEndpoint(
-    cc:             ControllerComponents,
-    logger:         LoggerLike,
-    pushEventQueue: PushEventQueue
+    cc:              ControllerComponents,
+    logger:          Logger[IO],
+    hookTokenCrypto: HookTokenCrypto[IO],
+    pushEventQueue:  PushEventQueue
 ) extends AbstractController(cc) {
 
   @Inject def this(
-      cc:             ControllerComponents,
-      pushEventQueue: PushEventQueue
-  ) = this(cc, Logger, pushEventQueue)
+      cc:              ControllerComponents,
+      pushEventQueue:  PushEventQueue,
+      logger:          IOLogger,
+      hookTokenCrypto: IOHookTokenCrypto
+  ) = this(cc, logger, hookTokenCrypto, pushEventQueue)
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
   import WebhookEventEndpoint._
+  import hookTokenCrypto._
 
   val processPushEvent: Action[PushEvent] = Action.async(parse.json[PushEvent]) { implicit request =>
-    pushEventQueue
-      .offer(request.body)
-      .map {
-        case QueueOfferResult.Enqueued ⇒
-          logger.info(s"'${request.body}' enqueued")
-          Accepted
-        case other ⇒
-          val errorResponse = ErrorMessage(s"'${request.body}' enqueueing problem: $other")
-          logger.error(errorResponse.toString)
-          InternalServerError(errorResponse.toJson)
+    (for {
+      authToken      <- findAuthToken(request)
+      decryptedToken <- decrypt(authToken)
+      _              <- validate(decryptedToken, request.body)
+      result         <- process(pushEvent = request.body)
+      _              <- logger.info(s"'${request.body}' enqueued")
+    } yield result)
+      .recover(logError andThen mapToResult)
+      .unsafeToFuture()
+  }
+
+  private def findAuthToken(request: Request[_]): IO[HookAuthToken] = IO.fromEither {
+    request.headers.get("X-Gitlab-Token") match {
+      case None           => Left(UnauthorizedException)
+      case Some(rawToken) => HookAuthToken.from(rawToken).leftMap(_ => UnauthorizedException)
+    }
+  }
+
+  private def validate(decryptedToken: String, pushEvent: PushEvent): IO[Unit] = IO.fromEither {
+    if (decryptedToken == pushEvent.project.id.toString) Right(())
+    else Left(UnauthorizedException)
+  }
+
+  private def process(pushEvent: PushEvent): IO[Result] =
+    IO.fromFuture(IO(pushEventQueue.offer(pushEvent)))
+      .flatMap {
+        case QueueOfferResult.Enqueued => IO.pure(Accepted)
+        case other                     => IO.raiseError(new RuntimeException(s"'$pushEvent' enqueueing problem: $other"))
       }
+
+  private lazy val mapToResult: Throwable => Result = {
+    case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
+    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage).toJson)
+  }
+
+  private lazy val logError: PartialFunction[Throwable, Throwable] = {
+    case exception: Throwable =>
+      logger.error(exception.getMessage)
+      exception
   }
 }
 

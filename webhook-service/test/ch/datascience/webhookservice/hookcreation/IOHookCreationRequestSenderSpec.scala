@@ -23,8 +23,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators.projectIds
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators.{hookAuthTokens, userAuthTokens}
-import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
+import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.client.WireMock._

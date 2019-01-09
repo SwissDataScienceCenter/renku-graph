@@ -38,6 +38,8 @@ import pureconfig._
 import pureconfig.error.ConfigReaderException
 
 import scala.language.{higherKinds, implicitConversions}
+import scala.util.Try
+import scala.util.control.NonFatal
 
 class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError[Interpretation, Throwable]) {
 
@@ -57,18 +59,13 @@ class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError
       validatedDecoded <- validate(encoded)
     } yield validatedDecoded
 
-  def decrypt(hookToken: String): Interpretation[HookAuthToken] =
-    for {
-      validatedToken   <- validate(hookToken)
-      decoded          <- decodeAndDecrypt(validatedToken)
-      validatedDecoded <- validate(decoded)
-    } yield validatedDecoded
+  def decrypt(hookToken: HookAuthToken): Interpretation[String] =
+    decodeAndDecrypt(hookToken)
+      .recoverWith(meaningfulError)
 
-  private def validate(string: String): Interpretation[HookAuthToken] =
+  private def validate(value: String): Interpretation[HookAuthToken] =
     ME.fromEither[HookAuthToken] {
-      RefType
-        .applyRef[HookAuthToken](string)
-        .leftMap(_ => new IllegalArgumentException("Message for encryption/decryption cannot be blank"))
+      HookAuthToken.from(value)
     }
 
   private def cipher(mode: Int): Cipher = {
@@ -89,13 +86,30 @@ class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError
       charset
     )
 
-  private implicit def pure[T](value: T): Interpretation[T] =
-    ME.pure(value)
+  private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[String]] = {
+    case NonFatal(cause) =>
+      ME.raiseError(new RuntimeException("HookAuthToken decryption failed", cause))
+  }
+
+  private implicit def pure[T](value: => T): Interpretation[T] =
+    Try(value)
+      .fold(
+        ME.raiseError,
+        ME.pure
+      )
 }
 
 object HookTokenCrypto {
   type Secret        = String Refined MinSize[W.`16`.T]
   type HookAuthToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+
+  object HookAuthToken {
+
+    def from(value: String): Either[Throwable, HookAuthToken] =
+      RefType
+        .applyRef[HookAuthToken](value)
+        .leftMap(_ => new IllegalArgumentException("A value to create HookAuthToken cannot be blank"))
+  }
 }
 
 @Singleton
