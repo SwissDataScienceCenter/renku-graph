@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.eventprocessing
 
 import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.{Materializer, QueueOfferResult}
@@ -31,14 +31,14 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.LoggerLike
-import play.api.libs.json.{JsError, JsValue, Json}
+import play.api.libs.json.{JsValue, Json}
 import play.api.mvc.ControllerComponents
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Injecting}
 
 import scala.concurrent.Future
 
-class PushEventConsumerSpec extends WordSpec with MixedMockFactory with GuiceOneAppPerTest with Injecting {
+class WebhookEventEndpointSpec extends WordSpec with MixedMockFactory with GuiceOneAppPerTest with Injecting {
 
   "POST /webhook-event" should {
 
@@ -132,7 +132,11 @@ class PushEventConsumerSpec extends WordSpec with MixedMockFactory with GuiceOne
     val project:        Project  = projects.generateOne
 
     val pushEventQueue: PushEventQueue = mock[PushEventQueue]
-    val logger           = Proxy.stub[LoggerLike]
-    val processPushEvent = new PushEventConsumer(inject[ControllerComponents], logger, pushEventQueue).processPushEvent
+    val logger = Proxy.stub[LoggerLike]
+    val processPushEvent = new WebhookEventEndpoint(
+      inject[ControllerComponents],
+      logger,
+      pushEventQueue
+    ).processPushEvent
   }
 }

@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators.projectIds
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators.{hookAuthTokens, userAuthTokens}
 import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
-import ch.datascience.webhookservice.routes.PushEventConsumer
+import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -106,7 +106,7 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Bef
     lazy val expectedBody = Json
       .obj(
         "id"          -> Json.fromInt(projectId.value),
-        "url"         -> Json.fromString(s"$selfUrl${PushEventConsumer.processPushEvent().url}"),
+        "url"         -> Json.fromString(s"$selfUrl${WebhookEventEndpoint.processPushEvent().url}"),
         "push_events" -> Json.fromBoolean(true),
         "token"       -> Json.fromString(hookAuthToken.value)
       )

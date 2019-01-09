@@ -19,14 +19,13 @@
 package ch.datascience.webhookservice
 
 import ch.datascience.graph.events._
+import ch.datascience.webhookservice.eventprocessing.WebhookEventEndpoint.pushEventReads
 import ch.datascience.webhookservice.queues.pushevent.PushEvent
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import play.api.libs.json.Json
 
 class PushEventDeserializationSpec extends WordSpec {
-
-  import PushEventConsumer.pushEventReads
 
   "JSON deserializer for PushEvent" should {
 

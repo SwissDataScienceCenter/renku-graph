@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.eventprocessing
 
 import akka.stream.QueueOfferResult
 import ch.datascience.controllers.ErrorMessage
@@ -30,7 +30,7 @@ import play.api.{Logger, LoggerLike}
 import scala.concurrent.ExecutionContext
 
 @Singleton
-class PushEventConsumer(
+class WebhookEventEndpoint(
     cc:             ControllerComponents,
     logger:         LoggerLike,
     pushEventQueue: PushEventQueue
@@ -43,7 +43,7 @@ class PushEventConsumer(
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
-  import PushEventConsumer._
+  import WebhookEventEndpoint._
 
   val processPushEvent: Action[PushEvent] = Action.async(parse.json[PushEvent]) { implicit request =>
     pushEventQueue
@@ -60,7 +60,7 @@ class PushEventConsumer(
   }
 }
 
-object PushEventConsumer {
+object WebhookEventEndpoint {
 
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._

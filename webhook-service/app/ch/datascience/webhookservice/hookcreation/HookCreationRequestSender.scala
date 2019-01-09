@@ -23,7 +23,7 @@ import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
 import ch.datascience.webhookservice.hookcreation.HookCreationRequestSender.UnauthorizedException
 import ch.datascience.webhookservice.model.UserAuthToken
-import ch.datascience.webhookservice.routes.PushEventConsumer
+import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
 import javax.inject.{Inject, Singleton}
 import org.http4s.Response
 
@@ -66,7 +66,7 @@ private class IOHookCreationRequestSender @Inject()(configProvider: IOHookCreati
   private def createPayload(projectId: ProjectId, hookAuthToken: HookAuthToken, selfUrl: HookCreationConfig.HostUrl) =
     Json.obj(
       "id"          -> Json.fromInt(projectId.value),
-      "url"         -> Json.fromString(s"$selfUrl${PushEventConsumer.processPushEvent().url}"),
+      "url"         -> Json.fromString(s"$selfUrl${WebhookEventEndpoint.processPushEvent().url}"),
       "push_events" -> Json.fromBoolean(true),
       "token"       -> Json.fromString(hookAuthToken.value)
     )
