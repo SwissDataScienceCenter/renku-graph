@@ -23,16 +23,15 @@ import java.net.URL
 import ch.datascience.config.ServiceUrl
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
-import play.api.{ Configuration, Environment }
+import play.api.{Configuration, Environment}
 
 class ServiceModule(
     environment:   Environment,
     configuration: Configuration
 ) extends AbstractModule {
 
-  override def configure(): Unit = {
-    bind( classOf[URL] )
-      .annotatedWith( Names.named( "gitlabUrl" ) )
-      .toInstance( configuration.get[ServiceUrl]( "services.gitlab.url" ).value )
-  }
+  override def configure(): Unit =
+    bind(classOf[URL])
+      .annotatedWith(Names.named("gitlabUrl"))
+      .toInstance(configuration.get[ServiceUrl]("services.gitlab.url").value)
 }

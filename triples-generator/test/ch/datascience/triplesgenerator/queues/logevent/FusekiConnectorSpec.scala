@@ -26,12 +26,12 @@ import org.apache.jena.rdfconnection.RDFConnection
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.concurrent.{ IntegrationPatience, ScalaFutures }
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.{ global => executionContext }
+import scala.concurrent.ExecutionContext.Implicits.{global => executionContext}
 import scala.concurrent.duration._
-import scala.language.{ implicitConversions, postfixOps }
+import scala.language.{implicitConversions, postfixOps}
 
 class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures with IntegrationPatience {
 
@@ -40,65 +40,69 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures wi
     "upload the triples to Jena Fuseki" in new TestCase {
 
       createConnection
-        .expects( fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName )
-        .returning( fusekiConnection )
+        .expects(fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName)
+        .returning(fusekiConnection)
 
-      ( fusekiConnection.load( _: Model ) )
-        .expects( rdfTriples.value )
+      (fusekiConnection
+        .load(_: Model))
+        .expects(rdfTriples.value)
 
-      ( fusekiConnection.close _ )
+      (fusekiConnection.close _)
         .expects()
 
-      fusekiConnector.upload( rdfTriples ).futureValue
+      fusekiConnector.upload(rdfTriples).futureValue
     }
 
     "return failure if upload to Jena Fuseki fails" in new TestCase {
 
       createConnection
-        .expects( fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName )
-        .returning( fusekiConnection )
+        .expects(fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName)
+        .returning(fusekiConnection)
 
-      val exception: Exception = new Exception( "message" )
-      ( fusekiConnection.load( _: Model ) )
-        .expects( rdfTriples.value )
-        .throwing( exception )
+      val exception: Exception = new Exception("message")
+      (fusekiConnection
+        .load(_: Model))
+        .expects(rdfTriples.value)
+        .throwing(exception)
 
-      ( fusekiConnection.close _ )
+      (fusekiConnection.close _)
         .expects()
 
       intercept[Exception] {
-        Await.result( fusekiConnector.upload( rdfTriples ), 1 second )
+        Await.result(fusekiConnector.upload(rdfTriples), 1 second)
       } shouldBe exception
     }
 
     "return failure if creating an url to fuseki fails" in new TestCase {
 
-      val exception: Exception = new Exception( "message" )
+      val exception: Exception = new Exception("message")
       createConnection
-        .expects( fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName )
-        .throwing( exception )
+        .expects(fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName)
+        .throwing(exception)
 
       intercept[Exception] {
-        Await.result( fusekiConnector.upload( rdfTriples ), 1 second )
+        Await.result(fusekiConnector.upload(rdfTriples), 1 second)
       } shouldBe exception
     }
 
     "return failure if closing connection to fuseki fails" in new TestCase {
 
       createConnection
-        .expects( fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName )
-        .returning( fusekiConnection )
+        .expects(fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName)
+        .returning(fusekiConnection)
 
-      ( fusekiConnection.load( _: Model ) )
-        .expects( rdfTriples.value )
+      (fusekiConnection
+        .load(_: Model))
+        .expects(rdfTriples.value)
 
-      val exception: Exception = new Exception( "message" )
-      ( fusekiConnection.close _ )
-        .expects().twice()
-        .throwing( exception )
+      val exception: Exception = new Exception("message")
+      (fusekiConnection.close _)
+        .expects()
+        .twice()
+        .throwing(exception)
 
       intercept[Exception] {
-        Await.result( fusekiConnector.upload( rdfTriples ), 1 second )
+        Await.result(fusekiConnector.upload(rdfTriples), 1 second)
       } shouldBe exception
     }
   }
@@ -111,6 +115,6 @@ class FusekiConnectorSpec extends WordSpec with MockFactory with ScalaFutures wi
     val fusekiConnection: RDFConnection = mock[RDFConnection]
     val fusekiConfig = fusekiConfigs.generateOne
 
-    val fusekiConnector = new FusekiConnector( fusekiConfig, createConnection )
+    val fusekiConnector = new FusekiConnector(fusekiConfig, createConnection)
   }
 }

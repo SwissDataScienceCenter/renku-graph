@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.generators
 
-import ch.datascience.triplesgenerator.config.DatasetType.{ Mem, TDB }
+import ch.datascience.triplesgenerator.config.DatasetType.{Mem, TDB}
 import ch.datascience.triplesgenerator.config._
 import ch.datascience.generators.Generators._
 import ch.datascience.triplesgenerator.queues.logevent.RDFTriples
@@ -28,20 +28,20 @@ import org.scalacheck.Gen
 object ServiceTypesGenerators {
 
   implicit val rdfTriplesSets: Gen[RDFTriples] = for {
-    model <- Gen.uuid.map( _ => ModelFactory.createDefaultModel() )
-    subject <- nonEmptyStrings() map model.createResource
+    model     <- Gen.uuid.map(_ => ModelFactory.createDefaultModel())
+    subject   <- nonEmptyStrings() map model.createResource
     predicate <- nonEmptyStrings() map model.createProperty
   } yield {
     val `object` = model.createResource
-    model.add( subject, predicate, `object` )
-    RDFTriples( model )
+    model.add(subject, predicate, `object`)
+    RDFTriples(model)
   }
 
   implicit val fusekiConfigs: Gen[FusekiConfig] = for {
-    fusekiUrl <- serviceUrls
+    fusekiUrl   <- serviceUrls
     datasetName <- nonEmptyStrings() map DatasetName.apply
-    datasetType <- Gen.oneOf( Mem, TDB )
-    username <- nonEmptyStrings() map Username.apply
-    password <- nonEmptyStrings() map Password.apply
-  } yield FusekiConfig( fusekiUrl, datasetName, datasetType, username, password )
+    datasetType <- Gen.oneOf(Mem, TDB)
+    username    <- nonEmptyStrings() map Username.apply
+    password    <- nonEmptyStrings() map Password.apply
+  } yield FusekiConfig(fusekiUrl, datasetName, datasetType, username, password)
 }

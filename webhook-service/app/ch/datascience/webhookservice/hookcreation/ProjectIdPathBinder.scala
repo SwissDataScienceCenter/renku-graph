@@ -23,15 +23,16 @@ import play.api.mvc.PathBindable
 
 object ProjectIdPathBinder {
 
-  implicit def pathBinder( implicit intBinder: PathBindable[Int] ): PathBindable[ProjectId] = new PathBindable[ProjectId] {
+  implicit def pathBinder(implicit intBinder: PathBindable[Int]): PathBindable[ProjectId] =
+    new PathBindable[ProjectId] {
 
-    override def bind( key: String, value: String ): Either[String, ProjectId] =
-      for {
-        id <- intBinder.bind( key, value )
-        projectId <- ProjectId.from( id )
-      } yield projectId
+      override def bind(key: String, value: String): Either[String, ProjectId] =
+        for {
+          id        <- intBinder.bind(key, value)
+          projectId <- ProjectId.from(id)
+        } yield projectId
 
-    override def unbind( key: String, projectId: ProjectId ): String =
-      projectId.toString
-  }
+      override def unbind(key: String, projectId: ProjectId): String =
+        projectId.toString
+    }
 }

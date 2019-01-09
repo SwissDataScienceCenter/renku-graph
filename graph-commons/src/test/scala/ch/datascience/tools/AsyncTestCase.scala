@@ -28,21 +28,21 @@ trait AsyncTestCase {
 
   private sealed trait ProcessingStatus
   private case object NotProcessed extends ProcessingStatus
-  private case object Processed extends ProcessingStatus
+  private case object Processed    extends ProcessingStatus
   private var eventProcessingStatus: ProcessingStatus = NotProcessed
 
   protected def asyncProcessFinished(): Unit = eventProcessingStatus = Processed
 
-  protected def waitForAsyncProcess( implicit patienceConfig: Eventually#PatienceConfig ): Unit =
+  protected def waitForAsyncProcess(implicit patienceConfig: Eventually#PatienceConfig): Unit =
     eventually {
       eventProcessingStatus shouldBe Processed
-    }( patienceConfig.toDemandedPatience, implicitly[org.scalactic.source.Position] )
+    }(patienceConfig.toDemandedPatience, implicitly[org.scalactic.source.Position])
 
-  private implicit class PatienceConfigOps( patienceConfig: Eventually#PatienceConfig ) {
+  private implicit class PatienceConfigOps(patienceConfig: Eventually#PatienceConfig) {
 
     lazy val toDemandedPatience: Eventually.PatienceConfig = {
       import patienceConfig._
-      Eventually.PatienceConfig( timeout, interval )
+      Eventually.PatienceConfig(timeout, interval)
     }
   }
 }

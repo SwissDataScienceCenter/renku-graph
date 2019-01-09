@@ -19,7 +19,7 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
@@ -29,23 +29,21 @@ class NonBlankSpec extends WordSpec with PropertyChecks {
   "NonBlank" should {
 
     "be instantiatable when values are not blank" in {
-      forAll( nonEmptyStrings() ) { someValue =>
-        NonBlankString( someValue ).toString shouldBe someValue.toString
+      forAll(nonEmptyStrings()) { someValue =>
+        NonBlankString(someValue).toString shouldBe someValue.toString
       }
     }
 
     "throw an IllegalArgumentException for empty String values" in {
-      intercept[IllegalArgumentException]( NonBlankString( "" ) ).getMessage shouldBe "NonBlankString cannot be blank"
+      intercept[IllegalArgumentException](NonBlankString("")).getMessage shouldBe "NonBlankString cannot be blank"
     }
 
     "throw an IllegalArgumentException for blank String values" in {
-      intercept[IllegalArgumentException]( NonBlankString( " " ) ).getMessage shouldBe "NonBlankString cannot be blank"
+      intercept[IllegalArgumentException](NonBlankString(" ")).getMessage shouldBe "NonBlankString cannot be blank"
     }
   }
 }
 
-private class NonBlankString private ( val value: String ) extends AnyVal with TinyType[String]
+private class NonBlankString private (val value: String) extends AnyVal with TinyType[String]
 
-private object NonBlankString
-  extends TinyTypeFactory[String, NonBlankString]( new NonBlankString( _ ) )
-  with NonBlank
+private object NonBlankString extends TinyTypeFactory[String, NonBlankString](new NonBlankString(_)) with NonBlank

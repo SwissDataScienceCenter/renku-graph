@@ -25,14 +25,14 @@ import play.filters.cors.CORSFilter
 import play.filters.headers.SecurityHeadersFilter
 import play.filters.hosts.AllowedHostsFilter
 
-class Filters @Inject() (
+class Filters @Inject()(
     allowedHostsFilter:    AllowedHostsFilter,
     corsFilter:            CORSFilter,
     securityHeadersFilter: SecurityHeadersFilter,
     accessLoggingFilter:   AccessLoggingFilter
 ) extends DefaultHttpFilters(
-  allowedHostsFilter,
-  corsFilter,
-  securityHeadersFilter,
-  accessLoggingFilter
-)
+      allowedHostsFilter,
+      corsFilter,
+      securityHeadersFilter,
+      accessLoggingFilter
+    )

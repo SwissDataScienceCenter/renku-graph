@@ -20,12 +20,12 @@ package ch.datascience.triplesgenerator.queues.logevent
 
 import ch.datascience.config.ServiceUrl
 import ch.datascience.triplesgenerator.config.FusekiConfig
-import javax.inject.{ Inject, Singleton }
-import org.apache.jena.rdfconnection.{ RDFConnection, RDFConnectionFuseki }
+import javax.inject.{Inject, Singleton}
+import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 @Singleton
 private class FusekiConnector(
@@ -35,30 +35,31 @@ private class FusekiConnector(
 
   import fusekiConfig._
 
-  @Inject() def this( fusekiConfig: FusekiConfig ) = this(
+  @Inject() def this(fusekiConfig: FusekiConfig) = this(
     fusekiConfig,
-    ( fusekiUrl: ServiceUrl ) => RDFConnectionFuseki
-      .create()
-      .destination( fusekiUrl.toString )
-      .build()
+    (fusekiUrl: ServiceUrl) =>
+      RDFConnectionFuseki
+        .create()
+        .destination(fusekiUrl.toString)
+        .build()
   )
 
-  def upload( rdfTriples: RDFTriples )( implicit executionContext: ExecutionContext ): Future[Unit] = Future {
+  def upload(rdfTriples: RDFTriples)(implicit executionContext: ExecutionContext): Future[Unit] = Future {
     var connection = Option.empty[RDFConnection]
     Try {
-      connection = Some( newConnection )
+      connection = Some(newConnection)
       connection foreach { conn =>
-        conn.load( rdfTriples.value )
+        conn.load(rdfTriples.value)
         conn.close()
       }
     } match {
-      case Success( _ ) => ()
-      case Failure( NonFatal( exception ) ) =>
-        connection foreach ( _.close() )
+      case Success(_) => ()
+      case Failure(NonFatal(exception)) =>
+        connection foreach (_.close())
         throw exception
     }
   }
 
   private def newConnection: RDFConnection =
-    fusekiConnectionBuilder( fusekiBaseUrl / datasetName )
+    fusekiConnectionBuilder(fusekiBaseUrl / datasetName)
 }

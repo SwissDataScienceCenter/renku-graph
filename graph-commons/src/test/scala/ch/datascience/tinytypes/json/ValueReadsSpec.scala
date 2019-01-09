@@ -29,11 +29,11 @@ class ValueReadsSpec extends WordSpec {
     val reads = implicitly[JsValue => JsResult[String]]
 
     "return value for JsString" in {
-      reads( JsString( "abc" ) ) shouldBe JsSuccess( "abc" )
+      reads(JsString("abc")) shouldBe JsSuccess("abc")
     }
 
     "return a JsError if value is not a String" in {
-      reads( JsNumber( 1 ) ) shouldBe JsError( s"Expected String but got '1'" )
+      reads(JsNumber(1)) shouldBe JsError(s"Expected String but got '1'")
     }
   }
 
@@ -41,7 +41,7 @@ class ValueReadsSpec extends WordSpec {
     val writes = implicitly[String => JsValue]
 
     "convert String to JsString" in {
-      writes( "abc" ) shouldBe JsString( "abc" )
+      writes("abc") shouldBe JsString("abc")
     }
   }
 
@@ -50,11 +50,11 @@ class ValueReadsSpec extends WordSpec {
     val reads = implicitly[JsValue => JsResult[Int]]
 
     "return value for JsNumber" in {
-      reads( JsNumber( 1 ) ) shouldBe JsSuccess( 1 )
+      reads(JsNumber(1)) shouldBe JsSuccess(1)
     }
 
     "return a JsError if value is not an Int" in {
-      reads( JsString( "1" ) ) shouldBe JsError( s"""Expected Int but got '"1"'""" )
+      reads(JsString("1")) shouldBe JsError(s"""Expected Int but got '"1"'""")
     }
   }
 
@@ -62,7 +62,7 @@ class ValueReadsSpec extends WordSpec {
     val writes = implicitly[Int => JsValue]
 
     "convert Int to JsNumber" in {
-      writes( 1 ) shouldBe JsNumber( 1 )
+      writes(1) shouldBe JsNumber(1)
     }
   }
 }

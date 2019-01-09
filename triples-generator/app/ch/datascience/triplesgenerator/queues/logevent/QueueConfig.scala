@@ -18,8 +18,8 @@
 
 package ch.datascience.triplesgenerator.queues.logevent
 
-import ch.datascience.config.{ AsyncParallelism, BufferSize }
-import javax.inject.{ Inject, Singleton }
+import ch.datascience.config.{AsyncParallelism, BufferSize}
+import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 
 @Singleton
@@ -29,9 +29,9 @@ private case class QueueConfig(
     fusekiUploadThreads:  AsyncParallelism
 ) {
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "log-events-queue.buffer-size" ),
-    configuration.get[AsyncParallelism]( "log-events-queue.triples-finder-parallelism" ),
-    configuration.get[AsyncParallelism]( "log-events-queue.fuseki-upload-parallelism" )
+  @Inject() def this(configuration: Configuration) = this(
+    configuration.get[BufferSize]("log-events-queue.buffer-size"),
+    configuration.get[AsyncParallelism]("log-events-queue.triples-finder-parallelism"),
+    configuration.get[AsyncParallelism]("log-events-queue.fuseki-upload-parallelism")
   )
 }

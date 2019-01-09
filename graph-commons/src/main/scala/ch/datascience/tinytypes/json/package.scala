@@ -24,17 +24,23 @@ import scala.language.implicitConversions
 
 package object json {
 
-  implicit def jsStringReads( jsValue: JsValue ): JsResult[String] = jsValue.validate[String].fold(
-    _ => JsError( s"Expected String but got '$jsValue'" ),
-    value => JsSuccess( value )
-  )
+  implicit def jsStringReads(jsValue: JsValue): JsResult[String] =
+    jsValue
+      .validate[String]
+      .fold(
+        _ => JsError(s"Expected String but got '$jsValue'"),
+        value => JsSuccess(value)
+      )
 
   implicit val stringToJson: String => JsValue = JsString
 
-  implicit def jsIntNumberReads( jsValue: JsValue ): JsResult[Int] = jsValue.validate[Int].fold(
-    _ => JsError( s"Expected Int but got '$jsValue'" ),
-    value => JsSuccess( value )
-  )
+  implicit def jsIntNumberReads(jsValue: JsValue): JsResult[Int] =
+    jsValue
+      .validate[Int]
+      .fold(
+        _ => JsError(s"Expected Int but got '$jsValue'"),
+        value => JsSuccess(value)
+      )
 
-  implicit val intToJson: Int => JsValue = JsNumber( _ )
+  implicit val intToJson: Int => JsValue = JsNumber(_)
 }

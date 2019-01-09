@@ -20,27 +20,27 @@ package ch.datascience.config
 
 import java.net.URL
 
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import com.typesafe.config.Config
 import play.api.ConfigLoader
 
 import scala.language.implicitConversions
 
-class ServiceUrl private ( val value: URL ) extends AnyVal with TinyType[URL]
+class ServiceUrl private (val value: URL) extends AnyVal with TinyType[URL]
 
-object ServiceUrl extends TinyTypeFactory[URL, ServiceUrl]( new ServiceUrl( _ ) ) {
+object ServiceUrl extends TinyTypeFactory[URL, ServiceUrl](new ServiceUrl(_)) {
 
-  def apply( url: String ): ServiceUrl = ServiceUrl( new URL( url ) )
+  def apply(url: String): ServiceUrl = ServiceUrl(new URL(url))
 
   implicit object ServiceUrlFinder extends ConfigLoader[ServiceUrl] {
-    override def load( config: Config, path: String ): ServiceUrl = ServiceUrl( config.getString( path ) )
+    override def load(config: Config, path: String): ServiceUrl = ServiceUrl(config.getString(path))
   }
 
-  implicit class ServiceUrlOps( serviceUrl: ServiceUrl ) {
-    def /( value: Any ): ServiceUrl = ServiceUrl(
-      new URL( s"$serviceUrl/$value" )
+  implicit class ServiceUrlOps(serviceUrl: ServiceUrl) {
+    def /(value: Any): ServiceUrl = ServiceUrl(
+      new URL(s"$serviceUrl/$value")
     )
   }
 
-  implicit def asString( serviceUrl: ServiceUrl ): String = serviceUrl.toString
+  implicit def asString(serviceUrl: ServiceUrl): String = serviceUrl.toString
 }

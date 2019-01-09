@@ -30,21 +30,22 @@ class BufferSizeSpec extends WordSpec with PropertyChecks {
   "instantiation" should {
 
     "successfully read BufferSize from config for values less than 1" in {
-      forAll( positiveInts() ) { positiveInt =>
+      forAll(positiveInts()) { positiveInt =>
         val config = Configuration.from(
-          Map( "buffer-size" -> positiveInt )
+          Map("buffer-size" -> positiveInt)
         )
 
-        config.get[BufferSize]( "buffer-size" ) shouldBe BufferSize( positiveInt )
+        config.get[BufferSize]("buffer-size") shouldBe BufferSize(positiveInt)
       }
     }
+
     "fail for values less than 1" in {
-      forAll( Gen.choose( -1000, 0 ) ) { nonPositiveInt =>
+      forAll(Gen.choose(-1000, 0)) { nonPositiveInt =>
         val config = Configuration.from(
-          Map( "buffer-size" -> nonPositiveInt )
+          Map("buffer-size" -> nonPositiveInt)
         )
 
-        an[IllegalArgumentException] should be thrownBy config.get[BufferSize]( "buffer-size" )
+        an[IllegalArgumentException] should be thrownBy config.get[BufferSize]("buffer-size")
       }
     }
   }

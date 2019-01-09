@@ -18,76 +18,76 @@
 
 package ch.datascience.triplesgenerator.queues.logevent
 
-import java.nio.file.{ FileSystems, Files, Path }
+import java.nio.file.{FileSystems, Files, Path}
 
 import akka.Done
 import akka.stream.scaladsl.Source
 import akka.stream.stage._
-import akka.stream.{ Attributes, Outlet, SourceShape }
+import akka.stream.{Attributes, Outlet, SourceShape}
 import akka.util.ByteString
-import javax.inject.{ Inject, Named }
-import play.api.libs.json.{ JsValue, Json }
+import javax.inject.{Inject, Named}
+import play.api.libs.json.{JsValue, Json}
 
-import scala.concurrent.{ Future, Promise }
+import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
 object FileSource {
-  def apply( path: String ): Source[Try[JsValue], Future[Done]] = {
-    val jPath = FileSystems.getDefault.getPath( path )
-    FileSource( jPath )
+  def apply(path: String): Source[Try[JsValue], Future[Done]] = {
+    val jPath = FileSystems.getDefault.getPath(path)
+    FileSource(jPath)
   }
 
-  def apply( path: Path ): Source[Try[JsValue], Future[Done]] = {
+  def apply(path: Path): Source[Try[JsValue], Future[Done]] =
     Source
-      .fromGraph( new FileSourceStage( path ) )
-      .map( Try[ByteString]( _ ) )
-      .map( _.map( _.toArray ) )
-      .map( _.map( Json.parse ) )
-  }
+      .fromGraph(new FileSourceStage(path))
+      .map(Try[ByteString](_))
+      .map(_.map(_.toArray))
+      .map(_.map(Json.parse))
 
   class FileSourceStage(
       val path: Path
   ) extends GraphStageWithMaterializedValue[SourceShape[ByteString], Future[Done]] {
-    val out: Outlet[ByteString] = Outlet( "FileSourceStage.out" )
+    val out: Outlet[ByteString] = Outlet("FileSourceStage.out")
 
-    def shape: SourceShape[ByteString] = SourceShape( out )
+    def shape: SourceShape[ByteString] = SourceShape(out)
 
-    def createLogicAndMaterializedValue( inheritedAttributes: Attributes ): ( GraphStageLogic, Future[Done] ) = {
+    def createLogicAndMaterializedValue(inheritedAttributes: Attributes): (GraphStageLogic, Future[Done]) = {
       val promise = Promise[Done]
 
-      val logic: GraphStageLogic = new GraphStageLogic( shape ) with StageLogging {
-        private val reader = Files.newBufferedReader( path )
+      val logic: GraphStageLogic = new GraphStageLogic(shape) with StageLogging {
+        private val reader = Files.newBufferedReader(path)
 
-        override def postStop(): Unit = {
-          promise.complete( Try {
+        override def postStop(): Unit =
+          promise.complete(Try {
             reader.close()
             Done
-          } )
-        }
+          })
 
-        setHandler( out, new OutHandler {
-          def onPull(): Unit = {
-            var line: String = null
+        setHandler(
+          out,
+          new OutHandler {
+            def onPull(): Unit = {
+              var line: String = null
 
-            while ( line eq null ) {
-              line = reader.readLine()
-              if ( line eq null ) Thread.sleep( 100L )
+              while (line eq null) {
+                line = reader.readLine()
+                if (line eq null) Thread.sleep(100L)
+              }
+
+              push(out, ByteString(line))
             }
-
-            push( out, ByteString( line ) )
           }
-        } )
-
+        )
       }
 
-      ( logic, promise.future )
+      (logic, promise.future)
     }
   }
 }
 
-class FileEventLogSourceProvider @Inject() ( @Named( "event-log-file-path" ) eventLogFilePath:Path )
-  extends EventLogSourceProvider {
+class FileEventLogSourceProvider @Inject()(@Named("event-log-file-path") eventLogFilePath: Path)
+    extends EventLogSourceProvider {
 
   override def get: Source[Try[JsValue], Future[Done]] =
-    FileSource( eventLogFilePath.toAbsolutePath.toString )
+    FileSource(eventLogFilePath.toAbsolutePath.toString)
 }

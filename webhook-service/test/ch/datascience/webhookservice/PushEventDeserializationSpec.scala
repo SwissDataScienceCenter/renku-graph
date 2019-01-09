@@ -31,17 +31,17 @@ class PushEventDeserializationSpec extends WordSpec {
   "JSON deserializer for PushEvent" should {
 
     "be able to translate a valid JSON to a PushEvent object" in {
-      Json.parse( pushEventJson ).as[PushEvent] shouldBe PushEvent(
-        before   = CommitId( "95790bf891e76fee5e1747ab589903a6a1f80f22" ),
-        after    = CommitId( "da1560886d4f094c3e6c9ef40349f7d38b5d27d7" ),
+      Json.parse(pushEventJson).as[PushEvent] shouldBe PushEvent(
+        before = CommitId("95790bf891e76fee5e1747ab589903a6a1f80f22"),
+        after  = CommitId("da1560886d4f094c3e6c9ef40349f7d38b5d27d7"),
         pushUser = PushUser(
-          UserId( 4 ),
-          Username( "jsmith" ),
-          Email( "john@example.com" )
+          UserId(4),
+          Username("jsmith"),
+          Email("john@example.com")
         ),
-        project  = Project(
-          ProjectId( 15 ),
-          ProjectPath( "mike/diaspora" )
+        project = Project(
+          ProjectId(15),
+          ProjectPath("mike/diaspora")
         )
       )
     }

@@ -33,12 +33,12 @@ class ProjectIdPathBinderSpec extends WordSpec {
 
     "return right with the ProjectId instance for valid values" in {
       val projectId = projectIds.generateOne
-      binder.bind( nonEmptyStrings().generateOne, projectId.toString ) shouldBe Right( projectId )
+      binder.bind(nonEmptyStrings().generateOne, projectId.toString) shouldBe Right(projectId)
     }
 
     "return left with an error if the value does not meet requirements" in {
       val projectId = -1
-      binder.bind( nonEmptyStrings().generateOne, projectId.toString ) shouldBe ProjectId.from( projectId )
+      binder.bind(nonEmptyStrings().generateOne, projectId.toString) shouldBe ProjectId.from(projectId)
     }
   }
 
@@ -46,7 +46,7 @@ class ProjectIdPathBinderSpec extends WordSpec {
 
     "invoke toString on the given projectId" in {
       val projectId = projectIds.generateOne
-      binder.unbind( nonEmptyStrings().generateOne, projectId ) shouldBe projectId.toString
+      binder.unbind(nonEmptyStrings().generateOne, projectId) shouldBe projectId.toString
     }
   }
 }

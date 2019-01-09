@@ -32,113 +32,119 @@ class FusekiConfigSpec extends WordSpec with PropertyChecks {
   "apply" should {
 
     "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.dataset-type', 'services.fuseki.username' and 'services.fuseki.password' to instantiate the FusekiConfig" in {
-      forAll( fusekiConfigs ) { fusekiConfig =>
+      forAll(fusekiConfigs) { fusekiConfig =>
         val config = Configuration.from(
-          Map( "services" ->
-            Map(
+          Map(
+            "services" -> Map(
               "fuseki" -> Map(
-                "url" -> fusekiConfig.fusekiBaseUrl.toString,
+                "url"          -> fusekiConfig.fusekiBaseUrl.toString,
                 "dataset-name" -> fusekiConfig.datasetName.value,
                 "dataset-type" -> fusekiConfig.datasetType.value,
-                "username" -> fusekiConfig.username.value,
-                "password" -> fusekiConfig.password.value
+                "username"     -> fusekiConfig.username.value,
+                "password"     -> fusekiConfig.password.value
               )
-            ) )
+            )
+          )
         )
 
-        val actual = new FusekiConfig( config )
+        val actual = new FusekiConfig(config)
 
         actual.fusekiBaseUrl shouldBe fusekiConfig.fusekiBaseUrl
-        actual.datasetName shouldBe fusekiConfig.datasetName
-        actual.datasetType shouldBe fusekiConfig.datasetType
-        actual.username shouldBe fusekiConfig.username
-        actual.password shouldBe fusekiConfig.password
+        actual.datasetName   shouldBe fusekiConfig.datasetName
+        actual.datasetType   shouldBe fusekiConfig.datasetType
+        actual.username      shouldBe fusekiConfig.username
+        actual.password      shouldBe fusekiConfig.password
       }
     }
 
     "throw an IllegalArgumentException if url invalid" in {
       val config = Configuration.from(
-        Map( "services" ->
-          Map(
+        Map(
+          "services" -> Map(
             "fuseki" -> Map(
-              "url" -> "invalid-url",
+              "url"          -> "invalid-url",
               "dataset-name" -> fusekiConfigs.generateOne.datasetName.value,
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
-              "username" -> fusekiConfigs.generateOne.datasetName.value,
-              "password" -> fusekiConfigs.generateOne.password.value
+              "username"     -> fusekiConfigs.generateOne.datasetName.value,
+              "password"     -> fusekiConfigs.generateOne.password.value
             )
-          ) )
+          )
+        )
       )
 
-      an[MalformedURLException] should be thrownBy new FusekiConfig( config )
+      an[MalformedURLException] should be thrownBy new FusekiConfig(config)
     }
 
     "throw an IllegalArgumentException if dataset-name is blank" in {
       val config = Configuration.from(
-        Map( "services" ->
-          Map(
+        Map(
+          "services" -> Map(
             "fuseki" -> Map(
-              "url" -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
+              "url"          -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> "  ",
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
-              "username" -> fusekiConfigs.generateOne.username.value,
-              "password" -> fusekiConfigs.generateOne.password.value
+              "username"     -> fusekiConfigs.generateOne.username.value,
+              "password"     -> fusekiConfigs.generateOne.password.value
             )
-          ) )
+          )
+        )
       )
 
-      an[IllegalArgumentException] should be thrownBy new FusekiConfig( config )
+      an[IllegalArgumentException] should be thrownBy new FusekiConfig(config)
     }
 
     "throw an IllegalArgumentException if dataset-type is unknown" in {
       val config = Configuration.from(
-        Map( "services" ->
-          Map(
+        Map(
+          "services" -> Map(
             "fuseki" -> Map(
-              "url" -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
+              "url"          -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> fusekiConfigs.generateOne.datasetName.value,
               "dataset-type" -> "unknown",
-              "username" -> fusekiConfigs.generateOne.username.value,
-              "password" -> fusekiConfigs.generateOne.password.value
+              "username"     -> fusekiConfigs.generateOne.username.value,
+              "password"     -> fusekiConfigs.generateOne.password.value
             )
-          ) )
+          )
+        )
       )
 
-      an[IllegalArgumentException] should be thrownBy new FusekiConfig( config )
+      an[IllegalArgumentException] should be thrownBy new FusekiConfig(config)
     }
 
     "throw an IllegalArgumentException if username is blank" in {
       val config = Configuration.from(
-        Map( "services" ->
-          Map(
+        Map(
+          "services" -> Map(
             "fuseki" -> Map(
-              "url" -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
+              "url"          -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> fusekiConfigs.generateOne.datasetName.value,
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
-              "username" -> "  ",
-              "password" -> fusekiConfigs.generateOne.password.value
+              "username"     -> "  ",
+              "password"     -> fusekiConfigs.generateOne.password.value
             )
-          ) )
+          )
+        )
       )
 
-      an[IllegalArgumentException] should be thrownBy new FusekiConfig( config )
+      an[IllegalArgumentException] should be thrownBy new FusekiConfig(config)
     }
 
     "throw an IllegalArgumentException if password is blank" in {
       val config = Configuration.from(
-        Map( "services" ->
-          Map(
+        Map(
+          "services" -> Map(
             "fuseki" -> Map(
-              "url" -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
+              "url"          -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> fusekiConfigs.generateOne.datasetName.value,
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
-              "username" -> fusekiConfigs.generateOne.username.value,
-              "password" -> ""
+              "username"     -> fusekiConfigs.generateOne.username.value,
+              "password"     -> ""
             )
-          ) )
+          )
+        )
       )
 
-      an[IllegalArgumentException] should be thrownBy new FusekiConfig( config )
+      an[IllegalArgumentException] should be thrownBy new FusekiConfig(config)
     }
   }
 }

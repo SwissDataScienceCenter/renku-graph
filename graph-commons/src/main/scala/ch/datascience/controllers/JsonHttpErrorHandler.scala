@@ -18,43 +18,43 @@
 
 package ch.datascience.controllers
 
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
 import play.api.Logger
 import play.api.http.HttpErrorHandler
 import play.api.http.Status._
-import play.api.libs.json.{ JsValue, Json }
-import play.api.mvc.{ RequestHeader, Result, Results }
+import play.api.libs.json.{JsValue, Json}
+import play.api.mvc.{RequestHeader, Result, Results}
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class JsonHttpErrorHandler @Inject() ()( implicit executionContext: ExecutionContext ) extends HttpErrorHandler {
+class JsonHttpErrorHandler @Inject()()(implicit executionContext: ExecutionContext) extends HttpErrorHandler {
 
-  override def onClientError( request: RequestHeader, statusCode: Int, message: String ): Future[Result] = Future {
-    Logger.error( s"${request.method} ${request.uri} for request ${request.id} failed with message: $message" )
+  override def onClientError(request: RequestHeader, statusCode: Int, message: String): Future[Result] = Future {
+    Logger.error(s"${request.method} ${request.uri} for request ${request.id} failed with message: $message")
 
     result(
       status = statusCode,
-      body   = Json.obj(
-        "requestId" -> request.id,
+      body = Json.obj(
+        "requestId"  -> request.id,
         "statusCode" -> statusCode,
-        "message" -> message
+        "message"    -> message
       )
     )
   }
 
-  override def onServerError( request: RequestHeader, exception: Throwable ): Future[Result] = Future {
-    Logger.error( s"${request.method} ${request.uri} for request ${request.id} failed", exception )
+  override def onServerError(request: RequestHeader, exception: Throwable): Future[Result] = Future {
+    Logger.error(s"${request.method} ${request.uri} for request ${request.id} failed", exception)
 
     result(
       status = INTERNAL_SERVER_ERROR,
-      body   = Json.obj(
-        "requestId" -> request.id,
+      body = Json.obj(
+        "requestId"  -> request.id,
         "statusCode" -> INTERNAL_SERVER_ERROR,
-        "message" -> exception.getMessage
+        "message"    -> exception.getMessage
       )
     )
   }
 
-  private def result( status: Int, body: JsValue ): Result = new Results.Status( status )( body )
+  private def result(status: Int, body: JsValue): Result = new Results.Status(status)(body)
 }

@@ -20,36 +20,36 @@ package ch.datascience.controllers
 
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import play.api.libs.json.{ JsError, JsPath, Json, KeyPathNode }
+import play.api.libs.json.{JsError, JsPath, Json, KeyPathNode}
 
 class ErrorMessageSpec extends WordSpec {
 
   "ErrorResponse" should {
 
     "be instantiatable from a non blank String" in {
-      ErrorMessage( "abc" ).value shouldBe "abc"
+      ErrorMessage("abc").value shouldBe "abc"
     }
 
     "throw an IllegalArgumentException for an empty String" in {
       intercept[IllegalArgumentException] {
-        ErrorMessage( "" )
+        ErrorMessage("")
       }.getMessage shouldBe "Error message cannot be blank"
     }
 
     "throw an IllegalArgumentException for a blank String" in {
       intercept[IllegalArgumentException] {
-        ErrorMessage( " " )
+        ErrorMessage(" ")
       }.getMessage shouldBe "Error message cannot be blank"
     }
 
     "be instantiatable from a JsError without path" in {
-      val jsError = JsError( "json error" )
-      ErrorMessage( jsError ).value shouldBe "Json deserialization error(s): json error"
+      val jsError = JsError("json error")
+      ErrorMessage(jsError).value shouldBe "Json deserialization error(s): json error"
     }
 
     "be instantiatable from a JsError with path" in {
-      val jsError = JsError( JsPath( List( KeyPathNode( "key" ) ) ), "json error" )
-      ErrorMessage( jsError ).value shouldBe "Json deserialization error(s): /key -> json error"
+      val jsError = JsError(JsPath(List(KeyPathNode("key"))), "json error")
+      ErrorMessage(jsError).value shouldBe "Json deserialization error(s): /key -> json error"
     }
   }
 
@@ -58,7 +58,7 @@ class ErrorMessageSpec extends WordSpec {
     import ErrorMessage._
 
     "deserialize ErrorMessage to JsValue" in {
-      ErrorMessage( "error message" ).toJson shouldBe Json.obj(
+      ErrorMessage("error message").toJson shouldBe Json.obj(
         "error" -> "error message"
       )
     }

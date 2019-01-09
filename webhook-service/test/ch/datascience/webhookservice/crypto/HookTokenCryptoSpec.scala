@@ -27,7 +27,7 @@ import eu.timepit.refined.api.RefType
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 class HookTokenCryptoSpec extends WordSpec {
 
@@ -36,26 +36,26 @@ class HookTokenCryptoSpec extends WordSpec {
     "encrypt and decrypt a given message" in new TestCase {
       val message: String = nonEmptyStrings().generateOne
 
-      val Success( crypted ) = aesCrypto.encrypt( message )
+      val Success(crypted) = aesCrypto.encrypt(message)
       crypted.value should not be message
 
-      val Success( decrypted ) = aesCrypto.decrypt( crypted.value )
+      val Success(decrypted) = aesCrypto.decrypt(crypted.value)
       decrypted.value shouldBe message
     }
 
     "fail for blank messages" in new TestCase {
-      val Failure( encryptException ) = aesCrypto.encrypt( " " )
-      encryptException shouldBe an[IllegalArgumentException]
+      val Failure(encryptException) = aesCrypto.encrypt(" ")
+      encryptException            shouldBe an[IllegalArgumentException]
       encryptException.getMessage shouldBe "Message for encryption/decryption cannot be blank"
 
-      val Failure( decryptException ) = aesCrypto.decrypt( " " )
-      decryptException shouldBe an[IllegalArgumentException]
+      val Failure(decryptException) = aesCrypto.decrypt(" ")
+      decryptException            shouldBe an[IllegalArgumentException]
       decryptException.getMessage shouldBe "Message for encryption/decryption cannot be blank"
     }
 
     "fail if cannot be decrypted" in new TestCase {
-      val Failure( decryptException ) = aesCrypto.decrypt( "sdfsf" )
-      decryptException shouldBe an[IllegalArgumentException]
+      val Failure(decryptException) = aesCrypto.decrypt("sdfsf")
+      decryptException            shouldBe an[IllegalArgumentException]
       decryptException.getMessage should not be "Message for encryption/decryption cannot be blank"
     }
   }
@@ -64,10 +64,11 @@ class HookTokenCryptoSpec extends WordSpec {
 
     import cats.implicits._
 
-    private val secret = new String( Base64.getEncoder.encode( "1234567890123456".getBytes( "utf-8" ) ), "utf-8" )
+    private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes("utf-8")), "utf-8")
     val aesCrypto = new HookTokenCrypto[Try](
-      RefType.applyRef[Secret]( secret )
-        .getOrElse( throw new IllegalArgumentException( "Wrong secret" ) )
+      RefType
+        .applyRef[Secret](secret)
+        .getOrElse(throw new IllegalArgumentException("Wrong secret"))
     )
   }
 }

@@ -22,7 +22,7 @@ import java.nio.file.Path
 
 import akka.actor.ActorSystem
 import akka.stream.QueueOfferResult.Enqueued
-import akka.stream.{ ActorMaterializer, Materializer }
+import akka.stream.{ActorMaterializer, Materializer}
 import ch.datascience.config.BufferSize
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -32,21 +32,21 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.concurrent.{ Eventually, IntegrationPatience, ScalaFutures }
+import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json.toJson
-import play.api.libs.json.{ JsValue, Json }
+import play.api.libs.json.{JsValue, Json}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source
 
 class CommitEventsQueueSpec
-  extends WordSpec
-  with MixedMockFactory
-  with Eventually
-  with ScalaFutures
-  with PropertyChecks
-  with IntegrationPatience {
+    extends WordSpec
+    with MixedMockFactory
+    with Eventually
+    with ScalaFutures
+    with PropertyChecks
+    with IntegrationPatience {
 
   "offer" should {
 
@@ -55,41 +55,41 @@ class CommitEventsQueueSpec
       val commitEventsList: List[CommitEvent] = commitEventsLists.generateOne
 
       commitEventsList.map { commitEvent =>
-        commitEventsQueue.offer( commitEvent ).futureValue shouldBe Enqueued
+        commitEventsQueue.offer(commitEvent).futureValue shouldBe Enqueued
       }
 
       eventually {
-        sunkEvents should contain allElementsOf commitEventsList.map( toJson[CommitEvent] )
+        sunkEvents should contain allElementsOf commitEventsList.map(toJson[CommitEvent])
       }
     }
   }
 
   private trait TestCase {
-    private implicit val system: ActorSystem = ActorSystem( "MyTest" )
+    private implicit val system:       ActorSystem  = ActorSystem("MyTest")
     private implicit val materializer: Materializer = ActorMaterializer()
 
     val tempEventLogPath: Path = {
       import java.nio.file._
-      Files.createTempFile( "renku-event", "log" )
+      Files.createTempFile("renku-event", "log")
     }
 
-    val eventLogSinkProvider = new FileEventLogSinkProvider( tempEventLogPath )
+    val eventLogSinkProvider = new FileEventLogSinkProvider(tempEventLogPath)
 
     val commitEventsQueue = new CommitEventsQueue(
-      QueueConfig( BufferSize( 1 ) ),
+      QueueConfig(BufferSize(1)),
       eventLogSinkProvider.get
     )
 
     def sunkEvents: Stream[JsValue] =
       Source
-        .fromFile( tempEventLogPath.toFile )
+        .fromFile(tempEventLogPath.toFile)
         .getLines()
-        .map( Json.parse )
+        .map(Json.parse)
         .toStream
   }
 
   private val commitEventsLists: Gen[List[CommitEvent]] = for {
-    eventsNumber <- positiveInts( max = 5 )
-    events <- Gen.listOfN( eventsNumber, commitEvents )
+    eventsNumber <- positiveInts(max = 5)
+    events       <- Gen.listOfN(eventsNumber, commitEvents)
   } yield events
 }

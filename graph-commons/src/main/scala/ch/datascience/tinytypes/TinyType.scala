@@ -25,26 +25,24 @@ trait TinyType[T] extends Any {
   override def toString: String = value.toString
 }
 
-abstract class TinyTypeFactory[V, TT <: TinyType[V]]( instantiate: V => TT )
-  extends Constraints[V]
-  with TypeName {
+abstract class TinyTypeFactory[V, TT <: TinyType[V]](instantiate: V => TT) extends Constraints[V] with TypeName {
 
-  final def apply( value: V ): TT = {
-    verify( value )
-    instantiate( value )
+  final def apply(value: V): TT = {
+    verify(value)
+    instantiate(value)
   }
 
-  final def unapply( sha: TT ): Option[V] = Some( sha.value )
+  final def unapply(sha: TT): Option[V] = Some(sha.value)
 
-  final def from( value: V ): Either[String, TT] = {
-    val maybeErrors = validateConstraints( value )
-    if ( maybeErrors.isEmpty ) Right( instantiate( value ) )
-    else Left( maybeErrors.mkString( "; " ) )
+  final def from(value: V): Either[String, TT] = {
+    val maybeErrors = validateConstraints(value)
+    if (maybeErrors.isEmpty) Right(instantiate(value))
+    else Left(maybeErrors.mkString("; "))
   }
 
-  private def verify( value: V ): Unit = {
-    val maybeErrors = validateConstraints( value )
-    if ( maybeErrors.nonEmpty ) throw new IllegalArgumentException( maybeErrors.mkString( "; " ) )
+  private def verify(value: V): Unit = {
+    val maybeErrors = validateConstraints(value)
+    if (maybeErrors.nonEmpty) throw new IllegalArgumentException(maybeErrors.mkString("; "))
   }
 }
 
@@ -52,18 +50,18 @@ trait Constraints[V] extends TypeName {
 
   private val constraints: collection.mutable.ListBuffer[Constraint] = collection.mutable.ListBuffer.empty
 
-  def addConstraint( check: V => Boolean, message: V => String ): Unit =
-    constraints += Constraint( check, message )
+  def addConstraint(check: V => Boolean, message: V => String): Unit =
+    constraints += Constraint(check, message)
 
-  private case class Constraint( check: V => Boolean, message: V => String )
+  private case class Constraint(check: V => Boolean, message: V => String)
 
-  protected def validateConstraints( value: V ): Seq[String] = constraints.foldLeft( Seq.empty[String] ) {
-    case ( errors, constraint ) =>
-      if ( !constraint.check( value ) ) errors :+ constraint.message( value )
+  protected def validateConstraints(value: V): Seq[String] = constraints.foldLeft(Seq.empty[String]) {
+    case (errors, constraint) =>
+      if (!constraint.check(value)) errors :+ constraint.message(value)
       else errors
   }
 }
 
 trait TypeName {
-  protected[this] lazy val typeName: String = getClass.getSimpleName.replace( "$", "" )
+  protected[this] lazy val typeName: String = getClass.getSimpleName.replace("$", "")
 }

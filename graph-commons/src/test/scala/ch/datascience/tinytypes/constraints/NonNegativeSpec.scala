@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -29,19 +29,17 @@ class NonNegativeSpec extends WordSpec with PropertyChecks {
   "NonNegative" should {
 
     "be instantiatable when values are greater or equal zero" in {
-      forAll( Gen.choose( 0, 100000 ) ) { someValue =>
-        NonNegativeInt( someValue ).value shouldBe someValue
+      forAll(Gen.choose(0, 100000)) { someValue =>
+        NonNegativeInt(someValue).value shouldBe someValue
       }
     }
 
     "throw an IllegalArgumentException for negative value" in {
-      intercept[IllegalArgumentException]( NonNegativeInt( -1 ) ).getMessage shouldBe "NonNegativeInt cannot be < 0"
+      intercept[IllegalArgumentException](NonNegativeInt(-1)).getMessage shouldBe "NonNegativeInt cannot be < 0"
     }
   }
 }
 
-private class NonNegativeInt private ( val value: Int ) extends AnyVal with TinyType[Int]
+private class NonNegativeInt private (val value: Int) extends AnyVal with TinyType[Int]
 
-private object NonNegativeInt
-  extends TinyTypeFactory[Int, NonNegativeInt]( new NonNegativeInt( _ ) )
-  with NonNegative
+private object NonNegativeInt extends TinyTypeFactory[Int, NonNegativeInt](new NonNegativeInt(_)) with NonNegative

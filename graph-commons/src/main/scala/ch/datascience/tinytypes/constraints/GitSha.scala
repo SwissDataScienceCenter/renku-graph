@@ -25,7 +25,7 @@ trait GitSha extends Constraints[String] {
   private val validationRegex: String = "[0-9a-f]{5,40}"
 
   addConstraint(
-    check = _.matches( validationRegex ),
-    message = ( value: String ) => s"'$value' is not a valid Git sha"
+    check   = _.matches(validationRegex),
+    message = (value: String) => s"'$value' is not a valid Git sha"
   )
 }

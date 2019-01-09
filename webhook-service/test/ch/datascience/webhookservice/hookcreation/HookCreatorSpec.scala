@@ -27,7 +27,7 @@ import ch.datascience.graph.events.ProjectId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.{ HookAuthToken, Secret }
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.{HookAuthToken, Secret}
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.model.UserAuthToken
 import org.scalamock.scalatest.MockFactory
@@ -43,63 +43,68 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     "log success and return right if creation of the hook in GitLab was successful" in new TestCase {
 
-      ( hookTokenCrypto.encrypt( _: String ) )
-        .expects( projectId.toString )
-        .returning( context.pure( hookAuthToken ) )
+      (hookTokenCrypto
+        .encrypt(_: String))
+        .expects(projectId.toString)
+        .returning(context.pure(hookAuthToken))
 
-      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken, _: HookAuthToken ) )
-        .expects( projectId, authToken, hookAuthToken )
-        .returning( context.pure( () ) )
+      (gitLabHookCreation
+        .createHook(_: ProjectId, _: UserAuthToken, _: HookAuthToken))
+        .expects(projectId, authToken, hookAuthToken)
+        .returning(context.pure(()))
 
-      hookCreation.createHook( projectId, authToken ) shouldBe context.pure( () )
+      hookCreation.createHook(projectId, authToken) shouldBe context.pure(())
 
-      logger.loggedOnly( Info, s"Hook created for project with id $projectId" )
+      logger.loggedOnly(Info, s"Hook created for project with id $projectId")
     }
 
     "log an error and return left if encryption of the hook auth token was unsuccessful" in new TestCase {
 
-      val exception: Exception = exceptions.generateOne
-      val error: Try[Nothing] = context.raiseError( exception )
-      ( hookTokenCrypto.encrypt( _: String ) )
-        .expects( projectId.toString )
-        .returning( error )
+      val exception: Exception    = exceptions.generateOne
+      val error:     Try[Nothing] = context.raiseError(exception)
+      (hookTokenCrypto
+        .encrypt(_: String))
+        .expects(projectId.toString)
+        .returning(error)
 
-      hookCreation.createHook( projectId, authToken ) shouldBe error
+      hookCreation.createHook(projectId, authToken) shouldBe error
 
-      logger.loggedOnly( Error, s"Hook creation failed for project with id $projectId", exception )
+      logger.loggedOnly(Error, s"Hook creation failed for project with id $projectId", exception)
     }
 
     "log an error and return left if creation of the hook in GitLab was unsuccessful" in new TestCase {
 
-      ( hookTokenCrypto.encrypt( _: String ) )
-        .expects( projectId.toString )
-        .returning( context.pure( hookAuthToken ) )
+      (hookTokenCrypto
+        .encrypt(_: String))
+        .expects(projectId.toString)
+        .returning(context.pure(hookAuthToken))
 
-      val exception: Exception = exceptions.generateOne
-      val error: Try[Nothing] = context.raiseError( exception )
-      ( gitLabHookCreation.createHook( _: ProjectId, _: UserAuthToken, _: HookAuthToken ) )
-        .expects( projectId, authToken, hookAuthToken )
-        .returning( error )
+      val exception: Exception    = exceptions.generateOne
+      val error:     Try[Nothing] = context.raiseError(exception)
+      (gitLabHookCreation
+        .createHook(_: ProjectId, _: UserAuthToken, _: HookAuthToken))
+        .expects(projectId, authToken, hookAuthToken)
+        .returning(error)
 
-      hookCreation.createHook( projectId, authToken ) shouldBe error
+      hookCreation.createHook(projectId, authToken) shouldBe error
 
-      logger.loggedOnly( Error, s"Hook creation failed for project with id $projectId", exception )
+      logger.loggedOnly(Error, s"Hook creation failed for project with id $projectId", exception)
     }
   }
 
   private trait TestCase {
-    val projectId = projectIds.generateOne
-    val authToken = userAuthTokens.generateOne
+    val projectId     = projectIds.generateOne
+    val authToken     = userAuthTokens.generateOne
     val hookAuthToken = hookAuthTokens.generateOne
 
     val context = MonadError[Try, Throwable]
 
-    val logger = TestLogger[Try]()
+    val logger             = TestLogger[Try]()
     val gitLabHookCreation = mock[HookCreationRequestSender[Try]]
 
-    class TryHookTokenCrypt( secret: Secret ) extends HookTokenCrypto[Try]( secret )
+    class TryHookTokenCrypt(secret: Secret) extends HookTokenCrypto[Try](secret)
     val hookTokenCrypto = mock[TryHookTokenCrypt]
 
-    val hookCreation = new HookCreator[Try]( gitLabHookCreation, logger, hookTokenCrypto )
+    val hookCreation = new HookCreator[Try](gitLabHookCreation, logger, hookTokenCrypto)
   }
 }

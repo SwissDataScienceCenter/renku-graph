@@ -19,7 +19,7 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
@@ -29,27 +29,25 @@ class GitShaSpec extends WordSpec with PropertyChecks {
   "GitSha" should {
 
     "be instantiatable for a valid sha" in {
-      forAll( shas ) { sha =>
-        SomeGitSha( sha ).toString shouldBe sha
+      forAll(shas) { sha =>
+        SomeGitSha(sha).toString shouldBe sha
       }
     }
 
     "throw an IllegalArgumentException for non-sha values" in {
       intercept[IllegalArgumentException] {
-        SomeGitSha( "abc" )
+        SomeGitSha("abc")
       }.getMessage shouldBe "'abc' is not a valid Git sha"
     }
 
     "throw an IllegalArgumentException for a blank value" in {
       intercept[IllegalArgumentException] {
-        SomeGitSha( "   " )
+        SomeGitSha("   ")
       }.getMessage shouldBe "'   ' is not a valid Git sha"
     }
   }
 }
 
-private class SomeGitSha private ( val value: String ) extends AnyVal with TinyType[String]
+private class SomeGitSha private (val value: String) extends AnyVal with TinyType[String]
 
-private object SomeGitSha
-  extends TinyTypeFactory[String, SomeGitSha]( new SomeGitSha( _ ) )
-  with GitSha
+private object SomeGitSha extends TinyTypeFactory[String, SomeGitSha](new SomeGitSha(_)) with GitSha
