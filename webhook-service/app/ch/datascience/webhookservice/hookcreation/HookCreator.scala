@@ -24,7 +24,7 @@ import cats.{Monad, MonadError}
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
-import ch.datascience.webhookservice.model.UserAuthToken
+import ch.datascience.webhookservice.model.AccessToken
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 
@@ -37,11 +37,11 @@ private class HookCreator[Interpretation[_]: Monad](
     hookTokenCrypto:    HookTokenCrypto[Interpretation]
 ) {
 
-  def createHook(projectId: ProjectId, userAuthToken: UserAuthToken)(
+  def createHook(projectId: ProjectId, accessToken: AccessToken)(
       implicit ME:          MonadError[Interpretation, Throwable]): Interpretation[Unit] = {
     for {
       hookAuthToken <- hookTokenCrypto.encrypt(projectId.toString)
-      _             <- gitLabHookCreation.createHook(projectId, userAuthToken, hookAuthToken)
+      _             <- gitLabHookCreation.createHook(projectId, accessToken, hookAuthToken)
       _             <- logger.info(s"Hook created for project with id $projectId")
     } yield ()
   }.recoverWith {

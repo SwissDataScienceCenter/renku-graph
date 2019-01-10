@@ -29,15 +29,17 @@ Creates a webhook for a project with the given `project id`.
 
 **Request format**
 
-A `PRIVATE-TOKEN` with user's GitLab token is required.
+The endpoint requires an authorization token. It has to be
+- either `PRIVATE-TOKEN` with user's personal access token in GitLab
+- or `OAUTH-TOKEN` with oauth token obtained from GitLab
 
 **Response**
 
-| Status                     | Description                                                    |
-|----------------------------|----------------------------------------------------------------|
-| CREATED (201)              | For valid payloads                                             |
-| UNAUTHORIZED (401)         | When there is no `PRIVATE-TOKEN` in the header or it's invalid |
-| BAD_GATEWAY (502)          | When there were problems with webhook creation                 |
+| Status                     | Description                                                                           |
+|----------------------------|---------------------------------------------------------------------------------------|
+| CREATED (201)              | For valid payloads                                                                    |
+| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `OAUTH-TOKEN` in the header or it's invalid |
+| BAD_GATEWAY (502)          | When there were problems with webhook creation                                        |
 
 #### POST /webhook-event
 
