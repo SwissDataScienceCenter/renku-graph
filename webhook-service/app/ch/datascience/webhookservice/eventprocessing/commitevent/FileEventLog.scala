@@ -25,6 +25,7 @@ import cats.effect.IO
 import javax.inject.{Inject, Named, Singleton}
 
 import scala.collection.JavaConverters._
+import scala.language.higherKinds
 import scala.util.Try
 
 class FileEventLog[Interpretation[_]](
@@ -50,3 +51,4 @@ class FileEventLog[Interpretation[_]](
 class FileIOEventLog @Inject()(
     @Named("event-log-file-path") eventLogFilePath: Path
 ) extends FileEventLog[IO](eventLogFilePath)
+    with IOEventLog // this mixin is just to make Guice be able to inject EventLog[IO]

@@ -21,8 +21,8 @@ package ch.datascience.webhookservice.generators
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
+import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.model.{AccessToken, OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.webhookservice.queues.pushevent.PushEvent
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 

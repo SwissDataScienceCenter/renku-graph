@@ -25,8 +25,8 @@ import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.graph.events.{CommitEvent, User}
 import ch.datascience.logging.IOLogger
+import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, IOCommitEventSender}
-import ch.datascience.webhookservice.queues.pushevent.PushEvent
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 

@@ -18,18 +18,15 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import akka.stream.QueueOfferResult
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events._
-import ch.datascience.logging.IOLogger
-import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
+import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
+import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.queues.pushevent.{PushEvent, PushEventQueue}
-import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 import play.api.mvc._
 
@@ -39,33 +36,31 @@ import scala.util.control.NonFatal
 @Singleton
 class WebhookEventEndpoint(
     cc:              ControllerComponents,
-    logger:          Logger[IO],
     hookTokenCrypto: HookTokenCrypto[IO],
-    pushEventQueue:  PushEventQueue
+    pushEventSender: PushEventSender[IO]
 ) extends AbstractController(cc) {
 
   @Inject def this(
       cc:              ControllerComponents,
-      pushEventQueue:  PushEventQueue,
-      logger:          IOLogger,
+      pushEventSender: IOPushEventSender,
       hookTokenCrypto: IOHookTokenCrypto
-  ) = this(cc, logger, hookTokenCrypto, pushEventQueue)
+  ) = this(cc, hookTokenCrypto, pushEventSender)
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
   import WebhookEventEndpoint._
   import hookTokenCrypto._
+  import pushEventSender._
 
   val processPushEvent: Action[PushEvent] = Action.async(parse.json[PushEvent]) { implicit request =>
     (for {
       authToken      <- findAuthToken(request)
       decryptedToken <- decrypt(authToken)
       _              <- validate(decryptedToken, request.body)
-      result         <- process(pushEvent = request.body)
-      _              <- logger.info(s"'${request.body}' enqueued")
-    } yield result)
-      .recover(logError andThen mapToResult)
+      _              <- storeCommitsInEventLog(pushEvent = request.body)
+    } yield Accepted)
       .unsafeToFuture()
+      .recover(mapToResult(request.body))
   }
 
   private def findAuthToken(request: Request[_]): IO[HookAuthToken] = IO.fromEither {
@@ -80,22 +75,9 @@ class WebhookEventEndpoint(
     else Left(UnauthorizedException)
   }
 
-  private def process(pushEvent: PushEvent): IO[Result] =
-    IO.fromFuture(IO(pushEventQueue.offer(pushEvent)))
-      .flatMap {
-        case QueueOfferResult.Enqueued => IO.pure(Accepted)
-        case other                     => IO.raiseError(new RuntimeException(s"'$pushEvent' enqueueing problem: $other"))
-      }
-
-  private lazy val mapToResult: Throwable => Result = {
+  private def mapToResult(pushEvent: PushEvent): PartialFunction[Throwable, Result] = {
     case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
-    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage).toJson)
-  }
-
-  private lazy val logError: PartialFunction[Throwable, Throwable] = {
-    case exception: Throwable =>
-      logger.error(exception.getMessage)
-      exception
+    case NonFatal(ex)               => InternalServerError(ErrorMessage(ex.getMessage).toJson)
   }
 }
 

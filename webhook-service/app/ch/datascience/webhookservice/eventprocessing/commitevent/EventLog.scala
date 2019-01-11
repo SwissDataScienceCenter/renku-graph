@@ -18,8 +18,12 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
+import cats.effect.IO
+
 import scala.language.higherKinds
 
 trait EventLog[Interpretation[_]] {
   def append(line: String): Interpretation[Unit]
 }
+
+trait IOEventLog extends EventLog[IO]

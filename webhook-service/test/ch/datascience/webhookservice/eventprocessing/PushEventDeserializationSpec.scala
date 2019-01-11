@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.eventprocessing
 
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.eventprocessing.WebhookEventEndpoint.pushEventReads
-import ch.datascience.webhookservice.queues.pushevent.PushEvent
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import play.api.libs.json.Json

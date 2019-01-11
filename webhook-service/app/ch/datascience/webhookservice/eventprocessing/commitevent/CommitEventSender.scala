@@ -54,7 +54,7 @@ class CommitEventSender[Interpretation[_]: Monad](
 
 @Singleton
 class IOCommitEventSender @Inject()(
-    eventLog:              EventLog[IO],
+    eventLog:              IOEventLog,
     commitEventSerializer: IOCommitEventSerializer,
     logger:                IOLogger,
 ) extends CommitEventSender[IO](eventLog, commitEventSerializer, logger)

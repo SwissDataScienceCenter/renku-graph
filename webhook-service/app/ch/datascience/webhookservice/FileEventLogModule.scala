@@ -18,9 +18,7 @@
 
 package ch.datascience.webhookservice
 
-import cats.effect.IO
-import ch.datascience.webhookservice.eventprocessing.commitevent.{EventLog, FileIOEventLog}
-import ch.datascience.webhookservice.queues.commitevent.{EventLogSinkProvider, FileEventLogSinkProvider}
+import ch.datascience.webhookservice.eventprocessing.commitevent.{FileIOEventLog, IOEventLog}
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
 import com.typesafe.config.Config
@@ -70,9 +68,7 @@ private object FileEventLogModule {
           validatedPath
         }
 
-      bind(classOf[EventLogSinkProvider])
-        .to(classOf[FileEventLogSinkProvider])
-      bind(classOf[EventLog[IO]])
+      bind(classOf[IOEventLog])
         .to(classOf[FileIOEventLog])
     }
   }
