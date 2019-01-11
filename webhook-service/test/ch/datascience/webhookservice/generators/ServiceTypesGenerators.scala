@@ -29,11 +29,11 @@ import org.scalacheck.Gen
 object ServiceTypesGenerators {
 
   implicit val pushEvents: Gen[PushEvent] = for {
-    before   <- commitIds
-    after    <- commitIds
-    pushUser <- pushUsers
-    project  <- projects
-  } yield PushEvent(before, after, pushUser, project)
+    maybeBefore <- Gen.option(commitIds)
+    after       <- commitIds
+    pushUser    <- pushUsers
+    project     <- projects
+  } yield PushEvent(maybeBefore, after, pushUser, project)
 
   implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
     length <- Gen.choose(5, 40)

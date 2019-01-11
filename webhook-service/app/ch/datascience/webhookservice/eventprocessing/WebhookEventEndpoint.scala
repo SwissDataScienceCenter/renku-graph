@@ -93,7 +93,7 @@ object WebhookEventEndpoint {
   )(Project.apply _)
 
   private[webhookservice] implicit val pushEventReads: Reads[PushEvent] = (
-    (__ \ "before").read[CommitId] and
+    (__ \ "before").readNullable[CommitId] and
       (__ \ "after").read[CommitId] and
       (__ \ "user_id").read[UserId] and
       (__ \ "user_username").read[Username] and
@@ -102,14 +102,14 @@ object WebhookEventEndpoint {
   )(toPushEvent _)
 
   private def toPushEvent(
-      before:   CommitId,
-      after:    CommitId,
-      userId:   UserId,
-      username: Username,
-      email:    Email,
-      project:  Project
+      maybeBefore: Option[CommitId],
+      after:       CommitId,
+      userId:      UserId,
+      username:    Username,
+      email:       Email,
+      project:     Project
   ): PushEvent = PushEvent(
-    before,
+    maybeBefore,
     after,
     PushUser(userId, username, email),
     project

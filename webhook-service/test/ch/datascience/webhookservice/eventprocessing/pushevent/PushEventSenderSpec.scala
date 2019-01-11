@@ -96,7 +96,7 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
     pushUser  = pushEvent.pushUser,
     author    = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
     committer = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-    parents   = Seq(pushEvent.before),
+    parents   = Seq(),
     project   = pushEvent.project,
     added     = Nil,
     modified  = Nil,
