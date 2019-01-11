@@ -35,6 +35,13 @@ libraryDependencies += "org.http4s" %% "http4s-blaze-server" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-circe" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-dsl" % http4sVersion
 
+val circeVersion = "0.10.0"
+libraryDependencies += "io.circe" %% "circe-core" % circeVersion
+libraryDependencies += "io.circe" %% "circe-generic" % circeVersion
+libraryDependencies += "io.circe" %% "circe-generic-extras" % circeVersion
+libraryDependencies += "io.circe" %% "circe-java8" % circeVersion
+libraryDependencies += "io.circe" %% "circe-parser" % circeVersion
+
 //Test dependencies
 libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.18.0" % Test
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
