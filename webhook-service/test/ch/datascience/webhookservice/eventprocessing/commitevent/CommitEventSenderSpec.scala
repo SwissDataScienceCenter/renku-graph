@@ -44,7 +44,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
         .expects(commitEvent)
         .returning(context.pure(serializedEvent))
 
-      (eventStorage
+      (eventLog
         .append(_: String))
         .expects(serializedEvent)
         .returning(context.pure(()))
@@ -83,7 +83,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
         .returning(context.pure(serializedEvent))
 
       val exception = exceptions.generateOne
-      (eventStorage
+      (eventLog
         .append(_: String))
         .expects(serialize(commitEvent))
         .returning(context.raiseError(exception))
@@ -105,9 +105,9 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
 
     class TestCommitEventSerializer extends CommitEventSerializer[Try]
     val eventSerializer = mock[TestCommitEventSerializer]
-    val eventStorage    = mock[CommitEventStorage[Try]]
+    val eventLog        = mock[EventLog[Try]]
     val logger          = TestLogger[Try]()
-    val eventSender     = new CommitEventSender[Try](eventStorage, eventSerializer, logger)
+    val eventSender     = new CommitEventSender[Try](eventLog, eventSerializer, logger)
   }
 
   private def serialize(commitEvent: CommitEvent): String =

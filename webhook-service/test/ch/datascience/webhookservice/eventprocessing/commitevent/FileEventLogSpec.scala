@@ -32,7 +32,7 @@ import org.scalatest.prop.PropertyChecks
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class FileCommitEventStorageSpec extends WordSpec with PropertyChecks {
+class FileEventLogSpec extends WordSpec with PropertyChecks {
 
   "append" should {
 
@@ -41,7 +41,7 @@ class FileCommitEventStorageSpec extends WordSpec with PropertyChecks {
       val linesToAppend: List[String] = lines.generateOne
 
       linesToAppend foreach { line =>
-        fileStorage.append(line) shouldBe Success(())
+        eventLog.append(line) shouldBe Success(())
       }
 
       Files.readAllLines(pathToEventLogFile).asScala.toList shouldBe linesToAppend
@@ -56,7 +56,7 @@ class FileCommitEventStorageSpec extends WordSpec with PropertyChecks {
       val linesToAppend: List[String] = lines.generateOne
 
       linesToAppend foreach { line =>
-        fileStorage.append(line) shouldBe Success(())
+        eventLog.append(line) shouldBe Success(())
       }
 
       Files.readAllLines(pathToEventLogFile).asScala.toList shouldBe initialLines ++ linesToAppend
@@ -66,7 +66,7 @@ class FileCommitEventStorageSpec extends WordSpec with PropertyChecks {
 
       Files.setPosixFilePermissions(pathToEventLogFile, PosixFilePermissions.fromString("r--r--r--"))
 
-      val Failure(exception) = fileStorage.append("line")
+      val Failure(exception) = eventLog.append("line")
 
       exception shouldBe an[AccessDeniedException]
     }
@@ -74,7 +74,7 @@ class FileCommitEventStorageSpec extends WordSpec with PropertyChecks {
 
   private trait TestCase {
     val pathToEventLogFile: Path = Files.createTempFile("renku-event", "log")
-    val fileStorage = new FileCommitEventStorage[Try](pathToEventLogFile)
+    val eventLog = new FileEventLog[Try](pathToEventLogFile)
   }
 
   private val lines: Gen[List[String]] = for {

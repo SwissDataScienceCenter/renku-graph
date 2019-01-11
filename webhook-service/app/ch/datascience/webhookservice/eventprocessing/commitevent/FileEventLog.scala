@@ -27,10 +27,10 @@ import javax.inject.{Inject, Named, Singleton}
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-class FileCommitEventStorage[Interpretation[_]](
+class FileEventLog[Interpretation[_]](
     eventLogFilePath: Path
 )(implicit ME:        MonadError[Interpretation, Throwable])
-    extends CommitEventStorage[Interpretation] {
+    extends EventLog[Interpretation] {
 
   override def append(line: String): Interpretation[Unit] = ME.fromTry {
     Try {
@@ -47,6 +47,6 @@ class FileCommitEventStorage[Interpretation[_]](
 }
 
 @Singleton
-class FileIOCommitEventStorage @Inject()(
+class FileIOEventLog @Inject()(
     @Named("event-log-file-path") eventLogFilePath: Path
-) extends FileCommitEventStorage[IO](eventLogFilePath)
+) extends FileEventLog[IO](eventLogFilePath)

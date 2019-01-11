@@ -20,6 +20,6 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import scala.language.higherKinds
 
-trait CommitEventStorage[Interpretation[_]] {
+trait EventLog[Interpretation[_]] {
   def append(line: String): Interpretation[Unit]
 }

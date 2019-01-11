@@ -30,7 +30,7 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class CommitEventSender[Interpretation[_]: Monad](
-    commitEventStorage:    CommitEventStorage[Interpretation],
+    eventLog:              EventLog[Interpretation],
     commitEventSerializer: CommitEventSerializer[Interpretation],
     logger:                Logger[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
@@ -40,7 +40,7 @@ class CommitEventSender[Interpretation[_]: Monad](
   def send(commitEvent: CommitEvent): Interpretation[Unit] = {
     for {
       serialisedEvent <- serialiseToJsonString(commitEvent)
-      _               <- commitEventStorage.append(serialisedEvent)
+      _               <- eventLog.append(serialisedEvent)
       _               <- logger.info(s"Commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} stored")
     } yield ()
   }.recoverWith(loggingError(commitEvent))
@@ -54,7 +54,7 @@ class CommitEventSender[Interpretation[_]: Monad](
 
 @Singleton
 private class IOCommitEventSender @Inject()(
-    commitEventStorage:    CommitEventStorage[IO],
+    eventLog:              EventLog[IO],
     commitEventSerializer: IOCommitEventSerializer,
     logger:                IOLogger,
-) extends CommitEventSender[IO](commitEventStorage, commitEventSerializer, logger)
+) extends CommitEventSender[IO](eventLog, commitEventSerializer, logger)

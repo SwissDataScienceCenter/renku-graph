@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice
 
 import cats.effect.IO
-import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventStorage, FileIOCommitEventStorage}
+import ch.datascience.webhookservice.eventprocessing.commitevent.{EventLog, FileIOEventLog}
 import ch.datascience.webhookservice.queues.commitevent.{EventLogSinkProvider, FileEventLogSinkProvider}
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
@@ -72,8 +72,8 @@ private object FileEventLogModule {
 
       bind(classOf[EventLogSinkProvider])
         .to(classOf[FileEventLogSinkProvider])
-      bind(classOf[CommitEventStorage[IO]])
-        .to(classOf[FileIOCommitEventStorage])
+      bind(classOf[EventLog[IO]])
+        .to(classOf[FileIOEventLog])
     }
   }
 
