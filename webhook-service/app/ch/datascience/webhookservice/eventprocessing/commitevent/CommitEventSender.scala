@@ -43,7 +43,7 @@ class CommitEventSender[Interpretation[_]: Monad](
       _               <- eventLog.append(serialisedEvent)
       _               <- logger.info(s"Commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} stored")
     } yield ()
-  }.recoverWith(loggingError(commitEvent))
+  } recoverWith loggingError(commitEvent)
 
   private def loggingError(commitEvent: CommitEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -53,7 +53,7 @@ class CommitEventSender[Interpretation[_]: Monad](
 }
 
 @Singleton
-private class IOCommitEventSender @Inject()(
+class IOCommitEventSender @Inject()(
     eventLog:              EventLog[IO],
     commitEventSerializer: IOCommitEventSerializer,
     logger:                IOLogger,

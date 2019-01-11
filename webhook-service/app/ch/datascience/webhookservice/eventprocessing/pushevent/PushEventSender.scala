@@ -1,0 +1,81 @@
+/*
+ * Copyright 2019 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.datascience.webhookservice.eventprocessing.pushevent
+
+import java.time.Instant
+
+import cats.effect.IO
+import cats.implicits._
+import cats.{Monad, MonadError}
+import ch.datascience.graph.events.{CommitEvent, User}
+import ch.datascience.logging.IOLogger
+import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, IOCommitEventSender}
+import ch.datascience.webhookservice.queues.pushevent.PushEvent
+import io.chrisdavenport.log4cats.Logger
+import javax.inject.{Inject, Singleton}
+
+import scala.language.higherKinds
+import scala.util.Try
+import scala.util.control.NonFatal
+
+class PushEventSender[Interpretation[_]: Monad](
+    commitEventSender: CommitEventSender[Interpretation],
+    logger:            Logger[Interpretation]
+)(implicit ME:         MonadError[Interpretation, Throwable]) {
+
+  import commitEventSender._
+
+  def storeCommitsInEventLog(pushEvent: PushEvent): Interpretation[Unit] = {
+    for {
+      commitEvent <- toCommitEvent(pushEvent)
+      _           <- send(commitEvent)
+      _           <- logger.info(s"PushEvent for id: ${pushEvent.after}, project: ${pushEvent.project.id} stored")
+    } yield ()
+  } recoverWith loggingError(pushEvent)
+
+  private def loggingError(pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"Storing pushEvent for id: ${pushEvent.after}, project: ${pushEvent.project.id} failed")
+      ME.raiseError(exception)
+  }
+
+  private def toCommitEvent(pushEvent: PushEvent): Interpretation[CommitEvent] = ME.fromTry {
+    Try {
+      CommitEvent(
+        pushEvent.after,
+        "",
+        Instant.EPOCH,
+        pushEvent.pushUser,
+        author    = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
+        committer = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
+        parents   = Seq(pushEvent.before),
+        project   = pushEvent.project,
+        added     = Nil,
+        modified  = Nil,
+        removed   = Nil
+      )
+    }
+  }
+}
+
+@Singleton
+class IOPushEventSender @Inject()(
+    commitEventSender: IOCommitEventSender,
+    logger:            IOLogger
+) extends PushEventSender[IO](commitEventSender, logger)

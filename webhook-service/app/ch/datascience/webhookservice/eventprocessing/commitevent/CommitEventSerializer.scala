@@ -26,7 +26,7 @@ import play.api.libs.json.{Json, Writes}
 
 import scala.util.Try
 
-private class CommitEventSerializer[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable]) {
+class CommitEventSerializer[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable]) {
 
   private implicit val userWrites:     Writes[User]        = Json.writes[User]
   private implicit val pushUserWrites: Writes[PushUser]    = Json.writes[PushUser]
