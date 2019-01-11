@@ -18,12 +18,9 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import java.time.Instant
-
 import cats.effect.IO
 import cats.implicits._
 import cats.{Monad, MonadError}
-import ch.datascience.graph.events.{CommitEvent, User}
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, IOCommitEventSender}
@@ -31,19 +28,20 @@ import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
-import scala.util.Try
 import scala.util.control.NonFatal
 
 class PushEventSender[Interpretation[_]: Monad](
-    commitEventSender: CommitEventSender[Interpretation],
-    logger:            Logger[Interpretation]
-)(implicit ME:         MonadError[Interpretation, Throwable]) {
+    commitEventsFinder: CommitEventsFinder[Interpretation],
+    commitEventSender:  CommitEventSender[Interpretation],
+    logger:             Logger[Interpretation]
+)(implicit ME:          MonadError[Interpretation, Throwable]) {
 
   import commitEventSender._
+  import commitEventsFinder._
 
   def storeCommitsInEventLog(pushEvent: PushEvent): Interpretation[Unit] = {
     for {
-      commitEvent <- toCommitEvent(pushEvent)
+      commitEvent <- findCommitEvents(pushEvent)
       _           <- send(commitEvent)
       _           <- logger.info(s"PushEvent for id: ${pushEvent.after}, project: ${pushEvent.project.id} stored")
     } yield ()
@@ -54,28 +52,11 @@ class PushEventSender[Interpretation[_]: Monad](
       logger.error(exception)(s"Storing pushEvent for id: ${pushEvent.after}, project: ${pushEvent.project.id} failed")
       ME.raiseError(exception)
   }
-
-  private def toCommitEvent(pushEvent: PushEvent): Interpretation[CommitEvent] = ME.fromTry {
-    Try {
-      CommitEvent(
-        pushEvent.after,
-        "",
-        Instant.EPOCH,
-        pushEvent.pushUser,
-        author    = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-        committer = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-        parents   = Seq(),
-        project   = pushEvent.project,
-        added     = Nil,
-        modified  = Nil,
-        removed   = Nil
-      )
-    }
-  }
 }
 
 @Singleton
 class IOPushEventSender @Inject()(
+    commitEventFinder: IOCommitEventsFinder,
     commitEventSender: IOCommitEventSender,
     logger:            IOLogger
-) extends PushEventSender[IO](commitEventSender, logger)
+) extends PushEventSender[IO](commitEventFinder, commitEventSender, logger)

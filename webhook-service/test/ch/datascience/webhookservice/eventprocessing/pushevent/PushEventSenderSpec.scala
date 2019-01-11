@@ -44,6 +44,11 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
     "convert the given push event to commit events and store them in the event log" in new TestCase {
       val commitEvent = commitEventFrom(pushEvent)
 
+      (commitEventsFinder
+        .findCommitEvents(_: PushEvent))
+        .expects(pushEvent)
+        .returning(context.pure(commitEvent))
+
       (commitEventSender
         .send(_: CommitEvent))
         .expects(commitEvent)
@@ -54,8 +59,31 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Info, s"PushEvent for id: ${pushEvent.after}, project: ${pushEvent.project.id} stored")
     }
 
+    "fail if finding commit events for the given push event fails" in new TestCase {
+      val commitEvent = commitEventFrom(pushEvent)
+
+      val exception = exceptions.generateOne
+      (commitEventsFinder
+        .findCommitEvents(_: PushEvent))
+        .expects(pushEvent)
+        .returning(context.raiseError(exception))
+
+      pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Failure(exception)
+
+      logger.loggedOnly(
+        Error,
+        s"Storing pushEvent for id: ${pushEvent.after}, project: ${pushEvent.project.id} failed",
+        exception
+      )
+    }
+
     "fail if storing in the event log fails" in new TestCase {
       val commitEvent = commitEventFrom(pushEvent)
+
+      (commitEventsFinder
+        .findCommitEvents(_: PushEvent))
+        .expects(pushEvent)
+        .returning(context.pure(commitEvent))
 
       val exception = exceptions.generateOne
       (commitEventSender
@@ -78,9 +106,10 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
     val pushEvent = pushEvents.generateOne
 
-    val commitEventSender = mock[TestCommitEventSender]
-    val logger            = TestLogger[Try]()
-    val pushEventSender   = new PushEventSender[Try](commitEventSender, logger)
+    val commitEventSender  = mock[TestCommitEventSender]
+    val commitEventsFinder = mock[TestCommitEventsFinder]
+    val logger             = TestLogger[Try]()
+    val pushEventSender    = new PushEventSender[Try](commitEventsFinder, commitEventSender, logger)
   }
 
   private class TestCommitEventSender(
@@ -88,6 +117,8 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
       commitEventSerializer: CommitEventSerializer[Try],
       logger:                Logger[Try]
   ) extends CommitEventSender[Try](eventLog, commitEventSerializer, logger)
+
+  private class TestCommitEventsFinder extends CommitEventsFinder[Try]
 
   private def commitEventFrom(pushEvent: PushEvent) = CommitEvent(
     id        = pushEvent.after,
