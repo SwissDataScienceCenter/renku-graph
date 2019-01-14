@@ -23,9 +23,11 @@ import org.scalacheck.Gen
 
 object EventsGenerators {
 
-  implicit val commitIds: Gen[CommitId] = shas map CommitId.apply
-  implicit val userIds:   Gen[UserId]   = nonNegativeInts() map UserId.apply
-  implicit val usernames: Gen[Username] = nonEmptyStrings() map Username.apply
+  implicit val commitIds:      Gen[CommitId]      = shas map CommitId.apply
+  implicit val commitMessages: Gen[CommitMessage] = nonEmptyStrings() map CommitMessage.apply
+  implicit val committedDates: Gen[CommittedDate] = timestampsInThePast map CommittedDate.apply
+  implicit val userIds:        Gen[UserId]        = nonNegativeInts() map UserId.apply
+  implicit val usernames:      Gen[Username]      = nonEmptyStrings() map Username.apply
   implicit val emails: Gen[Email] = for {
     beforeAt <- nonEmptyStrings()
     afterAt  <- nonEmptyStrings()
@@ -52,13 +54,13 @@ object EventsGenerators {
 
   implicit val commitEvents: Gen[CommitEvent] = for {
     commitId            <- commitIds
-    message             <- nonEmptyStrings()
-    timestamp           <- timestampsInThePast
+    message             <- commitMessages
+    committedDate       <- committedDates
     pushUser            <- pushUsers
     author              <- users
     committer           <- users
     parentCommitsNumber <- nonNegativeInts(4)
     parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
     project             <- projects
-  } yield CommitEvent(commitId, message, timestamp, pushUser, author, committer, parents, project, Nil, Nil, Nil)
+  } yield CommitEvent(commitId, message, committedDate, pushUser, author, committer, parents, project)
 }

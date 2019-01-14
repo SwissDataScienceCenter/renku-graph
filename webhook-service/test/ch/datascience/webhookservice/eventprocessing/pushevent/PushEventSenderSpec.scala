@@ -24,7 +24,7 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.{CommitEvent, User}
+import ch.datascience.graph.events.{CommitEvent, CommitMessage, CommittedDate, User}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.eventprocessing.PushEvent
@@ -121,16 +121,13 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
   private class TestCommitEventsFinder extends CommitEventsFinder[Try]
 
   private def commitEventFrom(pushEvent: PushEvent) = CommitEvent(
-    id        = pushEvent.after,
-    message   = "",
-    timestamp = Instant.EPOCH,
-    pushUser  = pushEvent.pushUser,
-    author    = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-    committer = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-    parents   = Seq(),
-    project   = pushEvent.project,
-    added     = Nil,
-    modified  = Nil,
-    removed   = Nil
+    id            = pushEvent.after,
+    message       = CommitMessage("abc"),
+    committedDate = CommittedDate(Instant.EPOCH),
+    pushUser      = pushEvent.pushUser,
+    author        = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
+    committer     = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
+    parents       = Seq(),
+    project       = pushEvent.project
   )
 }

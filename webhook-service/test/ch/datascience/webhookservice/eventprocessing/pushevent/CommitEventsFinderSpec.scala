@@ -22,7 +22,7 @@ import java.time.Instant
 
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.{CommitEvent, User}
+import ch.datascience.graph.events.{CommitEvent, CommitMessage, CommittedDate, User}
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators.pushEvents
 import org.scalatest.Matchers._
@@ -46,16 +46,13 @@ class CommitEventsFinderSpec extends WordSpec {
   }
 
   private def commitEventFrom(pushEvent: PushEvent) = CommitEvent(
-    id        = pushEvent.after,
-    message   = "",
-    timestamp = Instant.EPOCH,
-    pushUser  = pushEvent.pushUser,
-    author    = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-    committer = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-    parents   = Seq(),
-    project   = pushEvent.project,
-    added     = Nil,
-    modified  = Nil,
-    removed   = Nil
+    id            = pushEvent.after,
+    message       = CommitMessage("abc"),
+    committedDate = CommittedDate(Instant.EPOCH),
+    pushUser      = pushEvent.pushUser,
+    author        = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
+    committer     = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
+    parents       = Seq(),
+    project       = pushEvent.project
   )
 }

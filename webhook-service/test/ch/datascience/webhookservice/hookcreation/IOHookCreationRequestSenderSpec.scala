@@ -22,11 +22,10 @@ import cats.effect.{IO, Sync}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators.projectIds
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import com.github.tomakehurst.wiremock.WireMockServer
-import com.github.tomakehurst.wiremock.client.WireMock
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
@@ -34,11 +33,11 @@ import io.circe.Json
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, WordSpec}
+import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with BeforeAndAfterEach with BeforeAndAfterAll {
+class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
 
   "createHook" should {
 
@@ -118,7 +117,7 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Bef
   private trait TestCase {
     val projectId          = projectIds.generateOne
     val hookAuthToken      = hookAuthTokens.generateOne
-    val gitLabUrl          = url(s"http://localhost:$port")
+    val gitLabUrl          = url(externalServiceBaseUrl)
     val selfUrl            = validatedUrls.generateOne
     val hookCreationConfig = HookCreationConfig(gitLabUrl, selfUrl)
 
@@ -145,21 +144,5 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Bef
       RefType
         .applyRef[String Refined Url](value)
         .getOrElse(throw new IllegalArgumentException("Invalid url value"))
-  }
-
-  private val port   = 9995
-  private val server = new WireMockServer(port)
-
-  override def beforeEach {
-    server.resetAll()
-  }
-
-  override def beforeAll {
-    server.start()
-    WireMock.configureFor(port)
-  }
-
-  override def afterAll {
-    server.stop()
   }
 }

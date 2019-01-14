@@ -38,9 +38,9 @@ class CommitEventSerializerSpec extends WordSpec {
       serializer.serialiseToJsonString(commitEvent) shouldBe Success(
         Json
           .obj(
-            "id"        -> Json.fromString(commitEvent.id.value),
-            "message"   -> Json.fromString(commitEvent.message),
-            "timestamp" -> Json.fromString(commitEvent.timestamp.toString),
+            "id"            -> Json.fromString(commitEvent.id.value),
+            "message"       -> Json.fromString(commitEvent.message.value),
+            "committedDate" -> Json.fromString(commitEvent.committedDate.toString),
             "pushUser" -> Json.obj(
               "userId"   -> Json.fromInt(commitEvent.pushUser.userId.value),
               "username" -> Json.fromString(commitEvent.pushUser.username.value),
@@ -58,10 +58,7 @@ class CommitEventSerializerSpec extends WordSpec {
             "project" -> Json.obj(
               "id"   -> Json.fromInt(commitEvent.project.id.value),
               "path" -> Json.fromString(commitEvent.project.path.value)
-            ),
-            "added"    -> Json.fromValues(commitEvent.added.map(added => Json.fromString(added.value))),
-            "modified" -> Json.fromValues(commitEvent.modified.map(modified => Json.fromString(modified.value))),
-            "removed"  -> Json.fromValues(commitEvent.removed.map(removed => Json.fromString(removed.value)))
+            )
           )
           .noSpaces
       )

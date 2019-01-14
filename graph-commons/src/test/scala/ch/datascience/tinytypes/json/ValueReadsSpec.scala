@@ -18,11 +18,15 @@
 
 package ch.datascience.tinytypes.json
 
+import java.time.Instant
+
+import ch.datascience.generators.Generators.timestamps
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 
-class ValueReadsSpec extends WordSpec {
+class ValueReadsSpec extends WordSpec with PropertyChecks {
 
   "jsStringReads" should {
 
@@ -63,6 +67,31 @@ class ValueReadsSpec extends WordSpec {
 
     "convert Int to JsNumber" in {
       writes(1) shouldBe JsNumber(1)
+    }
+  }
+
+  "jsInstantStringReads" should {
+
+    val reads = implicitly[JsValue => JsResult[Instant]]
+
+    "return value for JsNumber" in {
+      forAll(timestamps) { timestamp =>
+        reads(JsString(timestamp.toString)) shouldBe JsSuccess(timestamp)
+      }
+    }
+
+    "return a JsError if value is not an Instant" in {
+      reads(JsString("1")) shouldBe JsError(s"""Expected Instant but got '"1"'""")
+    }
+  }
+
+  "instantToJson" should {
+    val writes = implicitly[Instant => JsValue]
+
+    "convert Instant to JsNumber" in {
+      forAll(timestamps) { timestamp =>
+        writes(timestamp) shouldBe JsString(timestamp.toString)
+      }
     }
   }
 }

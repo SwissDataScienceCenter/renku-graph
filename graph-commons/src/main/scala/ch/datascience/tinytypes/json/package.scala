@@ -18,6 +18,8 @@
 
 package ch.datascience.tinytypes
 
+import java.time.Instant
+
 import play.api.libs.json._
 
 import scala.language.implicitConversions
@@ -43,4 +45,15 @@ package object json {
       )
 
   implicit val intToJson: Int => JsValue = JsNumber(_)
+
+  implicit def jsInstantReads(jsValue: JsValue): JsResult[Instant] =
+    jsValue
+      .validate[Instant]
+      .fold(
+        _ => JsError(s"Expected Instant but got '$jsValue'"),
+        value => JsSuccess(value)
+      )
+
+  implicit val instantToJson: Instant => JsValue =
+    instant => implicitly[Writes[Instant]].writes(instant)
 }

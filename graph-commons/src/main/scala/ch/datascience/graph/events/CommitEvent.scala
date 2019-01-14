@@ -20,23 +20,21 @@ package ch.datascience.graph.events
 
 import java.time.Instant
 
-import ch.datascience.tinytypes.constraints.{GitSha, NonBlank}
+import ch.datascience.tinytypes.constraints.{GitSha, InstantInThePast, NonBlank}
 import ch.datascience.tinytypes.json._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import io.circe.Decoder
 import play.api.libs.json.{Format, Json, Writes}
 
 case class CommitEvent(
-    id:        CommitId,
-    message:   String,
-    timestamp: Instant,
-    pushUser:  PushUser,
-    author:    User,
-    committer: User,
-    parents:   Seq[CommitId],
-    project:   Project,
-    added:     Seq[GitFile],
-    modified:  Seq[GitFile],
-    removed:   Seq[GitFile]
+    id:            CommitId,
+    message:       CommitMessage,
+    committedDate: CommittedDate,
+    pushUser:      PushUser,
+    author:        User,
+    committer:     User,
+    parents:       Seq[CommitId],
+    project:       Project
 )
 
 object CommitEvent {
@@ -48,12 +46,18 @@ object CommitEvent {
 
 class CommitId private (val value: String) extends AnyVal with TinyType[String]
 object CommitId extends TinyTypeFactory[String, CommitId](new CommitId(_)) with GitSha {
-
-  implicit lazy val commitIdFormat: Format[CommitId] = TinyTypeFormat(CommitId.apply)
+  implicit lazy val format:  Format[CommitId]  = TinyTypeFormat(CommitId.apply)
+  implicit lazy val decoder: Decoder[CommitId] = Decoder.decodeString.map(CommitId.apply)
 }
 
-class GitFile private (val value: String) extends AnyVal with TinyType[String]
-object GitFile extends TinyTypeFactory[String, GitFile](new GitFile(_)) with NonBlank {
+class CommitMessage private (val value: String) extends AnyVal with TinyType[String]
+object CommitMessage extends TinyTypeFactory[String, CommitMessage](new CommitMessage(_)) with NonBlank {
+  implicit lazy val format:  Format[CommitMessage]  = TinyTypeFormat(CommitMessage.apply)
+  implicit lazy val decoder: Decoder[CommitMessage] = Decoder.decodeString.map(CommitMessage.apply)
+}
 
-  implicit lazy val gitFileFormat: Format[GitFile] = TinyTypeFormat(GitFile.apply)
+class CommittedDate private (val value: Instant) extends AnyVal with TinyType[Instant]
+object CommittedDate extends TinyTypeFactory[Instant, CommittedDate](new CommittedDate(_)) with InstantInThePast {
+  implicit lazy val format:  Format[CommittedDate]  = TinyTypeFormat(CommittedDate.apply)
+  implicit lazy val decoder: Decoder[CommittedDate] = Decoder.decodeZonedDateTime.map(t => CommittedDate(t.toInstant))
 }
