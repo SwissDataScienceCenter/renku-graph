@@ -22,9 +22,9 @@ import java.time.{LocalDateTime, ZoneOffset}
 
 import cats.effect.{IO, Sync}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, nonNegativeInts}
+import ch.datascience.generators.Generators.exceptions
+import ch.datascience.graph.events.CommittedDate
 import ch.datascience.graph.events.EventsGenerators.{projectIds, _}
-import ch.datascience.graph.events.{CommitId, CommittedDate}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.eventprocessing.pushevent.GitLabConfig._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
@@ -34,7 +34,6 @@ import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
 import io.circe.parser._
 import org.http4s.Status
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -123,7 +122,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     val committedDate = CommittedDate(LocalDateTime.of(2012, 9, 20, 9, 6, 12).atOffset(ZoneOffset.ofHours(3)).toInstant)
     val author        = users.generateOne
     val committer     = users.generateOne
-    val parents       = parentsLists.generateOne
+    val parents       = parentsIdsLists.generateOne
 
     lazy val Right(responseJson) = parse {
       s"""
@@ -154,10 +153,5 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
       RefType
         .applyRef[String Refined Url](value)
         .getOrElse(throw new IllegalArgumentException("Invalid url value"))
-
-    private lazy val parentsLists: Gen[List[CommitId]] = for {
-      parentCommitsNumber <- nonNegativeInts(4)
-      parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
-    } yield parents
   }
 }

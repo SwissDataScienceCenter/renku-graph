@@ -118,7 +118,9 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
       logger:                Logger[Try]
   ) extends CommitEventSender[Try](eventLog, commitEventSerializer, logger)
 
-  private class TestCommitEventsFinder extends CommitEventsFinder[Try]
+  private class TestCommitEventsFinder(
+      commitInfoFinder: CommitInfoFinder[Try]
+  ) extends CommitEventsFinder[Try](commitInfoFinder)
 
   private def commitEventFrom(pushEvent: PushEvent) = CommitEvent(
     id            = pushEvent.after,

@@ -18,41 +18,83 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import java.time.Instant
-
+import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.{CommitEvent, CommitMessage, CommittedDate, User}
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.graph.events._
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators.pushEvents
+import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
-class CommitEventsFinderSpec extends WordSpec {
+class CommitEventsFinderSpec extends WordSpec with MockFactory {
 
   "findCommitEvents" should {
 
-    "return commit event for the given push event" in new TestCase {
-      commitEventFinder.findCommitEvents(pushEvent) shouldBe Success(commitEventFrom(pushEvent))
+    "find commit info and combine that with the given push event to return commit event" in new TestCase {
+      val pushEvent = pushEvents.generateOne
+
+      val commitInfo = commitInfos(pushEvent).generateOne
+      (commitInfoFinder
+        .findCommitInfo(_: ProjectId, _: CommitId))
+        .expects(pushEvent.project.id, pushEvent.after)
+        .returning(context.pure(commitInfo))
+
+      commitEventFinder.findCommitEvents(pushEvent) shouldBe Success(commitEventFrom(pushEvent, commitInfo))
+    }
+
+    "fail if finding commit info fails" in new TestCase {
+      val pushEvent = pushEvents.generateOne
+
+      val exception = exceptions.generateOne
+      (commitInfoFinder
+        .findCommitInfo(_: ProjectId, _: CommitId))
+        .expects(pushEvent.project.id, pushEvent.after)
+        .returning(context.raiseError(exception))
+
+      commitEventFinder.findCommitEvents(pushEvent) shouldBe Failure(exception)
     }
   }
 
   private trait TestCase {
-    val pushEvent = pushEvents.generateOne
+    val context = MonadError[Try, Throwable]
 
-    val commitEventFinder = new CommitEventsFinder[Try]()
+    val commitInfoFinder  = mock[CommitInfoFinder[Try]]
+    val commitEventFinder = new CommitEventsFinder[Try](commitInfoFinder)
   }
 
-  private def commitEventFrom(pushEvent: PushEvent) = CommitEvent(
+  private def commitEventFrom(pushEvent: PushEvent, commitInfo: CommitInfo) = CommitEvent(
     id            = pushEvent.after,
-    message       = CommitMessage("abc"),
-    committedDate = CommittedDate(Instant.EPOCH),
+    message       = commitInfo.message,
+    committedDate = commitInfo.committedDate,
     pushUser      = pushEvent.pushUser,
-    author        = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-    committer     = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-    parents       = Seq(),
+    author        = commitInfo.author,
+    committer     = commitInfo.committer,
+    parents       = commitInfo.parents,
     project       = pushEvent.project
   )
+
+  private def commitInfos(pushEvent: PushEvent): Gen[CommitInfo] =
+    for {
+      message       <- commitMessages
+      committedDate <- committedDates
+      author        <- users
+      committer     <- users
+      parentsIds    <- parentsIdsLists
+    } yield
+      CommitInfo(
+        id            = pushEvent.after,
+        message       = message,
+        committedDate = committedDate,
+        author        = author,
+        committer     = committer,
+        parents       = parentsIds
+      )
+
 }

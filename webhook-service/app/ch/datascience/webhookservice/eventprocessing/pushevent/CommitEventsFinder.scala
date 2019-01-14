@@ -18,29 +18,38 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import java.time.Instant
-
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.graph.events.{CommitEvent, CommitMessage, CommittedDate, User}
+import cats.implicits._
+import ch.datascience.graph.events.CommitEvent
 import ch.datascience.webhookservice.eventprocessing.PushEvent
-import javax.inject.Singleton
+import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
 import scala.util.Try
 
-private class CommitEventsFinder[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable]) {
+private class CommitEventsFinder[Interpretation[_]](
+    commitInfoFinder: CommitInfoFinder[Interpretation]
+)(implicit ME:        MonadError[Interpretation, Throwable]) {
 
-  def findCommitEvents(pushEvent: PushEvent): Interpretation[CommitEvent] = ME.fromTry {
+  import commitInfoFinder._
+
+  def findCommitEvents(pushEvent: PushEvent): Interpretation[CommitEvent] =
+    for {
+      commitInfo  <- findCommitInfo(pushEvent.project.id, pushEvent.after)
+      commitEvent <- merge(pushEvent, commitInfo)
+    } yield commitEvent
+
+  private def merge(pushEvent: PushEvent, commitInfo: CommitInfo): Interpretation[CommitEvent] = ME.fromTry {
     Try {
       CommitEvent(
         id            = pushEvent.after,
-        message       = CommitMessage("abc"),
-        committedDate = CommittedDate(Instant.EPOCH),
+        message       = commitInfo.message,
+        committedDate = commitInfo.committedDate,
         pushUser      = pushEvent.pushUser,
-        author        = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-        committer     = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
-        parents       = Seq(),
+        author        = commitInfo.author,
+        committer     = commitInfo.committer,
+        parents       = commitInfo.parents,
         project       = pushEvent.project
       )
     }
@@ -48,4 +57,6 @@ private class CommitEventsFinder[Interpretation[_]]()(implicit ME: MonadError[In
 }
 
 @Singleton
-private class IOCommitEventsFinder() extends CommitEventsFinder[IO]
+private class IOCommitEventsFinder @Inject()(
+    commitInfoFinder: IOCommitInfoFinder
+) extends CommitEventsFinder[IO](commitInfoFinder)

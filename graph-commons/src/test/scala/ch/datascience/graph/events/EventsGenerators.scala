@@ -52,15 +52,19 @@ object EventsGenerators {
     path      <- projectPath
   } yield Project(projectId, path)
 
-  implicit val commitEvents: Gen[CommitEvent] = for {
-    commitId            <- commitIds
-    message             <- commitMessages
-    committedDate       <- committedDates
-    pushUser            <- pushUsers
-    author              <- users
-    committer           <- users
+  val parentsIdsLists: Gen[List[CommitId]] = for {
     parentCommitsNumber <- nonNegativeInts(4)
     parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
-    project             <- projects
-  } yield CommitEvent(commitId, message, committedDate, pushUser, author, committer, parents, project)
+  } yield parents
+
+  implicit val commitEvents: Gen[CommitEvent] = for {
+    commitId      <- commitIds
+    message       <- commitMessages
+    committedDate <- committedDates
+    pushUser      <- pushUsers
+    author        <- users
+    committer     <- users
+    parentsIds    <- parentsIdsLists
+    project       <- projects
+  } yield CommitEvent(commitId, message, committedDate, pushUser, author, committer, parentsIds, project)
 }
