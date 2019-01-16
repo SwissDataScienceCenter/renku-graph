@@ -59,6 +59,6 @@ class HookCreationEndpoint @Inject() (
 
   private val toResult: PartialFunction[Throwable, Result] = {
     case UnauthorizedException => Unauthorized( ErrorMessage( "Unauthorized" ).toJson )
-    case NonFatal( exception ) => BadGateway( ErrorMessage( exception.getMessage ).toJson )
+    case NonFatal( exception ) => InternalServerError( ErrorMessage( exception.getMessage ).toJson )
   }
 }

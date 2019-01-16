@@ -37,7 +37,7 @@ A `PRIVATE-TOKEN` with user's GitLab token is required.
 |----------------------------|----------------------------------------------------------------|
 | CREATED (201)              | For valid payloads                                             |
 | UNAUTHORIZED (401)         | When there is no `PRIVATE-TOKEN` in the header or it's invalid |
-| BAD_GATEWAY (502)          | When there were problems with webhook creation                 |
+| INTERNAL SERVER ERROR (500)| When there were problems with webhook creation                 |
 
 #### POST /webhook-event
 

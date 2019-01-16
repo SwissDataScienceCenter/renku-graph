@@ -3,7 +3,7 @@ jena:
     password: YjJ7OT8B0R6PJu9
 
 gitlab:
-  url: http://192.168.99.100/gitlab
+  url: https://renkulab.io/gitlab
 
 webhookService:
   play:

@@ -76,7 +76,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       contentAsJson( response ) shouldBe a[JsValue]
     }
 
-    "return BAD_GATEWAY when there was an error during hook creation" in new TestCase {
+    "return INTERNAL_SERVER_ERROR when there was an error during hook creation" in new TestCase {
 
       val errorMessage = ErrorMessage( "some error" )
       ( hookCreator.createHook( _: ProjectId, _: UserAuthToken )( _: MonadError[IO, Throwable] ) )
@@ -85,7 +85,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       val response = call( createHook( projectId ), request.withHeaders( "PRIVATE-TOKEN" -> authToken.toString ) )
 
-      status( response ) shouldBe BAD_GATEWAY
+      status( response ) shouldBe INTERNAL_SERVER_ERROR
       contentType( response ) shouldBe Some( JSON )
       contentAsJson( response ) shouldBe errorMessage.toJson
     }
