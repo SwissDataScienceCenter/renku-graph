@@ -55,7 +55,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       hookCreation.createHook(projectId, accessToken) shouldBe context.pure(())
 
-      logger.loggedOnly(Info, s"Hook created for project with id $projectId")
+      logger.loggedOnly(Info(s"Hook created for project with id $projectId"))
     }
 
     "log an error and return left if encryption of the hook auth token was unsuccessful" in new TestCase {
@@ -69,7 +69,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       hookCreation.createHook(projectId, accessToken) shouldBe error
 
-      logger.loggedOnly(Error, s"Hook creation failed for project with id $projectId", exception)
+      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
     "log an error and return left if creation of the hook in GitLab was unsuccessful" in new TestCase {
@@ -88,7 +88,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       hookCreation.createHook(projectId, accessToken) shouldBe error
 
-      logger.loggedOnly(Error, s"Hook creation failed for project with id $projectId", exception)
+      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
   }
 

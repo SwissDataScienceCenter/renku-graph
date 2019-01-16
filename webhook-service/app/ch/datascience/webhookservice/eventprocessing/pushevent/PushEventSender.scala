@@ -21,6 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import cats.effect.IO
 import cats.implicits._
 import cats.{Monad, MonadError}
+import ch.datascience.graph.events.CommitEvent
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, IOCommitEventSender}
@@ -40,18 +41,81 @@ class PushEventSender[Interpretation[_]: Monad](
   import commitEventsFinder._
 
   def storeCommitsInEventLog(pushEvent: PushEvent): Interpretation[Unit] = {
+    implicit val implicitPushEvent: PushEvent = pushEvent
     for {
-      commitEvent <- findCommitEvents(pushEvent)
-      _           <- send(commitEvent)
-      _           <- logger.info(s"PushEvent for id: ${pushEvent.after}, project: ${pushEvent.project.id} stored")
+      commitEventsStream <- findCommitEvents(pushEvent)
+      _                  <- (commitEventsStream map sendEvent).sequence
+      _                  <- logger.info(logMessageFor(pushEvent, "stored in event log"))
     } yield ()
   } recoverWith loggingError(pushEvent)
 
+  private def sendEvent(
+      maybeCommitEvent: Interpretation[CommitEvent]
+  )(implicit pushEvent: PushEvent) = {
+    for {
+      commitEvent <- maybeCommitEvent recoverWith fetchErrorLogging
+      _           <- send(commitEvent) recoverWith sendErrorLogging(commitEvent)
+      _           <- logger.info(logMessageFor(pushEvent, "stored in event log", Some(commitEvent)))
+    } yield ()
+  } recover withLogging
+
   private def loggingError(pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
-      logger.error(exception)(s"Storing pushEvent for id: ${pushEvent.after}, project: ${pushEvent.project.id} failed")
+      logger.error(exception)(logMessageFor(pushEvent, "storing in event log failed"))
       ME.raiseError(exception)
   }
+
+  private case class CommitEventProcessingException(
+      maybeCommitEvent: Option[CommitEvent],
+      message:          String,
+      cause:            Throwable
+  ) extends Exception
+
+  private def fetchErrorLogging(
+      implicit pushEvent: PushEvent
+  ): PartialFunction[Throwable, Interpretation[CommitEvent]] = {
+    case NonFatal(exception) =>
+      ME.raiseError(
+        CommitEventProcessingException(
+          maybeCommitEvent = None,
+          message          = "fetching one of the commit events failed",
+          cause            = exception
+        )
+      )
+  }
+
+  private def sendErrorLogging(
+      commitEvent:      CommitEvent
+  )(implicit pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      ME.raiseError(
+        CommitEventProcessingException(
+          maybeCommitEvent = Some(commitEvent),
+          message          = "storing in event log failed",
+          cause            = exception
+        )
+      )
+  }
+
+  private def withLogging(
+      implicit pushEvent: PushEvent
+  ): PartialFunction[Throwable, Unit] = {
+    case CommitEventProcessingException(maybeCommitEvent, message, cause) =>
+      logger.error(cause)(logMessageFor(pushEvent, message, maybeCommitEvent))
+    case NonFatal(exception) =>
+      ME.raiseError(exception)
+  }
+
+  private def logMessageFor(
+      pushEvent:        PushEvent,
+      message:          String,
+      maybeCommitEvent: Option[CommitEvent] = None
+  ) =
+    s"PushEvent after: ${pushEvent.after}, " +
+      s"project: ${pushEvent.project.id}" +
+      s"${maybeCommitEvent.map(_.id).map(id => s", CommitEvent id: $id").getOrElse("")}" +
+      s": $message"
+
 }
 
 @Singleton

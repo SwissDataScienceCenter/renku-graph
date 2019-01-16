@@ -122,7 +122,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     val committedDate = CommittedDate(LocalDateTime.of(2012, 9, 20, 9, 6, 12).atOffset(ZoneOffset.ofHours(3)).toInstant)
     val author        = users.generateOne
     val committer     = users.generateOne
-    val parents       = parentsIdsLists.generateOne
+    val parents       = parentsIdsLists().generateOne
 
     lazy val Right(responseJson) = parse {
       s"""

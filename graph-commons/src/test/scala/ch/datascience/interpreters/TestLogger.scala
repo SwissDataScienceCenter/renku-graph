@@ -19,6 +19,7 @@
 package ch.datascience.interpreters
 
 import cats.Monad
+import ch.datascience.interpreters.TestLogger.LogMessage.{Message, MessageAndThrowable}
 import io.chrisdavenport.log4cats.Logger
 import org.scalatest.Matchers._
 
@@ -29,12 +30,13 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
 
   import TestLogger.Level._
   import TestLogger._
+  import LogMessage._
 
-  def loggedOnly(level: Level, message: String): Unit =
-    invocations should contain only (level -> Message(message))
+  def loggedOnly(args: (Level, LogMessage)*): Unit =
+    invocations should contain only (args: _*)
 
-  def loggedOnly(level: Level, message: String, throwable: Throwable): Unit =
-    invocations should contain only (level -> MessageAndThrowable(message, throwable))
+  def loggedOnly(args: List[(Level, LogMessage)]): Unit =
+    invocations should contain only (args: _*)
 
   def expectNoLogs(): Unit =
     if (invocations.nonEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")
@@ -89,7 +91,7 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
     implicitly[Monad[Interpretation]].pure(())
   }
 
-  private[this] val invocations = ArrayBuffer.empty[(Level, Payload)]
+  private[this] val invocations = ArrayBuffer.empty[(Level, LogMessage)]
 
   private val invocationsPrettyPrint: () => String = () =>
     invocations
@@ -104,16 +106,26 @@ object TestLogger {
 
   def apply[Interpretation[_]: Monad](): TestLogger[Interpretation] = new TestLogger[Interpretation]
 
-  sealed trait Level
-  object Level {
-    case object Error extends Level
-    case object Warn  extends Level
-    case object Info  extends Level
-    case object Debug extends Level
-    case object Trace extends Level
+  sealed trait Level {
+
+    def apply(message: String): (Level, LogMessage) =
+      this -> Message(message)
+
+    def apply(message: String, throwable: Throwable): (Level, LogMessage) =
+      this -> MessageAndThrowable(message, throwable)
   }
 
-  private sealed trait Payload
-  private case class Message(message:             String) extends Payload
-  private case class MessageAndThrowable(message: String, throwable: Throwable) extends Payload
+  object Level {
+    final case object Error extends Level
+    final case object Warn  extends Level
+    final case object Info  extends Level
+    final case object Debug extends Level
+    final case object Trace extends Level
+  }
+
+  sealed trait LogMessage
+  object LogMessage {
+    final case class Message(message:             String) extends LogMessage
+    final case class MessageAndThrowable(message: String, throwable: Throwable) extends LogMessage
+  }
 }

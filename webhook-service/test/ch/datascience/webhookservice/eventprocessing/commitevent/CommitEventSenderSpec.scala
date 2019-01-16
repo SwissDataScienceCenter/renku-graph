@@ -51,10 +51,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
 
       eventSender.send(commitEvent)
 
-      logger.loggedOnly(
-        Info,
-        s"Commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} stored"
-      )
+      logger.loggedOnly(Info(s"Commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} stored"))
     }
 
     "fail when event serialization fails" in new TestCase {
@@ -68,9 +65,10 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
       eventSender.send(commitEvent)
 
       logger.loggedOnly(
-        Error,
-        s"Storing commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} failed",
-        exception
+        Error(
+          s"Storing commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} failed",
+          exception
+        )
       )
     }
 
@@ -91,9 +89,10 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
       eventSender.send(commitEvent)
 
       logger.loggedOnly(
-        Error,
-        s"Storing commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} failed",
-        exception
+        Error(
+          s"Storing commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} failed",
+          exception
+        )
       )
     }
   }

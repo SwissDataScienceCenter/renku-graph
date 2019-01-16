@@ -37,19 +37,49 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
 
   "findCommitEvents" should {
 
-    "find commit info and combine that with the given push event to return commit event" in new TestCase {
+    "return single commit event if finding commit info returns no parents" in new TestCase {
       val pushEvent = pushEvents.generateOne
 
-      val commitInfo = commitInfos(pushEvent).generateOne
+      val commitInfo = commitInfos(pushEvent.after, noParents).generateOne
+
       (commitInfoFinder
         .findCommitInfo(_: ProjectId, _: CommitId))
         .expects(pushEvent.project.id, pushEvent.after)
         .returning(context.pure(commitInfo))
 
-      commitEventFinder.findCommitEvents(pushEvent) shouldBe Success(commitEventFrom(pushEvent, commitInfo))
+      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+        Seq(commitEventFrom(pushEvent, commitInfo))
+      )
     }
 
-    "fail if finding commit info fails" in new TestCase {
+    "return commit events starting from the push event's 'after' until commit info with no parents" in new TestCase {
+      val pushEvent = pushEvents.generateOne
+
+      val firstCommitInfo = commitInfos(pushEvent.after, parentsIdsLists(minNumber = 1)).generateOne
+
+      val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
+        commitInfos(parentId, singleParent).generateOne
+      }
+
+      val thirdLevelCommitInfos = secondLevelCommitInfos.flatMap(_.parents) map { parentId =>
+        commitInfos(parentId, noParents).generateOne
+      }
+
+      (Seq(firstCommitInfo) ++ secondLevelCommitInfos ++ thirdLevelCommitInfos) foreach { commitInfo =>
+        (commitInfoFinder
+          .findCommitInfo(_: ProjectId, _: CommitId))
+          .expects(pushEvent.project.id, commitInfo.id)
+          .returning(context.pure(commitInfo))
+      }
+
+      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+        Seq(commitEventFrom(pushEvent, firstCommitInfo)),
+        secondLevelCommitInfos.map(commitEventFrom(pushEvent, _)),
+        secondLevelCommitInfos.flatMap(_.parents).map(commitEventFrom(pushEvent, thirdLevelCommitInfos))
+      )
+    }
+
+    "fail if finding the first commit info fails" in new TestCase {
       val pushEvent = pushEvents.generateOne
 
       val exception = exceptions.generateOne
@@ -58,19 +88,54 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
         .expects(pushEvent.project.id, pushEvent.after)
         .returning(context.raiseError(exception))
 
-      commitEventFinder.findCommitEvents(pushEvent) shouldBe Failure(exception)
+      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe Success(
+        Seq(
+          Failure(exception)
+        )
+      )
+    }
+
+    "fail if finding one of the commit info fails" in new TestCase {
+      val pushEvent = pushEvents.generateOne
+
+      val firstCommitInfo = commitInfos(pushEvent.after, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
+
+      val secondLevelCommitInfo1 +: secondLevelCommitInfo2 +: Nil = firstCommitInfo.parents map { parentId =>
+        commitInfos(parentId, noParents).generateOne
+      }
+
+      Seq(firstCommitInfo, secondLevelCommitInfo2) foreach { commitInfo =>
+        (commitInfoFinder
+          .findCommitInfo(_: ProjectId, _: CommitId))
+          .expects(pushEvent.project.id, commitInfo.id)
+          .returning(context.pure(commitInfo))
+      }
+
+      val exception = exceptions.generateOne
+      (commitInfoFinder
+        .findCommitInfo(_: ProjectId, _: CommitId))
+        .expects(pushEvent.project.id, secondLevelCommitInfo1.id)
+        .returning(context.raiseError(exception))
+
+      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe Success(
+        Seq(
+          Success(commitEventFrom(pushEvent, firstCommitInfo)),
+          Failure(exception),
+          Success(commitEventFrom(pushEvent, secondLevelCommitInfo2))
+        )
+      )
     }
   }
 
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
+    val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
 
     val commitInfoFinder  = mock[CommitInfoFinder[Try]]
     val commitEventFinder = new CommitEventsFinder[Try](commitInfoFinder)
   }
 
   private def commitEventFrom(pushEvent: PushEvent, commitInfo: CommitInfo) = CommitEvent(
-    id            = pushEvent.after,
+    id            = commitInfo.id,
     message       = commitInfo.message,
     committedDate = commitInfo.committedDate,
     pushUser      = pushEvent.pushUser,
@@ -80,16 +145,31 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
     project       = pushEvent.project
   )
 
-  private def commitInfos(pushEvent: PushEvent): Gen[CommitInfo] =
+  private def commitEventFrom(
+      pushEvent:         PushEvent,
+      parentCommitInfos: Seq[CommitInfo]
+  )(parentId:            CommitId): CommitEvent =
+    commitEventFrom(
+      pushEvent = pushEvent,
+      commitInfo = parentCommitInfos
+        .find(_.id == parentId)
+        .getOrElse(throw new Exception(s"No commitInfo for $parentId"))
+    )
+
+  private def toSuccess(commitEvents: Seq[CommitEvent]*) = Success(
+    commitEvents.flatten map Success.apply
+  )
+
+  private def commitInfos(commitId: CommitId, parentsGenerator: Gen[List[CommitId]]): Gen[CommitInfo] =
     for {
       message       <- commitMessages
       committedDate <- committedDates
       author        <- users
       committer     <- users
-      parentsIds    <- parentsIdsLists
+      parentsIds    <- parentsGenerator
     } yield
       CommitInfo(
-        id            = pushEvent.after,
+        id            = commitId,
         message       = message,
         committedDate = committedDate,
         author        = author,
@@ -97,4 +177,7 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
         parents       = parentsIds
       )
 
+  private val noParents: Gen[List[CommitId]] = Gen.const(List.empty)
+
+  private val singleParent: Gen[List[CommitId]] = parentsIdsLists(minNumber = 1, maxNumber = 1)
 }

@@ -20,6 +20,7 @@ package ch.datascience.graph.events
 
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
+import org.scalacheck.Gen._
 
 object EventsGenerators {
 
@@ -52,10 +53,15 @@ object EventsGenerators {
     path      <- projectPath
   } yield Project(projectId, path)
 
-  val parentsIdsLists: Gen[List[CommitId]] = for {
-    parentCommitsNumber <- nonNegativeInts(4)
-    parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
-  } yield parents
+  implicit def parentsIdsLists(minNumber: Int = 0, maxNumber: Int = 4): Gen[List[CommitId]] = {
+    require(minNumber <= maxNumber,
+            s"minNumber = $minNumber is not <= maxNumber = $maxNumber for generating parents Ids list")
+
+    for {
+      parentCommitsNumber <- choose(minNumber, maxNumber)
+      parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
+    } yield parents
+  }
 
   implicit val commitEvents: Gen[CommitEvent] = for {
     commitId      <- commitIds
@@ -64,7 +70,7 @@ object EventsGenerators {
     pushUser      <- pushUsers
     author        <- users
     committer     <- users
-    parentsIds    <- parentsIdsLists
+    parentsIds    <- parentsIdsLists()
     project       <- projects
   } yield CommitEvent(commitId, message, committedDate, pushUser, author, committer, parentsIds, project)
 }
