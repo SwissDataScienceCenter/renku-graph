@@ -18,8 +18,12 @@
 
 package ch.datascience.webhookservice.generators
 
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
+import ch.datascience.webhookservice.model.UserAuthToken
 import ch.datascience.webhookservice.queues.pushevent.PushEvent
+import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 
 object ServiceTypesGenerators {
@@ -30,4 +34,15 @@ object ServiceTypesGenerators {
     pushUser <- pushUsers
     project <- projects
   } yield PushEvent( before, after, pushUser, project )
+
+  implicit val userAuthTokens: Gen[UserAuthToken] = for {
+    length <- Gen.choose( 5, 40 )
+    chars <- Gen.listOfN( length, Gen.oneOf( ( 0 to 9 ).map( _.toString ) ++ ( 'a' to 'z' ).map( _.toString ) ) )
+  } yield UserAuthToken( chars.mkString( "" ) )
+
+  implicit val hookAuthTokens: Gen[HookAuthToken] = nonEmptyStrings().map { value =>
+    RefType
+      .applyRef[HookAuthToken]( value )
+      .getOrElse( throw new IllegalArgumentException( "Generated HookAuthToken cannot be blank" ) )
+  }
 }

@@ -23,6 +23,22 @@ Verifies service health.
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
 
+#### POST /projects/:id/hooks
+
+Creates a webhook for a project with the given `project id`.
+
+**Request format**
+
+A `PRIVATE-TOKEN` with user's GitLab token is required.
+
+**Response**
+
+| Status                     | Description                                                    |
+|----------------------------|----------------------------------------------------------------|
+| CREATED (201)              | For valid payloads                                             |
+| UNAUTHORIZED (401)         | When there is no `PRIVATE-TOKEN` in the header or it's invalid |
+| INTERNAL SERVER ERROR (500)| When there were problems with webhook creation                 |
+
 #### POST /webhook-event
 
 Consumes a Push Event.

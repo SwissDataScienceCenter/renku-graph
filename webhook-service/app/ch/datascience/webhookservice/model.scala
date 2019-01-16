@@ -19,25 +19,18 @@
 package ch.datascience.webhookservice
 
 import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.json._
 import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
-import play.api.libs.json.{ JsError, JsValue, Json, Writes }
+import play.api.libs.json.Format
 
-class ErrorResponse private ( val value: String ) extends AnyVal with TinyType[String]
-object ErrorResponse extends TinyTypeFactory[String, ErrorResponse]( new ErrorResponse( _ ) ) with NonBlank {
+object model {
 
-  implicit val errorResponseWrites: Writes[ErrorResponse] = Writes[ErrorResponse] {
-    case ErrorResponse( message ) => Json.obj( "error" -> message )
-  }
+  class UserAuthToken private ( val value: String ) extends AnyVal with TinyType[String]
 
-  def apply( jsError: JsError ): ErrorResponse = {
-    val errorMessage = jsError.errors.foldLeft( "Json deserialization error(s):" ) {
-      case ( message, ( path, pathErrors ) ) =>
-        s"$message\n $path -> ${pathErrors.map( _.message ).mkString( "; " )}"
-    }
-    ErrorResponse( errorMessage )
-  }
+  object UserAuthToken
+    extends TinyTypeFactory[String, UserAuthToken]( new UserAuthToken( _ ) )
+    with NonBlank {
 
-  implicit class ErrorResponseOps( errorResponse: ErrorResponse ) {
-    lazy val toJson: JsValue = Json.toJson( errorResponse )
+    implicit lazy val authTokenFormat: Format[UserAuthToken] = TinyTypeFormat( UserAuthToken.apply )
   }
 }

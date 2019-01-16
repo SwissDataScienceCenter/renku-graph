@@ -20,18 +20,20 @@ organization := "ch.datascience"
 version := "0.1.0-SNAPSHOT"
 name := "renku-graph-commons"
 
-// Play JSON library
-libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10"
+val pureConfigVersion = "0.10.1"
+libraryDependencies += "com.github.pureconfig" %% "pureconfig" % pureConfigVersion
+libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats-effect" % pureConfigVersion
+val playVersion = "2.6.10"
+libraryDependencies += "com.typesafe.play" %% "play-json" % playVersion
+val refinedVersion = "0.9.3"
+libraryDependencies += "eu.timepit" %% "refined" % refinedVersion
+libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
+val log4CatsVersion = "0.2.0"
+libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % log4CatsVersion
+libraryDependencies += "org.typelevel" %% "cats-core" % "1.5.0"
 
-val akkaStreamsVersion = "2.5.17"
-
-// Akka Streams library
-libraryDependencies += "com.typesafe.akka" %% "akka-stream" % akkaStreamsVersion
-
-// ScalaTest
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test
-
+// Test dependencies
+libraryDependencies += component("play-test") % Test
+libraryDependencies += "org.scalamock" %% "scalamock" % "4.1.0" % Test
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
-
-// Akka Streams test kit
-libraryDependencies += "com.typesafe.akka" %% "akka-stream-testkit" % akkaStreamsVersion % Test
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test

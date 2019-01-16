@@ -59,6 +59,8 @@ lazy val commonSettings = Seq(
   organization := "ch.datascience",
   scalaVersion := "2.12.8",
 
+  scalacOptions += "-Ypartial-unification",
+    
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
