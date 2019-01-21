@@ -20,10 +20,10 @@ package ch.datascience.graph.events
 
 import java.time.Instant
 
-import ch.datascience.tinytypes.constraints.{ GitSha, NonBlank }
+import ch.datascience.tinytypes.constraints.{GitSha, NonBlank}
 import ch.datascience.tinytypes.json._
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
-import play.api.libs.json.{ Format, Json, Writes }
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import play.api.libs.json.{Format, Json, Writes}
 
 case class CommitEvent(
     id:        CommitId,
@@ -40,24 +40,20 @@ case class CommitEvent(
 )
 
 object CommitEvent {
-  private implicit val userWrites: Writes[User] = Json.writes[User]
-  private implicit val pushUserWrites: Writes[PushUser] = Json.writes[PushUser]
-  private implicit val projectWrites: Writes[Project] = Json.writes[Project]
-  implicit val commitEventWrites: Writes[CommitEvent] = Json.writes[CommitEvent]
+  private implicit val userWrites:     Writes[User]        = Json.writes[User]
+  private implicit val pushUserWrites: Writes[PushUser]    = Json.writes[PushUser]
+  private implicit val projectWrites:  Writes[Project]     = Json.writes[Project]
+  implicit val commitEventWrites:      Writes[CommitEvent] = Json.writes[CommitEvent]
 }
 
-class CommitId private ( val value: String ) extends AnyVal with TinyType[String]
-object CommitId
-  extends TinyTypeFactory[String, CommitId]( new CommitId( _ ) )
-  with GitSha {
+class CommitId private (val value: String) extends AnyVal with TinyType[String]
+object CommitId extends TinyTypeFactory[String, CommitId](new CommitId(_)) with GitSha {
 
-  implicit lazy val commitIdFormat: Format[CommitId] = TinyTypeFormat( CommitId.apply )
+  implicit lazy val commitIdFormat: Format[CommitId] = TinyTypeFormat(CommitId.apply)
 }
 
-class GitFile private ( val value: String ) extends AnyVal with TinyType[String]
-object GitFile
-  extends TinyTypeFactory[String, GitFile]( new GitFile( _ ) )
-  with NonBlank {
+class GitFile private (val value: String) extends AnyVal with TinyType[String]
+object GitFile extends TinyTypeFactory[String, GitFile](new GitFile(_)) with NonBlank {
 
-  implicit lazy val gitFileFormat: Format[GitFile] = TinyTypeFormat( GitFile.apply )
+  implicit lazy val gitFileFormat: Format[GitFile] = TinyTypeFormat(GitFile.apply)
 }

@@ -20,40 +20,40 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect._
 import cats.implicits._
-import cats.{ Monad, MonadError }
+import cats.{Monad, MonadError}
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
-import ch.datascience.webhookservice.crypto.{ HookTokenCrypto, IOHookTokenCrypto }
+import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
 import ch.datascience.webhookservice.model.UserAuthToken
 import io.chrisdavenport.log4cats.Logger
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private class HookCreator[Interpretation[_] : Monad](
+private class HookCreator[Interpretation[_]: Monad](
     gitLabHookCreation: HookCreationRequestSender[Interpretation],
     logger:             Logger[Interpretation],
     hookTokenCrypto:    HookTokenCrypto[Interpretation]
 ) {
 
-  def createHook( projectId: ProjectId, userAuthToken: UserAuthToken )( implicit ME: MonadError[Interpretation, Throwable] ): Interpretation[Unit] = {
+  def createHook(projectId: ProjectId, userAuthToken: UserAuthToken)(
+      implicit ME:          MonadError[Interpretation, Throwable]): Interpretation[Unit] = {
     for {
-      hookAuthToken <- hookTokenCrypto.encrypt( projectId.toString )
-      _ <- gitLabHookCreation.createHook( projectId, userAuthToken, hookAuthToken )
-      _ <- logger.info( s"Hook created for project with id $projectId" )
+      hookAuthToken <- hookTokenCrypto.encrypt(projectId.toString)
+      _             <- gitLabHookCreation.createHook(projectId, userAuthToken, hookAuthToken)
+      _             <- logger.info(s"Hook created for project with id $projectId")
     } yield ()
   }.recoverWith {
-    case NonFatal( exception ) =>
-      logger.error( exception )( s"Hook creation failed for project with id $projectId" )
-      ME.raiseError( exception )
+    case NonFatal(exception) =>
+      logger.error(exception)(s"Hook creation failed for project with id $projectId")
+      ME.raiseError(exception)
   }
 }
 
 @Singleton
-private class IOHookCreator @Inject() (
+private class IOHookCreator @Inject()(
     gitLabHookCreation: IOHookCreationRequestSender,
     logger:             IOLogger,
     hookTokenCrypto:    IOHookTokenCrypto
-)
-  extends HookCreator[IO]( gitLabHookCreation, logger, hookTokenCrypto )
+) extends HookCreator[IO](gitLabHookCreation, logger, hookTokenCrypto)

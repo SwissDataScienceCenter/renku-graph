@@ -21,17 +21,18 @@ package ch.datascience.webhookservice.queues.commitevent
 import java.nio.file._
 
 import akka.stream.IOResult
-import akka.stream.scaladsl.{ FileIO, Flow, Keep, Sink }
+import akka.stream.scaladsl.{FileIO, Flow, Keep, Sink}
 import akka.util.ByteString
 import ch.datascience.graph.events.CommitEvent
-import javax.inject.{ Inject, Named }
-import play.api.libs.json.{ Json, Writes }
+import javax.inject.{Inject, Named}
+import play.api.libs.json.{Json, Writes}
 
 import scala.concurrent.Future
 
 object FileSink {
-  def apply[T : Writes]( path: String ): Sink[T, Future[IOResult]] = {
-    val jPath = FileSystems.getDefault.getPath( path )
+
+  def apply[T: Writes](path: String): Sink[T, Future[IOResult]] = {
+    val jPath = FileSystems.getDefault.getPath(path)
     val openOptions: Set[OpenOption] = Set(
       StandardOpenOption.WRITE,
       StandardOpenOption.CREATE,
@@ -39,27 +40,26 @@ object FileSink {
       StandardOpenOption.SYNC
     )
 
-    FileSink( jPath, openOptions )
+    FileSink(jPath, openOptions)
   }
 
-  def apply[T : Writes]( path: Path, options: Set[OpenOption] ): Sink[T, Future[IOResult]] = {
-    val flow = Flow.fromFunction( ( obj: T ) => toByteString( obj )( implicitly[Writes[T]] ) )
-    val sink = FileIO.toPath( path, options )
+  def apply[T: Writes](path: Path, options: Set[OpenOption]): Sink[T, Future[IOResult]] = {
+    val flow = Flow.fromFunction((obj: T) => toByteString(obj)(implicitly[Writes[T]]))
+    val sink = FileIO.toPath(path, options)
 
-    flow.toMat( sink )( Keep.right )
+    flow.toMat(sink)(Keep.right)
   }
 
-  private[this] def toByteString[T : Writes]( obj: T ): ByteString = {
-    val writer = implicitly[Writes[T]]
-    val byteArray = Json.toBytes( writer.writes( obj ) )
-    ByteString( byteArray ) ++ ByteString( "\n" )
+  private[this] def toByteString[T: Writes](obj: T): ByteString = {
+    val writer    = implicitly[Writes[T]]
+    val byteArray = Json.toBytes(writer.writes(obj))
+    ByteString(byteArray) ++ ByteString("\n")
   }
 }
 
-class FileEventLogSinkProvider @Inject() ( @Named( "event-log-file-path" ) eventLogFilePath:Path )
-  extends EventLogSinkProvider {
+class FileEventLogSinkProvider @Inject()(@Named("event-log-file-path") eventLogFilePath: Path)
+    extends EventLogSinkProvider {
 
-  override def get: Sink[CommitEvent, Future[IOResult]] = {
-    FileSink( eventLogFilePath.toAbsolutePath.toString )
-  }
+  override def get: Sink[CommitEvent, Future[IOResult]] =
+    FileSink(eventLogFilePath.toAbsolutePath.toString)
 }

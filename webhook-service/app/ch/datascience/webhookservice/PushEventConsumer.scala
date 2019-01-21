@@ -22,10 +22,10 @@ import akka.stream.QueueOfferResult
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events._
-import ch.datascience.webhookservice.queues.pushevent.{ PushEvent, PushEventQueue }
-import javax.inject.{ Inject, Singleton }
+import ch.datascience.webhookservice.queues.pushevent.{PushEvent, PushEventQueue}
+import javax.inject.{Inject, Singleton}
 import play.api.mvc._
-import play.api.{ Logger, LoggerLike }
+import play.api.{Logger, LoggerLike}
 
 import scala.concurrent.ExecutionContext
 
@@ -34,28 +34,28 @@ class PushEventConsumer(
     cc:             ControllerComponents,
     logger:         LoggerLike,
     pushEventQueue: PushEventQueue
-) extends AbstractController( cc ) {
+) extends AbstractController(cc) {
 
   @Inject def this(
       cc:             ControllerComponents,
       pushEventQueue: PushEventQueue
-  ) = this( cc, Logger, pushEventQueue )
+  ) = this(cc, Logger, pushEventQueue)
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
   import PushEventConsumer._
 
-  val processPushEvent: Action[PushEvent] = Action.async( parse.json[PushEvent] ) { implicit request =>
+  val processPushEvent: Action[PushEvent] = Action.async(parse.json[PushEvent]) { implicit request =>
     pushEventQueue
-      .offer( request.body )
+      .offer(request.body)
       .map {
         case QueueOfferResult.Enqueued ⇒
-          logger.info( s"'${request.body}' enqueued" )
+          logger.info(s"'${request.body}' enqueued")
           Accepted
         case other ⇒
-          val errorResponse = ErrorMessage( s"'${request.body}' enqueueing problem: $other" )
-          logger.error( errorResponse.toString )
-          InternalServerError( errorResponse.toJson )
+          val errorResponse = ErrorMessage(s"'${request.body}' enqueueing problem: $other")
+          logger.error(errorResponse.toString)
+          InternalServerError(errorResponse.toJson)
       }
   }
 }
@@ -67,18 +67,18 @@ object PushEventConsumer {
   import play.api.libs.json._
 
   private implicit val projectReads: Reads[Project] = (
-    ( __ \ "id" ).read[ProjectId] and
-    ( __ \ "path_with_namespace" ).read[ProjectPath]
-  )( Project.apply _ )
+    (__ \ "id").read[ProjectId] and
+      (__ \ "path_with_namespace").read[ProjectPath]
+  )(Project.apply _)
 
   private[webhookservice] implicit val pushEventReads: Reads[PushEvent] = (
-    ( __ \ "before" ).read[CommitId] and
-    ( __ \ "after" ).read[CommitId] and
-    ( __ \ "user_id" ).read[UserId] and
-    ( __ \ "user_username" ).read[Username] and
-    ( __ \ "user_email" ).read[Email] and
-    ( __ \ "project" ).read[Project]
-  )( toPushEvent _ )
+    (__ \ "before").read[CommitId] and
+      (__ \ "after").read[CommitId] and
+      (__ \ "user_id").read[UserId] and
+      (__ \ "user_username").read[Username] and
+      (__ \ "user_email").read[Email] and
+      (__ \ "project").read[Project]
+  )(toPushEvent _)
 
   private def toPushEvent(
       before:   CommitId,
@@ -88,6 +88,9 @@ object PushEventConsumer {
       email:    Email,
       project:  Project
   ): PushEvent = PushEvent(
-    before, after, PushUser( userId, username, email ), project
+    before,
+    after,
+    PushUser(userId, username, email),
+    project
   )
 }

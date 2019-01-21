@@ -22,7 +22,7 @@ import ch.datascience.tinytypes.Constraints
 
 trait GreaterThanZero extends Constraints[Int] {
   addConstraint(
-    check = _ > 0,
-    message = ( value: Int ) => s"$typeName cannot be <= 0"
+    check   = _ > 0,
+    message = (value: Int) => s"$typeName cannot be <= 0"
   )
 }

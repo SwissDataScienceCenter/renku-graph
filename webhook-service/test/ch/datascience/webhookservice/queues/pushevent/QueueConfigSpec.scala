@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.queues.pushevent
 
-import ch.datascience.config.{ AsyncParallelism, BufferSize }
+import ch.datascience.config.{AsyncParallelism, BufferSize}
 import ch.datascience.generators.Generators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -30,18 +30,20 @@ class QueueConfigSpec extends WordSpec with PropertyChecks {
   "apply" should {
 
     "read 'push-events-queue.buffer-size' and 'push-events-queue.commit-details-parallelism' to instantiate the QueueConfig" in {
-      forAll( positiveInts(), positiveInts() ) { ( bufferSizeValue, commitDetailsParallelism ) =>
+      forAll(positiveInts(), positiveInts()) { (bufferSizeValue, commitDetailsParallelism) =>
         val config = Configuration.from(
-          Map( "push-events-queue" -> Map(
-            "buffer-size" -> bufferSizeValue,
-            "commit-details-parallelism" -> commitDetailsParallelism
-          ) )
+          Map(
+            "push-events-queue" -> Map(
+              "buffer-size"                -> bufferSizeValue,
+              "commit-details-parallelism" -> commitDetailsParallelism
+            )
+          )
         )
 
-        val queueConfig = new QueueConfig( config )
+        val queueConfig = new QueueConfig(config)
 
-        queueConfig.bufferSize shouldBe BufferSize( bufferSizeValue )
-        queueConfig.commitDetailsParallelism shouldBe AsyncParallelism( commitDetailsParallelism )
+        queueConfig.bufferSize               shouldBe BufferSize(bufferSizeValue)
+        queueConfig.commitDetailsParallelism shouldBe AsyncParallelism(commitDetailsParallelism)
       }
     }
   }

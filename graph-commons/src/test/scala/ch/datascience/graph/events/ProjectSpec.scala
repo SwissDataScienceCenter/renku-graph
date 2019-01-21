@@ -29,22 +29,22 @@ class ProjectSpec extends WordSpec with PropertyChecks {
   "instantiation" should {
 
     "be successful for non-negative ids and valid files" in {
-      forAll( nonNegativeInts(), relativePaths ) { ( id, path ) =>
-        val project = Project( ProjectId( id ), ProjectPath( path ) )
-        project.id.value shouldBe id
+      forAll(nonNegativeInts(), relativePaths) { (id, path) =>
+        val project = Project(ProjectId(id), ProjectPath(path))
+        project.id.value   shouldBe id
         project.path.value shouldBe path
       }
     }
 
     "fail for negative ids" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        Project( ProjectId( -1 ), ProjectPath( relativePaths.generateOne ) )
+        Project(ProjectId(-1), ProjectPath(relativePaths.generateOne))
       }
     }
 
     "fail for blank paths" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        Project( ProjectId( nonNegativeInts().generateOne ), ProjectPath( "" ) )
+        Project(ProjectId(nonNegativeInts().generateOne), ProjectPath(""))
       }
     }
   }

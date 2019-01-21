@@ -20,17 +20,15 @@ package ch.datascience.webhookservice
 
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.json._
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import play.api.libs.json.Format
 
 object model {
 
-  class UserAuthToken private ( val value: String ) extends AnyVal with TinyType[String]
+  class UserAuthToken private (val value: String) extends AnyVal with TinyType[String]
 
-  object UserAuthToken
-    extends TinyTypeFactory[String, UserAuthToken]( new UserAuthToken( _ ) )
-    with NonBlank {
+  object UserAuthToken extends TinyTypeFactory[String, UserAuthToken](new UserAuthToken(_)) with NonBlank {
 
-    implicit lazy val authTokenFormat: Format[UserAuthToken] = TinyTypeFormat( UserAuthToken.apply )
+    implicit lazy val authTokenFormat: Format[UserAuthToken] = TinyTypeFormat(UserAuthToken.apply)
   }
 }

@@ -26,15 +26,15 @@ import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators
 import org.scalamock.scalatest.MixedMockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.concurrent.{ Eventually, ScalaFutures }
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import play.api.LoggerLike
 import play.api.libs.ws.ahc.AhcWSResponse
-import play.api.libs.ws.{ BodyWritable, WSAuthScheme, WSClient, WSRequest }
+import play.api.libs.ws.{BodyWritable, WSAuthScheme, WSClient, WSRequest}
 import play.api.test.Helpers._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
 class FusekiDatasetVerifierSpec extends WordSpec with MixedMockFactory with ScalaFutures with Eventually {
@@ -44,20 +44,20 @@ class FusekiDatasetVerifierSpec extends WordSpec with MixedMockFactory with Scal
     "do nothing if relevant dataset exists" in new TestCase {
 
       callToCheckDatasetExists
-        .returning( OK )
+        .returning(OK)
 
       datasetVerifier.assureDatasetExists.futureValue shouldBe Done
 
-      verifyInfoLogged( s"'${fusekiConfig.datasetName}' dataset exists in Jena; No action needed." )
+      verifyInfoLogged(s"'${fusekiConfig.datasetName}' dataset exists in Jena; No action needed.")
     }
 
     "create a dataset if relevant dataset does not exist" in new TestCase {
 
       callToCheckDatasetExists
-        .returning( NOT_FOUND )
+        .returning(NOT_FOUND)
 
       createDataset
-        .returning( OK )
+        .returning(OK)
 
       datasetVerifier.assureDatasetExists.futureValue shouldBe Done
 
@@ -68,58 +68,60 @@ class FusekiDatasetVerifierSpec extends WordSpec with MixedMockFactory with Scal
     }
 
     "throw an exception if check of dataset existence fails" in new TestCase {
-      val exception = new Exception( "message" )
+      val exception = new Exception("message")
       callToCheckDatasetExists
-        .throwing( exception )
+        .throwing(exception)
 
       intercept[Exception] {
-        Await.result( datasetVerifier.assureDatasetExists, 1 second )
+        Await.result(datasetVerifier.assureDatasetExists, 1 second)
       } shouldBe exception
     }
 
     "throw an exception if dataset creation fails" in new TestCase {
       callToCheckDatasetExists
-        .returning( NOT_FOUND )
+        .returning(NOT_FOUND)
 
-      val exception = new Exception( "message" )
+      val exception = new Exception("message")
       createDataset
-        .throwing( exception )
+        .throwing(exception)
 
       intercept[Exception] {
-        Await.result( datasetVerifier.assureDatasetExists, 1 second )
+        Await.result(datasetVerifier.assureDatasetExists, 1 second)
       } shouldBe exception
     }
   }
 
   private trait TestCase {
-    private implicit val system = ActorSystem()
+    private implicit val system       = ActorSystem()
     private implicit val materializer = ActorMaterializer()
 
-    val fusekiConfig = ServiceTypesGenerators.fusekiConfigs.generateOne
-    private val httpClient = mock[WSClient]
-    private val logger = Proxy.stub[LoggerLike]
-    lazy val datasetVerifier = new FusekiDatasetVerifier( fusekiConfig, httpClient, logger )
+    val fusekiConfig         = ServiceTypesGenerators.fusekiConfigs.generateOne
+    private val httpClient   = mock[WSClient]
+    private val logger       = Proxy.stub[LoggerLike]
+    lazy val datasetVerifier = new FusekiDatasetVerifier(fusekiConfig, httpClient, logger)
 
     def callToCheckDatasetExists = {
 
       import fusekiConfig._
 
-      val request = mock[WSRequest]
+      val request  = mock[WSRequest]
       val response = mock[AhcWSResponse]
 
-      ( httpClient.url( _: String ) )
-        .expects( ( fusekiBaseUrl / "$" / "datasets" / datasetName ).toString )
-        .returning( request )
+      (httpClient
+        .url(_: String))
+        .expects((fusekiBaseUrl / "$" / "datasets" / datasetName).toString)
+        .returning(request)
 
-      ( request.withAuth( _: String, _: String, _: WSAuthScheme ) )
-        .expects( username.toString, password.toString, WSAuthScheme.BASIC )
-        .returning( request )
+      (request
+        .withAuth(_: String, _: String, _: WSAuthScheme))
+        .expects(username.toString, password.toString, WSAuthScheme.BASIC)
+        .returning(request)
 
-      ( request.get _ )
+      (request.get _)
         .expects()
-        .returning( Future( response ) )
+        .returning(Future(response))
 
-      ( response.status _ )
+      (response.status _)
         .expects()
     }
 
@@ -127,39 +129,43 @@ class FusekiDatasetVerifierSpec extends WordSpec with MixedMockFactory with Scal
 
       import fusekiConfig._
 
-      val request = mock[WSRequest]
+      val request  = mock[WSRequest]
       val response = mock[AhcWSResponse]
 
-      ( httpClient.url( _: String ) )
-        .expects( ( fusekiBaseUrl / "$" / "datasets" ).toString )
-        .returning( request )
+      (httpClient
+        .url(_: String))
+        .expects((fusekiBaseUrl / "$" / "datasets").toString)
+        .returning(request)
 
-      ( request.withHttpHeaders _ )
-        .expects( Seq( CONTENT_TYPE -> "application/x-www-form-urlencoded" ) )
-        .returning( request )
+      (request.withHttpHeaders _)
+        .expects(Seq(CONTENT_TYPE -> "application/x-www-form-urlencoded"))
+        .returning(request)
 
-      ( request.withAuth( _: String, _: String, _: WSAuthScheme ) )
-        .expects( username.toString, password.toString, WSAuthScheme.BASIC )
-        .returning( request )
+      (request
+        .withAuth(_: String, _: String, _: WSAuthScheme))
+        .expects(username.toString, password.toString, WSAuthScheme.BASIC)
+        .returning(request)
 
-      ( request.post[Map[String, String]]( _: Map[String, String] )( _: BodyWritable[Map[String, String]] ) )
-        .expects( Map( "dbName" -> datasetName.toString, "dbType" -> datasetType.toString ), * )
-        .returning( Future.successful( response ) )
+      (request
+        .post[Map[String, String]](_: Map[String, String])(_: BodyWritable[Map[String, String]]))
+        .expects(Map("dbName" -> datasetName.toString, "dbType" -> datasetType.toString), *)
+        .returning(Future.successful(response))
 
-      ( response.status _ )
+      (response.status _)
         .expects()
     }
 
-    def verifyInfoLogged( expectedMessages: String* ) = {
+    def verifyInfoLogged(expectedMessages: String*) = {
       var callsCounter = 0
       logger
-        .verify( 'info )(
-          argAssert { ( message: () => String ) =>
-            message() shouldBe expectedMessages( callsCounter )
+        .verify('info)(
+          argAssert { (message: () => String) =>
+            message() shouldBe expectedMessages(callsCounter)
             callsCounter = callsCounter + 1
-          }, *
+          },
+          *
         )
-        .repeat( expectedMessages.size )
+        .repeat(expectedMessages.size)
     }
   }
 }

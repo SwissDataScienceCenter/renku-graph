@@ -19,16 +19,14 @@
 package ch.datascience.webhookservice.queues.commitevent
 
 import ch.datascience.config.BufferSize
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 
 @Singleton
-private case class QueueConfig(
-    bufferSize: BufferSize
-) {
+private case class QueueConfig(bufferSize: BufferSize) {
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "commit-events-queue.buffer-size" )
+  @Inject() def this(configuration: Configuration) = this(
+    configuration.get[BufferSize]("commit-events-queue.buffer-size")
   )
 
 }

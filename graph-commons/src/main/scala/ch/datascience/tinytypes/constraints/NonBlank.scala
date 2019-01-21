@@ -22,7 +22,7 @@ import ch.datascience.tinytypes.Constraints
 
 trait NonBlank extends Constraints[String] {
   addConstraint(
-    check = _.trim.nonEmpty,
-    message = ( _: String ) => s"$typeName cannot be blank"
+    check   = _.trim.nonEmpty,
+    message = (_: String) => s"$typeName cannot be blank"
   )
 }

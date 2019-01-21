@@ -20,51 +20,51 @@ package ch.datascience.logging
 
 import cats.effect._
 import io.chrisdavenport.log4cats.Logger
-import javax.inject.{ Inject, Singleton }
-import org.slf4j.{ Logger => Slf4jLogger }
+import javax.inject.{Inject, Singleton}
+import org.slf4j.{Logger => Slf4jLogger}
 
 @Singleton
-class IOLogger( logger: Slf4jLogger ) extends Logger[IO] {
+class IOLogger(logger: Slf4jLogger) extends Logger[IO] {
 
-  @Inject def this() = this( play.api.Logger.logger )
+  @Inject def this() = this(play.api.Logger.logger)
 
-  override def error( t: Throwable )( message: => String ): IO[Unit] = IO.pure {
-    logger.error( message, t )
+  override def error(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+    logger.error(message, t)
   }
 
-  override def warn( t: Throwable )( message: => String ): IO[Unit] = IO.pure {
-    logger.warn( message, t )
+  override def warn(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+    logger.warn(message, t)
   }
 
-  override def info( t: Throwable )( message: => String ): IO[Unit] = IO.pure {
-    logger.info( message, t )
+  override def info(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+    logger.info(message, t)
   }
 
-  override def debug( t: Throwable )( message: => String ): IO[Unit] = IO.pure {
-    logger.debug( message, t )
+  override def debug(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+    logger.debug(message, t)
   }
 
-  override def trace( t: Throwable )( message: => String ): IO[Unit] = IO.pure {
-    logger.trace( message, t )
+  override def trace(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+    logger.trace(message, t)
   }
 
-  override def error( message: => String ): IO[Unit] = IO.pure {
-    logger.error( message )
+  override def error(message: => String): IO[Unit] = IO.pure {
+    logger.error(message)
   }
 
-  override def warn( message: => String ): IO[Unit] = IO.pure {
-    logger.warn( message )
+  override def warn(message: => String): IO[Unit] = IO.pure {
+    logger.warn(message)
   }
 
-  override def info( message: => String ): IO[Unit] = IO.pure {
-    logger.info( message )
+  override def info(message: => String): IO[Unit] = IO.pure {
+    logger.info(message)
   }
 
-  override def debug( message: => String ): IO[Unit] = IO.pure {
-    logger.debug( message )
+  override def debug(message: => String): IO[Unit] = IO.pure {
+    logger.debug(message)
   }
 
-  override def trace( message: => String ): IO[Unit] = IO.pure {
-    logger.trace( message )
+  override def trace(message: => String): IO[Unit] = IO.pure {
+    logger.trace(message)
   }
 }

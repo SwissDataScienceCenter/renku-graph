@@ -30,21 +30,22 @@ class AsyncParallelismSpec extends WordSpec with PropertyChecks {
   "instantiation" should {
 
     "successfully read BufferSize from config for values less than 1" in {
-      forAll( positiveInts() ) { positiveInt =>
+      forAll(positiveInts()) { positiveInt =>
         val config = Configuration.from(
-          Map( "parallelism" -> positiveInt )
+          Map("parallelism" -> positiveInt)
         )
 
-        config.get[AsyncParallelism]( "parallelism" ) shouldBe AsyncParallelism( positiveInt )
+        config.get[AsyncParallelism]("parallelism") shouldBe AsyncParallelism(positiveInt)
       }
     }
+
     "fail for values less than 1" in {
-      forAll( Gen.choose( -1000, 0 ) ) { nonPositiveInt =>
+      forAll(Gen.choose(-1000, 0)) { nonPositiveInt =>
         val config = Configuration.from(
-          Map( "parallelism" -> nonPositiveInt )
+          Map("parallelism" -> nonPositiveInt)
         )
 
-        an[IllegalArgumentException] should be thrownBy config.get[AsyncParallelism]( "parallelism" )
+        an[IllegalArgumentException] should be thrownBy config.get[AsyncParallelism]("parallelism")
       }
     }
   }

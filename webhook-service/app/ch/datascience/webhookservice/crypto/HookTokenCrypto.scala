@@ -24,77 +24,86 @@ import java.util.Base64
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.{ HookAuthToken, Secret }
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.{HookAuthToken, Secret}
 import eu.timepit.refined.W
-import eu.timepit.refined.api.{ RefType, Refined }
+import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.MinSize
 import eu.timepit.refined.string.MatchesRegex
 import javax.crypto.Cipher
-import javax.crypto.spec.{ IvParameterSpec, SecretKeySpec }
-import javax.inject.{ Inject, Singleton }
+import javax.crypto.Cipher.{DECRYPT_MODE, ENCRYPT_MODE}
+import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
+import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import pureconfig._
 import pureconfig.error.ConfigReaderException
 
-import scala.language.{ higherKinds, implicitConversions }
+import scala.language.{higherKinds, implicitConversions}
 
-class HookTokenCrypto[Interpretation[_]]( secret: Secret )( implicit ME: MonadError[Interpretation, Throwable] ) {
+class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError[Interpretation, Throwable]) {
 
-  private lazy val base64Decoder = Base64.getDecoder
-  private lazy val base64Encoder = Base64.getEncoder
-  private lazy val algorithm = "AES/CBC/PKCS5Padding"
-  private lazy val key = new SecretKeySpec( base64Decoder.decode( secret.value ), "AES" )
-  private lazy val ivSpec = new IvParameterSpec( new Array[Byte]( 16 ) )
-  private lazy val charset = "utf-8"
+  private lazy val base64Decoder    = Base64.getDecoder
+  private lazy val base64Encoder    = Base64.getEncoder
+  private lazy val algorithm        = "AES/CBC/PKCS5Padding"
+  private lazy val key              = new SecretKeySpec(base64Decoder.decode(secret.value), "AES")
+  private lazy val ivSpec           = new IvParameterSpec(new Array[Byte](16))
+  private lazy val charset          = "utf-8"
+  private lazy val encryptingCipher = cipher(ENCRYPT_MODE)
+  private lazy val decryptingCipher = cipher(DECRYPT_MODE)
 
-  def encrypt( message: String ): Interpretation[HookAuthToken] = for {
-    validatedMessage <- validate( message )
-    cipher <- pure {
-      val c = Cipher.getInstance( algorithm )
-      c.init( Cipher.ENCRYPT_MODE, key, ivSpec )
-      c
-    }
-    encoded <- pure {
-      new String( base64Encoder.encode( cipher.doFinal( validatedMessage.value.getBytes( charset ) ) ), charset )
-    }
-    validatedDecoded <- validate( encoded )
-  } yield validatedDecoded
+  def encrypt(hookToken: String): Interpretation[HookAuthToken] =
+    for {
+      validatedToken   <- validate(hookToken)
+      encoded          <- encryptAndEncode(validatedToken)
+      validatedDecoded <- validate(encoded)
+    } yield validatedDecoded
 
-  def decrypt( message: String ): Interpretation[HookAuthToken] = for {
-    validatedMessage <- validate( message )
-    cipher <- pure {
-      val c = Cipher.getInstance( algorithm )
-      c.init( Cipher.DECRYPT_MODE, key, ivSpec )
-      c
-    }
-    decoded <- pure {
-      new String( cipher.doFinal( base64Decoder.decode( validatedMessage.value.getBytes( charset ) ) ), charset )
-    }
-    validatedDecoded <- validate( decoded )
-  } yield validatedDecoded
+  def decrypt(hookToken: String): Interpretation[HookAuthToken] =
+    for {
+      validatedToken   <- validate(hookToken)
+      decoded          <- decodeAndDecrypt(validatedToken)
+      validatedDecoded <- validate(decoded)
+    } yield validatedDecoded
 
-  private def validate( string: String ): Interpretation[HookAuthToken] =
+  private def validate(string: String): Interpretation[HookAuthToken] =
     ME.fromEither[HookAuthToken] {
       RefType
-        .applyRef[HookAuthToken]( string )
-        .leftMap( _ => new IllegalArgumentException( "Message for encryption/decryption cannot be blank" ) )
+        .applyRef[HookAuthToken](string)
+        .leftMap(_ => new IllegalArgumentException("Message for encryption/decryption cannot be blank"))
     }
 
-  private implicit def pure[T]( value: T ): Interpretation[T] =
-    ME.pure( value )
+  private def cipher(mode: Int): Cipher = {
+    val c = Cipher.getInstance(algorithm)
+    c.init(mode, key, ivSpec)
+    c
+  }
+
+  private def encryptAndEncode(authToken: HookAuthToken): Interpretation[String] =
+    new String(
+      base64Encoder.encode(encryptingCipher.doFinal(authToken.value.getBytes(charset))),
+      charset
+    )
+
+  private def decodeAndDecrypt(authToken: HookAuthToken): Interpretation[String] =
+    new String(
+      decryptingCipher.doFinal(base64Decoder.decode(authToken.value.getBytes(charset))),
+      charset
+    )
+
+  private implicit def pure[T](value: T): Interpretation[T] =
+    ME.pure(value)
 }
 
 object HookTokenCrypto {
-  type Secret = String Refined MinSize[W.`16`.T]
+  type Secret        = String Refined MinSize[W.`16`.T]
   type HookAuthToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 }
 
 @Singleton
-class IOHookTokenCrypto( secret: Secret ) extends HookTokenCrypto[IO]( secret ) {
+class IOHookTokenCrypto(secret: Secret) extends HookTokenCrypto[IO](secret) {
 
-  @Inject def this( configuration: Configuration ) = this(
-    loadConfig[Secret]( configuration.underlying, "services.gitlab.secret-token-secret" ).fold(
-      failures => throw new ConfigReaderException( failures ),
+  @Inject def this(configuration: Configuration) = this(
+    loadConfig[Secret](configuration.underlying, "services.gitlab.secret-token-secret").fold(
+      failures => throw new ConfigReaderException(failures),
       identity
     )
   )

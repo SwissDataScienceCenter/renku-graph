@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.queues.pushevent
 
-import ch.datascience.graph.events.{ CommitId, Project, PushUser }
+import ch.datascience.graph.events.{CommitId, Project, PushUser}
 
 case class PushEvent(
     before:   CommitId,

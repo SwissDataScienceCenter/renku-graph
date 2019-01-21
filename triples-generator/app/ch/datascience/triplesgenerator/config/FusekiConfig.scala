@@ -20,21 +20,19 @@ package ch.datascience.triplesgenerator.config
 
 import ch.datascience.config.ServiceUrl
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{ TinyType, TinyTypeFactory }
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import com.typesafe.config.Config
-import javax.inject.{ Inject, Singleton }
-import play.api.{ ConfigLoader, Configuration }
+import javax.inject.{Inject, Singleton}
+import play.api.{ConfigLoader, Configuration}
 
 import scala.language.implicitConversions
 
-class DatasetName private ( val value: String ) extends AnyVal with TinyType[String]
+class DatasetName private (val value: String) extends AnyVal with TinyType[String]
 
-object DatasetName
-  extends TinyTypeFactory[String, DatasetName]( new DatasetName( _ ) )
-  with NonBlank {
+object DatasetName extends TinyTypeFactory[String, DatasetName](new DatasetName(_)) with NonBlank {
 
   implicit object DatasetNameFinder extends ConfigLoader[DatasetName] {
-    override def load( config: Config, path: String ): DatasetName = DatasetName( config.getString( path ) )
+    override def load(config: Config, path: String): DatasetName = DatasetName(config.getString(path))
   }
 }
 
@@ -51,33 +49,29 @@ object DatasetType {
   }
 
   implicit object DatasetTypeFinder extends ConfigLoader[DatasetType] {
-    override def load( config: Config, path: String ): DatasetType = config.getString( path ) match {
+    override def load(config: Config, path: String): DatasetType = config.getString(path) match {
       case Mem.value => Mem
       case TDB.value => TDB
-      case other     => throw new IllegalArgumentException( s"'$other' is not valid dataset type" )
+      case other     => throw new IllegalArgumentException(s"'$other' is not valid dataset type")
     }
   }
 }
 
-class Username private ( val value: String ) extends AnyVal with TinyType[String]
+class Username private (val value: String) extends AnyVal with TinyType[String]
 
-object Username
-  extends TinyTypeFactory[String, Username]( new Username( _ ) )
-  with NonBlank {
+object Username extends TinyTypeFactory[String, Username](new Username(_)) with NonBlank {
 
   implicit object UsernameFinder extends ConfigLoader[Username] {
-    override def load( config: Config, path: String ): Username = Username( config.getString( path ) )
+    override def load(config: Config, path: String): Username = Username(config.getString(path))
   }
 }
 
-class Password private ( val value: String ) extends AnyVal with TinyType[String]
+class Password private (val value: String) extends AnyVal with TinyType[String]
 
-object Password
-  extends TinyTypeFactory[String, Password]( new Password( _ ) )
-  with NonBlank {
+object Password extends TinyTypeFactory[String, Password](new Password(_)) with NonBlank {
 
   implicit object PasswordFinder extends ConfigLoader[Password] {
-    override def load( config: Config, path: String ): Password = Password( config.getString( path ) )
+    override def load(config: Config, path: String): Password = Password(config.getString(path))
   }
 }
 
@@ -90,11 +84,11 @@ case class FusekiConfig(
     password:      Password
 ) {
 
-  @Inject def this( configuration: Configuration ) = this(
-    configuration.get[ServiceUrl]( "services.fuseki.url" ),
-    configuration.get[DatasetName]( "services.fuseki.dataset-name" ),
-    configuration.get[DatasetType]( "services.fuseki.dataset-type" ),
-    configuration.get[Username]( "services.fuseki.username" ),
-    configuration.get[Password]( "services.fuseki.password" )
+  @Inject def this(configuration: Configuration) = this(
+    configuration.get[ServiceUrl]("services.fuseki.url"),
+    configuration.get[DatasetName]("services.fuseki.dataset-name"),
+    configuration.get[DatasetType]("services.fuseki.dataset-type"),
+    configuration.get[Username]("services.fuseki.username"),
+    configuration.get[Password]("services.fuseki.password")
   )
 }

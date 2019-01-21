@@ -18,24 +18,26 @@
 
 package ch.datascience.triplesgenerator
 
-import ch.datascience.triplesgenerator.queues.logevent.{ EventLogSourceProvider, FileEventLogSourceProvider }
+import ch.datascience.triplesgenerator.queues.logevent.{EventLogSourceProvider, FileEventLogSourceProvider}
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
 import com.typesafe.config.Config
-import play.api.{ ConfigLoader, Configuration, Environment }
+import play.api.{ConfigLoader, Configuration, Environment}
 
-class FileEventLogModule( environment: Environment, configuration: Configuration )
-  extends AbstractModule {
+class FileEventLogModule(
+    environment:   Environment,
+    configuration: Configuration
+) extends AbstractModule {
 
-  import FileEventLogModule.{ FileEventLogDisabled, FileEventLogEnabled }
+  import FileEventLogModule.{FileEventLogDisabled, FileEventLogEnabled}
 
-  private val module: AbstractModule = configuration.getOptional[Boolean]( "file-event-log.enabled" ) match {
-    case Some( true ) => new FileEventLogEnabled( configuration )
-    case _            => FileEventLogDisabled
+  private val module: AbstractModule = configuration.getOptional[Boolean]("file-event-log.enabled") match {
+    case Some(true) => new FileEventLogEnabled(configuration)
+    case _          => FileEventLogDisabled
   }
 
   override def configure(): Unit =
-    module.configure( binder() )
+    module.configure(binder())
 }
 
 private object FileEventLogModule {
@@ -43,8 +45,8 @@ private object FileEventLogModule {
   import java.nio.file._
 
   private implicit object PathConfigReader extends ConfigLoader[Path] {
-    override def load( config: Config, path: String ): Path =
-      FileSystems.getDefault.getPath( config.getString( path ) )
+    override def load(config: Config, path: String): Path =
+      FileSystems.getDefault.getPath(config.getString(path))
   }
 
   private case class FileEventLogEnabled(
@@ -52,25 +54,25 @@ private object FileEventLogModule {
       deleteOnExit: Boolean
   ) extends AbstractModule {
 
-    def this( configuration: Configuration ) = this(
-      configuration.get[Path]( "file-event-log.file-path" ),
-      configuration.get[Boolean]( "file-event-log.delete-on-exit" )
+    def this(configuration: Configuration) = this(
+      configuration.get[Path]("file-event-log.file-path"),
+      configuration.get[Boolean]("file-event-log.delete-on-exit")
     )
 
     override def configure(): Unit = {
 
-      bind( classOf[Path] )
-        .annotatedWith( Names.named( "event-log-file-path" ) )
+      bind(classOf[Path])
+        .annotatedWith(Names.named("event-log-file-path"))
         .toInstance {
           val validatedPath =
-            if ( !Files.exists( filePath ) ) Files.createFile( filePath )
+            if (!Files.exists(filePath)) Files.createFile(filePath)
             else filePath
-          if ( deleteOnExit ) validatedPath.toFile.deleteOnExit()
+          if (deleteOnExit) validatedPath.toFile.deleteOnExit()
           validatedPath
         }
 
-      bind( classOf[EventLogSourceProvider] )
-        .to( classOf[FileEventLogSourceProvider] )
+      bind(classOf[EventLogSourceProvider])
+        .to(classOf[FileEventLogSourceProvider])
     }
   }
 

@@ -21,67 +21,68 @@ package ch.datascience.generators
 import java.time.Instant
 
 import ch.datascience.config.ServiceUrl
-import eu.timepit.refined.api.{ RefType, Refined }
+import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
 import org.scalacheck.Gen._
-import org.scalacheck.{ Arbitrary, Gen }
+import org.scalacheck.{Arbitrary, Gen}
 
 import scala.language.implicitConversions
 
 object Generators {
 
-  def nonEmptyStrings( maxLength: Int = 10 ): Gen[String] = {
-    require( maxLength > 0 )
+  def nonEmptyStrings(maxLength: Int = 10): Gen[String] = {
+    require(maxLength > 0)
 
     for {
-      length <- choose( 1, maxLength )
-      chars <- listOfN( length, alphaChar )
-    } yield chars.mkString( "" )
+      length <- choose(1, maxLength)
+      chars  <- listOfN(length, alphaChar)
+    } yield chars.mkString("")
   }
 
-  def positiveInts( max: Int = 1000 ): Gen[Int] = choose( 1, max )
+  def positiveInts(max: Int = 1000): Gen[Int] = choose(1, max)
 
-  def nonNegativeInts( max: Int = 1000 ): Gen[Int] = choose( 0, max )
+  def nonNegativeInts(max: Int = 1000): Gen[Int] = choose(0, max)
 
   val relativePaths: Gen[String] = for {
-    partsNumber <- Gen.choose( 1, 10 )
-    parts <- Gen.listOfN( partsNumber, nonEmptyStrings() )
-  } yield parts.mkString( "/" )
+    partsNumber <- Gen.choose(1, 10)
+    parts       <- Gen.listOfN(partsNumber, nonEmptyStrings())
+  } yield parts.mkString("/")
 
   val httpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
-      case true  => "http"
-      case false => "https"
-    }
-    port <- positiveInts( max = 9999 )
+                 case true  => "http"
+                 case false => "https"
+               }
+    port <- positiveInts(max = 9999)
     host <- nonEmptyStrings()
   } yield s"$protocol://$host:$port"
 
   val validatedUrls: Gen[String Refined Url] = httpUrls
     .map { value =>
       RefType
-        .applyRef[String Refined Url]( value )
-        .getOrElse( throw new IllegalArgumentException( "Invalid url value" ) )
+        .applyRef[String Refined Url](value)
+        .getOrElse(throw new IllegalArgumentException("Invalid url value"))
     }
 
   val shas: Gen[String] = for {
-    length <- Gen.choose( 5, 40 )
-    chars <- Gen.listOfN( length, Gen.oneOf( ( 0 to 9 ).map( _.toString ) ++ ( 'a' to 'f' ).map( _.toString ) ) )
-  } yield chars.mkString( "" )
+    length <- Gen.choose(5, 40)
+    chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'f').map(_.toString)))
+  } yield chars.mkString("")
 
   val timestampsInThePast: Gen[Instant] =
-    Gen.choose( Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli )
-      .map( Instant.ofEpochMilli )
+    Gen
+      .choose(Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli)
+      .map(Instant.ofEpochMilli)
 
   implicit val exceptions: Gen[Exception] =
-    nonEmptyStrings( 20 ).map( new Exception( _ ) )
+    nonEmptyStrings(20).map(new Exception(_))
 
   implicit val serviceUrls: Gen[ServiceUrl] =
-    httpUrls.map( ServiceUrl.apply )
+    httpUrls.map(ServiceUrl.apply)
 
   object Implicits {
 
-    implicit class GenOps[T]( generator: Gen[T] ) {
+    implicit class GenOps[T](generator: Gen[T]) {
       def generateOne: T = generator.sample getOrElse generateOne
     }
   }

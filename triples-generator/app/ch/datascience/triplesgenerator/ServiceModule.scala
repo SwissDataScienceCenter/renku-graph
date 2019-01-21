@@ -24,7 +24,7 @@ import ch.datascience.config.ServiceUrl
 import ch.datascience.triplesgenerator.queues.logevent.LogEventQueue
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
-import play.api.{ Configuration, Environment }
+import play.api.{Configuration, Environment}
 
 class ServiceModule(
     environment:   Environment,
@@ -33,14 +33,14 @@ class ServiceModule(
 
   override def configure(): Unit = {
 
-    bind( classOf[FusekiDatasetVerifier] )
+    bind(classOf[FusekiDatasetVerifier])
       .asEagerSingleton()
 
-    bind( classOf[URL] )
-      .annotatedWith( Names.named( "gitlabUrl" ) )
-      .toInstance( configuration.get[ServiceUrl]( "services.gitlab.url" ).value )
+    bind(classOf[URL])
+      .annotatedWith(Names.named("gitlabUrl"))
+      .toInstance(configuration.get[ServiceUrl]("services.gitlab.url").value)
 
-    bind( classOf[LogEventQueue] )
+    bind(classOf[LogEventQueue])
       .asEagerSingleton()
   }
 }

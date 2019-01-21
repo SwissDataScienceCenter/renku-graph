@@ -18,8 +18,8 @@
 
 package ch.datascience.webhookservice.queues.pushevent
 
-import ch.datascience.config.{ AsyncParallelism, BufferSize }
-import javax.inject.{ Inject, Singleton }
+import ch.datascience.config.{AsyncParallelism, BufferSize}
+import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 
 @Singleton
@@ -28,9 +28,9 @@ private case class QueueConfig(
     commitDetailsParallelism: AsyncParallelism
 ) {
 
-  @Inject() def this( configuration: Configuration ) = this(
-    configuration.get[BufferSize]( "push-events-queue.buffer-size" ),
-    configuration.get[AsyncParallelism]( "push-events-queue.commit-details-parallelism" )
+  @Inject() def this(configuration: Configuration) = this(
+    configuration.get[BufferSize]("push-events-queue.buffer-size"),
+    configuration.get[AsyncParallelism]("push-events-queue.commit-details-parallelism")
   )
 
 }

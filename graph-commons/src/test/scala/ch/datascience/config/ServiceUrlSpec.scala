@@ -31,14 +31,14 @@ class ServiceUrlSpec extends WordSpec with PropertyChecks {
   "apply" should {
 
     "be successful for valid urls" in {
-      forAll( httpUrls ) { url =>
-        ServiceUrl( url ).toString shouldBe url
+      forAll(httpUrls) { url =>
+        ServiceUrl(url).toString shouldBe url
       }
     }
 
     "fail for invalid urls" in {
       an[MalformedURLException] should be thrownBy {
-        ServiceUrl( "invalid url" )
+        ServiceUrl("invalid url")
       }
     }
   }
@@ -47,7 +47,7 @@ class ServiceUrlSpec extends WordSpec with PropertyChecks {
 
     "allow to add next path part" in {
       val url = serviceUrls.generateOne
-      ( url / "path" ).toString shouldBe s"$url/path"
+      (url / "path").toString shouldBe s"$url/path"
     }
   }
 }

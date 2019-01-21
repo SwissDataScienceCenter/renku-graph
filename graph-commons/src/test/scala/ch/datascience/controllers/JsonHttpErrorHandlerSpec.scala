@@ -36,16 +36,15 @@ class JsonHttpErrorHandlerSpec extends WordSpec with PropertyChecks {
 
     "return response with the given status code and body comprised of requestId, and the given status and message" in new TestCase {
 
-      forAll( errorStatusCodes, fakeRequests, nonEmptyStrings() ) { ( statusCode, request, message ) =>
+      forAll(errorStatusCodes, fakeRequests, nonEmptyStrings()) { (statusCode, request, message) =>
+        val result = errorHandler.onClientError(request, statusCode, message)
 
-        val result = errorHandler.onClientError( request, statusCode, message )
-
-        status( result ) shouldBe statusCode
-        contentType( result ) shouldBe Some( JSON )
-        contentAsJson( result ) shouldBe Json.obj(
-          "requestId" -> request.id,
+        status(result)      shouldBe statusCode
+        contentType(result) shouldBe Some(JSON)
+        contentAsJson(result) shouldBe Json.obj(
+          "requestId"  -> request.id,
           "statusCode" -> statusCode,
-          "message" -> message
+          "message"    -> message
         )
       }
     }
@@ -55,25 +54,24 @@ class JsonHttpErrorHandlerSpec extends WordSpec with PropertyChecks {
 
     "return response with the given status code and body comprised of requestId, and the given status and message" in new TestCase {
 
-      forAll( fakeRequests, exceptions ) { ( request, exception ) =>
+      forAll(fakeRequests, exceptions) { (request, exception) =>
+        val result = errorHandler.onServerError(request, exception)
 
-        val result = errorHandler.onServerError( request, exception )
-
-        status( result ) shouldBe INTERNAL_SERVER_ERROR
-        contentType( result ) shouldBe Some( JSON )
-        contentAsJson( result ) shouldBe Json.obj(
-          "requestId" -> request.id,
+        status(result)      shouldBe INTERNAL_SERVER_ERROR
+        contentType(result) shouldBe Some(JSON)
+        contentAsJson(result) shouldBe Json.obj(
+          "requestId"  -> request.id,
           "statusCode" -> INTERNAL_SERVER_ERROR,
-          "message" -> exception.getMessage
+          "message"    -> exception.getMessage
         )
       }
     }
   }
 
   private trait TestCase {
-    val errorHandler = new JsonHttpErrorHandler()( global )
+    val errorHandler = new JsonHttpErrorHandler()(global)
   }
 
-  private val errorStatusCodes: Gen[Int] = Gen.oneOf( 400, 401, 404, 500 )
-  private val fakeRequests: Gen[Request[_]] = Gen.uuid.map( _ => FakeRequest() )
+  private val errorStatusCodes: Gen[Int]        = Gen.oneOf(400, 401, 404, 500)
+  private val fakeRequests:     Gen[Request[_]] = Gen.uuid.map(_ => FakeRequest())
 }

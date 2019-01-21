@@ -31,7 +31,7 @@ class HookCreationConfigProviderSpec extends WordSpec {
 
     "return HookCreationConfig object with proper values" in {
       val gitLabUrl = validatedUrls.generateOne
-      val selfUrl = validatedUrls.generateOne
+      val selfUrl   = validatedUrls.generateOne
       val config = Configuration.from(
         Map(
           "services" -> Map(
@@ -45,7 +45,7 @@ class HookCreationConfigProviderSpec extends WordSpec {
         )
       )
 
-      new HookCreationConfigProvider[IO]( config ).get().unsafeRunSync() shouldBe HookCreationConfig(
+      new HookCreationConfigProvider[IO](config).get().unsafeRunSync() shouldBe HookCreationConfig(
         gitLabUrl,
         selfUrl
       )
@@ -54,7 +54,7 @@ class HookCreationConfigProviderSpec extends WordSpec {
     "fail if there are no 'services.gitlab.url' and 'services.self.url' in the config" in {
       val config = Configuration.empty
 
-      a[RuntimeException] should be thrownBy new HookCreationConfigProvider[IO]( config ).get().unsafeRunSync()
+      a[RuntimeException] should be thrownBy new HookCreationConfigProvider[IO](config).get().unsafeRunSync()
     }
   }
 }

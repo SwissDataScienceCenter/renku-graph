@@ -22,8 +22,8 @@ import java.time.Instant
 
 import akka.actor.ActorSystem
 import akka.stream.QueueOfferResult.Enqueued
-import akka.stream.{ ActorMaterializer, QueueOfferResult }
-import ch.datascience.config.{ AsyncParallelism, BufferSize }
+import akka.stream.{ActorMaterializer, QueueOfferResult}
+import ch.datascience.config.{AsyncParallelism, BufferSize}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events._
@@ -33,93 +33,89 @@ import ch.datascience.webhookservice.queues.commitevent.CommitEventsQueue
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.concurrent.{ Eventually, IntegrationPatience, ScalaFutures }
+import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import play.api.Logger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class PushEventQueueSpec
-  extends WordSpec
-  with MockFactory
-  with Eventually
-  with ScalaFutures
-  with IntegrationPatience {
+class PushEventQueueSpec extends WordSpec with MockFactory with Eventually with ScalaFutures with IntegrationPatience {
 
   "offer" should {
 
     "return Enqueued and trigger conversion to CommitEvent and offer to the CommitEvent queue" in new TestCase {
-      val pushEvent: PushEvent = pushEvents.generateOne
-      val commitEvent: CommitEvent = toCommitEvent( pushEvent )
+      val pushEvent:   PushEvent   = pushEvents.generateOne
+      val commitEvent: CommitEvent = toCommitEvent(pushEvent)
 
-      givenCommitEventOffer( commitEvent ) returningAndFinishingTest Future( Enqueued )
+      givenCommitEventOffer(commitEvent) returningAndFinishingTest Future(Enqueued)
 
-      pushEventQueue.offer( pushEvent ).futureValue shouldBe Enqueued
+      pushEventQueue.offer(pushEvent).futureValue shouldBe Enqueued
 
       waitForAsyncProcess
     }
 
     "not kill the queue when multiple events are offered and some of them fail" in new TestCase {
-      val pushEvent1: PushEvent = pushEvents.generateOne
-      val commitEvent1: CommitEvent = toCommitEvent( pushEvent1 )
-      givenCommitEventOffer( commitEvent1 ) returning Future( Enqueued )
+      val pushEvent1:   PushEvent   = pushEvents.generateOne
+      val commitEvent1: CommitEvent = toCommitEvent(pushEvent1)
+      givenCommitEventOffer(commitEvent1) returning Future(Enqueued)
 
-      val pushEvent2: PushEvent = pushEvents.generateOne
-      val commitEvent2: CommitEvent = toCommitEvent( pushEvent2 )
+      val pushEvent2:   PushEvent   = pushEvents.generateOne
+      val commitEvent2: CommitEvent = toCommitEvent(pushEvent2)
       val exception2 = exceptions.generateOne
-      givenCommitEventOffer( commitEvent2 ) returning Future.failed( exception2 )
+      givenCommitEventOffer(commitEvent2) returning Future.failed(exception2)
 
-      val pushEvent3: PushEvent = pushEvents.generateOne
-      val commitEvent3: CommitEvent = toCommitEvent( pushEvent3 )
-      givenCommitEventOffer( commitEvent3 ) returningAndFinishingTest Future( Enqueued )
+      val pushEvent3:   PushEvent   = pushEvents.generateOne
+      val commitEvent3: CommitEvent = toCommitEvent(pushEvent3)
+      givenCommitEventOffer(commitEvent3) returningAndFinishingTest Future(Enqueued)
 
-      pushEventQueue.offer( pushEvent1 ).futureValue shouldBe Enqueued
-      pushEventQueue.offer( pushEvent2 ).futureValue shouldBe Enqueued
-      pushEventQueue.offer( pushEvent3 ).futureValue shouldBe Enqueued
+      pushEventQueue.offer(pushEvent1).futureValue shouldBe Enqueued
+      pushEventQueue.offer(pushEvent2).futureValue shouldBe Enqueued
+      pushEventQueue.offer(pushEvent3).futureValue shouldBe Enqueued
 
       waitForAsyncProcess
     }
   }
 
   private trait TestCase extends AsyncTestCase {
-    private implicit val system = ActorSystem( "MyTest" )
+    private implicit val system       = ActorSystem("MyTest")
     private implicit val materializer = ActorMaterializer()
 
     val commitsEventQueue = mock[CommitEventsQueue]
     val pushEventQueue = new PushEventQueue(
       QueueConfig(
-        bufferSize               = BufferSize( 1 ),
-        commitDetailsParallelism = AsyncParallelism( 1 )
+        bufferSize               = BufferSize(1),
+        commitDetailsParallelism = AsyncParallelism(1)
       ),
       commitsEventQueue,
       Logger
     )
 
-    def givenCommitEventOffer( commitEvent: CommitEvent ) = new {
+    def givenCommitEventOffer(commitEvent: CommitEvent) = new {
       private val stubbing =
-        ( commitsEventQueue.offer( _: CommitEvent ) )
-          .expects( commitEvent )
+        (commitsEventQueue
+          .offer(_: CommitEvent))
+          .expects(commitEvent)
 
-      def returning( outcome: Future[QueueOfferResult] ): Unit =
-        stubbing.returning( outcome )
+      def returning(outcome: Future[QueueOfferResult]): Unit =
+        stubbing.returning(outcome)
 
-      def returningAndFinishingTest( outcome: Future[QueueOfferResult] ): Unit =
+      def returningAndFinishingTest(outcome: Future[QueueOfferResult]): Unit =
         stubbing
-          .returning( outcome )
+          .returning(outcome)
           .onCall { _: CommitEvent =>
             asyncProcessFinished()
             outcome
           }
     }
 
-    def toCommitEvent( pushEvent: PushEvent ) = CommitEvent(
+    def toCommitEvent(pushEvent: PushEvent) = CommitEvent(
       pushEvent.after,
       "",
       Instant.EPOCH,
       pushEvent.pushUser,
-      author    = User( pushEvent.pushUser.username, pushEvent.pushUser.email ),
-      committer = User( pushEvent.pushUser.username, pushEvent.pushUser.email ),
-      parents   = Seq( pushEvent.before ),
+      author    = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
+      committer = User(pushEvent.pushUser.username, pushEvent.pushUser.email),
+      parents   = Seq(pushEvent.before),
       project   = pushEvent.project,
       added     = Nil,
       modified  = Nil,
