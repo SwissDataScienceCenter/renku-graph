@@ -59,7 +59,7 @@ class WebhookEventEndpoint(
   val processPushEvent: Action[PushEvent] = Action.async(parse.json[PushEvent]) { implicit request =>
     (for {
       authToken      <- findAuthToken(request)
-      decryptedToken <- decrypt(authToken)
+      decryptedToken <- decrypt(authToken) recoverWith unauthorizedException
       _              <- validate(decryptedToken, request.body)
       result         <- process(pushEvent = request.body)
       _              <- logger.info(s"'${request.body}' enqueued")
@@ -73,6 +73,11 @@ class WebhookEventEndpoint(
       case None           => Left(UnauthorizedException)
       case Some(rawToken) => HookAuthToken.from(rawToken).leftMap(_ => UnauthorizedException)
     }
+  }
+
+  private lazy val unauthorizedException: PartialFunction[Throwable, IO[String]] = {
+    case NonFatal(_) =>
+      IO.raiseError(UnauthorizedException)
   }
 
   private def validate(decryptedToken: String, pushEvent: PushEvent): IO[Unit] = IO.fromEither {
@@ -93,7 +98,8 @@ class WebhookEventEndpoint(
   }
 
   private lazy val logError: PartialFunction[Throwable, Throwable] = {
-    case exception: Throwable =>
+    case ex @ UnauthorizedException => ex
+    case NonFatal(exception) =>
       logger.error(exception.getMessage)
       exception
   }

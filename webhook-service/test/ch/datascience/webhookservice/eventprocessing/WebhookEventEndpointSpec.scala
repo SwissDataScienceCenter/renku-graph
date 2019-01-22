@@ -118,7 +118,7 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       status(response)        shouldBe UNAUTHORIZED
       contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
-      logger.loggedOnly(Error, UnauthorizedException.getMessage)
+      logger.expectNoLogs()
     }
 
     "return UNAUTHORIZED when user X-Gitlab-Token is invalid" in new TestCase {
@@ -138,10 +138,10 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       status(response)        shouldBe UNAUTHORIZED
       contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
-      logger.loggedOnly(Error, UnauthorizedException.getMessage)
+      logger.expectNoLogs()
     }
 
-    "return INTERNAL_SERVER_ERROR when X-Gitlab-Token decryption fails" in new TestCase {
+    "return UNAUTHORIZED when X-Gitlab-Token decryption fails" in new TestCase {
 
       val invalidHookToken = hookTokenFor(projectIds.generateOne)
 
@@ -157,9 +157,9 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       val response = call(processPushEvent, request)
 
-      status(response)        shouldBe INTERNAL_SERVER_ERROR
-      contentAsJson(response) shouldBe ErrorMessage(exception.getMessage).toJson
-      logger.loggedOnly(Error, exception.getMessage)
+      status(response)        shouldBe UNAUTHORIZED
+      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
+      logger.expectNoLogs()
     }
   }
 
