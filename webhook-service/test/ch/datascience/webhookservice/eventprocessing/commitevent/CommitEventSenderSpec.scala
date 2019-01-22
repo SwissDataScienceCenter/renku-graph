@@ -24,13 +24,11 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 class CommitEventSenderSpec extends WordSpec with MockFactory {
 
@@ -49,9 +47,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
         .expects(serializedEvent)
         .returning(context.pure(()))
 
-      eventSender.send(commitEvent)
-
-      logger.loggedOnly(Info(s"Commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} stored"))
+      eventSender.send(commitEvent) shouldBe Success(())
     }
 
     "fail when event serialization fails" in new TestCase {
@@ -62,14 +58,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
         .expects(commitEvent)
         .returning(context.raiseError(exception))
 
-      eventSender.send(commitEvent)
-
-      logger.loggedOnly(
-        Error(
-          s"Storing commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} failed",
-          exception
-        )
-      )
+      eventSender.send(commitEvent) shouldBe Failure(exception)
     }
 
     "fail when delivering the event to the storage return an error" in new TestCase {
@@ -86,14 +75,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
         .expects(serialize(commitEvent))
         .returning(context.raiseError(exception))
 
-      eventSender.send(commitEvent)
-
-      logger.loggedOnly(
-        Error(
-          s"Storing commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} failed",
-          exception
-        )
-      )
+      eventSender.send(commitEvent) shouldBe Failure(exception)
     }
   }
 
@@ -105,8 +87,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
     class TestCommitEventSerializer extends CommitEventSerializer[Try]
     val eventSerializer = mock[TestCommitEventSerializer]
     val eventLog        = mock[EventLog[Try]]
-    val logger          = TestLogger[Try]()
-    val eventSender     = new CommitEventSender[Try](eventLog, eventSerializer, logger)
+    val eventSender     = new CommitEventSender[Try](eventLog, eventSerializer)
   }
 
   private def serialize(commitEvent: CommitEvent): String =

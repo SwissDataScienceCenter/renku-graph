@@ -29,7 +29,6 @@ import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, CommitEventSerializer, EventLog}
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import io.chrisdavenport.log4cats.Logger
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -146,9 +145,8 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
   private class TestCommitEventSender(
       eventLog:              EventLog[Try],
-      commitEventSerializer: CommitEventSerializer[Try],
-      logger:                Logger[Try]
-  ) extends CommitEventSender[Try](eventLog, commitEventSerializer, logger)
+      commitEventSerializer: CommitEventSerializer[Try]
+  ) extends CommitEventSender[Try](eventLog, commitEventSerializer)
 
   private class TestCommitEventsFinder(
       commitInfoFinder: CommitInfoFinder[Try]

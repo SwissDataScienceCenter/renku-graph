@@ -22,39 +22,26 @@ import cats.effect.IO
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.graph.events.CommitEvent
-import ch.datascience.logging.IOLogger
-import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
-import scala.util.control.NonFatal
 
 class CommitEventSender[Interpretation[_]: Monad](
     eventLog:              EventLog[Interpretation],
-    commitEventSerializer: CommitEventSerializer[Interpretation],
-    logger:                Logger[Interpretation]
+    commitEventSerializer: CommitEventSerializer[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
 
   import commitEventSerializer._
 
-  def send(commitEvent: CommitEvent): Interpretation[Unit] = {
+  def send(commitEvent: CommitEvent): Interpretation[Unit] =
     for {
       serialisedEvent <- serialiseToJsonString(commitEvent)
       _               <- eventLog.append(serialisedEvent)
-      _               <- logger.info(s"Commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} stored")
     } yield ()
-  } recoverWith loggingError(commitEvent)
-
-  private def loggingError(commitEvent: CommitEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"Storing commit event id: ${commitEvent.id}, project: ${commitEvent.project.id} failed")
-      ME.raiseError(exception)
-  }
 }
 
 @Singleton
 class IOCommitEventSender @Inject()(
     eventLog:              IOEventLog,
     commitEventSerializer: IOCommitEventSerializer,
-    logger:                IOLogger,
-) extends CommitEventSender[IO](eventLog, commitEventSerializer, logger)
+) extends CommitEventSender[IO](eventLog, commitEventSerializer)
