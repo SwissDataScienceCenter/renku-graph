@@ -39,13 +39,15 @@ The endpoint requires an authorization token. It has to be
 |----------------------------|---------------------------------------------------------------------------------------|
 | CREATED (201)              | For valid payloads                                                                    |
 | UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `OAUTH-TOKEN` in the header or it's invalid |
-| BAD_GATEWAY (502)          | When there were problems with webhook creation                                        |
+| INTERNAL SERVER ERROR (500)| When there were problems with webhook creation                 |
 
 #### POST /webhook-event
 
 Consumes a Push Event.
 
 **Request format** (for more details look at [GitLab documentation](https://docs.gitlab.com/ee/user/project/integrations/webhooks.html#push-events))
+
+A valid `X-Gitlab-Token` is required.
 
 ```
 {
@@ -63,11 +65,12 @@ Consumes a Push Event.
 
 **Response**
 
-| Status                     | Description                            |
-|----------------------------|----------------------------------------|
-| ACCEPTED (202)             | For valid payloads                     |
-| BAD REQUEST (400)          | When payload is invalid                |
-| INTERNAL SERVER ERROR (500)| When queue is not accepting new events |
+| Status                     | Description                                                     |
+|----------------------------|-----------------------------------------------------------------|
+| ACCEPTED (202)             | For valid payloads                                              |
+| BAD REQUEST (400)          | When payload is invalid                                         |
+| UNAUTHORIZED (401)         | When there is no `X-Gitlab-Token` in the header or it's invalid |
+| INTERNAL SERVER ERROR (500)| When queue is not accepting new events                          |
 
 ## Trying out
 
