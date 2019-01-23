@@ -22,7 +22,7 @@ import java.util.Base64
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.Secret
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.{HookAuthToken, Secret}
 import eu.timepit.refined.api.RefType
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -33,30 +33,29 @@ class HookTokenCryptoSpec extends WordSpec {
 
   "encrypt/decrypt" should {
 
-    "encrypt and decrypt a given message" in new TestCase {
-      val message: String = nonEmptyStrings().generateOne
+    "encrypt and decrypt a given value" in new TestCase {
+      val value: String = nonEmptyStrings().generateOne
 
-      val Success(crypted) = aesCrypto.encrypt(message)
-      crypted.value should not be message
+      val Success(crypted) = aesCrypto.encrypt(value)
+      crypted.value should not be value
 
-      val Success(decrypted) = aesCrypto.decrypt(crypted.value)
-      decrypted.value shouldBe message
+      val Success(decrypted) = aesCrypto.decrypt(crypted)
+      decrypted shouldBe value
     }
 
-    "fail for blank messages" in new TestCase {
+    "fail for blank values" in new TestCase {
       val Failure(encryptException) = aesCrypto.encrypt(" ")
       encryptException            shouldBe an[IllegalArgumentException]
-      encryptException.getMessage shouldBe "Message for encryption/decryption cannot be blank"
-
-      val Failure(decryptException) = aesCrypto.decrypt(" ")
-      decryptException            shouldBe an[IllegalArgumentException]
-      decryptException.getMessage shouldBe "Message for encryption/decryption cannot be blank"
+      encryptException.getMessage shouldBe "A value to create HookAuthToken cannot be blank"
     }
 
     "fail if cannot be decrypted" in new TestCase {
-      val Failure(decryptException) = aesCrypto.decrypt("sdfsf")
-      decryptException            shouldBe an[IllegalArgumentException]
-      decryptException.getMessage should not be "Message for encryption/decryption cannot be blank"
+      val token: HookAuthToken = HookAuthToken.from("abcd").fold(e => throw e, identity)
+
+      val Failure(decryptException) = aesCrypto.decrypt(token)
+
+      decryptException            shouldBe an[Exception]
+      decryptException.getMessage shouldBe "HookAuthToken decryption failed"
     }
   }
 
