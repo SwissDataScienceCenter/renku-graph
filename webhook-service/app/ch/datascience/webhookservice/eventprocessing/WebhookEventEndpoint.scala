@@ -55,7 +55,7 @@ class WebhookEventEndpoint(
   val processPushEvent: Action[PushEvent] = Action.async(parse.json[PushEvent]) { implicit request =>
     (for {
       authToken      <- findAuthToken(request)
-      decryptedToken <- decrypt(authToken)
+      decryptedToken <- decrypt(authToken) recoverWith unauthorizedException
       _              <- validate(decryptedToken, request.body)
       _              <- storeCommitsInEventLog(pushEvent = request.body)
     } yield Accepted)
@@ -70,6 +70,11 @@ class WebhookEventEndpoint(
     }
   }
 
+  private lazy val unauthorizedException: PartialFunction[Throwable, IO[String]] = {
+    case NonFatal(_) =>
+      IO.raiseError(UnauthorizedException)
+  }
+
   private def validate(decryptedToken: String, pushEvent: PushEvent): IO[Unit] = IO.fromEither {
     if (decryptedToken == pushEvent.project.id.toString) Right(())
     else Left(UnauthorizedException)
@@ -77,7 +82,7 @@ class WebhookEventEndpoint(
 
   private def mapToResult(pushEvent: PushEvent): PartialFunction[Throwable, Result] = {
     case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
-    case NonFatal(ex)               => InternalServerError(ErrorMessage(ex.getMessage).toJson)
+    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage).toJson)
   }
 }
 
