@@ -63,5 +63,9 @@ trait Constraints[V] extends TypeName {
 }
 
 trait TypeName {
-  protected[this] lazy val typeName: String = getClass.getSimpleName.replace("$", "")
+  protected[this] lazy val typeName: String = {
+    val className = getClass.getName.replace("$", ".")
+    if (className.endsWith(".")) className take className.length - 1
+    else className
+  }
 }

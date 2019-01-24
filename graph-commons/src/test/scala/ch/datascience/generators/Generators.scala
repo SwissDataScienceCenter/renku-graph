@@ -89,7 +89,14 @@ object Generators {
   object Implicits {
 
     implicit class GenOps[T](generator: Gen[T]) {
+
       def generateOne: T = generator.sample getOrElse generateOne
+
+      def generateDifferentThan(value: T): T = {
+        val generated = generator.sample.getOrElse(generateDifferentThan(value))
+        if (generated == value) generateDifferentThan(value)
+        else generated
+      }
     }
   }
 }

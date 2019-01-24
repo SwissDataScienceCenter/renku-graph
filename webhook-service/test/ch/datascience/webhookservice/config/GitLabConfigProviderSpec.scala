@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.pushevent
+package ch.datascience.webhookservice.config
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._

@@ -22,7 +22,8 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
 import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.model.{AccessToken, OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.webhookservice.model.{AccessToken, HookToken, ProjectAccessToken}
+import ch.datascience.webhookservice.model.AccessToken._
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 
@@ -55,4 +56,14 @@ object ServiceTypesGenerators {
       .applyRef[HookAuthToken](value)
       .getOrElse(throw new IllegalArgumentException("Generated HookAuthToken cannot be blank"))
   }
+
+  implicit val projectAccessTokens: Gen[ProjectAccessToken] = for {
+    length <- Gen.choose(5, 40)
+    chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
+  } yield ProjectAccessToken(chars.mkString(""))
+
+  implicit val hookTokens: Gen[HookToken] = for {
+    projectId          <- projectIds
+    projectAccessToken <- projectAccessTokens
+  } yield HookToken(projectId, projectAccessToken)
 }

@@ -24,9 +24,10 @@ import cats.effect.{IO, Sync}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.events.CommittedDate
-import ch.datascience.graph.events.EventsGenerators.{projectIds, _}
+import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.eventprocessing.pushevent.GitLabConfig._
+import ch.datascience.webhookservice.config.GitLabConfig._
+import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators.personalAccessTokens
 import com.github.tomakehurst.wiremock.client.WireMock._

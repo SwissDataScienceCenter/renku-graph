@@ -21,7 +21,8 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.IO
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
-import ch.datascience.webhookservice.model.{AccessToken, OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.webhookservice.model.AccessToken
+import ch.datascience.webhookservice.model.AccessToken._
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext

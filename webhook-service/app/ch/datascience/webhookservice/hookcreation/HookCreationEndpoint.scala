@@ -24,7 +24,8 @@ import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.model.{AccessToken, OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.webhookservice.model.AccessToken
+import ch.datascience.webhookservice.model.AccessToken._
 import javax.inject.{Inject, Singleton}
 import play.api.mvc.{AbstractController, ControllerComponents, Request, Result}
 

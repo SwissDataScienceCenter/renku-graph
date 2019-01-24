@@ -48,7 +48,7 @@ class TinyTypeFactorySpec extends WordSpec {
     "throw an IllegalArgument exception if the first type constraint is not met" in {
       intercept[IllegalArgumentException] {
         TinyTypeTest("abc")
-      }.getMessage shouldBe "TinyTypeTest cannot have 'abc' value"
+      }.getMessage shouldBe "ch.datascience.tinytypes.TinyTypeTest cannot have 'abc' value"
     }
 
     "throw an IllegalArgument exception if one of defined type constraints is not met" in {
@@ -65,7 +65,7 @@ class TinyTypeFactorySpec extends WordSpec {
     }
 
     "left with the errors if the type constraints are not met" in {
-      TinyTypeTest.from("abc") shouldBe Left("TinyTypeTest cannot have 'abc' value")
+      TinyTypeTest.from("abc") shouldBe Left("ch.datascience.tinytypes.TinyTypeTest cannot have 'abc' value")
     }
   }
 }

@@ -35,11 +35,11 @@ class NonBlankSpec extends WordSpec with PropertyChecks {
     }
 
     "throw an IllegalArgumentException for empty String values" in {
-      intercept[IllegalArgumentException](NonBlankString("")).getMessage shouldBe "NonBlankString cannot be blank"
+      intercept[IllegalArgumentException](NonBlankString("")).getMessage shouldBe "ch.datascience.tinytypes.constraints.NonBlankString cannot be blank"
     }
 
     "throw an IllegalArgumentException for blank String values" in {
-      intercept[IllegalArgumentException](NonBlankString(" ")).getMessage shouldBe "NonBlankString cannot be blank"
+      intercept[IllegalArgumentException](NonBlankString(" ")).getMessage shouldBe "ch.datascience.tinytypes.constraints.NonBlankString cannot be blank"
     }
   }
 }

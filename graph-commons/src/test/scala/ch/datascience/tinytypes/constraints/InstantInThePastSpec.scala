@@ -39,7 +39,7 @@ class InstantInThePastSpec extends WordSpec with PropertyChecks {
     "throw an IllegalArgumentException for instants the future" in {
       intercept[IllegalArgumentException] {
         InstantInThePastType(Instant.now().plusSeconds(10))
-      }.getMessage shouldBe "InstantInThePastType has to be in the past"
+      }.getMessage shouldBe "ch.datascience.tinytypes.constraints.InstantInThePastType has to be in the past"
     }
 
     "throw an IllegalArgumentException for instant equal to Instant.now" in {
@@ -50,7 +50,7 @@ class InstantInThePastSpec extends WordSpec with PropertyChecks {
 
       intercept[IllegalArgumentException] {
         InstantInThePastType(fixedNow)
-      }.getMessage shouldBe "InstantInThePastType has to be in the past"
+      }.getMessage shouldBe "ch.datascience.tinytypes.constraints.InstantInThePastType has to be in the past"
 
       InstantInThePastType.clock = Clock.system(systemZone)
     }
@@ -63,6 +63,6 @@ private object InstantInThePastType
     extends TinyTypeFactory[Instant, InstantInThePastType](new InstantInThePastType(_))
     with InstantInThePast {
 
-  var clock = Clock.systemDefaultZone()
+  var clock:                  Clock   = Clock.systemDefaultZone()
   protected override def now: Instant = clock.instant()
 }

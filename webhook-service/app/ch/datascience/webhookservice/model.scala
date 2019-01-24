@@ -18,6 +18,7 @@
 
 package ch.datascience.webhookservice
 
+import ch.datascience.graph.events.ProjectId
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 
@@ -25,11 +26,22 @@ object model {
 
   sealed trait AccessToken extends Any with TinyType[String]
 
-  class PersonalAccessToken private (val value: String) extends AnyVal with AccessToken
-  object PersonalAccessToken
-      extends TinyTypeFactory[String, PersonalAccessToken](new PersonalAccessToken(_))
-      with NonBlank
+  object AccessToken {
 
-  class OAuthAccessToken private (val value: String) extends AnyVal with AccessToken
-  object OAuthAccessToken extends TinyTypeFactory[String, OAuthAccessToken](new OAuthAccessToken(_)) with NonBlank
+    final class PersonalAccessToken private (val value: String) extends AnyVal with AccessToken
+    object PersonalAccessToken
+        extends TinyTypeFactory[String, PersonalAccessToken](new PersonalAccessToken(_))
+        with NonBlank
+
+    final class OAuthAccessToken private (val value: String) extends AnyVal with AccessToken
+    object OAuthAccessToken extends TinyTypeFactory[String, OAuthAccessToken](new OAuthAccessToken(_)) with NonBlank
+  }
+
+  final class ProjectAccessToken private (val value: String) extends AnyVal with AccessToken
+  object ProjectAccessToken extends TinyTypeFactory[String, ProjectAccessToken](new ProjectAccessToken(_)) with NonBlank
+
+  final case class HookToken(
+      projectId:          ProjectId,
+      projectAccessToken: ProjectAccessToken
+  )
 }

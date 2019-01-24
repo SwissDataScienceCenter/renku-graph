@@ -35,11 +35,11 @@ class GreaterThanZeroSpec extends WordSpec with PropertyChecks {
     }
 
     "throw an IllegalArgumentException for 0" in {
-      intercept[IllegalArgumentException](GreaterThanZeroInt(0)).getMessage shouldBe "GreaterThanZeroInt cannot be <= 0"
+      intercept[IllegalArgumentException](GreaterThanZeroInt(0)).getMessage shouldBe "ch.datascience.tinytypes.constraints.GreaterThanZeroInt cannot be <= 0"
     }
 
     "throw an IllegalArgumentException for negative value" in {
-      intercept[IllegalArgumentException](GreaterThanZeroInt(-1)).getMessage shouldBe "GreaterThanZeroInt cannot be <= 0"
+      intercept[IllegalArgumentException](GreaterThanZeroInt(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.GreaterThanZeroInt cannot be <= 0"
     }
   }
 }

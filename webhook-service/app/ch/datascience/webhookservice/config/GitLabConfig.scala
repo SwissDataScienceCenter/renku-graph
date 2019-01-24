@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.pushevent
+package ch.datascience.webhookservice.config
 
 import cats.effect.{IO, Sync}
-import ch.datascience.webhookservice.eventprocessing.pushevent.GitLabConfig._
+import ch.datascience.webhookservice.config.GitLabConfig._
 import eu.timepit.refined.api.Refined
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
@@ -27,7 +27,7 @@ import pureconfig.module.catseffect._
 
 import scala.language.higherKinds
 
-private class GitLabConfig[Interpretation[_]](configuration: Configuration) {
+class GitLabConfig[Interpretation[_]](configuration: Configuration) {
   import eu.timepit.refined.pureconfig._
 
   def get()(implicit F: Sync[Interpretation]): Interpretation[HostUrl] =
@@ -35,9 +35,9 @@ private class GitLabConfig[Interpretation[_]](configuration: Configuration) {
 }
 
 @Singleton
-private class IOGitLabConfigProvider @Inject()(configuration: Configuration) extends GitLabConfig[IO](configuration)
+class IOGitLabConfigProvider @Inject()(configuration: Configuration) extends GitLabConfig[IO](configuration)
 
-private object GitLabConfig {
+object GitLabConfig {
 
   import eu.timepit.refined.string.Url
 

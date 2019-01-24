@@ -35,16 +35,15 @@ private class HookCreator[Interpretation[_]: Monad](
     gitLabHookCreation: HookCreationRequestSender[Interpretation],
     logger:             Logger[Interpretation],
     hookTokenCrypto:    HookTokenCrypto[Interpretation]
-) {
+)(implicit ME:          MonadError[Interpretation, Throwable]) {
 
-  def createHook(projectId: ProjectId, accessToken: AccessToken)(
-      implicit ME:          MonadError[Interpretation, Throwable]): Interpretation[Unit] = {
+  def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[Unit] = {
     for {
       hookAuthToken <- hookTokenCrypto.encrypt(projectId.toString)
       _             <- gitLabHookCreation.createHook(projectId, accessToken, hookAuthToken)
       _             <- logger.info(s"Hook created for project with id $projectId")
     } yield ()
-  }.recoverWith {
+  } recoverWith {
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
       ME.raiseError(exception)

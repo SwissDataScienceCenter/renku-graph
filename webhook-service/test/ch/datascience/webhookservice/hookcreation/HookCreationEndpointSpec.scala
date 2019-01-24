@@ -19,7 +19,6 @@
 package ch.datascience.webhookservice.hookcreation
 
 import akka.stream.Materializer
-import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
@@ -28,7 +27,8 @@ import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.model.{AccessToken, OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.webhookservice.model.AccessToken
+import ch.datascience.webhookservice.model.AccessToken._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -50,8 +50,8 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       val accessToken = personalAccessTokens.generateOne
 
       (hookCreator
-        .createHook(_: ProjectId, _: PersonalAccessToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, accessToken, *)
+        .createHook(_: ProjectId, _: PersonalAccessToken))
+        .expects(projectId, accessToken)
         .returning(IO.pure(()))
 
       val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> accessToken.toString))
@@ -66,8 +66,8 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       val accessToken = oauthAccessTokens.generateOne
 
       (hookCreator
-        .createHook(_: ProjectId, _: OAuthAccessToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, accessToken, *)
+        .createHook(_: ProjectId, _: OAuthAccessToken))
+        .expects(projectId, accessToken)
         .returning(IO.pure(()))
 
       val response = call(createHook(projectId), request.withHeaders("OAUTH-TOKEN" -> accessToken.toString))
@@ -109,8 +109,8 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       val errorMessage = ErrorMessage("some error")
       (hookCreator
-        .createHook(_: ProjectId, _: AccessToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, accessToken, *)
+        .createHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
       val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
@@ -126,8 +126,8 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       val errorMessage = ErrorMessage("some error")
       (hookCreator
-        .createHook(_: ProjectId, _: AccessToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, accessToken, *)
+        .createHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 
       val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
