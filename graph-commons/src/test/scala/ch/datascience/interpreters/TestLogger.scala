@@ -19,7 +19,8 @@
 package ch.datascience.interpreters
 
 import cats.Monad
-import ch.datascience.interpreters.TestLogger.LogMessage.{Message, MessageAndThrowable}
+import ch.datascience.interpreters.TestLogger.LogMessage._
+import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import io.chrisdavenport.log4cats.Logger
 import org.scalatest.Matchers._
 
@@ -33,10 +34,44 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
   import LogMessage._
 
   def loggedOnly(args: (Level, LogMessage)*): Unit =
-    invocations should contain only (args: _*)
+    loggedOnly(args.toList)
 
   def loggedOnly(args: List[(Level, LogMessage)]): Unit =
-    invocations should contain only (args: _*)
+    (invocations zip args) foreach {
+      case ((actualLevel, MessageAndThrowable(actualMessage, actualException)),
+            (expectedLevel, MessageAndThrowableMatcher(expectedMessage, NotRefEqual(expectedException)))) =>
+        if ((actualLevel == expectedLevel) &&
+            (actualMessage == expectedMessage) &&
+            (actualException.getClass == expectedException.getClass) &&
+            (actualException.getMessage == expectedException.getMessage)) ()
+        else
+          fail {
+            s"Log entry: '$actualLevel: $actualMessage: $actualException' does not match '$expectedLevel: $expectedMessage: $expectedException'"
+          }
+      case ((actualLevel, MessageAndThrowable(actualMessage, actualException)),
+            (expectedLevel, MessageAndThrowable(expectedMessage, expectedException))) =>
+        if ((actualLevel == expectedLevel) &&
+            (actualMessage == expectedMessage) &&
+            (actualException == expectedException)) ()
+        else
+          fail {
+            s"Log entry: '$actualLevel: $actualMessage: $actualException' does not match '$expectedLevel: $expectedMessage: $expectedException'"
+          }
+      case ((actualLevel, Message(actualMessage)), (expectedLevel, Message(expectedMessage))) =>
+        if ((actualLevel == expectedLevel) &&
+            (actualMessage == expectedMessage)) ()
+        else
+          fail {
+            s"Log entry: '$actualLevel: $actualMessage' does not match '$expectedLevel: $expectedMessage'"
+          }
+      case ((actualLevel, actualMessage), (expectedLevel, expectedMessage)) =>
+        if ((actualLevel == expectedLevel) &&
+            (actualMessage == expectedMessage)) ()
+        else
+          fail {
+            s"Log entry: '$actualLevel: $actualMessage' does not match '$expectedLevel: $expectedMessage'"
+          }
+    }
 
   def expectNoLogs(): Unit =
     if (invocations.nonEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")
@@ -96,8 +131,9 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
   private val invocationsPrettyPrint: () => String = () =>
     invocations
       .map {
-        case (level, Message(message))                        => s"$level '$message'"
-        case (level, MessageAndThrowable(message, throwable)) => s"$level '$message' $throwable"
+        case (level, Message(message))                                      => s"$level '$message'"
+        case (level, MessageAndThrowable(message, throwable))               => s"$level '$message' $throwable"
+        case (level, MessageAndThrowableMatcher(message, throwableMatcher)) => s"$level '$message' $throwableMatcher"
       }
       .mkString("\n", "\n", "")
 }
@@ -113,6 +149,9 @@ object TestLogger {
 
     def apply(message: String, throwable: Throwable): (Level, LogMessage) =
       this -> MessageAndThrowable(message, throwable)
+
+    def apply(message: String, throwableMatcher: Matcher): (Level, LogMessage) =
+      this -> MessageAndThrowableMatcher(message, throwableMatcher)
   }
 
   object Level {
@@ -125,7 +164,15 @@ object TestLogger {
 
   sealed trait LogMessage
   object LogMessage {
-    final case class Message(message:             String) extends LogMessage
-    final case class MessageAndThrowable(message: String, throwable: Throwable) extends LogMessage
+    final case class Message(message:                    String) extends LogMessage
+    final case class MessageAndThrowable(message:        String, throwable: Throwable) extends LogMessage
+    final case class MessageAndThrowableMatcher(message: String, throwableMatcher: Matcher) extends LogMessage
+  }
+
+  sealed trait Matcher
+  object Matcher {
+    final case class NotRefEqual(throwable: Throwable) extends Matcher {
+      override lazy val toString: String = throwable.toString
+    }
   }
 }

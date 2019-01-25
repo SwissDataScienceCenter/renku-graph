@@ -27,11 +27,12 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.ProjectId
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.model.HookToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -52,12 +53,12 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
         .expects(pushEvent)
         .returning(context.pure(()))
 
-      val hookToken = hookTokenFor(pushEvent)
+      val serializedHookToken = serializedHookTokenFor(pushEvent)
       val request = jsonRequest
         .withBody(payloadFor(pushEvent))
-        .withHeaders("X-Gitlab-Token" -> hookToken.toString())
+        .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString())
 
-      expectDecryptionOf(hookToken, returning = pushEvent.project.id)
+      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id, hookAccessToken))
 
       val response = call(processPushEvent, request)
 
@@ -73,12 +74,12 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
         .expects(pushEvent)
         .returning(context.raiseError(exception))
 
-      val hookToken = hookTokenFor(pushEvent)
+      val serializedHookToken = serializedHookTokenFor(pushEvent)
       val request = jsonRequest
         .withBody(payloadFor(pushEvent))
-        .withHeaders("X-Gitlab-Token" -> hookToken.toString())
+        .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString())
 
-      expectDecryptionOf(hookToken, returning = pushEvent.project.id)
+      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id, hookAccessToken))
 
       val response = call(processPushEvent, request)
 
@@ -88,10 +89,10 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
 
-      val hookToken = hookTokenFor(pushEvent)
+      val serializedHookToken = serializedHookTokenFor(pushEvent)
       val request = jsonRequest
         .withBody(Json.obj())
-        .withHeaders("X-Gitlab-Token" -> hookToken.toString())
+        .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString())
 
       val response = call(processPushEvent, request)
 
@@ -113,15 +114,15 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     "return UNAUTHORIZED when user X-Gitlab-Token is invalid" in new TestCase {
 
       val otherProjectId   = projectIds.generateOne
-      val invalidHookToken = hookTokenFor(otherProjectId)
+      val invalidHookToken = serializedHookTokenFor(otherProjectId)
       val request = jsonRequest
         .withBody(payloadFor(pushEvent))
         .withHeaders("X-Gitlab-Token" -> invalidHookToken.toString())
 
       (hookTokenCrypto
-        .decrypt(_: HookAuthToken))
+        .decrypt(_: SerializedHookToken))
         .expects(invalidHookToken)
-        .returning(context.pure(otherProjectId.toString()))
+        .returning(context.pure(HookToken(otherProjectId, hookAccessTokens.generateOne)))
 
       val response = call(processPushEvent, request)
 
@@ -131,7 +132,7 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
     "return UNAUTHORIZED when X-Gitlab-Token decryption fails" in new TestCase {
 
-      val invalidHookToken = hookTokenFor(projectIds.generateOne)
+      val invalidHookToken = serializedHookTokenFor(projectIds.generateOne)
 
       val request = jsonRequest
         .withBody(payloadFor(pushEvent))
@@ -139,7 +140,7 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       val exception = new Exception("decryption failure")
       (hookTokenCrypto
-        .decrypt(_: HookAuthToken))
+        .decrypt(_: SerializedHookToken))
         .expects(invalidHookToken)
         .returning(context.raiseError(exception))
 
@@ -154,8 +155,9 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     implicit val materializer: Materializer = app.materializer
     val context = MonadError[IO, Throwable]
 
-    val jsonRequest = FakeRequest().withHeaders(CONTENT_TYPE -> JSON)
-    val pushEvent: PushEvent = pushEvents.generateOne
+    val jsonRequest     = FakeRequest().withHeaders(CONTENT_TYPE -> JSON)
+    val pushEvent       = pushEvents.generateOne
+    val hookAccessToken = hookAccessTokens.generateOne
 
     val pushEventSender = mock[IOPushEventSender]
     val hookTokenCrypto = mock[IOHookTokenCrypto]
@@ -181,21 +183,21 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       )
     )
 
-    def hookTokenFor(pushEvent: PushEvent): HookAuthToken =
-      hookTokenFor(pushEvent.project.id)
+    def serializedHookTokenFor(pushEvent: PushEvent): SerializedHookToken =
+      serializedHookTokenFor(pushEvent.project.id)
 
-    def hookTokenFor(projectId: ProjectId): HookAuthToken =
-      HookAuthToken
+    def serializedHookTokenFor(projectId: ProjectId): SerializedHookToken =
+      SerializedHookToken
         .from(projectId.toString)
         .fold(
           exception => throw exception,
           identity
         )
 
-    def expectDecryptionOf(hookAuthToken: HookAuthToken, returning: ProjectId) =
+    def expectDecryptionOf(hookAuthToken: SerializedHookToken, returning: HookToken) =
       (hookTokenCrypto
-        .decrypt(_: HookAuthToken))
+        .decrypt(_: SerializedHookToken))
         .expects(hookAuthToken)
-        .returning(IO.pure(returning.toString()))
+        .returning(IO.pure(returning))
   }
 }

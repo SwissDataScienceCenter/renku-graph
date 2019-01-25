@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.model.ProjectInfo
+import ch.datascience.webhookservice.model.{ProjectInfo, ProjectOwner}
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
@@ -67,9 +67,10 @@ private class IOProjectInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfig
   private implicit lazy val projectInfoDecoder: EntityDecoder[IO, ProjectInfo] = {
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
       for {
-        id   <- cursor.downField("id").as[ProjectId]
-        path <- cursor.downField("path_with_namespace").as[ProjectPath]
-      } yield ProjectInfo(id, path)
+        id      <- cursor.downField("id").as[ProjectId]
+        path    <- cursor.downField("path_with_namespace").as[ProjectPath]
+        ownerId <- cursor.downField("owner").downField("id").as[UserId]
+      } yield ProjectInfo(id, path, ProjectOwner(ownerId))
 
     jsonOf[IO, ProjectInfo]
   }

@@ -22,12 +22,12 @@ import cats.effect.{IO, Sync}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfig.HostUrl
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators.{oauthAccessTokens, personalAccessTokens}
-import ch.datascience.webhookservice.model.ProjectInfo
+import ch.datascience.webhookservice.model.{ProjectInfo, ProjectOwner}
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
@@ -55,7 +55,8 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       projectInfoFinder.findProjectInfo(projectId, personalAccessToken).unsafeRunSync() shouldBe ProjectInfo(
         projectId,
-        projectPath
+        projectPath,
+        ProjectOwner(userId)
       )
     }
 
@@ -71,7 +72,8 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       projectInfoFinder.findProjectInfo(projectId, oauthAccessToken).unsafeRunSync() shouldBe ProjectInfo(
         projectId,
-        projectPath
+        projectPath,
+        ProjectOwner(userId)
       )
     }
 
@@ -101,7 +103,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
       } shouldBe UnauthorizedException
     }
 
-    "return a RuntimeException if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
+    "return a RuntimeException if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
       val personalAccessToken = personalAccessTokens.generateOne
 
@@ -136,6 +138,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
     val gitLabUrl   = url(externalServiceBaseUrl)
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
+    val userId      = userIds.generateOne
 
     val configProvider = mock[IOGitLabConfigProvider]
 
@@ -150,7 +153,10 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
     lazy val projectJson: String = Json
       .obj(
         "id"                  -> Json.fromInt(projectId.value),
-        "path_with_namespace" -> Json.fromString(projectPath.value)
+        "path_with_namespace" -> Json.fromString(projectPath.value),
+        "owner" -> Json.obj(
+          "id" -> Json.fromInt(userId.value)
+        )
       )
       .toString()
   }

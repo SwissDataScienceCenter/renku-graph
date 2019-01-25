@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
 import ch.datascience.graph.events.ProjectId
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
@@ -31,7 +31,7 @@ private trait HookCreationRequestSender[Interpretation[_]] {
   def createHook(
       projectId:     ProjectId,
       accessToken:   AccessToken,
-      hookAuthToken: HookAuthToken
+      hookAuthToken: SerializedHookToken
   ): Interpretation[Unit]
 }
 
@@ -50,7 +50,7 @@ private class IOHookCreationRequestSender @Inject()(configProvider: IOHookCreati
   import org.http4s.circe._
   import org.http4s.{Request, Response, Uri}
 
-  def createHook(projectId: ProjectId, accessToken: AccessToken, hookAuthToken: HookAuthToken): IO[Unit] =
+  def createHook(projectId: ProjectId, accessToken: AccessToken, hookAuthToken: SerializedHookToken): IO[Unit] =
     for {
       config <- configProvider.get()
       uri    <- F.fromEither(Uri.fromString(s"${config.gitLabUrl}/api/v4/projects/$projectId/hooks"))
@@ -59,7 +59,9 @@ private class IOHookCreationRequestSender @Inject()(configProvider: IOHookCreati
       result <- send(requestWithPayload)(mapResponse)
     } yield result
 
-  private def createPayload(projectId: ProjectId, hookAuthToken: HookAuthToken, selfUrl: HookCreationConfig.HostUrl) =
+  private def createPayload(projectId:     ProjectId,
+                            hookAuthToken: SerializedHookToken,
+                            selfUrl:       HookCreationConfig.HostUrl) =
     Json.obj(
       "id"          -> Json.fromInt(projectId.value),
       "url"         -> Json.fromString(s"$selfUrl${WebhookEventEndpoint.processPushEvent().url}"),

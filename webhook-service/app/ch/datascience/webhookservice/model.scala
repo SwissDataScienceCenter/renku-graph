@@ -18,22 +18,30 @@
 
 package ch.datascience.webhookservice
 
-import ch.datascience.graph.events.{ProjectId, ProjectPath}
+import ch.datascience.graph.events.{ProjectId, ProjectPath, UserId}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import io.circe.Decoder
 
 object model {
 
-  final class ProjectAccessToken private (val value: String) extends AnyVal with TinyType[String]
-  object ProjectAccessToken extends TinyTypeFactory[String, ProjectAccessToken](new ProjectAccessToken(_)) with NonBlank
+  final class HookAccessToken private (val value: String) extends AnyVal with TinyType[String]
+  object HookAccessToken extends TinyTypeFactory[String, HookAccessToken](new HookAccessToken(_)) with NonBlank {
+    implicit lazy val hookAccessTokenDecoder: Decoder[HookAccessToken] = Decoder.decodeString.map(HookAccessToken.apply)
+  }
 
   final case class HookToken(
-      projectId:          ProjectId,
-      projectAccessToken: ProjectAccessToken
+      projectId:       ProjectId,
+      hookAccessToken: HookAccessToken
+  )
+
+  final case class ProjectOwner(
+      id: UserId
   )
 
   final case class ProjectInfo(
-      id:   ProjectId,
-      path: ProjectPath
+      id:    ProjectId,
+      path:  ProjectPath,
+      owner: ProjectOwner
   )
 }

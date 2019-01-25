@@ -22,6 +22,7 @@ import cats.effect.{IO, Sync}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators.projectIds
+import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
@@ -54,7 +55,7 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
           .willReturn(created())
       }
 
-      sender.createHook(projectId, personalAccessToken, hookAuthToken).unsafeRunSync() shouldBe ((): Unit)
+      sender.createHook(projectId, personalAccessToken, serializedHookToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
@@ -70,7 +71,7 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
           .willReturn(created())
       }
 
-      sender.createHook(projectId, oauthAccessToken, hookAuthToken).unsafeRunSync() shouldBe ((): Unit)
+      sender.createHook(projectId, oauthAccessToken, serializedHookToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "return an error if config cannot be read" in new TestCase {
@@ -79,7 +80,7 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
       val accessToken = accessTokens.generateOne
 
       intercept[Exception] {
-        sender.createHook(projectId, accessToken, hookAuthToken).unsafeRunSync()
+        sender.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
       } shouldBe exception
     }
 
@@ -94,7 +95,7 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
       }
 
       intercept[Exception] {
-        sender.createHook(projectId, accessToken, hookAuthToken).unsafeRunSync()
+        sender.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -109,24 +110,24 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
       }
 
       intercept[Exception] {
-        sender.createHook(projectId, accessToken, hookAuthToken).unsafeRunSync()
+        sender.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
       }.getMessage shouldBe s"POST $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.BadRequest}; body: some message"
     }
   }
 
   private trait TestCase {
-    val projectId          = projectIds.generateOne
-    val hookAuthToken      = hookAuthTokens.generateOne
-    val gitLabUrl          = url(externalServiceBaseUrl)
-    val selfUrl            = validatedUrls.generateOne
-    val hookCreationConfig = HookCreationConfig(gitLabUrl, selfUrl)
+    val projectId           = projectIds.generateOne
+    val serializedHookToken = serializedHookTokens.generateOne
+    val gitLabUrl           = url(externalServiceBaseUrl)
+    val selfUrl             = validatedUrls.generateOne
+    val hookCreationConfig  = HookCreationConfig(gitLabUrl, selfUrl)
 
     lazy val expectedBody = Json
       .obj(
         "id"          -> Json.fromInt(projectId.value),
         "url"         -> Json.fromString(s"$selfUrl${WebhookEventEndpoint.processPushEvent().url}"),
         "push_events" -> Json.fromBoolean(true),
-        "token"       -> Json.fromString(hookAuthToken.value)
+        "token"       -> Json.fromString(serializedHookToken.value)
       )
       .toString()
 

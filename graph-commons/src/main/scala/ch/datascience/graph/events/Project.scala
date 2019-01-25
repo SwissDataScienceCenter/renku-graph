@@ -37,6 +37,14 @@ object ProjectId extends TinyTypeFactory[Int, ProjectId](new ProjectId(_)) with 
 
 class ProjectPath private (val value: String) extends AnyVal with TinyType[String]
 object ProjectPath extends TinyTypeFactory[String, ProjectPath](new ProjectPath(_)) with NonBlank {
+  addConstraint(
+    check = value =>
+      value.contains("/") &&
+        (value.indexOf("/") == value.lastIndexOf("/")) &&
+        !value.startsWith("/") &&
+        !value.endsWith("/"),
+    message = (value: String) => s"'$value' is not a valid $typeName"
+  )
   implicit lazy val projectPathFormat:  Format[ProjectPath]  = TinyTypeFormat(ProjectPath.apply)
   implicit lazy val projectPathDecoder: Decoder[ProjectPath] = Decoder.decodeString.map(ProjectPath.apply)
 }

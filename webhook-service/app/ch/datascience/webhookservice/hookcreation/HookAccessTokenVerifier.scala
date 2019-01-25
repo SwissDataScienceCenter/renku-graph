@@ -22,25 +22,25 @@ import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
+import ch.datascience.webhookservice.model.ProjectInfo
 import io.circe.Decoder.decodeList
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait GraphTokenVerifier[Interpretation[_]] {
-  def checkTokenPresence(
-      projectId:   ProjectId,
-      userId:      UserId,
+private trait HookAccessTokenVerifier[Interpretation[_]] {
+  def checkHookAccessTokenPresence(
+      projectInfo: ProjectInfo,
       accessToken: AccessToken
   ): Interpretation[Boolean]
 }
 
 @Singleton
-private class IOGraphTokenVerifier @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
-    implicit executionContext:                                     ExecutionContext)
+private class IOHookAccessTokenVerifier @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
+    implicit executionContext:                                          ExecutionContext)
     extends IORestClient
-    with GraphTokenVerifier[IO] {
+    with HookAccessTokenVerifier[IO] {
 
   import cats.effect._
   import ch.datascience.webhookservice.exceptions.UnauthorizedException
@@ -51,12 +51,12 @@ private class IOGraphTokenVerifier @Inject()(gitLabConfigProvider: IOGitLabConfi
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def checkTokenPresence(projectId: ProjectId, userId: UserId, accessToken: AccessToken): IO[Boolean] =
+  def checkHookAccessTokenPresence(projectInfo: ProjectInfo, accessToken: AccessToken): IO[Boolean] =
     for {
       gitLabHostUrl <- gitLabConfigProvider.get()
-      uri           <- validateUri(s"$gitLabHostUrl/api/v4/users/$userId/impersonation_tokens")
+      uri           <- validateUri(s"$gitLabHostUrl/api/v4/users/${projectInfo.owner.id}/impersonation_tokens")
       existingHooks <- send(request(GET, uri, accessToken))(mapResponse)
-    } yield checkProjectHookExists(existingHooks, projectId)
+    } yield checkProjectHookExists(existingHooks, projectInfo.path)
 
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[List[String]] =
     response.status match {
@@ -73,6 +73,6 @@ private class IOGraphTokenVerifier @Inject()(gitLabConfigProvider: IOGitLabConfi
     jsonOf[IO, List[String]]
   }
 
-  private def checkProjectHookExists(hookNames: List[String], projectId: ProjectId): Boolean =
-    hookNames.contains(s"renku-graph-$projectId")
+  private def checkProjectHookExists(hookNames: List[String], projectPath: ProjectPath): Boolean =
+    hookNames contains s"${projectPath.value.replace("/", "-")}-hook-access-token"
 }

@@ -25,6 +25,7 @@ import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
+import ch.datascience.webhookservice.model.HookToken
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 
@@ -32,27 +33,52 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private class HookCreator[Interpretation[_]: Monad](
-    gitLabHookCreation: HookCreationRequestSender[Interpretation],
-    logger:             Logger[Interpretation],
-    hookTokenCrypto:    HookTokenCrypto[Interpretation]
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+    projectInfoFinder:       ProjectInfoFinder[Interpretation],
+    hookAccessTokenVerifier: HookAccessTokenVerifier[Interpretation],
+    hookAccessTokenCreator:  HookAccessTokenCreator[Interpretation],
+    gitLabHookCreation:      HookCreationRequestSender[Interpretation],
+    logger:                  Logger[Interpretation],
+    hookTokenCrypto:         HookTokenCrypto[Interpretation]
+)(implicit ME:               MonadError[Interpretation, Throwable]) {
+
+  import projectInfoFinder._
+  import hookAccessTokenVerifier._
+  import hookAccessTokenCreator._
 
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[Unit] = {
     for {
-      hookAuthToken <- hookTokenCrypto.encrypt(projectId.toString)
-      _             <- gitLabHookCreation.createHook(projectId, accessToken, hookAuthToken)
-      _             <- logger.info(s"Hook created for project with id $projectId")
+      projectInfo         <- findProjectInfo(projectId, accessToken)
+      _                   <- checkHookAccessTokenPresence(projectInfo, accessToken) flatMap failIfHookAccessTokenExists(projectId)
+      hookAccessToken     <- createHookAccessToken(projectInfo, accessToken)
+      serializedHookToken <- hookTokenCrypto.encrypt(HookToken(projectInfo.id, hookAccessToken))
+      _                   <- gitLabHookCreation.createHook(projectId, accessToken, serializedHookToken)
+      _                   <- logger.info(s"Hook created for project with id $projectId")
     } yield ()
   } recoverWith {
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
       ME.raiseError(exception)
   }
+
+  private def failIfHookAccessTokenExists(projectId: ProjectId): Boolean => Interpretation[Unit] = {
+    case true  => ME.raiseError(new RuntimeException(s"Hook already created for the project $projectId"))
+    case false => ME.pure(())
+  }
 }
 
 @Singleton
 private class IOHookCreator @Inject()(
-    gitLabHookCreation: IOHookCreationRequestSender,
-    logger:             IOLogger,
-    hookTokenCrypto:    IOHookTokenCrypto
-) extends HookCreator[IO](gitLabHookCreation, logger, hookTokenCrypto)
+    projectInfoFinder:       IOProjectInfoFinder,
+    hookAccessTokenVerifier: IOHookAccessTokenVerifier,
+    hookAccessTokenCreator:  IOHookAccessTokenCreator,
+    gitLabHookCreation:      IOHookCreationRequestSender,
+    logger:                  IOLogger,
+    hookTokenCrypto:         IOHookTokenCrypto
+) extends HookCreator[IO](
+      projectInfoFinder,
+      hookAccessTokenVerifier,
+      hookAccessTokenCreator,
+      gitLabHookCreation,
+      logger,
+      hookTokenCrypto
+    )

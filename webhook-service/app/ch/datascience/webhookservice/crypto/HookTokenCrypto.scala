@@ -24,11 +24,15 @@ import java.util.Base64
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.{HookAuthToken, Secret}
+import ch.datascience.graph.events.ProjectId
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.{Secret, SerializedHookToken}
+import ch.datascience.webhookservice.model.{HookAccessToken, HookToken}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.MinSize
 import eu.timepit.refined.string.MatchesRegex
+import io.circe.parser._
+import io.circe.{Decoder, HCursor, Json}
 import javax.crypto.Cipher
 import javax.crypto.Cipher.{DECRYPT_MODE, ENCRYPT_MODE}
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
@@ -52,20 +56,32 @@ class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError
   private lazy val encryptingCipher = cipher(ENCRYPT_MODE)
   private lazy val decryptingCipher = cipher(DECRYPT_MODE)
 
-  def encrypt(hookToken: String): Interpretation[HookAuthToken] =
+  def encrypt(hookToken: HookToken): Interpretation[SerializedHookToken] =
     for {
-      validatedToken   <- validate(hookToken)
-      encoded          <- encryptAndEncode(validatedToken)
+      serializedToken  <- serialize(hookToken)
+      encoded          <- encryptAndEncode(serializedToken)
       validatedDecoded <- validate(encoded)
     } yield validatedDecoded
 
-  def decrypt(hookToken: HookAuthToken): Interpretation[String] =
-    decodeAndDecrypt(hookToken)
-      .recoverWith(meaningfulError)
+  def decrypt(serializedToken: SerializedHookToken): Interpretation[HookToken] = {
+    for {
+      decoded      <- decodeAndDecrypt(serializedToken)
+      deserialized <- deserialize(decoded)
+    } yield deserialized
+  } recoverWith meaningfulError
 
-  private def validate(value: String): Interpretation[HookAuthToken] =
-    ME.fromEither[HookAuthToken] {
-      HookAuthToken.from(value)
+  private def serialize(hook: HookToken): Interpretation[String] = pure {
+    Json
+      .obj(
+        "projectId"       -> Json.fromInt(hook.projectId.value),
+        "hookAccessToken" -> Json.fromString(hook.hookAccessToken.value)
+      )
+      .noSpaces
+  }
+
+  private def validate(value: String): Interpretation[SerializedHookToken] =
+    ME.fromEither[SerializedHookToken] {
+      SerializedHookToken.from(value)
     }
 
   private def cipher(mode: Int): Cipher = {
@@ -74,21 +90,32 @@ class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError
     c
   }
 
-  private def encryptAndEncode(authToken: HookAuthToken): Interpretation[String] =
+  private def encryptAndEncode(authToken: String): Interpretation[String] =
     new String(
-      base64Encoder.encode(encryptingCipher.doFinal(authToken.value.getBytes(charset))),
+      base64Encoder.encode(encryptingCipher.doFinal(authToken.getBytes(charset))),
       charset
     )
 
-  private def decodeAndDecrypt(authToken: HookAuthToken): Interpretation[String] =
+  private def decodeAndDecrypt(authToken: SerializedHookToken): Interpretation[String] =
     new String(
       decryptingCipher.doFinal(base64Decoder.decode(authToken.value.getBytes(charset))),
       charset
     )
 
-  private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[String]] = {
+  private implicit val hookTokenDecoder: Decoder[HookToken] = (cursor: HCursor) =>
+    for {
+      projectId       <- cursor.downField("projectId").as[ProjectId]
+      hookAccessToken <- cursor.downField("hookAccessToken").as[HookAccessToken]
+    } yield HookToken(projectId, hookAccessToken)
+
+  private def deserialize(json: String): Interpretation[HookToken] = ME.fromEither {
+    parse(json)
+      .flatMap(_.as[HookToken])
+  }
+
+  private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[HookToken]] = {
     case NonFatal(cause) =>
-      ME.raiseError(new RuntimeException("HookAuthToken decryption failed", cause))
+      ME.raiseError(new RuntimeException("HookToken decryption failed", cause))
   }
 
   private implicit def pure[T](value: => T): Interpretation[T] =
@@ -100,14 +127,14 @@ class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError
 }
 
 object HookTokenCrypto {
-  type Secret        = String Refined MinSize[W.`16`.T]
-  type HookAuthToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+  type Secret              = String Refined MinSize[W.`16`.T]
+  type SerializedHookToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 
-  object HookAuthToken {
+  object SerializedHookToken {
 
-    def from(value: String): Either[Throwable, HookAuthToken] =
+    def from(value: String): Either[Throwable, SerializedHookToken] =
       RefType
-        .applyRef[HookAuthToken](value)
+        .applyRef[SerializedHookToken](value)
         .leftMap(_ => new IllegalArgumentException("A value to create HookAuthToken cannot be blank"))
   }
 }

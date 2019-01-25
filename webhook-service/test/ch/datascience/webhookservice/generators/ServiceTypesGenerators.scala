@@ -18,13 +18,11 @@
 
 package ch.datascience.webhookservice.generators
 
-import ch.datascience.clients.AccessToken
-import ch.datascience.clients.AccessToken._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.model.{HookToken, ProjectAccessToken}
+import ch.datascience.webhookservice.model.{HookAccessToken, HookToken, ProjectInfo, ProjectOwner}
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 
@@ -37,34 +35,29 @@ object ServiceTypesGenerators {
     project     <- projects
   } yield PushEvent(maybeBefore, after, pushUser, project)
 
-  implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
-    length <- Gen.choose(5, 40)
-    chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
-  } yield PersonalAccessToken(chars.mkString(""))
-
-  implicit val oauthAccessTokens: Gen[OAuthAccessToken] = for {
-    length <- Gen.choose(5, 40)
-    chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
-  } yield OAuthAccessToken(chars.mkString(""))
-
-  implicit val accessTokens: Gen[AccessToken] = for {
-    boolean     <- Gen.oneOf(true, false)
-    accessToken <- if (boolean) personalAccessTokens else oauthAccessTokens
-  } yield accessToken
-
-  implicit val hookAuthTokens: Gen[HookAuthToken] = nonEmptyStrings().map { value =>
+  implicit val serializedHookTokens: Gen[SerializedHookToken] = nonEmptyStrings().map { value =>
     RefType
-      .applyRef[HookAuthToken](value)
+      .applyRef[SerializedHookToken](value)
       .getOrElse(throw new IllegalArgumentException("Generated HookAuthToken cannot be blank"))
   }
 
-  implicit val projectAccessTokens: Gen[ProjectAccessToken] = for {
+  implicit val hookAccessTokens: Gen[HookAccessToken] = for {
     length <- Gen.choose(5, 40)
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
-  } yield ProjectAccessToken(chars.mkString(""))
+  } yield HookAccessToken(chars.mkString(""))
 
   implicit val hookTokens: Gen[HookToken] = for {
-    projectId          <- projectIds
-    projectAccessToken <- projectAccessTokens
-  } yield HookToken(projectId, projectAccessToken)
+    projectId       <- projectIds
+    hookAccessToken <- hookAccessTokens
+  } yield HookToken(projectId, hookAccessToken)
+
+  implicit val projectOwner: Gen[ProjectOwner] = for {
+    id <- userIds
+  } yield ProjectOwner(id)
+
+  implicit val projectInfos: Gen[ProjectInfo] = for {
+    id    <- projectIds
+    path  <- projectPaths
+    owner <- projectOwner
+  } yield ProjectInfo(id, path, owner)
 }

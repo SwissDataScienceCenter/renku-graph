@@ -37,8 +37,8 @@ case class User(
 
 class UserId private (val value: Int) extends AnyVal with TinyType[Int]
 object UserId extends TinyTypeFactory[Int, UserId](new UserId(_)) with NonNegative {
-
-  implicit lazy val userIdFormat: Format[UserId] = TinyTypeFormat(UserId.apply)
+  implicit lazy val userIdFormat:  Format[UserId]  = TinyTypeFormat(UserId.apply)
+  implicit lazy val userIdDecoder: Decoder[UserId] = Decoder.decodeInt.map(UserId.apply)
 }
 
 class Username private (val value: String) extends AnyVal with TinyType[String]

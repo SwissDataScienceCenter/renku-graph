@@ -23,10 +23,11 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events._
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
 import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.webhookservice.model.HookToken
 import javax.inject.{Inject, Singleton}
 import play.api.mvc._
 
@@ -54,29 +55,29 @@ class WebhookEventEndpoint(
 
   val processPushEvent: Action[PushEvent] = Action.async(parse.json[PushEvent]) { implicit request =>
     (for {
-      authToken      <- findAuthToken(request)
-      decryptedToken <- decrypt(authToken) recoverWith unauthorizedException
-      _              <- validate(decryptedToken, request.body)
-      _              <- storeCommitsInEventLog(pushEvent = request.body)
+      authToken <- findAuthToken(request)
+      hookToken <- decrypt(authToken) recoverWith unauthorizedException
+      _         <- validate(hookToken, request.body)
+      _         <- storeCommitsInEventLog(pushEvent = request.body)
     } yield Accepted)
       .unsafeToFuture()
       .recover(mapToResult(request.body))
   }
 
-  private def findAuthToken(request: Request[_]): IO[HookAuthToken] = IO.fromEither {
+  private def findAuthToken(request: Request[_]): IO[SerializedHookToken] = IO.fromEither {
     request.headers.get("X-Gitlab-Token") match {
       case None           => Left(UnauthorizedException)
-      case Some(rawToken) => HookAuthToken.from(rawToken).leftMap(_ => UnauthorizedException)
+      case Some(rawToken) => SerializedHookToken.from(rawToken).leftMap(_ => UnauthorizedException)
     }
   }
 
-  private lazy val unauthorizedException: PartialFunction[Throwable, IO[String]] = {
+  private lazy val unauthorizedException: PartialFunction[Throwable, IO[HookToken]] = {
     case NonFatal(_) =>
       IO.raiseError(UnauthorizedException)
   }
 
-  private def validate(decryptedToken: String, pushEvent: PushEvent): IO[Unit] = IO.fromEither {
-    if (decryptedToken == pushEvent.project.id.toString) Right(())
+  private def validate(hookToken: HookToken, pushEvent: PushEvent): IO[Unit] = IO.fromEither {
+    if (hookToken.projectId == pushEvent.project.id) Right(())
     else Left(UnauthorizedException)
   }
 
