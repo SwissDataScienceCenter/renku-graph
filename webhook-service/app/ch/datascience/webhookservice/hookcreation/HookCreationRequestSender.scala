@@ -19,16 +19,15 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
+import ch.datascience.clients.{AccessToken, IORestClient}
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.HookAuthToken
-import ch.datascience.webhookservice.model.AccessToken
-import ch.datascience.webhookservice.model.AccessToken._
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private abstract class HookCreationRequestSender[Interpretation[_]] {
+private trait HookCreationRequestSender[Interpretation[_]] {
   def createHook(
       projectId:     ProjectId,
       accessToken:   AccessToken,
@@ -39,31 +38,25 @@ private abstract class HookCreationRequestSender[Interpretation[_]] {
 @Singleton
 private class IOHookCreationRequestSender @Inject()(configProvider: IOHookCreationConfigProvider)(
     implicit executionContext:                                      ExecutionContext)
-    extends HookCreationRequestSender[IO] {
+    extends IORestClient
+    with HookCreationRequestSender[IO] {
 
   import cats.effect._
   import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
   import ch.datascience.webhookservice.exceptions.UnauthorizedException
   import io.circe.Json
-  import org.http4s.AuthScheme.Bearer
-  import org.http4s.Credentials.Token
   import org.http4s.Method.POST
   import org.http4s.Status.{Created, Unauthorized}
   import org.http4s.circe._
-  import org.http4s.client.blaze.BlazeClientBuilder
-  import org.http4s.headers.Authorization
-  import org.http4s.{Header, Headers, Request, Response, Uri}
-
-  private implicit val cs: ContextShift[IO] = IO.contextShift(executionContext)
-  private val F = implicitly[ConcurrentEffect[IO]]
+  import org.http4s.{Request, Response, Uri}
 
   def createHook(projectId: ProjectId, accessToken: AccessToken, hookAuthToken: HookAuthToken): IO[Unit] =
     for {
       config <- configProvider.get()
       uri    <- F.fromEither(Uri.fromString(s"${config.gitLabUrl}/api/v4/projects/$projectId/hooks"))
-      payload = createPayload(projectId, hookAuthToken, config.selfUrl)
-      request = createRequest(uri, accessToken, payload)
-      result <- send(request)
+      payload            = createPayload(projectId, hookAuthToken, config.selfUrl)
+      requestWithPayload = request(POST, uri, accessToken).withEntity(payload)
+      result <- send(requestWithPayload)(mapResponse)
     } yield result
 
   private def createPayload(projectId: ProjectId, hookAuthToken: HookAuthToken, selfUrl: HookCreationConfig.HostUrl) =
@@ -74,34 +67,10 @@ private class IOHookCreationRequestSender @Inject()(configProvider: IOHookCreati
       "token"       -> Json.fromString(hookAuthToken.value)
     )
 
-  private def createRequest(uri: Uri, accessToken: AccessToken, payload: Json) =
-    Request[IO](
-      method  = POST,
-      uri     = uri,
-      headers = authHeader(accessToken)
-    ).withEntity(payload)
-
-  private lazy val authHeader: AccessToken => Headers = {
-    case PersonalAccessToken(token) => Headers(Header("PRIVATE-TOKEN", token))
-    case OAuthAccessToken(token)    => Headers(Authorization(Token(Bearer, token)))
-  }
-
-  private def send(request: Request[IO]) = BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>
-    httpClient.fetch[Unit](request) { response =>
-      response.status match {
-        case Created      => F.pure(())
-        case Unauthorized => F.raiseError(UnauthorizedException)
-        case _            => raiseError(request, response)
-      }
+  private def mapResponse(request: Request[IO], response: Response[IO]): IO[Unit] =
+    response.status match {
+      case Created      => F.pure(())
+      case Unauthorized => F.raiseError(UnauthorizedException)
+      case _            => raiseError(request, response)
     }
-  }
-
-  private def raiseError(request: Request[IO], response: Response[IO]): IO[Unit] =
-    for {
-      bodyAsString <- response.as[String]
-      _ <- F.raiseError {
-            new RuntimeException(
-              s"${request.method} ${request.uri} returned ${response.status}; body: ${bodyAsString.split('\n').map(_.trim.filter(_ >= ' ')).mkString}")
-          }
-    } yield ()
 }

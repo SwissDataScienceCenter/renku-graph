@@ -22,25 +22,24 @@ import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import io.circe.Decoder.decodeList
+import ch.datascience.webhookservice.model.ProjectInfo
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait GraphTokenVerifier[Interpretation[_]] {
-  def checkTokenPresence(
+private trait ProjectInfoFinder[Interpretation[_]] {
+  def findProjectInfo(
       projectId:   ProjectId,
-      userId:      UserId,
       accessToken: AccessToken
-  ): Interpretation[Boolean]
+  ): Interpretation[ProjectInfo]
 }
 
 @Singleton
-private class IOGraphTokenVerifier @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
-    implicit executionContext:                                     ExecutionContext)
+private class IOProjectInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
+    implicit executionContext:                                    ExecutionContext)
     extends IORestClient
-    with GraphTokenVerifier[IO] {
+    with ProjectInfoFinder[IO] {
 
   import cats.effect._
   import ch.datascience.webhookservice.exceptions.UnauthorizedException
@@ -51,28 +50,27 @@ private class IOGraphTokenVerifier @Inject()(gitLabConfigProvider: IOGitLabConfi
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def checkTokenPresence(projectId: ProjectId, userId: UserId, accessToken: AccessToken): IO[Boolean] =
+  def findProjectInfo(projectId: ProjectId, accessToken: AccessToken): IO[ProjectInfo] =
     for {
       gitLabHostUrl <- gitLabConfigProvider.get()
-      uri           <- validateUri(s"$gitLabHostUrl/api/v4/users/$userId/impersonation_tokens")
-      existingHooks <- send(request(GET, uri, accessToken))(mapResponse)
-    } yield checkProjectHookExists(existingHooks, projectId)
+      uri           <- validateUri(s"$gitLabHostUrl/api/v4/projects/$projectId")
+      projectInfo   <- send(request(GET, uri, accessToken))(mapResponse)
+    } yield projectInfo
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[List[String]] =
+  private def mapResponse(request: Request[IO], response: Response[IO]): IO[ProjectInfo] =
     response.status match {
-      case Ok           => response.as[List[String]] handleErrorWith contextToError(request, response)
+      case Ok           => response.as[ProjectInfo] handleErrorWith contextToError(request, response)
       case Unauthorized => F.raiseError(UnauthorizedException)
       case _            => raiseError(request, response)
     }
 
-  private implicit lazy val hooksNamesDecoder: EntityDecoder[IO, List[String]] = {
-    implicit val hookNameDecoder: Decoder[List[String]] = decodeList {
-      _.downField("name").as[String]
-    }
+  private implicit lazy val projectInfoDecoder: EntityDecoder[IO, ProjectInfo] = {
+    implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
+      for {
+        id   <- cursor.downField("id").as[ProjectId]
+        path <- cursor.downField("path_with_namespace").as[ProjectPath]
+      } yield ProjectInfo(id, path)
 
-    jsonOf[IO, List[String]]
+    jsonOf[IO, ProjectInfo]
   }
-
-  private def checkProjectHookExists(hookNames: List[String], projectId: ProjectId): Boolean =
-    hookNames.contains(s"renku-graph-$projectId")
 }

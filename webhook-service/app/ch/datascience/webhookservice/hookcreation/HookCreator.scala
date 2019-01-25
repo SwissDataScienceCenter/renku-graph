@@ -21,10 +21,10 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
+import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
-import ch.datascience.webhookservice.model.AccessToken
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 

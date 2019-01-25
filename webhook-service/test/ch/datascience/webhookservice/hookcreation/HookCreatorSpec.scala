@@ -20,6 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats._
 import cats.implicits._
+import ch.datascience.clients.AccessToken
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators.projectIds
@@ -29,7 +30,6 @@ import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.{HookAuthToken, Secret}
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.model.AccessToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

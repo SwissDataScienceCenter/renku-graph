@@ -46,18 +46,19 @@ object CommitEvent {
 
 class CommitId private (val value: String) extends AnyVal with TinyType[String]
 object CommitId extends TinyTypeFactory[String, CommitId](new CommitId(_)) with GitSha {
-  implicit lazy val format:  Format[CommitId]  = TinyTypeFormat(CommitId.apply)
-  implicit lazy val decoder: Decoder[CommitId] = Decoder.decodeString.map(CommitId.apply)
+  implicit lazy val commitIdFormat:  Format[CommitId]  = TinyTypeFormat(CommitId.apply)
+  implicit lazy val commitIdDecoder: Decoder[CommitId] = Decoder.decodeString.map(CommitId.apply)
 }
 
 class CommitMessage private (val value: String) extends AnyVal with TinyType[String]
 object CommitMessage extends TinyTypeFactory[String, CommitMessage](new CommitMessage(_)) with NonBlank {
-  implicit lazy val format:  Format[CommitMessage]  = TinyTypeFormat(CommitMessage.apply)
-  implicit lazy val decoder: Decoder[CommitMessage] = Decoder.decodeString.map(CommitMessage.apply)
+  implicit lazy val commitMessageFormat:  Format[CommitMessage]  = TinyTypeFormat(CommitMessage.apply)
+  implicit lazy val commitMessageDecoder: Decoder[CommitMessage] = Decoder.decodeString.map(CommitMessage.apply)
 }
 
 class CommittedDate private (val value: Instant) extends AnyVal with TinyType[Instant]
 object CommittedDate extends TinyTypeFactory[Instant, CommittedDate](new CommittedDate(_)) with InstantInThePast {
-  implicit lazy val format:  Format[CommittedDate]  = TinyTypeFormat(CommittedDate.apply)
-  implicit lazy val decoder: Decoder[CommittedDate] = Decoder.decodeZonedDateTime.map(t => CommittedDate(t.toInstant))
+  implicit lazy val committedDateFormat: Format[CommittedDate] = TinyTypeFormat(CommittedDate.apply)
+  implicit lazy val committedDateDecoder: Decoder[CommittedDate] =
+    Decoder.decodeZonedDateTime.map(t => CommittedDate(t.toInstant))
 }

@@ -20,12 +20,12 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.clients.AccessToken
+import ch.datascience.clients.AccessToken._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.model.AccessToken
-import ch.datascience.webhookservice.model.AccessToken._
 import javax.inject.{Inject, Singleton}
 import play.api.mvc.{AbstractController, ControllerComponents, Request, Result}
 
