@@ -36,11 +36,11 @@ spec:
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
             - name: JENA_BASE_URL
-              value: "http://{{ include "call-nested" (list . "jena" "jena.fullname") }}:{{ .Values.jena.service.port }}"
+              value: "http://{{ template "jena.fullname" . }}:{{ .Values.jena.service.port }}"
             - name: JENA_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "call-nested" (list . "jena" "jena.fullname") }}
+                  name: {{ template "jena.fullname" . }}
                   key: jena-admin-password
           ports:
             - name: http1
@@ -83,7 +83,11 @@ spec:
                 fieldRef:
                   fieldPath: status.podIP
             - name: SELF_URL
-              value: "{{ printf "http://$(SELF_IP):9001" }}"
+              {{- if .Values.global.renku.domain }}
+              value: {{ template "http" . }}://{{ .Values.global.renku.domain }}
+              {{- else }}
+              value: {{ printf "http://$(SELF_IP):9001" | quote }}
+              {{- end }}
           command:
             - bin/webhook-service
             - -Dhttp.port=9001
