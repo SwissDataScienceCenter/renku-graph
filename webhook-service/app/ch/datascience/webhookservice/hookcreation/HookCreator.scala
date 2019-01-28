@@ -25,7 +25,10 @@ import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
+import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.model.HookToken
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
@@ -35,6 +38,7 @@ import scala.util.control.NonFatal
 
 private class HookCreator[Interpretation[_]: Monad](
     projectHookUrlFinder:    ProjectHookUrlFinder[Interpretation],
+    projectHookVerifier:     ProjectHookVerifier[Interpretation],
     projectInfoFinder:       ProjectInfoFinder[Interpretation],
     hookAccessTokenVerifier: HookAccessTokenVerifier[Interpretation],
     hookAccessTokenCreator:  HookAccessTokenCreator[Interpretation],
@@ -43,23 +47,33 @@ private class HookCreator[Interpretation[_]: Monad](
     hookTokenCrypto:         HookTokenCrypto[Interpretation]
 )(implicit ME:               MonadError[Interpretation, Throwable]) {
 
-  import projectHookUrlFinder._
   import hookAccessTokenCreator._
   import hookAccessTokenVerifier._
   import hookTokenCrypto._
+  import projectHookUrlFinder._
+  import projectHookVerifier._
   import projectInfoFinder._
 
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[Unit] = {
     for {
-      projectHookUrl      <- findProjectHookUrl
-      projectInfo         <- findProjectInfo(projectId, accessToken)
-      _                   <- checkHookAccessTokenPresence(projectInfo, accessToken) flatMap failIfHookAccessTokenExists(projectId)
-      hookAccessToken     <- createHookAccessToken(projectInfo, accessToken)
-      serializedHookToken <- encrypt(HookToken(projectInfo.id, hookAccessToken))
-      _                   <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-      _                   <- logger.info(s"Hook created for project with id $projectId")
+      projectHookUrl          <- findProjectHookUrl
+      projectHookPresence     <- checkProjectHookPresence(HookIdentifier(projectId, projectHookUrl), accessToken)
+      _                       <- failIfProjectHookExists(projectId, projectHookUrl)(projectHookPresence)
+      projectInfo             <- findProjectInfo(projectId, accessToken)
+      hookAccessTokenPresence <- checkHookAccessTokenPresence(projectInfo, accessToken)
+      _                       <- failIfHookAccessTokenExists(projectId)(hookAccessTokenPresence)
+      hookAccessToken         <- createHookAccessToken(projectInfo, accessToken)
+      serializedHookToken     <- encrypt(HookToken(projectInfo.id, hookAccessToken))
+      _                       <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
+      _                       <- logger.info(s"Hook created for project with id $projectId")
     } yield ()
   } recoverWith loggingError(projectId)
+
+  private def failIfProjectHookExists(projectId:      ProjectId,
+                                      projectHookUrl: ProjectHookUrl): Boolean => Interpretation[Unit] = {
+    case true  => ME.raiseError(HookAlreadyCreated(projectId, projectHookUrl))
+    case false => ME.pure(())
+  }
 
   private def failIfHookAccessTokenExists(projectId: ProjectId): Boolean => Interpretation[Unit] = {
     case true  => ME.raiseError(new RuntimeException(s"Hook already created for the project $projectId"))
@@ -67,15 +81,29 @@ private class HookCreator[Interpretation[_]: Monad](
   }
 
   private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case exception @ HookAlreadyCreated(_, _) =>
+      logger.warn(exception)(s"Hook creation failed for project with id $projectId")
+      ME.raiseError(exception)
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
       ME.raiseError(exception)
   }
 }
 
+private object HookCreator {
+
+  final case class HookAlreadyCreated(
+      projectId:      ProjectId,
+      projectHookUrl: ProjectHookUrl
+  ) extends RuntimeException {
+    s"Hook already created for projectId: $projectId, url: $projectHookUrl"
+  }
+}
+
 @Singleton
 private class IOHookCreator @Inject()(
     projectHookUrlFinder:    IOProjectHookUrlFinder,
+    projectHookVerifier:     IOProjectHookVerifier,
     projectInfoFinder:       IOProjectInfoFinder,
     hookAccessTokenVerifier: IOHookAccessTokenVerifier,
     hookAccessTokenCreator:  IOHookAccessTokenCreator,
@@ -84,6 +112,7 @@ private class IOHookCreator @Inject()(
     hookTokenCrypto:         IOHookTokenCrypto
 ) extends HookCreator[IO](
       projectHookUrlFinder,
+      projectHookVerifier,
       projectInfoFinder,
       hookAccessTokenVerifier,
       hookAccessTokenCreator,

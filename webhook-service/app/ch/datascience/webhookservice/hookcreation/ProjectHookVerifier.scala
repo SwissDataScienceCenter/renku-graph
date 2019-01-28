@@ -20,9 +20,10 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
+import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
 import io.circe.Decoder.decodeList
 import javax.inject.{Inject, Singleton}
 
@@ -31,9 +32,17 @@ import scala.language.higherKinds
 
 private trait ProjectHookVerifier[Interpretation[_]] {
   def checkProjectHookPresence(
-      projectHook: ProjectHook,
-      accessToken: AccessToken
+      projectHookId: HookIdentifier,
+      accessToken:   AccessToken
   ): Interpretation[Boolean]
+}
+
+private object ProjectHookVerifier {
+
+  final case class HookIdentifier(
+      projectId:      ProjectId,
+      projectHookUrl: ProjectHookUrl
+  )
 }
 
 @Singleton
@@ -52,12 +61,12 @@ private class IOProjectHookVerifier @Inject()(
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  override def checkProjectHookPresence(projectHook: ProjectHook, accessToken: AccessToken): IO[Boolean] =
+  override def checkProjectHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): IO[Boolean] =
     for {
       gitLabHostUrl      <- gitLabUrlProvider.get()
-      uri                <- validateUri(s"$gitLabHostUrl/api/v4/projects/${projectHook.projectId}/hooks")
+      uri                <- validateUri(s"$gitLabHostUrl/api/v4/projects/${projectHookId.projectId}/hooks")
       existingHooksNames <- send(request(GET, uri, accessToken))(mapResponse)
-    } yield checkProjectHookExists(existingHooksNames, projectHook.projectHookUrl)
+    } yield checkProjectHookExists(existingHooksNames, projectHookId.projectHookUrl)
 
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[List[String]] =
     response.status match {

@@ -40,12 +40,12 @@ class GitLabConfig[Interpretation[_]](
   }
 }
 
-@Singleton
-class IOGitLabConfigProvider @Inject()(configuration: Configuration) extends GitLabConfig[IO](configuration)
-
 object GitLabConfig {
 
   import eu.timepit.refined.string.Url
 
   type HostUrl = String Refined Url
 }
+
+@Singleton
+class IOGitLabConfigProvider @Inject()(configuration: Configuration) extends GitLabConfig[IO](configuration)

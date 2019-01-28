@@ -24,6 +24,7 @@ import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHo
 import org.scalacheck.Gen
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
 
 private object HookCreationGenerators {
 
@@ -39,5 +40,14 @@ private object HookCreationGenerators {
       projectId,
       hookUrl,
       serializedHookToken
+    )
+
+  implicit val projectHookIds: Gen[HookIdentifier] = for {
+    projectId <- projectIds
+    hookUrl   <- projectHookUrls
+  } yield
+    HookIdentifier(
+      projectId,
+      hookUrl,
     )
 }
