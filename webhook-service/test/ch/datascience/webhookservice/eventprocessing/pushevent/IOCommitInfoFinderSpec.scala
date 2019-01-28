@@ -143,9 +143,8 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     val configProvider = mock[IOGitLabConfigProvider]
 
     def expectGitLabConfigProvider(returning: IO[HostUrl]) =
-      (configProvider
-        .get()(_: Sync[IO]))
-        .expects(*)
+      (configProvider.get _)
+        .expects()
         .returning(returning)
 
     val finder = new IOCommitInfoFinder(configProvider)

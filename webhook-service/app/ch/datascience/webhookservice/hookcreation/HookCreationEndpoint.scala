@@ -55,7 +55,7 @@ class HookCreationEndpoint @Inject()(
       .getOrElse(Left(UnauthorizedException))
   }
 
-  private def convert(headers: Option[String], to: String => Either[String, AccessToken]) =
+  private def convert(headers: Option[String], to: String => Either[Exception, AccessToken]) =
     headers.map {
       to(_).leftMap(_ => UnauthorizedException)
     }

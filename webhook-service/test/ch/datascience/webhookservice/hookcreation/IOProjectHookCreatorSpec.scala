@@ -18,15 +18,15 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.{IO, Sync}
+import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.EventsGenerators.projectIds
 import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
+import ch.datascience.webhookservice.config.{GitLabConfig, IOGitLabConfigProvider}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
+import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
@@ -45,101 +45,98 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
     "send relevant Json payload and 'PRIVATE-TOKEN' header (when Personal Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
-      expectConfigProvider(returning = IO.pure(projectHookCreatorConfig))
+      expectGitLabHostProvider(returning = IO.pure(gitLabUrl))
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
         post(s"/api/v4/projects/$projectId/hooks")
           .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
-          .withRequestBody(equalToJson(expectedBody))
+          .withRequestBody(equalToJson(toJson(projectHook)))
           .willReturn(created())
       }
 
-      hookCreator.createHook(projectId, personalAccessToken, serializedHookToken).unsafeRunSync() shouldBe ((): Unit)
+      hookCreator.createHook(projectHook, personalAccessToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
-      expectConfigProvider(returning = IO.pure(projectHookCreatorConfig))
+      expectGitLabHostProvider(returning = IO.pure(gitLabUrl))
       val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
         post(s"/api/v4/projects/$projectId/hooks")
           .withHeader("Authorization", equalTo(s"Bearer $oauthAccessToken"))
-          .withRequestBody(equalToJson(expectedBody))
+          .withRequestBody(equalToJson(toJson(projectHook)))
           .willReturn(created())
       }
 
-      hookCreator.createHook(projectId, oauthAccessToken, serializedHookToken).unsafeRunSync() shouldBe ((): Unit)
+      hookCreator.createHook(projectHook, oauthAccessToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
-    "return an error if config cannot be read" in new TestCase {
+    "return an error if gitLabUrl cannot be read" in new TestCase {
       val exception = exceptions.generateOne
-      expectConfigProvider(returning = IO.raiseError(exception))
+      expectGitLabHostProvider(returning = IO.raiseError(exception))
       val accessToken = accessTokens.generateOne
 
       intercept[Exception] {
-        hookCreator.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
+        hookCreator.createHook(projectHook, accessToken).unsafeRunSync()
       } shouldBe exception
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-      expectConfigProvider(returning = IO.pure(projectHookCreatorConfig))
+      expectGitLabHostProvider(returning = IO.pure(gitLabUrl))
       val accessToken = accessTokens.generateOne
 
       stubFor {
         post(s"/api/v4/projects/$projectId/hooks")
-          .withRequestBody(equalToJson(expectedBody))
+          .withRequestBody(equalToJson(toJson(projectHook)))
           .willReturn(unauthorized())
       }
 
       intercept[Exception] {
-        hookCreator.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
+        hookCreator.createHook(projectHook, accessToken).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
     "return a RuntimeException if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
-      expectConfigProvider(returning = IO.pure(projectHookCreatorConfig))
+      expectGitLabHostProvider(returning = IO.pure(gitLabUrl))
       val accessToken = accessTokens.generateOne
 
       stubFor {
         post(s"/api/v4/projects/$projectId/hooks")
-          .withRequestBody(equalToJson(expectedBody))
+          .withRequestBody(equalToJson(toJson(projectHook)))
           .willReturn(badRequest().withBody("some message"))
       }
 
       intercept[Exception] {
-        hookCreator.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
+        hookCreator.createHook(projectHook, accessToken).unsafeRunSync()
       }.getMessage shouldBe s"POST $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.BadRequest}; body: some message"
     }
   }
 
   private trait TestCase {
-    val projectId                = projectIds.generateOne
-    val serializedHookToken      = serializedHookTokens.generateOne
-    val gitLabUrl                = url(externalServiceBaseUrl)
-    val selfUrl                  = validatedUrls.generateOne
-    val projectHookCreatorConfig = ProjectHookCreatorConfig(gitLabUrl, selfUrl)
+    val projectHook = projectHooks.generateOne
+    val projectId   = projectHook.projectId
+    val gitLabUrl   = url(externalServiceBaseUrl)
 
-    lazy val expectedBody = Json
-      .obj(
-        "id"          -> Json.fromInt(projectId.value),
-        "url"         -> Json.fromString(s"$selfUrl${WebhookEventEndpoint.processPushEvent().url}"),
-        "push_events" -> Json.fromBoolean(true),
-        "token"       -> Json.fromString(serializedHookToken.value)
-      )
-      .toString()
+    def toJson(projectHook: ProjectHook) =
+      Json
+        .obj(
+          "id"          -> Json.fromInt(projectHook.projectId.value),
+          "url"         -> Json.fromString(projectHook.projectHookUrl.value),
+          "push_events" -> Json.fromBoolean(true),
+          "token"       -> Json.fromString(projectHook.serializedHookToken.value)
+        )
+        .toString()
 
-    val configProvider = mock[IOProjectProjectHookCreatorConfigProvider]
+    val configProvider = mock[IOGitLabConfigProvider]
+    val hookCreator    = new IOProjectHookCreator(configProvider)
 
-    def expectConfigProvider(returning: IO[ProjectHookCreatorConfig]) =
-      (configProvider
-        .get()(_: Sync[IO]))
-        .expects(*)
+    def expectGitLabHostProvider(returning: IO[GitLabConfig.HostUrl]) =
+      (configProvider.get _)
+        .expects()
         .returning(returning)
-
-    val hookCreator = new IOProjectHookCreator(configProvider)
 
     private def url(value: String) =
       RefType

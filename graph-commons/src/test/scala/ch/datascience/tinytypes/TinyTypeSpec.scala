@@ -64,8 +64,14 @@ class TinyTypeFactorySpec extends WordSpec {
       TinyTypeTest.from("def").map(_.value) shouldBe Right("def")
     }
 
-    "left with the errors if the type constraints are not met" in {
-      TinyTypeTest.from("abc") shouldBe Left("ch.datascience.tinytypes.TinyTypeTest cannot have 'abc' value")
+    "return Left with the IllegalArgumentException containing errors if the type constraints are not met" in {
+      val result = TinyTypeTest.from("abc")
+
+      result shouldBe a[Left[_, _]]
+
+      val Left(exception) = result
+      exception            shouldBe an[IllegalArgumentException]
+      exception.getMessage shouldBe "ch.datascience.tinytypes.TinyTypeTest cannot have 'abc' value"
     }
   }
 }

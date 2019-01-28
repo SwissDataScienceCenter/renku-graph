@@ -148,9 +148,8 @@ class IOHookAccessTokenVerifierSpec extends WordSpec with MockFactory with Exter
     val configProvider = mock[IOGitLabConfigProvider]
 
     def expectGitLabConfigProvider(returning: IO[HostUrl]) =
-      (configProvider
-        .get()(_: Sync[IO]))
-        .expects(*)
+      (configProvider.get _)
+        .expects()
         .returning(returning)
 
     val verifier = new IOHookAccessTokenVerifier(configProvider)

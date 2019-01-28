@@ -21,7 +21,10 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
+import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
+import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
@@ -29,44 +32,49 @@ import scala.language.higherKinds
 
 private trait ProjectHookCreator[Interpretation[_]] {
   def createHook(
-      projectId:     ProjectId,
-      accessToken:   AccessToken,
-      hookAuthToken: SerializedHookToken
+      projectHook: ProjectHook,
+      accessToken: AccessToken
   ): Interpretation[Unit]
 }
 
+private object ProjectHookCreator {
+
+  final case class ProjectHook(
+      projectId:           ProjectId,
+      projectHookUrl:      ProjectHookUrl,
+      serializedHookToken: SerializedHookToken
+  )
+}
+
 @Singleton
-private class IOProjectHookCreator @Inject()(configProvider: IOProjectProjectHookCreatorConfigProvider)(
-    implicit executionContext:                               ExecutionContext)
+private class IOProjectHookCreator @Inject()(
+    gitLabConfigProvider:    IOGitLabConfigProvider
+)(implicit executionContext: ExecutionContext)
     extends IORestClient
     with ProjectHookCreator[IO] {
 
   import cats.effect._
-  import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
   import ch.datascience.webhookservice.exceptions.UnauthorizedException
   import io.circe.Json
   import org.http4s.Method.POST
   import org.http4s.Status.{Created, Unauthorized}
   import org.http4s.circe._
-  import org.http4s.{Request, Response, Uri}
+  import org.http4s.{Request, Response}
 
-  def createHook(projectId: ProjectId, accessToken: AccessToken, hookAuthToken: SerializedHookToken): IO[Unit] =
+  def createHook(projectHook: ProjectHook, accessToken: AccessToken): IO[Unit] =
     for {
-      config <- configProvider.get()
-      uri    <- F.fromEither(Uri.fromString(s"${config.gitLabUrl}/api/v4/projects/$projectId/hooks"))
-      payload            = createPayload(projectId, hookAuthToken, config.selfUrl)
-      requestWithPayload = request(POST, uri, accessToken).withEntity(payload)
+      gitLabUrl <- gitLabConfigProvider.get()
+      uri       <- validateUri(s"$gitLabUrl/api/v4/projects/${projectHook.projectId}/hooks")
+      requestWithPayload = request(POST, uri, accessToken).withEntity(payload(projectHook))
       result <- send(requestWithPayload)(mapResponse)
     } yield result
 
-  private def createPayload(projectId:     ProjectId,
-                            hookAuthToken: SerializedHookToken,
-                            selfUrl:       ProjectHookCreatorConfig.HostUrl) =
+  private def payload(projectHook: ProjectHook) =
     Json.obj(
-      "id"          -> Json.fromInt(projectId.value),
-      "url"         -> Json.fromString(s"$selfUrl${WebhookEventEndpoint.processPushEvent().url}"),
+      "id"          -> Json.fromInt(projectHook.projectId.value),
+      "url"         -> Json.fromString(projectHook.projectHookUrl.value),
       "push_events" -> Json.fromBoolean(true),
-      "token"       -> Json.fromString(hookAuthToken.value)
+      "token"       -> Json.fromString(projectHook.serializedHookToken.value)
     )
 
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[Unit] =

@@ -25,6 +25,7 @@ import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
+import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.model.HookToken
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
@@ -33,6 +34,7 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private class HookCreator[Interpretation[_]: Monad](
+    projectHookUrlFinder:    ProjectHookUrlFinder[Interpretation],
     projectInfoFinder:       ProjectInfoFinder[Interpretation],
     hookAccessTokenVerifier: HookAccessTokenVerifier[Interpretation],
     hookAccessTokenCreator:  HookAccessTokenCreator[Interpretation],
@@ -41,17 +43,20 @@ private class HookCreator[Interpretation[_]: Monad](
     hookTokenCrypto:         HookTokenCrypto[Interpretation]
 )(implicit ME:               MonadError[Interpretation, Throwable]) {
 
-  import projectInfoFinder._
-  import hookAccessTokenVerifier._
+  import projectHookUrlFinder._
   import hookAccessTokenCreator._
+  import hookAccessTokenVerifier._
+  import hookTokenCrypto._
+  import projectInfoFinder._
 
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[Unit] = {
     for {
+      projectHookUrl      <- findProjectHookUrl
       projectInfo         <- findProjectInfo(projectId, accessToken)
       _                   <- checkHookAccessTokenPresence(projectInfo, accessToken) flatMap failIfHookAccessTokenExists(projectId)
       hookAccessToken     <- createHookAccessToken(projectInfo, accessToken)
-      serializedHookToken <- hookTokenCrypto.encrypt(HookToken(projectInfo.id, hookAccessToken))
-      _                   <- projectHookCreator.createHook(projectId, accessToken, serializedHookToken)
+      serializedHookToken <- encrypt(HookToken(projectInfo.id, hookAccessToken))
+      _                   <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
       _                   <- logger.info(s"Hook created for project with id $projectId")
     } yield ()
   } recoverWith loggingError(projectId)
@@ -70,6 +75,7 @@ private class HookCreator[Interpretation[_]: Monad](
 
 @Singleton
 private class IOHookCreator @Inject()(
+    projectHookUrlFinder:    IOProjectHookUrlFinder,
     projectInfoFinder:       IOProjectInfoFinder,
     hookAccessTokenVerifier: IOHookAccessTokenVerifier,
     hookAccessTokenCreator:  IOHookAccessTokenCreator,
@@ -77,6 +83,7 @@ private class IOHookCreator @Inject()(
     logger:                  IOLogger,
     hookTokenCrypto:         IOHookTokenCrypto
 ) extends HookCreator[IO](
+      projectHookUrlFinder,
       projectInfoFinder,
       hookAccessTokenVerifier,
       hookAccessTokenCreator,

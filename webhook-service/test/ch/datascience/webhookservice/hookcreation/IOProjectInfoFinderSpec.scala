@@ -143,9 +143,8 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
     val configProvider = mock[IOGitLabConfigProvider]
 
     def expectGitLabConfigProvider(returning: IO[HostUrl]) =
-      (configProvider
-        .get()(_: Sync[IO]))
-        .expects(*)
+      (configProvider.get _)
+        .expects()
         .returning(returning)
 
     val projectInfoFinder = new IOProjectInfoFinder(configProvider)

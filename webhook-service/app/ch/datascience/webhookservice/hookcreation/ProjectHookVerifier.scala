@@ -20,27 +20,28 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
-import ch.datascience.graph.events._
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.model.ProjectInfo
+import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
+import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
 import io.circe.Decoder.decodeList
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait HookAccessTokenVerifier[Interpretation[_]] {
-  def checkHookAccessTokenPresence(
-      projectInfo: ProjectInfo,
+private trait ProjectHookVerifier[Interpretation[_]] {
+  def checkProjectHookPresence(
+      projectHook: ProjectHook,
       accessToken: AccessToken
   ): Interpretation[Boolean]
 }
 
 @Singleton
-private class IOHookAccessTokenVerifier @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
-    implicit executionContext:                                          ExecutionContext)
+private class IOProjectHookVerifier @Inject()(
+    gitLabUrlProvider:       IOGitLabConfigProvider
+)(implicit executionContext: ExecutionContext)
     extends IORestClient
-    with HookAccessTokenVerifier[IO] {
+    with ProjectHookVerifier[IO] {
 
   import cats.effect._
   import ch.datascience.webhookservice.exceptions.UnauthorizedException
@@ -51,12 +52,12 @@ private class IOHookAccessTokenVerifier @Inject()(gitLabConfigProvider: IOGitLab
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def checkHookAccessTokenPresence(projectInfo: ProjectInfo, accessToken: AccessToken): IO[Boolean] =
+  override def checkProjectHookPresence(projectHook: ProjectHook, accessToken: AccessToken): IO[Boolean] =
     for {
-      gitLabHostUrl       <- gitLabConfigProvider.get()
-      uri                 <- validateUri(s"$gitLabHostUrl/api/v4/users/${projectInfo.owner.id}/impersonation_tokens")
-      existingTokensNames <- send(request(GET, uri, accessToken))(mapResponse)
-    } yield checkProjectHookExists(existingTokensNames, projectInfo.path)
+      gitLabHostUrl      <- gitLabUrlProvider.get()
+      uri                <- validateUri(s"$gitLabHostUrl/api/v4/projects/${projectHook.projectId}/hooks")
+      existingHooksNames <- send(request(GET, uri, accessToken))(mapResponse)
+    } yield checkProjectHookExists(existingHooksNames, projectHook.projectHookUrl)
 
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[List[String]] =
     response.status match {
@@ -65,14 +66,14 @@ private class IOHookAccessTokenVerifier @Inject()(gitLabConfigProvider: IOGitLab
       case _            => raiseError(request, response)
     }
 
-  private implicit lazy val hooksNamesDecoder: EntityDecoder[IO, List[String]] = {
+  private implicit lazy val hooksUrlsDecoder: EntityDecoder[IO, List[String]] = {
     implicit val hookNameDecoder: Decoder[List[String]] = decodeList {
-      _.downField("name").as[String]
+      _.downField("url").as[String]
     }
 
     jsonOf[IO, List[String]]
   }
 
-  private def checkProjectHookExists(tokensNames: List[String], projectPath: ProjectPath): Boolean =
-    tokensNames contains s"${projectPath.value.replace("/", "-")}-hook-access-token"
+  private def checkProjectHookExists(hooksNames: List[String], urlToFind: ProjectHookUrl): Boolean =
+    hooksNames contains urlToFind.value
 }

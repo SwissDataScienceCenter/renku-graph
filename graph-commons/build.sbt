@@ -22,7 +22,7 @@ name := "renku-graph-commons"
 
 val pureConfigVersion = "0.10.1"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig" % pureConfigVersion
-libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats-effect" % pureConfigVersion
+libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
 libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10"
 

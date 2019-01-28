@@ -18,43 +18,37 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.tinytypes.TinyType
+import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import play.api.Configuration
 
-class ProjectHookCreatorConfigProviderSpec extends WordSpec {
+class ProjectHookUrlSpec extends WordSpec {
 
-  "get" should {
+  "ProjectHookUrl" should {
 
-    "return HookCreationConfig object with proper values" in {
-      val gitLabUrl = validatedUrls.generateOne
-      val selfUrl   = validatedUrls.generateOne
-      val config = Configuration.from(
-        Map(
-          "services" -> Map(
-            "gitlab" -> Map(
-              "url" -> gitLabUrl.toString()
-            ),
-            "self" -> Map(
-              "url" -> selfUrl.toString()
-            )
-          )
-        )
-      )
+    "be a TinyType" in {
+      ProjectHookUrl(validatedUrls.generateOne.value) shouldBe a[TinyType[_]]
+    }
+  }
 
-      new ProjectHookCreatorConfigProvider[IO](config).get().unsafeRunSync() shouldBe ProjectHookCreatorConfig(
-        gitLabUrl,
-        selfUrl
-      )
+  "instantiate" should {
+
+    "be successful for valid urls" in {
+      val url = validatedUrls.generateOne
+
+      val Right(projectHookUrl) = ProjectHookUrl.from(url.value)
+
+      projectHookUrl.value shouldBe url.value
     }
 
-    "fail if there are no 'services.gitlab.url' and 'services.self.url' in the config" in {
-      val config = Configuration.empty
+    "fail if the value is not a valid url" in {
+      val Left(exception) = ProjectHookUrl.from("123")
 
-      a[RuntimeException] should be thrownBy new ProjectHookCreatorConfigProvider[IO](config).get().unsafeRunSync()
+      exception            shouldBe an[IllegalArgumentException]
+      exception.getMessage shouldBe "'123' is not a valid ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl"
     }
   }
 }

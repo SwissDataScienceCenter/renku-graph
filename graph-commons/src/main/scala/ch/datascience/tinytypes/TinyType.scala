@@ -27,22 +27,17 @@ trait TinyType[T] extends Any {
 
 abstract class TinyTypeFactory[V, TT <: TinyType[V]](instantiate: V => TT) extends Constraints[V] with TypeName {
 
-  final def apply(value: V): TT = {
-    verify(value)
-    instantiate(value)
-  }
+  final def apply(value: V): TT = from(value).fold(
+    exception => throw exception,
+    identity
+  )
 
   final def unapply(sha: TT): Option[V] = Some(sha.value)
 
-  final def from(value: V): Either[String, TT] = {
+  final def from(value: V): Either[IllegalArgumentException, TT] = {
     val maybeErrors = validateConstraints(value)
     if (maybeErrors.isEmpty) Right(instantiate(value))
-    else Left(maybeErrors.mkString("; "))
-  }
-
-  private def verify(value: V): Unit = {
-    val maybeErrors = validateConstraints(value)
-    if (maybeErrors.nonEmpty) throw new IllegalArgumentException(maybeErrors.mkString("; "))
+    else Left(new IllegalArgumentException(maybeErrors.mkString("; ")))
   }
 }
 

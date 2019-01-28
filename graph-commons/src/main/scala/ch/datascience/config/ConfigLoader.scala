@@ -18,16 +18,22 @@
 
 package ch.datascience.config
 
-import ch.datascience.tinytypes.constraints.GreaterThanZero
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import com.typesafe.config.Config
-import play.api.{ConfigLoader => PlayConfigLoader}
+import cats.implicits._
+import cats.MonadError
+import ch.datascience.config.ConfigLoader.ConfigLoadingException
+import pureconfig.error.ConfigReaderFailures
 
-class BufferSize private (val value: Int) extends AnyVal with TinyType[Int]
+import scala.language.higherKinds
 
-object BufferSize extends TinyTypeFactory[Int, BufferSize](new BufferSize(_)) with GreaterThanZero {
+abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
-  implicit object BufferSizeFinder extends PlayConfigLoader[BufferSize] {
-    override def load(config: Config, path: String): BufferSize = BufferSize(config.getInt(path))
+  protected def fromEither[T](loadedConfig: ConfigReaderFailures Either T): Interpretation[T] = ME.fromEither[T] {
+    loadedConfig leftMap (new ConfigLoadingException(_))
+  }
+}
+
+object ConfigLoader {
+  final class ConfigLoadingException(failures: ConfigReaderFailures) extends Exception {
+    override def getMessage: String = failures.toList.map(_.description).mkString("; ")
   }
 }

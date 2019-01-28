@@ -22,6 +22,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.eventprocessing.PushEvent
+import ch.datascience.webhookservice.hookcreation.SelfUrlConfig.SelfUrl
 import ch.datascience.webhookservice.model.{HookAccessToken, HookToken, ProjectInfo, ProjectOwner}
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
@@ -60,4 +61,7 @@ object ServiceTypesGenerators {
     path  <- projectPaths
     owner <- projectOwner
   } yield ProjectInfo(id, path, owner)
+
+  implicit val selfUrls: Gen[SelfUrl] =
+    validatedUrls map (url => SelfUrl.apply(url.value))
 }

@@ -16,46 +16,61 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.config
+package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import play.api.Configuration
 
 import scala.util.{Failure, Success, Try}
 
-class GitLabConfigProviderSpec extends WordSpec {
+class SelfUrlConfigProviderSpec extends WordSpec {
 
   private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
 
   "get" should {
 
-    "return HostUrl" in {
-      val gitLabUrl = validatedUrls.generateOne
+    "return SelfUrl" in {
+      val selfUrl = selfUrls.generateOne
       val config = Configuration.from(
         Map(
           "services" -> Map(
-            "gitlab" -> Map(
-              "url" -> gitLabUrl.toString()
+            "self" -> Map(
+              "url" -> selfUrl.toString()
             )
           )
         )
       )
 
-      new GitLabConfig[Try](config).get() shouldBe Success(gitLabUrl)
+      new SelfUrlConfig[Try](config).get() shouldBe Success(selfUrl)
     }
 
-    "fail if there is no 'services.gitlab.url' in the config" in {
+    "fail if the value for 'services.self.url' is invalid" in {
+      val config = Configuration.from(
+        Map(
+          "services" -> Map(
+            "self" -> Map(
+              "url" -> "123"
+            )
+          )
+        )
+      )
+
+      val Failure(exception) = new SelfUrlConfig[Try](config).get()
+
+      exception.getMessage should include(
+        "'123' is not a valid ch.datascience.webhookservice.hookcreation.SelfUrlConfig.SelfUrl"
+      )
+    }
+
+    "fail if there is no 'services.self.url' in the config" in {
       val config = Configuration.empty
 
-      val Failure(exception) = new GitLabConfig[Try](config).get()
-
-      exception shouldBe a[ConfigLoadingException]
+      new SelfUrlConfig[Try](config).get() shouldBe a[Failure[_]]
     }
   }
 }

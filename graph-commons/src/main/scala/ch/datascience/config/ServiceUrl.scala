@@ -22,7 +22,7 @@ import java.net.URL
 
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import com.typesafe.config.Config
-import play.api.ConfigLoader
+import play.api.{ConfigLoader => PlayConfigLoader}
 
 import scala.language.implicitConversions
 
@@ -32,7 +32,7 @@ object ServiceUrl extends TinyTypeFactory[URL, ServiceUrl](new ServiceUrl(_)) {
 
   def apply(url: String): ServiceUrl = ServiceUrl(new URL(url))
 
-  implicit object ServiceUrlFinder extends ConfigLoader[ServiceUrl] {
+  implicit object ServiceUrlFinder extends PlayConfigLoader[ServiceUrl] {
     override def load(config: Config, path: String): ServiceUrl = ServiceUrl(config.getString(path))
   }
 

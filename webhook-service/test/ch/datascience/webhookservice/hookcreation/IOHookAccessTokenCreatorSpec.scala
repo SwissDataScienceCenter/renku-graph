@@ -156,9 +156,8 @@ class IOHookAccessTokenCreatorSpec extends WordSpec with MockFactory with Extern
     val configProvider = mock[IOGitLabConfigProvider]
 
     def expectGitLabConfigProvider(returning: IO[HostUrl]) =
-      (configProvider
-        .get()(_: Sync[IO]))
-        .expects(*)
+      (configProvider.get _)
+        .expects()
         .returning(returning)
 
     val accessTokenCreator = new IOHookAccessTokenCreator(configProvider)
