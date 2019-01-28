@@ -25,7 +25,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import play.api.Configuration
 
-class HookCreationConfigProviderSpec extends WordSpec {
+class ProjectHookCreatorConfigProviderSpec extends WordSpec {
 
   "get" should {
 
@@ -45,7 +45,7 @@ class HookCreationConfigProviderSpec extends WordSpec {
         )
       )
 
-      new HookCreationConfigProvider[IO](config).get().unsafeRunSync() shouldBe HookCreationConfig(
+      new ProjectHookCreatorConfigProvider[IO](config).get().unsafeRunSync() shouldBe ProjectHookCreatorConfig(
         gitLabUrl,
         selfUrl
       )
@@ -54,7 +54,7 @@ class HookCreationConfigProviderSpec extends WordSpec {
     "fail if there are no 'services.gitlab.url' and 'services.self.url' in the config" in {
       val config = Configuration.empty
 
-      a[RuntimeException] should be thrownBy new HookCreationConfigProvider[IO](config).get().unsafeRunSync()
+      a[RuntimeException] should be thrownBy new ProjectHookCreatorConfigProvider[IO](config).get().unsafeRunSync()
     }
   }
 }

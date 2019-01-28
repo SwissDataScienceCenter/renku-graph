@@ -65,7 +65,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(HookToken(projectId, hookAccessToken))
         .returning(context.pure(serializedHookToken))
 
-      (gitLabHookCreation
+      (projectHookCreator
         .createHook(_: ProjectId, _: AccessToken, _: SerializedHookToken))
         .expects(projectId, accessToken, serializedHookToken)
         .returning(context.pure(()))
@@ -210,7 +210,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
-      (gitLabHookCreation
+      (projectHookCreator
         .createHook(_: ProjectId, _: AccessToken, _: SerializedHookToken))
         .expects(projectId, accessToken, serializedHookToken)
         .returning(error)
@@ -234,7 +234,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     val projectInfoFinder       = mock[ProjectInfoFinder[Try]]
     val hookAccessTokenVerifier = mock[HookAccessTokenVerifier[Try]]
     val hookAccessTokenCreator  = mock[HookAccessTokenCreator[Try]]
-    val gitLabHookCreation      = mock[HookCreationRequestSender[Try]]
+    val projectHookCreator      = mock[ProjectHookCreator[Try]]
 
     class TryHookTokenCrypt(secret: Secret) extends HookTokenCrypto[Try](secret)
     val hookTokenCrypto = mock[TryHookTokenCrypt]
@@ -243,7 +243,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       projectInfoFinder,
       hookAccessTokenVerifier,
       hookAccessTokenCreator,
-      gitLabHookCreation,
+      projectHookCreator,
       logger,
       hookTokenCrypto
     )

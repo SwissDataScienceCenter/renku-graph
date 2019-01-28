@@ -38,14 +38,14 @@ import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
 
   "createHook" should {
 
     "send relevant Json payload and 'PRIVATE-TOKEN' header (when Personal Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
-      expectConfigProvider(returning = IO.pure(hookCreationConfig))
+      expectConfigProvider(returning = IO.pure(projectHookCreatorConfig))
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -55,13 +55,13 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
           .willReturn(created())
       }
 
-      sender.createHook(projectId, personalAccessToken, serializedHookToken).unsafeRunSync() shouldBe ((): Unit)
+      hookCreator.createHook(projectId, personalAccessToken, serializedHookToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
-      expectConfigProvider(returning = IO.pure(hookCreationConfig))
+      expectConfigProvider(returning = IO.pure(projectHookCreatorConfig))
       val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -71,7 +71,7 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
           .willReturn(created())
       }
 
-      sender.createHook(projectId, oauthAccessToken, serializedHookToken).unsafeRunSync() shouldBe ((): Unit)
+      hookCreator.createHook(projectId, oauthAccessToken, serializedHookToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "return an error if config cannot be read" in new TestCase {
@@ -80,12 +80,12 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
       val accessToken = accessTokens.generateOne
 
       intercept[Exception] {
-        sender.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
+        hookCreator.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
       } shouldBe exception
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-      expectConfigProvider(returning = IO.pure(hookCreationConfig))
+      expectConfigProvider(returning = IO.pure(projectHookCreatorConfig))
       val accessToken = accessTokens.generateOne
 
       stubFor {
@@ -95,12 +95,12 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
       }
 
       intercept[Exception] {
-        sender.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
+        hookCreator.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
     "return a RuntimeException if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
-      expectConfigProvider(returning = IO.pure(hookCreationConfig))
+      expectConfigProvider(returning = IO.pure(projectHookCreatorConfig))
       val accessToken = accessTokens.generateOne
 
       stubFor {
@@ -110,17 +110,17 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
       }
 
       intercept[Exception] {
-        sender.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
+        hookCreator.createHook(projectId, accessToken, serializedHookToken).unsafeRunSync()
       }.getMessage shouldBe s"POST $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.BadRequest}; body: some message"
     }
   }
 
   private trait TestCase {
-    val projectId           = projectIds.generateOne
-    val serializedHookToken = serializedHookTokens.generateOne
-    val gitLabUrl           = url(externalServiceBaseUrl)
-    val selfUrl             = validatedUrls.generateOne
-    val hookCreationConfig  = HookCreationConfig(gitLabUrl, selfUrl)
+    val projectId                = projectIds.generateOne
+    val serializedHookToken      = serializedHookTokens.generateOne
+    val gitLabUrl                = url(externalServiceBaseUrl)
+    val selfUrl                  = validatedUrls.generateOne
+    val projectHookCreatorConfig = ProjectHookCreatorConfig(gitLabUrl, selfUrl)
 
     lazy val expectedBody = Json
       .obj(
@@ -131,15 +131,15 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Ext
       )
       .toString()
 
-    val configProvider = mock[IOHookCreationConfigProvider]
+    val configProvider = mock[IOProjectProjectHookCreatorConfigProvider]
 
-    def expectConfigProvider(returning: IO[HookCreationConfig]) =
+    def expectConfigProvider(returning: IO[ProjectHookCreatorConfig]) =
       (configProvider
         .get()(_: Sync[IO]))
         .expects(*)
         .returning(returning)
 
-    val sender = new IOHookCreationRequestSender(configProvider)
+    val hookCreator = new IOProjectHookCreator(configProvider)
 
     private def url(value: String) =
       RefType

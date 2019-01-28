@@ -36,7 +36,7 @@ private class HookCreator[Interpretation[_]: Monad](
     projectInfoFinder:       ProjectInfoFinder[Interpretation],
     hookAccessTokenVerifier: HookAccessTokenVerifier[Interpretation],
     hookAccessTokenCreator:  HookAccessTokenCreator[Interpretation],
-    gitLabHookCreation:      HookCreationRequestSender[Interpretation],
+    projectHookCreator:      ProjectHookCreator[Interpretation],
     logger:                  Logger[Interpretation],
     hookTokenCrypto:         HookTokenCrypto[Interpretation]
 )(implicit ME:               MonadError[Interpretation, Throwable]) {
@@ -51,18 +51,20 @@ private class HookCreator[Interpretation[_]: Monad](
       _                   <- checkHookAccessTokenPresence(projectInfo, accessToken) flatMap failIfHookAccessTokenExists(projectId)
       hookAccessToken     <- createHookAccessToken(projectInfo, accessToken)
       serializedHookToken <- hookTokenCrypto.encrypt(HookToken(projectInfo.id, hookAccessToken))
-      _                   <- gitLabHookCreation.createHook(projectId, accessToken, serializedHookToken)
+      _                   <- projectHookCreator.createHook(projectId, accessToken, serializedHookToken)
       _                   <- logger.info(s"Hook created for project with id $projectId")
     } yield ()
-  } recoverWith {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"Hook creation failed for project with id $projectId")
-      ME.raiseError(exception)
-  }
+  } recoverWith loggingError(projectId)
 
   private def failIfHookAccessTokenExists(projectId: ProjectId): Boolean => Interpretation[Unit] = {
     case true  => ME.raiseError(new RuntimeException(s"Hook already created for the project $projectId"))
     case false => ME.pure(())
+  }
+
+  private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"Hook creation failed for project with id $projectId")
+      ME.raiseError(exception)
   }
 }
 
@@ -71,14 +73,14 @@ private class IOHookCreator @Inject()(
     projectInfoFinder:       IOProjectInfoFinder,
     hookAccessTokenVerifier: IOHookAccessTokenVerifier,
     hookAccessTokenCreator:  IOHookAccessTokenCreator,
-    gitLabHookCreation:      IOHookCreationRequestSender,
+    projectHookCreator:      IOProjectHookCreator,
     logger:                  IOLogger,
     hookTokenCrypto:         IOHookTokenCrypto
 ) extends HookCreator[IO](
       projectInfoFinder,
       hookAccessTokenVerifier,
       hookAccessTokenCreator,
-      gitLabHookCreation,
+      projectHookCreator,
       logger,
       hookTokenCrypto
     )

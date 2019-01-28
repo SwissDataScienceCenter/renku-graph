@@ -25,32 +25,32 @@ import play.api.Configuration
 import pureconfig.module.catseffect._
 
 import scala.language.higherKinds
-import HookCreationConfig._
+import ProjectHookCreatorConfig._
 import javax.inject.{Inject, Singleton}
 
-private class HookCreationConfigProvider[Interpretation[_]](configuration: Configuration) {
+private class ProjectHookCreatorConfigProvider[Interpretation[_]](configuration: Configuration) {
   import eu.timepit.refined.pureconfig._
 
-  def get()(implicit F: Sync[Interpretation]): Interpretation[HookCreationConfig] =
+  def get()(implicit F: Sync[Interpretation]): Interpretation[ProjectHookCreatorConfig] =
     (
       loadConfigF[Interpretation, HostUrl](configuration.underlying, "services.self.url"),
       loadConfigF[Interpretation, HostUrl](configuration.underlying, "services.gitlab.url")
     ) mapN {
       case (selfUrl, gitLabUrl) =>
-        HookCreationConfig(gitLabUrl, selfUrl)
+        ProjectHookCreatorConfig(gitLabUrl, selfUrl)
     }
 }
 
 @Singleton
-private class IOHookCreationConfigProvider @Inject()(configuration: Configuration)
-    extends HookCreationConfigProvider[IO](configuration)
+private class IOProjectProjectHookCreatorConfigProvider @Inject()(configuration: Configuration)
+    extends ProjectHookCreatorConfigProvider[IO](configuration)
 
-private case class HookCreationConfig(
+private case class ProjectHookCreatorConfig(
     gitLabUrl: HostUrl,
     selfUrl:   HostUrl
 )
 
-private object HookCreationConfig {
+private object ProjectHookCreatorConfig {
 
   import eu.timepit.refined.string.Url
 

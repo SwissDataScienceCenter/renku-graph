@@ -27,7 +27,7 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait HookCreationRequestSender[Interpretation[_]] {
+private trait ProjectHookCreator[Interpretation[_]] {
   def createHook(
       projectId:     ProjectId,
       accessToken:   AccessToken,
@@ -36,10 +36,10 @@ private trait HookCreationRequestSender[Interpretation[_]] {
 }
 
 @Singleton
-private class IOHookCreationRequestSender @Inject()(configProvider: IOHookCreationConfigProvider)(
-    implicit executionContext:                                      ExecutionContext)
+private class IOProjectHookCreator @Inject()(configProvider: IOProjectProjectHookCreatorConfigProvider)(
+    implicit executionContext:                               ExecutionContext)
     extends IORestClient
-    with HookCreationRequestSender[IO] {
+    with ProjectHookCreator[IO] {
 
   import cats.effect._
   import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
@@ -61,7 +61,7 @@ private class IOHookCreationRequestSender @Inject()(configProvider: IOHookCreati
 
   private def createPayload(projectId:     ProjectId,
                             hookAuthToken: SerializedHookToken,
-                            selfUrl:       HookCreationConfig.HostUrl) =
+                            selfUrl:       ProjectHookCreatorConfig.HostUrl) =
     Json.obj(
       "id"          -> Json.fromInt(projectId.value),
       "url"         -> Json.fromString(s"$selfUrl${WebhookEventEndpoint.processPushEvent().url}"),
