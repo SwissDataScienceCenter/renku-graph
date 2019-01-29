@@ -115,9 +115,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       val expectedException = HookAlreadyCreated(projectId, projectHookUrl)
       hookCreation.createHook(projectId, accessToken) shouldBe context.raiseError(expectedException)
 
-      logger.loggedOnly(
-        Warn(s"Hook creation failed for project with id $projectId", expectedException)
-      )
+      logger.loggedOnly(Warn(expectedException.getMessage))
     }
 
     "log an error if hook presence verification fails" in new TestCase {
@@ -184,7 +182,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val result = hookCreation.createHook(projectId, accessToken)
 
-      val expectationException = new RuntimeException(s"Hook already created for the project $projectId")
+      val expectationException = new RuntimeException(s"Hook already created for the project with id $projectId")
       result.failed.foreach { exception =>
         exception            shouldBe a[RuntimeException]
         exception.getMessage shouldBe expectationException.getMessage

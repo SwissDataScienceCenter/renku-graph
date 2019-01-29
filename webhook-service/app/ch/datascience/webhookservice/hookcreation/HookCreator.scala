@@ -76,13 +76,13 @@ private class HookCreator[Interpretation[_]: Monad](
   }
 
   private def failIfHookAccessTokenExists(projectId: ProjectId): Boolean => Interpretation[Unit] = {
-    case true  => ME.raiseError(new RuntimeException(s"Hook already created for the project $projectId"))
+    case true  => ME.raiseError(new RuntimeException(s"Hook already created for the project with id $projectId"))
     case false => ME.pure(())
   }
 
   private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Unit]] = {
     case exception @ HookAlreadyCreated(_, _) =>
-      logger.warn(exception)(s"Hook creation failed for project with id $projectId")
+      logger.warn(exception.getMessage)
       ME.raiseError(exception)
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
@@ -95,9 +95,7 @@ private object HookCreator {
   final case class HookAlreadyCreated(
       projectId:      ProjectId,
       projectHookUrl: ProjectHookUrl
-  ) extends RuntimeException {
-    s"Hook already created for projectId: $projectId, url: $projectHookUrl"
-  }
+  ) extends RuntimeException(s"Hook already created for projectId: $projectId, url: $projectHookUrl")
 }
 
 @Singleton

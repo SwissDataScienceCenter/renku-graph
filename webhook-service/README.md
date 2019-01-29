@@ -39,7 +39,8 @@ The endpoint requires an authorization token. It has to be
 |----------------------------|---------------------------------------------------------------------------------------|
 | CREATED (201)              | For valid payloads                                                                    |
 | UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `OAUTH-TOKEN` in the header or it's invalid |
-| INTERNAL SERVER ERROR (500)| When there were problems with webhook creation                 |
+| CONFLICT (409)             | When hook for the given project was already created                                   |
+| INTERNAL SERVER ERROR (500)| When there were problems with webhook creation                                        |
 
 #### POST /webhook-event
 

@@ -26,6 +26,7 @@ import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
 import javax.inject.{Inject, Singleton}
 import play.api.mvc.{AbstractController, ControllerComponents, Request, Result}
 
@@ -61,7 +62,8 @@ class HookCreationEndpoint @Inject()(
     }
 
   private val toResult: PartialFunction[Throwable, Result] = {
-    case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
-    case NonFatal(exception)        => BadGateway(ErrorMessage(exception.getMessage).toJson)
+    case ex @ HookAlreadyCreated(_, _) => Conflict(ErrorMessage(ex.getMessage).toJson)
+    case ex @ UnauthorizedException    => Unauthorized(ErrorMessage(ex.getMessage).toJson)
+    case NonFatal(exception)           => InternalServerError(ErrorMessage(exception.getMessage).toJson)
   }
 }
