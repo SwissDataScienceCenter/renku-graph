@@ -29,7 +29,7 @@ import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.{HookAuthToken, Secret}
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.model.UserAuthToken
+import ch.datascience.webhookservice.model.AccessToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -49,11 +49,11 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(hookAuthToken))
 
       (gitLabHookCreation
-        .createHook(_: ProjectId, _: UserAuthToken, _: HookAuthToken))
-        .expects(projectId, authToken, hookAuthToken)
+        .createHook(_: ProjectId, _: AccessToken, _: HookAuthToken))
+        .expects(projectId, accessToken, hookAuthToken)
         .returning(context.pure(()))
 
-      hookCreation.createHook(projectId, authToken) shouldBe context.pure(())
+      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(())
 
       logger.loggedOnly(Info, s"Hook created for project with id $projectId")
     }
@@ -67,7 +67,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectId.toString)
         .returning(error)
 
-      hookCreation.createHook(projectId, authToken) shouldBe error
+      hookCreation.createHook(projectId, accessToken) shouldBe error
 
       logger.loggedOnly(Error, s"Hook creation failed for project with id $projectId", exception)
     }
@@ -82,11 +82,11 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
       (gitLabHookCreation
-        .createHook(_: ProjectId, _: UserAuthToken, _: HookAuthToken))
-        .expects(projectId, authToken, hookAuthToken)
+        .createHook(_: ProjectId, _: AccessToken, _: HookAuthToken))
+        .expects(projectId, accessToken, hookAuthToken)
         .returning(error)
 
-      hookCreation.createHook(projectId, authToken) shouldBe error
+      hookCreation.createHook(projectId, accessToken) shouldBe error
 
       logger.loggedOnly(Error, s"Hook creation failed for project with id $projectId", exception)
     }
@@ -94,7 +94,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
   private trait TestCase {
     val projectId     = projectIds.generateOne
-    val authToken     = userAuthTokens.generateOne
+    val accessToken   = accessTokens.generateOne
     val hookAuthToken = hookAuthTokens.generateOne
 
     val context = MonadError[Try, Throwable]

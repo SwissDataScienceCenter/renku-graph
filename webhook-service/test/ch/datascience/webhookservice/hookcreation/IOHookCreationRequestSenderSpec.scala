@@ -22,7 +22,7 @@ import cats.effect.{IO, Sync}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators.projectIds
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators.{hookAuthTokens, userAuthTokens}
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import com.github.tomakehurst.wiremock.WireMockServer
@@ -42,62 +42,81 @@ class IOHookCreationRequestSenderSpec extends WordSpec with MockFactory with Bef
 
   "createHook" should {
 
-    "send relevant Json payload to remote client and return Unit if it responds with CREATED" in new TestCase {
+    "send relevant Json payload and 'PRIVATE-TOKEN' header (when Personal Access Token is given) " +
+      "and return Unit if the remote responds with CREATED" in new TestCase {
+
       expectConfigProvider(returning = IO.pure(hookCreationConfig))
+      val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
         post(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(userAuthToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
           .withRequestBody(equalToJson(expectedBody))
           .willReturn(created())
       }
 
-      sender.createHook(projectId, userAuthToken, hookAuthToken).unsafeRunSync() shouldBe ((): Unit)
+      sender.createHook(projectId, personalAccessToken, hookAuthToken).unsafeRunSync() shouldBe ((): Unit)
+    }
+
+    "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
+      "and return Unit if the remote responds with CREATED" in new TestCase {
+
+      expectConfigProvider(returning = IO.pure(hookCreationConfig))
+      val oauthAccessToken = oauthAccessTokens.generateOne
+
+      stubFor {
+        post(s"/api/v4/projects/$projectId/hooks")
+          .withHeader("Authorization", equalTo(s"Bearer $oauthAccessToken"))
+          .withRequestBody(equalToJson(expectedBody))
+          .willReturn(created())
+      }
+
+      sender.createHook(projectId, oauthAccessToken, hookAuthToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "return an error if config cannot be read" in new TestCase {
       val exception = exceptions.generateOne
       expectConfigProvider(returning = IO.raiseError(exception))
+      val accessToken = accessTokens.generateOne
 
       intercept[Exception] {
-        sender.createHook(projectId, userAuthToken, hookAuthToken).unsafeRunSync()
+        sender.createHook(projectId, accessToken, hookAuthToken).unsafeRunSync()
       } shouldBe exception
     }
 
-    "return an UnauthorizedException if remote client responds with UNAUTHORISED" in new TestCase {
+    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
       expectConfigProvider(returning = IO.pure(hookCreationConfig))
+      val accessToken = accessTokens.generateOne
 
       stubFor {
         post(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(userAuthToken.toString))
           .withRequestBody(equalToJson(expectedBody))
           .willReturn(unauthorized())
       }
 
       intercept[Exception] {
-        sender.createHook(projectId, userAuthToken, hookAuthToken).unsafeRunSync()
+        sender.createHook(projectId, accessToken, hookAuthToken).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
-    "return a RuntimeException if remote client responds with status neither CREATED nor UNAUTHORISED" in new TestCase {
+    "return a RuntimeException if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
       expectConfigProvider(returning = IO.pure(hookCreationConfig))
+      val accessToken = accessTokens.generateOne
 
       stubFor {
         post(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(userAuthToken.toString))
           .withRequestBody(equalToJson(expectedBody))
           .willReturn(badRequest().withBody("some message"))
       }
 
       intercept[Exception] {
-        sender.createHook(projectId, userAuthToken, hookAuthToken).unsafeRunSync()
+        sender.createHook(projectId, accessToken, hookAuthToken).unsafeRunSync()
       }.getMessage shouldBe s"POST $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.BadRequest}; body: some message"
     }
   }
 
   private trait TestCase {
     val projectId          = projectIds.generateOne
-    val userAuthToken      = userAuthTokens.generateOne
     val hookAuthToken      = hookAuthTokens.generateOne
     val gitLabUrl          = url(s"http://localhost:$port")
     val selfUrl            = validatedUrls.generateOne

@@ -24,7 +24,7 @@ import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.model.UserAuthToken
+import ch.datascience.webhookservice.model.{AccessToken, OAuthAccessToken, PersonalAccessToken}
 import javax.inject.{Inject, Singleton}
 import play.api.mvc.{AbstractController, ControllerComponents, Request, Result}
 
@@ -41,21 +41,23 @@ class HookCreationEndpoint @Inject()(
 
   def createHook(projectId: ProjectId) = Action.async { implicit request =>
     (for {
-      userAuthToken <- findUserAuthToken(request)
-      createdResult <- hookCreator
-                        .createHook(projectId, userAuthToken)
-                        .map(_ => Created)
-    } yield createdResult)
+      accessToken <- findAccessToken(request)
+      _           <- hookCreator.createHook(projectId, accessToken)
+    } yield Created)
       .unsafeToFuture()
       .recover(toResult)
   }
 
-  private def findUserAuthToken(request: Request[_]): IO[UserAuthToken] = IO.fromEither {
-    request.headers.get("PRIVATE-TOKEN") match {
-      case None           => Left(UnauthorizedException)
-      case Some(rawToken) => UserAuthToken.from(rawToken).leftMap(_ => UnauthorizedException)
-    }
+  private def findAccessToken(request: Request[_]): IO[AccessToken] = IO.fromEither {
+    convert(request.headers.get("OAUTH-TOKEN"), to = OAuthAccessToken.from)
+      .orElse(convert(request.headers.get("PRIVATE-TOKEN"), to = PersonalAccessToken.from))
+      .getOrElse(Left(UnauthorizedException))
   }
+
+  private def convert(headers: Option[String], to: String => Either[String, AccessToken]) =
+    headers.map {
+      to(_).leftMap(_ => UnauthorizedException)
+    }
 
   private val toResult: PartialFunction[Throwable, Result] = {
     case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
