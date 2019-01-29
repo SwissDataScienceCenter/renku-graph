@@ -33,11 +33,14 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
   import TestLogger._
   import LogMessage._
 
-  def loggedOnly(args: (Level, LogMessage)*): Unit =
-    loggedOnly(args.toList)
+  def loggedOnly(expected: (Level, LogMessage)*): Unit =
+    loggedOnly(expected.toList)
 
-  def loggedOnly(args: List[(Level, LogMessage)]): Unit =
-    (invocations zip args) foreach {
+  def loggedOnly(expected: List[(Level, LogMessage)]): Unit = {
+    if (invocations.size != expected.size)
+      fail(s"Actual log entries does not match expected: actual: $invocations, expected: $expected")
+
+    (invocations zip expected) foreach {
       case ((actualLevel, MessageAndThrowable(actualMessage, actualException)),
             (expectedLevel, MessageAndThrowableMatcher(expectedMessage, NotRefEqual(expectedException)))) =>
         if ((actualLevel == expectedLevel) &&
@@ -72,6 +75,7 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
             s"Log entry: '$actualLevel: $actualMessage' does not match '$expectedLevel: $expectedMessage'"
           }
     }
+  }
 
   def expectNoLogs(): Unit =
     if (invocations.nonEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")

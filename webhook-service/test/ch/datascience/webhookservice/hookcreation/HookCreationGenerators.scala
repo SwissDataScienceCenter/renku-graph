@@ -24,7 +24,9 @@ import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHo
 import org.scalacheck.Gen
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
 import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
+import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
 
 private object HookCreationGenerators {
 
@@ -49,5 +51,27 @@ private object HookCreationGenerators {
     HookIdentifier(
       projectId,
       hookUrl,
+    )
+
+  implicit val pushEventInfos: Gen[PushEventInfo] = for {
+    projectId <- projectIds
+    userId    <- userIds
+    commitTo  <- commitIds
+  } yield
+    PushEventInfo(
+      projectId,
+      userId,
+      commitTo
+    )
+
+  implicit val userInfos: Gen[UserInfo] = for {
+    userId   <- userIds
+    username <- usernames
+    email    <- emails
+  } yield
+    UserInfo(
+      userId,
+      username,
+      email
     )
 }

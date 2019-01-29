@@ -42,9 +42,10 @@ private class HookCreator[Interpretation[_]: Monad](
     projectInfoFinder:       ProjectInfoFinder[Interpretation],
     hookAccessTokenVerifier: HookAccessTokenVerifier[Interpretation],
     hookAccessTokenCreator:  HookAccessTokenCreator[Interpretation],
+    hookTokenCrypto:         HookTokenCrypto[Interpretation],
     projectHookCreator:      ProjectHookCreator[Interpretation],
-    logger:                  Logger[Interpretation],
-    hookTokenCrypto:         HookTokenCrypto[Interpretation]
+    eventsHistoryLoader:     EventsHistoryLoader[Interpretation],
+    logger:                  Logger[Interpretation]
 )(implicit ME:               MonadError[Interpretation, Throwable]) {
 
   import hookAccessTokenCreator._
@@ -66,6 +67,7 @@ private class HookCreator[Interpretation[_]: Monad](
       serializedHookToken     <- encrypt(HookToken(projectInfo.id, hookAccessToken))
       _                       <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
       _                       <- logger.info(s"Hook created for project with id $projectId")
+      _                       <- ME.pure(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken))
     } yield ()
   } recoverWith loggingError(projectId)
 
@@ -105,16 +107,18 @@ private class IOHookCreator @Inject()(
     projectInfoFinder:       IOProjectInfoFinder,
     hookAccessTokenVerifier: IOHookAccessTokenVerifier,
     hookAccessTokenCreator:  IOHookAccessTokenCreator,
+    hookTokenCrypto:         IOHookTokenCrypto,
     projectHookCreator:      IOProjectHookCreator,
-    logger:                  IOLogger,
-    hookTokenCrypto:         IOHookTokenCrypto
+    eventsHistoryLoader:     IOEventsHistoryLoader,
+    logger:                  IOLogger
 ) extends HookCreator[IO](
       projectHookUrlFinder,
       projectHookVerifier,
       projectInfoFinder,
       hookAccessTokenVerifier,
       hookAccessTokenCreator,
+      hookTokenCrypto,
       projectHookCreator,
-      logger,
-      hookTokenCrypto
+      eventsHistoryLoader,
+      logger
     )

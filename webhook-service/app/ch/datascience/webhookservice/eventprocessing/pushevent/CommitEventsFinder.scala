@@ -29,7 +29,7 @@ import scala.language.higherKinds
 import scala.util.Try
 import scala.util.control.NonFatal
 
-private class CommitEventsFinder[Interpretation[_]](
+class CommitEventsFinder[Interpretation[_]](
     commitInfoFinder: CommitInfoFinder[Interpretation]
 )(implicit ME:        MonadError[Interpretation, Throwable]) {
 
@@ -84,6 +84,6 @@ private class CommitEventsFinder[Interpretation[_]](
 }
 
 @Singleton
-private class IOCommitEventsFinder @Inject()(
+class IOCommitEventsFinder @Inject()(
     commitInfoFinder: IOCommitInfoFinder
 ) extends CommitEventsFinder[IO](commitInfoFinder)
