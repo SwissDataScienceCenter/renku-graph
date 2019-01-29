@@ -28,13 +28,12 @@ import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.model.UserAuthToken
+import ch.datascience.webhookservice.model.{AccessToken, OAuthAccessToken, PersonalAccessToken}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.http.MimeTypes.JSON
-import play.api.libs.json.JsValue
 import play.api.mvc.ControllerComponents
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Injecting}
@@ -48,24 +47,42 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     "return CREATED when a valid PRIVATE-TOKEN is present in the header " +
       "and webhook is successfully created for project with the given id in in GitLab" in new TestCase {
 
+      val accessToken = personalAccessTokens.generateOne
+
       (hookCreator
-        .createHook(_: ProjectId, _: UserAuthToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, authToken, *)
+        .createHook(_: ProjectId, _: PersonalAccessToken)(_: MonadError[IO, Throwable]))
+        .expects(projectId, accessToken, *)
         .returning(IO.pure(()))
 
-      val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> authToken.toString))
+      val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> accessToken.toString))
 
       status(response)          shouldBe CREATED
       contentAsString(response) shouldBe ""
     }
 
-    "return UNAUTHORIZED when user PRIVATE-TOKEN is not present" in new TestCase {
+    "return CREATED when a valid OAUTH-TOKEN is present in the header " +
+      "and webhook is successfully created for project with the given id in in GitLab" in new TestCase {
+
+      val accessToken = oauthAccessTokens.generateOne
+
+      (hookCreator
+        .createHook(_: ProjectId, _: OAuthAccessToken)(_: MonadError[IO, Throwable]))
+        .expects(projectId, accessToken, *)
+        .returning(IO.pure(()))
+
+      val response = call(createHook(projectId), request.withHeaders("OAUTH-TOKEN" -> accessToken.toString))
+
+      status(response)          shouldBe CREATED
+      contentAsString(response) shouldBe ""
+    }
+
+    "return UNAUTHORIZED when neither PRIVATE-TOKEN nor OAUTH-TOKEN is not present" in new TestCase {
 
       val response = call(createHook(projectId), request)
 
       status(response)        shouldBe UNAUTHORIZED
       contentType(response)   shouldBe Some(JSON)
-      contentAsJson(response) shouldBe a[JsValue]
+      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
     }
 
     "return UNAUTHORIZED when user PRIVATE-TOKEN is invalid" in new TestCase {
@@ -74,37 +91,50 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       status(response)        shouldBe UNAUTHORIZED
       contentType(response)   shouldBe Some(JSON)
-      contentAsJson(response) shouldBe a[JsValue]
+      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
+    }
+
+    "return UNAUTHORIZED when OAUTH-TOKEN is invalid" in new TestCase {
+
+      val response = call(createHook(projectId), request.withHeaders("OAUTH-TOKEN" -> ""))
+
+      status(response)        shouldBe UNAUTHORIZED
+      contentType(response)   shouldBe Some(JSON)
+      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
     }
 
     "return BAD_GATEWAY when there was an error during hook creation" in new TestCase {
 
+      val accessToken = accessTokens.generateOne
+
       val errorMessage = ErrorMessage("some error")
       (hookCreator
-        .createHook(_: ProjectId, _: UserAuthToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, authToken, *)
+        .createHook(_: ProjectId, _: AccessToken)(_: MonadError[IO, Throwable]))
+        .expects(projectId, accessToken, *)
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
-      val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> authToken.toString))
+      val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
 
       status(response)        shouldBe BAD_GATEWAY
       contentType(response)   shouldBe Some(JSON)
       contentAsJson(response) shouldBe errorMessage.toJson
     }
 
-    "return UNAUTHORIZED when there was an UnauthorizedExcetion thrown during hook creation" in new TestCase {
+    "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook creation" in new TestCase {
+
+      val accessToken = accessTokens.generateOne
 
       val errorMessage = ErrorMessage("some error")
       (hookCreator
-        .createHook(_: ProjectId, _: UserAuthToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, authToken, *)
+        .createHook(_: ProjectId, _: AccessToken)(_: MonadError[IO, Throwable]))
+        .expects(projectId, accessToken, *)
         .returning(IO.raiseError(UnauthorizedException))
 
-      val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> authToken.toString))
+      val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
 
       status(response)        shouldBe UNAUTHORIZED
       contentType(response)   shouldBe Some(JSON)
-      contentAsJson(response) shouldBe a[JsValue]
+      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
     }
   }
 
@@ -114,9 +144,15 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
     val request   = FakeRequest().withHeaders(CONTENT_TYPE -> JSON)
     val projectId = projectIds.generateOne
-    val authToken = userAuthTokens.generateOne
 
     val hookCreator = mock[IOHookCreator]
     val createHook  = new HookCreationEndpoint(inject[ControllerComponents], hookCreator).createHook _
+
+    implicit class RequestOps[T](request: FakeRequest[T]) {
+      def withAuthorizationHeader(accessToken: AccessToken): FakeRequest[T] = accessToken match {
+        case PersonalAccessToken(token) => request.withHeaders("PRIVATE-TOKEN" -> token)
+        case OAuthAccessToken(token)    => request.withHeaders("OAUTH-TOKEN"   -> token)
+      }
+    }
   }
 }
