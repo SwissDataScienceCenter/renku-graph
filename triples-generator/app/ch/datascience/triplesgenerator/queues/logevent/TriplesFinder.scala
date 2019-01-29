@@ -164,16 +164,17 @@ private object Commands {
           'diff,
           "--name-only",
           s"${commit.parentId}..${commit.id}"
-        )(destinationDirectory).out.lines.mkString("\n")
+        )(destinationDirectory).out.lines
 
         %%(
-          'renku,
-          'log,
-          "--format",
-          "rdf",
-          "--revision",
-          s"${commit.parentId}..${commit.id}",
-          changedFiles
+          Array(
+              'renku,
+              'log,
+              "--format",
+              "rdf",
+              "--revision",
+              s"${commit.parentId}..${commit.id}"
+          ) ++ changedFiles:_*
         )(destinationDirectory)
     }
 
