@@ -164,7 +164,7 @@ private object Commands {
           'diff,
           "--name-only",
           s"${commit.parentId}..${commit.id}"
-        )(destinationDirectory).out.lines.mkString("\n")
+        )(destinationDirectory).out.lines
 
         %%(
           'renku,
