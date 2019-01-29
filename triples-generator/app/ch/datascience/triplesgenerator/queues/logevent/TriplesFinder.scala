@@ -167,14 +167,13 @@ private object Commands {
         )(destinationDirectory).out.lines
 
         %%(
-          Array(
-              'renku,
-              'log,
-              "--format",
-              "rdf",
-              "--revision",
-              s"${commit.parentId}..${commit.id}"
-          ) ++ changedFiles:_*
+          'renku,
+          'log,
+          "--format",
+          "rdf",
+          "--revision",
+          s"${commit.parentId}..${commit.id}",
+          changedFiles
         )(destinationDirectory)
     }
 
