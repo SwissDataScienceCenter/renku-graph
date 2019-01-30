@@ -24,7 +24,6 @@ import ch.datascience.webhookservice.config.GitLabConfig._
 import eu.timepit.refined.api.Refined
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
-import pureconfig._
 import ch.datascience.config.ConfigLoader
 
 import scala.language.higherKinds
@@ -35,9 +34,7 @@ class GitLabConfig[Interpretation[_]](
     extends ConfigLoader[Interpretation] {
   import eu.timepit.refined.pureconfig._
 
-  def get(): Interpretation[HostUrl] = fromEither {
-    loadConfig[HostUrl](configuration.underlying, "services.gitlab.url")
-  }
+  def get(): Interpretation[HostUrl] = find[HostUrl]("services.gitlab.url", configuration.underlying)
 }
 
 object GitLabConfig {

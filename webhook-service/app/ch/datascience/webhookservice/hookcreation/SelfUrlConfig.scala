@@ -44,9 +44,7 @@ private class SelfUrlConfig[Interpretation[_]](
       }
     }
 
-  def get(): Interpretation[SelfUrl] = fromEither[SelfUrl] {
-    loadConfig[SelfUrl](configuration.underlying, "services.self.url")
-  }
+  def get(): Interpretation[SelfUrl] = find[SelfUrl]("services.self.url", configuration.underlying)
 }
 
 @Singleton

@@ -21,13 +21,20 @@ package ch.datascience.config
 import cats.implicits._
 import cats.MonadError
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
+import com.typesafe.config.Config
 import pureconfig.error.ConfigReaderFailures
+import pureconfig._
 
 import scala.language.higherKinds
 
 abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
-  protected def fromEither[T](loadedConfig: ConfigReaderFailures Either T): Interpretation[T] = ME.fromEither[T] {
+  protected def find[T](key: String, config: Config)(implicit reader: Derivation[ConfigReader[T]]): Interpretation[T] =
+    fromEither {
+      loadConfig[T](config, key)
+    }
+
+  private def fromEither[T](loadedConfig: ConfigReaderFailures Either T): Interpretation[T] = ME.fromEither[T] {
     loadedConfig leftMap (new ConfigLoadingException(_))
   }
 }
