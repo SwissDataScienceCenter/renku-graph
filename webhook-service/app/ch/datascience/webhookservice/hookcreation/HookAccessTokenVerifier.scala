@@ -53,26 +53,37 @@ private class IOHookAccessTokenVerifier @Inject()(gitLabConfigProvider: IOGitLab
 
   def checkHookAccessTokenPresence(projectInfo: ProjectInfo, accessToken: AccessToken): IO[Boolean] =
     for {
-      gitLabHostUrl       <- gitLabConfigProvider.get()
-      uri                 <- validateUri(s"$gitLabHostUrl/api/v4/users/${projectInfo.owner.id}/impersonation_tokens")
-      existingTokensNames <- send(request(GET, uri, accessToken))(mapResponse)
-    } yield checkProjectHookExists(existingTokensNames, projectInfo.path)
+      gitLabHostUrl  <- gitLabConfigProvider.get()
+      uri            <- validateUri(s"$gitLabHostUrl/api/v4/users/${projectInfo.owner.id}/impersonation_tokens")
+      existingTokens <- send(request(GET, uri, accessToken))(mapResponse)
+    } yield checkProjectTokenExists(existingTokens, projectInfo.path)
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[List[String]] =
+  private def mapResponse(request: Request[IO], response: Response[IO]): IO[List[TokenInfo]] =
     response.status match {
-      case Ok           => response.as[List[String]] handleErrorWith contextToError(request, response)
+      case Ok           => response.as[List[TokenInfo]] handleErrorWith contextToError(request, response)
       case Unauthorized => F.raiseError(UnauthorizedException)
       case _            => raiseError(request, response)
     }
 
-  private implicit lazy val hooksNamesDecoder: EntityDecoder[IO, List[String]] = {
-    implicit val hookNameDecoder: Decoder[List[String]] = decodeList {
-      _.downField("name").as[String]
+  private implicit lazy val tokensInfoDecoder: EntityDecoder[IO, List[TokenInfo]] = {
+    implicit val hookNameDecoder: Decoder[List[TokenInfo]] = decodeList { cursor =>
+      for {
+        name   <- cursor.downField("name").as[String]
+        active <- cursor.downField("active").as[Boolean]
+      } yield TokenInfo(name, active)
     }
 
-    jsonOf[IO, List[String]]
+    jsonOf[IO, List[TokenInfo]]
   }
 
-  private def checkProjectHookExists(tokensNames: List[String], projectPath: ProjectPath): Boolean =
-    tokensNames contains s"${projectPath.value.replace("/", "-")}-hook-access-token"
+  private def checkProjectTokenExists(tokens: List[TokenInfo], projectPath: ProjectPath): Boolean =
+    tokens
+      .filter(_.active)
+      .map(_.name)
+      .contains(s"${projectPath.value.replace("/", "-")}-hook-access-token")
+
+  private case class TokenInfo(
+      name:   String,
+      active: Boolean
+  )
 }

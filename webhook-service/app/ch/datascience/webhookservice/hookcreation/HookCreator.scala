@@ -67,7 +67,7 @@ private class HookCreator[Interpretation[_]: Monad](
       serializedHookToken     <- encrypt(HookToken(projectInfo.id, hookAccessToken))
       _                       <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
       _                       <- logger.info(s"Hook created for project with id $projectId")
-      _                       <- ME.pure(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken))
+      _                       <- eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) recover withSuccess
     } yield ()
   } recoverWith loggingError(projectId)
 
@@ -78,7 +78,10 @@ private class HookCreator[Interpretation[_]: Monad](
   }
 
   private def failIfHookAccessTokenExists(projectId: ProjectId): Boolean => Interpretation[Unit] = {
-    case true  => ME.raiseError(new RuntimeException(s"Hook already created for the project with id $projectId"))
+    case true =>
+      ME.raiseError(
+        new RuntimeException(s"Personal Access Token already exists for hook of the project with id $projectId")
+      )
     case false => ME.pure(())
   }
 
@@ -89,6 +92,10 @@ private class HookCreator[Interpretation[_]: Monad](
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
       ME.raiseError(exception)
+  }
+
+  private lazy val withSuccess: PartialFunction[Throwable, Unit] = {
+    case NonFatal(_) => ()
   }
 }
 

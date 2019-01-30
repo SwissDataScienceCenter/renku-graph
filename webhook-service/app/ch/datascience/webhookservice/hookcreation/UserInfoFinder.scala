@@ -78,7 +78,7 @@ private class IOUserInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigPro
       for {
         id       <- cursor.downField("id").as[UserId]
         username <- cursor.downField("username").as[Username]
-        email    <- cursor.downField("public_email").as[Email]
+        email    <- cursor.downField("email").as[Email]
       } yield UserInfo(id, username, email)
 
     jsonOf[IO, UserInfo]

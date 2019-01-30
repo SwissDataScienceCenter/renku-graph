@@ -91,7 +91,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Info(s"Hook created for project with id $projectId"))
     }
 
-    "succeed even if trigger of loading all events fails" in new TestCase {
+    "succeed even if loading all events fails" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -205,7 +205,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
-    "log an error if hook's access token was already created" in new TestCase {
+    "log an error if hook's access token already exists" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -228,7 +228,9 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val result = hookCreation.createHook(projectId, accessToken)
 
-      val expectationException = new RuntimeException(s"Hook already created for the project with id $projectId")
+      val expectationException = new RuntimeException(
+        s"Personal Access Token already exists for hook of the project with id $projectId"
+      )
       result.failed.foreach { exception =>
         exception            shouldBe a[RuntimeException]
         exception.getMessage shouldBe expectationException.getMessage

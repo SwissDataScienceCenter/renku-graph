@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.{IO, Sync}
+import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.events.EventsGenerators._
@@ -51,7 +51,7 @@ class IOHookAccessTokenVerifierSpec extends WordSpec with MockFactory with Exter
       stubFor {
         get(s"/api/v4/users/${projectInfo.owner.id}/impersonation_tokens")
           .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
-          .willReturn(okJson(withTokens(oneTokenFor = projectInfo.path)))
+          .willReturn(okJson(withTokens(oneTokenFor = projectInfo.path, active = true)))
       }
 
       verifier.checkHookAccessTokenPresence(projectInfo, personalAccessToken).unsafeRunSync() shouldBe true
@@ -64,7 +64,7 @@ class IOHookAccessTokenVerifierSpec extends WordSpec with MockFactory with Exter
       stubFor {
         get(s"/api/v4/users/${projectInfo.owner.id}/impersonation_tokens")
           .withHeader("Authorization", equalTo(s"Bearer $oauthAccessToken"))
-          .willReturn(okJson(withTokens(oneTokenFor = projectInfo.path)))
+          .willReturn(okJson(withTokens(oneTokenFor = projectInfo.path, active = true)))
       }
 
       verifier.checkHookAccessTokenPresence(projectInfo, oauthAccessToken).unsafeRunSync() shouldBe true
@@ -78,7 +78,20 @@ class IOHookAccessTokenVerifierSpec extends WordSpec with MockFactory with Exter
       stubFor {
         get(s"/api/v4/users/${projectInfo.owner.id}/impersonation_tokens")
           .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
-          .willReturn(okJson(withTokens(oneTokenFor = otherProjectPath)))
+          .willReturn(okJson(withTokens(oneTokenFor = otherProjectPath, active = false)))
+      }
+
+      verifier.checkHookAccessTokenPresence(projectInfo, personalAccessToken).unsafeRunSync() shouldBe false
+    }
+
+    "return false if a 'projectPath-hook-access-token' token does exist but is inactive" in new TestCase {
+      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
+      val personalAccessToken = personalAccessTokens.generateOne
+
+      stubFor {
+        get(s"/api/v4/users/${projectInfo.owner.id}/impersonation_tokens")
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .willReturn(okJson(withTokens(oneTokenFor = projectInfo.path, active = false)))
       }
 
       verifier.checkHookAccessTokenPresence(projectInfo, personalAccessToken).unsafeRunSync() shouldBe false
@@ -155,7 +168,7 @@ class IOHookAccessTokenVerifierSpec extends WordSpec with MockFactory with Exter
     val verifier = new IOHookAccessTokenVerifier(configProvider)
   }
 
-  private def withTokens(oneTokenFor: ProjectPath): String =
+  private def withTokens(oneTokenFor: ProjectPath, active: Boolean): String =
     Json
       .arr(
         Json.obj(
@@ -164,7 +177,7 @@ class IOHookAccessTokenVerifierSpec extends WordSpec with MockFactory with Exter
           "name"   -> Json.fromString("other-token-1")
         ),
         Json.obj(
-          "active" -> Json.fromBoolean(true),
+          "active" -> Json.fromBoolean(active),
           "scopes" -> Json.arr(Json.fromString("api")),
           "name"   -> Json.fromString(s"${oneTokenFor.value.replace("/", "-")}-hook-access-token")
         ),

@@ -150,7 +150,8 @@ class IOUserInfoFinderSpec extends WordSpec with MockFactory with ExternalServic
       .obj(
         "id"           -> Json.fromInt(userInfo.userId.value),
         "username"     -> Json.fromString(userInfo.username.value),
-        "public_email" -> Json.fromString(userInfo.email.value)
+        "email"        -> Json.fromString(userInfo.email.value),
+        "public_email" -> Json.fromString(emails.generateOne.value)
       )
       .noSpaces
   }
