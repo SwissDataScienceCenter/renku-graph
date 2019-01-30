@@ -58,7 +58,7 @@ class WebhookEventEndpoint(
       authToken <- findAuthToken(request)
       hookToken <- decrypt(authToken) recoverWith unauthorizedException
       _         <- validate(hookToken, request.body)
-      _         <- storeCommitsInEventLog(pushEvent = request.body)
+      _         <- storeCommitsInEventLog(pushEvent = request.body, hookToken.hookAccessToken)
     } yield Accepted)
       .unsafeToFuture()
       .recover(mapToResult(request.body))

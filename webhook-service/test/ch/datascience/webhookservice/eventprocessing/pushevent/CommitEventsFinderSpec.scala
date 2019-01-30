@@ -23,6 +23,7 @@ import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators.pushEvents
@@ -47,7 +48,7 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
         .expects(pushEvent.project.id, pushEvent.after)
         .returning(context.pure(commitInfo))
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+      commitEventFinder.findCommitEvents(pushEvent, hookAccessToken).map(_.toList) shouldBe toSuccess(
         Seq(commitEventFrom(pushEvent, commitInfo))
       )
     }
@@ -72,7 +73,7 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
           .returning(context.pure(commitInfo))
       }
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+      commitEventFinder.findCommitEvents(pushEvent, hookAccessToken).map(_.toList) shouldBe toSuccess(
         Seq(commitEventFrom(pushEvent, firstCommitInfo)),
         secondLevelCommitInfos.map(commitEventFrom(pushEvent, _)),
         secondLevelCommitInfos.flatMap(_.parents).map(commitEventFrom(pushEvent, thirdLevelCommitInfos))
@@ -88,7 +89,7 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
         .expects(pushEvent.project.id, pushEvent.after)
         .returning(context.raiseError(exception))
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe Success(
+      commitEventFinder.findCommitEvents(pushEvent, hookAccessToken).map(_.toList) shouldBe Success(
         Seq(
           Failure(exception)
         )
@@ -117,7 +118,7 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
         .expects(pushEvent.project.id, secondLevelCommitInfo1.id)
         .returning(context.raiseError(exception))
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe Success(
+      commitEventFinder.findCommitEvents(pushEvent, hookAccessToken).map(_.toList) shouldBe Success(
         Seq(
           Success(commitEventFrom(pushEvent, firstCommitInfo)),
           Failure(exception),
@@ -129,6 +130,8 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
 
   private trait TestCase {
     val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+
+    val hookAccessToken = hookAccessTokens.generateOne
 
     val commitInfoFinder  = mock[CommitInfoFinder[Try]]
     val commitEventFinder = new CommitEventsFinder[Try](commitInfoFinder)

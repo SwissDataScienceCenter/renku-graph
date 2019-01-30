@@ -67,7 +67,7 @@ private class HookCreator[Interpretation[_]: Monad](
       serializedHookToken     <- encrypt(HookToken(projectInfo.id, hookAccessToken))
       _                       <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
       _                       <- logger.info(s"Hook created for project with id $projectId")
-      _                       <- eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) recover withSuccess
+      _                       <- eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken) recover withSuccess
     } yield ()
   } recoverWith loggingError(projectId)
 

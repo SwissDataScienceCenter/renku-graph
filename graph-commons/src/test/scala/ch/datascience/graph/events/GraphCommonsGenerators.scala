@@ -38,4 +38,9 @@ object GraphCommonsGenerators {
     boolean     <- Gen.oneOf(true, false)
     accessToken <- if (boolean) personalAccessTokens else oauthAccessTokens
   } yield accessToken
+
+  implicit val hookAccessTokens: Gen[HookAccessToken] = for {
+    length <- Gen.choose(5, 40)
+    chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
+  } yield HookAccessToken(chars.mkString(""))
 }

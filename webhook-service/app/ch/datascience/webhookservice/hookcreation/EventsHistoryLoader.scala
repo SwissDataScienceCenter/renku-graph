@@ -23,7 +23,7 @@ import cats.data.OptionT
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.clients.AccessToken
-import ch.datascience.graph.events.{Project, PushUser}
+import ch.datascience.graph.events.{HookAccessToken, Project, PushUser}
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
@@ -47,23 +47,28 @@ private class EventsHistoryLoader[Interpretation[_]](
   import pushEventSender._
   import userInfoFinder._
 
-  def loadAllEvents(projectInfo: ProjectInfo, accessToken: AccessToken): Interpretation[Unit] = {
+  def loadAllEvents(projectInfo:     ProjectInfo,
+                    hookAccessToken: HookAccessToken,
+                    accessToken:     AccessToken): Interpretation[Unit] = {
     for {
       latestPushEvent <- OptionT(fetchLatestPushEvent(projectInfo.id, accessToken))
       userInfo        <- OptionT.liftF(findUserInfo(latestPushEvent.authorId, accessToken))
-      _               <- OptionT.liftF(storeCommitsInEventLog(pushEvent(latestPushEvent, projectInfo, userInfo)))
+      pushEvent       <- OptionT.liftF(pushEventFrom(latestPushEvent, projectInfo, userInfo))
+      _               <- OptionT.liftF(storeCommitsInEventLog(pushEvent, hookAccessToken))
       _               <- OptionT.liftF(logger.info(s"Project: ${projectInfo.id}: events history sent to the Event Log"))
     } yield ()
   }.value
     .flatMap(logNoEventsSent(projectInfo))
     .recoverWith(loggingError(projectInfo))
 
-  private def pushEvent(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo, userInfo: UserInfo) = PushEvent(
-    maybeBefore = None,
-    after       = pushEventInfo.commitTo,
-    pushUser    = PushUser(userInfo.userId, userInfo.username, userInfo.email),
-    project     = Project(projectInfo.id, projectInfo.path)
-  )
+  private def pushEventFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo, userInfo: UserInfo) = ME.pure {
+    PushEvent(
+      maybeBefore = None,
+      after       = pushEventInfo.commitTo,
+      pushUser    = PushUser(userInfo.userId, userInfo.username, userInfo.email),
+      project     = Project(projectInfo.id, projectInfo.path)
+    )
+  }
 
   private def logNoEventsSent(projectInfo: ProjectInfo): Option[Unit] => Interpretation[Unit] = {
     case None => logger.info(s"Project: ${projectInfo.id}: No events to be sent to the Event Log")

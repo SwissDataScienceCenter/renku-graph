@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import java.net.URLEncoder
 
-import cats.effect.{IO, Sync}
+import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.GraphCommonsGenerators._

@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.clients.AccessToken
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.GraphCommonsGenerators.accessTokens
+import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
@@ -32,6 +32,8 @@ import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSend
 import ch.datascience.webhookservice.eventprocessing.pushevent.{CommitEventsFinder, PushEventSender}
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
+import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
+import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
 import ch.datascience.webhookservice.model.ProjectInfo
 import io.chrisdavenport.log4cats.Logger
 import org.scalamock.scalatest.MockFactory
@@ -59,18 +61,11 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
         .returning(context.pure(userInfo))
 
       (pushEventSender
-        .storeCommitsInEventLog(_: PushEvent))
-        .expects(
-          PushEvent(
-            maybeBefore = None,
-            after       = pushEventInfo.commitTo,
-            pushUser    = PushUser(pushEventInfo.authorId, userInfo.username, userInfo.email),
-            project     = Project(projectInfo.id, projectInfo.path)
-          )
-        )
+        .storeCommitsInEventLog(_: PushEvent, _: HookAccessToken))
+        .expects(pushEventFrom(pushEventInfo, projectInfo, userInfo), hookAccessToken)
         .returning(context.pure(()))
 
-      eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe Success(())
+      eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken) shouldBe Success(())
 
       logger.loggedOnly(Info(s"Project: ${projectInfo.id}: events history sent to the Event Log"))
     }
@@ -83,7 +78,7 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(None))
 
-      eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe Success(())
+      eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken) shouldBe Success(())
 
       logger.loggedOnly(Info(s"Project: ${projectInfo.id}: No events to be sent to the Event Log"))
     }
@@ -97,7 +92,7 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(error)
 
-      eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe error
+      eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken) shouldBe error
 
       logger.loggedOnly(Error(s"Project: ${projectInfo.id}: Sending events to the Event Log failed", exception))
     }
@@ -117,7 +112,7 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
         .expects(pushEventInfo.authorId, accessToken)
         .returning(error)
 
-      eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe error
+      eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken) shouldBe error
 
       logger.loggedOnly(Error(s"Project: ${projectInfo.id}: Sending events to the Event Log failed", exception))
     }
@@ -139,20 +134,21 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
       val error     = context.raiseError(exception)
       (pushEventSender
-        .storeCommitsInEventLog(_: PushEvent))
-        .expects(*)
+        .storeCommitsInEventLog(_: PushEvent, _: HookAccessToken))
+        .expects(*, *)
         .returning(error)
 
-      eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe error
+      eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken) shouldBe error
 
       logger.loggedOnly(Error(s"Project: ${projectInfo.id}: Sending events to the Event Log failed", exception))
     }
   }
 
   private trait TestCase {
-    val projectInfo = projectInfos.generateOne
-    val projectId   = projectInfo.id
-    val accessToken = accessTokens.generateOne
+    val projectInfo     = projectInfos.generateOne
+    val projectId       = projectInfo.id
+    val hookAccessToken = hookAccessTokens.generateOne
+    val accessToken     = accessTokens.generateOne
 
     val context = MonadError[Try, Throwable]
 
@@ -180,4 +176,15 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
   private def userInfoWith(userId: UserId) =
     userInfos.generateOne
       .copy(userId = userId)
+
+  private def pushEventFrom(
+      pushEventInfo: PushEventInfo,
+      projectInfo:   ProjectInfo,
+      userInfo:      UserInfo
+  ) = PushEvent(
+    maybeBefore = None,
+    after       = pushEventInfo.commitTo,
+    pushUser    = PushUser(pushEventInfo.authorId, userInfo.username, userInfo.email),
+    project     = Project(projectInfo.id, projectInfo.path)
+  )
 }

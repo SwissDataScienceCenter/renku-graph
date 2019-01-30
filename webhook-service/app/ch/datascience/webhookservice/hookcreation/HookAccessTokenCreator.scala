@@ -20,8 +20,9 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
+import ch.datascience.graph.events.HookAccessToken
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.model.{HookAccessToken, ProjectInfo}
+import ch.datascience.webhookservice.model.ProjectInfo
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext

@@ -21,15 +21,15 @@ package ch.datascience.webhookservice.hookcreation
 import cats._
 import cats.implicits._
 import ch.datascience.clients.AccessToken
+import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.GraphCommonsGenerators._
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.events.{HookAccessToken, ProjectId}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.Secret
 import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
@@ -429,8 +429,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     def expectEventsHistoryLoader(returning: Try[Unit]): Unit =
       (eventsHistoryLoader
-        .loadAllEvents(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
+        .loadAllEvents(_: ProjectInfo, _: HookAccessToken, _: AccessToken))
+        .expects(projectInfo, hookAccessToken, accessToken)
         .returning(returning)
   }
 }

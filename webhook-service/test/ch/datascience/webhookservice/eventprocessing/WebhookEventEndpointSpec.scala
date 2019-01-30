@@ -26,7 +26,8 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.events.GraphCommonsGenerators._
+import ch.datascience.graph.events.{HookAccessToken, ProjectId}
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
@@ -49,8 +50,8 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
       (pushEventSender
-        .storeCommitsInEventLog(_: PushEvent))
-        .expects(pushEvent)
+        .storeCommitsInEventLog(_: PushEvent, _: HookAccessToken))
+        .expects(pushEvent, hookAccessToken)
         .returning(context.pure(()))
 
       val serializedHookToken = serializedHookTokenFor(pushEvent)
@@ -70,8 +71,8 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       val exception = exceptions.generateOne
       (pushEventSender
-        .storeCommitsInEventLog(_: PushEvent))
-        .expects(pushEvent)
+        .storeCommitsInEventLog(_: PushEvent, _: HookAccessToken))
+        .expects(pushEvent, hookAccessToken)
         .returning(context.raiseError(exception))
 
       val serializedHookToken = serializedHookTokenFor(pushEvent)

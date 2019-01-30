@@ -19,51 +19,40 @@
 package ch.datascience.webhookservice.crypto
 
 import eu.timepit.refined.pureconfig._
-import java.util.Base64
-
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.graph.events.ProjectId
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.{Secret, SerializedHookToken}
-import ch.datascience.webhookservice.model.{HookAccessToken, HookToken}
+import ch.datascience.crypto.AesCrypto
+import ch.datascience.crypto.AesCrypto.Secret
+import ch.datascience.graph.events.{HookAccessToken, ProjectId}
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
+import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.collection.MinSize
 import eu.timepit.refined.string.MatchesRegex
 import io.circe.parser._
 import io.circe.{Decoder, HCursor, Json}
-import javax.crypto.Cipher
-import javax.crypto.Cipher.{DECRYPT_MODE, ENCRYPT_MODE}
-import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import pureconfig._
 import pureconfig.error.ConfigReaderException
 
 import scala.language.{higherKinds, implicitConversions}
-import scala.util.Try
 import scala.util.control.NonFatal
 
-class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError[Interpretation, Throwable]) {
+class HookTokenCrypto[Interpretation[_]](
+    secret:    Secret
+)(implicit ME: MonadError[Interpretation, Throwable])
+    extends AesCrypto[Interpretation, HookToken, SerializedHookToken](secret) {
 
-  private lazy val base64Decoder    = Base64.getDecoder
-  private lazy val base64Encoder    = Base64.getEncoder
-  private lazy val algorithm        = "AES/CBC/PKCS5Padding"
-  private lazy val key              = new SecretKeySpec(base64Decoder.decode(secret.value), "AES")
-  private lazy val ivSpec           = new IvParameterSpec(new Array[Byte](16))
-  private lazy val charset          = "utf-8"
-  private lazy val encryptingCipher = cipher(ENCRYPT_MODE)
-  private lazy val decryptingCipher = cipher(DECRYPT_MODE)
-
-  def encrypt(hookToken: HookToken): Interpretation[SerializedHookToken] =
+  override def encrypt(hookToken: HookToken): Interpretation[SerializedHookToken] =
     for {
       serializedToken  <- serialize(hookToken)
       encoded          <- encryptAndEncode(serializedToken)
       validatedDecoded <- validate(encoded)
     } yield validatedDecoded
 
-  def decrypt(serializedToken: SerializedHookToken): Interpretation[HookToken] = {
+  override def decrypt(serializedToken: SerializedHookToken): Interpretation[HookToken] = {
     for {
       decoded      <- decodeAndDecrypt(serializedToken)
       deserialized <- deserialize(decoded)
@@ -84,24 +73,6 @@ class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError
       SerializedHookToken.from(value)
     }
 
-  private def cipher(mode: Int): Cipher = {
-    val c = Cipher.getInstance(algorithm)
-    c.init(mode, key, ivSpec)
-    c
-  }
-
-  private def encryptAndEncode(authToken: String): Interpretation[String] =
-    new String(
-      base64Encoder.encode(encryptingCipher.doFinal(authToken.getBytes(charset))),
-      charset
-    )
-
-  private def decodeAndDecrypt(authToken: SerializedHookToken): Interpretation[String] =
-    new String(
-      decryptingCipher.doFinal(base64Decoder.decode(authToken.value.getBytes(charset))),
-      charset
-    )
-
   private implicit val hookTokenDecoder: Decoder[HookToken] = (cursor: HCursor) =>
     for {
       projectId       <- cursor.downField("projectId").as[ProjectId]
@@ -117,17 +88,9 @@ class HookTokenCrypto[Interpretation[_]](secret: Secret)(implicit ME: MonadError
     case NonFatal(cause) =>
       ME.raiseError(new RuntimeException("HookToken decryption failed", cause))
   }
-
-  private implicit def pure[T](value: => T): Interpretation[T] =
-    Try(value)
-      .fold(
-        ME.raiseError,
-        ME.pure
-      )
 }
 
 object HookTokenCrypto {
-  type Secret              = String Refined MinSize[W.`16`.T]
   type SerializedHookToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 
   object SerializedHookToken {
@@ -135,7 +98,7 @@ object HookTokenCrypto {
     def from(value: String): Either[Throwable, SerializedHookToken] =
       RefType
         .applyRef[SerializedHookToken](value)
-        .leftMap(_ => new IllegalArgumentException("A value to create HookAuthToken cannot be blank"))
+        .leftMap(_ => new IllegalArgumentException("A value to create HookToken cannot be blank"))
   }
 }
 
@@ -143,7 +106,7 @@ object HookTokenCrypto {
 class IOHookTokenCrypto(secret: Secret) extends HookTokenCrypto[IO](secret) {
 
   @Inject def this(configuration: Configuration) = this(
-    loadConfig[Secret](configuration.underlying, "services.gitlab.secret-token-secret").fold(
+    loadConfig[Secret](configuration.underlying, "services.gitlab.hook-token-secret").fold(
       failures => throw new ConfigReaderException(failures),
       identity
     )

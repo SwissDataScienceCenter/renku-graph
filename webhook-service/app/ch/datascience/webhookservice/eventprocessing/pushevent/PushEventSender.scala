@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import cats.effect.IO
 import cats.implicits._
 import cats.{Monad, MonadError}
-import ch.datascience.graph.events.CommitEvent
+import ch.datascience.graph.events.{CommitEvent, HookAccessToken}
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, IOCommitEventSender}
@@ -40,10 +40,10 @@ class PushEventSender[Interpretation[_]: Monad](
   import commitEventSender._
   import commitEventsFinder._
 
-  def storeCommitsInEventLog(pushEvent: PushEvent): Interpretation[Unit] = {
+  def storeCommitsInEventLog(pushEvent: PushEvent, hookAccessToken: HookAccessToken): Interpretation[Unit] = {
     implicit val implicitPushEvent: PushEvent = pushEvent
     for {
-      commitEventsStream <- findCommitEvents(pushEvent)
+      commitEventsStream <- findCommitEvents(pushEvent, hookAccessToken)
       _                  <- (commitEventsStream map sendEvent).sequence
       _                  <- logger.info(logMessageFor(pushEvent, "stored in event log"))
     } yield ()

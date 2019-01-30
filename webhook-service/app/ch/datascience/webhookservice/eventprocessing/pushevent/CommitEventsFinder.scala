@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.graph.events.{CommitEvent, CommitId}
+import ch.datascience.graph.events.{CommitEvent, CommitId, HookAccessToken}
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import javax.inject.{Inject, Singleton}
 
@@ -37,7 +37,8 @@ class CommitEventsFinder[Interpretation[_]](
 
   import Stream._
 
-  def findCommitEvents(pushEvent: PushEvent): Interpretation[Stream[Interpretation[CommitEvent]]] =
+  def findCommitEvents(pushEvent:       PushEvent,
+                       hookAccessToken: HookAccessToken): Interpretation[Stream[Interpretation[CommitEvent]]] =
     stream(List(pushEvent.after))(pushEvent)
 
   private def stream(
@@ -51,7 +52,7 @@ class CommitEventsFinder[Interpretation[_]](
           commitEvent     <- findCommitEvent(commitId, pushEvent)
           nextCommitEvent <- stream(commitsToProcess ++ commitEvent.parents)
         } yield ME.pure(commitEvent) #:: nextCommitEvent
-      } recoverWith { elementForFailure(commitsToProcess) }
+      } recoverWith elementForFailure(commitsToProcess)
     }
 
   private def elementForFailure(

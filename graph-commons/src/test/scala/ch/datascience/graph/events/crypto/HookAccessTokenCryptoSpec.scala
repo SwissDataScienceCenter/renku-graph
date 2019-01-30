@@ -16,42 +16,41 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.crypto
+package ch.datascience.graph.events.crypto
 
 import java.util.Base64
 
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.model.HookToken
+import ch.datascience.graph.events.GraphCommonsGenerators._
+import ch.datascience.graph.events.crypto.HookAccessTokenCrypto.SerializedHookAccessToken
 import eu.timepit.refined.api.RefType
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.util.{Failure, Success, Try}
 
-class HookTokenCryptoSpec extends WordSpec {
+class HookAccessTokenCryptoSpec extends WordSpec {
 
   "encrypt/decrypt" should {
 
     "encrypt and decrypt a given HookToken" in new TestCase {
-      val token: HookToken = hookTokens.generateOne
+      val token = hookAccessTokens.generateOne
 
-      val Success(crypted) = hookTokenCrypto.encrypt(token)
+      val Success(crypted) = hookAccessTokenCrypto.encrypt(token)
       crypted.value should not be token
 
-      val Success(decrypted) = hookTokenCrypto.decrypt(crypted)
+      val Success(decrypted) = hookAccessTokenCrypto.decrypt(crypted)
       decrypted shouldBe token
     }
 
     "fail if cannot be decrypted" in new TestCase {
-      val token: SerializedHookToken = SerializedHookToken.from("abcd").fold(e => throw e, identity)
+      val token = SerializedHookAccessToken.from("abcd").fold(e => throw e, identity)
 
-      val Failure(decryptException) = hookTokenCrypto.decrypt(token)
+      val Failure(decryptException) = hookAccessTokenCrypto.decrypt(token)
 
       decryptException            shouldBe an[Exception]
-      decryptException.getMessage shouldBe "HookToken decryption failed"
+      decryptException.getMessage shouldBe "HookAccessToken decryption failed"
     }
   }
 
@@ -60,7 +59,7 @@ class HookTokenCryptoSpec extends WordSpec {
     import cats.implicits._
 
     private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes("utf-8")), "utf-8")
-    val hookTokenCrypto = new HookTokenCrypto[Try](
+    val hookAccessTokenCrypto = new HookAccessTokenCrypto[Try](
       RefType
         .applyRef[Secret](secret)
         .getOrElse(throw new IllegalArgumentException("Wrong secret"))
