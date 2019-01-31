@@ -52,8 +52,8 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       )
     }
 
-    "return commit events starting from the push event's 'after' until commit info with no parents" in new TestCase {
-      val commitEventsOrigin = commitEventsOrigins.generateOne
+    "return commit events starting from the 'commitTo' until commit info with no parents" in new TestCase {
+      val commitEventsOrigin = commitEventsOrigins.generateOne.copy(maybeCommitFrom = None)
 
       val firstCommitInfo = commitInfos(commitEventsOrigin.commitTo, parentsIdsLists(minNumber = 1)).generateOne
 
@@ -76,6 +76,35 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
         Seq(commitEventFrom(commitEventsOrigin, firstCommitInfo)),
         secondLevelCommitInfos map (commitEventFrom(commitEventsOrigin, _)),
         secondLevelCommitInfos.flatMap(_.parents) map commitEventFrom(commitEventsOrigin, thirdLevelCommitInfos)
+      )
+    }
+
+    "return commit events starting from the 'commitTo' until found commit id matches the `commitTo`" in new TestCase {
+      val commitTo = commitIds.generateOne
+
+      val firstCommitInfo = commitInfos(commitTo, parentsIdsLists(minNumber = 3)).generateOne
+
+      val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
+        commitInfos(parentId, noParents).generateOne
+      }
+
+      val commitFrom = firstCommitInfo.parents(firstCommitInfo.parents.size - 2)
+      val commitEventsOrigin = commitEventsOrigins.generateOne.copy(
+        maybeCommitFrom = Some(commitFrom),
+        commitTo        = commitTo
+      )
+
+      val commitInfosUpToCommitFrom = secondLevelCommitInfos.takeWhile(_.id != commitFrom)
+      (Seq(firstCommitInfo) ++ commitInfosUpToCommitFrom) foreach { commitInfo =>
+        (commitInfoFinder
+          .findCommitInfo(_: ProjectId, _: CommitId))
+          .expects(commitEventsOrigin.project.id, commitInfo.id)
+          .returning(context.pure(commitInfo))
+      }
+
+      commitEventFinder.findCommitEvents(commitEventsOrigin).map(_.toList) shouldBe toSuccess(
+        Seq(commitEventFrom(commitEventsOrigin, firstCommitInfo)),
+        commitInfosUpToCommitFrom map (commitEventFrom(commitEventsOrigin, _))
       )
     }
 

@@ -26,7 +26,6 @@ import ch.datascience.webhookservice.eventprocessing.CommitEventsOrigin
 import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
-import scala.util.Try
 import scala.util.control.NonFatal
 
 class CommitEventsFinder[Interpretation[_]](
@@ -36,54 +35,60 @@ class CommitEventsFinder[Interpretation[_]](
   import commitInfoFinder._
 
   import Stream._
+  type CommitEventsStream = Interpretation[Stream[Interpretation[CommitEvent]]]
 
-  def findCommitEvents(commitEventsOrigin: CommitEventsOrigin): Interpretation[Stream[Interpretation[CommitEvent]]] =
-    stream(List(commitEventsOrigin.commitTo))(commitEventsOrigin)
+  def findCommitEvents(commitEventsOrigin: CommitEventsOrigin): CommitEventsStream =
+    stream(List(commitEventsOrigin.commitTo), commitEventsOrigin)
 
-  private def stream(
-      commitIds:        List[CommitId]
-  )(commitEventsOrigin: CommitEventsOrigin): Interpretation[Stream[Interpretation[CommitEvent]]] =
+  private def stream(commitIds: List[CommitId], commitEventsOrigin: CommitEventsOrigin): CommitEventsStream =
     commitIds match {
-      case Nil =>
-        ME.pure(Stream.empty[Interpretation[CommitEvent]])
-      case commitId +: commitsToProcess => {
-        for {
-          commitEvent     <- findCommitEvent(commitId, commitEventsOrigin)
-          nextCommitEvent <- stream(commitsToProcess ++ commitEvent.parents)(commitEventsOrigin)
-        } yield ME.pure(commitEvent) #:: nextCommitEvent
-      } recoverWith elementForFailure(commitsToProcess)(commitEventsOrigin)
+      case Nil                                 => emptyStream
+      case commitId +: commitIdsStillToProcess => nextElement(commitId, commitIdsStillToProcess, commitEventsOrigin)
     }
 
+  private lazy val emptyStream = ME.pure(Stream.empty[Interpretation[CommitEvent]])
+
+  private def nextElement(commitId:                CommitId,
+                          commitIdsStillToProcess: List[CommitId],
+                          commitEventsOrigin:      CommitEventsOrigin) = {
+    for {
+      commitEvent <- findCommitEvent(commitId, commitEventsOrigin)
+      commitIdsToProcess = findCommitIdsToProcess(commitIdsStillToProcess,
+                                                  commitEvent.parents,
+                                                  commitEventsOrigin.maybeCommitFrom)
+      nextCommitEvent <- stream(commitIdsToProcess, commitEventsOrigin)
+    } yield ME.pure(commitEvent) #:: nextCommitEvent
+  } recoverWith elementForFailure(commitIdsStillToProcess, commitEventsOrigin)
+
+  private def findCommitIdsToProcess(commitsToProcess:    List[CommitId],
+                                     parentCommits:       List[CommitId],
+                                     maybeEarliestCommit: Option[CommitId]): List[CommitId] =
+    commitsToProcess ++ parentCommits.takeWhile(commitId => !maybeEarliestCommit.contains(commitId))
+
   private def elementForFailure(
-      commitsToProcess: List[CommitId]
-  )(commitEventsOrigin: CommitEventsOrigin)
-    : PartialFunction[Throwable, Interpretation[Stream[Interpretation[CommitEvent]]]] = {
+      commitIdsToProcess: List[CommitId],
+      commitEventsOrigin: CommitEventsOrigin): PartialFunction[Throwable, CommitEventsStream] = {
     case NonFatal(exception) =>
-      stream(commitsToProcess)(commitEventsOrigin) map (ME.raiseError[CommitEvent](exception) #:: _)
+      stream(commitIdsToProcess, commitEventsOrigin) map (ME.raiseError[CommitEvent](exception) #:: _)
   }
 
   private def findCommitEvent(commitId: CommitId, commitEventsOrigin: CommitEventsOrigin): Interpretation[CommitEvent] =
     for {
-      commitInfo  <- findCommitInfo(commitEventsOrigin.project.id, commitId)
-      commitEvent <- merge(commitInfo, commitEventsOrigin)
-    } yield commitEvent
+      commitInfo <- findCommitInfo(commitEventsOrigin.project.id, commitId)
+    } yield merge(commitInfo, commitEventsOrigin)
 
-  private def merge(commitInfo: CommitInfo, commitEventsOrigin: CommitEventsOrigin): Interpretation[CommitEvent] =
-    ME.fromTry {
-      Try {
-        CommitEvent(
-          id              = commitInfo.id,
-          message         = commitInfo.message,
-          committedDate   = commitInfo.committedDate,
-          pushUser        = commitEventsOrigin.pushUser,
-          author          = commitInfo.author,
-          committer       = commitInfo.committer,
-          parents         = commitInfo.parents,
-          project         = commitEventsOrigin.project,
-          hookAccessToken = commitEventsOrigin.hookAccessToken
-        )
-      }
-    }
+  private def merge(commitInfo: CommitInfo, commitEventsOrigin: CommitEventsOrigin): CommitEvent =
+    CommitEvent(
+      id              = commitInfo.id,
+      message         = commitInfo.message,
+      committedDate   = commitInfo.committedDate,
+      pushUser        = commitEventsOrigin.pushUser,
+      author          = commitInfo.author,
+      committer       = commitInfo.committer,
+      parents         = commitInfo.parents,
+      project         = commitEventsOrigin.project,
+      hookAccessToken = commitEventsOrigin.hookAccessToken
+    )
 }
 
 @Singleton

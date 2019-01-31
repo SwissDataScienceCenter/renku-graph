@@ -88,7 +88,7 @@ private case class CommitInfo(
     committedDate: CommittedDate,
     author:        User,
     committer:     User,
-    parents:       Seq[CommitId]
+    parents:       List[CommitId]
 )
 
 private object CommitInfo {
