@@ -28,12 +28,11 @@ import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events.{HookAccessToken, ProjectId}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
-import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
+import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, PersonalAccessTokenAlreadyCreated}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.model.{HookToken, ProjectInfo}
@@ -147,7 +146,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
-    "log a warning and fail with HookAlreadyCreated if hook is already created for that project" in new TestCase {
+    "log an Error and fail with HookAlreadyCreated if hook is already created for that project" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -161,7 +160,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       val expectedException = HookAlreadyCreated(projectId, projectHookUrl)
       hookCreation.createHook(projectId, accessToken) shouldBe context.raiseError(expectedException)
 
-      logger.loggedOnly(Warn(expectedException.getMessage))
+      logger.loggedOnly(Error(expectedException.getMessage))
     }
 
     "log an error if hook presence verification fails" in new TestCase {
@@ -205,7 +204,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
-    "log an error if hook's access token already exists" in new TestCase {
+    "log an Error and fail with PersonalAccessTokenAlreadyCreated if hook's access token already exists" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -226,19 +225,10 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectInfo, accessToken)
         .returning(context.pure(true))
 
-      val result = hookCreation.createHook(projectId, accessToken)
+      val expectedException = PersonalAccessTokenAlreadyCreated(projectId)
+      hookCreation.createHook(projectId, accessToken) shouldBe context.raiseError(expectedException)
 
-      val expectationException = new RuntimeException(
-        s"Personal Access Token already exists for hook of the project with id $projectId"
-      )
-      result.failed.foreach { exception =>
-        exception            shouldBe a[RuntimeException]
-        exception.getMessage shouldBe expectationException.getMessage
-      }
-
-      logger.loggedOnly(
-        Error(s"Hook creation failed for project with id $projectId", NotRefEqual(expectationException))
-      )
+      logger.loggedOnly(Error(expectedException.getMessage))
     }
 
     "log an error if hook access token verification fails" in new TestCase {

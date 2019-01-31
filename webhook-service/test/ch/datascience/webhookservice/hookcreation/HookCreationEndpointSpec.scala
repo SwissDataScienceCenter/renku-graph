@@ -30,7 +30,7 @@ import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
+import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, PersonalAccessTokenAlreadyCreated}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -121,6 +121,25 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       contentType(response) shouldBe Some(JSON)
       contentAsJson(response) shouldBe ErrorMessage(
         s"Hook already created for projectId: $projectId, url: $projectHookUrl"
+      ).toJson
+    }
+
+    "return CONFLICT when personal access token for the hook was already created" in new TestCase {
+
+      val accessToken    = accessTokens.generateOne
+      val projectHookUrl = projectHookUrls.generateOne
+
+      (hookCreator
+        .createHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(IO.raiseError(PersonalAccessTokenAlreadyCreated(projectId)))
+
+      val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
+
+      status(response)      shouldBe CONFLICT
+      contentType(response) shouldBe Some(JSON)
+      contentAsJson(response) shouldBe ErrorMessage(
+        s"Hook's Personal Access Token already created for projectId: $projectId"
       ).toJson
     }
 

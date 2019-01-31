@@ -25,7 +25,7 @@ import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
+import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, PersonalAccessTokenAlreadyCreated}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
@@ -78,16 +78,16 @@ private class HookCreator[Interpretation[_]: Monad](
   }
 
   private def failIfHookAccessTokenExists(projectId: ProjectId): Boolean => Interpretation[Unit] = {
-    case true =>
-      ME.raiseError(
-        new RuntimeException(s"Personal Access Token already exists for hook of the project with id $projectId")
-      )
+    case true  => ME.raiseError(PersonalAccessTokenAlreadyCreated(projectId))
     case false => ME.pure(())
   }
 
   private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Unit]] = {
     case exception @ HookAlreadyCreated(_, _) =>
-      logger.warn(exception.getMessage)
+      logger.error(exception.getMessage)
+      ME.raiseError(exception)
+    case exception @ PersonalAccessTokenAlreadyCreated(_) =>
+      logger.error(exception.getMessage)
       ME.raiseError(exception)
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
@@ -105,6 +105,10 @@ private object HookCreator {
       projectId:      ProjectId,
       projectHookUrl: ProjectHookUrl
   ) extends RuntimeException(s"Hook already created for projectId: $projectId, url: $projectHookUrl")
+
+  final case class PersonalAccessTokenAlreadyCreated(
+      projectId: ProjectId
+  ) extends RuntimeException(s"Hook's Personal Access Token already created for projectId: $projectId")
 }
 
 @Singleton
