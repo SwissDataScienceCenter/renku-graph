@@ -24,25 +24,19 @@ import ch.datascience.tinytypes.constraints.{GitSha, InstantInThePast, NonBlank}
 import ch.datascience.tinytypes.json._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import io.circe.Decoder
-import play.api.libs.json.{Format, Json, Writes}
+import play.api.libs.json.Format
 
 final case class CommitEvent(
-    id:            CommitId,
-    message:       CommitMessage,
-    committedDate: CommittedDate,
-    pushUser:      PushUser,
-    author:        User,
-    committer:     User,
-    parents:       Seq[CommitId],
-    project:       Project
+    id:              CommitId,
+    message:         CommitMessage,
+    committedDate:   CommittedDate,
+    pushUser:        PushUser,
+    author:          User,
+    committer:       User,
+    parents:         Seq[CommitId],
+    project:         Project,
+    hookAccessToken: HookAccessToken
 )
-
-object CommitEvent {
-  private implicit val userWrites:     Writes[User]        = Json.writes[User]
-  private implicit val pushUserWrites: Writes[PushUser]    = Json.writes[PushUser]
-  private implicit val projectWrites:  Writes[Project]     = Json.writes[Project]
-  implicit val commitEventWrites:      Writes[CommitEvent] = Json.writes[CommitEvent]
-}
 
 final class CommitId private (val value: String) extends AnyVal with TinyType[String]
 object CommitId extends TinyTypeFactory[String, CommitId](new CommitId(_)) with GitSha {
@@ -65,5 +59,14 @@ object CommittedDate extends TinyTypeFactory[Instant, CommittedDate](new Committ
 
 final class HookAccessToken private (val value: String) extends AnyVal with TinyType[String]
 object HookAccessToken extends TinyTypeFactory[String, HookAccessToken](new HookAccessToken(_)) with NonBlank {
-  implicit lazy val hookAccessTokenDecoder: Decoder[HookAccessToken] = Decoder.decodeString.map(HookAccessToken.apply)
+  implicit lazy val hookAccessTokenDecoder: Decoder[HookAccessToken] =
+    Decoder.decodeString.map(HookAccessToken.apply)
+}
+
+final class SerializedHookAccessToken private (val value: String) extends AnyVal with TinyType[String]
+object SerializedHookAccessToken
+    extends TinyTypeFactory[String, SerializedHookAccessToken](new SerializedHookAccessToken(_))
+    with NonBlank {
+  implicit lazy val serializedHookAccessTokenDecoder: Decoder[SerializedHookAccessToken] =
+    Decoder.decodeString.map(SerializedHookAccessToken.apply)
 }

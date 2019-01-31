@@ -25,8 +25,8 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events._
-import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators.pushEvents
+import ch.datascience.webhookservice.eventprocessing.CommitEventsOrigin
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators.commitEventsOrigins
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -39,24 +39,23 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
   "findCommitEvents" should {
 
     "return single commit event if finding commit info returns no parents" in new TestCase {
-      val pushEvent = pushEvents.generateOne
-
-      val commitInfo = commitInfos(pushEvent.after, noParents).generateOne
+      val commitEventsOrigin = commitEventsOrigins.generateOne
+      val commitInfo         = commitInfos(commitEventsOrigin.commitTo, noParents).generateOne
 
       (commitInfoFinder
         .findCommitInfo(_: ProjectId, _: CommitId))
-        .expects(pushEvent.project.id, pushEvent.after)
+        .expects(commitEventsOrigin.project.id, commitEventsOrigin.commitTo)
         .returning(context.pure(commitInfo))
 
-      commitEventFinder.findCommitEvents(pushEvent, hookAccessToken).map(_.toList) shouldBe toSuccess(
-        Seq(commitEventFrom(pushEvent, commitInfo))
+      commitEventFinder.findCommitEvents(commitEventsOrigin).map(_.toList) shouldBe toSuccess(
+        Seq(commitEventFrom(commitEventsOrigin, commitInfo))
       )
     }
 
     "return commit events starting from the push event's 'after' until commit info with no parents" in new TestCase {
-      val pushEvent = pushEvents.generateOne
+      val commitEventsOrigin = commitEventsOrigins.generateOne
 
-      val firstCommitInfo = commitInfos(pushEvent.after, parentsIdsLists(minNumber = 1)).generateOne
+      val firstCommitInfo = commitInfos(commitEventsOrigin.commitTo, parentsIdsLists(minNumber = 1)).generateOne
 
       val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
         commitInfos(parentId, singleParent).generateOne
@@ -69,27 +68,27 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       (Seq(firstCommitInfo) ++ secondLevelCommitInfos ++ thirdLevelCommitInfos) foreach { commitInfo =>
         (commitInfoFinder
           .findCommitInfo(_: ProjectId, _: CommitId))
-          .expects(pushEvent.project.id, commitInfo.id)
+          .expects(commitEventsOrigin.project.id, commitInfo.id)
           .returning(context.pure(commitInfo))
       }
 
-      commitEventFinder.findCommitEvents(pushEvent, hookAccessToken).map(_.toList) shouldBe toSuccess(
-        Seq(commitEventFrom(pushEvent, firstCommitInfo)),
-        secondLevelCommitInfos.map(commitEventFrom(pushEvent, _)),
-        secondLevelCommitInfos.flatMap(_.parents).map(commitEventFrom(pushEvent, thirdLevelCommitInfos))
+      commitEventFinder.findCommitEvents(commitEventsOrigin).map(_.toList) shouldBe toSuccess(
+        Seq(commitEventFrom(commitEventsOrigin, firstCommitInfo)),
+        secondLevelCommitInfos map (commitEventFrom(commitEventsOrigin, _)),
+        secondLevelCommitInfos.flatMap(_.parents) map commitEventFrom(commitEventsOrigin, thirdLevelCommitInfos)
       )
     }
 
     "fail if finding the first commit info fails" in new TestCase {
-      val pushEvent = pushEvents.generateOne
+      val commitEventsOrigin = commitEventsOrigins.generateOne
 
       val exception = exceptions.generateOne
       (commitInfoFinder
         .findCommitInfo(_: ProjectId, _: CommitId))
-        .expects(pushEvent.project.id, pushEvent.after)
+        .expects(commitEventsOrigin.project.id, commitEventsOrigin.commitTo)
         .returning(context.raiseError(exception))
 
-      commitEventFinder.findCommitEvents(pushEvent, hookAccessToken).map(_.toList) shouldBe Success(
+      commitEventFinder.findCommitEvents(commitEventsOrigin).map(_.toList) shouldBe Success(
         Seq(
           Failure(exception)
         )
@@ -97,9 +96,10 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
     }
 
     "fail if finding one of the commit info fails" in new TestCase {
-      val pushEvent = pushEvents.generateOne
+      val commitEventsOrigin = commitEventsOrigins.generateOne
 
-      val firstCommitInfo = commitInfos(pushEvent.after, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
+      val firstCommitInfo =
+        commitInfos(commitEventsOrigin.commitTo, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
 
       val secondLevelCommitInfo1 +: secondLevelCommitInfo2 +: Nil = firstCommitInfo.parents map { parentId =>
         commitInfos(parentId, noParents).generateOne
@@ -108,21 +108,21 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       Seq(firstCommitInfo, secondLevelCommitInfo2) foreach { commitInfo =>
         (commitInfoFinder
           .findCommitInfo(_: ProjectId, _: CommitId))
-          .expects(pushEvent.project.id, commitInfo.id)
+          .expects(commitEventsOrigin.project.id, commitInfo.id)
           .returning(context.pure(commitInfo))
       }
 
       val exception = exceptions.generateOne
       (commitInfoFinder
         .findCommitInfo(_: ProjectId, _: CommitId))
-        .expects(pushEvent.project.id, secondLevelCommitInfo1.id)
+        .expects(commitEventsOrigin.project.id, secondLevelCommitInfo1.id)
         .returning(context.raiseError(exception))
 
-      commitEventFinder.findCommitEvents(pushEvent, hookAccessToken).map(_.toList) shouldBe Success(
+      commitEventFinder.findCommitEvents(commitEventsOrigin).map(_.toList) shouldBe Success(
         Seq(
-          Success(commitEventFrom(pushEvent, firstCommitInfo)),
+          Success(commitEventFrom(commitEventsOrigin, firstCommitInfo)),
           Failure(exception),
-          Success(commitEventFrom(pushEvent, secondLevelCommitInfo2))
+          Success(commitEventFrom(commitEventsOrigin, secondLevelCommitInfo2))
         )
       )
     }
@@ -137,23 +137,25 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
     val commitEventFinder = new CommitEventsFinder[Try](commitInfoFinder)
   }
 
-  private def commitEventFrom(pushEvent: PushEvent, commitInfo: CommitInfo) = CommitEvent(
-    id            = commitInfo.id,
-    message       = commitInfo.message,
-    committedDate = commitInfo.committedDate,
-    pushUser      = pushEvent.pushUser,
-    author        = commitInfo.author,
-    committer     = commitInfo.committer,
-    parents       = commitInfo.parents,
-    project       = pushEvent.project
-  )
+  private def commitEventFrom(commitEventsOrigin: CommitEventsOrigin, commitInfo: CommitInfo) =
+    CommitEvent(
+      id              = commitInfo.id,
+      message         = commitInfo.message,
+      committedDate   = commitInfo.committedDate,
+      pushUser        = commitEventsOrigin.pushUser,
+      author          = commitInfo.author,
+      committer       = commitInfo.committer,
+      parents         = commitInfo.parents,
+      project         = commitEventsOrigin.project,
+      hookAccessToken = commitEventsOrigin.hookAccessToken
+    )
 
   private def commitEventFrom(
-      pushEvent:         PushEvent,
-      parentCommitInfos: Seq[CommitInfo]
-  )(parentId:            CommitId): CommitEvent =
+      commitEventsOrigin: CommitEventsOrigin,
+      parentCommitInfos:  Seq[CommitInfo]
+  )(parentId:             CommitId): CommitEvent =
     commitEventFrom(
-      pushEvent = pushEvent,
+      commitEventsOrigin = commitEventsOrigin,
       commitInfo = parentCommitInfos
         .find(_.id == parentId)
         .getOrElse(throw new Exception(s"No commitInfo for $parentId"))

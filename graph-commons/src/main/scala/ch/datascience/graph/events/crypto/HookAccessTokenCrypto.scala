@@ -18,17 +18,12 @@
 
 package ch.datascience.graph.events.crypto
 
-import eu.timepit.refined.pureconfig._
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.graph.events.HookAccessToken
-import ch.datascience.graph.events.crypto.HookAccessTokenCrypto.SerializedHookAccessToken
-import eu.timepit.refined.W
-import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.string.MatchesRegex
+import ch.datascience.graph.events.{HookAccessToken, SerializedHookAccessToken}
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
 import pureconfig._
@@ -50,7 +45,7 @@ class HookAccessTokenCrypto[Interpretation[_]](
 
   override def decrypt(serializedToken: SerializedHookAccessToken): Interpretation[HookAccessToken] = {
     for {
-      decoded      <- decodeAndDecrypt(serializedToken)
+      decoded      <- decodeAndDecrypt(serializedToken.value)
       deserialized <- deserialize(decoded)
     } yield deserialized
   } recoverWith meaningfulError
@@ -70,23 +65,13 @@ class HookAccessTokenCrypto[Interpretation[_]](
   }
 }
 
-object HookAccessTokenCrypto {
-  type SerializedHookAccessToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-
-  object SerializedHookAccessToken {
-
-    def from(value: String): Either[Throwable, SerializedHookAccessToken] =
-      RefType
-        .applyRef[SerializedHookAccessToken](value)
-        .leftMap(_ => new IllegalArgumentException("A value to create HookAccessToken cannot be blank"))
-  }
-}
+import eu.timepit.refined.pureconfig._
 
 @Singleton
 class IOHookAccessTokenCrypto(secret: Secret) extends HookAccessTokenCrypto[IO](secret) {
 
   @Inject def this(configuration: Configuration) = this(
-    loadConfig[Secret](configuration.underlying, "services.gitlab.hook-access-token-secret").fold(
+    loadConfig[Secret](configuration.underlying, "event-log.hook-access-token-secret").fold(
       failures => throw new ConfigReaderException(failures),
       identity
     )

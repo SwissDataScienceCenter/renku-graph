@@ -18,22 +18,34 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
+import cats.MonadError
 import cats.implicits._
+import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators.commitEvents
+import ch.datascience.graph.events.crypto.HookAccessTokenCrypto
 import io.circe.Json
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import ch.datascience.generators.Generators._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.events.HookAccessToken
+import ch.datascience.graph.events.GraphCommonsGenerators._
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
-class CommitEventSerializerSpec extends WordSpec {
+class CommitEventSerializerSpec extends WordSpec with MockFactory {
 
   "serialiseToJsonString" should {
 
-    "create a single line json" in new TestCase {
+    "return a single line json if serialization is successful" in new TestCase {
 
-      val commitEvent = commitEvents.generateOne
+      val serializedHookAccessToken = serializedHookAccessTokens.generateOne
+      (hookAccessTokenCrypto
+        .encrypt(_: HookAccessToken))
+        .expects(commitEvent.hookAccessToken)
+        .returning(context.pure(serializedHookAccessToken))
 
       serializer.serialiseToJsonString(commitEvent) shouldBe Success(
         Json
@@ -58,14 +70,32 @@ class CommitEventSerializerSpec extends WordSpec {
             "project" -> Json.obj(
               "id"   -> Json.fromInt(commitEvent.project.id.value),
               "path" -> Json.fromString(commitEvent.project.path.value)
-            )
+            ),
+            "hookAccessToken" -> Json.fromString(serializedHookAccessToken.value)
           )
           .noSpaces
       )
     }
+
+    "fail if Hook Access Token serialization fails" in new TestCase {
+
+      val exception = exceptions.generateOne
+      (hookAccessTokenCrypto
+        .encrypt(_: HookAccessToken))
+        .expects(commitEvent.hookAccessToken)
+        .returning(context.raiseError(exception))
+
+      serializer.serialiseToJsonString(commitEvent) shouldBe Failure(exception)
+    }
   }
 
   private trait TestCase {
-    val serializer = new CommitEventSerializer[Try]()
+    val context = MonadError[Try, Throwable]
+
+    val commitEvent = commitEvents.generateOne
+
+    class TryHookAccessTokenCrypto(secret: Secret) extends HookAccessTokenCrypto[Try](secret)
+    val hookAccessTokenCrypto = mock[TryHookAccessTokenCrypto]
+    val serializer            = new CommitEventSerializer[Try](hookAccessTokenCrypto)
   }
 }

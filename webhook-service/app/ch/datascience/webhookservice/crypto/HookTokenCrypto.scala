@@ -54,7 +54,7 @@ class HookTokenCrypto[Interpretation[_]](
 
   override def decrypt(serializedToken: SerializedHookToken): Interpretation[HookToken] = {
     for {
-      decoded      <- decodeAndDecrypt(serializedToken)
+      decoded      <- decodeAndDecrypt(serializedToken.value)
       deserialized <- deserialize(decoded)
     } yield deserialized
   } recoverWith meaningfulError

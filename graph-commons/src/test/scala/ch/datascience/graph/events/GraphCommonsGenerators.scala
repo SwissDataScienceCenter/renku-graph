@@ -20,6 +20,9 @@ package ch.datascience.graph.events
 
 import ch.datascience.clients.AccessToken
 import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.crypto.AesCrypto
+import ch.datascience.graph.events.crypto.IOHookAccessTokenCrypto
+import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 
 object GraphCommonsGenerators {
@@ -43,4 +46,16 @@ object GraphCommonsGenerators {
     length <- Gen.choose(5, 40)
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
   } yield HookAccessToken(chars.mkString(""))
+
+  implicit val serializedHookAccessTokens: Gen[SerializedHookAccessToken] = {
+    val cryptoSecret = RefType
+      .applyRef[AesCrypto.Secret]("eUF0aUo5cmdubUtkRmJyVw==")
+      .getOrElse(throw new IllegalArgumentException("Invalid Secret"))
+
+    val hookAccessTokenCrypto = new IOHookAccessTokenCrypto(cryptoSecret)
+
+    hookAccessTokens
+      .map(hookAccessTokenCrypto.encrypt)
+      .map(_.unsafeRunSync())
+  }
 }

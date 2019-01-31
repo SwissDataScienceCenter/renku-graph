@@ -25,7 +25,7 @@ import cats.implicits._
 import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.{HookAccessToken, Project, PushUser}
 import ch.datascience.logging.IOLogger
-import ch.datascience.webhookservice.eventprocessing.PushEvent
+import ch.datascience.webhookservice.eventprocessing.CommitEventsOrigin
 import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
 import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
 import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
@@ -51,22 +51,26 @@ private class EventsHistoryLoader[Interpretation[_]](
                     hookAccessToken: HookAccessToken,
                     accessToken:     AccessToken): Interpretation[Unit] = {
     for {
-      latestPushEvent <- OptionT(fetchLatestPushEvent(projectInfo.id, accessToken))
-      userInfo        <- OptionT.liftF(findUserInfo(latestPushEvent.authorId, accessToken))
-      pushEvent       <- OptionT.liftF(pushEventFrom(latestPushEvent, projectInfo, userInfo))
-      _               <- OptionT.liftF(storeCommitsInEventLog(pushEvent, hookAccessToken))
-      _               <- OptionT.liftF(logger.info(s"Project: ${projectInfo.id}: events history sent to the Event Log"))
+      latestPushEvent    <- OptionT(fetchLatestPushEvent(projectInfo.id, accessToken))
+      userInfo           <- OptionT.liftF(findUserInfo(latestPushEvent.authorId, accessToken))
+      commitEventsOrigin <- OptionT.liftF(commitEventsOrigin(latestPushEvent, projectInfo, userInfo, hookAccessToken))
+      _                  <- OptionT.liftF(storeCommitsInEventLog(commitEventsOrigin))
+      _                  <- OptionT.liftF(logger.info(s"Project: ${projectInfo.id}: events history sent to the Event Log"))
     } yield ()
   }.value
     .flatMap(logNoEventsSent(projectInfo))
     .recoverWith(loggingError(projectInfo))
 
-  private def pushEventFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo, userInfo: UserInfo) = ME.pure {
-    PushEvent(
-      maybeBefore = None,
-      after       = pushEventInfo.commitTo,
-      pushUser    = PushUser(userInfo.userId, userInfo.username, userInfo.email),
-      project     = Project(projectInfo.id, projectInfo.path)
+  private def commitEventsOrigin(pushEventInfo:   PushEventInfo,
+                                 projectInfo:     ProjectInfo,
+                                 userInfo:        UserInfo,
+                                 hookAccessToken: HookAccessToken) = ME.pure {
+    CommitEventsOrigin(
+      maybeCommitFrom = None,
+      commitTo        = pushEventInfo.commitTo,
+      pushUser        = PushUser(userInfo.userId, userInfo.username, userInfo.email),
+      project         = Project(projectInfo.id, projectInfo.path),
+      hookAccessToken = hookAccessToken
     )
   }
 

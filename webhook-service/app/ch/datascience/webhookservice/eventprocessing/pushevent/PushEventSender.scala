@@ -21,9 +21,9 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import cats.effect.IO
 import cats.implicits._
 import cats.{Monad, MonadError}
-import ch.datascience.graph.events.{CommitEvent, HookAccessToken}
+import ch.datascience.graph.events.CommitEvent
 import ch.datascience.logging.IOLogger
-import ch.datascience.webhookservice.eventprocessing.PushEvent
+import ch.datascience.webhookservice.eventprocessing.CommitEventsOrigin
 import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, IOCommitEventSender}
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
@@ -40,28 +40,25 @@ class PushEventSender[Interpretation[_]: Monad](
   import commitEventSender._
   import commitEventsFinder._
 
-  def storeCommitsInEventLog(pushEvent: PushEvent, hookAccessToken: HookAccessToken): Interpretation[Unit] = {
-    implicit val implicitPushEvent: PushEvent = pushEvent
+  def storeCommitsInEventLog(commitEventsOrigin: CommitEventsOrigin): Interpretation[Unit] = {
     for {
-      commitEventsStream <- findCommitEvents(pushEvent, hookAccessToken)
-      _                  <- (commitEventsStream map sendEvent).sequence
-      _                  <- logger.info(logMessageFor(pushEvent, "stored in event log"))
+      commitEventsStream <- findCommitEvents(commitEventsOrigin)
+      _                  <- (commitEventsStream map sendEvent(commitEventsOrigin)).sequence
+      _                  <- logger.info(logMessageFor(commitEventsOrigin, "stored in event log"))
     } yield ()
-  } recoverWith loggingError(pushEvent)
+  } recoverWith loggingError(commitEventsOrigin)
 
-  private def sendEvent(
-      maybeCommitEvent: Interpretation[CommitEvent]
-  )(implicit pushEvent: PushEvent) = {
+  private def sendEvent(commitEventsOrigin: CommitEventsOrigin)(maybeCommitEvent: Interpretation[CommitEvent]) = {
     for {
       commitEvent <- maybeCommitEvent recoverWith fetchErrorLogging
       _           <- send(commitEvent) recoverWith sendErrorLogging(commitEvent)
-      _           <- logger.info(logMessageFor(pushEvent, "stored in event log", Some(commitEvent)))
+      _           <- logger.info(logMessageFor(commitEventsOrigin, "stored in event log", Some(commitEvent)))
     } yield ()
-  } recover withLogging
+  } recover withLogging(commitEventsOrigin)
 
-  private def loggingError(pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+  private def loggingError(commitEventsOrigin: CommitEventsOrigin): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
-      logger.error(exception)(logMessageFor(pushEvent, "storing in event log failed"))
+      logger.error(exception)(logMessageFor(commitEventsOrigin, "storing in event log failed"))
       ME.raiseError(exception)
   }
 
@@ -71,9 +68,7 @@ class PushEventSender[Interpretation[_]: Monad](
       cause:            Throwable
   ) extends Exception
 
-  private def fetchErrorLogging(
-      implicit pushEvent: PushEvent
-  ): PartialFunction[Throwable, Interpretation[CommitEvent]] = {
+  private lazy val fetchErrorLogging: PartialFunction[Throwable, Interpretation[CommitEvent]] = {
     case NonFatal(exception) =>
       ME.raiseError(
         CommitEventProcessingException(
@@ -84,9 +79,7 @@ class PushEventSender[Interpretation[_]: Monad](
       )
   }
 
-  private def sendErrorLogging(
-      commitEvent:      CommitEvent
-  )(implicit pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+  private def sendErrorLogging(commitEvent: CommitEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
       ME.raiseError(
         CommitEventProcessingException(
@@ -97,22 +90,20 @@ class PushEventSender[Interpretation[_]: Monad](
       )
   }
 
-  private def withLogging(
-      implicit pushEvent: PushEvent
-  ): PartialFunction[Throwable, Unit] = {
+  private def withLogging(commitEventsOrigin: CommitEventsOrigin): PartialFunction[Throwable, Unit] = {
     case CommitEventProcessingException(maybeCommitEvent, message, cause) =>
-      logger.error(cause)(logMessageFor(pushEvent, message, maybeCommitEvent))
+      logger.error(cause)(logMessageFor(commitEventsOrigin, message, maybeCommitEvent))
     case NonFatal(exception) =>
       ME.raiseError(exception)
   }
 
   private def logMessageFor(
-      pushEvent:        PushEvent,
-      message:          String,
-      maybeCommitEvent: Option[CommitEvent] = None
+      commitEventsOrigin: CommitEventsOrigin,
+      message:            String,
+      maybeCommitEvent:   Option[CommitEvent] = None
   ) =
-    s"PushEvent after: ${pushEvent.after}, " +
-      s"project: ${pushEvent.project.id}" +
+    s"PushEvent commitTo: ${commitEventsOrigin.commitTo}, " +
+      s"project: ${commitEventsOrigin.project.id}" +
       s"${maybeCommitEvent.map(_.id).map(id => s", CommitEvent id: $id").getOrElse("")}" +
       s": $message"
 

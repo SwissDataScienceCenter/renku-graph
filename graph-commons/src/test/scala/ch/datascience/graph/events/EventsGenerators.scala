@@ -21,6 +21,7 @@ package ch.datascience.graph.events
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
+import GraphCommonsGenerators._
 
 object EventsGenerators {
 
@@ -64,13 +65,15 @@ object EventsGenerators {
   }
 
   implicit val commitEvents: Gen[CommitEvent] = for {
-    commitId      <- commitIds
-    message       <- commitMessages
-    committedDate <- committedDates
-    pushUser      <- pushUsers
-    author        <- users
-    committer     <- users
-    parentsIds    <- parentsIdsLists()
-    project       <- projects
-  } yield CommitEvent(commitId, message, committedDate, pushUser, author, committer, parentsIds, project)
+    commitId        <- commitIds
+    message         <- commitMessages
+    committedDate   <- committedDates
+    pushUser        <- pushUsers
+    author          <- users
+    committer       <- users
+    parentsIds      <- parentsIdsLists()
+    project         <- projects
+    hookAccessToken <- hookAccessTokens
+  } yield
+    CommitEvent(commitId, message, committedDate, pushUser, author, committer, parentsIds, project, hookAccessToken)
 }

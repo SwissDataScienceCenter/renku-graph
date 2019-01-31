@@ -27,7 +27,7 @@ import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.webhookservice.eventprocessing.PushEvent
+import ch.datascience.webhookservice.eventprocessing.CommitEventsOrigin
 import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender
 import ch.datascience.webhookservice.eventprocessing.pushevent.{CommitEventsFinder, PushEventSender}
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
@@ -61,8 +61,8 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
         .returning(context.pure(userInfo))
 
       (pushEventSender
-        .storeCommitsInEventLog(_: PushEvent, _: HookAccessToken))
-        .expects(pushEventFrom(pushEventInfo, projectInfo, userInfo), hookAccessToken)
+        .storeCommitsInEventLog(_: CommitEventsOrigin))
+        .expects(commitEventsOrigin(pushEventInfo, projectInfo, userInfo, hookAccessToken))
         .returning(context.pure(()))
 
       eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken) shouldBe Success(())
@@ -134,8 +134,8 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
       val error     = context.raiseError(exception)
       (pushEventSender
-        .storeCommitsInEventLog(_: PushEvent, _: HookAccessToken))
-        .expects(*, *)
+        .storeCommitsInEventLog(_: CommitEventsOrigin))
+        .expects(*)
         .returning(error)
 
       eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken) shouldBe error
@@ -177,14 +177,16 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
     userInfos.generateOne
       .copy(userId = userId)
 
-  private def pushEventFrom(
-      pushEventInfo: PushEventInfo,
-      projectInfo:   ProjectInfo,
-      userInfo:      UserInfo
-  ) = PushEvent(
-    maybeBefore = None,
-    after       = pushEventInfo.commitTo,
-    pushUser    = PushUser(pushEventInfo.authorId, userInfo.username, userInfo.email),
-    project     = Project(projectInfo.id, projectInfo.path)
+  private def commitEventsOrigin(
+      pushEventInfo:   PushEventInfo,
+      projectInfo:     ProjectInfo,
+      userInfo:        UserInfo,
+      hookAccessToken: HookAccessToken
+  ) = CommitEventsOrigin(
+    maybeCommitFrom = None,
+    commitTo        = pushEventInfo.commitTo,
+    pushUser        = PushUser(pushEventInfo.authorId, userInfo.username, userInfo.email),
+    project         = Project(projectInfo.id, projectInfo.path),
+    hookAccessToken = hookAccessToken
   )
 }

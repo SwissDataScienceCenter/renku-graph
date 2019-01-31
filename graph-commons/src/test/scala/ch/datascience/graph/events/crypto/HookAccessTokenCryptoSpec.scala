@@ -23,7 +23,7 @@ import java.util.Base64
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.GraphCommonsGenerators._
-import ch.datascience.graph.events.crypto.HookAccessTokenCrypto.SerializedHookAccessToken
+import ch.datascience.graph.events.SerializedHookAccessToken
 import eu.timepit.refined.api.RefType
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -45,7 +45,7 @@ class HookAccessTokenCryptoSpec extends WordSpec {
     }
 
     "fail if cannot be decrypted" in new TestCase {
-      val token = SerializedHookAccessToken.from("abcd").fold(e => throw e, identity)
+      val token = SerializedHookAccessToken("abcd")
 
       val Failure(decryptException) = hookAccessTokenCrypto.decrypt(token)
 

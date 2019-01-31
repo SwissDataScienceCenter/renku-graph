@@ -22,7 +22,6 @@ import java.util.Base64
 
 import cats.MonadError
 import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.graph.events.crypto.HookAccessTokenCrypto.SerializedHookAccessToken
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.MinSize
@@ -55,16 +54,16 @@ abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](
     c
   }
 
-  protected def encryptAndEncode(serializedToken: String): Interpretation[String] = pure {
+  protected def encryptAndEncode(toEncryptAndEncode: String): Interpretation[String] = pure {
     new String(
-      base64Encoder.encode(encryptingCipher.doFinal(serializedToken.getBytes(charset))),
+      base64Encoder.encode(encryptingCipher.doFinal(toEncryptAndEncode.getBytes(charset))),
       charset
     )
   }
 
-  protected def decodeAndDecrypt(authToken: SerializedHookAccessToken): Interpretation[String] = pure {
+  protected def decodeAndDecrypt(toDecodeAndDecrypt: String): Interpretation[String] = pure {
     new String(
-      decryptingCipher.doFinal(base64Decoder.decode(authToken.value.getBytes(charset))),
+      decryptingCipher.doFinal(base64Decoder.decode(toDecodeAndDecrypt.getBytes(charset))),
       charset
     )
   }
