@@ -22,7 +22,7 @@ import java.time.Instant
 
 import ch.datascience.tinytypes.constraints.{GitSha, InstantInThePast, NonBlank}
 import ch.datascience.tinytypes.json._
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{Sensitive, TinyType, TinyTypeFactory}
 import io.circe.Decoder
 import play.api.libs.json.Format
 
@@ -57,7 +57,7 @@ object CommittedDate extends TinyTypeFactory[Instant, CommittedDate](new Committ
     Decoder.decodeZonedDateTime.map(t => CommittedDate(t.toInstant))
 }
 
-final class HookAccessToken private (val value: String) extends AnyVal with TinyType[String]
+final class HookAccessToken private (val value: String) extends AnyVal with TinyType[String] with Sensitive
 object HookAccessToken extends TinyTypeFactory[String, HookAccessToken](new HookAccessToken(_)) with NonBlank {
   implicit lazy val hookAccessTokenDecoder: Decoder[HookAccessToken] =
     Decoder.decodeString.map(HookAccessToken.apply)

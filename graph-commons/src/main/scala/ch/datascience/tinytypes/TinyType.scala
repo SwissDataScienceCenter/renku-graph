@@ -25,6 +25,12 @@ trait TinyType[T] extends Any {
   override def toString: String = value.toString
 }
 
+trait Sensitive extends Any {
+  self: TinyType[_] =>
+
+  override def toString: String = "<sensitive>"
+}
+
 abstract class TinyTypeFactory[V, TT <: TinyType[V]](instantiate: V => TT) extends Constraints[V] with TypeName {
 
   final def apply(value: V): TT = from(value).fold(

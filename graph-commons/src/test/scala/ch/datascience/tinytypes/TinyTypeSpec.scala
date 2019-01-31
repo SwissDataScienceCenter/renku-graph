@@ -37,6 +37,22 @@ class TinyTypeSpec extends WordSpec {
   }
 }
 
+class SensitiveSpec extends WordSpec {
+
+  "toString" should {
+
+    "return a '<sensitive>' instead of the value" in {
+      ("abc" +: 2 +: 2L +: true +: Nil) foreach { someValue =>
+        val tinyType: TinyType[Any] = new TinyType[Any] with Sensitive {
+          override val value: Any = someValue
+        }
+
+        tinyType.toString shouldBe "<sensitive>"
+      }
+    }
+  }
+}
+
 class TinyTypeFactorySpec extends WordSpec {
 
   "apply" should {
