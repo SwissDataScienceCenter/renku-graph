@@ -90,49 +90,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Info(s"Hook created for project with id $projectId"))
     }
 
-    "succeed even if loading all events fails" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
-
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(false))
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(context.pure(projectInfo))
-
-      (hookAccessTokenVerifier
-        .checkHookAccessTokenPresence(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(false))
-
-      (hookAccessTokenCreator
-        .createHookAccessToken(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(hookAccessToken))
-
-      (hookTokenCrypto
-        .encrypt(_: HookToken))
-        .expects(HookToken(projectId, hookAccessToken))
-        .returning(context.pure(serializedHookToken))
-
-      (projectHookCreator
-        .createHook(_: ProjectHook, _: AccessToken))
-        .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-        .returning(context.pure(()))
-
-      expectEventsHistoryLoader(returning = context.raiseError(exceptions.generateOne))
-
-      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(())
-
-      logger.loggedOnly(Info(s"Hook created for project with id $projectId"))
-    }
-
     "log an error if finding project hook url fails" in new TestCase {
 
       val exception: Exception    = exceptions.generateOne
@@ -367,6 +324,51 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .createHook(_: ProjectHook, _: AccessToken))
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(error)
+
+      hookCreation.createHook(projectId, accessToken) shouldBe error
+
+      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
+    }
+
+    "log an error if loading all events fails" in new TestCase {
+
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
+        .returning(context.pure(projectHookUrl))
+
+      (projectHookVerifier
+        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
+        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
+        .returning(context.pure(false))
+
+      (projectInfoFinder
+        .findProjectInfo(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(projectInfo))
+
+      (hookAccessTokenVerifier
+        .checkHookAccessTokenPresence(_: ProjectInfo, _: AccessToken))
+        .expects(projectInfo, accessToken)
+        .returning(context.pure(false))
+
+      (hookAccessTokenCreator
+        .createHookAccessToken(_: ProjectInfo, _: AccessToken))
+        .expects(projectInfo, accessToken)
+        .returning(context.pure(hookAccessToken))
+
+      (hookTokenCrypto
+        .encrypt(_: HookToken))
+        .expects(HookToken(projectId, hookAccessToken))
+        .returning(context.pure(serializedHookToken))
+
+      (projectHookCreator
+        .createHook(_: ProjectHook, _: AccessToken))
+        .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
+        .returning(context.pure(()))
+
+      val exception: Exception = exceptions.generateOne
+      val error = context.raiseError(exception)
+      expectEventsHistoryLoader(returning = error)
 
       hookCreation.createHook(projectId, accessToken) shouldBe error
 

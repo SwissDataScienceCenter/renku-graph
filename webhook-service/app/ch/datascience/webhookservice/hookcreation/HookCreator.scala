@@ -66,8 +66,8 @@ private class HookCreator[Interpretation[_]: Monad](
       hookAccessToken         <- createHookAccessToken(projectInfo, accessToken)
       serializedHookToken     <- encrypt(HookToken(projectInfo.id, hookAccessToken))
       _                       <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
+      _                       <- eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken)
       _                       <- logger.info(s"Hook created for project with id $projectId")
-      _                       <- eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken) recover withSuccess
     } yield ()
   } recoverWith loggingError(projectId)
 
@@ -92,10 +92,6 @@ private class HookCreator[Interpretation[_]: Monad](
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
       ME.raiseError(exception)
-  }
-
-  private lazy val withSuccess: PartialFunction[Throwable, Unit] = {
-    case NonFatal(_) => ()
   }
 }
 
