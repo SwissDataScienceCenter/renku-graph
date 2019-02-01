@@ -32,11 +32,19 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
-Hack for calling templates in a fake scope (until this is solved https://github.com/helm/helm/issues/4535)
+Define http scheme
 */}}
-{{- define "call-nested" }}
-{{- $dot := index . 0 }}
-{{- $subchart := index . 1 }}
-{{- $template := index . 2 }}
-{{- include $template (dict "Chart" (dict "Name" $subchart) "Values" (index $dot.Values $subchart) "Release" $dot.Release "Capabilities" $dot.Capabilities) }}
-{{- end }}
+{{- define "http" -}}
+{{- if .Values.global.useHTTPS -}}
+https
+{{- else -}}
+http
+{{- end -}}
+{{- end -}}
+
+{{/*
+Define subcharts full names
+*/}}
+{{- define "jena.fullname" -}}
+{{- printf "%s-%s" .Release.Name "jena" | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
