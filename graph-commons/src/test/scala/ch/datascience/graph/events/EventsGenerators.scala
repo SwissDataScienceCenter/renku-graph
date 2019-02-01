@@ -20,12 +20,15 @@ package ch.datascience.graph.events
 
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
+import org.scalacheck.Gen._
 
 object EventsGenerators {
 
-  implicit val commitIds: Gen[CommitId] = shas map CommitId.apply
-  implicit val userIds:   Gen[UserId]   = nonNegativeInts() map UserId.apply
-  implicit val usernames: Gen[Username] = nonEmptyStrings() map Username.apply
+  implicit val commitIds:      Gen[CommitId]      = shas map CommitId.apply
+  implicit val commitMessages: Gen[CommitMessage] = nonEmptyStrings() map CommitMessage.apply
+  implicit val committedDates: Gen[CommittedDate] = timestampsInThePast map CommittedDate.apply
+  implicit val userIds:        Gen[UserId]        = nonNegativeInts() map UserId.apply
+  implicit val usernames:      Gen[Username]      = nonEmptyStrings() map Username.apply
   implicit val emails: Gen[Email] = for {
     beforeAt <- nonEmptyStrings()
     afterAt  <- nonEmptyStrings()
@@ -50,15 +53,24 @@ object EventsGenerators {
     path      <- projectPath
   } yield Project(projectId, path)
 
+  implicit def parentsIdsLists(minNumber: Int = 0, maxNumber: Int = 4): Gen[List[CommitId]] = {
+    require(minNumber <= maxNumber,
+            s"minNumber = $minNumber is not <= maxNumber = $maxNumber for generating parents Ids list")
+
+    for {
+      parentCommitsNumber <- choose(minNumber, maxNumber)
+      parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
+    } yield parents
+  }
+
   implicit val commitEvents: Gen[CommitEvent] = for {
-    commitId            <- commitIds
-    message             <- nonEmptyStrings()
-    timestamp           <- timestampsInThePast
-    pushUser            <- pushUsers
-    author              <- users
-    committer           <- users
-    parentCommitsNumber <- nonNegativeInts(4)
-    parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
-    project             <- projects
-  } yield CommitEvent(commitId, message, timestamp, pushUser, author, committer, parents, project, Nil, Nil, Nil)
+    commitId      <- commitIds
+    message       <- commitMessages
+    committedDate <- committedDates
+    pushUser      <- pushUsers
+    author        <- users
+    committer     <- users
+    parentsIds    <- parentsIdsLists()
+    project       <- projects
+  } yield CommitEvent(commitId, message, committedDate, pushUser, author, committer, parentsIds, project)
 }

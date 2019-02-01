@@ -16,21 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.pushevent
+package ch.datascience.webhookservice.eventprocessing.commitevent
 
-import ch.datascience.config.{AsyncParallelism, BufferSize}
-import javax.inject.{Inject, Singleton}
-import play.api.Configuration
+import cats.effect.IO
 
-@Singleton
-private case class QueueConfig(
-    bufferSize:               BufferSize,
-    commitDetailsParallelism: AsyncParallelism
-) {
+import scala.language.higherKinds
 
-  @Inject() def this(configuration: Configuration) = this(
-    configuration.get[BufferSize]("push-events-queue.buffer-size"),
-    configuration.get[AsyncParallelism]("push-events-queue.commit-details-parallelism")
-  )
-
+trait EventLog[Interpretation[_]] {
+  def append(line: String): Interpretation[Unit]
 }
+
+trait IOEventLog extends EventLog[IO]

@@ -16,17 +16,30 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.commitevent
+package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import ch.datascience.config.BufferSize
+import cats.effect.{IO, Sync}
+import ch.datascience.webhookservice.eventprocessing.pushevent.GitLabConfig._
+import eu.timepit.refined.api.Refined
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
+import pureconfig.module.catseffect._
+
+import scala.language.higherKinds
+
+private class GitLabConfig[Interpretation[_]](configuration: Configuration) {
+  import eu.timepit.refined.pureconfig._
+
+  def get()(implicit F: Sync[Interpretation]): Interpretation[HostUrl] =
+    loadConfigF[Interpretation, HostUrl](configuration.underlying, "services.gitlab.url")
+}
 
 @Singleton
-private case class QueueConfig(bufferSize: BufferSize) {
+private class IOGitLabConfigProvider @Inject()(configuration: Configuration) extends GitLabConfig[IO](configuration)
 
-  @Inject() def this(configuration: Configuration) = this(
-    configuration.get[BufferSize]("commit-events-queue.buffer-size")
-  )
+private object GitLabConfig {
 
+  import eu.timepit.refined.string.Url
+
+  type HostUrl = String Refined Url
 }

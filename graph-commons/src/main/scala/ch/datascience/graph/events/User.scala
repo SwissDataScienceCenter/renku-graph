@@ -21,6 +21,7 @@ package ch.datascience.graph.events
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegative}
 import ch.datascience.tinytypes.json._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import io.circe.Decoder
 import play.api.libs.json.Format
 
 case class PushUser(
@@ -42,12 +43,12 @@ object UserId extends TinyTypeFactory[Int, UserId](new UserId(_)) with NonNegati
 
 class Username private (val value: String) extends AnyVal with TinyType[String]
 object Username extends TinyTypeFactory[String, Username](new Username(_)) with NonBlank {
-
-  implicit lazy val usernameFormat: Format[Username] = TinyTypeFormat(Username.apply)
+  implicit lazy val format:  Format[Username]  = TinyTypeFormat(Username.apply)
+  implicit lazy val decoder: Decoder[Username] = Decoder.decodeString.map(Username.apply)
 }
 
 class Email private (val value: String) extends AnyVal with TinyType[String]
 object Email extends TinyTypeFactory[String, Email](new Email(_)) with NonBlank {
-
-  implicit lazy val emailFormat: Format[Email] = TinyTypeFormat(Email.apply)
+  implicit lazy val format:  Format[Email]  = TinyTypeFormat(Email.apply)
+  implicit lazy val decoder: Decoder[Email] = Decoder.decodeString.map(Email.apply)
 }

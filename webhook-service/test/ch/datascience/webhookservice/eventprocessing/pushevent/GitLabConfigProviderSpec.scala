@@ -16,35 +16,38 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.pushevent
+package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import ch.datascience.config.{AsyncParallelism, BufferSize}
+import cats.effect.IO
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.prop.PropertyChecks
 import play.api.Configuration
 
-class QueueConfigSpec extends WordSpec with PropertyChecks {
+class GitLabConfigProviderSpec extends WordSpec {
 
-  "apply" should {
+  "get" should {
 
-    "read 'push-events-queue.buffer-size' and 'push-events-queue.commit-details-parallelism' to instantiate the QueueConfig" in {
-      forAll(positiveInts(), positiveInts()) { (bufferSizeValue, commitDetailsParallelism) =>
-        val config = Configuration.from(
-          Map(
-            "push-events-queue" -> Map(
-              "buffer-size"                -> bufferSizeValue,
-              "commit-details-parallelism" -> commitDetailsParallelism
+    "return HostUrl" in {
+      val gitLabUrl = validatedUrls.generateOne
+      val config = Configuration.from(
+        Map(
+          "services" -> Map(
+            "gitlab" -> Map(
+              "url" -> gitLabUrl.toString()
             )
           )
         )
+      )
 
-        val queueConfig = new QueueConfig(config)
+      new GitLabConfig[IO](config).get().unsafeRunSync() shouldBe gitLabUrl
+    }
 
-        queueConfig.bufferSize               shouldBe BufferSize(bufferSizeValue)
-        queueConfig.commitDetailsParallelism shouldBe AsyncParallelism(commitDetailsParallelism)
-      }
+    "fail if there is no 'services.gitlab.url' in the config" in {
+      val config = Configuration.empty
+
+      a[RuntimeException] should be thrownBy new GitLabConfig[IO](config).get().unsafeRunSync()
     }
   }
 }

@@ -16,13 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.queues.pushevent
+package ch.datascience.graph.events
 
-import ch.datascience.graph.events.{CommitId, Project, PushUser}
+import java.time.LocalDateTime
+import java.time.ZoneOffset.ofHours
 
-case class PushEvent(
-    before:   CommitId,
-    after:    CommitId,
-    pushUser: PushUser,
-    project:  Project
-)
+import io.circe._
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+
+class CommittedDateSpec extends WordSpec {
+
+  "apply" should {
+
+    "be able to instantiate from date time with zone json string" in {
+      val Right(decoded) = CommittedDate.decoder.decodeJson(Json.fromString("2012-09-20T09:06:12+03:00"))
+
+      decoded shouldBe CommittedDate(LocalDateTime.of(2012, 9, 20, 9, 6, 12).atOffset(ofHours(3)).toInstant)
+    }
+  }
+}

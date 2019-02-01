@@ -30,10 +30,13 @@ libraryDependencies += "eu.timepit" %% "refined" % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 val log4CatsVersion = "0.2.0"
 libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % log4CatsVersion
+val circeVersion = "0.10.0"
+libraryDependencies += "io.circe" %% "circe-core" % circeVersion
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.5.0"
 
 // Test dependencies
 libraryDependencies += component("play-test") % Test
+libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.18.0" % Test
 libraryDependencies += "org.scalamock" %% "scalamock" % "4.1.0" % Test
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % Test
