@@ -79,6 +79,34 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       )
     }
 
+    "return a single commit event for 'commitTo' when `commitFrom` is the first parent of `commitTo`" in new TestCase {
+      val commitTo   = commitIds.generateOne
+      val commitFrom = commitIds.generateOne
+
+      val firstCommitInfo = {
+        val info = commitInfos(commitTo, parentsIdsLists(minNumber = 2)).generateOne
+        info.copy(parents = commitFrom +: info.parents)
+      }
+
+      val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
+        commitInfos(parentId, noParents).generateOne
+      }
+
+      val commitEventsOrigin = commitEventsOrigins.generateOne.copy(
+        maybeCommitFrom = Some(commitFrom),
+        commitTo        = commitTo
+      )
+
+      (commitInfoFinder
+        .findCommitInfo(_: ProjectId, _: CommitId))
+        .expects(commitEventsOrigin.project.id, firstCommitInfo.id)
+        .returning(context.pure(firstCommitInfo))
+
+      commitEventFinder.findCommitEvents(commitEventsOrigin).map(_.toList) shouldBe toSuccess(
+        Seq(commitEventFrom(commitEventsOrigin, firstCommitInfo))
+      )
+    }
+
     "return commit events starting from the 'commitTo' until found commit id matches the `commitTo`" in new TestCase {
       val commitTo = commitIds.generateOne
 

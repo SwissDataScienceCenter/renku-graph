@@ -42,11 +42,9 @@ class CommitEventsFinder[Interpretation[_]](
 
   private def stream(commitIds: List[CommitId], commitEventsOrigin: CommitEventsOrigin): CommitEventsStream =
     commitIds match {
-      case Nil                                 => emptyStream
+      case Nil                                 => ME.pure(Stream.empty[Interpretation[CommitEvent]])
       case commitId +: commitIdsStillToProcess => nextElement(commitId, commitIdsStillToProcess, commitEventsOrigin)
     }
-
-  private lazy val emptyStream = ME.pure(Stream.empty[Interpretation[CommitEvent]])
 
   private def nextElement(commitId:                CommitId,
                           commitIdsStillToProcess: List[CommitId],
@@ -63,7 +61,7 @@ class CommitEventsFinder[Interpretation[_]](
   private def findCommitIdsToProcess(commitsToProcess:    List[CommitId],
                                      parentCommits:       List[CommitId],
                                      maybeEarliestCommit: Option[CommitId]): List[CommitId] =
-    commitsToProcess ++ parentCommits.takeWhile(commitId => !maybeEarliestCommit.contains(commitId))
+    (commitsToProcess ++ parentCommits).takeWhile(commitId => !maybeEarliestCommit.contains(commitId))
 
   private def elementForFailure(
       commitIdsToProcess: List[CommitId],
