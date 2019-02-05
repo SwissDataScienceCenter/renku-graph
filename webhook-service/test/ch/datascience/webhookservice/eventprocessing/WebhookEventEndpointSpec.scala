@@ -36,6 +36,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
+import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.json.{JsObject, JsString, JsValue, Json}
 import play.api.mvc.ControllerComponents
 import play.api.test.Helpers._
@@ -167,20 +168,23 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     ).processPushEvent
 
     def pushEventPayloadFrom(pushEvent: PushEvent): JsObject =
-      pushEvent.maybeCommitFrom.foldLeft(commonJson(pushEvent)) { (json, before) =>
-        json + ("before" -> JsString(before.value))
-      }
-
-    private def commonJson(pushEvent: PushEvent) = Json.obj(
-      "after"         -> pushEvent.commitTo.value,
-      "user_id"       -> pushEvent.pushUser.userId.value,
-      "user_username" -> pushEvent.pushUser.username.value,
-      "user_email"    -> pushEvent.pushUser.email.value,
-      "project" -> Json.obj(
-        "id"                  -> pushEvent.project.id.value,
-        "path_with_namespace" -> pushEvent.project.path.value
+      Json.obj(
+        Seq(
+          pushEvent.maybeCommitFrom.map(before => "before" -> toJsFieldJsValueWrapper(before.value)),
+          Some("after"         -> toJsFieldJsValueWrapper(pushEvent.commitTo.value)),
+          Some("user_id"       -> toJsFieldJsValueWrapper(pushEvent.pushUser.userId.value)),
+          Some("user_username" -> toJsFieldJsValueWrapper(pushEvent.pushUser.username.value)),
+          pushEvent.pushUser.maybeEmail.map(email => "user_email" -> toJsFieldJsValueWrapper(email.value)),
+          Some(
+            "project" -> toJsFieldJsValueWrapper(
+              Json.obj(
+                "id"                  -> toJsFieldJsValueWrapper(pushEvent.project.id.value),
+                "path_with_namespace" -> toJsFieldJsValueWrapper(pushEvent.project.path.value)
+              )
+            )
+          )
+        ).flatten: _*
       )
-    )
 
     def expectDecryptionOf(hookAuthToken: SerializedHookToken, returning: HookToken) =
       (hookTokenCrypto

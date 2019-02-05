@@ -63,7 +63,7 @@ private class EventsHistoryLoader[Interpretation[_]](
     PushEvent(
       maybeCommitFrom = None,
       commitTo        = pushEventInfo.commitTo,
-      pushUser        = PushUser(userInfo.userId, userInfo.username, userInfo.email),
+      pushUser        = PushUser(userInfo.userId, userInfo.username, maybeEmail = None),
       project         = Project(projectInfo.id, projectInfo.path)
     )
   }

@@ -103,7 +103,7 @@ object WebhookEventEndpoint {
       (__ \ "after").read[CommitId] and
       (__ \ "user_id").read[UserId] and
       (__ \ "user_username").read[Username] and
-      (__ \ "user_email").read[Email] and
+      (__ \ "user_email").readNullable[Email] and
       (__ \ "project").read[Project]
   )(toPushEvent _)
 
@@ -112,12 +112,12 @@ object WebhookEventEndpoint {
       commitTo:        CommitId,
       userId:          UserId,
       username:        Username,
-      email:           Email,
+      maybeEmail:      Option[Email],
       project:         Project
   ): PushEvent = PushEvent(
     maybeCommitFrom,
     commitTo,
-    PushUser(userId, username, email),
+    PushUser(userId, username, maybeEmail),
     project
   )
 }

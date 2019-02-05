@@ -35,10 +35,10 @@ object EventsGenerators {
   } yield Email(s"$beforeAt@$afterAt")
 
   implicit val pushUsers: Gen[PushUser] = for {
-    userId   <- userIds
-    username <- usernames
-    email    <- emails
-  } yield PushUser(userId, username, email)
+    userId     <- userIds
+    username   <- usernames
+    maybeEmail <- Gen.option(emails)
+  } yield PushUser(userId, username, maybeEmail)
 
   implicit val users: Gen[User] = for {
     username <- usernames

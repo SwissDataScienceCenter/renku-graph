@@ -39,8 +39,7 @@ private object UserInfoFinder {
 
   final case class UserInfo(
       userId:   UserId,
-      username: Username,
-      email:    Email
+      username: Username
   )
 }
 
@@ -78,8 +77,7 @@ private class IOUserInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigPro
       for {
         id       <- cursor.downField("id").as[UserId]
         username <- cursor.downField("username").as[Username]
-        email    <- cursor.downField("email").as[Email]
-      } yield UserInfo(id, username, email)
+      } yield UserInfo(id, username)
 
     jsonOf[IO, UserInfo]
   }

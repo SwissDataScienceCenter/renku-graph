@@ -25,9 +25,9 @@ import io.circe.Decoder
 import play.api.libs.json.Format
 
 case class PushUser(
-    userId:   UserId,
-    username: Username,
-    email:    Email
+    userId:     UserId,
+    username:   Username,
+    maybeEmail: Option[Email]
 )
 
 case class User(

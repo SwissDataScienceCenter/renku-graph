@@ -37,11 +37,7 @@ class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpret
             "id"            -> Json.fromString(commitEvent.id.value),
             "message"       -> Json.fromString(commitEvent.message.value),
             "committedDate" -> Json.fromString(commitEvent.committedDate.toString),
-            "pushUser" -> Json.obj(
-              "userId"   -> Json.fromInt(commitEvent.pushUser.userId.value),
-              "username" -> Json.fromString(commitEvent.pushUser.username.value),
-              "email"    -> Json.fromString(commitEvent.pushUser.email.value)
-            ),
+            "pushUser"      -> toJson(commitEvent.pushUser),
             "author" -> Json.obj(
               "username" -> Json.fromString(commitEvent.author.username.value),
               "email"    -> Json.fromString(commitEvent.author.email.value)
@@ -59,6 +55,15 @@ class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpret
           .noSpaces
       }
     }
+
+  private def toJson(pushUser: PushUser): Json =
+    Json.obj(
+      Seq(
+        Some("userId"   -> Json.fromInt(pushUser.userId.value)),
+        Some("username" -> Json.fromString(pushUser.username.value)),
+        pushUser.maybeEmail.map(email => "email" -> Json.fromString(email.value))
+      ).flatten: _*
+    )
 }
 
 @Singleton

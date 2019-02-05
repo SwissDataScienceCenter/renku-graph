@@ -183,7 +183,7 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
   ) = PushEvent(
     maybeCommitFrom = None,
     commitTo        = pushEventInfo.commitTo,
-    pushUser        = PushUser(pushEventInfo.authorId, userInfo.username, userInfo.email),
+    pushUser        = PushUser(pushEventInfo.authorId, userInfo.username, maybeEmail = None),
     project         = Project(projectInfo.id, projectInfo.path)
   )
 }

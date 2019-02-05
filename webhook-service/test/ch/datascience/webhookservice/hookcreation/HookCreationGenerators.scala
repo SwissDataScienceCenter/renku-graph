@@ -67,11 +67,5 @@ private object HookCreationGenerators {
   implicit val userInfos: Gen[UserInfo] = for {
     userId   <- userIds
     username <- usernames
-    email    <- emails
-  } yield
-    UserInfo(
-      userId,
-      username,
-      email
-    )
+  } yield UserInfo(userId, username)
 }
