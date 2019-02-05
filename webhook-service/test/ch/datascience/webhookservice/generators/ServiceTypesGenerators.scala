@@ -20,9 +20,8 @@ package ch.datascience.webhookservice.generators
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import ch.datascience.webhookservice.eventprocessing.CommitEventsOrigin
+import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.hookcreation.SelfUrlConfig.SelfUrl
 import ch.datascience.webhookservice.model.{HookToken, ProjectInfo, ProjectOwner}
 import eu.timepit.refined.api.RefType
@@ -30,13 +29,12 @@ import org.scalacheck.Gen
 
 object ServiceTypesGenerators {
 
-  implicit val commitEventsOrigins: Gen[CommitEventsOrigin] = for {
-    maybeBefore     <- Gen.option(commitIds)
-    after           <- commitIds
-    pushUser        <- pushUsers
-    project         <- projects
-    hookAccessToken <- hookAccessTokens
-  } yield CommitEventsOrigin(maybeBefore, after, pushUser, project, hookAccessToken)
+  implicit val pushEvents: Gen[PushEvent] = for {
+    maybeBefore <- Gen.option(commitIds)
+    after       <- commitIds
+    pushUser    <- pushUsers
+    project     <- projects
+  } yield PushEvent(maybeBefore, after, pushUser, project)
 
   implicit val serializedHookTokens: Gen[SerializedHookToken] = nonEmptyStrings().map { value =>
     RefType
@@ -45,9 +43,8 @@ object ServiceTypesGenerators {
   }
 
   implicit val hookTokens: Gen[HookToken] = for {
-    projectId       <- projectIds
-    hookAccessToken <- hookAccessTokens
-  } yield HookToken(projectId, hookAccessToken)
+    projectId <- projectIds
+  } yield HookToken(projectId)
 
   implicit val projectOwner: Gen[ProjectOwner] = for {
     id <- userIds

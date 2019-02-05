@@ -25,14 +25,14 @@ import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.GraphCommonsGenerators._
-import ch.datascience.graph.events.{HookAccessToken, ProjectId}
+import ch.datascience.graph.events.ProjectId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
-import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, PersonalAccessTokenAlreadyCreated}
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.model.{HookToken, ProjectInfo}
@@ -47,7 +47,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
   "createHook" should {
 
-    "succeed if both hook's access token and the hook itself were successfully created" in new TestCase {
+    "succeed if hook does not exists and was successfully created" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -63,19 +63,9 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(projectInfo))
 
-      (hookAccessTokenVerifier
-        .checkHookAccessTokenPresence(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(false))
-
-      (hookAccessTokenCreator
-        .createHookAccessToken(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(hookAccessToken))
-
       (hookTokenCrypto
         .encrypt(_: HookToken))
-        .expects(HookToken(projectId, hookAccessToken))
+        .expects(HookToken(projectId))
         .returning(context.pure(serializedHookToken))
 
       (projectHookCreator
@@ -161,94 +151,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
-    "log an Error and fail with PersonalAccessTokenAlreadyCreated if hook's access token already exists" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
-
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(false))
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(context.pure(projectInfo))
-
-      (hookAccessTokenVerifier
-        .checkHookAccessTokenPresence(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(true))
-
-      val expectedException = PersonalAccessTokenAlreadyCreated(projectId)
-      hookCreation.createHook(projectId, accessToken) shouldBe context.raiseError(expectedException)
-
-      logger.loggedOnly(Error(expectedException.getMessage))
-    }
-
-    "log an error if hook access token verification fails" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
-
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(false))
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(context.pure(projectInfo))
-
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (hookAccessTokenVerifier
-        .checkHookAccessTokenPresence(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(error)
-
-      hookCreation.createHook(projectId, accessToken) shouldBe error
-
-      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
-    }
-
-    "log an error if hook access token creation fails" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
-
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(false))
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(context.pure(projectInfo))
-
-      (hookAccessTokenVerifier
-        .checkHookAccessTokenPresence(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(false))
-
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (hookAccessTokenCreator
-        .createHookAccessToken(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(error)
-
-      hookCreation.createHook(projectId, accessToken) shouldBe error
-
-      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
-    }
-
     "log an error if hook token encryption fails" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
@@ -265,21 +167,11 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(projectInfo))
 
-      (hookAccessTokenVerifier
-        .checkHookAccessTokenPresence(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(false))
-
-      (hookAccessTokenCreator
-        .createHookAccessToken(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(hookAccessToken))
-
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
       (hookTokenCrypto
         .encrypt(_: HookToken))
-        .expects(HookToken(projectId, hookAccessToken))
+        .expects(HookToken(projectId))
         .returning(error)
 
       hookCreation.createHook(projectId, accessToken) shouldBe error
@@ -303,19 +195,9 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(projectInfo))
 
-      (hookAccessTokenVerifier
-        .checkHookAccessTokenPresence(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(false))
-
-      (hookAccessTokenCreator
-        .createHookAccessToken(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(hookAccessToken))
-
       (hookTokenCrypto
         .encrypt(_: HookToken))
-        .expects(HookToken(projectId, hookAccessToken))
+        .expects(HookToken(projectId))
         .returning(context.pure(serializedHookToken))
 
       val exception: Exception    = exceptions.generateOne
@@ -346,19 +228,9 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(projectInfo))
 
-      (hookAccessTokenVerifier
-        .checkHookAccessTokenPresence(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(false))
-
-      (hookAccessTokenCreator
-        .createHookAccessToken(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(context.pure(hookAccessToken))
-
       (hookTokenCrypto
         .encrypt(_: HookToken))
-        .expects(HookToken(projectId, hookAccessToken))
+        .expects(HookToken(projectId))
         .returning(context.pure(serializedHookToken))
 
       (projectHookCreator
@@ -366,8 +238,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(context.pure(()))
 
-      val exception: Exception = exceptions.generateOne
-      val error = context.raiseError(exception)
+      val exception: Exception    = exceptions.generateOne
+      val error:     Try[Nothing] = context.raiseError(exception)
       expectEventsHistoryLoader(returning = error)
 
       hookCreation.createHook(projectId, accessToken) shouldBe error
@@ -382,16 +254,13 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     val projectHookUrl      = projectHookUrls.generateOne
     val serializedHookToken = serializedHookTokens.generateOne
     val accessToken         = accessTokens.generateOne
-    val hookAccessToken     = hookAccessTokens.generateOne
 
     val context = MonadError[Try, Throwable]
 
-    val logger                  = TestLogger[Try]()
-    val projectInfoFinder       = mock[ProjectInfoFinder[Try]]
-    val projectHookVerifier     = mock[ProjectHookVerifier[Try]]
-    val hookAccessTokenVerifier = mock[HookAccessTokenVerifier[Try]]
-    val hookAccessTokenCreator  = mock[HookAccessTokenCreator[Try]]
-    val projectHookCreator      = mock[ProjectHookCreator[Try]]
+    val logger              = TestLogger[Try]()
+    val projectInfoFinder   = mock[ProjectInfoFinder[Try]]
+    val projectHookVerifier = mock[ProjectHookVerifier[Try]]
+    val projectHookCreator  = mock[ProjectHookCreator[Try]]
 
     class TryProjectHookUrlFinder(
         selfUrlConfig: SelfUrlConfig[Try]
@@ -411,8 +280,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       projectHookUrlFinder,
       projectHookVerifier,
       projectInfoFinder,
-      hookAccessTokenVerifier,
-      hookAccessTokenCreator,
       hookTokenCrypto,
       projectHookCreator,
       eventsHistoryLoader,
@@ -421,8 +288,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     def expectEventsHistoryLoader(returning: Try[Unit]): Unit =
       (eventsHistoryLoader
-        .loadAllEvents(_: ProjectInfo, _: HookAccessToken, _: AccessToken))
-        .expects(projectInfo, hookAccessToken, accessToken)
+        .loadAllEvents(_: ProjectInfo, _: AccessToken))
+        .expects(projectInfo, accessToken)
         .returning(returning)
   }
 }

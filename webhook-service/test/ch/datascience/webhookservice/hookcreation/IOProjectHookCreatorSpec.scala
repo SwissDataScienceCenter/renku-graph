@@ -50,7 +50,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
 
       stubFor {
         post(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .withRequestBody(equalToJson(toJson(projectHook)))
           .willReturn(created())
       }
@@ -66,7 +66,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
 
       stubFor {
         post(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("Authorization", equalTo(s"Bearer $oauthAccessToken"))
+          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
           .withRequestBody(equalToJson(toJson(projectHook)))
           .willReturn(created())
       }

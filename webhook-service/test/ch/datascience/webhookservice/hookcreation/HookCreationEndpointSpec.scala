@@ -56,7 +56,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
         .expects(projectId, accessToken)
         .returning(IO.pure(()))
 
-      val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> accessToken.toString))
+      val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> accessToken.value))
 
       status(response)          shouldBe CREATED
       contentAsString(response) shouldBe ""
@@ -72,7 +72,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
         .expects(projectId, accessToken)
         .returning(IO.pure(()))
 
-      val response = call(createHook(projectId), request.withHeaders("OAUTH-TOKEN" -> accessToken.toString))
+      val response = call(createHook(projectId), request.withHeaders("OAUTH-TOKEN" -> accessToken.value))
 
       status(response)          shouldBe CREATED
       contentAsString(response) shouldBe ""

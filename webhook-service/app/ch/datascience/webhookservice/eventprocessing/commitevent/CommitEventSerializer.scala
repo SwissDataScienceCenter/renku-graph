@@ -20,29 +20,16 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
 import cats.effect.IO
-import cats.implicits._
 import ch.datascience.graph.events._
-import ch.datascience.graph.events.crypto.{HookAccessTokenCrypto, IOHookAccessTokenCrypto}
 import io.circe.Json
-import javax.inject.{Inject, Singleton}
+import javax.inject.Singleton
 
 import scala.language.higherKinds
 import scala.util.Try
 
-class CommitEventSerializer[Interpretation[_]](
-    hookAccessTokenCrypto: HookAccessTokenCrypto[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable]) {
-
-  import hookAccessTokenCrypto._
+class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
   def serialiseToJsonString(commitEvent: CommitEvent): Interpretation[String] =
-    for {
-      serializedHookAccessToken <- encrypt(commitEvent.hookAccessToken)
-      serializedCommitEvent     <- serialise(commitEvent, serializedHookAccessToken)
-    } yield serializedCommitEvent
-
-  private def serialise(commitEvent:               CommitEvent,
-                        serializedHookAccessToken: SerializedHookAccessToken): Interpretation[String] =
     ME.fromTry {
       Try {
         Json
@@ -67,8 +54,7 @@ class CommitEventSerializer[Interpretation[_]](
             "project" -> Json.obj(
               "id"   -> Json.fromInt(commitEvent.project.id.value),
               "path" -> Json.fromString(commitEvent.project.path.value)
-            ),
-            "hookAccessToken" -> Json.fromString(serializedHookAccessToken.value)
+            )
           )
           .noSpaces
       }
@@ -76,6 +62,4 @@ class CommitEventSerializer[Interpretation[_]](
 }
 
 @Singleton
-private class IOCommitEventSerializer @Inject()(
-    hookAccessTokenCrypto: IOHookAccessTokenCrypto
-) extends CommitEventSerializer[IO](hookAccessTokenCrypto)
+private class IOCommitEventSerializer extends CommitEventSerializer[IO]

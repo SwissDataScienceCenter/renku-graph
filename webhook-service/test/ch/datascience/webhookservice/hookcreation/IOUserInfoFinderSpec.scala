@@ -52,7 +52,7 @@ class IOUserInfoFinderSpec extends WordSpec with MockFactory with ExternalServic
       val userInfo = userInfoWith(userId)
       stubFor {
         get(s"/api/v4/users/$userId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson(userInfo.toJson))
       }
 
@@ -66,7 +66,7 @@ class IOUserInfoFinderSpec extends WordSpec with MockFactory with ExternalServic
       val userInfo = userInfoWith(userId)
       stubFor {
         get(s"/api/v4/users/$userId")
-          .withHeader("Authorization", equalTo(s"Bearer $oauthAccessToken"))
+          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
           .willReturn(okJson(userInfo.toJson))
       }
 
@@ -90,7 +90,7 @@ class IOUserInfoFinderSpec extends WordSpec with MockFactory with ExternalServic
 
       stubFor {
         get(s"/api/v4/users/$userId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(unauthorized())
       }
 
@@ -105,7 +105,7 @@ class IOUserInfoFinderSpec extends WordSpec with MockFactory with ExternalServic
 
       stubFor {
         get(s"/api/v4/users/$userId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(notFound().withBody("some error"))
       }
 
@@ -120,7 +120,7 @@ class IOUserInfoFinderSpec extends WordSpec with MockFactory with ExternalServic
 
       stubFor {
         get(s"/api/v4/users/$userId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson("{}"))
       }
 

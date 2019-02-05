@@ -49,7 +49,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
 
       stubFor {
         get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson(withHooks(projectId, oneHookUrl = projectHookId.projectHookUrl)))
       }
 
@@ -62,7 +62,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
 
       stubFor {
         get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("Authorization", equalTo(s"Bearer $oauthAccessToken"))
+          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
           .willReturn(okJson(withHooks(projectId, oneHookUrl = projectHookId.projectHookUrl)))
       }
 
@@ -75,7 +75,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
 
       stubFor {
         get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("Authorization", equalTo(s"Bearer $oauthAccessToken"))
+          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
           .willReturn(okJson(
             withHooks(projectId, oneHookUrl = projectHookUrls generateDifferentThan projectHookId.projectHookUrl)))
       }
@@ -100,7 +100,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
 
       stubFor {
         get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(unauthorized())
       }
 
@@ -115,7 +115,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
 
       stubFor {
         get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(serviceUnavailable().withBody("some error"))
       }
 
@@ -130,7 +130,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
 
       stubFor {
         get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson("{}"))
       }
 

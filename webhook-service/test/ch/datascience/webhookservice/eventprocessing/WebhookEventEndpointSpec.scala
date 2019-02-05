@@ -26,8 +26,6 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.GraphCommonsGenerators._
-import ch.datascience.graph.events.{HookAccessToken, ProjectId}
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
@@ -50,15 +48,15 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
       (pushEventSender
-        .storeCommitsInEventLog(_: CommitEventsOrigin))
-        .expects(commitEventsOrigin)
+        .storeCommitsInEventLog(_: PushEvent))
+        .expects(pushEvent)
         .returning(context.pure(()))
 
       val request = jsonRequest
-        .withBody(pushEventPayloadFrom(commitEventsOrigin))
+        .withBody(pushEventPayloadFrom(pushEvent))
         .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString)
 
-      expectDecryptionOf(serializedHookToken, returning = HookToken(commitEventsOrigin.project.id, hookAccessToken))
+      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
       val response = call(processPushEvent, request)
 
@@ -70,15 +68,15 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       val exception = exceptions.generateOne
       (pushEventSender
-        .storeCommitsInEventLog(_: CommitEventsOrigin))
-        .expects(commitEventsOrigin)
+        .storeCommitsInEventLog(_: PushEvent))
+        .expects(pushEvent)
         .returning(context.raiseError(exception))
 
       val request = jsonRequest
-        .withBody(pushEventPayloadFrom(commitEventsOrigin))
+        .withBody(pushEventPayloadFrom(pushEvent))
         .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString)
 
-      expectDecryptionOf(serializedHookToken, returning = HookToken(commitEventsOrigin.project.id, hookAccessToken))
+      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
       val response = call(processPushEvent, request)
 
@@ -101,7 +99,7 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
       val request = jsonRequest
-        .withBody(pushEventPayloadFrom(commitEventsOrigin))
+        .withBody(pushEventPayloadFrom(pushEvent))
 
       val response = call(processPushEvent, request)
 
@@ -112,13 +110,13 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     "return UNAUTHORIZED when user X-Gitlab-Token is invalid" in new TestCase {
 
       val request = jsonRequest
-        .withBody(pushEventPayloadFrom(commitEventsOrigin))
+        .withBody(pushEventPayloadFrom(pushEvent))
         .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString)
 
       (hookTokenCrypto
         .decrypt(_: SerializedHookToken))
         .expects(serializedHookToken)
-        .returning(context.pure(HookToken(projectIds.generateOne, hookAccessTokens.generateOne)))
+        .returning(context.pure(HookToken(projectIds.generateOne)))
 
       val response = call(processPushEvent, request)
 
@@ -129,7 +127,7 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     "return UNAUTHORIZED when X-Gitlab-Token decryption fails" in new TestCase {
 
       val request = jsonRequest
-        .withBody(pushEventPayloadFrom(commitEventsOrigin))
+        .withBody(pushEventPayloadFrom(pushEvent))
         .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString)
 
       val exception = new Exception("decryption failure")
@@ -149,9 +147,8 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
     implicit val materializer: Materializer = app.materializer
     val context = MonadError[IO, Throwable]
 
-    val jsonRequest        = FakeRequest().withHeaders(CONTENT_TYPE -> JSON)
-    val commitEventsOrigin = commitEventsOrigins.generateOne
-    val hookAccessToken    = commitEventsOrigin.hookAccessToken
+    val jsonRequest = FakeRequest().withHeaders(CONTENT_TYPE -> JSON)
+    val pushEvent   = pushEvents.generateOne
     val serializedHookToken = nonEmptyStrings().map {
       SerializedHookToken
         .from(_)
@@ -169,19 +166,19 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       pushEventSender
     ).processPushEvent
 
-    def pushEventPayloadFrom(commitEventsOrigin: CommitEventsOrigin): JsObject =
-      commitEventsOrigin.maybeCommitFrom.foldLeft(commonJson(commitEventsOrigin)) { (json, before) =>
+    def pushEventPayloadFrom(pushEvent: PushEvent): JsObject =
+      pushEvent.maybeCommitFrom.foldLeft(commonJson(pushEvent)) { (json, before) =>
         json + ("before" -> JsString(before.value))
       }
 
-    private def commonJson(commitEventsOrigin: CommitEventsOrigin) = Json.obj(
-      "after"         -> commitEventsOrigin.commitTo.value,
-      "user_id"       -> commitEventsOrigin.pushUser.userId.value,
-      "user_username" -> commitEventsOrigin.pushUser.username.value,
-      "user_email"    -> commitEventsOrigin.pushUser.email.value,
+    private def commonJson(pushEvent: PushEvent) = Json.obj(
+      "after"         -> pushEvent.commitTo.value,
+      "user_id"       -> pushEvent.pushUser.userId.value,
+      "user_username" -> pushEvent.pushUser.username.value,
+      "user_email"    -> pushEvent.pushUser.email.value,
       "project" -> Json.obj(
-        "id"                  -> commitEventsOrigin.project.id.value,
-        "path_with_namespace" -> commitEventsOrigin.project.path.value
+        "id"                  -> pushEvent.project.id.value,
+        "path_with_namespace" -> pushEvent.project.path.value
       )
     )
 

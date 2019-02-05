@@ -58,7 +58,7 @@ class WebhookEventEndpoint(
       authToken <- findAuthToken(request)
       hookToken <- decrypt(authToken) recoverWith unauthorizedException
       _         <- validate(hookToken, request.body)
-      _         <- storeCommitsInEventLog(commitEventsOrigin(request, hookToken))
+      _         <- storeCommitsInEventLog(request.body)
     } yield Accepted)
       .unsafeToFuture()
       .recover(mapToResult(request.body))
@@ -81,15 +81,6 @@ class WebhookEventEndpoint(
     else Left(UnauthorizedException)
   }
 
-  private def commitEventsOrigin(request: Request[PushEvent], hookToken: HookToken) =
-    CommitEventsOrigin(
-      request.body.maybeBefore,
-      request.body.after,
-      request.body.pushUser,
-      request.body.project,
-      hookToken.hookAccessToken
-    )
-
   private def mapToResult(pushEvent: PushEvent): PartialFunction[Throwable, Result] = {
     case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
     case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage).toJson)
@@ -101,13 +92,6 @@ object WebhookEventEndpoint {
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._
   import play.api.libs.json._
-
-  case class PushEvent(
-      maybeBefore: Option[CommitId],
-      after:       CommitId,
-      pushUser:    PushUser,
-      project:     Project
-  )
 
   private implicit val projectReads: Reads[Project] = (
     (__ \ "id").read[ProjectId] and
@@ -124,15 +108,15 @@ object WebhookEventEndpoint {
   )(toPushEvent _)
 
   private def toPushEvent(
-      maybeBefore: Option[CommitId],
-      after:       CommitId,
-      userId:      UserId,
-      username:    Username,
-      email:       Email,
-      project:     Project
+      maybeCommitFrom: Option[CommitId],
+      commitTo:        CommitId,
+      userId:          UserId,
+      username:        Username,
+      email:           Email,
+      project:         Project
   ): PushEvent = PushEvent(
-    maybeBefore,
-    after,
+    maybeCommitFrom,
+    commitTo,
     PushUser(userId, username, email),
     project
   )

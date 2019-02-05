@@ -24,7 +24,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events._
-import ch.datascience.graph.events.crypto.HookAccessTokenCrypto
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -85,9 +84,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
 
     val commitEvent = commitEvents.generateOne
 
-    class TestCommitEventSerializer(
-        hookAccessTokenCrypto: HookAccessTokenCrypto[Try]
-    ) extends CommitEventSerializer[Try](hookAccessTokenCrypto)
+    class TestCommitEventSerializer extends CommitEventSerializer[Try]
     val eventSerializer = mock[TestCommitEventSerializer]
     val eventLog        = mock[EventLog[Try]]
     val eventSender     = new CommitEventSender[Try](eventLog, eventSerializer)

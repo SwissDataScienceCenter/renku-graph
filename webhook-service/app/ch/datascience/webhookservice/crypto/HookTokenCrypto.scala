@@ -24,7 +24,7 @@ import cats.effect.IO
 import cats.implicits._
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.graph.events.{HookAccessToken, ProjectId}
+import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.W
@@ -60,12 +60,7 @@ class HookTokenCrypto[Interpretation[_]](
   } recoverWith meaningfulError
 
   private def serialize(hook: HookToken): Interpretation[String] = pure {
-    Json
-      .obj(
-        "projectId"       -> Json.fromInt(hook.projectId.value),
-        "hookAccessToken" -> Json.fromString(hook.hookAccessToken.value)
-      )
-      .noSpaces
+    Json.obj("projectId" -> Json.fromInt(hook.projectId.value)).noSpaces
   }
 
   private def validate(value: String): Interpretation[SerializedHookToken] =
@@ -74,10 +69,7 @@ class HookTokenCrypto[Interpretation[_]](
     }
 
   private implicit val hookTokenDecoder: Decoder[HookToken] = (cursor: HCursor) =>
-    for {
-      projectId       <- cursor.downField("projectId").as[ProjectId]
-      hookAccessToken <- cursor.downField("hookAccessToken").as[HookAccessToken]
-    } yield HookToken(projectId, hookAccessToken)
+    cursor.downField("projectId").as[ProjectId].map(HookToken)
 
   private def deserialize(json: String): Interpretation[HookToken] = ME.fromEither {
     parse(json)

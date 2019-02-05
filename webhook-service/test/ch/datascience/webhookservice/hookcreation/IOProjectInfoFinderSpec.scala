@@ -49,7 +49,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson(projectJson))
       }
 
@@ -66,7 +66,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
-          .withHeader("Authorization", equalTo(s"Bearer $oauthAccessToken"))
+          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
           .willReturn(okJson(projectJson))
       }
 
@@ -94,7 +94,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(unauthorized())
       }
 
@@ -109,7 +109,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(notFound().withBody("some error"))
       }
 
@@ -124,7 +124,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson("{}"))
       }
 

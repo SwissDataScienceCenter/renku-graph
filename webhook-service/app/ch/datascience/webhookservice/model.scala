@@ -18,13 +18,12 @@
 
 package ch.datascience.webhookservice
 
-import ch.datascience.graph.events.{HookAccessToken, ProjectId, ProjectPath, UserId}
+import ch.datascience.graph.events.{ProjectId, ProjectPath, UserId}
 
 object model {
 
   final case class HookToken(
-      projectId:       ProjectId,
-      hookAccessToken: HookAccessToken
+      projectId: ProjectId
   )
 
   final case class ProjectOwner(

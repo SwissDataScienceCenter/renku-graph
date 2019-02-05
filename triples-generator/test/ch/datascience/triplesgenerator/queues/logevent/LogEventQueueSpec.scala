@@ -269,11 +269,8 @@ class LogEventQueueSpec extends WordSpec with MockFactory with Eventually with S
         .upload(_: RDFTriples)(_: ExecutionContext))
         .verify(rdfTriples, ec)
   }
-
-  import ch.datascience.tinytypes.json._
-  private implicit val userWrites:            Writes[User]            = Json.writes[User]
-  private implicit val pushUserWrites:        Writes[PushUser]        = Json.writes[PushUser]
-  private implicit val projectWrites:         Writes[Project]         = Json.writes[Project]
-  private implicit val hookAccessTokenWrites: Writes[HookAccessToken] = TinyTypeFormat(HookAccessToken.apply)
-  private implicit val commitEventWrites:     Writes[CommitEvent]     = Json.writes[CommitEvent]
+  private implicit val userWrites:        Writes[User]        = Json.writes[User]
+  private implicit val pushUserWrites:    Writes[PushUser]    = Json.writes[PushUser]
+  private implicit val projectWrites:     Writes[Project]     = Json.writes[Project]
+  private implicit val commitEventWrites: Writes[CommitEvent] = Json.writes[CommitEvent]
 }

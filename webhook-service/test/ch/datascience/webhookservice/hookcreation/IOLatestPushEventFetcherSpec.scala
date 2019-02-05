@@ -51,7 +51,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
 
       stubFor {
         get(s"/api/v4/projects/$projectId/events?action=pushed")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson(pushEvents(projectId, commitsIdsList)))
       }
 
@@ -70,7 +70,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
 
       stubFor {
         get(s"/api/v4/projects/$projectId/events?action=pushed")
-          .withHeader("Authorization", equalTo(s"Bearer $oauthAccessToken"))
+          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
           .willReturn(okJson(pushEvents(projectId, commitsIdsList)))
       }
 
@@ -89,7 +89,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
 
       stubFor {
         get(s"/api/v4/projects/$projectId/events?action=pushed")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson("[]"))
       }
 
@@ -102,7 +102,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
 
       stubFor {
         get(s"/api/v4/projects/$projectId/events?action=pushed")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(notFound())
       }
 
@@ -126,7 +126,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
 
       stubFor {
         get(s"/api/v4/projects/$projectId/events?action=pushed")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(unauthorized())
       }
 
@@ -141,7 +141,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
 
       stubFor {
         get(s"/api/v4/projects/$projectId/events?action=pushed")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(badRequest().withBody("some error"))
       }
 
@@ -156,7 +156,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
 
       stubFor {
         get(s"/api/v4/projects/$projectId/events?action=pushed")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.toString))
+          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson("{}"))
       }
 

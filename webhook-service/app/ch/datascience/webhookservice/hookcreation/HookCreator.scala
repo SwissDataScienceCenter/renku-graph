@@ -25,7 +25,7 @@ import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
-import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, PersonalAccessTokenAlreadyCreated}
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
@@ -37,19 +37,15 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private class HookCreator[Interpretation[_]: Monad](
-    projectHookUrlFinder:    ProjectHookUrlFinder[Interpretation],
-    projectHookVerifier:     ProjectHookVerifier[Interpretation],
-    projectInfoFinder:       ProjectInfoFinder[Interpretation],
-    hookAccessTokenVerifier: HookAccessTokenVerifier[Interpretation],
-    hookAccessTokenCreator:  HookAccessTokenCreator[Interpretation],
-    hookTokenCrypto:         HookTokenCrypto[Interpretation],
-    projectHookCreator:      ProjectHookCreator[Interpretation],
-    eventsHistoryLoader:     EventsHistoryLoader[Interpretation],
-    logger:                  Logger[Interpretation]
-)(implicit ME:               MonadError[Interpretation, Throwable]) {
+    projectHookUrlFinder: ProjectHookUrlFinder[Interpretation],
+    projectHookVerifier:  ProjectHookVerifier[Interpretation],
+    projectInfoFinder:    ProjectInfoFinder[Interpretation],
+    hookTokenCrypto:      HookTokenCrypto[Interpretation],
+    projectHookCreator:   ProjectHookCreator[Interpretation],
+    eventsHistoryLoader:  EventsHistoryLoader[Interpretation],
+    logger:               Logger[Interpretation]
+)(implicit ME:            MonadError[Interpretation, Throwable]) {
 
-  import hookAccessTokenCreator._
-  import hookAccessTokenVerifier._
   import hookTokenCrypto._
   import projectHookUrlFinder._
   import projectHookVerifier._
@@ -57,17 +53,14 @@ private class HookCreator[Interpretation[_]: Monad](
 
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[Unit] = {
     for {
-      projectHookUrl          <- findProjectHookUrl
-      projectHookPresence     <- checkProjectHookPresence(HookIdentifier(projectId, projectHookUrl), accessToken)
-      _                       <- failIfProjectHookExists(projectId, projectHookUrl)(projectHookPresence)
-      projectInfo             <- findProjectInfo(projectId, accessToken)
-      hookAccessTokenPresence <- checkHookAccessTokenPresence(projectInfo, accessToken)
-      _                       <- failIfHookAccessTokenExists(projectId)(hookAccessTokenPresence)
-      hookAccessToken         <- createHookAccessToken(projectInfo, accessToken)
-      serializedHookToken     <- encrypt(HookToken(projectInfo.id, hookAccessToken))
-      _                       <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-      _                       <- eventsHistoryLoader.loadAllEvents(projectInfo, hookAccessToken, accessToken)
-      _                       <- logger.info(s"Hook created for project with id $projectId")
+      projectHookUrl      <- findProjectHookUrl
+      projectHookPresence <- checkProjectHookPresence(HookIdentifier(projectId, projectHookUrl), accessToken)
+      _                   <- failIfProjectHookExists(projectId, projectHookUrl)(projectHookPresence)
+      projectInfo         <- findProjectInfo(projectId, accessToken)
+      serializedHookToken <- encrypt(HookToken(projectInfo.id))
+      _                   <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
+      _                   <- eventsHistoryLoader.loadAllEvents(projectInfo, accessToken)
+      _                   <- logger.info(s"Hook created for project with id $projectId")
     } yield ()
   } recoverWith loggingError(projectId)
 
@@ -77,16 +70,8 @@ private class HookCreator[Interpretation[_]: Monad](
     case false => ME.pure(())
   }
 
-  private def failIfHookAccessTokenExists(projectId: ProjectId): Boolean => Interpretation[Unit] = {
-    case true  => ME.raiseError(PersonalAccessTokenAlreadyCreated(projectId))
-    case false => ME.pure(())
-  }
-
   private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Unit]] = {
     case exception @ HookAlreadyCreated(_, _) =>
-      logger.error(exception.getMessage)
-      ME.raiseError(exception)
-    case exception @ PersonalAccessTokenAlreadyCreated(_) =>
       logger.error(exception.getMessage)
       ME.raiseError(exception)
     case NonFatal(exception) =>
@@ -109,21 +94,17 @@ private object HookCreator {
 
 @Singleton
 private class IOHookCreator @Inject()(
-    projectHookUrlFinder:    IOProjectHookUrlFinder,
-    projectHookVerifier:     IOProjectHookVerifier,
-    projectInfoFinder:       IOProjectInfoFinder,
-    hookAccessTokenVerifier: IOHookAccessTokenVerifier,
-    hookAccessTokenCreator:  IOHookAccessTokenCreator,
-    hookTokenCrypto:         IOHookTokenCrypto,
-    projectHookCreator:      IOProjectHookCreator,
-    eventsHistoryLoader:     IOEventsHistoryLoader,
-    logger:                  IOLogger
+    projectHookUrlFinder: IOProjectHookUrlFinder,
+    projectHookVerifier:  IOProjectHookVerifier,
+    projectInfoFinder:    IOProjectInfoFinder,
+    hookTokenCrypto:      IOHookTokenCrypto,
+    projectHookCreator:   IOProjectHookCreator,
+    eventsHistoryLoader:  IOEventsHistoryLoader,
+    logger:               IOLogger
 ) extends HookCreator[IO](
       projectHookUrlFinder,
       projectHookVerifier,
       projectInfoFinder,
-      hookAccessTokenVerifier,
-      hookAccessTokenCreator,
       hookTokenCrypto,
       projectHookCreator,
       eventsHistoryLoader,
