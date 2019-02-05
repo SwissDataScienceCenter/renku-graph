@@ -43,7 +43,7 @@ import play.api.test.{FakeRequest, Injecting}
 
 class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAppPerTest with Injecting {
 
-  "POST /webhook-event" should {
+  "POST /webhooks/events" should {
 
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 

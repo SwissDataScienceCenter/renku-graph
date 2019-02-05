@@ -7,10 +7,11 @@ This is a microservice which:
 
 ## API
 
-| Method | Path                               | Description                           |
-|--------|------------------------------------|---------------------------------------|
-|  GET   | ```/ping```                        | To check if service is healthy        |
-|  POST  | ```/webhook-event```               | Consumes push events sent from GitLab |
+| Method | Path                               | Description                               |
+|--------|------------------------------------|-------------------------------------------|
+|  GET   | ```/ping```                        | To check if service is healthy            |
+|  POST  | ```/webhooks/projects/:id```       | Creates a webhook for a project in GitLab |
+|  POST  | ```/webhooks/events```             | Consumes push events sent from GitLab     |
 
 #### GET /ping
 
@@ -23,7 +24,7 @@ Verifies service health.
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
 
-#### POST /projects/:id/hooks
+#### POST /webhooks/projects/:id
 
 Creates a webhook for a project with the given `project id`.
 
@@ -42,7 +43,7 @@ The endpoint requires an authorization token. It has to be
 | CONFLICT (409)             | When the hook already exists                                                          |
 | INTERNAL SERVER ERROR (500)| When there were problems with webhook creation                                        |
 
-#### POST /webhook-event
+#### POST /webhooks/events
 
 Consumes a Push Event.
 
@@ -94,5 +95,5 @@ docker run --rm -e 'PLAY_APPLICATION_SECRET=tLm_qFcq]L2>s>s`xd6iu6R[BHfK]>hgd/=H
 ```bash
 curl -X POST --header "Content-Type: application/json" \
   --data '{"before": "<commit_id>", "after": "<commit_id>", "user_id": <user-id>, "user_username": "<user-name>", "user_email": "<user-email>", "project": {"id": <project-id>, "path_with_namespace": "<org-name>/<project-name>"}}' \
-  http://localhost:9001/webhook-event
+  http://localhost:9001/webhooks/events
 ```
