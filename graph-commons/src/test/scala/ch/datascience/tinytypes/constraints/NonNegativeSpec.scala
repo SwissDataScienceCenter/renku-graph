@@ -35,7 +35,7 @@ class NonNegativeSpec extends WordSpec with PropertyChecks {
     }
 
     "throw an IllegalArgumentException for negative value" in {
-      intercept[IllegalArgumentException](NonNegativeInt(-1)).getMessage shouldBe "NonNegativeInt cannot be < 0"
+      intercept[IllegalArgumentException](NonNegativeInt(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.NonNegativeInt cannot be < 0"
     }
   }
 }

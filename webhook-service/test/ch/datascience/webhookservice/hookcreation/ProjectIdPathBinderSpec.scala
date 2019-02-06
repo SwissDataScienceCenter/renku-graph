@@ -18,16 +18,17 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
-import ch.datascience.generators.Generators._
+import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.ProjectId
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
 class ProjectIdPathBinderSpec extends WordSpec {
 
-  private val binder = ProjectIdPathBinder.pathBinder
+  private val binder = ProjectIdPathBinder.projectIdPathBinder
 
   "bind" should {
 
@@ -38,7 +39,9 @@ class ProjectIdPathBinderSpec extends WordSpec {
 
     "return left with an error if the value does not meet requirements" in {
       val projectId = -1
-      binder.bind(nonEmptyStrings().generateOne, projectId.toString) shouldBe ProjectId.from(projectId)
+      binder.bind(nonEmptyStrings().generateOne, projectId.toString) shouldBe ProjectId
+        .from(projectId)
+        .leftMap(_.getMessage)
     }
   }
 

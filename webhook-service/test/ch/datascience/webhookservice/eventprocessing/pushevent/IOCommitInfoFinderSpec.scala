@@ -24,11 +24,12 @@ import cats.effect.{IO, Sync}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.events.CommittedDate
-import ch.datascience.graph.events.EventsGenerators.{projectIds, _}
+import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.eventprocessing.pushevent.GitLabConfig._
+import ch.datascience.webhookservice.config.GitLabConfig._
+import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators.personalAccessTokens
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
@@ -92,7 +93,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(okJson("""{"some_field": "some value"}"""))
+          .willReturn(okJson("{}"))
       }
 
       intercept[Exception] {
@@ -142,9 +143,8 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     val configProvider = mock[IOGitLabConfigProvider]
 
     def expectGitLabConfigProvider(returning: IO[HostUrl]) =
-      (configProvider
-        .get()(_: Sync[IO]))
-        .expects(*)
+      (configProvider.get _)
+        .expects()
         .returning(returning)
 
     val finder = new IOCommitInfoFinder(configProvider)

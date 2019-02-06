@@ -16,43 +16,33 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.config
 
-import cats.effect.{IO, Sync}
-import cats.implicits._
+import cats.MonadError
+import cats.effect.IO
+import ch.datascience.webhookservice.config.GitLabConfig._
 import eu.timepit.refined.api.Refined
+import javax.inject.{Inject, Singleton}
 import play.api.Configuration
-import pureconfig.module.catseffect._
+import ch.datascience.config.ConfigLoader
 
 import scala.language.higherKinds
-import HookCreationConfig._
-import javax.inject.{Inject, Singleton}
 
-private class HookCreationConfigProvider[Interpretation[_]](configuration: Configuration) {
+class GitLabConfig[Interpretation[_]](
+    configuration: Configuration
+)(implicit ME:     MonadError[Interpretation, Throwable])
+    extends ConfigLoader[Interpretation] {
   import eu.timepit.refined.pureconfig._
 
-  def get()(implicit F: Sync[Interpretation]): Interpretation[HookCreationConfig] =
-    (
-      loadConfigF[Interpretation, HostUrl](configuration.underlying, "services.self.url"),
-      loadConfigF[Interpretation, HostUrl](configuration.underlying, "services.gitlab.url")
-    ) mapN {
-      case (selfUrl, gitLabUrl) =>
-        HookCreationConfig(gitLabUrl, selfUrl)
-    }
+  def get(): Interpretation[HostUrl] = find[HostUrl]("services.gitlab.url", configuration.underlying)
 }
 
-@Singleton
-private class IOHookCreationConfigProvider @Inject()(configuration: Configuration)
-    extends HookCreationConfigProvider[IO](configuration)
-
-private case class HookCreationConfig(
-    gitLabUrl: HostUrl,
-    selfUrl:   HostUrl
-)
-
-private object HookCreationConfig {
+object GitLabConfig {
 
   import eu.timepit.refined.string.Url
 
   type HostUrl = String Refined Url
 }
+
+@Singleton
+class IOGitLabConfigProvider @Inject()(configuration: Configuration) extends GitLabConfig[IO](configuration)

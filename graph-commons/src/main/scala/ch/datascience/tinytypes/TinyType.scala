@@ -25,24 +25,25 @@ trait TinyType[T] extends Any {
   override def toString: String = value.toString
 }
 
+trait Sensitive extends Any {
+  self: TinyType[_] =>
+
+  override def toString: String = "<sensitive>"
+}
+
 abstract class TinyTypeFactory[V, TT <: TinyType[V]](instantiate: V => TT) extends Constraints[V] with TypeName {
 
-  final def apply(value: V): TT = {
-    verify(value)
-    instantiate(value)
-  }
+  final def apply(value: V): TT = from(value).fold(
+    exception => throw exception,
+    identity
+  )
 
   final def unapply(sha: TT): Option[V] = Some(sha.value)
 
-  final def from(value: V): Either[String, TT] = {
+  final def from(value: V): Either[IllegalArgumentException, TT] = {
     val maybeErrors = validateConstraints(value)
     if (maybeErrors.isEmpty) Right(instantiate(value))
-    else Left(maybeErrors.mkString("; "))
-  }
-
-  private def verify(value: V): Unit = {
-    val maybeErrors = validateConstraints(value)
-    if (maybeErrors.nonEmpty) throw new IllegalArgumentException(maybeErrors.mkString("; "))
+    else Left(new IllegalArgumentException(maybeErrors.mkString("; ")))
   }
 }
 
@@ -63,5 +64,9 @@ trait Constraints[V] extends TypeName {
 }
 
 trait TypeName {
-  protected[this] lazy val typeName: String = getClass.getSimpleName.replace("$", "")
+  protected[this] lazy val typeName: String = {
+    val className = getClass.getName.replace("$", ".")
+    if (className.endsWith(".")) className take className.length - 1
+    else className
+  }
 }

@@ -20,13 +20,16 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.clients.AccessToken
+import ch.datascience.clients.AccessToken._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.model.{AccessToken, OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import javax.inject.{Inject, Singleton}
-import play.api.mvc.{AbstractController, ControllerComponents, Request, Result}
+import play.api.mvc._
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -39,13 +42,13 @@ class HookCreationEndpoint @Inject()(
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
-  def createHook(projectId: ProjectId) = Action.async { implicit request =>
+  def createHook(projectId: ProjectId): Action[AnyContent] = Action.async { implicit request =>
     (for {
-      accessToken <- findAccessToken(request)
-      _           <- hookCreator.createHook(projectId, accessToken)
-    } yield Created)
+      accessToken    <- findAccessToken(request)
+      creationResult <- hookCreator.createHook(projectId, accessToken)
+    } yield toHttpResult(creationResult))
       .unsafeToFuture()
-      .recover(toResult)
+      .recover(withHttpResult)
   }
 
   private def findAccessToken(request: Request[_]): IO[AccessToken] = IO.fromEither {
@@ -54,13 +57,18 @@ class HookCreationEndpoint @Inject()(
       .getOrElse(Left(UnauthorizedException))
   }
 
-  private def convert(headers: Option[String], to: String => Either[String, AccessToken]) =
+  private def convert(headers: Option[String], to: String => Either[Exception, AccessToken]) =
     headers.map {
       to(_).leftMap(_ => UnauthorizedException)
     }
 
-  private val toResult: PartialFunction[Throwable, Result] = {
+  private lazy val toHttpResult: HookCreationResult => Result = {
+    case HookCreated => Created
+    case HookExisted => Ok
+  }
+
+  private val withHttpResult: PartialFunction[Throwable, Result] = {
     case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
-    case NonFatal(exception)        => BadGateway(ErrorMessage(exception.getMessage).toJson)
+    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage).toJson)
   }
 }

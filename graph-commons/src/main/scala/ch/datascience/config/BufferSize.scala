@@ -21,13 +21,13 @@ package ch.datascience.config
 import ch.datascience.tinytypes.constraints.GreaterThanZero
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import com.typesafe.config.Config
-import play.api.ConfigLoader
+import play.api.{ConfigLoader => PlayConfigLoader}
 
 class BufferSize private (val value: Int) extends AnyVal with TinyType[Int]
 
 object BufferSize extends TinyTypeFactory[Int, BufferSize](new BufferSize(_)) with GreaterThanZero {
 
-  implicit object BufferSizeFinder extends ConfigLoader[BufferSize] {
+  implicit object BufferSizeFinder extends PlayConfigLoader[BufferSize] {
     override def load(config: Config, path: String): BufferSize = BufferSize(config.getInt(path))
   }
 }

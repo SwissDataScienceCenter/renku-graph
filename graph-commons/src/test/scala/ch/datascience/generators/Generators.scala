@@ -44,10 +44,11 @@ object Generators {
 
   def nonNegativeInts(max: Int = 1000): Gen[Int] = choose(0, max)
 
-  val relativePaths: Gen[String] = for {
-    partsNumber <- Gen.choose(1, 10)
-    parts       <- Gen.listOfN(partsNumber, nonEmptyStrings())
-  } yield parts.mkString("/")
+  def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] =
+    for {
+      partsNumber <- Gen.choose(minSegments, maxSegments)
+      parts       <- Gen.listOfN(partsNumber, nonEmptyStrings())
+    } yield parts.mkString("/")
 
   val httpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
@@ -89,7 +90,14 @@ object Generators {
   object Implicits {
 
     implicit class GenOps[T](generator: Gen[T]) {
+
       def generateOne: T = generator.sample getOrElse generateOne
+
+      def generateDifferentThan(value: T): T = {
+        val generated = generator.sample.getOrElse(generateDifferentThan(value))
+        if (generated == value) generateDifferentThan(value)
+        else generated
+      }
     }
   }
 }

@@ -18,22 +18,31 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
+import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators.commitEvents
 import io.circe.Json
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import ch.datascience.graph.events.EventsGenerators._
 
 import scala.util.{Success, Try}
 
-class CommitEventSerializerSpec extends WordSpec {
+class CommitEventSerializerSpec extends WordSpec with MockFactory {
 
   "serialiseToJsonString" should {
 
-    "create a single line json" in new TestCase {
+    "return a single line json if serialization is successful and there's pushUser's email" in new TestCase {
 
-      val commitEvent = commitEvents.generateOne
+      val pushUserEmail = emails.generateOne
+      val commitEvent = {
+        val event = commitEvents.generateOne
+        event.copy(
+          pushUser = event.pushUser.copy(maybeEmail = Some(pushUserEmail))
+        )
+      }
 
       serializer.serialiseToJsonString(commitEvent) shouldBe Success(
         Json
@@ -44,7 +53,44 @@ class CommitEventSerializerSpec extends WordSpec {
             "pushUser" -> Json.obj(
               "userId"   -> Json.fromInt(commitEvent.pushUser.userId.value),
               "username" -> Json.fromString(commitEvent.pushUser.username.value),
-              "email"    -> Json.fromString(commitEvent.pushUser.email.value)
+              "email"    -> Json.fromString(pushUserEmail.value)
+            ),
+            "author" -> Json.obj(
+              "username" -> Json.fromString(commitEvent.author.username.value),
+              "email"    -> Json.fromString(commitEvent.author.email.value)
+            ),
+            "committer" -> Json.obj(
+              "username" -> Json.fromString(commitEvent.committer.username.value),
+              "email"    -> Json.fromString(commitEvent.committer.email.value)
+            ),
+            "parents" -> Json.fromValues(commitEvent.parents.map(parent => Json.fromString(parent.value))),
+            "project" -> Json.obj(
+              "id"   -> Json.fromInt(commitEvent.project.id.value),
+              "path" -> Json.fromString(commitEvent.project.path.value)
+            )
+          )
+          .noSpaces
+      )
+    }
+
+    "return a single line json if serialization is successful and there's no pushUser's email" in new TestCase {
+
+      val commitEvent = {
+        val event = commitEvents.generateOne
+        event.copy(
+          pushUser = event.pushUser.copy(maybeEmail = None)
+        )
+      }
+
+      serializer.serialiseToJsonString(commitEvent) shouldBe Success(
+        Json
+          .obj(
+            "id"            -> Json.fromString(commitEvent.id.value),
+            "message"       -> Json.fromString(commitEvent.message.value),
+            "committedDate" -> Json.fromString(commitEvent.committedDate.toString),
+            "pushUser" -> Json.obj(
+              "userId"   -> Json.fromInt(commitEvent.pushUser.userId.value),
+              "username" -> Json.fromString(commitEvent.pushUser.username.value)
             ),
             "author" -> Json.obj(
               "username" -> Json.fromString(commitEvent.author.username.value),

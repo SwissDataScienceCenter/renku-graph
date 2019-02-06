@@ -19,7 +19,7 @@
 package ch.datascience.interpreters
 
 import cats.Monad
-import ch.datascience.interpreters.TestLogger.LogMessage.{Message, MessageAndThrowable}
+import ch.datascience.interpreters.TestLogger.LogMessage._
 import io.chrisdavenport.log4cats.Logger
 import org.scalatest.Matchers._
 
@@ -32,72 +32,74 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
   import TestLogger._
   import LogMessage._
 
-  def loggedOnly(args: (Level, LogMessage)*): Unit =
-    invocations should contain only (args: _*)
+  private[this] val invocations = ArrayBuffer.empty[LogEntry]
 
-  def loggedOnly(args: List[(Level, LogMessage)]): Unit =
-    invocations should contain only (args: _*)
+  def loggedOnly(expected: LogEntry*): Unit =
+    loggedOnly(expected.toList)
+
+  def loggedOnly(expected: List[LogEntry]): Unit =
+    invocations should contain only (expected: _*)
 
   def expectNoLogs(): Unit =
     if (invocations.nonEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")
 
   override def error(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += (Error -> MessageAndThrowable(message, t))
+    invocations += LogEntry(Error, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def warn(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += (Warn -> MessageAndThrowable(message, t))
+    invocations += LogEntry(Warn, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def info(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += (Info -> MessageAndThrowable(message, t))
+    invocations += LogEntry(Info, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def debug(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += (Debug -> MessageAndThrowable(message, t))
+    invocations += LogEntry(Debug, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def trace(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += (Trace -> MessageAndThrowable(message, t))
+    invocations += LogEntry(Trace, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def error(message: => String): Interpretation[Unit] = {
-    invocations += (Error -> Message(message))
+    invocations += LogEntry(Error, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def warn(message: => String): Interpretation[Unit] = {
-    invocations += (Warn -> Message(message))
+    invocations += LogEntry(Warn, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def info(message: => String): Interpretation[Unit] = {
-    invocations += (Info -> Message(message))
+    invocations += LogEntry(Info, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def debug(message: => String): Interpretation[Unit] = {
-    invocations += (Debug -> Message(message))
+    invocations += LogEntry(Debug, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def trace(message: => String): Interpretation[Unit] = {
-    invocations += (Trace -> Message(message))
+    invocations += LogEntry(Trace, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
-  private[this] val invocations = ArrayBuffer.empty[(Level, LogMessage)]
-
-  private val invocationsPrettyPrint: () => String = () =>
+  private def invocationsPrettyPrint: String =
     invocations
       .map {
-        case (level, Message(message))                        => s"$level '$message'"
-        case (level, MessageAndThrowable(message, throwable)) => s"$level '$message' $throwable"
+        case LogEntry(level, Message(message))                        => s"$level '$message'"
+        case LogEntry(level, MessageAndThrowable(message, throwable)) => s"$level '$message' $throwable"
+        case LogEntry(level, MessageAndThrowableMatcher(message, throwableMatcher)) =>
+          s"$level '$message' $throwableMatcher"
       }
       .mkString("\n", "\n", "")
 }
@@ -106,13 +108,18 @@ object TestLogger {
 
   def apply[Interpretation[_]: Monad](): TestLogger[Interpretation] = new TestLogger[Interpretation]
 
+  private[TestLogger] case class LogEntry(level: Level, message: LogMessage)
+
   sealed trait Level {
 
-    def apply(message: String): (Level, LogMessage) =
-      this -> Message(message)
+    def apply(message: String): LogEntry =
+      LogEntry(this, Message(message))
 
-    def apply(message: String, throwable: Throwable): (Level, LogMessage) =
-      this -> MessageAndThrowable(message, throwable)
+    def apply(message: String, throwable: Throwable): LogEntry =
+      LogEntry(this, MessageAndThrowable(message, throwable))
+
+    def apply(message: String, throwableMatcher: Matcher): LogEntry =
+      LogEntry(this, MessageAndThrowableMatcher(message, throwableMatcher))
   }
 
   object Level {
@@ -125,7 +132,32 @@ object TestLogger {
 
   sealed trait LogMessage
   object LogMessage {
-    final case class Message(message:             String) extends LogMessage
-    final case class MessageAndThrowable(message: String, throwable: Throwable) extends LogMessage
+    final case class Message(message:                    String) extends LogMessage
+    final case class MessageAndThrowableMatcher(message: String, throwableMatcher: Matcher) extends LogMessage
+    final case class MessageAndThrowable(message:        String, throwable: Throwable) extends LogMessage {
+      override def equals(other: Any): Boolean = other match {
+        case MessageAndThrowable(otherMessage, otherThrowable) =>
+          (message == otherMessage) && (throwable == otherThrowable)
+        case MessageAndThrowableMatcher(otherMessage, otherMatcher) =>
+          (message == otherMessage) && (otherMatcher matches throwable)
+        case _ => false
+      }
+    }
+  }
+
+  sealed trait Matcher {
+    def matches(other: Throwable): Boolean
+  }
+
+  object Matcher {
+
+    final case class NotRefEqual(throwable: Throwable) extends Matcher {
+
+      override def matches(other: Throwable): Boolean =
+        (other.getClass == throwable.getClass) &&
+          (other.getMessage == throwable.getMessage)
+
+      override lazy val toString: String = throwable.toString
+    }
   }
 }

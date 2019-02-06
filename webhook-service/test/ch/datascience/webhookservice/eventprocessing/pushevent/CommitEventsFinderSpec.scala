@@ -38,13 +38,12 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
   "findCommitEvents" should {
 
     "return single commit event if finding commit info returns no parents" in new TestCase {
-      val pushEvent = pushEvents.generateOne
-
-      val commitInfo = commitInfos(pushEvent.after, noParents).generateOne
+      val pushEvent  = pushEvents.generateOne
+      val commitInfo = commitInfos(pushEvent.commitTo, noParents).generateOne
 
       (commitInfoFinder
         .findCommitInfo(_: ProjectId, _: CommitId))
-        .expects(pushEvent.project.id, pushEvent.after)
+        .expects(pushEvent.project.id, pushEvent.commitTo)
         .returning(context.pure(commitInfo))
 
       commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
@@ -52,10 +51,10 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       )
     }
 
-    "return commit events starting from the push event's 'after' until commit info with no parents" in new TestCase {
-      val pushEvent = pushEvents.generateOne
+    "return commit events starting from the 'commitTo' until commit info with no parents" in new TestCase {
+      val pushEvent = pushEvents.generateOne.copy(maybeCommitFrom = None)
 
-      val firstCommitInfo = commitInfos(pushEvent.after, parentsIdsLists(minNumber = 1)).generateOne
+      val firstCommitInfo = commitInfos(pushEvent.commitTo, parentsIdsLists(minNumber = 1)).generateOne
 
       val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
         commitInfos(parentId, singleParent).generateOne
@@ -74,8 +73,65 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
 
       commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
         Seq(commitEventFrom(pushEvent, firstCommitInfo)),
-        secondLevelCommitInfos.map(commitEventFrom(pushEvent, _)),
-        secondLevelCommitInfos.flatMap(_.parents).map(commitEventFrom(pushEvent, thirdLevelCommitInfos))
+        secondLevelCommitInfos map (commitEventFrom(pushEvent, _)),
+        secondLevelCommitInfos.flatMap(_.parents) map commitEventFrom(pushEvent, thirdLevelCommitInfos)
+      )
+    }
+
+    "return a single commit event for 'commitTo' when `commitFrom` is the first parent of `commitTo`" in new TestCase {
+      val commitTo   = commitIds.generateOne
+      val commitFrom = commitIds.generateOne
+
+      val firstCommitInfo = {
+        val info = commitInfos(commitTo, parentsIdsLists(minNumber = 2)).generateOne
+        info.copy(parents = commitFrom +: info.parents)
+      }
+
+      val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
+        commitInfos(parentId, noParents).generateOne
+      }
+
+      val pushEvent = pushEvents.generateOne.copy(
+        maybeCommitFrom = Some(commitFrom),
+        commitTo        = commitTo
+      )
+
+      (commitInfoFinder
+        .findCommitInfo(_: ProjectId, _: CommitId))
+        .expects(pushEvent.project.id, firstCommitInfo.id)
+        .returning(context.pure(firstCommitInfo))
+
+      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+        Seq(commitEventFrom(pushEvent, firstCommitInfo))
+      )
+    }
+
+    "return commit events starting from the 'commitTo' until found commit id matches the `commitTo`" in new TestCase {
+      val commitTo = commitIds.generateOne
+
+      val firstCommitInfo = commitInfos(commitTo, parentsIdsLists(minNumber = 3)).generateOne
+
+      val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
+        commitInfos(parentId, noParents).generateOne
+      }
+
+      val commitFrom = firstCommitInfo.parents(firstCommitInfo.parents.size - 2)
+      val pushEvent = pushEvents.generateOne.copy(
+        maybeCommitFrom = Some(commitFrom),
+        commitTo        = commitTo
+      )
+
+      val commitInfosUpToCommitFrom = secondLevelCommitInfos.takeWhile(_.id != commitFrom)
+      (Seq(firstCommitInfo) ++ commitInfosUpToCommitFrom) foreach { commitInfo =>
+        (commitInfoFinder
+          .findCommitInfo(_: ProjectId, _: CommitId))
+          .expects(pushEvent.project.id, commitInfo.id)
+          .returning(context.pure(commitInfo))
+      }
+
+      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+        Seq(commitEventFrom(pushEvent, firstCommitInfo)),
+        commitInfosUpToCommitFrom map (commitEventFrom(pushEvent, _))
       )
     }
 
@@ -85,7 +141,7 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
       (commitInfoFinder
         .findCommitInfo(_: ProjectId, _: CommitId))
-        .expects(pushEvent.project.id, pushEvent.after)
+        .expects(pushEvent.project.id, pushEvent.commitTo)
         .returning(context.raiseError(exception))
 
       commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe Success(
@@ -98,7 +154,8 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
     "fail if finding one of the commit info fails" in new TestCase {
       val pushEvent = pushEvents.generateOne
 
-      val firstCommitInfo = commitInfos(pushEvent.after, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
+      val firstCommitInfo =
+        commitInfos(pushEvent.commitTo, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
 
       val secondLevelCommitInfo1 +: secondLevelCommitInfo2 +: Nil = firstCommitInfo.parents map { parentId =>
         commitInfos(parentId, noParents).generateOne
@@ -134,16 +191,17 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
     val commitEventFinder = new CommitEventsFinder[Try](commitInfoFinder)
   }
 
-  private def commitEventFrom(pushEvent: PushEvent, commitInfo: CommitInfo) = CommitEvent(
-    id            = commitInfo.id,
-    message       = commitInfo.message,
-    committedDate = commitInfo.committedDate,
-    pushUser      = pushEvent.pushUser,
-    author        = commitInfo.author,
-    committer     = commitInfo.committer,
-    parents       = commitInfo.parents,
-    project       = pushEvent.project
-  )
+  private def commitEventFrom(pushEvent: PushEvent, commitInfo: CommitInfo) =
+    CommitEvent(
+      id            = commitInfo.id,
+      message       = commitInfo.message,
+      committedDate = commitInfo.committedDate,
+      pushUser      = pushEvent.pushUser,
+      author        = commitInfo.author,
+      committer     = commitInfo.committer,
+      parents       = commitInfo.parents,
+      project       = pushEvent.project
+    )
 
   private def commitEventFrom(
       pushEvent:         PushEvent,

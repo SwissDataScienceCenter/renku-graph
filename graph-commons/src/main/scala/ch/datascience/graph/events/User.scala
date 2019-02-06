@@ -25,9 +25,9 @@ import io.circe.Decoder
 import play.api.libs.json.Format
 
 case class PushUser(
-    userId:   UserId,
-    username: Username,
-    email:    Email
+    userId:     UserId,
+    username:   Username,
+    maybeEmail: Option[Email]
 )
 
 case class User(
@@ -37,18 +37,18 @@ case class User(
 
 class UserId private (val value: Int) extends AnyVal with TinyType[Int]
 object UserId extends TinyTypeFactory[Int, UserId](new UserId(_)) with NonNegative {
-
-  implicit lazy val userIdFormat: Format[UserId] = TinyTypeFormat(UserId.apply)
+  implicit lazy val userIdFormat:  Format[UserId]  = TinyTypeFormat(UserId.apply)
+  implicit lazy val userIdDecoder: Decoder[UserId] = Decoder.decodeInt.map(UserId.apply)
 }
 
 class Username private (val value: String) extends AnyVal with TinyType[String]
 object Username extends TinyTypeFactory[String, Username](new Username(_)) with NonBlank {
-  implicit lazy val format:  Format[Username]  = TinyTypeFormat(Username.apply)
-  implicit lazy val decoder: Decoder[Username] = Decoder.decodeString.map(Username.apply)
+  implicit lazy val userNameFormat:  Format[Username]  = TinyTypeFormat(Username.apply)
+  implicit lazy val userNameDecoder: Decoder[Username] = Decoder.decodeString.map(Username.apply)
 }
 
 class Email private (val value: String) extends AnyVal with TinyType[String]
 object Email extends TinyTypeFactory[String, Email](new Email(_)) with NonBlank {
-  implicit lazy val format:  Format[Email]  = TinyTypeFormat(Email.apply)
-  implicit lazy val decoder: Decoder[Email] = Decoder.decodeString.map(Email.apply)
+  implicit lazy val emailFormat:  Format[Email]  = TinyTypeFormat(Email.apply)
+  implicit lazy val emailDecoder: Decoder[Email] = Decoder.decodeString.map(Email.apply)
 }

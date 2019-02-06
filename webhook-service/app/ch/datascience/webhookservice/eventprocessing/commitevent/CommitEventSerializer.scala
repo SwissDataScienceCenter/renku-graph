@@ -20,24 +20,50 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.graph.events.{CommitEvent, Project, PushUser, User}
+import ch.datascience.graph.events._
+import io.circe.Json
 import javax.inject.Singleton
-import play.api.libs.json.{Json, Writes}
 
+import scala.language.higherKinds
 import scala.util.Try
 
-class CommitEventSerializer[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable]) {
+class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
-  private implicit val userWrites:     Writes[User]        = Json.writes[User]
-  private implicit val pushUserWrites: Writes[PushUser]    = Json.writes[PushUser]
-  private implicit val projectWrites:  Writes[Project]     = Json.writes[Project]
-  private val commitEventWrites:       Writes[CommitEvent] = Json.writes[CommitEvent]
-
-  def serialiseToJsonString(commitEvent: CommitEvent): Interpretation[String] = ME.fromTry {
-    Try {
-      Json.stringify(commitEventWrites.writes(commitEvent))
+  def serialiseToJsonString(commitEvent: CommitEvent): Interpretation[String] =
+    ME.fromTry {
+      Try {
+        Json
+          .obj(
+            "id"            -> Json.fromString(commitEvent.id.value),
+            "message"       -> Json.fromString(commitEvent.message.value),
+            "committedDate" -> Json.fromString(commitEvent.committedDate.toString),
+            "pushUser"      -> toJson(commitEvent.pushUser),
+            "author" -> Json.obj(
+              "username" -> Json.fromString(commitEvent.author.username.value),
+              "email"    -> Json.fromString(commitEvent.author.email.value)
+            ),
+            "committer" -> Json.obj(
+              "username" -> Json.fromString(commitEvent.committer.username.value),
+              "email"    -> Json.fromString(commitEvent.committer.email.value)
+            ),
+            "parents" -> Json.arr(commitEvent.parents.map(parentId => Json.fromString(parentId.value)): _*),
+            "project" -> Json.obj(
+              "id"   -> Json.fromInt(commitEvent.project.id.value),
+              "path" -> Json.fromString(commitEvent.project.path.value)
+            )
+          )
+          .noSpaces
+      }
     }
-  }
+
+  private def toJson(pushUser: PushUser): Json =
+    Json.obj(
+      Seq(
+        Some("userId"   -> Json.fromInt(pushUser.userId.value)),
+        Some("username" -> Json.fromString(pushUser.username.value)),
+        pushUser.maybeEmail.map(email => "email" -> Json.fromString(email.value))
+      ).flatten: _*
+    )
 }
 
 @Singleton

@@ -20,9 +20,11 @@ package ch.datascience.webhookservice.crypto
 
 import java.util.Base64
 
+import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.{HookAuthToken, Secret}
+import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.RefType
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -33,29 +35,23 @@ class HookTokenCryptoSpec extends WordSpec {
 
   "encrypt/decrypt" should {
 
-    "encrypt and decrypt a given value" in new TestCase {
-      val value: String = nonEmptyStrings().generateOne
+    "encrypt and decrypt a given HookToken" in new TestCase {
+      val token: HookToken = hookTokens.generateOne
 
-      val Success(crypted) = aesCrypto.encrypt(value)
-      crypted.value should not be value
+      val Success(crypted) = hookTokenCrypto.encrypt(token)
+      crypted.value should not be token
 
-      val Success(decrypted) = aesCrypto.decrypt(crypted)
-      decrypted shouldBe value
-    }
-
-    "fail for blank values" in new TestCase {
-      val Failure(encryptException) = aesCrypto.encrypt(" ")
-      encryptException            shouldBe an[IllegalArgumentException]
-      encryptException.getMessage shouldBe "A value to create HookAuthToken cannot be blank"
+      val Success(decrypted) = hookTokenCrypto.decrypt(crypted)
+      decrypted shouldBe token
     }
 
     "fail if cannot be decrypted" in new TestCase {
-      val token: HookAuthToken = HookAuthToken.from("abcd").fold(e => throw e, identity)
+      val token: SerializedHookToken = SerializedHookToken.from("abcd").fold(e => throw e, identity)
 
-      val Failure(decryptException) = aesCrypto.decrypt(token)
+      val Failure(decryptException) = hookTokenCrypto.decrypt(token)
 
       decryptException            shouldBe an[Exception]
-      decryptException.getMessage shouldBe "HookAuthToken decryption failed"
+      decryptException.getMessage shouldBe "HookToken decryption failed"
     }
   }
 
@@ -64,7 +60,7 @@ class HookTokenCryptoSpec extends WordSpec {
     import cats.implicits._
 
     private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes("utf-8")), "utf-8")
-    val aesCrypto = new HookTokenCrypto[Try](
+    val hookTokenCrypto = new HookTokenCrypto[Try](
       RefType
         .applyRef[Secret](secret)
         .getOrElse(throw new IllegalArgumentException("Wrong secret"))

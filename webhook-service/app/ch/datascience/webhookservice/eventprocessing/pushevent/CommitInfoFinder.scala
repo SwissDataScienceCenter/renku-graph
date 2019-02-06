@@ -20,6 +20,7 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import cats.effect.IO
 import ch.datascience.graph.events._
+import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
@@ -38,8 +39,8 @@ private class IOCommitInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigP
     extends CommitInfoFinder[IO] {
 
   import CommitInfo._
-  import GitLabConfig._
   import cats.effect._
+  import ch.datascience.webhookservice.config.GitLabConfig._
   import ch.datascience.webhookservice.exceptions.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status.{Ok, Unauthorized}
@@ -87,7 +88,7 @@ private case class CommitInfo(
     committedDate: CommittedDate,
     author:        User,
     committer:     User,
-    parents:       Seq[CommitId]
+    parents:       List[CommitId]
 )
 
 private object CommitInfo {

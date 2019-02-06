@@ -35,22 +35,22 @@ object EventsGenerators {
   } yield Email(s"$beforeAt@$afterAt")
 
   implicit val pushUsers: Gen[PushUser] = for {
-    userId   <- userIds
-    username <- usernames
-    email    <- emails
-  } yield PushUser(userId, username, email)
+    userId     <- userIds
+    username   <- usernames
+    maybeEmail <- Gen.option(emails)
+  } yield PushUser(userId, username, maybeEmail)
 
   implicit val users: Gen[User] = for {
     username <- usernames
     email    <- emails
   } yield User(username, email)
 
-  implicit val projectIds:  Gen[ProjectId]   = nonNegativeInts() map ProjectId.apply
-  implicit val projectPath: Gen[ProjectPath] = relativePaths map ProjectPath.apply
+  implicit val projectIds:   Gen[ProjectId]   = nonNegativeInts() map ProjectId.apply
+  implicit val projectPaths: Gen[ProjectPath] = relativePaths(minSegments = 2, maxSegments = 2) map ProjectPath.apply
 
   implicit val projects: Gen[Project] = for {
     projectId <- projectIds
-    path      <- projectPath
+    path      <- projectPaths
   } yield Project(projectId, path)
 
   implicit def parentsIdsLists(minNumber: Int = 0, maxNumber: Int = 4): Gen[List[CommitId]] = {

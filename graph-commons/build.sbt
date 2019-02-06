@@ -22,17 +22,23 @@ name := "renku-graph-commons"
 
 val pureConfigVersion = "0.10.1"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig" % pureConfigVersion
-libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats-effect" % pureConfigVersion
-val playVersion = "2.6.10"
-libraryDependencies += "com.typesafe.play" %% "play-json" % playVersion
+libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
+
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10"
+
 val refinedVersion = "0.9.3"
 libraryDependencies += "eu.timepit" %% "refined" % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
-val log4CatsVersion = "0.2.0"
-libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % log4CatsVersion
-val circeVersion = "0.10.0"
-libraryDependencies += "io.circe" %% "circe-core" % circeVersion
+
+libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "0.2.0"
+libraryDependencies += "io.circe" %% "circe-core" % "0.10.0"
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.5.0"
+
+val http4sVersion = "0.19.0"
+libraryDependencies += "org.http4s" %% "http4s-blaze-client" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-blaze-server" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-circe" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-dsl" % http4sVersion
 
 // Test dependencies
 libraryDependencies += component("play-test") % Test

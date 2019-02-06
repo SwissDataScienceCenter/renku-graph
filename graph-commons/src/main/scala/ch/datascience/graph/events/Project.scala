@@ -21,6 +21,7 @@ package ch.datascience.graph.events
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegative}
 import ch.datascience.tinytypes.json._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import io.circe.Decoder
 import play.api.libs.json.Format
 
 case class Project(
@@ -30,12 +31,20 @@ case class Project(
 
 class ProjectId private (val value: Int) extends AnyVal with TinyType[Int]
 object ProjectId extends TinyTypeFactory[Int, ProjectId](new ProjectId(_)) with NonNegative {
-
-  implicit lazy val projectIdFormat: Format[ProjectId] = TinyTypeFormat(ProjectId.apply)
+  implicit lazy val projectIdFormat:  Format[ProjectId]  = TinyTypeFormat(ProjectId.apply)
+  implicit lazy val projectIdDecoder: Decoder[ProjectId] = Decoder.decodeInt.map(ProjectId.apply)
 }
 
 class ProjectPath private (val value: String) extends AnyVal with TinyType[String]
 object ProjectPath extends TinyTypeFactory[String, ProjectPath](new ProjectPath(_)) with NonBlank {
-
-  implicit lazy val projectPathFormat: Format[ProjectPath] = TinyTypeFormat(ProjectPath.apply)
+  addConstraint(
+    check = value =>
+      value.contains("/") &&
+        (value.indexOf("/") == value.lastIndexOf("/")) &&
+        !value.startsWith("/") &&
+        !value.endsWith("/"),
+    message = (value: String) => s"'$value' is not a valid $typeName"
+  )
+  implicit lazy val projectPathFormat:  Format[ProjectPath]  = TinyTypeFormat(ProjectPath.apply)
+  implicit lazy val projectPathDecoder: Decoder[ProjectPath] = Decoder.decodeString.map(ProjectPath.apply)
 }

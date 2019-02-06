@@ -35,8 +35,8 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import play.api.Logger
-import play.api.libs.json.JsValue
 import play.api.libs.json.Json._
+import play.api.libs.json.{JsValue, Json, Writes}
 
 import scala.concurrent.ExecutionContext.Implicits.{global => ec}
 import scala.concurrent.{ExecutionContext, Future}
@@ -269,4 +269,8 @@ class LogEventQueueSpec extends WordSpec with MockFactory with Eventually with S
         .upload(_: RDFTriples)(_: ExecutionContext))
         .verify(rdfTriples, ec)
   }
+  private implicit val userWrites:        Writes[User]        = Json.writes[User]
+  private implicit val pushUserWrites:    Writes[PushUser]    = Json.writes[PushUser]
+  private implicit val projectWrites:     Writes[Project]     = Json.writes[Project]
+  private implicit val commitEventWrites: Writes[CommitEvent] = Json.writes[CommitEvent]
 }

@@ -19,16 +19,19 @@
 package ch.datascience.webhookservice.hookcreation
 
 import akka.stream.Materializer
-import cats.MonadError
 import cats.effect.{ContextShift, IO}
+import ch.datascience.clients.AccessToken
+import ch.datascience.clients.AccessToken._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.model.{AccessToken, OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -42,7 +45,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAppPerTest with Injecting {
 
-  "POST /projects/:id/hooks" should {
+  "POST /projects/:id/webhooks" should {
 
     "return CREATED when a valid PRIVATE-TOKEN is present in the header " +
       "and webhook is successfully created for project with the given id in in GitLab" in new TestCase {
@@ -50,29 +53,45 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       val accessToken = personalAccessTokens.generateOne
 
       (hookCreator
-        .createHook(_: ProjectId, _: PersonalAccessToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, accessToken, *)
-        .returning(IO.pure(()))
+        .createHook(_: ProjectId, _: PersonalAccessToken))
+        .expects(projectId, accessToken)
+        .returning(IO.pure(HookCreated))
 
-      val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> accessToken.toString))
+      val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> accessToken.value))
 
       status(response)          shouldBe CREATED
       contentAsString(response) shouldBe ""
     }
 
     "return CREATED when a valid OAUTH-TOKEN is present in the header " +
-      "and webhook is successfully created for project with the given id in in GitLab" in new TestCase {
+      "and webhook is successfully created for project with the given id in GitLab" in new TestCase {
 
       val accessToken = oauthAccessTokens.generateOne
 
       (hookCreator
-        .createHook(_: ProjectId, _: OAuthAccessToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, accessToken, *)
-        .returning(IO.pure(()))
+        .createHook(_: ProjectId, _: OAuthAccessToken))
+        .expects(projectId, accessToken)
+        .returning(IO.pure(HookCreated))
 
-      val response = call(createHook(projectId), request.withHeaders("OAUTH-TOKEN" -> accessToken.toString))
+      val response = call(createHook(projectId), request.withHeaders("OAUTH-TOKEN" -> accessToken.value))
 
       status(response)          shouldBe CREATED
+      contentAsString(response) shouldBe ""
+    }
+
+    "return OK when hook was already created" in new TestCase {
+
+      val accessToken    = accessTokens.generateOne
+      val projectHookUrl = projectHookUrls.generateOne
+
+      (hookCreator
+        .createHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(IO.pure(HookExisted))
+
+      val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
+
+      status(response)          shouldBe OK
       contentAsString(response) shouldBe ""
     }
 
@@ -103,19 +122,19 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
     }
 
-    "return BAD_GATEWAY when there was an error during hook creation" in new TestCase {
+    "return INTERNAL_SERVER_ERROR when there was an error during hook creation" in new TestCase {
 
       val accessToken = accessTokens.generateOne
 
       val errorMessage = ErrorMessage("some error")
       (hookCreator
-        .createHook(_: ProjectId, _: AccessToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, accessToken, *)
+        .createHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
       val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
 
-      status(response)        shouldBe BAD_GATEWAY
+      status(response)        shouldBe INTERNAL_SERVER_ERROR
       contentType(response)   shouldBe Some(JSON)
       contentAsJson(response) shouldBe errorMessage.toJson
     }
@@ -126,8 +145,8 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
       val errorMessage = ErrorMessage("some error")
       (hookCreator
-        .createHook(_: ProjectId, _: AccessToken)(_: MonadError[IO, Throwable]))
-        .expects(projectId, accessToken, *)
+        .createHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 
       val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))

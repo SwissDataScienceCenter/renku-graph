@@ -24,27 +24,51 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
 
-class ProjectSpec extends WordSpec with PropertyChecks {
+class ProjectIdSpec extends WordSpec with PropertyChecks {
 
   "instantiation" should {
 
-    "be successful for non-negative ids and valid files" in {
-      forAll(nonNegativeInts(), relativePaths) { (id, path) =>
-        val project = Project(ProjectId(id), ProjectPath(path))
-        project.id.value   shouldBe id
-        project.path.value shouldBe path
+    "be successful for non-negative values" in {
+      forAll(nonNegativeInts()) { id =>
+        ProjectId(id).value shouldBe id
       }
     }
 
     "fail for negative ids" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        Project(ProjectId(-1), ProjectPath(relativePaths.generateOne))
+        ProjectId(-1).value
+      }
+    }
+  }
+}
+
+class ProjectPathSpec extends WordSpec with PropertyChecks {
+
+  "instantiation" should {
+
+    "be successful for values having two segments separated with a '/'" in {
+      forAll(relativePaths(minSegments = 2, maxSegments = 2)) { path =>
+        ProjectPath(path).value shouldBe path
       }
     }
 
-    "fail for blank paths" in {
+    "fail for blank value" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        Project(ProjectId(nonNegativeInts().generateOne), ProjectPath(""))
+        ProjectPath(" ").value
+      }
+    }
+
+    "fail single segment values" in {
+      an[IllegalArgumentException] shouldBe thrownBy {
+        ProjectPath(nonEmptyStrings().generateOne).value
+      }
+    }
+
+    "fail for values with more than two segments" in {
+      forAll(relativePaths(minSegments = 3, maxSegments = 11)) { path =>
+        an[IllegalArgumentException] shouldBe thrownBy {
+          ProjectPath(path).value
+        }
       }
     }
   }

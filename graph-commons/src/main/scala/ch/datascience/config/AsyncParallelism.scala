@@ -21,13 +21,13 @@ package ch.datascience.config
 import ch.datascience.tinytypes.constraints.GreaterThanZero
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import com.typesafe.config.Config
-import play.api.ConfigLoader
+import play.api.{ConfigLoader => PlayConfigLoader}
 
 case class AsyncParallelism private (value: Int) extends AnyVal with TinyType[Int]
 
 object AsyncParallelism extends TinyTypeFactory[Int, AsyncParallelism](new AsyncParallelism(_)) with GreaterThanZero {
 
-  implicit object TriplesFinderThreadsFinder extends ConfigLoader[AsyncParallelism] {
+  implicit object TriplesFinderThreadsFinder extends PlayConfigLoader[AsyncParallelism] {
     override def load(config: Config, path: String): AsyncParallelism = AsyncParallelism(config.getInt(path))
   }
 }

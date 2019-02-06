@@ -41,23 +41,20 @@ class PushEventSender[Interpretation[_]: Monad](
   import commitEventsFinder._
 
   def storeCommitsInEventLog(pushEvent: PushEvent): Interpretation[Unit] = {
-    implicit val implicitPushEvent: PushEvent = pushEvent
     for {
       commitEventsStream <- findCommitEvents(pushEvent)
-      _                  <- (commitEventsStream map sendEvent).sequence
+      _                  <- (commitEventsStream map sendEvent(pushEvent)).sequence
       _                  <- logger.info(logMessageFor(pushEvent, "stored in event log"))
     } yield ()
   } recoverWith loggingError(pushEvent)
 
-  private def sendEvent(
-      maybeCommitEvent: Interpretation[CommitEvent]
-  )(implicit pushEvent: PushEvent) = {
+  private def sendEvent(pushEvent: PushEvent)(maybeCommitEvent: Interpretation[CommitEvent]) = {
     for {
       commitEvent <- maybeCommitEvent recoverWith fetchErrorLogging
       _           <- send(commitEvent) recoverWith sendErrorLogging(commitEvent)
       _           <- logger.info(logMessageFor(pushEvent, "stored in event log", Some(commitEvent)))
     } yield ()
-  } recover withLogging
+  } recover withLogging(pushEvent)
 
   private def loggingError(pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -71,9 +68,7 @@ class PushEventSender[Interpretation[_]: Monad](
       cause:            Throwable
   ) extends Exception
 
-  private def fetchErrorLogging(
-      implicit pushEvent: PushEvent
-  ): PartialFunction[Throwable, Interpretation[CommitEvent]] = {
+  private lazy val fetchErrorLogging: PartialFunction[Throwable, Interpretation[CommitEvent]] = {
     case NonFatal(exception) =>
       ME.raiseError(
         CommitEventProcessingException(
@@ -84,9 +79,7 @@ class PushEventSender[Interpretation[_]: Monad](
       )
   }
 
-  private def sendErrorLogging(
-      commitEvent:      CommitEvent
-  )(implicit pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+  private def sendErrorLogging(commitEvent: CommitEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
       ME.raiseError(
         CommitEventProcessingException(
@@ -97,9 +90,7 @@ class PushEventSender[Interpretation[_]: Monad](
       )
   }
 
-  private def withLogging(
-      implicit pushEvent: PushEvent
-  ): PartialFunction[Throwable, Unit] = {
+  private def withLogging(pushEvent: PushEvent): PartialFunction[Throwable, Unit] = {
     case CommitEventProcessingException(maybeCommitEvent, message, cause) =>
       logger.error(cause)(logMessageFor(pushEvent, message, maybeCommitEvent))
     case NonFatal(exception) =>
@@ -111,7 +102,7 @@ class PushEventSender[Interpretation[_]: Monad](
       message:          String,
       maybeCommitEvent: Option[CommitEvent] = None
   ) =
-    s"PushEvent after: ${pushEvent.after}, " +
+    s"PushEvent commitTo: ${pushEvent.commitTo}, " +
       s"project: ${pushEvent.project.id}" +
       s"${maybeCommitEvent.map(_.id).map(id => s", CommitEvent id: $id").getOrElse("")}" +
       s": $message"

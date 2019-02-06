@@ -20,16 +20,22 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats._
 import cats.implicits._
+import ch.datascience.clients.AccessToken
+import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.EventsGenerators.projectIds
+import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
-import ch.datascience.webhookservice.crypto.HookTokenCrypto.{HookAuthToken, Secret}
+import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.model.AccessToken
+import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
+import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
+import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
+import ch.datascience.webhookservice.model.{HookToken, ProjectInfo}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -39,32 +45,63 @@ import scala.util.Try
 
 class HookCreatorSpec extends WordSpec with MockFactory {
 
-  "create" should {
+  "createHook" should {
 
-    "log success and return right if creation of the hook in GitLab was successful" in new TestCase {
+    "return HookCreated if hook does not exists and it was successfully created" in new TestCase {
+
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
+        .returning(context.pure(projectHookUrl))
+
+      (projectHookVerifier
+        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
+        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
+        .returning(context.pure(false))
+
+      (projectInfoFinder
+        .findProjectInfo(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(projectInfo))
 
       (hookTokenCrypto
-        .encrypt(_: String))
-        .expects(projectId.toString)
-        .returning(context.pure(hookAuthToken))
+        .encrypt(_: HookToken))
+        .expects(HookToken(projectId))
+        .returning(context.pure(serializedHookToken))
 
-      (gitLabHookCreation
-        .createHook(_: ProjectId, _: AccessToken, _: HookAuthToken))
-        .expects(projectId, accessToken, hookAuthToken)
+      (projectHookCreator
+        .create(_: ProjectHook, _: AccessToken))
+        .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(context.pure(()))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(())
+      expectEventsHistoryLoader(returning = context.pure(()))
+
+      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(HookCreated)
 
       logger.loggedOnly(Info(s"Hook created for project with id $projectId"))
     }
 
-    "log an error and return left if encryption of the hook auth token was unsuccessful" in new TestCase {
+    "return HookExisted if hook was already created for that project" in new TestCase {
+
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
+        .returning(context.pure(projectHookUrl))
+
+      (projectHookVerifier
+        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
+        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
+        .returning(context.pure(true))
+
+      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(HookExisted)
+
+      logger.loggedOnly(Info(s"Hook already created for projectId: $projectId, url: $projectHookUrl"))
+    }
+
+    "log an error if finding project hook url fails" in new TestCase {
 
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
-      (hookTokenCrypto
-        .encrypt(_: String))
-        .expects(projectId.toString)
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
         .returning(error)
 
       hookCreation.createHook(projectId, accessToken) shouldBe error
@@ -72,19 +109,137 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
-    "log an error and return left if creation of the hook in GitLab was unsuccessful" in new TestCase {
+    "log an error if hook presence verification fails" in new TestCase {
 
-      (hookTokenCrypto
-        .encrypt(_: String))
-        .expects(projectId.toString)
-        .returning(context.pure(hookAuthToken))
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
+        .returning(context.pure(projectHookUrl))
 
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
-      (gitLabHookCreation
-        .createHook(_: ProjectId, _: AccessToken, _: HookAuthToken))
-        .expects(projectId, accessToken, hookAuthToken)
+      (projectHookVerifier
+        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
+        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
         .returning(error)
+
+      hookCreation.createHook(projectId, accessToken) shouldBe error
+
+      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
+    }
+
+    "log an error if project info fetching fails" in new TestCase {
+
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
+        .returning(context.pure(projectHookUrl))
+
+      (projectHookVerifier
+        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
+        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
+        .returning(context.pure(false))
+
+      val exception: Exception    = exceptions.generateOne
+      val error:     Try[Nothing] = context.raiseError(exception)
+      (projectInfoFinder
+        .findProjectInfo(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(error)
+
+      hookCreation.createHook(projectId, accessToken) shouldBe error
+
+      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
+    }
+
+    "log an error if hook token encryption fails" in new TestCase {
+
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
+        .returning(context.pure(projectHookUrl))
+
+      (projectHookVerifier
+        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
+        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
+        .returning(context.pure(false))
+
+      (projectInfoFinder
+        .findProjectInfo(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(projectInfo))
+
+      val exception: Exception    = exceptions.generateOne
+      val error:     Try[Nothing] = context.raiseError(exception)
+      (hookTokenCrypto
+        .encrypt(_: HookToken))
+        .expects(HookToken(projectId))
+        .returning(error)
+
+      hookCreation.createHook(projectId, accessToken) shouldBe error
+
+      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
+    }
+
+    "log an error if hook creation fails" in new TestCase {
+
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
+        .returning(context.pure(projectHookUrl))
+
+      (projectHookVerifier
+        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
+        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
+        .returning(context.pure(false))
+
+      (projectInfoFinder
+        .findProjectInfo(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(projectInfo))
+
+      (hookTokenCrypto
+        .encrypt(_: HookToken))
+        .expects(HookToken(projectId))
+        .returning(context.pure(serializedHookToken))
+
+      val exception: Exception    = exceptions.generateOne
+      val error:     Try[Nothing] = context.raiseError(exception)
+      (projectHookCreator
+        .create(_: ProjectHook, _: AccessToken))
+        .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
+        .returning(error)
+
+      hookCreation.createHook(projectId, accessToken) shouldBe error
+
+      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
+    }
+
+    "log an error if loading all events fails" in new TestCase {
+
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
+        .returning(context.pure(projectHookUrl))
+
+      (projectHookVerifier
+        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
+        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
+        .returning(context.pure(false))
+
+      (projectInfoFinder
+        .findProjectInfo(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(projectInfo))
+
+      (hookTokenCrypto
+        .encrypt(_: HookToken))
+        .expects(HookToken(projectId))
+        .returning(context.pure(serializedHookToken))
+
+      (projectHookCreator
+        .create(_: ProjectHook, _: AccessToken))
+        .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
+        .returning(context.pure(()))
+
+      val exception: Exception    = exceptions.generateOne
+      val error:     Try[Nothing] = context.raiseError(exception)
+      expectEventsHistoryLoader(returning = error)
 
       hookCreation.createHook(projectId, accessToken) shouldBe error
 
@@ -93,18 +248,47 @@ class HookCreatorSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val projectId     = projectIds.generateOne
-    val accessToken   = accessTokens.generateOne
-    val hookAuthToken = hookAuthTokens.generateOne
+    val projectInfo         = projectInfos.generateOne
+    val projectId           = projectInfo.id
+    val projectHookUrl      = projectHookUrls.generateOne
+    val serializedHookToken = serializedHookTokens.generateOne
+    val accessToken         = accessTokens.generateOne
 
     val context = MonadError[Try, Throwable]
 
-    val logger             = TestLogger[Try]()
-    val gitLabHookCreation = mock[HookCreationRequestSender[Try]]
+    val logger              = TestLogger[Try]()
+    val projectInfoFinder   = mock[ProjectInfoFinder[Try]]
+    val projectHookVerifier = mock[ProjectHookVerifier[Try]]
+    val projectHookCreator  = mock[ProjectHookCreator[Try]]
+
+    class TryProjectHookUrlFinder(
+        selfUrlConfig: SelfUrlConfig[Try]
+    )(implicit ME:     MonadError[Try, Throwable])
+        extends ProjectHookUrlFinder[Try](selfUrlConfig)
+    val projectHookUrlFinder = mock[TryProjectHookUrlFinder]
 
     class TryHookTokenCrypt(secret: Secret) extends HookTokenCrypto[Try](secret)
     val hookTokenCrypto = mock[TryHookTokenCrypt]
+    class TryEventsHistoryLoader(latestPushEventFetcher: LatestPushEventFetcher[Try],
+                                 userInfoFinder:         UserInfoFinder[Try],
+                                 pushEventSender:        PushEventSender[Try])
+        extends EventsHistoryLoader[Try](latestPushEventFetcher, userInfoFinder, pushEventSender, logger)
+    val eventsHistoryLoader = mock[TryEventsHistoryLoader]
 
-    val hookCreation = new HookCreator[Try](gitLabHookCreation, logger, hookTokenCrypto)
+    val hookCreation = new HookCreator[Try](
+      projectHookUrlFinder,
+      projectHookVerifier,
+      projectInfoFinder,
+      hookTokenCrypto,
+      projectHookCreator,
+      eventsHistoryLoader,
+      logger
+    )
+
+    def expectEventsHistoryLoader(returning: Try[Unit]): Unit =
+      (eventsHistoryLoader
+        .loadAllEvents(_: ProjectInfo, _: AccessToken))
+        .expects(projectInfo, accessToken)
+        .returning(returning)
   }
 }

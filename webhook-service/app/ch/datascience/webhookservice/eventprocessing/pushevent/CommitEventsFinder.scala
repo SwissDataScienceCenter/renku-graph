@@ -26,64 +26,66 @@ import ch.datascience.webhookservice.eventprocessing.PushEvent
 import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
-import scala.util.Try
 import scala.util.control.NonFatal
 
-private class CommitEventsFinder[Interpretation[_]](
+class CommitEventsFinder[Interpretation[_]](
     commitInfoFinder: CommitInfoFinder[Interpretation]
 )(implicit ME:        MonadError[Interpretation, Throwable]) {
 
   import commitInfoFinder._
 
   import Stream._
+  type CommitEventsStream = Interpretation[Stream[Interpretation[CommitEvent]]]
 
-  def findCommitEvents(pushEvent: PushEvent): Interpretation[Stream[Interpretation[CommitEvent]]] =
-    stream(List(pushEvent.after))(pushEvent)
+  def findCommitEvents(pushEvent: PushEvent): CommitEventsStream =
+    stream(List(pushEvent.commitTo), pushEvent)
 
-  private def stream(
-      commitIds:        List[CommitId]
-  )(implicit pushEvent: PushEvent): Interpretation[Stream[Interpretation[CommitEvent]]] =
+  private def stream(commitIds: List[CommitId], pushEvent: PushEvent): CommitEventsStream =
     commitIds match {
-      case Nil =>
-        ME.pure(Stream.empty[Interpretation[CommitEvent]])
-      case commitId +: commitsToProcess => {
-        for {
-          commitEvent     <- findCommitEvent(commitId, pushEvent)
-          nextCommitEvent <- stream(commitsToProcess ++ commitEvent.parents)
-        } yield ME.pure(commitEvent) #:: nextCommitEvent
-      } recoverWith { elementForFailure(commitsToProcess) }
+      case Nil                                 => ME.pure(Stream.empty[Interpretation[CommitEvent]])
+      case commitId +: commitIdsStillToProcess => nextElement(commitId, commitIdsStillToProcess, pushEvent)
     }
 
-  private def elementForFailure(
-      commitsToProcess: List[CommitId]
-  )(implicit pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Stream[Interpretation[CommitEvent]]]] = {
+  private def nextElement(commitId: CommitId, commitIdsStillToProcess: List[CommitId], pushEvent: PushEvent) = {
+    for {
+      commitEvent <- findCommitEvent(commitId, pushEvent)
+      commitIdsToProcess = findCommitIdsToProcess(commitIdsStillToProcess,
+                                                  commitEvent.parents,
+                                                  pushEvent.maybeCommitFrom)
+      nextCommitEvent <- stream(commitIdsToProcess, pushEvent)
+    } yield ME.pure(commitEvent) #:: nextCommitEvent
+  } recoverWith elementForFailure(commitIdsStillToProcess, pushEvent)
+
+  private def findCommitIdsToProcess(commitsToProcess:    List[CommitId],
+                                     parentCommits:       List[CommitId],
+                                     maybeEarliestCommit: Option[CommitId]): List[CommitId] =
+    (commitsToProcess ++ parentCommits).takeWhile(commitId => !maybeEarliestCommit.contains(commitId))
+
+  private def elementForFailure(commitIdsToProcess: List[CommitId],
+                                pushEvent:          PushEvent): PartialFunction[Throwable, CommitEventsStream] = {
     case NonFatal(exception) =>
-      stream(commitsToProcess) map (ME.raiseError[CommitEvent](exception) #:: _)
+      stream(commitIdsToProcess, pushEvent) map (ME.raiseError[CommitEvent](exception) #:: _)
   }
 
   private def findCommitEvent(commitId: CommitId, pushEvent: PushEvent): Interpretation[CommitEvent] =
     for {
-      commitInfo  <- findCommitInfo(pushEvent.project.id, commitId)
-      commitEvent <- merge(commitInfo, pushEvent)
-    } yield commitEvent
+      commitInfo <- findCommitInfo(pushEvent.project.id, commitId)
+    } yield merge(commitInfo, pushEvent)
 
-  private def merge(commitInfo: CommitInfo, pushEvent: PushEvent): Interpretation[CommitEvent] = ME.fromTry {
-    Try {
-      CommitEvent(
-        id            = commitInfo.id,
-        message       = commitInfo.message,
-        committedDate = commitInfo.committedDate,
-        pushUser      = pushEvent.pushUser,
-        author        = commitInfo.author,
-        committer     = commitInfo.committer,
-        parents       = commitInfo.parents,
-        project       = pushEvent.project
-      )
-    }
-  }
+  private def merge(commitInfo: CommitInfo, pushEvent: PushEvent): CommitEvent =
+    CommitEvent(
+      id            = commitInfo.id,
+      message       = commitInfo.message,
+      committedDate = commitInfo.committedDate,
+      pushUser      = pushEvent.pushUser,
+      author        = commitInfo.author,
+      committer     = commitInfo.committer,
+      parents       = commitInfo.parents,
+      project       = pushEvent.project
+    )
 }
 
 @Singleton
-private class IOCommitEventsFinder @Inject()(
+class IOCommitEventsFinder @Inject()(
     commitInfoFinder: IOCommitInfoFinder
 ) extends CommitEventsFinder[IO](commitInfoFinder)

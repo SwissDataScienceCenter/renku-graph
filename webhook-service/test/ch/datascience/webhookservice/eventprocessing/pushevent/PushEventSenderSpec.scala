@@ -156,17 +156,19 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
     for {
       commitEvent <- commitEventFrom(pushEvent)
     } yield {
-      val firstCommitEvent = commitEventFrom(pushEvent.after, pushEvent.pushUser, pushEvent.project).generateOne
+      val firstCommitEvent = commitEventFrom(pushEvent).generateOne
+
       commitEvent.parents.foldLeft(Stream(Try(firstCommitEvent))) { (commitEvents, parentId) =>
         Try(commitEventFrom(parentId, pushEvent.pushUser, pushEvent.project).generateOne) #:: commitEvents
       }
     }
 
-  private def commitEventFrom(pushEvent: PushEvent): Gen[CommitEvent] = commitEventFrom(
-    pushEvent.after,
-    pushEvent.pushUser,
-    pushEvent.project
-  )
+  private def commitEventFrom(pushEvent: PushEvent): Gen[CommitEvent] =
+    commitEventFrom(
+      pushEvent.commitTo,
+      pushEvent.pushUser,
+      pushEvent.project
+    )
 
   private def commitEventFrom(commitId: CommitId, pushUser: PushUser, project: Project): Gen[CommitEvent] =
     for {
@@ -194,17 +196,17 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
     }
 
   private def failedFetching(pushEvent: PushEvent): String =
-    s"PushEvent after: ${pushEvent.after}, project: ${pushEvent.project.id}: fetching one of the commit events failed"
+    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: fetching one of the commit events failed"
 
   private def failedStoring(pushEvent: PushEvent): String =
-    s"PushEvent after: ${pushEvent.after}, project: ${pushEvent.project.id}: storing in event log failed"
+    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: storing in event log failed"
 
   private def failedStoring(pushEvent: PushEvent, commitEvent: CommitEvent): String =
-    s"PushEvent after: ${pushEvent.after}, project: ${pushEvent.project.id}, CommitEvent id: ${commitEvent.id}: storing in event log failed"
+    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}, CommitEvent id: ${commitEvent.id}: storing in event log failed"
 
   private def successfulStoring(pushEvent: PushEvent, commitEvent: CommitEvent): String =
-    s"PushEvent after: ${pushEvent.after}, project: ${pushEvent.project.id}, CommitEvent id: ${commitEvent.id}: stored in event log"
+    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}, CommitEvent id: ${commitEvent.id}: stored in event log"
 
   private def successfulStoring(pushEvent: PushEvent): String =
-    s"PushEvent after: ${pushEvent.after}, project: ${pushEvent.project.id}: stored in event log"
+    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: stored in event log"
 }

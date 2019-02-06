@@ -37,6 +37,22 @@ class TinyTypeSpec extends WordSpec {
   }
 }
 
+class SensitiveSpec extends WordSpec {
+
+  "toString" should {
+
+    "return a '<sensitive>' instead of the value" in {
+      ("abc" +: 2 +: 2L +: true +: Nil) foreach { someValue =>
+        val tinyType: TinyType[Any] = new TinyType[Any] with Sensitive {
+          override val value: Any = someValue
+        }
+
+        tinyType.toString shouldBe "<sensitive>"
+      }
+    }
+  }
+}
+
 class TinyTypeFactorySpec extends WordSpec {
 
   "apply" should {
@@ -48,7 +64,7 @@ class TinyTypeFactorySpec extends WordSpec {
     "throw an IllegalArgument exception if the first type constraint is not met" in {
       intercept[IllegalArgumentException] {
         TinyTypeTest("abc")
-      }.getMessage shouldBe "TinyTypeTest cannot have 'abc' value"
+      }.getMessage shouldBe "ch.datascience.tinytypes.TinyTypeTest cannot have 'abc' value"
     }
 
     "throw an IllegalArgument exception if one of defined type constraints is not met" in {
@@ -64,8 +80,14 @@ class TinyTypeFactorySpec extends WordSpec {
       TinyTypeTest.from("def").map(_.value) shouldBe Right("def")
     }
 
-    "left with the errors if the type constraints are not met" in {
-      TinyTypeTest.from("abc") shouldBe Left("TinyTypeTest cannot have 'abc' value")
+    "return Left with the IllegalArgumentException containing errors if the type constraints are not met" in {
+      val result = TinyTypeTest.from("abc")
+
+      result shouldBe a[Left[_, _]]
+
+      val Left(exception) = result
+      exception            shouldBe an[IllegalArgumentException]
+      exception.getMessage shouldBe "ch.datascience.tinytypes.TinyTypeTest cannot have 'abc' value"
     }
   }
 }
