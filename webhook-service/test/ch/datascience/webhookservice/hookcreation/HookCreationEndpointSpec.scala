@@ -30,7 +30,7 @@ import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
-import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, PersonalAccessTokenAlreadyCreated}
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -78,6 +78,22 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       contentAsString(response) shouldBe ""
     }
 
+    "return OK when hook was already created" in new TestCase {
+
+      val accessToken    = accessTokens.generateOne
+      val projectHookUrl = projectHookUrls.generateOne
+
+      (hookCreator
+        .createHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(IO.raiseError(HookAlreadyCreated(projectId, projectHookUrl)))
+
+      val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
+
+      status(response)          shouldBe OK
+      contentAsString(response) shouldBe ""
+    }
+
     "return UNAUTHORIZED when neither PRIVATE-TOKEN nor OAUTH-TOKEN is not present" in new TestCase {
 
       val response = call(createHook(projectId), request)
@@ -103,44 +119,6 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       status(response)        shouldBe UNAUTHORIZED
       contentType(response)   shouldBe Some(JSON)
       contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
-    }
-
-    "return CONFLICT when hook was already created" in new TestCase {
-
-      val accessToken    = accessTokens.generateOne
-      val projectHookUrl = projectHookUrls.generateOne
-
-      (hookCreator
-        .createHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(IO.raiseError(HookAlreadyCreated(projectId, projectHookUrl)))
-
-      val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
-
-      status(response)      shouldBe CONFLICT
-      contentType(response) shouldBe Some(JSON)
-      contentAsJson(response) shouldBe ErrorMessage(
-        s"Hook already created for projectId: $projectId, url: $projectHookUrl"
-      ).toJson
-    }
-
-    "return CONFLICT when personal access token for the hook was already created" in new TestCase {
-
-      val accessToken    = accessTokens.generateOne
-      val projectHookUrl = projectHookUrls.generateOne
-
-      (hookCreator
-        .createHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(IO.raiseError(PersonalAccessTokenAlreadyCreated(projectId)))
-
-      val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
-
-      status(response)      shouldBe CONFLICT
-      contentType(response) shouldBe Some(JSON)
-      contentAsJson(response) shouldBe ErrorMessage(
-        s"Hook's Personal Access Token already created for projectId: $projectId"
-      ).toJson
     }
 
     "return INTERNAL_SERVER_ERROR when there was an error during hook creation" in new TestCase {

@@ -62,7 +62,7 @@ private class HookCreator[Interpretation[_]: Monad](
       _                   <- eventsHistoryLoader.loadAllEvents(projectInfo, accessToken)
       _                   <- logger.info(s"Hook created for project with id $projectId")
     } yield ()
-  } recoverWith loggingError(projectId)
+  } recoverWith logging(projectId)
 
   private def failIfProjectHookExists(projectId:      ProjectId,
                                       projectHookUrl: ProjectHookUrl): Boolean => Interpretation[Unit] = {
@@ -70,9 +70,9 @@ private class HookCreator[Interpretation[_]: Monad](
     case false => ME.pure(())
   }
 
-  private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Unit]] = {
+  private def logging(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Unit]] = {
     case exception @ HookAlreadyCreated(_, _) =>
-      logger.error(exception.getMessage)
+      logger.info(exception.getMessage)
       ME.raiseError(exception)
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
@@ -86,10 +86,6 @@ private object HookCreator {
       projectId:      ProjectId,
       projectHookUrl: ProjectHookUrl
   ) extends RuntimeException(s"Hook already created for projectId: $projectId, url: $projectHookUrl")
-
-  final case class PersonalAccessTokenAlreadyCreated(
-      projectId: ProjectId
-  ) extends RuntimeException(s"Hook's Personal Access Token already created for projectId: $projectId")
 }
 
 @Singleton

@@ -26,9 +26,9 @@ import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, PersonalAccessTokenAlreadyCreated}
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
 import javax.inject.{Inject, Singleton}
-import play.api.mvc.{AbstractController, ControllerComponents, Request, Result}
+import play.api.mvc._
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -41,7 +41,7 @@ class HookCreationEndpoint @Inject()(
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
-  def createHook(projectId: ProjectId) = Action.async { implicit request =>
+  def createHook(projectId: ProjectId): Action[AnyContent] = Action.async { implicit request =>
     (for {
       accessToken <- findAccessToken(request)
       _           <- hookCreator.createHook(projectId, accessToken)
@@ -62,9 +62,8 @@ class HookCreationEndpoint @Inject()(
     }
 
   private val toResult: PartialFunction[Throwable, Result] = {
-    case ex @ HookAlreadyCreated(_, _)             => Conflict(ErrorMessage(ex.getMessage).toJson)
-    case ex @ PersonalAccessTokenAlreadyCreated(_) => Conflict(ErrorMessage(ex.getMessage).toJson)
-    case ex @ UnauthorizedException                => Unauthorized(ErrorMessage(ex.getMessage).toJson)
-    case NonFatal(exception)                       => InternalServerError(ErrorMessage(exception.getMessage).toJson)
+    case HookAlreadyCreated(_, _)   => Ok
+    case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
+    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage).toJson)
   }
 }

@@ -80,20 +80,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Info(s"Hook created for project with id $projectId"))
     }
 
-    "log an error if finding project hook url fails" in new TestCase {
-
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(error)
-
-      hookCreation.createHook(projectId, accessToken) shouldBe error
-
-      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
-    }
-
-    "log an Error and fail with HookAlreadyCreated if hook is already created for that project" in new TestCase {
+    "log an Info and fail with HookAlreadyCreated if hook is already created for that project" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -107,7 +94,20 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       val expectedException = HookAlreadyCreated(projectId, projectHookUrl)
       hookCreation.createHook(projectId, accessToken) shouldBe context.raiseError(expectedException)
 
-      logger.loggedOnly(Error(expectedException.getMessage))
+      logger.loggedOnly(Info(expectedException.getMessage))
+    }
+
+    "log an error if finding project hook url fails" in new TestCase {
+
+      val exception: Exception    = exceptions.generateOne
+      val error:     Try[Nothing] = context.raiseError(exception)
+      (projectHookUrlFinder.findProjectHookUrl _)
+        .expects()
+        .returning(error)
+
+      hookCreation.createHook(projectId, accessToken) shouldBe error
+
+      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
     "log an error if hook presence verification fails" in new TestCase {
