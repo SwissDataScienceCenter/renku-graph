@@ -38,9 +38,9 @@ The endpoint requires an authorization token. It has to be
 
 | Status                     | Description                                                                           |
 |----------------------------|---------------------------------------------------------------------------------------|
-| CREATED (201)              | For valid payloads                                                                    |
+| OK (200)                   | When hook already exists for the project                                              |
+| CREATED (201)              | When a new hook was created                                                           |
 | UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `OAUTH-TOKEN` in the header or it's invalid |
-| CONFLICT (409)             | When the hook already exists                                                          |
 | INTERNAL SERVER ERROR (500)| When there were problems with webhook creation                                        |
 
 #### POST /webhooks/events
