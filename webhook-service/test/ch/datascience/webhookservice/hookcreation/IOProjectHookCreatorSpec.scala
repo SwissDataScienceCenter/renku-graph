@@ -40,7 +40,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
 
-  "createHook" should {
+  "create" should {
 
     "send relevant Json payload and 'PRIVATE-TOKEN' header (when Personal Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
@@ -55,7 +55,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
           .willReturn(created())
       }
 
-      hookCreator.createHook(projectHook, personalAccessToken).unsafeRunSync() shouldBe ((): Unit)
+      hookCreator.create(projectHook, personalAccessToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
@@ -71,7 +71,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
           .willReturn(created())
       }
 
-      hookCreator.createHook(projectHook, oauthAccessToken).unsafeRunSync() shouldBe ((): Unit)
+      hookCreator.create(projectHook, oauthAccessToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "return an error if gitLabUrl cannot be read" in new TestCase {
@@ -80,7 +80,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
       val accessToken = accessTokens.generateOne
 
       intercept[Exception] {
-        hookCreator.createHook(projectHook, accessToken).unsafeRunSync()
+        hookCreator.create(projectHook, accessToken).unsafeRunSync()
       } shouldBe exception
     }
 
@@ -95,7 +95,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
       }
 
       intercept[Exception] {
-        hookCreator.createHook(projectHook, accessToken).unsafeRunSync()
+        hookCreator.create(projectHook, accessToken).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -110,7 +110,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
       }
 
       intercept[Exception] {
-        hookCreator.createHook(projectHook, accessToken).unsafeRunSync()
+        hookCreator.create(projectHook, accessToken).unsafeRunSync()
       }.getMessage shouldBe s"POST $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.BadRequest}; body: some message"
     }
   }

@@ -18,6 +18,7 @@
 
 package ch.datascience.webhookservice.hookcreation
 
+import cats.data.EitherT
 import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
@@ -25,7 +26,7 @@ import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
+import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, HookCreationResult}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
@@ -46,46 +47,68 @@ private class HookCreator[Interpretation[_]: Monad](
     logger:               Logger[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable]) {
 
+  import HookCreator.HookCreationResult._
   import hookTokenCrypto._
+  import projectHookCreator.create
   import projectHookUrlFinder._
   import projectHookVerifier._
   import projectInfoFinder._
 
-  def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[Unit] = {
+  def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookCreationResult] = {
     for {
-      projectHookUrl      <- findProjectHookUrl
-      projectHookPresence <- checkProjectHookPresence(HookIdentifier(projectId, projectHookUrl), accessToken)
-      _                   <- failIfProjectHookExists(projectId, projectHookUrl)(projectHookPresence)
-      projectInfo         <- findProjectInfo(projectId, accessToken)
-      serializedHookToken <- encrypt(HookToken(projectInfo.id))
-      _                   <- projectHookCreator.createHook(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-      _                   <- eventsHistoryLoader.loadAllEvents(projectInfo, accessToken)
-      _                   <- logger.info(s"Hook created for project with id $projectId")
+      projectHookUrl      <- right(findProjectHookUrl)
+      projectHookPresent  <- right(checkProjectHookPresence(HookIdentifier(projectId, projectHookUrl), accessToken))
+      _                   <- leftIfProjectHookExists(projectHookPresent, projectId, projectHookUrl)
+      projectInfo         <- right(findProjectInfo(projectId, accessToken))
+      serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
+      _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
+      _                   <- right(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken))
     } yield ()
-  } recoverWith logging(projectId)
+  } fold (leftToHookExisted, rightToHookCreated(projectId)) recoverWith loggingError(projectId)
 
-  private def failIfProjectHookExists(projectId:      ProjectId,
-                                      projectHookUrl: ProjectHookUrl): Boolean => Interpretation[Unit] = {
-    case true  => ME.raiseError(HookAlreadyCreated(projectId, projectHookUrl))
-    case false => ME.pure(())
+  private def leftIfProjectHookExists(
+      projectHookPresent: Boolean,
+      projectId:          ProjectId,
+      projectHookUrl:     ProjectHookUrl): EitherT[Interpretation, HookAlreadyCreated, Unit] = EitherT.cond[Interpretation](
+    test  = !projectHookPresent,
+    left  = HookAlreadyCreated(projectId, projectHookUrl),
+    right = ()
+  )
+
+  private lazy val leftToHookExisted: HookAlreadyCreated => HookCreationResult = hookAlreadyCreated => {
+    logger.info(
+      s"Hook already created for projectId: ${hookAlreadyCreated.projectId}, url: ${hookAlreadyCreated.projectHookUrl}"
+    )
+    HookExisted
   }
 
-  private def logging(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case exception @ HookAlreadyCreated(_, _) =>
-      logger.info(exception.getMessage)
-      ME.raiseError(exception)
+  private def rightToHookCreated(projectId: ProjectId): Unit => HookCreationResult = _ => {
+    logger.info(s"Hook created for project with id $projectId")
+    HookCreated
+  }
+
+  private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[HookCreationResult]] = {
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
       ME.raiseError(exception)
   }
+
+  private def right[T](value: Interpretation[T]): EitherT[Interpretation, HookAlreadyCreated, T] =
+    EitherT.right[HookAlreadyCreated](value)
 }
 
 private object HookCreator {
 
-  final case class HookAlreadyCreated(
+  sealed trait HookCreationResult
+  object HookCreationResult {
+    final case object HookCreated extends HookCreationResult
+    final case object HookExisted extends HookCreationResult
+  }
+
+  private case class HookAlreadyCreated(
       projectId:      ProjectId,
       projectHookUrl: ProjectHookUrl
-  ) extends RuntimeException(s"Hook already created for projectId: $projectId, url: $projectHookUrl")
+  )
 }
 
 @Singleton

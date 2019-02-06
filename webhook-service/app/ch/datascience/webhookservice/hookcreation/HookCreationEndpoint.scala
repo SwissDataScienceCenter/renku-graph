@@ -26,7 +26,8 @@ import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import javax.inject.{Inject, Singleton}
 import play.api.mvc._
 
@@ -43,11 +44,11 @@ class HookCreationEndpoint @Inject()(
 
   def createHook(projectId: ProjectId): Action[AnyContent] = Action.async { implicit request =>
     (for {
-      accessToken <- findAccessToken(request)
-      _           <- hookCreator.createHook(projectId, accessToken)
-    } yield Created)
+      accessToken    <- findAccessToken(request)
+      creationResult <- hookCreator.createHook(projectId, accessToken)
+    } yield toHttpResult(creationResult))
       .unsafeToFuture()
-      .recover(toResult)
+      .recover(withHttpResult)
   }
 
   private def findAccessToken(request: Request[_]): IO[AccessToken] = IO.fromEither {
@@ -61,8 +62,12 @@ class HookCreationEndpoint @Inject()(
       to(_).leftMap(_ => UnauthorizedException)
     }
 
-  private val toResult: PartialFunction[Throwable, Result] = {
-    case HookAlreadyCreated(_, _)   => Ok
+  private lazy val toHttpResult: HookCreationResult => Result = {
+    case HookCreated => Created
+    case HookExisted => Ok
+  }
+
+  private val withHttpResult: PartialFunction[Throwable, Result] = {
     case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
     case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage).toJson)
   }

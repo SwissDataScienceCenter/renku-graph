@@ -32,7 +32,7 @@ import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.model.{HookToken, ProjectInfo}
@@ -47,7 +47,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
   "createHook" should {
 
-    "succeed if hook does not exists and was successfully created" in new TestCase {
+    "return HookCreated if hook does not exists and it was successfully created" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -69,18 +69,18 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(serializedHookToken))
 
       (projectHookCreator
-        .createHook(_: ProjectHook, _: AccessToken))
+        .create(_: ProjectHook, _: AccessToken))
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(context.pure(()))
 
       expectEventsHistoryLoader(returning = context.pure(()))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(())
+      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(HookCreated)
 
       logger.loggedOnly(Info(s"Hook created for project with id $projectId"))
     }
 
-    "log an Info and fail with HookAlreadyCreated if hook is already created for that project" in new TestCase {
+    "return HookExisted if hook was already created for that project" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -91,10 +91,9 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
         .returning(context.pure(true))
 
-      val expectedException = HookAlreadyCreated(projectId, projectHookUrl)
-      hookCreation.createHook(projectId, accessToken) shouldBe context.raiseError(expectedException)
+      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(HookExisted)
 
-      logger.loggedOnly(Info(expectedException.getMessage))
+      logger.loggedOnly(Info(s"Hook already created for projectId: $projectId, url: $projectHookUrl"))
     }
 
     "log an error if finding project hook url fails" in new TestCase {
@@ -203,7 +202,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
       (projectHookCreator
-        .createHook(_: ProjectHook, _: AccessToken))
+        .create(_: ProjectHook, _: AccessToken))
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(error)
 
@@ -234,7 +233,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(serializedHookToken))
 
       (projectHookCreator
-        .createHook(_: ProjectHook, _: AccessToken))
+        .create(_: ProjectHook, _: AccessToken))
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(context.pure(()))
 

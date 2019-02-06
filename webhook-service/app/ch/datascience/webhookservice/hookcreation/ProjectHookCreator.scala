@@ -31,7 +31,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait ProjectHookCreator[Interpretation[_]] {
-  def createHook(
+  def create(
       projectHook: ProjectHook,
       accessToken: AccessToken
   ): Interpretation[Unit]
@@ -61,7 +61,7 @@ private class IOProjectHookCreator @Inject()(
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  def createHook(projectHook: ProjectHook, accessToken: AccessToken): IO[Unit] =
+  def create(projectHook: ProjectHook, accessToken: AccessToken): IO[Unit] =
     for {
       gitLabUrl <- gitLabConfigProvider.get()
       uri       <- validateUri(s"$gitLabUrl/api/v4/projects/${projectHook.projectId}/hooks")

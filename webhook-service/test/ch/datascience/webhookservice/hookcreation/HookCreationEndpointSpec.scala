@@ -31,6 +31,7 @@ import ch.datascience.graph.events._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookAlreadyCreated
+import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -54,7 +55,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       (hookCreator
         .createHook(_: ProjectId, _: PersonalAccessToken))
         .expects(projectId, accessToken)
-        .returning(IO.pure(()))
+        .returning(IO.pure(HookCreated))
 
       val response = call(createHook(projectId), request.withHeaders("PRIVATE-TOKEN" -> accessToken.value))
 
@@ -70,7 +71,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       (hookCreator
         .createHook(_: ProjectId, _: OAuthAccessToken))
         .expects(projectId, accessToken)
-        .returning(IO.pure(()))
+        .returning(IO.pure(HookCreated))
 
       val response = call(createHook(projectId), request.withHeaders("OAUTH-TOKEN" -> accessToken.value))
 
@@ -86,7 +87,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
       (hookCreator
         .createHook(_: ProjectId, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(IO.raiseError(HookAlreadyCreated(projectId, projectHookUrl)))
+        .returning(IO.pure(HookExisted))
 
       val response = call(createHook(projectId), request.withAuthorizationHeader(accessToken))
 
