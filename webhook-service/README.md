@@ -10,7 +10,7 @@ This is a microservice which:
 | Method | Path                               | Description                               |
 |--------|------------------------------------|-------------------------------------------|
 |  GET   | ```/ping```                        | To check if service is healthy            |
-|  POST  | ```/webhooks/projects/:id```       | Creates a webhook for a project in GitLab |
+|  POST  | ```/projects/:id/webhooks```       | Creates a webhook for a project in GitLab |
 |  POST  | ```/webhooks/events```             | Consumes push events sent from GitLab     |
 
 #### GET /ping
@@ -24,7 +24,7 @@ Verifies service health.
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
 
-#### POST /webhooks/projects/:id
+#### POST /projects/:id/webhooks
 
 Creates a webhook for a project with the given `project id`.
 

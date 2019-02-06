@@ -45,7 +45,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class HookCreationEndpointSpec extends WordSpec with MockFactory with GuiceOneAppPerTest with Injecting {
 
-  "POST /webhooks/projects/:id" should {
+  "POST /projects/:id/webhooks" should {
 
     "return CREATED when a valid PRIVATE-TOKEN is present in the header " +
       "and webhook is successfully created for project with the given id in in GitLab" in new TestCase {
