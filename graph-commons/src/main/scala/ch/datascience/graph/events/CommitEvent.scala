@@ -27,14 +27,14 @@ import io.circe.Decoder
 import play.api.libs.json.Format
 
 final case class CommitEvent(
-    id:              CommitId,
-    message:         CommitMessage,
-    committedDate:   CommittedDate,
-    pushUser:        PushUser,
-    author:          User,
-    committer:       User,
-    parents:         List[CommitId],
-    project:         Project
+    id:            CommitId,
+    message:       CommitMessage,
+    committedDate: CommittedDate,
+    pushUser:      PushUser,
+    author:        User,
+    committer:     User,
+    parents:       List[CommitId],
+    project:       Project
 )
 
 final class CommitId private (val value: String) extends AnyVal with TinyType[String]
