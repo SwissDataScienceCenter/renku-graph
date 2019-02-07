@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.project
 
 import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
@@ -28,7 +28,7 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait ProjectInfoFinder[Interpretation[_]] {
+trait ProjectInfoFinder[Interpretation[_]] {
   def findProjectInfo(
       projectId:   ProjectId,
       accessToken: AccessToken
@@ -36,8 +36,8 @@ private trait ProjectInfoFinder[Interpretation[_]] {
 }
 
 @Singleton
-private class IOProjectInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
-    implicit executionContext:                                    ExecutionContext)
+class IOProjectInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
+    implicit executionContext:                            ExecutionContext)
     extends IORestClient
     with ProjectInfoFinder[IO] {
 

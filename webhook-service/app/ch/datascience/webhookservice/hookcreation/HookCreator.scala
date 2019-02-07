@@ -31,6 +31,7 @@ import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.model.HookToken
+import ch.datascience.webhookservice.project.{IOProjectInfoFinder, ProjectInfoFinder}
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 
