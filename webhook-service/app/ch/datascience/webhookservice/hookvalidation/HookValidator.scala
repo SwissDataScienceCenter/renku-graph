@@ -18,6 +18,7 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
+import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
@@ -26,7 +27,6 @@ import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.model.ProjectInfo
-import ch.datascience.webhookservice.project.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.project._
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
@@ -34,7 +34,7 @@ import javax.inject.{Inject, Singleton}
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private class HookValidator[Interpretation[_]](
+class HookValidator[Interpretation[_]](
     projectInfoFinder:    ProjectInfoFinder[Interpretation],
     projectHookUrlFinder: ProjectHookUrlFinder[Interpretation],
     projectHookVerifier:  ProjectHookVerifier[Interpretation],
@@ -75,7 +75,7 @@ private class HookValidator[Interpretation[_]](
   }
 }
 
-private object HookValidator {
+object HookValidator {
 
   sealed trait HookValidationResult
   object HookValidationResult {
@@ -85,7 +85,7 @@ private object HookValidator {
 }
 
 @Singleton
-private class IOHookValidator @Inject()(
+class IOHookValidator @Inject()(
     projectInfoFinder:    IOProjectInfoFinder,
     projectHookUrlFinder: IOProjectHookUrlFinder,
     projectHookVerifier:  IOProjectHookVerifier,

@@ -33,8 +33,9 @@ import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
+import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
+import ch.datascience.webhookservice.hookvalidation.TryHookValidator
 import ch.datascience.webhookservice.model.{HookToken, ProjectInfo}
-import ch.datascience.webhookservice.project.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.project._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -53,10 +54,10 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects()
         .returning(context.pure(projectHookUrl))
 
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(false))
+      (projectHookValidator
+        .validateHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(HookMissing))
 
       (projectInfoFinder
         .findProjectInfo(_: ProjectId, _: AccessToken))
@@ -86,10 +87,10 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects()
         .returning(context.pure(projectHookUrl))
 
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(true))
+      (projectHookValidator
+        .validateHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(HookExists))
 
       hookCreation.createHook(projectId, accessToken) shouldBe context.pure(HookExisted)
 
@@ -109,7 +110,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
-    "log an error if hook presence verification fails" in new TestCase {
+    "log an error if hook validation fails" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -117,9 +118,9 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
+      (projectHookValidator
+        .validateHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
         .returning(error)
 
       hookCreation.createHook(projectId, accessToken) shouldBe error
@@ -133,10 +134,10 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects()
         .returning(context.pure(projectHookUrl))
 
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(false))
+      (projectHookValidator
+        .validateHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(HookMissing))
 
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
@@ -156,10 +157,10 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects()
         .returning(context.pure(projectHookUrl))
 
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(false))
+      (projectHookValidator
+        .validateHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(HookMissing))
 
       (projectInfoFinder
         .findProjectInfo(_: ProjectId, _: AccessToken))
@@ -184,10 +185,10 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects()
         .returning(context.pure(projectHookUrl))
 
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(false))
+      (projectHookValidator
+        .validateHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(HookMissing))
 
       (projectInfoFinder
         .findProjectInfo(_: ProjectId, _: AccessToken))
@@ -217,10 +218,10 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects()
         .returning(context.pure(projectHookUrl))
 
-      (projectHookVerifier
-        .checkProjectHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), accessToken)
-        .returning(context.pure(false))
+      (projectHookValidator
+        .validateHook(_: ProjectId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(context.pure(HookMissing))
 
       (projectInfoFinder
         .findProjectInfo(_: ProjectId, _: AccessToken))
@@ -258,7 +259,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     val logger               = TestLogger[Try]()
     val projectInfoFinder    = mock[ProjectInfoFinder[Try]]
-    val projectHookVerifier  = mock[ProjectHookVerifier[Try]]
+    val projectHookValidator = mock[TryHookValidator]
     val projectHookCreator   = mock[ProjectHookCreator[Try]]
     val projectHookUrlFinder = mock[TryProjectHookUrlFinder]
 
@@ -272,7 +273,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     val hookCreation = new HookCreator[Try](
       projectHookUrlFinder,
-      projectHookVerifier,
+      projectHookValidator,
       projectInfoFinder,
       hookTokenCrypto,
       projectHookCreator,

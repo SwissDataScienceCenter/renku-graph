@@ -18,6 +18,7 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
+import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.clients.AccessToken
@@ -30,8 +31,8 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.model.ProjectVisibility
-import ch.datascience.webhookservice.project.ProjectHookVerifier.HookIdentifier
-import ch.datascience.webhookservice.project.{ProjectHookVerifier, ProjectInfoFinder, TryProjectHookUrlFinder}
+import ch.datascience.webhookservice.project._
+import io.chrisdavenport.log4cats.Logger
 import org.scalacheck.Arbitrary
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -200,3 +201,10 @@ class HookValidatorSpec extends WordSpec with MockFactory {
     val validator            = new HookValidator[Try](projectInfoFinder, projectHookUrlFinder, projectHookVerifier, logger)
   }
 }
+
+class TryHookValidator(
+    projectInfoFinder:    ProjectInfoFinder[Try],
+    projectHookUrlFinder: ProjectHookUrlFinder[Try],
+    projectHookVerifier:  ProjectHookVerifier[Try],
+    logger:               Logger[Try]
+) extends HookValidator[Try](projectInfoFinder, projectHookUrlFinder, projectHookVerifier, logger)

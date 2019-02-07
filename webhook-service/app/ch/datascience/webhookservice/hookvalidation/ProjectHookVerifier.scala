@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.project
+package ch.datascience.webhookservice.hookvalidation
 
 import ProjectHookVerifier.HookIdentifier
 import cats.effect.IO
@@ -30,14 +30,14 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-trait ProjectHookVerifier[Interpretation[_]] {
+private trait ProjectHookVerifier[Interpretation[_]] {
   def checkProjectHookPresence(
       projectHookId: HookIdentifier,
       accessToken:   AccessToken
   ): Interpretation[Boolean]
 }
 
-object ProjectHookVerifier {
+private object ProjectHookVerifier {
 
   final case class HookIdentifier(
       projectId:      ProjectId,
@@ -46,7 +46,7 @@ object ProjectHookVerifier {
 }
 
 @Singleton
-class IOProjectHookVerifier @Inject()(
+private class IOProjectHookVerifier @Inject()(
     gitLabUrlProvider:       IOGitLabConfigProvider
 )(implicit executionContext: ExecutionContext)
     extends IORestClient
