@@ -46,6 +46,9 @@ The endpoint requires an authorization token. It has to be
 
 #### POST /projects/:id/webhooks/validation
 
+**Notice**
+This endpoint is under development and works just for public projects. For non-public projects it responds with INTERNAL SERVER ERROR (500).
+
 Validates the webhook for the project with the given `project id`. It succeeds (OK) if either the project is public and there's a hook for it or it's private, there's a hook for it and a Personal Access Token (PAT). If either there's no webhook or there's no PAT in case of a private project, the call results with NOT_FOUND. In case of private projects, if there's a hook created for a project but no PAT available (or the PAT doesn't work), the hook will be removed as part of the validation process.
 
 **Request format**
