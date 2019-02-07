@@ -31,7 +31,6 @@ import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.model.{HookToken, ProjectInfo}

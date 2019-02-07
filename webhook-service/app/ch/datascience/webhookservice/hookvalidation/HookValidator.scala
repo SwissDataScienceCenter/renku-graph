@@ -18,18 +18,61 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
+import cats.MonadError
 import cats.effect.IO
+import cats.implicits._
+import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
-import javax.inject.Singleton
+import ch.datascience.logging.IOLogger
+import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
+import ch.datascience.webhookservice.model.ProjectInfo
+import ch.datascience.webhookservice.project.ProjectHookVerifier.HookIdentifier
+import ch.datascience.webhookservice.project._
+import io.chrisdavenport.log4cats.Logger
+import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
-private class HookValidator[Interpretation[_]] {
-  import HookValidator._
-  import ch.datascience.clients.AccessToken
+private class HookValidator[Interpretation[_]](
+    projectInfoFinder:    ProjectInfoFinder[Interpretation],
+    projectHookUrlFinder: ProjectHookUrlFinder[Interpretation],
+    projectHookVerifier:  ProjectHookVerifier[Interpretation],
+    logger:               Logger[Interpretation]
+)(implicit ME:            MonadError[Interpretation, Throwable]) {
 
-  def validateHook(id: ProjectId, accessToken: AccessToken): Interpretation[HookValidationResult] = ???
+  import HookValidator.HookValidationResult._
+  import ch.datascience.webhookservice.model.ProjectVisibility._
+  import projectHookUrlFinder._
+  import projectHookVerifier._
+  import projectInfoFinder._
 
+  def validateHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookValidationResult] = {
+    for {
+      projectInfo                 <- findProjectInfo(projectId, accessToken)
+      hookUrl                     <- findProjectHookUrl
+      hookPresent                 <- checkProjectHookPresence(HookIdentifier(projectId, hookUrl), accessToken)
+      afterVisibilityCheckPresent <- failIfNonPublicProject(hookPresent, projectInfo)
+      validationResult            <- toValidationResult(afterVisibilityCheckPresent, projectId)
+    } yield validationResult
+  } recoverWith loggingError(projectId)
+
+  private def failIfNonPublicProject(projectHookPresent: Boolean, projectInfo: ProjectInfo): Interpretation[Boolean] =
+    if (projectInfo.visibility == Public) ME.pure(projectHookPresent)
+    else ME.raiseError(new NotImplementedError("Hook validation does not work for private projects"))
+
+  private def toValidationResult(projectHookPresent: Boolean,
+                                 projectId:          ProjectId): Interpretation[HookValidationResult] =
+    if (projectHookPresent)
+      logger.info(s"Hook exists for project with id $projectId").map(_ => HookExists)
+    else
+      logger.info(s"Hook missing for project with id $projectId").map(_ => HookMissing)
+
+  private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[HookValidationResult]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"Hook validation fails for project with id $projectId")
+      ME.raiseError(exception)
+  }
 }
 
 private object HookValidator {
@@ -42,4 +85,9 @@ private object HookValidator {
 }
 
 @Singleton
-private class IOHookValidator extends HookValidator[IO] {}
+private class IOHookValidator @Inject()(
+    projectInfoFinder:    IOProjectInfoFinder,
+    projectHookUrlFinder: IOProjectHookUrlFinder,
+    projectHookVerifier:  IOProjectHookVerifier,
+    logger:               IOLogger
+) extends HookValidator[IO](projectInfoFinder, projectHookUrlFinder, projectHookVerifier, logger)
