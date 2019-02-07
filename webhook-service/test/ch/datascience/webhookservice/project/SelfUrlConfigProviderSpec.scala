@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.project
 
 import cats.MonadError
 import cats.implicits._
@@ -63,7 +63,7 @@ class SelfUrlConfigProviderSpec extends WordSpec {
       val Failure(exception) = new SelfUrlConfig[Try](config).get()
 
       exception.getMessage should include(
-        "'123' is not a valid ch.datascience.webhookservice.hookcreation.SelfUrlConfig.SelfUrl"
+        "'123' is not a valid ch.datascience.webhookservice.project.SelfUrlConfig.SelfUrl"
       )
     }
 

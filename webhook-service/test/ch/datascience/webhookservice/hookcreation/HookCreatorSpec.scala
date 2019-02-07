@@ -34,9 +34,9 @@ import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
-import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.model.{HookToken, ProjectInfo}
-import ch.datascience.webhookservice.project.ProjectInfoFinder
+import ch.datascience.webhookservice.project.ProjectHookVerifier.HookIdentifier
+import ch.datascience.webhookservice.project._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -257,15 +257,10 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     val context = MonadError[Try, Throwable]
 
-    val logger              = TestLogger[Try]()
-    val projectInfoFinder   = mock[ProjectInfoFinder[Try]]
-    val projectHookVerifier = mock[ProjectHookVerifier[Try]]
-    val projectHookCreator  = mock[ProjectHookCreator[Try]]
-
-    class TryProjectHookUrlFinder(
-        selfUrlConfig: SelfUrlConfig[Try]
-    )(implicit ME:     MonadError[Try, Throwable])
-        extends ProjectHookUrlFinder[Try](selfUrlConfig)
+    val logger               = TestLogger[Try]()
+    val projectInfoFinder    = mock[ProjectInfoFinder[Try]]
+    val projectHookVerifier  = mock[ProjectHookVerifier[Try]]
+    val projectHookCreator   = mock[ProjectHookCreator[Try]]
     val projectHookUrlFinder = mock[TryProjectHookUrlFinder]
 
     class TryHookTokenCrypt(secret: Secret) extends HookTokenCrypto[Try](secret)

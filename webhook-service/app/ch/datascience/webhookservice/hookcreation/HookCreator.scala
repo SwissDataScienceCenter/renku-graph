@@ -28,10 +28,10 @@ import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
 import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, HookCreationResult}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
-import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
-import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.model.HookToken
-import ch.datascience.webhookservice.project.{IOProjectInfoFinder, ProjectInfoFinder}
+import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.project.ProjectHookVerifier.HookIdentifier
+import ch.datascience.webhookservice.project._
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 

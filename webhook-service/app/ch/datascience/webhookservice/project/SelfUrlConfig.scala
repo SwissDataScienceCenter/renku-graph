@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.project
 
+import SelfUrlConfig.SelfUrl
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import ch.datascience.webhookservice.hookcreation.SelfUrlConfig.SelfUrl
 import eu.timepit.refined.api.{RefType, Refined}
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration

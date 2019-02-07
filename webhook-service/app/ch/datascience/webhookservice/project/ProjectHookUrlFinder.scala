@@ -16,21 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.project
 
+import ProjectHookUrlFinder.ProjectHookUrl
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
-import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
 import eu.timepit.refined.api.{RefType, Refined}
 import io.circe.Decoder
 import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
 
-private class ProjectHookUrlFinder[Interpretation[_]](
+class ProjectHookUrlFinder[Interpretation[_]](
     selfUrlConfig: SelfUrlConfig[Interpretation]
 )(implicit ME:     MonadError[Interpretation, Throwable]) {
 
@@ -41,7 +41,7 @@ private class ProjectHookUrlFinder[Interpretation[_]](
     } yield projectHookUrl
 }
 
-private object ProjectHookUrlFinder {
+object ProjectHookUrlFinder {
   import eu.timepit.refined.string.Url
 
   class ProjectHookUrl private (val value: String) extends AnyVal with TinyType[String]
@@ -60,6 +60,6 @@ private object ProjectHookUrlFinder {
 }
 
 @Singleton
-private class IOProjectHookUrlFinder @Inject()(
+class IOProjectHookUrlFinder @Inject()(
     selfUrlConfig: IOSelfUrlConfigProvider
 ) extends ProjectHookUrlFinder[IO](selfUrlConfig)

@@ -22,8 +22,10 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.hookcreation.SelfUrlConfig.SelfUrl
 import ch.datascience.webhookservice.model._
+import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.project.ProjectHookVerifier.HookIdentifier
+import ch.datascience.webhookservice.project.SelfUrlConfig.SelfUrl
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 
@@ -61,4 +63,12 @@ object ServiceTypesGenerators {
 
   implicit val selfUrls: Gen[SelfUrl] =
     validatedUrls map (url => SelfUrl.apply(url.value))
+
+  implicit val projectHookUrls: Gen[ProjectHookUrl] =
+    validatedUrls map (url => ProjectHookUrl.apply(url.value))
+
+  implicit val projectHookIds: Gen[HookIdentifier] = for {
+    projectId <- projectIds
+    hookUrl   <- projectHookUrls
+  } yield HookIdentifier(projectId, hookUrl)
 }

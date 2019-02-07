@@ -20,7 +20,7 @@ package ch.datascience.controllers
 
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import play.api.libs.json.{JsError, JsPath, Json, KeyPathNode}
+import play.api.libs.json._
 
 class ErrorMessageSpec extends WordSpec {
 

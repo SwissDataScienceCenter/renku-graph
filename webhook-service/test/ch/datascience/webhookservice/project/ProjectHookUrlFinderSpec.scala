@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.project
 
 import cats.MonadError
 import cats.implicits._
@@ -24,8 +24,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
-import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
-import ch.datascience.webhookservice.hookcreation.SelfUrlConfig.SelfUrl
+import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.project.SelfUrlConfig.SelfUrl
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -71,3 +71,5 @@ class ProjectHookUrlFinderSpec extends WordSpec with MockFactory {
     val hookUrlFinder = new ProjectHookUrlFinder[Try](selfUrlConfig)
   }
 }
+
+class TryProjectHookUrlFinder(selfUrlConfig: SelfUrlConfig[Try]) extends ProjectHookUrlFinder[Try](selfUrlConfig)
