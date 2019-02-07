@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.hookvalidation
 
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
+import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
+import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
 import ch.datascience.webhookservice.security.IOAccessTokenFinder
 import javax.inject.{Inject, Singleton}
 import play.api.mvc._
@@ -32,9 +32,9 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 @Singleton
-class HookCreationEndpoint @Inject()(
+class HookValidationEndpoint @Inject()(
     cc:                ControllerComponents,
-    hookCreator:       IOHookCreator,
+    hookValidator:     IOHookValidator,
     accessTokenFinder: IOAccessTokenFinder
 ) extends AbstractController(cc) {
 
@@ -42,18 +42,18 @@ class HookCreationEndpoint @Inject()(
 
   private implicit val executionContext: ExecutionContext = defaultExecutionContext
 
-  def createHook(projectId: ProjectId): Action[AnyContent] = Action.async { implicit request =>
+  def validateHook(projectId: ProjectId): Action[AnyContent] = Action.async { implicit request =>
     (for {
       accessToken    <- findAccessToken(request)
-      creationResult <- hookCreator.createHook(projectId, accessToken)
+      creationResult <- hookValidator.validateHook(projectId, accessToken)
     } yield toHttpResult(creationResult))
       .unsafeToFuture()
       .recover(withHttpResult)
   }
 
-  private lazy val toHttpResult: HookCreationResult => Result = {
-    case HookCreated => Created
-    case HookExisted => Ok
+  private lazy val toHttpResult: HookValidationResult => Result = {
+    case HookExists  => Ok
+    case HookMissing => NotFound
   }
 
   private val withHttpResult: PartialFunction[Throwable, Result] = {

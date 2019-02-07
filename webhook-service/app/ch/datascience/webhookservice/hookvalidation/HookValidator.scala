@@ -16,20 +16,30 @@
  * limitations under the License.
  */
 
-package ch.datascience.clients
+package ch.datascience.webhookservice.hookvalidation
 
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{Sensitive, TinyType, TinyTypeFactory}
+import cats.effect.IO
+import ch.datascience.graph.events.ProjectId
+import javax.inject.Singleton
 
-sealed trait AccessToken extends Any with TinyType[String] with Sensitive
+import scala.language.higherKinds
 
-object AccessToken {
+private class HookValidator[Interpretation[_]] {
+  import HookValidator._
+  import ch.datascience.clients.AccessToken
 
-  final class PersonalAccessToken private (val value: String) extends AnyVal with AccessToken
-  object PersonalAccessToken
-      extends TinyTypeFactory[String, PersonalAccessToken](new PersonalAccessToken(_))
-      with NonBlank
+  def validateHook(id: ProjectId, accessToken: AccessToken): Interpretation[HookValidationResult] = ???
 
-  final class OAuthAccessToken private (val value: String) extends AnyVal with AccessToken
-  object OAuthAccessToken extends TinyTypeFactory[String, OAuthAccessToken](new OAuthAccessToken(_)) with NonBlank
 }
+
+private object HookValidator {
+
+  sealed trait HookValidationResult
+  object HookValidationResult {
+    final case object HookExists  extends HookValidationResult
+    final case object HookMissing extends HookValidationResult
+  }
+}
+
+@Singleton
+private class IOHookValidator extends HookValidator[IO] {}
