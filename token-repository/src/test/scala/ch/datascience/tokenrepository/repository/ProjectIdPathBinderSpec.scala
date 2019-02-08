@@ -16,30 +16,29 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository
+package ch.datascience.tokenrepository.repository
 
-import cats.effect.IO
-import ch.datascience.http.EndpointTester._
-import org.http4s.dsl.io._
-import org.http4s.{Method, Request, Status, Uri}
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.events.EventsGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class PingEndpointSpec extends WordSpec {
+class ProjectIdPathBinderSpec extends WordSpec {
 
-  "ping" should {
+  "unapply" should {
 
-    "respond with OK and 'pong' body" in new TestCase {
-      val response = endpoint.call(
-        Request(Method.GET, Uri.uri("/ping"))
-      )
+    "convert valid projectId as string to ProjectId" in {
+      val projectId = projectIds.generateOne
 
-      response.status       shouldBe Status.Ok
-      response.body[String] shouldBe "pong"
+      ProjectIdPathBinder.unapply(projectId.toString) shouldBe Some(projectId)
     }
-  }
 
-  private trait TestCase {
-    val endpoint = new PingEndpoint[IO].ping.orNotFound
+    "return None if string value cannot be converted to an int" in {
+      ProjectIdPathBinder.unapply("a") shouldBe None
+    }
+
+    "return None if string value is blank" in {
+      ProjectIdPathBinder.unapply(" ") shouldBe None
+    }
   }
 }

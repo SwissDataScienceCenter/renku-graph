@@ -4,9 +4,10 @@ This is a microservice which provides CRUD operations for `projectId` -> `access
 
 ## API
 
-| Method | Path                               | Description                               |
-|--------|------------------------------------|-------------------------------------------|
-|  GET   | ```/ping```                        | To check if service is healthy            |
+| Method | Path                               | Description                                |
+|--------|------------------------------------|--------------------------------------------|
+|  GET   | ```/ping```                        | To check if service is healthy             |
+|  GET   | ```/projects/:id/tokens```         | Fetches an access token for the project id |
 
 #### GET /ping
 
@@ -18,6 +19,33 @@ Verifies service health.
 |----------------------------|-------------------------|
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
+
+#### GET /projects/:id/tokens
+
+Fetches an access token for a project with the given id.
+
+**Request format**
+
+The endpoint requires a `TOKEN` in the request headers.
+
+**Response**
+
+| Status                     | Description                                                                           |
+|----------------------------|---------------------------------------------------------------------------------------|
+| OK (200)                   | When an access token can be found for the project                                     |
+| NOT_FOUND (404)            | When an access token cannot be found for the project                                  |
+| UNAUTHORIZED (401)         | When there's no `TOKEN` in the header or it's invalid                                 |
+| INTERNAL SERVER ERROR (500)| When there were problems with finding the token                                       |
+
+Response for a case when the token is a Personal Access Token
+```
+{ "personalAccessToken": "<some-token-value>" }
+```
+
+Response for a case when the token is an OAuth Access Token
+```
+{ "oauthAccessToken": "<some-token-value>" }
+```
 
 ## Trying out
 

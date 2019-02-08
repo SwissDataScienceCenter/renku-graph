@@ -18,8 +18,8 @@
 
 package ch.datascience.clients
 
-import ch.datascience.tinytypes.{Sensitive, TinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{Sensitive, TinyType, TinyTypeFactory}
 
 sealed trait AccessToken extends Any with TinyType[String] with Sensitive
 
