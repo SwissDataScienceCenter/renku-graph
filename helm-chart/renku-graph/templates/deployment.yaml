@@ -35,6 +35,12 @@ spec:
                   key: triplesGenerator-play-secret
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
+            - name: JENA_DATASET_NAME
+              {{- if .Values.global.jena.dataset }}
+              value: {{ .Values.global.jena.dataset }}
+              {{- else }}
+              value: renku
+              {{- end }}
             - name: JENA_BASE_URL
               value: "http://{{ template "jena.fullname" . }}:{{ .Values.jena.service.port }}"
             - name: JENA_ADMIN_PASSWORD
