@@ -24,7 +24,12 @@ resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
 
+val doobieVersion = "0.6.0"
+libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
+libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
+
 //Test dependencies
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
-libraryDependencies += "org.scalamock"  %% "scalamock"  % "4.1.0"  % Test
-libraryDependencies += "org.scalatest"  %% "scalatest"  % "3.0.5"  % Test
+libraryDependencies += "org.tpolecat"   %% "doobie-scalatest" % doobieVersion % Test
+libraryDependencies += "org.scalacheck" %% "scalacheck"       % "1.14.0"      % Test
+libraryDependencies += "org.scalamock"  %% "scalamock"        % "4.1.0"       % Test
+libraryDependencies += "org.scalatest"  %% "scalatest"        % "3.0.5"       % Test

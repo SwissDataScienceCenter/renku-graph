@@ -18,15 +18,29 @@
 
 package ch.datascience.tokenrepository.repository
 
+import cats.MonadError
 import cats.data.OptionT
 import cats.effect.IO
 import ch.datascience.clients.AccessToken
+import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.graph.events.ProjectId
 
 import scala.language.higherKinds
 
-private class TokensRepository[Interpretation[_]] {
-  def findToken(projectId: ProjectId): OptionT[Interpretation, AccessToken] = ???
+private class TokenFinder[Interpretation[_]](
+    tokenInRepoFinder: TokenInRepoFinder[Interpretation]
+)(implicit ME:         MonadError[Interpretation, Throwable]) {
+
+  def findToken(projectId: ProjectId): OptionT[Interpretation, AccessToken] =
+    tokenInRepoFinder.findToken(projectId).flatMap(toAccessToken)
+
+  private lazy val toAccessToken: ((String, TokenType)) => OptionT[Interpretation, AccessToken] = {
+    case (token, TokenType.OAuth)    => toOptionT(OAuthAccessToken.from(token))
+    case (token, TokenType.Personal) => toOptionT(PersonalAccessToken.from(token))
+  }
+
+  private def toOptionT[T](maybeValue: Either[IllegalArgumentException, T]): OptionT[Interpretation, T] =
+    OptionT.liftF(ME.fromEither(maybeValue))
 }
 
-private class IOTokensRepository extends TokensRepository[IO]
+private object IOTokenFinder extends TokenFinder[IO](new TokenInRepoFinder[IO](IODBTransactorProvider))

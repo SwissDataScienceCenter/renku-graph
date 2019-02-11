@@ -123,8 +123,10 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val projectId = projectIds.generateOne
 
-    val tokensRepository = mock[TokensRepository[IO]]
+    val tokensRepository = mock[IOTokenFinder]
     val logger           = TestLogger[IO]()
     val endpoint         = new FetchTokenEndpoint[IO](tokensRepository, logger).fetchToken.orNotFound
   }
+
+  private class IOTokenFinder(tokenInRepoFinder: TokenInRepoFinder[IO]) extends TokenFinder[IO](tokenInRepoFinder)
 }

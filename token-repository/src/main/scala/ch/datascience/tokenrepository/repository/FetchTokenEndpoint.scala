@@ -36,7 +36,7 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class FetchTokenEndpoint[F[_]: Effect](
-    tokensRepository: TokensRepository[F],
+    tokensRepository: TokenFinder[F],
     logger:           Logger[F]
 ) extends Http4sDsl[F] {
 
@@ -46,7 +46,7 @@ class FetchTokenEndpoint[F[_]: Effect](
         .findToken(projectId)
         .value
         .flatMap(toHttpResult(projectId))
-        .recoverWith(withHttpResult(projectId))
+        .recoverWith(httpResult(projectId))
   }
 
   private def toHttpResult(projectId: ProjectId): Option[AccessToken] => F[Response[F]] = {
@@ -64,7 +64,7 @@ class FetchTokenEndpoint[F[_]: Effect](
     case OAuthAccessToken(token)    => Json.obj("oauthAccessToken"    -> Json.fromString(token))
   }
 
-  private def withHttpResult(projectId: ProjectId): PartialFunction[Throwable, F[Response[F]]] = {
+  private def httpResult(projectId: ProjectId): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Finding token for projectId: $projectId failed")
       logger.error(exception)(errorMessage.value)
@@ -74,6 +74,6 @@ class FetchTokenEndpoint[F[_]: Effect](
 
 class IOFetchTokenEndpoint
     extends FetchTokenEndpoint[IO](
-      new IOTokensRepository(),
+      IOTokenFinder,
       ApplicationLogger
     )
