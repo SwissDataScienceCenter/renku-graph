@@ -24,15 +24,20 @@ import ch.datascience.clients.AccessToken
 import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.graph.events.ProjectId
+import ch.datascience.tokenrepository.ApplicationLogger
+import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
-import org.http4s.HttpRoutes
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{HttpRoutes, Response}
 
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
 class FetchTokenEndpoint[F[_]: Effect](
-    tokensRepository: TokensRepository[F]
+    tokensRepository: TokensRepository[F],
+    logger:           Logger[F]
 ) extends Http4sDsl[F] {
 
   val fetchToken: HttpRoutes[F] = HttpRoutes.of[F] {
@@ -40,19 +45,35 @@ class FetchTokenEndpoint[F[_]: Effect](
       tokensRepository
         .findToken(projectId)
         .value
-        .flatMap {
-          case Some(token) => Ok(toJson(token))
-          case None        => NotFound(InfoMessage("No access token found"))
-        }
-        .recoverWith {
-          case throwable => InternalServerError(ErrorMessage(s"Access token finding failed for project id: $projectId"))
-        }
+        .flatMap(toHttpResult(projectId))
+        .recoverWith(withHttpResult(projectId))
+  }
+
+  private def toHttpResult(projectId: ProjectId): Option[AccessToken] => F[Response[F]] = {
+    case Some(token) =>
+      logger.info(s"Token for projectId: $projectId found")
+      Ok(toJson(token))
+    case None =>
+      val message = InfoMessage(s"Token for projectId: $projectId not found")
+      logger.info(message.value)
+      NotFound(message)
   }
 
   private def toJson: AccessToken => Json = {
     case PersonalAccessToken(token) => Json.obj("personalAccessToken" -> Json.fromString(token))
     case OAuthAccessToken(token)    => Json.obj("oauthAccessToken"    -> Json.fromString(token))
   }
+
+  private def withHttpResult(projectId: ProjectId): PartialFunction[Throwable, F[Response[F]]] = {
+    case NonFatal(exception) =>
+      val errorMessage = ErrorMessage(s"Finding token for projectId: $projectId failed")
+      logger.error(exception)(errorMessage.value)
+      InternalServerError(errorMessage)
+  }
 }
 
-class IOFetchTokenEndpoint extends FetchTokenEndpoint[IO](new IOTokensRepository())
+class IOFetchTokenEndpoint
+    extends FetchTokenEndpoint[IO](
+      new IOTokensRepository(),
+      ApplicationLogger
+    )

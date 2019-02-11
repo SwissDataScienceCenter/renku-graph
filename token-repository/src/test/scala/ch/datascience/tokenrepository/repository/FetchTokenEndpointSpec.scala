@@ -27,6 +27,8 @@ import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.http.EndpointTester._
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.Json
 import org.http4s.dsl.io._
 import org.http4s.{Method, Request, Status, Uri}
@@ -53,6 +55,8 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
       response.status     shouldBe Status.Ok
       response.body[Json] shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
+
+      logger.loggedOnly(Info(s"Token for projectId: $projectId found"))
     }
 
     "respond with OK with the personal access token if one is found in the repository" in new TestCase {
@@ -70,6 +74,8 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
       response.status     shouldBe Status.Ok
       response.body[Json] shouldBe Json.obj("personalAccessToken" -> Json.fromString(accessToken.value))
+
+      logger.loggedOnly(Info(s"Token for projectId: $projectId found"))
     }
 
     "respond with NOT_FOUND if there is not token in the repository" in new TestCase {
@@ -86,7 +92,9 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
       )
 
       response.status     shouldBe Status.NotFound
-      response.body[Json] shouldBe Json.obj("message" -> Json.fromString("No access token found"))
+      response.body[Json] shouldBe Json.obj("message" -> Json.fromString(s"Token for projectId: $projectId not found"))
+
+      logger.loggedOnly(Info(s"Token for projectId: $projectId not found"))
     }
 
     "respond with INTERNAL_SERVER_ERROR if finding token in the repository fails" in new TestCase {
@@ -105,8 +113,10 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
       response.status shouldBe Status.InternalServerError
       response.body[Json] shouldBe Json.obj(
-        "message" -> Json.fromString(s"Access token finding failed for project id: $projectId")
+        "message" -> Json.fromString(s"Finding token for projectId: $projectId failed")
       )
+
+      logger.loggedOnly(Error(s"Finding token for projectId: $projectId failed", exception))
     }
   }
 
@@ -114,6 +124,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
     val projectId = projectIds.generateOne
 
     val tokensRepository = mock[TokensRepository[IO]]
-    val endpoint         = new FetchTokenEndpoint[IO](tokensRepository).fetchToken.orNotFound
+    val logger           = TestLogger[IO]()
+    val endpoint         = new FetchTokenEndpoint[IO](tokensRepository, logger).fetchToken.orNotFound
   }
 }
