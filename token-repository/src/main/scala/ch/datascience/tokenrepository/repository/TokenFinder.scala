@@ -43,4 +43,4 @@ private class TokenFinder[Interpretation[_]](
     OptionT.liftF(ME.fromEither(maybeValue))
 }
 
-private object IOTokenFinder extends TokenFinder[IO](new TokenInRepoFinder[IO](IODBTransactorProvider))
+private object IOTokenFinder extends TokenFinder[IO](new TokenInRepoFinder[IO](IOTransactorProvider))

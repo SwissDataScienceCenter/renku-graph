@@ -18,8 +18,20 @@
 
 package ch.datascience.tokenrepository.repository
 
-import org.scalacheck.Gen
+import cats.effect.{ContextShift, IO}
+import doobie.util.transactor.Transactor
+import doobie.util.transactor.Transactor.Aux
 
-private object RepositoryGenerators {
-  implicit val tokenTypes: Gen[TokenType] = Gen.oneOf(TokenType.OAuth, TokenType.Personal)
+import scala.concurrent.ExecutionContext
+
+private object H2TransactorProvider extends TransactorProvider[IO] {
+
+  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
+  override lazy val transactor: Aux[IO, Unit] = Transactor.fromDriverManager[IO](
+    driver = "org.h2.Driver",
+    url    = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
+    user   = "tokenstorage",
+    pass   = ""
+  )
 }

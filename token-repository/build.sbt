@@ -29,6 +29,7 @@ libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
 //Test dependencies
+libraryDependencies += "org.tpolecat"   %% "doobie-h2"        % doobieVersion % Test
 libraryDependencies += "org.tpolecat"   %% "doobie-scalatest" % doobieVersion % Test
 libraryDependencies += "org.scalacheck" %% "scalacheck"       % "1.14.0"      % Test
 libraryDependencies += "org.scalamock"  %% "scalamock"        % "4.1.0"       % Test

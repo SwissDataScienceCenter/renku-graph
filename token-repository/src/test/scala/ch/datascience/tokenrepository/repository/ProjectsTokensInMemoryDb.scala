@@ -18,8 +18,28 @@
 
 package ch.datascience.tokenrepository.repository
 
-import org.scalacheck.Gen
+import ch.datascience.tokenrepository.repository.H2TransactorProvider.transactor
+import doobie.free.connection.ConnectionIO
+import doobie.implicits._
+import cats.implicits._
 
-private object RepositoryGenerators {
-  implicit val tokenTypes: Gen[TokenType] = Gen.oneOf(TokenType.OAuth, TokenType.Personal)
+object ProjectsTokensInMemoryDb {
+
+  def assureProjectsTokensIsEmpty(): Unit =
+    sql"""
+         |CREATE TABLE projects_tokens(
+         | project_id int4 PRIMARY KEY,
+         | token VARCHAR (100) NOT NULL,
+         | token_type VARCHAR (20) NOT NULL
+         |);
+       """.stripMargin.update.run
+      .flatMap {
+        case 1 => 1.pure[ConnectionIO]
+        case 0 => emptyProjectsTokensTable()
+      }
+      .transact(transactor)
+      .unsafeRunSync()
+
+  private def emptyProjectsTokensTable() =
+    sql"TRUNCATE TABLE projects_tokens".update.run
 }
