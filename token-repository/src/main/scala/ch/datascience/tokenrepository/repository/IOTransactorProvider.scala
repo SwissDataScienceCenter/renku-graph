@@ -18,28 +18,22 @@
 
 package ch.datascience.tokenrepository.repository
 
-import ch.datascience.tokenrepository.repository.H2TransactorProvider.transactor
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
-import cats.implicits._
+import cats.effect.{ContextShift, IO}
+import ch.datascience.db.TransactorProvider
+import doobie.util.transactor.Transactor
+import doobie.util.transactor.Transactor.Aux
 
-object ProjectsTokensInMemoryDb {
+import scala.concurrent.ExecutionContext
+import scala.language.higherKinds
 
-  def assureProjectsTokensIsEmpty(): Unit =
-    sql"""
-         |CREATE TABLE projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | token VARCHAR (100) NOT NULL,
-         | token_type VARCHAR (20) NOT NULL
-         |);
-       """.stripMargin.update.run
-      .flatMap {
-        case 1 => 1.pure[ConnectionIO]
-        case 0 => emptyProjectsTokensTable()
-      }
-      .transact(transactor)
-      .unsafeRunSync()
+private object IOTransactorProvider extends TransactorProvider[IO] {
 
-  private def emptyProjectsTokensTable() =
-    sql"TRUNCATE TABLE projects_tokens".update.run
+  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
+  lazy val transactor: Aux[IO, Unit] = Transactor.fromDriverManager[IO](
+    driver = "org.postgresql.Driver",
+    url    = "jdbc:postgresql:projects_tokens",
+    user   = "tokenstorage",
+    pass   = ""
+  )
 }

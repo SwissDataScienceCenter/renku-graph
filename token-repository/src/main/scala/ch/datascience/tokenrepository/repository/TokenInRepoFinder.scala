@@ -21,6 +21,7 @@ package ch.datascience.tokenrepository.repository
 import cats.data.OptionT
 import cats.implicits._
 import cats.{Monad, MonadError}
+import ch.datascience.db.TransactorProvider
 import ch.datascience.graph.events.ProjectId
 
 import scala.language.higherKinds

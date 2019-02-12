@@ -18,6 +18,7 @@
 
 package ch.datascience.tokenrepository.repository
 
+import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
@@ -25,7 +26,7 @@ import ch.datascience.graph.events.ProjectId
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class TokenAssociatorSpec extends WordSpec {
+class TokenAssociatorSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
 
   "associate" should {
 
@@ -59,22 +60,13 @@ class TokenAssociatorSpec extends WordSpec {
 
   private trait TestCase {
 
-    ProjectsTokensInMemoryDb.assureProjectsTokensIsEmpty()
-
     val projectId = projectIds.generateOne
-
-    private val transactorProvider = H2TransactorProvider
 
     val associator = new TokenAssociator(transactorProvider)
 
     def findToken(projectId: ProjectId): Option[String] = {
       val finder = new TokenInRepoFinder(transactorProvider)
       finder.findToken(projectId).value.unsafeRunSync().map(_._1)
-    }
-
-    private lazy val assureInserted: Int => Unit = {
-      case 1 => ()
-      case _ => fail("insertion problem")
     }
   }
 }

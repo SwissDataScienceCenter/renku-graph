@@ -18,6 +18,7 @@
 
 package ch.datascience.tokenrepository.repository
 
+import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
@@ -26,7 +27,7 @@ import doobie.implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class TokenInRepoFinderSpec extends WordSpec {
+class TokenInRepoFinderSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
 
   "findToken" should {
 
@@ -69,12 +70,7 @@ class TokenInRepoFinderSpec extends WordSpec {
 
   private trait TestCase {
 
-    ProjectsTokensInMemoryDb.assureProjectsTokensIsEmpty()
-
     val projectId = projectIds.generateOne
-
-    private val transactorProvider = H2TransactorProvider
-    import transactorProvider.transactor
 
     val finder = new TokenInRepoFinder(transactorProvider)
 

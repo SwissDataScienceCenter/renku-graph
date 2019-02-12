@@ -16,22 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.db
 
-import cats.effect.{ContextShift, IO}
-import doobie.util.transactor.Transactor
 import doobie.util.transactor.Transactor.Aux
 
-import scala.concurrent.ExecutionContext
+import scala.language.higherKinds
 
-private object H2TransactorProvider extends TransactorProvider[IO] {
-
-  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-
-  override lazy val transactor: Aux[IO, Unit] = Transactor.fromDriverManager[IO](
-    driver = "org.h2.Driver",
-    url    = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
-    user   = "tokenstorage",
-    pass   = ""
-  )
+abstract class TransactorProvider[Interpretation[_]] {
+  def transactor: Aux[Interpretation, Unit]
 }
