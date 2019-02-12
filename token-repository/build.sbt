@@ -23,6 +23,7 @@ version := "0.1.0-SNAPSHOT"
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
+libraryDependencies += "io.circe"       %% "circe-parser"   % "0.10.0"
 
 val doobieVersion = "0.6.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
