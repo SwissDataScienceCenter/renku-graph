@@ -19,6 +19,7 @@
 package ch.datascience.tokenrepository.repository
 
 import cats.data.OptionT
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.db.TransactorProvider
@@ -31,14 +32,17 @@ private class TokenInRepoFinder[Interpretation[_]: Monad](
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
   import doobie.implicits._
-  import transactorProvider.transactor
 
   def findToken(projectId: ProjectId): OptionT[Interpretation, (String, TokenType)] = OptionT {
-    sql"select token, token_type from projects_tokens where project_id = ${projectId.value}"
-      .query[(String, String)]
-      .option
-      .transact(transactor)
-      .flatMap(toTokenAndTypeTuple(projectId))
+    for {
+      transactor <- transactorProvider.transactor
+      token <- sql"select token, token_type from projects_tokens where project_id = ${projectId.value}"
+                .query[(String, String)]
+                .option
+                .transact(transactor)
+                .flatMap(toTokenAndTypeTuple(projectId))
+
+    } yield token
   }
 
   private def toTokenAndTypeTuple(
@@ -51,3 +55,6 @@ private class TokenInRepoFinder[Interpretation[_]: Monad](
       ME.raiseError(new RuntimeException(s"Unknown token type: $tokenType for projectId: $projectId"))
   }
 }
+
+private class IOTokenInRepoFinder(implicit contextShift: ContextShift[IO])
+    extends TokenInRepoFinder[IO](new TransactorProvider[IO](new ProjectsTokensConfig[IO]))

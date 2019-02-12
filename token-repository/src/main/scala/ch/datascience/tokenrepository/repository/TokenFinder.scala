@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import ch.datascience.clients.AccessToken
 import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.graph.events.ProjectId
@@ -43,4 +43,6 @@ private class TokenFinder[Interpretation[_]](
     OptionT.liftF(ME.fromEither(maybeValue))
 }
 
-private object IOTokenFinder extends TokenFinder[IO](new TokenInRepoFinder[IO](IOTransactorProvider))
+private class IOTokenFinder(
+    implicit contextShift: ContextShift[IO]
+) extends TokenFinder[IO](new IOTokenInRepoFinder)

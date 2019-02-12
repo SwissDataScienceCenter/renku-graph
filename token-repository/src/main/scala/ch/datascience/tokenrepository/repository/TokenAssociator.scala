@@ -18,6 +18,7 @@
 
 package ch.datascience.tokenrepository.repository
 
+import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.db.TransactorProvider
 import ch.datascience.graph.events.ProjectId
@@ -29,17 +30,19 @@ private class TokenAssociator[Interpretation[_]: Monad](
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
   import doobie.implicits._
-  import transactorProvider.transactor
 
   def associate(projectId: ProjectId, encryptedToken: String, tokenType: TokenType): Interpretation[Unit] =
-    sql"select token from projects_tokens where project_id = ${projectId.value}"
-      .query[String]
-      .option
-      .flatMap {
-        case Some(_) => update(projectId, encryptedToken, tokenType)
-        case None    => insert(projectId, encryptedToken, tokenType)
-      }
-      .transact(transactor)
+    for {
+      transactor <- transactorProvider.transactor
+      _ <- sql"select token from projects_tokens where project_id = ${projectId.value}"
+            .query[String]
+            .option
+            .flatMap {
+              case Some(_) => update(projectId, encryptedToken, tokenType)
+              case None    => insert(projectId, encryptedToken, tokenType)
+            }
+            .transact(transactor)
+    } yield ()
 
   private def insert(projectId: ProjectId, encryptedToken: String, tokenType: TokenType) =
     sql"""insert into 

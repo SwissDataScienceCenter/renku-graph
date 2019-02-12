@@ -18,22 +18,16 @@
 
 package ch.datascience.tokenrepository.repository
 
-import cats.effect.{ContextShift, IO}
-import ch.datascience.db.TransactorProvider
-import doobie.util.transactor.Transactor
-import doobie.util.transactor.Transactor.Aux
+import cats.MonadError
+import ch.datascience.db.DBConfigProvider
+import eu.timepit.refined.auto._
 
-import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private object IOTransactorProvider extends TransactorProvider[IO] {
-
-  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-
-  lazy val transactor: Aux[IO, Unit] = Transactor.fromDriverManager[IO](
-    driver = "org.postgresql.Driver",
-    url    = "jdbc:postgresql:projects_tokens",
-    user   = "tokenstorage",
-    pass   = ""
-  )
-}
+private class ProjectsTokensConfig[Interpretation[_]](
+    implicit ME: MonadError[Interpretation, Throwable]
+) extends DBConfigProvider[Interpretation](
+      namespace = "projects-tokens",
+      driver    = "org.postgresql.Driver",
+      url       = "jdbc:postgresql:projects_tokens"
+    )

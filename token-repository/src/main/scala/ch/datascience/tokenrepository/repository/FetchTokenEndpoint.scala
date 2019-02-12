@@ -18,7 +18,7 @@
 
 package ch.datascience.tokenrepository.repository
 
-import cats.effect.{Effect, IO}
+import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.clients.AccessToken
 import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -72,8 +72,8 @@ class FetchTokenEndpoint[F[_]: Effect](
   }
 }
 
-class IOFetchTokenEndpoint
+class IOFetchTokenEndpoint(implicit contextShift: ContextShift[IO])
     extends FetchTokenEndpoint[IO](
-      IOTokenFinder,
+      new IOTokenFinder,
       ApplicationLogger
     )

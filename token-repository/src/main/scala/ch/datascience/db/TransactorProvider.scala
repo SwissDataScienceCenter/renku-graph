@@ -18,10 +18,27 @@
 
 package ch.datascience.db
 
+import cats.effect.{Async, ContextShift}
+import cats.implicits._
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.orchestration.Provider
+import doobie.util.transactor.Transactor
 import doobie.util.transactor.Transactor.Aux
 
 import scala.language.higherKinds
 
-abstract class TransactorProvider[Interpretation[_]] {
-  def transactor: Aux[Interpretation, Unit]
+class TransactorProvider[Interpretation[_]](
+    dbConfigProvider: Provider[Interpretation, DBConfig]
+)(implicit async:     Async[Interpretation], cs: ContextShift[Interpretation]) {
+
+  lazy val transactor: Interpretation[Aux[Interpretation, Unit]] =
+    for {
+      dbConfig <- dbConfigProvider.get()
+    } yield
+      Transactor.fromDriverManager[Interpretation](
+        driver = dbConfig.driver.value,
+        url    = dbConfig.url.value,
+        user   = dbConfig.user.value,
+        pass   = dbConfig.pass
+      )
 }

@@ -16,22 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.db
+package ch.datascience.orchestration
 
-import cats.effect.{ContextShift, IO}
-import doobie.util.transactor.Transactor
-import doobie.util.transactor.Transactor.Aux
+import scala.language.higherKinds
 
-import scala.concurrent.ExecutionContext
-
-class H2TransactorProvider(dbName: String, user: String, pass: String = "") extends TransactorProvider[IO] {
-
-  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-
-  override lazy val transactor: Aux[IO, Unit] = Transactor.fromDriverManager[IO](
-    driver = "org.h2.Driver",
-    url    = s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1",
-    user   = user,
-    pass   = pass
-  )
+trait Provider[Interpretation[_], T] {
+  def get(): Interpretation[T]
 }
