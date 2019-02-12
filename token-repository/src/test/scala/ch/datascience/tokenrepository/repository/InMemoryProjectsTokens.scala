@@ -30,8 +30,7 @@ trait InMemoryProjectsTokens {
     sql"""
          |CREATE TABLE projects_tokens(
          | project_id int4 PRIMARY KEY,
-         | token VARCHAR (100) NOT NULL,
-         | token_type VARCHAR (20) NOT NULL
+         | token VARCHAR (100) NOT NULL
          |);
        """.stripMargin.update.run
       .transact(transactor)

@@ -25,7 +25,7 @@ import ch.datascience.clients.AccessToken
 import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.tokenrepository.repository.AccessTokenCrypto.SerializedAccessToken
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.MatchesRegex
@@ -40,18 +40,18 @@ import scala.util.control.NonFatal
 private class AccessTokenCrypto[Interpretation[_]](
     secret:    Secret
 )(implicit ME: MonadError[Interpretation, Throwable])
-    extends AesCrypto[Interpretation, AccessToken, SerializedAccessToken](secret) {
+    extends AesCrypto[Interpretation, AccessToken, EncryptedAccessToken](secret) {
 
-  override def encrypt(accessToken: AccessToken): Interpretation[SerializedAccessToken] =
+  override def encrypt(accessToken: AccessToken): Interpretation[EncryptedAccessToken] =
     for {
       serializedToken  <- pure(serialize(accessToken))
       encoded          <- encryptAndEncode(serializedToken)
       validatedDecoded <- validate(encoded)
     } yield validatedDecoded
 
-  override def decrypt(serializedToken: SerializedAccessToken): Interpretation[AccessToken] = {
+  override def decrypt(encryptedToken: EncryptedAccessToken): Interpretation[AccessToken] = {
     for {
-      decoded      <- decodeAndDecrypt(serializedToken.value)
+      decoded      <- decodeAndDecrypt(encryptedToken.value)
       deserialized <- deserialize(decoded)
     } yield deserialized
   } recoverWith meaningfulError
@@ -61,9 +61,9 @@ private class AccessTokenCrypto[Interpretation[_]](
     case PersonalAccessToken(token) => Json.obj("personal" -> Json.fromString(token)).noSpaces
   }
 
-  private def validate(value: String): Interpretation[SerializedAccessToken] =
-    ME.fromEither[SerializedAccessToken] {
-      SerializedAccessToken.from(value)
+  private def validate(value: String): Interpretation[EncryptedAccessToken] =
+    ME.fromEither[EncryptedAccessToken] {
+      EncryptedAccessToken.from(value)
     }
 
   private implicit val accessTokenDecoder: Decoder[AccessToken] = (cursor: HCursor) => {
@@ -108,13 +108,13 @@ private object AccessTokenCrypto {
       )
     )
 
-  type SerializedAccessToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+  type EncryptedAccessToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 
-  object SerializedAccessToken {
+  object EncryptedAccessToken {
 
-    def from(value: String): Either[Throwable, SerializedAccessToken] =
+    def from(value: String): Either[Throwable, EncryptedAccessToken] =
       RefType
-        .applyRef[SerializedAccessToken](value)
+        .applyRef[EncryptedAccessToken](value)
         .leftMap(_ => new IllegalArgumentException("A value to create SerializedAccessToken cannot be blank"))
   }
 }

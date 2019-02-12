@@ -24,6 +24,7 @@ import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.db.TransactorProvider
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 
 import scala.language.higherKinds
 
@@ -33,26 +34,26 @@ private class TokenInRepoFinder[Interpretation[_]: Monad](
 
   import doobie.implicits._
 
-  def findToken(projectId: ProjectId): OptionT[Interpretation, (String, TokenType)] = OptionT {
+  def findToken(projectId: ProjectId): OptionT[Interpretation, EncryptedAccessToken] = OptionT {
     for {
       transactor <- transactorProvider.transactor
-      token <- sql"select token, token_type from projects_tokens where project_id = ${projectId.value}"
-                .query[(String, String)]
+      token <- sql"select token from projects_tokens where project_id = ${projectId.value}"
+                .query[String]
                 .option
                 .transact(transactor)
-                .flatMap(toTokenAndTypeTuple(projectId))
+                .flatMap(toSerializedAccessToken(projectId))
 
     } yield token
   }
 
-  private def toTokenAndTypeTuple(
+  private def toSerializedAccessToken(
       projectId: ProjectId
-  ): Option[(String, String)] => Interpretation[Option[(String, TokenType)]] = {
-    case None                                             => ME.pure(None)
-    case Some((encryptedToken, TokenType.Personal.value)) => ME.pure(Some(encryptedToken -> TokenType.Personal))
-    case Some((encryptedToken, TokenType.OAuth.value))    => ME.pure(Some(encryptedToken -> TokenType.OAuth))
-    case Some((_, tokenType)) =>
-      ME.raiseError(new RuntimeException(s"Unknown token type: $tokenType for projectId: $projectId"))
+  ): Option[String] => Interpretation[Option[EncryptedAccessToken]] = {
+    case None => ME.pure(None)
+    case Some(encryptedToken) =>
+      ME.fromEither {
+        EncryptedAccessToken.from(encryptedToken).map(Option.apply)
+      }
   }
 }
 

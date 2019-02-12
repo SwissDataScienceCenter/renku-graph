@@ -128,5 +128,8 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
     val endpoint         = new FetchTokenEndpoint[IO](tokensRepository, logger).fetchToken.orNotFound
   }
 
-  private class IOTokenFinder(tokenInRepoFinder: TokenInRepoFinder[IO]) extends TokenFinder[IO](tokenInRepoFinder)
+  private class IOTokenFinder(
+      tokenInRepoFinder: TokenInRepoFinder[IO],
+      accessTokenCrypto: AccessTokenCrypto[IO]
+  ) extends TokenFinder[IO](tokenInRepoFinder, accessTokenCrypto)
 }

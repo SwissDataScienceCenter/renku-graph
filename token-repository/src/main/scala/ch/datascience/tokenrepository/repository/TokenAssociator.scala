@@ -22,6 +22,7 @@ import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.db.TransactorProvider
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 
 import scala.language.higherKinds
 
@@ -31,28 +32,28 @@ private class TokenAssociator[Interpretation[_]: Monad](
 
   import doobie.implicits._
 
-  def associate(projectId: ProjectId, encryptedToken: String, tokenType: TokenType): Interpretation[Unit] =
+  def associate(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
     for {
       transactor <- transactorProvider.transactor
       _ <- sql"select token from projects_tokens where project_id = ${projectId.value}"
             .query[String]
             .option
             .flatMap {
-              case Some(_) => update(projectId, encryptedToken, tokenType)
-              case None    => insert(projectId, encryptedToken, tokenType)
+              case Some(_) => update(projectId, encryptedToken)
+              case None    => insert(projectId, encryptedToken)
             }
             .transact(transactor)
     } yield ()
 
-  private def insert(projectId: ProjectId, encryptedToken: String, tokenType: TokenType) =
+  private def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken) =
     sql"""insert into 
-          projects_tokens (project_id, token, token_type) 
-          values (${projectId.value}, $encryptedToken, ${tokenType.value})
+          projects_tokens (project_id, token) 
+          values (${projectId.value}, ${encryptedToken.value})
       """.update.run.map(failIfMultiUpdate(projectId))
 
-  private def update(projectId: ProjectId, encryptedToken: String, tokenType: TokenType) =
+  private def update(projectId: ProjectId, encryptedToken: EncryptedAccessToken) =
     sql"""update projects_tokens 
-                set token = $encryptedToken, token_type = ${tokenType.value}
+                set token = ${encryptedToken.value} 
                 where project_id = ${projectId.value}
             """.update.run.map(failIfMultiUpdate(projectId))
 

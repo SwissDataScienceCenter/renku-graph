@@ -18,8 +18,20 @@
 
 package ch.datascience.tokenrepository.repository
 
+import ch.datascience.generators.Generators._
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 
 private object RepositoryGenerators {
-  implicit val tokenTypes: Gen[TokenType] = Gen.oneOf(TokenType.OAuth, TokenType.Personal)
+
+  implicit val encryptedTokens: Gen[EncryptedAccessToken] =
+    nonEmptyStrings()
+      .map { value =>
+        RefType
+          .applyRef[EncryptedAccessToken](value)
+          .getOrElse {
+            throw new IllegalArgumentException("Invalid value generated for EncryptedAccessToken")
+          }
+      }
 }

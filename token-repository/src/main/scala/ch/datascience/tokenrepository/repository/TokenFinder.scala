@@ -22,27 +22,24 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
 import ch.datascience.clients.AccessToken
-import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.graph.events.ProjectId
 
 import scala.language.higherKinds
 
 private class TokenFinder[Interpretation[_]](
-    tokenInRepoFinder: TokenInRepoFinder[Interpretation]
+    tokenInRepoFinder: TokenInRepoFinder[Interpretation],
+    accessTokenCrypto: AccessTokenCrypto[Interpretation]
 )(implicit ME:         MonadError[Interpretation, Throwable]) {
 
+  import accessTokenCrypto._
+
   def findToken(projectId: ProjectId): OptionT[Interpretation, AccessToken] =
-    tokenInRepoFinder.findToken(projectId).flatMap(toAccessToken)
-
-  private lazy val toAccessToken: ((String, TokenType)) => OptionT[Interpretation, AccessToken] = {
-    case (token, TokenType.OAuth)    => toOptionT(OAuthAccessToken.from(token))
-    case (token, TokenType.Personal) => toOptionT(PersonalAccessToken.from(token))
-  }
-
-  private def toOptionT[T](maybeValue: Either[IllegalArgumentException, T]): OptionT[Interpretation, T] =
-    OptionT.liftF(ME.fromEither(maybeValue))
+    for {
+      encryptedToken <- tokenInRepoFinder.findToken(projectId)
+      accessToken    <- OptionT.liftF(decrypt(encryptedToken))
+    } yield accessToken
 }
 
 private class IOTokenFinder(
     implicit contextShift: ContextShift[IO]
-) extends TokenFinder[IO](new IOTokenInRepoFinder)
+) extends TokenFinder[IO](new IOTokenInRepoFinder, AccessTokenCrypto[IO]())

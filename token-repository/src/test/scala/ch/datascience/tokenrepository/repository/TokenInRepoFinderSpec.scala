@@ -20,9 +20,10 @@ package ch.datascience.tokenrepository.repository
 
 import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import doobie.implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -31,40 +32,17 @@ class TokenInRepoFinderSpec extends WordSpec with DbSpec with InMemoryProjectsTo
 
   "findToken" should {
 
-    "return token associated with the projectId - Personal Access Token case" in new TestCase {
+    "return token associated with the projectId" in new TestCase {
 
-      val encryptedToken = nonEmptyStrings().generateOne
-      val tokenType      = TokenType.Personal
+      val encryptedToken = encryptedTokens.generateOne
 
-      insert(projectId, encryptedToken, tokenType.value)
+      insert(projectId, encryptedToken)
 
-      finder.findToken(projectId).value.unsafeRunSync shouldBe Some(encryptedToken -> tokenType)
-    }
-
-    "return token associated with the projectId - OAuth Access Token case" in new TestCase {
-
-      val encryptedToken = nonEmptyStrings().generateOne
-      val tokenType      = TokenType.OAuth
-
-      insert(projectId, encryptedToken, tokenType.value)
-
-      finder.findToken(projectId).value.unsafeRunSync shouldBe Some(encryptedToken -> tokenType)
+      finder.findToken(projectId).value.unsafeRunSync shouldBe Some(encryptedToken)
     }
 
     "return None if there's no token associated with the projectId" in new TestCase {
       finder.findToken(projectId).value.unsafeRunSync shouldBe None
-    }
-
-    "fail with an error if the token associated with the projectId is of unknown type" in new TestCase {
-      val encryptedToken = nonEmptyStrings().generateOne
-
-      insert(projectId, encryptedToken, "UNKNOWN_TYPE")
-
-      val result = finder.findToken(projectId)
-
-      intercept[RuntimeException] {
-        result.value.unsafeRunSync
-      }.getMessage shouldBe s"Unknown token type: UNKNOWN_TYPE for projectId: $projectId"
     }
   }
 
@@ -74,10 +52,10 @@ class TokenInRepoFinderSpec extends WordSpec with DbSpec with InMemoryProjectsTo
 
     val finder = new TokenInRepoFinder(transactorProvider)
 
-    def insert(projectId: ProjectId, accessToken: String, tokenType: String): Unit =
+    def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit =
       sql"""insert into 
-          projects_tokens (project_id, token, token_type) 
-          values (${projectId.value}, $accessToken, $tokenType)
+          projects_tokens (project_id, token) 
+          values (${projectId.value}, ${encryptedToken.value})
       """.update.run
         .map(assureInserted)
         .transact(transactor)

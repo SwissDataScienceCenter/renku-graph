@@ -20,9 +20,10 @@ package ch.datascience.tokenrepository.repository
 
 import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -30,33 +31,29 @@ class TokenAssociatorSpec extends WordSpec with DbSpec with InMemoryProjectsToke
 
   "associate" should {
 
-    allTokenTypes foreach { tokenType =>
-      s"succeed if token does not exist - $tokenType type case" in new TestCase {
+    s"succeed if token does not exist" in new TestCase {
 
-        val encryptedToken = nonEmptyStrings().generateOne
+      val encryptedToken = encryptedTokens.generateOne
 
-        associator.associate(projectId, encryptedToken, tokenType).unsafeRunSync shouldBe ()
+      associator.associate(projectId, encryptedToken).unsafeRunSync shouldBe ()
 
-        findToken(projectId) shouldBe Some(encryptedToken)
-      }
+      findToken(projectId) shouldBe Some(encryptedToken)
+    }
 
-      s"succeed if token exists - $tokenType type case" in new TestCase {
+    s"succeed if token exists" in new TestCase {
 
-        val encryptedToken = nonEmptyStrings().generateOne
+      val encryptedToken = encryptedTokens.generateOne
 
-        associator.associate(projectId, encryptedToken, tokenType).unsafeRunSync shouldBe ()
+      associator.associate(projectId, encryptedToken).unsafeRunSync shouldBe ()
 
-        findToken(projectId) shouldBe Some(encryptedToken)
+      findToken(projectId) shouldBe Some(encryptedToken)
 
-        val newEncryptedToken = nonEmptyStrings().generateOne
-        associator.associate(projectId, newEncryptedToken, tokenType).unsafeRunSync shouldBe ()
+      val newEncryptedToken = encryptedTokens.generateOne
+      associator.associate(projectId, newEncryptedToken).unsafeRunSync shouldBe ()
 
-        findToken(projectId) shouldBe Some(newEncryptedToken)
-      }
+      findToken(projectId) shouldBe Some(newEncryptedToken)
     }
   }
-
-  private lazy val allTokenTypes = Set(TokenType.OAuth, TokenType.Personal)
 
   private trait TestCase {
 
@@ -64,9 +61,10 @@ class TokenAssociatorSpec extends WordSpec with DbSpec with InMemoryProjectsToke
 
     val associator = new TokenAssociator(transactorProvider)
 
-    def findToken(projectId: ProjectId): Option[String] = {
-      val finder = new TokenInRepoFinder(transactorProvider)
-      finder.findToken(projectId).value.unsafeRunSync().map(_._1)
-    }
+    def findToken(projectId: ProjectId): Option[EncryptedAccessToken] =
+      new TokenInRepoFinder(transactorProvider)
+        .findToken(projectId)
+        .value
+        .unsafeRunSync()
   }
 }

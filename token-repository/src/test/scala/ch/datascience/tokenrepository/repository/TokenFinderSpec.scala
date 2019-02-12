@@ -22,12 +22,15 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.implicits._
 import ch.datascience.clients.AccessToken
-import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.db.TransactorProvider
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -38,30 +41,21 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
   "findToken" should {
 
-    "return Personal Access Token if found in the db" in new TestCase {
+    "return Access Token if an Encrypted token found in the db it was possible to decrypt it" in new TestCase {
 
-      val encryptedToken = nonEmptyStrings().generateOne
-      val tokenType: TokenType = TokenType.Personal
-
+      val encryptedToken = encryptedTokens.generateOne
       (tokenInRepoFinder
         .findToken(_: ProjectId))
         .expects(projectId)
-        .returning(OptionT(context.pure(Option(encryptedToken -> tokenType))))
+        .returning(OptionT.some(encryptedToken))
 
-      tokenFinder.findToken(projectId) shouldBe OptionT(context.pure(Option(PersonalAccessToken(encryptedToken))))
-    }
+      val accessToken = accessTokens.generateOne
+      (accessTokenCrypto
+        .decrypt(_: EncryptedAccessToken))
+        .expects(encryptedToken)
+        .returning(context.pure(accessToken))
 
-    "return OAuth Access Token if found in the db" in new TestCase {
-
-      val encryptedToken = nonEmptyStrings().generateOne
-      val tokenType: TokenType = TokenType.OAuth
-
-      (tokenInRepoFinder
-        .findToken(_: ProjectId))
-        .expects(projectId)
-        .returning(OptionT(context.pure(Option(encryptedToken -> tokenType))))
-
-      tokenFinder.findToken(projectId) shouldBe OptionT(context.pure(Option(OAuthAccessToken(encryptedToken))))
+      tokenFinder.findToken(projectId) shouldBe OptionT.some[Try](accessToken)
     }
 
     "return None if no token was found in the db" in new TestCase {
@@ -69,7 +63,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
       (tokenInRepoFinder
         .findToken(_: ProjectId))
         .expects(projectId)
-        .returning(OptionT.none[Try, (String, TokenType)])
+        .returning(OptionT.none[Try, EncryptedAccessToken])
 
       tokenFinder.findToken(projectId) shouldBe OptionT.none[Try, AccessToken]
     }
@@ -80,7 +74,24 @@ class TokenFinderSpec extends WordSpec with MockFactory {
       (tokenInRepoFinder
         .findToken(_: ProjectId))
         .expects(projectId)
-        .returning(OptionT.liftF[Try, (String, TokenType)](context.raiseError(exception)))
+        .returning(OptionT.liftF[Try, EncryptedAccessToken](context.raiseError(exception)))
+
+      tokenFinder.findToken(projectId).value shouldBe context.raiseError(exception)
+    }
+
+    "fail if decrypting found token fails" in new TestCase {
+
+      val encryptedToken = encryptedTokens.generateOne
+      (tokenInRepoFinder
+        .findToken(_: ProjectId))
+        .expects(projectId)
+        .returning(OptionT.some(encryptedToken))
+
+      val exception = exceptions.generateOne
+      (accessTokenCrypto
+        .decrypt(_: EncryptedAccessToken))
+        .expects(encryptedToken)
+        .returning(context.raiseError(exception))
 
       tokenFinder.findToken(projectId).value shouldBe context.raiseError(exception)
     }
@@ -91,8 +102,10 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
     val projectId = projectIds.generateOne
 
+    class TryAccessTokenCrypto(secret: Secret) extends AccessTokenCrypto[Try](secret)
+    val accessTokenCrypto = mock[TryAccessTokenCrypto]
     val tokenInRepoFinder = mock[TryTokenInRepoFinder]
-    val tokenFinder       = new TokenFinder[Try](tokenInRepoFinder)
+    val tokenFinder       = new TokenFinder[Try](tokenInRepoFinder, accessTokenCrypto)
   }
 
   private class TryTokenInRepoFinder(transactorProvider: TransactorProvider[Try])
