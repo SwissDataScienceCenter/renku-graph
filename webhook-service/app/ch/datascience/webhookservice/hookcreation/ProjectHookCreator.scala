@@ -24,7 +24,7 @@ import ch.datascience.graph.events.ProjectId
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
-import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext

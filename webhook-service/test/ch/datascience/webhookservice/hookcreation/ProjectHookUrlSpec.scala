@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookcreation
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.TinyType
-import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -48,7 +48,7 @@ class ProjectHookUrlSpec extends WordSpec {
       val Left(exception) = ProjectHookUrl.from("123")
 
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe "'123' is not a valid ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl"
+      exception.getMessage shouldBe "'123' is not a valid ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl"
     }
   }
 }

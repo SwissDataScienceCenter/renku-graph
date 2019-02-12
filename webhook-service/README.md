@@ -7,12 +7,13 @@ This is a microservice which:
 
 ## API
 
-| Method | Path                               | Description                               |
-|--------|------------------------------------|-------------------------------------------|
-|  GET   | ```/ping```                        | To check if service is healthy            |
-|  POST  | ```/projects/:id/webhooks```       | Creates a webhook for a project in GitLab |
-|  POST  | ```/webhooks/events```             | Consumes push events sent from GitLab     |
-
+| Method | Path                                      | Description                                    |
+|--------|-------------------------------------------|------------------------------------------------|
+|  GET   | ```/ping```                               | To check if service is healthy                 |
+|  POST  | ```/projects/:id/webhooks```              | Creates a webhook for a project in GitLab      |
+|  POST  | ```/projects/:id/webhooks/validation```   | Validates the project's webhook                |
+|  POST  | ```/webhooks/events```                    | Consumes push events sent from GitLab          |
+     
 #### GET /ping
 
 Verifies service health.
@@ -41,7 +42,29 @@ The endpoint requires an authorization token. It has to be
 | OK (200)                   | When hook already exists for the project                                              |
 | CREATED (201)              | When a new hook was created                                                           |
 | UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `OAUTH-TOKEN` in the header or it's invalid |
-| INTERNAL SERVER ERROR (500)| When there were problems with webhook creation                                        |
+| INTERNAL SERVER ERROR (500)| When there are problems with webhook creation                                         |
+
+#### POST /projects/:id/webhooks/validation
+
+**Notice**
+This endpoint is under development and works just for public projects. For non-public projects it responds with INTERNAL SERVER ERROR (500).
+
+Validates the webhook for the project with the given `project id`. It succeeds (OK) if either the project is public and there's a hook for it or it's private, there's a hook for it and a Personal Access Token (PAT). If either there's no webhook or there's no PAT in case of a private project, the call results with NOT_FOUND. In case of private projects, if there's a hook created for a project but no PAT available (or the PAT doesn't work), the hook will be removed as part of the validation process.
+
+**Request format**
+
+The endpoint requires an authorization token. It has to be
+- either `PRIVATE-TOKEN` with user's personal access token in GitLab
+- or `OAUTH-TOKEN` with oauth token obtained from GitLab
+
+**Response**
+
+| Status                     | Description                                                                                                                                                       |
+|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| OK (200)                   | When the hook exists for the project and the project is either public or there's a Personal Access Token available for it                                         |
+| NOT_FOUND (404)            | When the hook either does not exists or there's no Personal Access Token available for it. If the hook exists but there's no PAT for it, the hook will be removed |
+| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `OAUTH-TOKEN` in the header or it's invalid                                                                             |
+| INTERNAL SERVER ERROR (500)| When there are problems with validating the hook presence                                                                                                         |
 
 #### POST /webhooks/events
 

@@ -28,9 +28,12 @@ import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
 import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, HookCreationResult}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
-import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
-import ch.datascience.webhookservice.hookcreation.ProjectHookVerifier.HookIdentifier
+import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
+import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.HookMissing
+import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
 import ch.datascience.webhookservice.model.HookToken
+import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.project._
 import io.chrisdavenport.log4cats.Logger
 import javax.inject.{Inject, Singleton}
 
@@ -39,7 +42,7 @@ import scala.util.control.NonFatal
 
 private class HookCreator[Interpretation[_]: Monad](
     projectHookUrlFinder: ProjectHookUrlFinder[Interpretation],
-    projectHookVerifier:  ProjectHookVerifier[Interpretation],
+    projectHookValidator: HookValidator[Interpretation],
     projectInfoFinder:    ProjectInfoFinder[Interpretation],
     hookTokenCrypto:      HookTokenCrypto[Interpretation],
     projectHookCreator:   ProjectHookCreator[Interpretation],
@@ -51,14 +54,14 @@ private class HookCreator[Interpretation[_]: Monad](
   import hookTokenCrypto._
   import projectHookCreator.create
   import projectHookUrlFinder._
-  import projectHookVerifier._
+  import projectHookValidator._
   import projectInfoFinder._
 
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookCreationResult] = {
     for {
       projectHookUrl      <- right(findProjectHookUrl)
-      projectHookPresent  <- right(checkProjectHookPresence(HookIdentifier(projectId, projectHookUrl), accessToken))
-      _                   <- leftIfProjectHookExists(projectHookPresent, projectId, projectHookUrl)
+      hookValidation      <- right(validateHook(projectId, accessToken))
+      _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
       projectInfo         <- right(findProjectInfo(projectId, accessToken))
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
       _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
@@ -67,10 +70,10 @@ private class HookCreator[Interpretation[_]: Monad](
   } fold (leftToHookExisted, rightToHookCreated(projectId)) recoverWith loggingError(projectId)
 
   private def leftIfProjectHookExists(
-      projectHookPresent: Boolean,
-      projectId:          ProjectId,
-      projectHookUrl:     ProjectHookUrl): EitherT[Interpretation, HookAlreadyCreated, Unit] = EitherT.cond[Interpretation](
-    test  = !projectHookPresent,
+      hookValidation: HookValidationResult,
+      projectId:      ProjectId,
+      projectHookUrl: ProjectHookUrl): EitherT[Interpretation, HookAlreadyCreated, Unit] = EitherT.cond[Interpretation](
+    test  = hookValidation == HookMissing,
     left  = HookAlreadyCreated(projectId, projectHookUrl),
     right = ()
   )
@@ -114,7 +117,7 @@ private object HookCreator {
 @Singleton
 private class IOHookCreator @Inject()(
     projectHookUrlFinder: IOProjectHookUrlFinder,
-    projectHookVerifier:  IOProjectHookVerifier,
+    projectHookValidator: IOHookValidator,
     projectInfoFinder:    IOProjectInfoFinder,
     hookTokenCrypto:      IOHookTokenCrypto,
     projectHookCreator:   IOProjectHookCreator,
@@ -122,7 +125,7 @@ private class IOHookCreator @Inject()(
     logger:               IOLogger
 ) extends HookCreator[IO](
       projectHookUrlFinder,
-      projectHookVerifier,
+      projectHookValidator,
       projectInfoFinder,
       hookTokenCrypto,
       projectHookCreator,

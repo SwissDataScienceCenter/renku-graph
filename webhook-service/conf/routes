@@ -1,4 +1,5 @@
-GET     /ping                    ch.datascience.webhookservice.HealthCheckController.ping
+GET     /ping                               ch.datascience.webhookservice.HealthCheckController.ping
 
-POST    /webhooks/events         ch.datascience.webhookservice.eventprocessing.WebhookEventEndpoint.processPushEvent
-POST    /projects/:id/webhooks   ch.datascience.webhookservice.hookcreation.HookCreationEndpoint.createHook(id: ProjectId)
+POST    /webhooks/events                    ch.datascience.webhookservice.eventprocessing.WebhookEventEndpoint.processPushEvent
+POST    /projects/:id/webhooks              ch.datascience.webhookservice.hookcreation.HookCreationEndpoint.createHook(id: ProjectId)
+POST    /projects/:id/webhooks/validation   ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint.validateHook(id: ProjectId)

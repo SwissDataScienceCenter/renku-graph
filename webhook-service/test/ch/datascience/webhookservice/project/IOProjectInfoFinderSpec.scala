@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.project
 
-import cats.effect.{IO, Sync}
+import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.events.EventsGenerators._
@@ -27,6 +27,7 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfig.HostUrl
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.model.{ProjectInfo, ProjectOwner}
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
@@ -55,6 +56,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       projectInfoFinder.findProjectInfo(projectId, personalAccessToken).unsafeRunSync() shouldBe ProjectInfo(
         projectId,
+        projectVisibility,
         projectPath,
         ProjectOwner(userId)
       )
@@ -72,6 +74,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       projectInfoFinder.findProjectInfo(projectId, oauthAccessToken).unsafeRunSync() shouldBe ProjectInfo(
         projectId,
+        projectVisibility,
         projectPath,
         ProjectOwner(userId)
       )
@@ -135,10 +138,11 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
   }
 
   private trait TestCase {
-    val gitLabUrl   = url(externalServiceBaseUrl)
-    val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
-    val userId      = userIds.generateOne
+    val gitLabUrl         = url(externalServiceBaseUrl)
+    val projectId         = projectIds.generateOne
+    val projectVisibility = projectVisibilities.generateOne
+    val projectPath       = projectPaths.generateOne
+    val userId            = userIds.generateOne
 
     val configProvider = mock[IOGitLabConfigProvider]
 
@@ -152,6 +156,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
     lazy val projectJson: String = Json
       .obj(
         "id"                  -> Json.fromInt(projectId.value),
+        "visibility"          -> Json.fromString(projectVisibility.value),
         "path_with_namespace" -> Json.fromString(projectPath.value),
         "owner" -> Json.obj(
           "id" -> Json.fromInt(userId.value)

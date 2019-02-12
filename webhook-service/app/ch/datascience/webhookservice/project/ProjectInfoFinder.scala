@@ -16,19 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.project
 
 import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
 import ch.datascience.graph.events._
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.model.{ProjectInfo, ProjectOwner}
+import ch.datascience.webhookservice.model.{ProjectInfo, ProjectOwner, ProjectVisibility}
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait ProjectInfoFinder[Interpretation[_]] {
+trait ProjectInfoFinder[Interpretation[_]] {
   def findProjectInfo(
       projectId:   ProjectId,
       accessToken: AccessToken
@@ -36,8 +36,8 @@ private trait ProjectInfoFinder[Interpretation[_]] {
 }
 
 @Singleton
-private class IOProjectInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
-    implicit executionContext:                                    ExecutionContext)
+class IOProjectInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
+    implicit executionContext:                            ExecutionContext)
     extends IORestClient
     with ProjectInfoFinder[IO] {
 
@@ -67,10 +67,11 @@ private class IOProjectInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfig
   private implicit lazy val projectInfoDecoder: EntityDecoder[IO, ProjectInfo] = {
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
       for {
-        id      <- cursor.downField("id").as[ProjectId]
-        path    <- cursor.downField("path_with_namespace").as[ProjectPath]
-        ownerId <- cursor.downField("owner").downField("id").as[UserId]
-      } yield ProjectInfo(id, path, ProjectOwner(ownerId))
+        id         <- cursor.downField("id").as[ProjectId]
+        visibility <- cursor.downField("visibility").as[ProjectVisibility]
+        path       <- cursor.downField("path_with_namespace").as[ProjectPath]
+        ownerId    <- cursor.downField("owner").downField("id").as[UserId]
+      } yield ProjectInfo(id, visibility, path, ProjectOwner(ownerId))
 
     jsonOf[IO, ProjectInfo]
   }
