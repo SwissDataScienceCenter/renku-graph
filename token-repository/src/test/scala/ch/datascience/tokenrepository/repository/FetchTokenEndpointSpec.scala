@@ -44,7 +44,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
       val accessToken = oauthAccessTokens.generateOne
 
-      (tokensRepository
+      (tokensFinder
         .findToken(_: ProjectId))
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
@@ -63,7 +63,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
       val accessToken = personalAccessTokens.generateOne
 
-      (tokensRepository
+      (tokensFinder
         .findToken(_: ProjectId))
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
@@ -82,7 +82,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
       val accessToken = personalAccessTokens.generateOne
 
-      (tokensRepository
+      (tokensFinder
         .findToken(_: ProjectId))
         .expects(projectId)
         .returning(OptionT.none[IO, AccessToken])
@@ -102,7 +102,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
       val accessToken = personalAccessTokens.generateOne
 
       val exception = exceptions.generateOne
-      (tokensRepository
+      (tokensFinder
         .findToken(_: ProjectId))
         .expects(projectId)
         .returning(OptionT(IO.raiseError[Option[AccessToken]](exception)))
@@ -123,9 +123,9 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val projectId = projectIds.generateOne
 
-    val tokensRepository = mock[IOTokenFinder]
-    val logger           = TestLogger[IO]()
-    val endpoint         = new FetchTokenEndpoint[IO](tokensRepository, logger).fetchToken.orNotFound
+    val tokensFinder = mock[IOTokenFinder]
+    val logger       = TestLogger[IO]()
+    val endpoint     = new FetchTokenEndpoint[IO](tokensFinder, logger).fetchToken.orNotFound
   }
 
   private class IOTokenFinder(

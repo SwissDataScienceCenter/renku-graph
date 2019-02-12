@@ -26,7 +26,7 @@ import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAcce
 
 import scala.language.higherKinds
 
-private class TokenAssociator[Interpretation[_]: Monad](
+private class TokenInRepoAssociator[Interpretation[_]: Monad](
     transactorProvider: TransactorProvider[Interpretation]
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
@@ -53,9 +53,9 @@ private class TokenAssociator[Interpretation[_]: Monad](
 
   private def update(projectId: ProjectId, encryptedToken: EncryptedAccessToken) =
     sql"""update projects_tokens 
-                set token = ${encryptedToken.value} 
-                where project_id = ${projectId.value}
-            """.update.run.map(failIfMultiUpdate(projectId))
+          set token = ${encryptedToken.value} 
+          where project_id = ${projectId.value}
+      """.update.run.map(failIfMultiUpdate(projectId))
 
   private def failIfMultiUpdate(projectId: ProjectId): Int => Unit = {
     case 1 => ()

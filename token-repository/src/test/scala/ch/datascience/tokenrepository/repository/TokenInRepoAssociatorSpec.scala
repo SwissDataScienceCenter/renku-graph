@@ -27,7 +27,7 @@ import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class TokenAssociatorSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
+class TokenInRepoAssociatorSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
 
   "associate" should {
 
@@ -59,7 +59,7 @@ class TokenAssociatorSpec extends WordSpec with DbSpec with InMemoryProjectsToke
 
     val projectId = projectIds.generateOne
 
-    val associator = new TokenAssociator(transactorProvider)
+    val associator = new TokenInRepoAssociator(transactorProvider)
 
     def findToken(projectId: ProjectId): Option[EncryptedAccessToken] =
       new TokenInRepoFinder(transactorProvider)

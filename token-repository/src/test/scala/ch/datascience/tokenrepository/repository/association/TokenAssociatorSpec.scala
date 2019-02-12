@@ -16,27 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.http
+package ch.datascience.tokenrepository.repository.association
 
-import cats.data.Kleisli
-import cats.effect.IO
-import io.circe.Json
-import org.http4s.circe._
-import org.http4s.{EntityDecoder, EntityEncoder, Request, Response, Status}
+import org.scalatest.WordSpec
 
-object EndpointTester {
-
-  implicit val jsonEntityDecoder: EntityDecoder[IO, Json] = jsonOf[IO, Json]
-  implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
-
-  implicit class EndpointOps(endpoint: Kleisli[IO, Request[IO], Response[IO]]) {
-
-    def call(request: Request[IO]) = new {
-      private val runResponse: Response[IO] = endpoint.run(request).unsafeRunSync()
-
-      lazy val status: Status = runResponse.status
-
-      def body[T](implicit decoder: EntityDecoder[IO, T]): T = runResponse.as[T].unsafeRunSync
-    }
-  }
-}
+private class TokenAssociatorSpec extends WordSpec {}

@@ -35,21 +35,21 @@ import org.http4s.{HttpRoutes, Response}
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class FetchTokenEndpoint[F[_]: Effect](
-    tokensRepository: TokenFinder[F],
-    logger:           Logger[F]
-) extends Http4sDsl[F] {
+class FetchTokenEndpoint[Interpretation[_]: Effect](
+    tokenFinder: TokenFinder[Interpretation],
+    logger:      Logger[Interpretation]
+) extends Http4sDsl[Interpretation] {
 
-  val fetchToken: HttpRoutes[F] = HttpRoutes.of[F] {
+  val fetchToken: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
     case GET -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
-      tokensRepository
+      tokenFinder
         .findToken(projectId)
         .value
         .flatMap(toHttpResult(projectId))
         .recoverWith(httpResult(projectId))
   }
 
-  private def toHttpResult(projectId: ProjectId): Option[AccessToken] => F[Response[F]] = {
+  private def toHttpResult(projectId: ProjectId): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
     case Some(token) =>
       logger.info(s"Token for projectId: $projectId found")
       Ok(toJson(token))
@@ -64,7 +64,7 @@ class FetchTokenEndpoint[F[_]: Effect](
     case OAuthAccessToken(token)    => Json.obj("oauthAccessToken"    -> Json.fromString(token))
   }
 
-  private def httpResult(projectId: ProjectId): PartialFunction[Throwable, F[Response[F]]] = {
+  private def httpResult(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Finding token for projectId: $projectId failed")
       logger.error(exception)(errorMessage.value)

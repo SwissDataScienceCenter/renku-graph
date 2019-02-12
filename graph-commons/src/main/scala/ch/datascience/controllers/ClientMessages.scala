@@ -35,7 +35,7 @@ object ErrorMessage {
 
   def apply(errorMessage: String): ErrorMessage =
     RefType
-      .applyRef[ErrorMessage](errorMessage)
+      .applyRef[ErrorMessage](errorMessage.split('\n').map(_.trim.filter(_ >= ' ')).mkString)
       .fold(
         _ => throw new IllegalArgumentException("Error message cannot be blank"),
         identity
