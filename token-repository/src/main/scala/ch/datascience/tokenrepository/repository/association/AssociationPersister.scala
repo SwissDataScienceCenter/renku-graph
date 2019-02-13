@@ -18,11 +18,13 @@
 
 package ch.datascience.tokenrepository.repository.association
 
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.db.TransactorProvider
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.ProjectsTokensConfig
 
 import scala.language.higherKinds
 
@@ -62,3 +64,6 @@ private class AssociationPersister[Interpretation[_]: Monad](
     case _ => new RuntimeException(s"Associating token for a projectId: $projectId")
   }
 }
+
+private class IOAssociationPersister(implicit contextShift: ContextShift[IO])
+    extends AssociationPersister[IO](new TransactorProvider[IO](new ProjectsTokensConfig[IO]))

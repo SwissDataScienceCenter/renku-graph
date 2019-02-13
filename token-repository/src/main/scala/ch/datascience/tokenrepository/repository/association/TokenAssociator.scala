@@ -19,6 +19,7 @@
 package ch.datascience.tokenrepository.repository.association
 
 import cats.MonadError
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
@@ -40,3 +41,10 @@ private class TokenAssociator[Interpretiation[_]](
       _              <- persistAssociation(projectId, encryptedToken)
     } yield ()
 }
+
+private class IOTokenAssociator(
+    implicit contextShift: ContextShift[IO]
+) extends TokenAssociator[IO](
+      AccessTokenCrypto[IO](),
+      new IOAssociationPersister
+    )
