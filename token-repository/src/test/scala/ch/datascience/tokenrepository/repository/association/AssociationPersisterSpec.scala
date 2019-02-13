@@ -22,9 +22,9 @@ import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.ProjectId
-import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.InMemoryProjectsTokens
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
-import ch.datascience.tokenrepository.repository.{InMemoryProjectsTokens, TokenInRepoFinder}
+import doobie.implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -38,7 +38,7 @@ class AssociationPersisterSpec extends WordSpec with DbSpec with InMemoryProject
 
       associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ()
 
-      findToken(projectId) shouldBe Some(encryptedToken)
+      findToken(projectId) shouldBe Some(encryptedToken.value)
     }
 
     s"succeed if token exists" in new TestCase {
@@ -47,12 +47,12 @@ class AssociationPersisterSpec extends WordSpec with DbSpec with InMemoryProject
 
       associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ()
 
-      findToken(projectId) shouldBe Some(encryptedToken)
+      findToken(projectId) shouldBe Some(encryptedToken.value)
 
       val newEncryptedToken = encryptedAccessTokens.generateOne
       associator.persistAssociation(projectId, newEncryptedToken).unsafeRunSync shouldBe ()
 
-      findToken(projectId) shouldBe Some(newEncryptedToken)
+      findToken(projectId) shouldBe Some(newEncryptedToken.value)
     }
   }
 
@@ -62,10 +62,14 @@ class AssociationPersisterSpec extends WordSpec with DbSpec with InMemoryProject
 
     val associator = new AssociationPersister(transactorProvider)
 
-    def findToken(projectId: ProjectId): Option[EncryptedAccessToken] =
-      new TokenInRepoFinder(transactorProvider)
-        .findToken(projectId)
-        .value
+    def findToken(projectId: ProjectId): Option[String] =
+      sql"""select token 
+            from projects_tokens  
+            where project_id = ${projectId.value}
+         """
+        .query[String]
+        .option
+        .transact(transactor)
         .unsafeRunSync()
   }
 }

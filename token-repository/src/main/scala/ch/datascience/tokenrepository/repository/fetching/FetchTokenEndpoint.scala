@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.tokenrepository.repository.fetching
 
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
@@ -26,6 +26,7 @@ import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.tokenrepository.ApplicationLogger
+import ch.datascience.tokenrepository.repository._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import org.http4s.circe._

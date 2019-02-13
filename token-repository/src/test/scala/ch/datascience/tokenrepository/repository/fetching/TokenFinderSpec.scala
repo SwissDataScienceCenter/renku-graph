@@ -16,14 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.tokenrepository.repository.fetching
 
 import cats.MonadError
 import cats.data.OptionT
 import cats.implicits._
 import ch.datascience.clients.AccessToken
-import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.db.TransactorProvider
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
@@ -31,6 +29,7 @@ import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
+import ch.datascience.tokenrepository.repository.TryAccessTokenCrypto
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -103,10 +102,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
     val projectId = projectIds.generateOne
 
     val accessTokenCrypto = mock[TryAccessTokenCrypto]
-    val tokenInRepoFinder = mock[TryTokenInRepoFinder]
+    val tokenInRepoFinder = mock[TryPersistedTokensFinder]
     val tokenFinder       = new TokenFinder[Try](tokenInRepoFinder, accessTokenCrypto)
   }
-
-  private class TryTokenInRepoFinder(transactorProvider: TransactorProvider[Try])
-      extends TokenInRepoFinder[Try](transactorProvider)
 }

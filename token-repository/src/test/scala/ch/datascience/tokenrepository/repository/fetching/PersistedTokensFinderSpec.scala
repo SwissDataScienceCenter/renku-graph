@@ -16,19 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.tokenrepository.repository.fetching
 
 import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.InMemoryProjectsTokens
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import doobie.implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class TokenInRepoFinderSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
+class PersistedTokensFinderSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
 
   "findToken" should {
 
@@ -50,13 +51,13 @@ class TokenInRepoFinderSpec extends WordSpec with DbSpec with InMemoryProjectsTo
 
     val projectId = projectIds.generateOne
 
-    val finder = new TokenInRepoFinder(transactorProvider)
+    val finder = new PersistedTokensFinder(transactorProvider)
 
     def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit =
       sql"""insert into 
-          projects_tokens (project_id, token) 
-          values (${projectId.value}, ${encryptedToken.value})
-      """.update.run
+            projects_tokens (project_id, token) 
+            values (${projectId.value}, ${encryptedToken.value})
+         """.update.run
         .map(assureInserted)
         .transact(transactor)
         .unsafeRunSync()

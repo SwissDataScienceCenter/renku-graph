@@ -16,18 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.tokenrepository.repository.fetching
 
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
 import ch.datascience.clients.AccessToken
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.tokenrepository.repository._
 
 import scala.language.higherKinds
 
 private class TokenFinder[Interpretation[_]](
-    tokenInRepoFinder: TokenInRepoFinder[Interpretation],
+    tokenInRepoFinder: PersistedTokensFinder[Interpretation],
     accessTokenCrypto: AccessTokenCrypto[Interpretation]
 )(implicit ME:         MonadError[Interpretation, Throwable]) {
 
@@ -42,4 +43,4 @@ private class TokenFinder[Interpretation[_]](
 
 private class IOTokenFinder(
     implicit contextShift: ContextShift[IO]
-) extends TokenFinder[IO](new IOTokenInRepoFinder, AccessTokenCrypto[IO]())
+) extends TokenFinder[IO](new IOPersistedTokensFinder, AccessTokenCrypto[IO]())

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.tokenrepository.repository.fetching
 
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
@@ -25,10 +25,11 @@ import cats.{Monad, MonadError}
 import ch.datascience.db.TransactorProvider
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.ProjectsTokensConfig
 
 import scala.language.higherKinds
 
-private class TokenInRepoFinder[Interpretation[_]: Monad](
+private class PersistedTokensFinder[Interpretation[_]: Monad](
     transactorProvider: TransactorProvider[Interpretation]
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
@@ -57,5 +58,5 @@ private class TokenInRepoFinder[Interpretation[_]: Monad](
   }
 }
 
-private class IOTokenInRepoFinder(implicit contextShift: ContextShift[IO])
-    extends TokenInRepoFinder[IO](new TransactorProvider[IO](new ProjectsTokensConfig[IO]))
+private class IOPersistedTokensFinder(implicit contextShift: ContextShift[IO])
+    extends PersistedTokensFinder[IO](new TransactorProvider[IO](new ProjectsTokensConfig[IO]))

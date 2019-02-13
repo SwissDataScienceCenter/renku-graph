@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository
 
 import cats.effect._
-import ch.datascience.tokenrepository.repository.{FetchTokenEndpoint, IOFetchTokenEndpoint}
+import ch.datascience.tokenrepository.repository.fetching.{FetchTokenEndpoint, IOFetchTokenEndpoint}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds

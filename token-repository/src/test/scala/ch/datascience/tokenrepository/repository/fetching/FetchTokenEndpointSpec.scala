@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.tokenrepository.repository.fetching
 
 import cats.data.OptionT
 import cats.effect.IO
@@ -127,9 +127,4 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
     val logger       = TestLogger[IO]()
     val endpoint     = new FetchTokenEndpoint[IO](tokensFinder, logger).fetchToken.orNotFound
   }
-
-  private class IOTokenFinder(
-      tokenInRepoFinder: TokenInRepoFinder[IO],
-      accessTokenCrypto: AccessTokenCrypto[IO]
-  ) extends TokenFinder[IO](tokenInRepoFinder, accessTokenCrypto)
 }
