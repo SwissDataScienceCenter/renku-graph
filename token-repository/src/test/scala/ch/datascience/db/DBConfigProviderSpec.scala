@@ -21,11 +21,12 @@ package ch.datascience.db
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.db.DBConfigProvider.DBConfig.{Driver, Url}
+import ch.datascience.db.DBConfigProvider.DBConfig._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -40,59 +41,81 @@ class DBConfigProviderSpec extends WordSpec {
 
     "return db config read from the configuration" in new TestCase {
       val namespace = nonEmptyStrings().generateOne
+      val host      = hosts.generateOne
       val user      = nonEmptyStrings().generateOne
       val password  = nonEmptyStrings().generateOne
 
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
+            "db-host" -> host.value,
             "db-user" -> user,
             "db-pass" -> password
           ).asJava
         ).asJava
       )
 
-      val Success(dbConfig) = new DBConfigProvider[Try](namespace, driver, url, config).get()
+      val Success(dbConfig) = new DBConfigProvider[Try](namespace, driver, dbName, urlPrefix, config).get()
 
       dbConfig.driver     shouldBe driver
-      dbConfig.url        shouldBe url
+      dbConfig.url.value  shouldBe s"$urlPrefix://$host/$dbName"
       dbConfig.user.value shouldBe user
       dbConfig.pass       shouldBe password
     }
 
     "fail if there is no db config namespace in the config" in new TestCase {
-      val Failure(exception) = new DBConfigProvider[Try]("unknown", driver, url, ConfigFactory.empty()).get()
+      val Failure(exception) =
+        new DBConfigProvider[Try]("unknown", driver, dbName, urlPrefix, ConfigFactory.empty()).get()
 
       exception shouldBe a[ConfigLoadingException]
     }
 
-    "fail if there is no '<config-namespace>.user' in the config" in new TestCase {
+    "fail if there is no '<config-namespace>.db-host' in the config" in new TestCase {
       val namespace = nonEmptyStrings().generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "projects-tokens" -> Map(
+            "db-host" -> "",
+            "db-user" -> nonEmptyStrings().generateOne,
+            "db-pass" -> nonEmptyStrings().generateOne
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = new DBConfigProvider[Try](namespace, driver, dbName, urlPrefix, config).get()
+
+      exception shouldBe a[ConfigLoadingException]
+    }
+
+    "fail if there is no '<config-namespace>.db-user' in the config" in new TestCase {
+      val namespace = nonEmptyStrings().generateOne
+      val config = ConfigFactory.parseMap(
+        Map(
+          "projects-tokens" -> Map(
+            "db-host" -> hosts.generateOne.value,
             "db-user" -> "",
             "db-pass" -> nonEmptyStrings().generateOne
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = new DBConfigProvider[Try](namespace, driver, url, config).get()
+      val Failure(exception) = new DBConfigProvider[Try](namespace, driver, dbName, urlPrefix, config).get()
 
       exception shouldBe a[ConfigLoadingException]
     }
 
-    "fail if there is no '<config-namespace>.password' in the config" in new TestCase {
+    "fail if there is no '<config-namespace>.db-pass' in the config" in new TestCase {
       val namespace = nonEmptyStrings().generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "projects-tokens" -> Map(
+            "db-host" -> hosts.generateOne.value,
             "db-user" -> nonEmptyStrings().generateOne
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = new DBConfigProvider[Try](namespace, driver, url, config).get()
+      val Failure(exception) = new DBConfigProvider[Try](namespace, driver, dbName, urlPrefix, config).get()
 
       exception shouldBe a[ConfigLoadingException]
     }
@@ -102,8 +125,19 @@ class DBConfigProviderSpec extends WordSpec {
     val driver = RefType
       .applyRef[Driver](nonEmptyStrings().generateOne)
       .getOrElse(throw new IllegalArgumentException("Invalid driver value"))
-    val url = RefType
-      .applyRef[Url](nonEmptyStrings().generateOne)
+    val dbName = RefType
+      .applyRef[DbName](nonEmptyStrings().generateOne)
       .getOrElse(throw new IllegalArgumentException("Invalid url value"))
+    val urlPrefix = RefType
+      .applyRef[UrlPrefix](nonEmptyStrings().generateOne)
+      .getOrElse(throw new IllegalArgumentException("Invalid url value"))
+
+    val hosts: Gen[Host] = for {
+      hostname <- nonEmptyStrings()
+      port     <- positiveInts()
+    } yield
+      RefType
+        .applyRef[Host](s"$hostname:$port")
+        .getOrElse(throw new IllegalArgumentException("Invalid url value"))
   }
 }

@@ -29,5 +29,6 @@ private class ProjectsTokensConfig[Interpretation[_]](
 ) extends DBConfigProvider[Interpretation](
       namespace = "projects-tokens",
       driver    = "org.postgresql.Driver",
-      url       = "jdbc:postgresql:projects_tokens"
+      dbName    = "projects_tokens",
+      urlPrefix = "jdbc:postgresql"
     )
