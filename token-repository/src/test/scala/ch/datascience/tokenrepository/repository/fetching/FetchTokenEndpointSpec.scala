@@ -125,6 +125,6 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
     val tokensFinder = mock[IOTokenFinder]
     val logger       = TestLogger[IO]()
-    val endpoint     = new FetchTokenEndpoint[IO](tokensFinder, logger).fetchToken.orNotFound
+    val endpoint     = new FetchTokenEndpoint[IO](tokensFinder, logger).fetchToken.or(notAvailableResponse)
   }
 }

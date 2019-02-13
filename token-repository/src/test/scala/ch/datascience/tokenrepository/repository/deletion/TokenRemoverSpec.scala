@@ -16,43 +16,36 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository.association
+package ch.datascience.tokenrepository.repository.deletion
 
 import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokens
-import ch.datascience.tokenrepository.repository.RepositoryGenerators._
+import ch.datascience.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import doobie.implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class AssociationPersisterSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
+class TokenRemoverSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
 
-  "persistAssociation" should {
+  "delete" should {
 
     "succeed if token does not exist" in new TestCase {
-
-      val encryptedToken = encryptedAccessTokens.generateOne
-
-      associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ()
-
-      findToken(projectId) shouldBe Some(encryptedToken.value)
+      remover.delete(projectId).unsafeRunSync shouldBe ()
     }
 
     "succeed if token exists" in new TestCase {
 
       val encryptedToken = encryptedAccessTokens.generateOne
-
-      associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ()
-
+      insert(projectId, encryptedToken)
       findToken(projectId) shouldBe Some(encryptedToken.value)
 
-      val newEncryptedToken = encryptedAccessTokens.generateOne
-      associator.persistAssociation(projectId, newEncryptedToken).unsafeRunSync shouldBe ()
+      remover.delete(projectId).unsafeRunSync shouldBe ()
 
-      findToken(projectId) shouldBe Some(newEncryptedToken.value)
+      findToken(projectId) shouldBe None
     }
   }
 
@@ -60,7 +53,7 @@ class AssociationPersisterSpec extends WordSpec with DbSpec with InMemoryProject
 
     val projectId = projectIds.generateOne
 
-    val associator = new AssociationPersister(transactorProvider)
+    val remover = new TokenRemover(transactorProvider)
 
     def findToken(projectId: ProjectId): Option[String] =
       sql"""select token 
@@ -71,5 +64,19 @@ class AssociationPersisterSpec extends WordSpec with DbSpec with InMemoryProject
         .option
         .transact(transactor)
         .unsafeRunSync()
+
+    def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit =
+      sql"""insert into 
+            projects_tokens (project_id, token) 
+            values (${projectId.value}, ${encryptedToken.value})
+         """.update.run
+        .map(assureInserted)
+        .transact(transactor)
+        .unsafeRunSync()
+
+    private lazy val assureInserted: Int => Unit = {
+      case 1 => ()
+      case _ => fail("insertion problem")
+    }
   }
 }

@@ -61,7 +61,7 @@ private class AssociationPersister[Interpretation[_]: Monad](
 
   private def failIfMultiUpdate(projectId: ProjectId): Int => Unit = {
     case 1 => ()
-    case _ => new RuntimeException(s"Associating token for a projectId: $projectId")
+    case _ => throw new RuntimeException(s"Associating token for a projectId: $projectId")
   }
 }
 

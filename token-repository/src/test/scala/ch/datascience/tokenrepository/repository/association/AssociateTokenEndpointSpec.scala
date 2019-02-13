@@ -111,7 +111,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
       val expectedMessage = s"Associating token with projectId: $projectId failed"
       response.body[Json] shouldBe json"""{"message": $expectedMessage}"""
 
-      logger.loggedOnly(Error(s"Associating token with projectId: $projectId failed", exception))
+      logger.loggedOnly(Error(expectedMessage, exception))
     }
   }
 
@@ -123,6 +123,6 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
 
     val tokensAssociator = mock[IOTokenAssociator]
     val logger           = TestLogger[IO]()
-    val endpoint         = new AssociateTokenEndpoint[IO](tokensAssociator, logger).associateToken.orNotFound
+    val endpoint         = new AssociateTokenEndpoint[IO](tokensAssociator, logger).associateToken.or(notAvailableResponse)
   }
 }

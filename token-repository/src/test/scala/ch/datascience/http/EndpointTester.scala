@@ -22,7 +22,7 @@ import cats.data.Kleisli
 import cats.effect.IO
 import io.circe.Json
 import org.http4s.circe._
-import org.http4s.{EntityDecoder, EntityEncoder, Request, Response, Status}
+import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, Request, Response, Status}
 
 object EndpointTester {
 
@@ -38,5 +38,12 @@ object EndpointTester {
 
       def body[T](implicit decoder: EntityDecoder[IO, T]): T = runResponse.as[T].unsafeRunSync
     }
+  }
+
+  val notAvailableResponse: Response[IO] = Response(Status.ServiceUnavailable)
+
+  implicit class RoutesOps(routes: HttpRoutes[IO]) {
+    def or(response: Response[IO]): Kleisli[IO, Request[IO], Response[IO]] =
+      Kleisli(a => routes.run(a).getOrElse(response))
   }
 }

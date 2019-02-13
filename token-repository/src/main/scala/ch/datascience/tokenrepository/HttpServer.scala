@@ -20,6 +20,7 @@ package ch.datascience.tokenrepository
 
 import cats.effect._
 import ch.datascience.tokenrepository.repository.association.{AssociateTokenEndpoint, IOAssociateTokenEndpoint}
+import ch.datascience.tokenrepository.repository.deletion.{DeleteTokenEndpoint, IODeleteTokenEndpoint}
 import ch.datascience.tokenrepository.repository.fetching.{FetchTokenEndpoint, IOFetchTokenEndpoint}
 
 import scala.concurrent.ExecutionContext
@@ -31,7 +32,8 @@ object HttpServer extends IOApp {
   private val server = new HttpServer[IO](
     new PingEndpoint[IO],
     new IOFetchTokenEndpoint,
-    new IOAssociateTokenEndpoint
+    new IOAssociateTokenEndpoint,
+    new IODeleteTokenEndpoint
   )
   override def run(args: List[String]): IO[ExitCode] = server.run
 }
@@ -39,7 +41,8 @@ object HttpServer extends IOApp {
 private class HttpServer[F[_]: ConcurrentEffect](
     pingEndpoint:           PingEndpoint[F],
     fetchTokenEndpoint:     FetchTokenEndpoint[F],
-    associateTokenEndpoint: AssociateTokenEndpoint[F]
+    associateTokenEndpoint: AssociateTokenEndpoint[F],
+    deleteTokenEndpoint:    DeleteTokenEndpoint[F]
 ) {
   import cats.implicits._
   import org.http4s.server.blaze._
@@ -50,6 +53,7 @@ private class HttpServer[F[_]: ConcurrentEffect](
       .mountService(pingEndpoint.ping, "/")
       .mountService(fetchTokenEndpoint.fetchToken, "/")
       .mountService(associateTokenEndpoint.associateToken, "/")
+      .mountService(deleteTokenEndpoint.deleteToken, "/")
       .serve
       .compile
       .drain
