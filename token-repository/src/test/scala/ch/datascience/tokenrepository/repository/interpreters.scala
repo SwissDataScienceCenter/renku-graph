@@ -18,20 +18,9 @@
 
 package ch.datascience.tokenrepository.repository
 
-import ch.datascience.generators.Generators._
-import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import eu.timepit.refined.api.RefType
-import org.scalacheck.Gen
+import cats.implicits._
+import ch.datascience.crypto.AesCrypto.Secret
 
-private object RepositoryGenerators {
+import scala.util.Try
 
-  implicit val encryptedAccessTokens: Gen[EncryptedAccessToken] =
-    nonEmptyStrings()
-      .map { value =>
-        RefType
-          .applyRef[EncryptedAccessToken](value)
-          .getOrElse {
-            throw new IllegalArgumentException("Invalid value generated for EncryptedAccessToken")
-          }
-      }
-}
+private class TryAccessTokenCrypto(secret: Secret) extends AccessTokenCrypto[Try](secret)

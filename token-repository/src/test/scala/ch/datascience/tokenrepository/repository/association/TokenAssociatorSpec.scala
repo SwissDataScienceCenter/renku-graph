@@ -18,6 +18,77 @@
 
 package ch.datascience.tokenrepository.repository.association
 
+import cats.MonadError
+import cats.implicits._
+import ch.datascience.clients.AccessToken
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.events.EventsGenerators._
+import ch.datascience.graph.events.GraphCommonsGenerators._
+import ch.datascience.graph.events.ProjectId
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.RepositoryGenerators._
+import ch.datascience.tokenrepository.repository.TryAccessTokenCrypto
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-private class TokenAssociatorSpec extends WordSpec {}
+import scala.util.Try
+
+class TokenAssociatorSpec extends WordSpec with MockFactory {
+
+  "associate" should {
+
+    "succeed if token encryption and storing in the db is successful" in new TestCase {
+      val encryptedAccessToken = encryptedAccessTokens.generateOne
+      (accessTokenCrypto
+        .encrypt(_: AccessToken))
+        .expects(accessToken)
+        .returning(context.pure(encryptedAccessToken))
+
+      (associationPersister
+        .persistAssociation(_: ProjectId, _: EncryptedAccessToken))
+        .expects(projectId, encryptedAccessToken)
+        .returning(context.pure(()))
+
+      tokenAssociator.associate(projectId, accessToken) shouldBe context.pure(())
+    }
+
+    "fail if token encryption fails" in new TestCase {
+      val exception = exceptions.generateOne
+      (accessTokenCrypto
+        .encrypt(_: AccessToken))
+        .expects(accessToken)
+        .returning(context.raiseError(exception))
+
+      tokenAssociator.associate(projectId, accessToken) shouldBe context.raiseError(exception)
+    }
+
+    "fail if storing in the db fails" in new TestCase {
+      val encryptedAccessToken = encryptedAccessTokens.generateOne
+      (accessTokenCrypto
+        .encrypt(_: AccessToken))
+        .expects(accessToken)
+        .returning(context.pure(encryptedAccessToken))
+
+      val exception = exceptions.generateOne
+      (associationPersister
+        .persistAssociation(_: ProjectId, _: EncryptedAccessToken))
+        .expects(projectId, encryptedAccessToken)
+        .returning(context.raiseError(exception))
+
+      tokenAssociator.associate(projectId, accessToken) shouldBe context.raiseError(exception)
+    }
+  }
+
+  private trait TestCase {
+    val projectId   = projectIds.generateOne
+    val accessToken = accessTokens.generateOne
+
+    val context = MonadError[Try, Throwable]
+
+    val accessTokenCrypto    = mock[TryAccessTokenCrypto]
+    val associationPersister = mock[TryAssociationPersister]
+    val tokenAssociator      = new TokenAssociator[Try](accessTokenCrypto, associationPersister)
+  }
+}

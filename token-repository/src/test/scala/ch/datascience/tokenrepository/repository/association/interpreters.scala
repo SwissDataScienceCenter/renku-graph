@@ -18,25 +18,17 @@
 
 package ch.datascience.tokenrepository.repository.association
 
-import cats.MonadError
+import cats.effect.IO
 import cats.implicits._
-import ch.datascience.clients.AccessToken
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.db.TransactorProvider
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto
 
-import scala.language.higherKinds
+import scala.util.Try
 
-private class TokenAssociator[Interpretiation[_]](
-    accessTokenCrypto:    AccessTokenCrypto[Interpretiation],
-    associationPersister: AssociationPersister[Interpretiation]
-)(implicit ME:            MonadError[Interpretiation, Throwable]) {
+private class TryAssociationPersister(transactorProvider: TransactorProvider[Try])
+    extends AssociationPersister[Try](transactorProvider)
 
-  import accessTokenCrypto._
-  import associationPersister._
-
-  def associate(projectId: ProjectId, token: AccessToken): Interpretiation[Unit] =
-    for {
-      encryptedToken <- encrypt(token)
-      _              <- persistAssociation(projectId, encryptedToken)
-    } yield ()
-}
+private class IOTokenAssociator(
+    accessTokenCrypto:    AccessTokenCrypto[IO],
+    associationPersister: AssociationPersister[IO]
+) extends TokenAssociator[IO](accessTokenCrypto, associationPersister)

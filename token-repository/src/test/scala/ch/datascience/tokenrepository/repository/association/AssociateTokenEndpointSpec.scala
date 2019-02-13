@@ -125,6 +125,4 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
     val logger           = TestLogger[IO]()
     val endpoint         = new AssociateTokenEndpoint[IO](tokensAssociator, logger).associateToken.orNotFound
   }
-
-  private class IOTokenAssociator extends TokenAssociator[IO]
 }

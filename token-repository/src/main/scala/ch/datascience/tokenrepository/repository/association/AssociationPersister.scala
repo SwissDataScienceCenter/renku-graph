@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.tokenrepository.repository.association
 
 import cats.implicits._
 import cats.{Monad, MonadError}
@@ -26,13 +26,13 @@ import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAcce
 
 import scala.language.higherKinds
 
-private class TokenInRepoAssociator[Interpretation[_]: Monad](
+private class AssociationPersister[Interpretation[_]: Monad](
     transactorProvider: TransactorProvider[Interpretation]
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
-  def associate(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
+  def persistAssociation(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
     for {
       transactor <- transactorProvider.transactor
       _ <- sql"select token from projects_tokens where project_id = ${projectId.value}"

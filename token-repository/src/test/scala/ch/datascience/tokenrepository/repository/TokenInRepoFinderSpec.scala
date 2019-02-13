@@ -34,7 +34,7 @@ class TokenInRepoFinderSpec extends WordSpec with DbSpec with InMemoryProjectsTo
 
     "return token associated with the projectId" in new TestCase {
 
-      val encryptedToken = encryptedTokens.generateOne
+      val encryptedToken = encryptedAccessTokens.generateOne
 
       insert(projectId, encryptedToken)
 

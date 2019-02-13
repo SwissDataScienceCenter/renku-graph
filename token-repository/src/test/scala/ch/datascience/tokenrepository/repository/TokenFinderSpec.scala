@@ -43,7 +43,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
     "return Access Token if an Encrypted token found in the db it was possible to decrypt it" in new TestCase {
 
-      val encryptedToken = encryptedTokens.generateOne
+      val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
         .findToken(_: ProjectId))
         .expects(projectId)
@@ -81,7 +81,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
     "fail if decrypting found token fails" in new TestCase {
 
-      val encryptedToken = encryptedTokens.generateOne
+      val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
         .findToken(_: ProjectId))
         .expects(projectId)
@@ -102,7 +102,6 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
     val projectId = projectIds.generateOne
 
-    class TryAccessTokenCrypto(secret: Secret) extends AccessTokenCrypto[Try](secret)
     val accessTokenCrypto = mock[TryAccessTokenCrypto]
     val tokenInRepoFinder = mock[TryTokenInRepoFinder]
     val tokenFinder       = new TokenFinder[Try](tokenInRepoFinder, accessTokenCrypto)

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.tokenrepository.repository.association
 
 import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
@@ -24,32 +24,33 @@ import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
+import ch.datascience.tokenrepository.repository.{InMemoryProjectsTokens, TokenInRepoFinder}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class TokenInRepoAssociatorSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
+class AssociationPersisterSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
 
-  "associate" should {
+  "persistAssociation" should {
 
     s"succeed if token does not exist" in new TestCase {
 
-      val encryptedToken = encryptedTokens.generateOne
+      val encryptedToken = encryptedAccessTokens.generateOne
 
-      associator.associate(projectId, encryptedToken).unsafeRunSync shouldBe ()
+      associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ()
 
       findToken(projectId) shouldBe Some(encryptedToken)
     }
 
     s"succeed if token exists" in new TestCase {
 
-      val encryptedToken = encryptedTokens.generateOne
+      val encryptedToken = encryptedAccessTokens.generateOne
 
-      associator.associate(projectId, encryptedToken).unsafeRunSync shouldBe ()
+      associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ()
 
       findToken(projectId) shouldBe Some(encryptedToken)
 
-      val newEncryptedToken = encryptedTokens.generateOne
-      associator.associate(projectId, newEncryptedToken).unsafeRunSync shouldBe ()
+      val newEncryptedToken = encryptedAccessTokens.generateOne
+      associator.persistAssociation(projectId, newEncryptedToken).unsafeRunSync shouldBe ()
 
       findToken(projectId) shouldBe Some(newEncryptedToken)
     }
@@ -59,7 +60,7 @@ class TokenInRepoAssociatorSpec extends WordSpec with DbSpec with InMemoryProjec
 
     val projectId = projectIds.generateOne
 
-    val associator = new TokenInRepoAssociator(transactorProvider)
+    val associator = new AssociationPersister(transactorProvider)
 
     def findToken(projectId: ProjectId): Option[EncryptedAccessToken] =
       new TokenInRepoFinder(transactorProvider)
