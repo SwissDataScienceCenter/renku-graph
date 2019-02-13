@@ -49,7 +49,7 @@ private class HttpServer[F[_]: ConcurrentEffect](
 
   def run(implicit ec: ExecutionContext): F[ExitCode] =
     BlazeBuilder[F]
-      .bindHttp(9003, "localhost")
+      .bindHttp(9003, "0.0.0.0")
       .mountService(pingEndpoint.ping, "/")
       .mountService(fetchTokenEndpoint.fetchToken, "/")
       .mountService(associateTokenEndpoint.associateToken, "/")

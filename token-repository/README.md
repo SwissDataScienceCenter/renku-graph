@@ -94,5 +94,5 @@ docker build -f token-repository/Dockerfile -t token-repository .
 - run the service
 
 ```bash
-docker run --rm -e 'DB_URL=<url>' -p 9003:9000 token-repository
+docker run --rm -p 9003:9003 token-repository
 ```
