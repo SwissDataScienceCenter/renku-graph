@@ -2,6 +2,15 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+tokenRepository:
+  image:
+    repository: renku/token-repository
+    tag: 'latest'
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+
 triplesGenerator:
   image:
     repository: renku/triples-generator
@@ -39,7 +48,7 @@ ingress:
   enabled: false
   annotations: {}
     # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
+  # kubernetes.io/tls-acme: "true"
   paths: []
   hosts:
     - chart-example.local
@@ -58,7 +67,7 @@ resources: {}
   #  memory: 128Mi
   # requests:
   #  cpu: 100m
-  #  memory: 128Mi
+#  memory: 128Mi
 
 nodeSelector: {}
 

@@ -22,6 +22,48 @@ spec:
         release: {{ .Release.Name }}
     spec:
       containers:
+        - name: {{ .Chart.Name }}-token-repository
+          image: "{{ .Values.tokenRepository.image.repository }}:{{ .Values.tokenRepository.image.tag }}"
+          imagePullPolicy: {{ .Values.tokenRepository.image.pullPolicy }}
+          env:
+            - name: PROJECTS_TOKENS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "graph.fullname" . }}
+                  key: tokenRepository-token-secret
+            - name: POSTGRES_HOST
+              value: "{{ template "postgresql.fullname" . }}:5432"
+            - name: PROJECTS_TOKENS_USER
+              {{- if .Values.tokenRepository.dbUser }}
+              value: {{ .Values.tokenRepository.dbUser }}
+              {{- else }}
+              value: tokenstorage
+              {{- end }}
+            - name: PROJECTS_TOKENS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "graph.fullname" . }}
+                  key: tokenRepository-dbPass
+          ports:
+            - name: http1
+              containerPort: 9003
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http1
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http1
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+  {{ toYaml .Values.resources | indent 12 }}
         - name: {{ .Chart.Name }}-triples-generator
           image: "{{ .Values.triplesGenerator.image.repository }}:{{ .Values.triplesGenerator.image.tag }}"
           imagePullPolicy: {{ .Values.triplesGenerator.image.pullPolicy }}

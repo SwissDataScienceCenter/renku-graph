@@ -7,15 +7,15 @@ charts:
     paths:
       - ..
     images:
-      webhook-service:
-        # Context to send to docker build for use by the Dockerfile
+      token-repository:
         contextPath: ..
-        # Dockerfile path relative to chartpress.yaml
+        dockerfilePath: ../token-repository/Dockerfile
+        valuesPath: tokenRepository.image
+      webhook-service:
+        contextPath: ..
         dockerfilePath: ../webhook-service/Dockerfile
         valuesPath: webhookService.image
       triples-generator:
-        # Context to send to docker build for use by the Dockerfile
         contextPath: ..
-        # Dockerfile path relative to chartpress.yaml
         dockerfilePath: ../triples-generator/Dockerfile
         valuesPath: triplesGenerator.image
