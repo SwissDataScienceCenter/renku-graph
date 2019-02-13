@@ -4,10 +4,12 @@ This is a microservice which provides CRUD operations for `projectId` -> `access
 
 ## API
 
-| Method | Path                               | Description                                |
-|--------|------------------------------------|--------------------------------------------|
-|  GET   | ```/ping```                        | To check if service is healthy             |
-|  GET   | ```/projects/:id/tokens```         | Fetches an access token for the project id |
+| Method  | Path                               | Description                                  |
+|---------|------------------------------------|----------------------------------------------|
+|  GET    | ```/ping```                        | To check if service is healthy               |
+|  GET    | ```/projects/:id/tokens```         | Fetches an access token for the project id   |
+|  PUT    | ```/projects/:id/tokens```         | Associates the given token and project id    |
+|  DELETE | ```/projects/:id/tokens```         | Deletes the token and project id association |
 
 #### GET /ping
 
@@ -22,11 +24,7 @@ Verifies service health.
 
 #### GET /projects/:id/tokens
 
-Fetches an access token for a project with the given id.
-
-**Request format**
-
-The endpoint requires a `TOKEN` in the request headers.
+Fetches an access token for a project id.
 
 **Response**
 
@@ -34,7 +32,6 @@ The endpoint requires a `TOKEN` in the request headers.
 |----------------------------|---------------------------------------------------------------------------------------|
 | OK (200)                   | When an access token can be found for the project                                     |
 | NOT_FOUND (404)            | When an access token cannot be found for the project                                  |
-| UNAUTHORIZED (401)         | When there's no `TOKEN` in the header or it's invalid                                 |
 | INTERNAL SERVER ERROR (500)| When there were problems with finding the token                                       |
 
 Response for a case when the token is a Personal Access Token
@@ -46,6 +43,43 @@ Response for a case when the token is an OAuth Access Token
 ```
 { "oauthAccessToken": "<some-token-value>" }
 ```
+
+#### PUT /projects/:id/tokens
+
+Associates the given token and project id. It succeeds regardless of the association is newly created, it existed before or it got updated. 
+
+**Request format**
+
+The endpoint requires a token to sent in the request JSON body. Allowed payloads are:
+
+* Personal Access Tokens
+```
+{ "personalAccessToken": "<some-token-value>" }
+```
+
+* OAuth Access Tokens
+```
+{ "oauthAccessToken": "<some-token-value>" }
+```
+
+**Response**
+
+| Status                     | Description                                                            |
+|----------------------------|------------------------------------------------------------------------|
+| NO_CONTENT (204)           | When the association was successful                                    |
+| BAD_REQUEST (400)          | When the request body is invalid                                       |
+| INTERNAL SERVER ERROR (500)| When there were problems with associating the token and the project id |
+
+#### DELETE /projects/:id/tokens
+
+Deletes the association of a token and a project id. The deletion is successful regardless the association existed or not.
+
+**Response**
+
+| Status                     | Description                                            |
+|----------------------------|--------------------------------------------------------|
+| NO_CONTENT (204)           | When deletion was successful                           |
+| INTERNAL SERVER ERROR (500)| When there were problems with deleting the association |
 
 ## Trying out
 
