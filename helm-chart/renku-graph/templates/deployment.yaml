@@ -34,16 +34,16 @@ spec:
             - name: POSTGRES_HOST
               value: "{{ template "postgresql.fullname" . }}:5432"
             - name: PROJECTS_TOKENS_USER
-              {{- if .Values.tokenRepository.dbUser }}
-              value: {{ .Values.tokenRepository.dbUser }}
+              {{- if .Values.global.tokenRepository.postgresUser }}
+              value: {{ .Values.global.tokenRepository.postgresUser }}
               {{- else }}
               value: tokenstorage
               {{- end }}
             - name: PROJECTS_TOKENS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "graph.fullname" . }}
-                  key: tokenRepository-dbPass
+                  name: {{ template "renku.fullname" . }}
+                  key: tokenRepository-postgresPassword
           ports:
             - name: http1
               containerPort: 9003
