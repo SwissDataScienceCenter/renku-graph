@@ -26,11 +26,11 @@ spec:
           image: "{{ .Values.tokenRepository.image.repository }}:{{ .Values.tokenRepository.image.tag }}"
           imagePullPolicy: {{ .Values.tokenRepository.image.pullPolicy }}
           env:
-            - name: PROJECTS_TOKENS_SECRET
+            - name: TOKEN_ENCRYPTION_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ template "graph.fullname" . }}
-                  key: tokenRepository-token-secret
+                  key: tokenRepository-tokenEncryption-secret
             - name: POSTGRES_HOST
               value: "{{ template "postgresql.fullname" . }}:5432"
             - name: PROJECTS_TOKENS_USER
