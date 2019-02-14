@@ -33,13 +33,13 @@ spec:
                   key: tokenRepository-tokenEncryption-secret
             - name: POSTGRES_HOST
               value: "{{ template "postgresql.fullname" . }}:5432"
-            - name: PROJECTS_TOKENS_USER
+            - name: POSTGRES_USER
               {{- if .Values.global.tokenRepository.postgresUser }}
               value: {{ .Values.global.tokenRepository.postgresUser }}
               {{- else }}
               value: tokenstorage
               {{- end }}
-            - name: PROJECTS_TOKENS_PASSWORD
+            - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ template "renku.fullname" . }}
