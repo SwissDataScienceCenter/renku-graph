@@ -19,24 +19,11 @@
 package ch.datascience.tokenrepository
 
 import cats.effect._
-import ch.datascience.tokenrepository.repository.association.{AssociateTokenEndpoint, IOAssociateTokenEndpoint}
-import ch.datascience.tokenrepository.repository.deletion.{DeleteTokenEndpoint, IODeleteTokenEndpoint}
-import ch.datascience.tokenrepository.repository.fetching.{FetchTokenEndpoint, IOFetchTokenEndpoint}
+import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint
+import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
+import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint
 
-import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
-
-object HttpServer extends IOApp {
-  import scala.concurrent.ExecutionContext.Implicits.global
-
-  private val server = new HttpServer[IO](
-    new PingEndpoint[IO],
-    new IOFetchTokenEndpoint,
-    new IOAssociateTokenEndpoint,
-    new IODeleteTokenEndpoint
-  )
-  override def run(args: List[String]): IO[ExitCode] = server.run
-}
 
 private class HttpServer[F[_]: ConcurrentEffect](
     pingEndpoint:           PingEndpoint[F],
@@ -47,7 +34,7 @@ private class HttpServer[F[_]: ConcurrentEffect](
   import cats.implicits._
   import org.http4s.server.blaze._
 
-  def run(implicit ec: ExecutionContext): F[ExitCode] =
+  def run: F[ExitCode] =
     BlazeBuilder[F]
       .bindHttp(9003, "0.0.0.0")
       .mountService(pingEndpoint.ping, "/")

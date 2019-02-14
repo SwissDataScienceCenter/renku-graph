@@ -38,4 +38,6 @@ trait InMemoryProjectsTokens {
 
   protected def prepareDbForTest(transactor: Aux[IO, Unit]): Unit =
     sql"TRUNCATE TABLE projects_tokens".update.run
+      .transact(transactor)
+      .unsafeRunSync()
 }
