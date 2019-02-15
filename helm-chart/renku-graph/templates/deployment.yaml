@@ -34,8 +34,8 @@ spec:
             - name: POSTGRES_HOST
               value: "{{ template "postgresql.fullname" . }}:5432"
             - name: POSTGRES_USER
-              {{- if .Values.global.tokenRepository.postgresUser }}
-              value: {{ .Values.global.tokenRepository.postgresUser }}
+              {{- if .Values.global.graph.tokenRepository.postgresUser }}
+              value: {{ .Values.global.graph.tokenRepository.postgresUser }}
               {{- else }}
               value: tokenstorage
               {{- end }}
@@ -78,8 +78,8 @@ spec:
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
             - name: JENA_DATASET_NAME
-              {{- if .Values.global.jena.dataset }}
-              value: {{ .Values.global.jena.dataset }}
+              {{- if .Values.global.graph.jena.dataset }}
+              value: {{ .Values.global.graph.jena.dataset }}
               {{- else }}
               value: renku
               {{- end }}

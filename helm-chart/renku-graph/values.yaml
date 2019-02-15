@@ -10,6 +10,10 @@ tokenRepository:
   service:
     type: ClusterIP
     port: 80
+  tokenEncryption:
+    ## A secret for signing access tokens stored in the database
+    ## Generated using: `openssl rand -hex 8|base64`
+    secret:
 
 triplesGenerator:
   image:
