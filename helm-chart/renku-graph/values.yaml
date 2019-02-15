@@ -10,6 +10,10 @@ triplesGenerator:
   service:
     type: ClusterIP
     port: 80
+  play:
+    ## A Play app secret used for built in encryption utilities
+    ## Generated using: `sbt playGenerateSecret`
+    secret:
 
 webhookService:
   image:
@@ -19,6 +23,14 @@ webhookService:
   service:
     type: ClusterIP
     port: 80
+  play:
+    ## A Play app secret used for built in encryption utilities
+    ## Generated using: `sbt playGenerateSecret`
+    secret:
+  hookToken:
+    ## A secret for signing request header tokens to be sent by GitLab with the Push Events
+    ## Generated using: `openssl rand -hex 8|base64`
+    secret:
 
 nameOverride: ''
 fullnameOverride: ''
@@ -39,7 +51,7 @@ ingress:
   enabled: false
   annotations: {}
     # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
+  # kubernetes.io/tls-acme: "true"
   paths: []
   hosts:
     - chart-example.local
@@ -58,7 +70,7 @@ resources: {}
   #  memory: 128Mi
   # requests:
   #  cpu: 100m
-  #  memory: 128Mi
+#  memory: 128Mi
 
 nodeSelector: {}
 
