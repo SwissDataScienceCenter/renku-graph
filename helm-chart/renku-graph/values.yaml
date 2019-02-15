@@ -23,6 +23,10 @@ triplesGenerator:
   service:
     type: ClusterIP
     port: 80
+  play:
+    ## A Play app secret used for built in encryption utilities
+    ## Generated using: `sbt playGenerateSecret`
+    secret:
 
 webhookService:
   image:
@@ -32,6 +36,14 @@ webhookService:
   service:
     type: ClusterIP
     port: 80
+  play:
+    ## A Play app secret used for built in encryption utilities
+    ## Generated using: `sbt playGenerateSecret`
+    secret:
+  hookToken:
+    ## A secret for signing request header tokens to be sent by GitLab with the Push Events
+    ## Generated using: `openssl rand -hex 8|base64`
+    secret:
 
 nameOverride: ''
 fullnameOverride: ''

@@ -16,23 +16,26 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.hookvalidation
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.events.EventsGenerators.projectIds
 import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.{GitLabConfig, IOGitLabConfigProvider}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
-import ch.datascience.webhookservice.hookcreation.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
+import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
 import io.circe.Json
 import org.http4s.Status
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -184,4 +187,9 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
     RefType
       .applyRef[String Refined Url](value)
       .getOrElse(throw new IllegalArgumentException("Invalid url value"))
+
+  private val projectHookIds: Gen[HookIdentifier] = for {
+    projectId <- projectIds
+    hookUrl   <- projectHookUrls
+  } yield HookIdentifier(projectId, hookUrl)
 }
