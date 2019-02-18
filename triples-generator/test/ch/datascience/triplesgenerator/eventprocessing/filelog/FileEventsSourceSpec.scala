@@ -1,0 +1,85 @@
+package ch.datascience.triplesgenerator.eventprocessing.filelog
+
+import java.nio.file.{Files, OpenOption, StandardOpenOption}
+
+import cats.effect._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.triplesgenerator.eventprocessing.EventsSource
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+
+import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.language.postfixOps
+
+class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPatience {
+
+  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
+  "file event source" should {
+
+    "send every new line in a file to the registered processor" in new TestCase {
+      val fileLines = nonEmptyStringsList().generateOne
+
+      writeToFile(fileLines)
+
+      val accumulator = ArrayBuffer.empty[String]
+      def processor(line: String): IO[Unit] = IO(accumulator += line)
+
+      eventsSource.withEventsProcessor(processor).run.unsafeRunCancelable(_ => Unit)
+
+      eventually {
+        accumulator shouldBe fileLines
+      }
+
+      val laterAddedLine = nonEmptyStrings().generateOne
+      writeToFile(laterAddedLine)
+
+      eventually {
+        accumulator shouldBe (fileLines :+ laterAddedLine)
+      }
+    }
+
+    "continue if there is an error during processing" in new TestCase {
+      val line1 = nonEmptyStrings().generateOne
+      val line2 = nonEmptyStrings().generateOne
+      val line3 = nonEmptyStrings().generateOne
+
+      writeToFile(Seq(line1, line2, line3))
+
+      val accumulator = ArrayBuffer.empty[String]
+      def processor(line: String): IO[Unit] =
+        if (line == line2) IO.raiseError(new Exception("error during processing line2"))
+        else IO(accumulator += line)
+
+      eventsSource.withEventsProcessor(processor).run.unsafeRunCancelable(_ => Unit)
+
+      eventually {
+        println(s"$accumulator -> $line1, $line2, $line3")
+        accumulator shouldBe Seq(line1, line3)
+      }
+    }
+  }
+
+  private val openOptions: Seq[OpenOption] = Seq(
+    StandardOpenOption.WRITE,
+    StandardOpenOption.CREATE,
+    StandardOpenOption.APPEND,
+    StandardOpenOption.SYNC
+  )
+
+  private trait TestCase {
+    val eventLogFile      = Files.createTempFile("test-events", "log")
+    private val newRunner = new FileEventProcessorRunner(eventLogFile, _)
+    val eventsSource      = new EventsSource[IO](newRunner)
+
+    def writeToFile(item: String): Unit = writeToFile(Seq(item))
+
+    def writeToFile(items: Seq[String]): Unit =
+      Files.write(eventLogFile, items.asJavaCollection, openOptions: _*)
+  }
+}
