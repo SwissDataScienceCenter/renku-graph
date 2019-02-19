@@ -39,7 +39,7 @@ abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](
   private lazy val base64Decoder    = Base64.getDecoder
   private lazy val base64Encoder    = Base64.getEncoder
   private lazy val algorithm        = "AES/CBC/PKCS5Padding"
-  private lazy val key              = new SecretKeySpec(base64Decoder.decode(secret.value), "AES")
+  private lazy val key              = new SecretKeySpec(base64Decoder.decode(secret.value).takeWhile(_ != 10), "AES")
   private lazy val ivSpec           = new IvParameterSpec(new Array[Byte](16))
   private lazy val charset          = "utf-8"
   private lazy val encryptingCipher = cipher(ENCRYPT_MODE)

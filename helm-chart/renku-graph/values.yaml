@@ -2,6 +2,19 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+tokenRepository:
+  image:
+    repository: renku/token-repository
+    tag: 'latest'
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  tokenEncryption:
+    ## A secret for signing access tokens stored in the database
+    ## Generated using: `openssl rand -hex 8|base64`
+    secret:
+
 triplesGenerator:
   image:
     repository: renku/triples-generator

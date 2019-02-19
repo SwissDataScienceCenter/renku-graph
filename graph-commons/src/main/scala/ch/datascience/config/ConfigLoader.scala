@@ -18,12 +18,12 @@
 
 package ch.datascience.config
 
-import cats.implicits._
 import cats.MonadError
+import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import com.typesafe.config.Config
-import pureconfig.error.ConfigReaderFailures
 import pureconfig._
+import pureconfig.error.ConfigReaderFailures
 
 import scala.language.higherKinds
 

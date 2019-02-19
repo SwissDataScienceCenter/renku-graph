@@ -11,6 +11,7 @@ lazy val root = Project(
   base = file(".")
 ).aggregate(
   graphCommons, 
+  tokenRepository,
   webhookService,
   triplesGenerator
 )
@@ -49,6 +50,19 @@ lazy val triplesGenerator = Project(
   graphCommons % "test->test"
 ).enablePlugins(
   PlayScala, 
+  JavaAppPackaging, 
+  AutomateHeaderPlugin
+)
+
+lazy val tokenRepository = Project(
+  id   = "token-repository",
+  base = file("token-repository")
+).settings(
+  commonSettings
+).dependsOn(
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
   JavaAppPackaging, 
   AutomateHeaderPlugin
 )

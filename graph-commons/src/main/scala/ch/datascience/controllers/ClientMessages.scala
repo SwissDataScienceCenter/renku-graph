@@ -18,10 +18,16 @@
 
 package ch.datascience.controllers
 
+import cats.Applicative
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.MatchesRegex
+import io.circe.{Encoder, Json => CirceJson}
+import org.http4s.EntityEncoder
+import org.http4s.circe.jsonEncoderOf
 import play.api.libs.json._
+
+import scala.language.higherKinds
 
 object ErrorMessage {
 
@@ -29,7 +35,7 @@ object ErrorMessage {
 
   def apply(errorMessage: String): ErrorMessage =
     RefType
-      .applyRef[ErrorMessage](errorMessage)
+      .applyRef[ErrorMessage](errorMessage.split('\n').map(_.trim.filter(_ >= ' ')).mkString)
       .fold(
         _ => throw new IllegalArgumentException("Error message cannot be blank"),
         identity
@@ -50,4 +56,31 @@ object ErrorMessage {
   implicit class ErrorMessageOps(errorResponse: ErrorMessage) {
     lazy val toJson: JsValue = Json.toJson(errorResponse)
   }
+
+  private implicit val encoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
+    CirceJson.obj("message" -> CirceJson.fromString(message.value))
+  }
+
+  implicit def infoMessageDecoder[F[_]: Applicative]: EntityEncoder[F, ErrorMessage] =
+    jsonEncoderOf[F, ErrorMessage]
+}
+
+object InfoMessage {
+
+  type InfoMessage = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+
+  def apply(message: String): InfoMessage =
+    RefType
+      .applyRef[InfoMessage](message)
+      .fold(
+        _ => throw new IllegalArgumentException("Error message cannot be blank"),
+        identity
+      )
+
+  private implicit val encoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
+    CirceJson.obj("message" -> CirceJson.fromString(message.value))
+  }
+
+  implicit def infoMessageDecoder[F[_]: Applicative]: EntityEncoder[F, InfoMessage] =
+    jsonEncoderOf[F, InfoMessage]
 }
