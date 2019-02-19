@@ -81,7 +81,7 @@ spec:
               {{- if .Values.global.graph.jena.dataset }}
               value: {{ .Values.global.graph.jena.dataset }}
               {{- else }}
-              value: renku
+              value: {{ .Release.Namespace }}
               {{- end }}
             - name: JENA_BASE_URL
               value: "http://{{ template "jena.fullname" . }}:{{ .Values.jena.service.port }}"
