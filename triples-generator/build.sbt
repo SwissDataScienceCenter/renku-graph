@@ -39,3 +39,12 @@ libraryDependencies += "org.typelevel"   %% "cats-core"         % "1.4.0"
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
 libraryDependencies += "org.scalamock"  %% "scalamock"  % "4.1.0"  % Test
 libraryDependencies += "org.scalatest"  %% "scalatest"  % "3.0.5"  % Test
+
+val jettyRequiredByWiremock = "9.2.24.v20180105"
+dependencyOverrides += "org.eclipse.jetty" % "jetty-http"     % jettyRequiredByWiremock % Test
+dependencyOverrides += "org.eclipse.jetty" % "jetty-io"       % jettyRequiredByWiremock % Test
+dependencyOverrides += "org.eclipse.jetty" % "jetty-server"   % jettyRequiredByWiremock % Test
+dependencyOverrides += "org.eclipse.jetty" % "jetty-servlet"  % jettyRequiredByWiremock % Test
+dependencyOverrides += "org.eclipse.jetty" % "jetty-servlets" % jettyRequiredByWiremock % Test
+dependencyOverrides += "org.eclipse.jetty" % "jetty-util"     % jettyRequiredByWiremock % Test
+dependencyOverrides += "org.eclipse.jetty" % "jetty-webapp"   % jettyRequiredByWiremock % Test

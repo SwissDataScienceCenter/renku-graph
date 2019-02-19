@@ -21,6 +21,7 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
 import ch.datascience.graph.events.{CommitId, ProjectId, UserId}
+import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
 import javax.inject.{Inject, Singleton}
@@ -47,7 +48,7 @@ private object LatestPushEventFetcher {
 @Singleton
 private class IOLatestPushEventFetcher @Inject()(
     gitLabConfig:            IOGitLabConfigProvider
-)(implicit executionContext: ExecutionContext)
+)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
     extends IORestClient
     with LatestPushEventFetcher[IO] {
 
@@ -72,8 +73,8 @@ private class IOLatestPushEventFetcher @Inject()(
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[Option[PushEventInfo]] =
     response.status match {
       case Ok           => response.as[Option[PushEventInfo]] handleErrorWith contextToError(request, response)
-      case NotFound     => F.pure(None)
-      case Unauthorized => F.raiseError(UnauthorizedException)
+      case NotFound     => IO.pure(None)
+      case Unauthorized => IO.raiseError(UnauthorizedException)
       case _            => raiseError(request, response)
     }
 

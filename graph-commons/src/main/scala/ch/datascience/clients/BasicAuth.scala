@@ -16,28 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.clients
 
-import java.net.URL
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 
-import ch.datascience.config.ServiceUrl
-import ch.datascience.triplesgenerator.queues.logevent.LogEventQueue
-import com.google.inject.AbstractModule
-import com.google.inject.name.Names
-import play.api.{Configuration, Environment}
+case class BasicAuth(username: BasicAuthUsername, password: BasicAuthPassword)
 
-class ServiceModule(
-    environment:   Environment,
-    configuration: Configuration
-) extends AbstractModule {
+class BasicAuthUsername private (val value: String) extends AnyVal with TinyType[String]
+object BasicAuthUsername extends TinyTypeFactory[String, BasicAuthUsername](new BasicAuthUsername(_)) with NonBlank
 
-  override def configure(): Unit =
-//    bind(classOf[FusekiDatasetVerifier])
-//      .asEagerSingleton()
-
-//    bind(classOf[URL])
-//      .annotatedWith(Names.named("gitlabUrl"))
-//      .toInstance(configuration.get[ServiceUrl]("services.gitlab.url").value)
-    bind(classOf[LogEventQueue])
-      .asEagerSingleton()
-}
+class BasicAuthPassword private (val value: String) extends AnyVal with TinyType[String]
+object BasicAuthPassword extends TinyTypeFactory[String, BasicAuthPassword](new BasicAuthPassword(_)) with NonBlank

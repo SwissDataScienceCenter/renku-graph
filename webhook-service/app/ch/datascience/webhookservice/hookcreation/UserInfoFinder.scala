@@ -21,6 +21,7 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.IO
 import ch.datascience.clients.{AccessToken, IORestClient}
 import ch.datascience.graph.events._
+import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
 import javax.inject.{Inject, Singleton}
@@ -44,8 +45,9 @@ private object UserInfoFinder {
 }
 
 @Singleton
-private class IOUserInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
-    implicit executionContext:                                 ExecutionContext)
+private class IOUserInfoFinder @Inject()(
+    gitLabConfigProvider:    IOGitLabConfigProvider
+)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
     extends IORestClient
     with UserInfoFinder[IO] {
 
@@ -68,7 +70,7 @@ private class IOUserInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigPro
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[UserInfo] =
     response.status match {
       case Ok           => response.as[UserInfo] handleErrorWith contextToError(request, response)
-      case Unauthorized => F.raiseError(UnauthorizedException)
+      case Unauthorized => IO.raiseError(UnauthorizedException)
       case _            => raiseError(request, response)
     }
 

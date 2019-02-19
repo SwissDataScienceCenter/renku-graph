@@ -18,7 +18,7 @@
 
 package ch.datascience.clients
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO}
+import cats.effect.{ContextShift, IO}
 import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
@@ -29,14 +29,12 @@ import org.http4s.headers.Authorization
 import scala.concurrent.ExecutionContext
 
 abstract class IORestClient(
-    implicit executionContext: ExecutionContext
+    implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO]
 ) {
 
-  private implicit val cs: ContextShift[IO]     = IO.contextShift(executionContext)
-  protected val F:         ConcurrentEffect[IO] = implicitly[ConcurrentEffect[IO]]
-
   protected def validateUri(uri: String): IO[Uri] =
-    F.fromEither(Uri.fromString(uri))
+    IO.fromEither(Uri.fromString(uri))
 
   protected def request(method: Method, uri: Uri, accessToken: AccessToken): Request[IO] =
     Request[IO](
@@ -45,10 +43,20 @@ abstract class IORestClient(
       headers = authHeader(accessToken)
     )
 
+  protected def request(method: Method, uri: Uri, basicAuth: BasicAuth): Request[IO] =
+    Request[IO](
+      method  = method,
+      uri     = uri,
+      headers = basicAuthHeader(basicAuth)
+    )
+
   private lazy val authHeader: AccessToken => Headers = {
     case PersonalAccessToken(token) => Headers(Header("PRIVATE-TOKEN", token))
     case OAuthAccessToken(token)    => Headers(Authorization(Token(Bearer, token)))
   }
+
+  private def basicAuthHeader(basicAuth: BasicAuth): Headers =
+    Headers(Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value)))
 
   protected def send[ResultType](request: Request[IO])(
       mapResponse:                        (Request[IO], Response[IO]) => IO[ResultType]): IO[ResultType] =
@@ -60,7 +68,7 @@ abstract class IORestClient(
     response
       .as[String]
       .flatMap { bodyAsString =>
-        F.raiseError {
+        IO.raiseError {
           new RuntimeException(
             exceptionMessage(request, response, MessageDetails(bodyAsString)),
           )
@@ -68,7 +76,7 @@ abstract class IORestClient(
       }
 
   protected def contextToError[T](request: Request[IO], response: Response[IO])(cause: Throwable): IO[T] =
-    F.raiseError {
+    IO.raiseError {
       new RuntimeException(
         exceptionMessage(request, response, MessageDetails(cause)),
         cause

@@ -18,9 +18,10 @@
 
 package ch.datascience.triplesgenerator.generators
 
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.triplesgenerator.config.DatasetType.{Mem, TDB}
 import ch.datascience.triplesgenerator.config._
-import ch.datascience.generators.Generators._
 import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
 import org.apache.jena.rdf.model.ModelFactory
 import org.scalacheck.Gen
@@ -41,7 +42,7 @@ object ServiceTypesGenerators {
     fusekiUrl   <- serviceUrls
     datasetName <- nonEmptyStrings() map DatasetName.apply
     datasetType <- Gen.oneOf(Mem, TDB)
-    username    <- nonEmptyStrings() map Username.apply
-    password    <- nonEmptyStrings() map Password.apply
+    username    <- basicAuthUsernames
+    password    <- basicAuthPasswords
   } yield FusekiConfig(fusekiUrl, datasetName, datasetType, username, password)
 }

@@ -20,18 +20,33 @@ package ch.datascience.webhookservice
 
 import java.net.URL
 
+import cats.effect.{ContextShift, IO}
 import ch.datascience.config.ServiceUrl
 import com.google.inject.AbstractModule
 import com.google.inject.name.Names
-import play.api.{Configuration, Environment}
+import com.typesafe.config.Config
+import javax.inject.{Inject, Singleton}
+import play.api.{ConfigLoader, Configuration, Environment}
+
+import scala.concurrent.ExecutionContext
 
 class ServiceModule(
     environment:   Environment,
     configuration: Configuration
 ) extends AbstractModule {
 
+  private implicit object ServiceUrlFinder extends ConfigLoader[ServiceUrl] {
+    override def load(config: Config, path: String): ServiceUrl = ServiceUrl(config.getString(path))
+  }
   override def configure(): Unit =
     bind(classOf[URL])
       .annotatedWith(Names.named("gitlabUrl"))
       .toInstance(configuration.get[ServiceUrl]("services.gitlab.url").value)
+}
+
+@Singleton
+class IOContextShift @Inject()(executionContext: ExecutionContext) extends ContextShift[IO] {
+  private val contextShift = IO.contextShift(executionContext)
+  override def shift: IO[Unit] = contextShift.shift
+  override def evalOn[A](ec: ExecutionContext)(fa: IO[A]): IO[A] = contextShift.evalOn(ec)(fa)
 }

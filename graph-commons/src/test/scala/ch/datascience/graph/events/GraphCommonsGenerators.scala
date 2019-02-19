@@ -18,8 +18,9 @@
 
 package ch.datascience.graph.events
 
-import ch.datascience.clients.AccessToken
+import ch.datascience.clients.{AccessToken, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.generators.Generators.nonEmptyStrings
 import org.scalacheck.Gen
 
 object GraphCommonsGenerators {
@@ -38,4 +39,7 @@ object GraphCommonsGenerators {
     boolean     <- Gen.oneOf(true, false)
     accessToken <- if (boolean) personalAccessTokens else oauthAccessTokens
   } yield accessToken
+
+  implicit val basicAuthUsernames: Gen[BasicAuthUsername] = nonEmptyStrings() map BasicAuthUsername.apply
+  implicit val basicAuthPasswords: Gen[BasicAuthPassword] = nonEmptyStrings() map BasicAuthPassword.apply
 }

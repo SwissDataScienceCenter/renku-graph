@@ -23,6 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.{GitLabConfig, IOGitLabConfigProvider}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
@@ -114,6 +115,8 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
       }.getMessage shouldBe s"POST $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.BadRequest}; body: some message"
     }
   }
+
+  private implicit val cs: IOContextShift = new IOContextShift(global)
 
   private trait TestCase {
     val projectHook = projectHooks.generateOne

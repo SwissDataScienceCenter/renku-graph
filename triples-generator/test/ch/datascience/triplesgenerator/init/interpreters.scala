@@ -16,28 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.triplesgenerator.init
 
-import java.net.URL
+import scala.util.Try
 
-import ch.datascience.config.ServiceUrl
-import ch.datascience.triplesgenerator.queues.logevent.LogEventQueue
-import com.google.inject.AbstractModule
-import com.google.inject.name.Names
-import play.api.{Configuration, Environment}
+private abstract class TryDatasetExistenceChecker extends DatasetExistenceChecker[Try]
 
-class ServiceModule(
-    environment:   Environment,
-    configuration: Configuration
-) extends AbstractModule {
-
-  override def configure(): Unit =
-//    bind(classOf[FusekiDatasetVerifier])
-//      .asEagerSingleton()
-
-//    bind(classOf[URL])
-//      .annotatedWith(Names.named("gitlabUrl"))
-//      .toInstance(configuration.get[ServiceUrl]("services.gitlab.url").value)
-    bind(classOf[LogEventQueue])
-      .asEagerSingleton()
-}
+private abstract class TryDatasetExistenceCreator extends DatasetExistenceCreator[Try]

@@ -20,21 +20,19 @@ package ch.datascience.config
 
 import java.net.URL
 
+import cats.implicits._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import com.typesafe.config.Config
-import play.api.{ConfigLoader => PlayConfigLoader}
+import pureconfig.ConfigReader
+import pureconfig.error.CannotConvert
 
 import scala.language.implicitConversions
+import scala.util.Try
 
 class ServiceUrl private (val value: URL) extends AnyVal with TinyType[URL]
 
 object ServiceUrl extends TinyTypeFactory[URL, ServiceUrl](new ServiceUrl(_)) {
 
   def apply(url: String): ServiceUrl = ServiceUrl(new URL(url))
-
-  implicit object ServiceUrlFinder extends PlayConfigLoader[ServiceUrl] {
-    override def load(config: Config, path: String): ServiceUrl = ServiceUrl(config.getString(path))
-  }
 
   implicit class ServiceUrlOps(serviceUrl: ServiceUrl) {
     def /(value: Any): ServiceUrl = ServiceUrl(
@@ -43,4 +41,10 @@ object ServiceUrl extends TinyTypeFactory[URL, ServiceUrl](new ServiceUrl(_)) {
   }
 
   implicit def asString(serviceUrl: ServiceUrl): String = serviceUrl.toString
+
+  implicit val serviceUrlReader: ConfigReader[ServiceUrl] =
+    ConfigReader.fromString[ServiceUrl] { value =>
+      Try(ServiceUrl(value)).toEither
+        .leftMap(exception => CannotConvert(value, ServiceUrl.getClass.toString, exception.getMessage))
+    }
 }

@@ -18,22 +18,25 @@
 
 package ch.datascience.triplesgenerator.config
 
-import java.net.MalformedURLException
-
+import cats.implicits._
+import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
+import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
-import play.api.Configuration
 
-class FusekiConfigSpec extends WordSpec with PropertyChecks {
+import scala.collection.JavaConverters._
+import scala.util.{Failure, Success, Try}
+
+class FusekiConfigProviderSpec extends WordSpec with PropertyChecks {
 
   "apply" should {
 
     "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.dataset-type', 'services.fuseki.username' and 'services.fuseki.password' to instantiate the FusekiConfig" in {
       forAll(fusekiConfigs) { fusekiConfig =>
-        val config = Configuration.from(
+        val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
               "fuseki" -> Map(
@@ -42,12 +45,12 @@ class FusekiConfigSpec extends WordSpec with PropertyChecks {
                 "dataset-type" -> fusekiConfig.datasetType.value,
                 "username"     -> fusekiConfig.username.value,
                 "password"     -> fusekiConfig.password.value
-              )
-            )
-          )
+              ).asJava
+            ).asJava
+          ).asJava
         )
 
-        val actual = new FusekiConfig(config)
+        val Success(actual) = new FusekiConfigProvider[Try](config).get
 
         actual.fusekiBaseUrl shouldBe fusekiConfig.fusekiBaseUrl
         actual.datasetName   shouldBe fusekiConfig.datasetName
@@ -57,8 +60,8 @@ class FusekiConfigSpec extends WordSpec with PropertyChecks {
       }
     }
 
-    "throw an IllegalArgumentException if url invalid" in {
-      val config = Configuration.from(
+    "fail if url invalid" in {
+      val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "fuseki" -> Map(
@@ -67,16 +70,18 @@ class FusekiConfigSpec extends WordSpec with PropertyChecks {
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
               "username"     -> fusekiConfigs.generateOne.datasetName.value,
               "password"     -> fusekiConfigs.generateOne.password.value
-            )
-          )
-        )
+            ).asJava
+          ).asJava
+        ).asJava
       )
 
-      an[MalformedURLException] should be thrownBy new FusekiConfig(config)
+      val Failure(exception) = new FusekiConfigProvider[Try](config).get
+
+      exception shouldBe an[ConfigLoadingException]
     }
 
-    "throw an IllegalArgumentException if dataset-name is blank" in {
-      val config = Configuration.from(
+    "fail if dataset-name is blank" in {
+      val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "fuseki" -> Map(
@@ -85,16 +90,18 @@ class FusekiConfigSpec extends WordSpec with PropertyChecks {
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
               "username"     -> fusekiConfigs.generateOne.username.value,
               "password"     -> fusekiConfigs.generateOne.password.value
-            )
-          )
-        )
+            ).asJava
+          ).asJava
+        ).asJava
       )
 
-      an[IllegalArgumentException] should be thrownBy new FusekiConfig(config)
+      val Failure(exception) = new FusekiConfigProvider[Try](config).get
+
+      exception shouldBe an[ConfigLoadingException]
     }
 
-    "throw an IllegalArgumentException if dataset-type is unknown" in {
-      val config = Configuration.from(
+    "fail if dataset-type is unknown" in {
+      val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "fuseki" -> Map(
@@ -103,16 +110,18 @@ class FusekiConfigSpec extends WordSpec with PropertyChecks {
               "dataset-type" -> "unknown",
               "username"     -> fusekiConfigs.generateOne.username.value,
               "password"     -> fusekiConfigs.generateOne.password.value
-            )
-          )
-        )
+            ).asJava
+          ).asJava
+        ).asJava
       )
 
-      an[IllegalArgumentException] should be thrownBy new FusekiConfig(config)
+      val Failure(exception) = new FusekiConfigProvider[Try](config).get
+
+      exception shouldBe an[ConfigLoadingException]
     }
 
-    "throw an IllegalArgumentException if username is blank" in {
-      val config = Configuration.from(
+    "fail if username is blank" in {
+      val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "fuseki" -> Map(
@@ -121,16 +130,18 @@ class FusekiConfigSpec extends WordSpec with PropertyChecks {
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
               "username"     -> "  ",
               "password"     -> fusekiConfigs.generateOne.password.value
-            )
-          )
-        )
+            ).asJava
+          ).asJava
+        ).asJava
       )
 
-      an[IllegalArgumentException] should be thrownBy new FusekiConfig(config)
+      val Failure(exception) = new FusekiConfigProvider[Try](config).get
+
+      exception shouldBe an[ConfigLoadingException]
     }
 
-    "throw an IllegalArgumentException if password is blank" in {
-      val config = Configuration.from(
+    "fail if password is blank" in {
+      val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "fuseki" -> Map(
@@ -139,12 +150,14 @@ class FusekiConfigSpec extends WordSpec with PropertyChecks {
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
               "username"     -> fusekiConfigs.generateOne.username.value,
               "password"     -> ""
-            )
-          )
-        )
+            ).asJava
+          ).asJava
+        ).asJava
       )
 
-      an[IllegalArgumentException] should be thrownBy new FusekiConfig(config)
+      val Failure(exception) = new FusekiConfigProvider[Try](config).get
+
+      exception shouldBe an[ConfigLoadingException]
     }
   }
 }

@@ -16,28 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.triplesgenerator.config
 
-import java.net.URL
+import cats.MonadError
+import cats.effect.IO
+import com.typesafe.config.Config
 
-import ch.datascience.config.ServiceUrl
-import ch.datascience.triplesgenerator.queues.logevent.LogEventQueue
-import com.google.inject.AbstractModule
-import com.google.inject.name.Names
-import play.api.{Configuration, Environment}
+import scala.util.Try
 
-class ServiceModule(
-    environment:   Environment,
-    configuration: Configuration
-) extends AbstractModule {
+class TryFusekiConfigProvider(
+    config:    Config
+)(implicit ME: MonadError[Try, Throwable])
+    extends FusekiConfigProvider[Try](config)
 
-  override def configure(): Unit =
-//    bind(classOf[FusekiDatasetVerifier])
-//      .asEagerSingleton()
-
-//    bind(classOf[URL])
-//      .annotatedWith(Names.named("gitlabUrl"))
-//      .toInstance(configuration.get[ServiceUrl]("services.gitlab.url").value)
-    bind(classOf[LogEventQueue])
-      .asEagerSingleton()
-}
+class IOFusekiConfigProvider(
+    config:    Config
+)(implicit ME: MonadError[IO, Throwable])
+    extends FusekiConfigProvider[IO](config)

@@ -18,77 +18,84 @@
 
 package ch.datascience.triplesgenerator.config
 
-import ch.datascience.config.ServiceUrl
+import cats.MonadError
+import cats.implicits._
+import ch.datascience.clients.{BasicAuthPassword, BasicAuthUsername}
+import ch.datascience.config.{ConfigLoader, ServiceUrl}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import com.typesafe.config.Config
-import javax.inject.{Inject, Singleton}
-import play.api.{ConfigLoader, Configuration}
+import com.typesafe.config.{Config, ConfigFactory}
+import pureconfig.ConfigReader
+import pureconfig.error.CannotConvert
 
-import scala.language.implicitConversions
+import scala.language.higherKinds
 
 class DatasetName private (val value: String) extends AnyVal with TinyType[String]
 
 object DatasetName extends TinyTypeFactory[String, DatasetName](new DatasetName(_)) with NonBlank {
 
-  implicit object DatasetNameFinder extends ConfigLoader[DatasetName] {
-    override def load(config: Config, path: String): DatasetName = DatasetName(config.getString(path))
-  }
+  private[config] implicit val datasetNameReader: ConfigReader[DatasetName] =
+    ConfigReader.fromString[DatasetName] { value =>
+      DatasetName
+        .from(value)
+        .leftMap(exception => CannotConvert(value, DatasetName.getClass.toString, exception.getMessage))
+    }
 }
 
-sealed trait DatasetType extends TinyType[String]
+sealed trait DatasetType extends TinyType[String] with Product with Serializable
 
 object DatasetType {
 
-  case object Mem extends DatasetType {
+  final case object Mem extends DatasetType {
     override val value: String = "mem"
   }
 
-  case object TDB extends DatasetType {
+  final case object TDB extends DatasetType {
     override val value: String = "tdb"
   }
 
-  implicit object DatasetTypeFinder extends ConfigLoader[DatasetType] {
-    override def load(config: Config, path: String): DatasetType = config.getString(path) match {
-      case Mem.value => Mem
-      case TDB.value => TDB
-      case other     => throw new IllegalArgumentException(s"'$other' is not valid dataset type")
+  private[config] implicit val datasetTypeReader: ConfigReader[DatasetType] =
+    ConfigReader.fromString[DatasetType] {
+      case Mem.value => Right(Mem)
+      case TDB.value => Right(TDB)
+      case other =>
+        Left(CannotConvert(other, DatasetType.getClass.toString, s"$other is neither $Mem nor $TDB"))
     }
-  }
 }
 
-class Username private (val value: String) extends AnyVal with TinyType[String]
-
-object Username extends TinyTypeFactory[String, Username](new Username(_)) with NonBlank {
-
-  implicit object UsernameFinder extends ConfigLoader[Username] {
-    override def load(config: Config, path: String): Username = Username(config.getString(path))
-  }
-}
-
-class Password private (val value: String) extends AnyVal with TinyType[String]
-
-object Password extends TinyTypeFactory[String, Password](new Password(_)) with NonBlank {
-
-  implicit object PasswordFinder extends ConfigLoader[Password] {
-    override def load(config: Config, path: String): Password = Password(config.getString(path))
-  }
-}
-
-@Singleton
-case class FusekiConfig(
+final case class FusekiConfig(
     fusekiBaseUrl: ServiceUrl,
     datasetName:   DatasetName,
     datasetType:   DatasetType,
-    username:      Username,
-    password:      Password
-) {
+    username:      BasicAuthUsername,
+    password:      BasicAuthPassword
+)
 
-  @Inject def this(configuration: Configuration) = this(
-    configuration.get[ServiceUrl]("services.fuseki.url"),
-    configuration.get[DatasetName]("services.fuseki.dataset-name"),
-    configuration.get[DatasetType]("services.fuseki.dataset-type"),
-    configuration.get[Username]("services.fuseki.username"),
-    configuration.get[Password]("services.fuseki.password")
-  )
+class FusekiConfigProvider[Interpretation[_]](
+    config:    Config = ConfigFactory.load()
+)(implicit ME: MonadError[Interpretation, Throwable])
+    extends ConfigLoader[Interpretation] {
+
+  private implicit val usernameReader: ConfigReader[BasicAuthUsername] =
+    ConfigReader.fromString[BasicAuthUsername] { value =>
+      BasicAuthUsername
+        .from(value)
+        .leftMap(exception => CannotConvert(value, BasicAuthUsername.getClass.toString, exception.getMessage))
+    }
+
+  private implicit val passwordReader: ConfigReader[BasicAuthPassword] =
+    ConfigReader.fromString[BasicAuthPassword] { value =>
+      BasicAuthPassword
+        .from(value)
+        .leftMap(exception => CannotConvert(value, BasicAuthPassword.getClass.toString, exception.getMessage))
+    }
+
+  def get: Interpretation[FusekiConfig] =
+    for {
+      url         <- find[ServiceUrl]("services.fuseki.url", config)
+      datasetName <- find[DatasetName]("services.fuseki.dataset-name", config)
+      datasetType <- find[DatasetType]("services.fuseki.dataset-type", config)
+      username    <- find[BasicAuthUsername]("services.fuseki.username", config)
+      password    <- find[BasicAuthPassword]("services.fuseki.password", config)
+    } yield FusekiConfig(url, datasetName, datasetType, username, password)
 }
