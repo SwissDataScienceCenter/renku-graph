@@ -292,8 +292,9 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     }
   }
 
+  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
   private trait TestCase {
-    private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
     val successfulCommandResult = CommandResult(exitCode = 0, chunks = Nil)
 
     val gitLabUrl:        ServiceUrl  = serviceUrls.generateOne

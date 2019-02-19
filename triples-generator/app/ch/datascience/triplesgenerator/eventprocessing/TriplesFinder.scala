@@ -28,7 +28,7 @@ import ch.datascience.graph.events.{CommitId, ProjectPath}
 import ch.datascience.triplesgenerator.eventprocessing.Commit._
 import org.apache.jena.rdf.model.ModelFactory
 
-import scala.language.{higherKinds, implicitConversions}
+import scala.language.higherKinds
 
 private abstract class TriplesFinder[Interpretation[_]] {
   def generateTriples(commit: Commit): Interpretation[RDFTriples]
