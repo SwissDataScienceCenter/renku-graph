@@ -25,6 +25,7 @@ import ch.datascience.triplesgenerator.config.FusekiConfig
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
 private abstract class FusekiConnector[Interpretation[_]] {
   def upload(rdfTriples: RDFTriples): Interpretation[Unit]
@@ -41,6 +42,7 @@ private class IOFusekiConnector(
   def upload(rdfTriples: RDFTriples): IO[Unit] =
     newConnection
       .bracket(send(rdfTriples))(closeConnection)
+      .recoverWith(meaningfulError)
 
   private def newConnection: IO[RDFConnection] =
     contextShift.shift *> IO(fusekiConnectionBuilder(fusekiBaseUrl / datasetName))
@@ -50,6 +52,11 @@ private class IOFusekiConnector(
 
   private def closeConnection(connection: RDFConnection): IO[Unit] =
     IO(connection.close())
+
+  private lazy val meaningfulError: PartialFunction[Throwable, IO[Unit]] = {
+    case NonFatal(exception) =>
+      IO.raiseError(new RuntimeException("Uploading triples to Jena failed", exception))
+  }
 }
 
 private object IOFusekiConnector {

@@ -32,7 +32,9 @@ private class CommitEventsDeserialiser[Interpretation[_]](
 ) {
 
   def deserialiseToCommitEvents(jsonString: String): Interpretation[List[Commit]] = ME.fromEither {
-    parse(jsonString).flatMap(_.as[List[Commit]]).leftMap(toMeaningfulError(jsonString))
+    parse(jsonString)
+      .flatMap(_.as[List[Commit]])
+      .leftMap(toMeaningfulError(jsonString))
   }
 
   private implicit val commitsDecoder: Decoder[List[Commit]] = (cursor: HCursor) =>
@@ -48,10 +50,6 @@ private class CommitEventsDeserialiser[Interpretation[_]](
 
   private def toMeaningfulError(json: String): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"CommitEvent cannot be deserialised: '$json'")
-    case failure: ParsingFailure => {
-      println(failure)
-      ParsingFailure(s"CommitEvent cannot be deserialised: '$json'", failure)
-    }
+    case failure: ParsingFailure  => ParsingFailure(s"CommitEvent cannot be deserialised: '$json'", failure)
   }
-
 }

@@ -59,9 +59,11 @@ class FusekiConnectorSpec extends WordSpec with MockFactory {
         .expects(fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName)
         .throwing(exception)
 
-      intercept[Exception] {
+      val actual = intercept[Exception] {
         fusekiConnector.upload(rdfTriples).unsafeRunSync()
-      } shouldBe exception
+      }
+      actual.getMessage shouldBe "Uploading triples to Jena failed"
+      actual.getCause   shouldBe exception
     }
 
     "fail if upload to Jena Fuseki fails" in new TestCase {
@@ -79,9 +81,11 @@ class FusekiConnectorSpec extends WordSpec with MockFactory {
       (fusekiConnection.close _)
         .expects()
 
-      intercept[Exception] {
+      val actual = intercept[Exception] {
         fusekiConnector.upload(rdfTriples).unsafeRunSync()
-      } shouldBe exception
+      }
+      actual.getMessage shouldBe "Uploading triples to Jena failed"
+      actual.getCause   shouldBe exception
     }
 
     "fail if closing the connection to fuseki fails" in new TestCase {
@@ -99,9 +103,11 @@ class FusekiConnectorSpec extends WordSpec with MockFactory {
         .expects()
         .throwing(exception)
 
-      intercept[Exception] {
+      val actual = intercept[Exception] {
         fusekiConnector.upload(rdfTriples).unsafeRunSync()
-      } shouldBe exception
+      }
+      actual.getMessage shouldBe "Uploading triples to Jena failed"
+      actual.getCause   shouldBe exception
     }
   }
 

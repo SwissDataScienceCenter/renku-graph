@@ -29,6 +29,7 @@ import ch.datascience.triplesgenerator.eventprocessing.Commit._
 import org.apache.jena.rdf.model.ModelFactory
 
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
 private abstract class TriplesFinder[Interpretation[_]] {
   def generateTriples(commit: Commit): Interpretation[RDFTriples]
@@ -52,14 +53,16 @@ private class IOTriplesFinder(
   private val repositoryDirectoryFinder = ".*/(.*)$".r
 
   def generateTriples(commit: Commit): IO[RDFTriples] =
-    createRepositoryDirectory(commit.projectPath).bracket { repositoryDirectory =>
-      for {
-        _             <- git cloneRepo (gitRepositoryUrl(commit.projectPath), repositoryDirectory, workDirectory)
-        _             <- git checkout (commit.id, repositoryDirectory)
-        triplesStream <- findTriplesStream(commit, repositoryDirectory)
-        rdfTriples    <- toRdfTriples(triplesStream)
-      } yield rdfTriples
-    }(repositoryDirectory => delete(repositoryDirectory))
+    createRepositoryDirectory(commit.projectPath)
+      .bracket { repositoryDirectory =>
+        for {
+          _             <- git cloneRepo (gitRepositoryUrl(commit.projectPath), repositoryDirectory, workDirectory)
+          _             <- git checkout (commit.id, repositoryDirectory)
+          triplesStream <- findTriplesStream(commit, repositoryDirectory)
+          rdfTriples    <- toRdfTriples(triplesStream)
+        } yield rdfTriples
+      }(repositoryDirectory => delete(repositoryDirectory))
+      .recoverWith(meaningfulError)
 
   private def createRepositoryDirectory(projectPath: ProjectPath): IO[Path] =
     contextShift.shift *> mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
@@ -81,6 +84,11 @@ private class IOTriplesFinder(
       case withParent:    CommitWithParent    => renku.log(withParent, repositoryDirectory)
       case withoutParent: CommitWithoutParent => renku.log(withoutParent, repositoryDirectory)
     }
+  }
+
+  private lazy val meaningfulError: PartialFunction[Throwable, IO[RDFTriples]] = {
+    case NonFatal(exception) =>
+      IO.raiseError(new RuntimeException("Triples generation failed", exception))
   }
 }
 
