@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.generators
 import ch.datascience.triplesgenerator.config.DatasetType.{Mem, TDB}
 import ch.datascience.triplesgenerator.config._
 import ch.datascience.generators.Generators._
-import ch.datascience.triplesgenerator.queues.logevent.RDFTriples
+import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
 import org.apache.jena.rdf.model.ModelFactory
 import org.scalacheck.Gen
 

@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.queues.logevent
 
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.apache.jena.rdf.model.Model
 import org.apache.jena.rdfconnection.RDFConnection

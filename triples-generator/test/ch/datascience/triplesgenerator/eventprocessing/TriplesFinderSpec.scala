@@ -16,30 +16,28 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.queues.logevent
+package ch.datascience.triplesgenerator.eventprocessing
 
 import java.io.InputStream
 
 import ammonite.ops.{CommandResult, root}
+import cats.effect.{ContextShift, IO}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.{CommitId, ProjectPath}
-import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
+import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
-import ch.datascience.triplesgenerator.queues.logevent.LogEventQueue.{CommitWithParent, CommitWithoutParent}
 import org.scalacheck.Gen
-import org.scalamock.function.{MockFunction0, MockFunction1}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import os.Path
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
-class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with IntegrationPatience {
+class TriplesFinderSpec extends WordSpec with MockFactory {
 
   "generateTriples" should {
 
@@ -52,29 +50,34 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(IO.pure(successfulCommandResult))
 
       (git
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
+        .returning(IO.pure(successfulCommandResult))
 
       (renku
         .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(rdfTriplesStream)
+        .returning(IO.pure(rdfTriplesStream))
 
       toRdfTriples
         .expects(rdfTriplesStream)
-        .returning(rdfTriples)
+        .returning(IO.pure(rdfTriples))
 
       (file
-        .removeSilently(_: Path))
+        .delete(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
 
-      triplesFinder.generateTriples(commitWithoutParent).futureValue shouldBe Right(rdfTriples)
+      triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync() shouldBe rdfTriples
     }
 
     "create a temp directory, " +
@@ -88,178 +91,211 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(IO.pure(successfulCommandResult))
 
       (git
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
+        .returning(IO.pure(successfulCommandResult))
 
       (renku
         .log(_: CommitWithParent, _: Path)(_: (CommitWithParent, Path) => CommandResult))
         .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
-        .returning(rdfTriplesStream)
+        .returning(IO.pure(rdfTriplesStream))
 
       toRdfTriples
         .expects(rdfTriplesStream)
-        .returning(rdfTriples)
+        .returning(IO.pure(rdfTriples))
 
       (file
-        .removeSilently(_: Path))
+        .delete(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
 
-      triplesFinder.generateTriples(commitWithParent).futureValue shouldBe Right(rdfTriples)
+      triplesFinder.generateTriples(commitWithParent).unsafeRunSync() shouldBe rdfTriples
     }
 
-    "return an error if create a temp directory fails" in new TestCase {
-      val exception = new Exception("message")
+    "fail if temp directory creation fails" in new TestCase {
+      val exception = exceptions.generateOne
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
-        .throwing(exception)
+        .returning(IO.raiseError(exception))
 
-      (file
-        .removeSilently(_: Path))
-        .expects(repositoryDirectory)
-
-      triplesFinder.generateTriples(commitWithoutParent).futureValue shouldBe Left(exception)
+      intercept[Exception] {
+        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+      } shouldBe exception
     }
 
-    "return an error if cloning the repo fails" in new TestCase {
+    "fail if cloning the repo fails" in new TestCase {
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
 
-      val exception = new Exception("message")
+      val exception = exceptions.generateOne
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .throwing(exception)
+        .returning(IO.raiseError(exception))
 
       (file
-        .removeSilently(_: Path))
+        .delete(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
 
-      triplesFinder.generateTriples(commitWithoutParent).futureValue shouldBe Left(exception)
+      intercept[Exception] {
+        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+      } shouldBe exception
     }
 
-    "return an error if checking out the sha fails" in new TestCase {
+    "fail if checking out the sha fails" in new TestCase {
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(IO.pure(successfulCommandResult))
 
-      val exception = new Exception("message")
+      val exception = exceptions.generateOne
       (git
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
-        .throwing(exception)
+        .returning(IO.raiseError(exception))
 
       (file
-        .removeSilently(_: Path))
+        .delete(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
 
-      triplesFinder.generateTriples(commitWithoutParent).futureValue shouldBe Left(exception)
+      intercept[Exception] {
+        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+      } shouldBe exception
     }
 
-    "return an error if calling 'renku log' fails" in new TestCase {
+    "fail if calling 'renku log' fails" in new TestCase {
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(IO.pure(successfulCommandResult))
 
       (git
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
+        .returning(IO.pure(successfulCommandResult))
 
-      val exception = new Exception("message")
+      val exception = exceptions.generateOne
       (renku
         .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .throwing(exception)
+        .returning(IO.raiseError(exception))
 
       (file
-        .removeSilently(_: Path))
+        .delete(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
 
-      triplesFinder.generateTriples(commitWithoutParent).futureValue shouldBe Left(exception)
+      intercept[Exception] {
+        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+      } shouldBe exception
     }
 
-    "return an error if converting the rdf triples stream to rdf triples fails" in new TestCase {
+    "fail if converting the rdf triples stream to rdf triples fails" in new TestCase {
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(IO.pure(successfulCommandResult))
 
       (git
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
-
-      (renku
-        .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
-        .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(rdfTriplesStream)
-
-      val exception = new Exception("message")
-      toRdfTriples
-        .expects(rdfTriplesStream)
-        .throwing(exception)
-
-      (file
-        .removeSilently(_: Path))
-        .expects(repositoryDirectory)
-
-      triplesFinder.generateTriples(commitWithoutParent).futureValue shouldBe Left(exception)
-    }
-
-    "return an error if removing the temp folder fails" in new TestCase {
-      (file
-        .mkdir(_: Path))
-        .expects(repositoryDirectory)
-
-      (git
-        .cloneRepo(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
+        .returning(IO.pure(successfulCommandResult))
 
       (renku
         .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(rdfTriplesStream)
+        .returning(IO.pure(rdfTriplesStream))
+
+      val exception = exceptions.generateOne
+      toRdfTriples
+        .expects(rdfTriplesStream)
+        .returning(IO.raiseError(exception))
+
+      (file
+        .delete(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
+
+      intercept[Exception] {
+        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "fail if removing the temp folder fails" in new TestCase {
+      (file
+        .mkdir(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
+
+      (git
+        .cloneRepo(_: ServiceUrl, _: Path, _: Path))
+        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(IO.pure(successfulCommandResult))
+
+      (git
+        .checkout(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(IO.pure(successfulCommandResult))
+
+      (renku
+        .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
+        .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
+        .returning(IO.pure(rdfTriplesStream))
 
       toRdfTriples
         .expects(rdfTriplesStream)
-        .returning(rdfTriples)
+        .returning(IO.pure(rdfTriples))
 
-      val exception = new Exception("message")
+      val exception = exceptions.generateOne
       (file
-        .removeSilently(_: Path))
+        .delete(_: Path))
         .expects(repositoryDirectory)
-        .throwing(exception)
+        .returning(IO.raiseError(exception))
+        .atLeastOnce()
 
-      (file
-        .removeSilently(_: Path))
-        .expects(repositoryDirectory)
-
-      triplesFinder.generateTriples(commitWithoutParent).futureValue shouldBe Left(exception)
+      intercept[Exception] {
+        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+      } shouldBe exception
     }
   }
 
   private trait TestCase {
+    private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+    val successfulCommandResult = CommandResult(exitCode = 0, chunks = Nil)
+
     val gitLabUrl:        ServiceUrl  = serviceUrls.generateOne
     val repositoryName:   String      = nonEmptyStrings().generateOne
     val projectPath:      ProjectPath = ProjectPath(s"user/$repositoryName")
@@ -281,12 +317,13 @@ class TriplesFinderSpec extends WordSpec with MockFactory with ScalaFutures with
     val rdfTriplesStream:    InputStream = mock[InputStream]
     val rdfTriples:          RDFTriples  = rdfTriplesSets.generateOne
 
-    val file:         Commands.File                          = mock[Commands.File]
-    val git:          Commands.Git                           = mock[Commands.Git]
-    val renku:        Commands.Renku                         = mock[Commands.Renku]
-    val randomLong:   MockFunction0[Long]                    = mockFunction[Long]
-    val toRdfTriples: MockFunction1[InputStream, RDFTriples] = mockFunction[InputStream, RDFTriples]
+    val file         = mock[Commands.File]
+    val git          = mock[Commands.Git]
+    val renku        = mock[Commands.Renku]
+    val randomLong   = mockFunction[Long]
+    val toRdfTriples = mockFunction[InputStream, IO[RDFTriples]]
     randomLong.expects().returning(pathDifferentiator)
-    val triplesFinder = new TriplesFinder(file, git, renku, gitLabUrl, toRdfTriples, randomLong)
+
+    val triplesFinder = new IOTriplesFinder(file, git, renku, gitLabUrl, toRdfTriples, randomLong)
   }
 }

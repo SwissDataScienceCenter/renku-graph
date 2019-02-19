@@ -16,48 +16,34 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.queues.logevent
+package ch.datascience.triplesgenerator.eventprocessing
 
-import java.io.{ByteArrayInputStream, InputStream}
-import java.net.URL
+import java.io._
 import java.security.SecureRandom
 
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.config.ServiceUrl
 import ch.datascience.graph.events.{CommitId, ProjectPath}
-import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
-import ch.datascience.triplesgenerator.queues.logevent.LogEventQueue.{Commit, CommitWithParent, CommitWithoutParent}
-import javax.inject.{Inject, Named, Singleton}
+import ch.datascience.triplesgenerator.eventprocessing.Commit._
 import org.apache.jena.rdf.model.ModelFactory
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.language.implicitConversions
-import scala.util.Try
-import scala.util.control.NonFatal
+import scala.language.{higherKinds, implicitConversions}
 
-@Singleton
-private class TriplesFinder(
-    file:         Commands.File,
-    git:          Commands.Git,
-    renku:        Commands.Renku,
-    gitLabUrl:    ServiceUrl,
-    toRdfTriples: InputStream => RDFTriples,
-    randomLong:   () => Long
-) {
+private abstract class TriplesFinder[Interpretation[_]] {
+  def generateTriples(commit: Commit): Interpretation[RDFTriples]
+}
 
-  @Inject() def this(
-      file:                          Commands.File,
-      git:                           Commands.Git,
-      renku:                         Commands.Renku,
-      @Named("gitlabUrl") gitlabUrl: URL
-  ) = this(
-    file,
-    git,
-    renku,
-    ServiceUrl(gitlabUrl),
-    (inputStream: InputStream) => RDFTriples(ModelFactory.createDefaultModel.read(inputStream, "")),
-    new SecureRandom().nextLong _
-  )
+private class IOTriplesFinder(
+    file:      Commands.File,
+    git:       Commands.Git,
+    renku:     Commands.Renku,
+    gitLabUrl: ServiceUrl,
+    toRdfTriples: InputStream => IO[RDFTriples] = inputStream =>
+      IO(RDFTriples(ModelFactory.createDefaultModel.read(inputStream, ""))),
+    randomLong:          () => Long = new SecureRandom().nextLong _
+)(implicit contextShift: ContextShift[IO])
+    extends TriplesFinder[IO] {
 
   import ammonite.ops.{Path, root}
   import file._
@@ -65,27 +51,18 @@ private class TriplesFinder(
   private val workDirectory: Path = root / "tmp"
   private val repositoryDirectoryFinder = ".*/(.*)$".r
 
-  def generateTriples(commit:    Commit)(
-      implicit executionContext: ExecutionContext): Future[Either[Throwable, RDFTriples]] = Future {
-    val repositoryDirectory = tempDirectoryName(repositoryNameFrom(commit.projectPath))
-    val gitRepositoryUrl    = gitLabUrl / s"${commit.projectPath}.git"
+  def generateTriples(commit: Commit): IO[RDFTriples] =
+    createRepositoryDirectory(commit.projectPath).bracket { repositoryDirectory =>
+      for {
+        _             <- git cloneRepo (gitRepositoryUrl(commit.projectPath), repositoryDirectory, workDirectory)
+        _             <- git checkout (commit.id, repositoryDirectory)
+        triplesStream <- findTriplesStream(commit, repositoryDirectory)
+        rdfTriples    <- toRdfTriples(triplesStream)
+      } yield rdfTriples
+    }(repositoryDirectory => delete(repositoryDirectory))
 
-    val maybeTriplesFile = for {
-      _             <- pure(mkdir(repositoryDirectory))
-      _             <- git cloneRepo (gitRepositoryUrl, repositoryDirectory, workDirectory)
-      _             <- git checkout (commit.id, repositoryDirectory)
-      triplesStream <- findTriplesStream(commit, repositoryDirectory)
-      rdfTriples    <- toRdfTriples(triplesStream)
-      _             <- removeSilently(repositoryDirectory)
-    } yield rdfTriples
-
-    maybeTriplesFile.toEither.leftMap {
-      case NonFatal(exception) =>
-        removeSilently(repositoryDirectory)
-        exception
-      case other => throw other
-    }
-  }
+  private def createRepositoryDirectory(projectPath: ProjectPath): IO[Path] =
+    contextShift.shift *> mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
 
   private def tempDirectoryName(repositoryName: String) =
     workDirectory / s"$repositoryName-${randomLong()}"
@@ -94,7 +71,10 @@ private class TriplesFinder(
     case repositoryDirectoryFinder(folderName) => folderName
   }
 
-  private def findTriplesStream(commit: Commit, repositoryDirectory: Path): InputStream = {
+  private def gitRepositoryUrl(projectPath: ProjectPath) =
+    gitLabUrl / s"$projectPath.git"
+
+  private def findTriplesStream(commit: Commit, repositoryDirectory: Path): IO[InputStream] = {
     import renku._
 
     commit match {
@@ -102,9 +82,6 @@ private class TriplesFinder(
       case withoutParent: CommitWithoutParent => renku.log(withoutParent, repositoryDirectory)
     }
   }
-
-  private implicit def pure[V](maybeValue: => V): Try[V] =
-    Try(maybeValue)
 }
 
 private object Commands {
@@ -112,46 +89,44 @@ private object Commands {
   import ammonite.ops
   import ammonite.ops._
 
-  @Singleton
   class File {
 
-    def mkdir(newDir: Path): Unit = ops.mkdir ! newDir
+    def mkdir(newDir: Path): IO[Path] = IO {
+      ops.mkdir ! newDir
+      newDir
+    }
 
-    def removeSilently(path: java.nio.file.Path): Unit =
-      removeSilently(Path(path))
-
-    def removeSilently(repositoryDirectory: Path): Unit =
-      Try {
-        ops.rm ! repositoryDirectory
-      } fold (
-        _ => (),
-        identity
-      )
+    def delete(repositoryDirectory: Path): IO[Unit] = IO {
+      ops.rm ! repositoryDirectory
+    }
   }
 
-  @Singleton
   class Git {
 
     def cloneRepo(
         repositoryUrl:        ServiceUrl,
         destinationDirectory: Path,
         workDirectory:        Path
-    ): CommandResult =
+    ): IO[CommandResult] = IO {
       %%('git, 'clone, repositoryUrl.toString, destinationDirectory.toString)(workDirectory)
+    }
 
     def checkout(
         commitId:            CommitId,
         repositoryDirectory: Path
-    ): CommandResult =
+    ): IO[CommandResult] = IO {
       %%('git, 'checkout, commitId.value)(repositoryDirectory)
+    }
   }
 
-  @Singleton
   class Renku {
 
-    def log[T <: Commit](commit:  T, destinationDirectory: Path)(
-        implicit generateTriples: (T, Path) => CommandResult): InputStream =
+    def log[T <: Commit](
+        commit:                 T,
+        destinationDirectory:   Path
+    )(implicit generateTriples: (T, Path) => CommandResult): IO[InputStream] = IO {
       generateTriples(commit, destinationDirectory).out.toInputStream
+    }
 
     implicit val commitWithoutParentTriplesFinder: (CommitWithoutParent, Path) => CommandResult = {
       case (_, destinationDirectory) =>

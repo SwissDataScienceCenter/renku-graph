@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.queues.logevent
+package ch.datascience.triplesgenerator.eventprocessing
 
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import org.apache.jena.rdf.model.Model

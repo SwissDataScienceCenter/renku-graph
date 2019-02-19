@@ -23,6 +23,7 @@ import akka.stream.OverflowStrategy.backpressure
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import ch.datascience.graph.events.{CommitId, ProjectPath}
+import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
 import javax.inject.{Inject, Singleton}
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 import play.api.{Logger, LoggerLike}

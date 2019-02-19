@@ -28,6 +28,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events._
 import ch.datascience.tools.AsyncTestCase
+import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
