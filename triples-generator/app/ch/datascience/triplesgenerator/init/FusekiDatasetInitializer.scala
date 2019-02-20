@@ -19,14 +19,17 @@
 package ch.datascience.triplesgenerator.init
 
 import cats.MonadError
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.logging.IOLogger
 import ch.datascience.triplesgenerator.config.{FusekiConfig, FusekiConfigProvider}
 import io.chrisdavenport.log4cats.Logger
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private class FusekiDatasetInitializer[Interpretation[_]](
+class FusekiDatasetInitializer[Interpretation[_]](
     fusekiConfigProvider:    FusekiConfigProvider[Interpretation],
     datasetExistenceChecker: DatasetExistenceChecker[Interpretation],
     datasetExistenceCreator: DatasetExistenceCreator[Interpretation],
@@ -63,3 +66,13 @@ private class FusekiDatasetInitializer[Interpretation[_]](
       ME.raiseError(exception)
   }
 }
+
+class IOFusekiDatasetInitializer(
+    implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO]
+) extends FusekiDatasetInitializer[IO](
+      new FusekiConfigProvider[IO](),
+      new IODatasetExistenceChecker,
+      new IODatasetExistenceCreator,
+      new IOLogger
+    )

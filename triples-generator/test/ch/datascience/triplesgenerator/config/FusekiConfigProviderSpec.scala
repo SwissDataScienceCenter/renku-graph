@@ -32,7 +32,7 @@ import scala.util.{Failure, Success, Try}
 
 class FusekiConfigProviderSpec extends WordSpec with PropertyChecks {
 
-  "apply" should {
+  "get" should {
 
     "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.dataset-type', 'services.fuseki.username' and 'services.fuseki.password' to instantiate the FusekiConfig" in {
       forAll(fusekiConfigs) { fusekiConfig =>

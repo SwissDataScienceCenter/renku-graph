@@ -38,7 +38,7 @@ import scala.util.Try
 
 class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
-  "toTriplesAndStore" should {
+  "apply" should {
 
     "succeed if a commit event in Json can be deserialised, turn into triples and all stored in Jena successfully" in new TestCase {
 
@@ -50,7 +50,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       commits map succeedTriplesAndUploading
 
-      eventProcessor.toTriplesAndStore(eventJson) shouldBe context.unit
+      eventProcessor(eventJson) shouldBe context.unit
 
       commits.toList foreach logSuccess
     }
@@ -87,7 +87,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       succeedTriplesAndUploading(commit4)
 
-      eventProcessor.toTriplesAndStore(eventJson) shouldBe context.unit
+      eventProcessor(eventJson) shouldBe context.unit
 
       logSuccess(commit1)
       logError(commit2, exception2)
@@ -103,7 +103,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(eventJson)
         .returning(context.raiseError(exception))
 
-      eventProcessor.toTriplesAndStore(eventJson) shouldBe context.unit
+      eventProcessor(eventJson) shouldBe context.unit
 
       logger.loggedOnly(Error("Commit Event deserialisation failed", exception))
     }

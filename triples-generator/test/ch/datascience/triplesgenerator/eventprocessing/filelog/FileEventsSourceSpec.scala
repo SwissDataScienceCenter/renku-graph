@@ -24,6 +24,8 @@ import cats.effect._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.triplesgenerator.eventprocessing.EventsSource
+import com.typesafe.config.ConfigFactory
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -34,7 +36,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 
-class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPatience {
+class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPatience with MockFactory {
 
   private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
@@ -77,9 +79,25 @@ class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPati
       eventsSource.withEventsProcessor(processor).run.unsafeRunCancelable(_ => Unit)
 
       eventually {
-        println(s"$accumulator -> $line1, $line2, $line3")
         accumulator shouldBe Seq(line1, line3)
       }
+    }
+
+    "fail if the log file cannot be found in the config" in {
+      class IOLogFileConfigProvider extends LogFileConfigProvider[IO]
+      val configProvider = mock[IOLogFileConfigProvider]
+      val newRunner      = new FileEventProcessorRunner(_, configProvider)
+      val eventsSource   = new EventsSource[IO](newRunner)
+      def processor(line: String): IO[Unit] = IO.unit
+
+      val exception = exceptions.generateOne
+      (configProvider.get _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      intercept[Exception] {
+        eventsSource.withEventsProcessor(processor).run.unsafeRunSync
+      } shouldBe exception
     }
   }
 
@@ -91,9 +109,17 @@ class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPati
   )
 
   private trait TestCase {
-    val eventLogFile      = Files.createTempFile("test-events", "log")
-    private val newRunner = new FileEventProcessorRunner(eventLogFile, _)
-    val eventsSource      = new EventsSource[IO](newRunner)
+    val eventLogFile = Files.createTempFile("test-events", "log")
+    private val config = ConfigFactory.parseMap(
+      Map(
+        "file-event-log" -> Map(
+          "file-path" -> eventLogFile.toFile.getAbsolutePath
+        ).asJava
+      ).asJava
+    )
+    private val configProvider = new LogFileConfigProvider[IO](config)
+    private val newRunner      = new FileEventProcessorRunner(_, configProvider)
+    val eventsSource           = new EventsSource[IO](newRunner)
 
     def writeToFile(item: String): Unit = writeToFile(Seq(item))
 

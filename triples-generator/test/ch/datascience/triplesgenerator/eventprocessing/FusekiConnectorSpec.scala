@@ -22,6 +22,7 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.triplesgenerator.config.IOFusekiConfigProvider
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.apache.jena.rdf.model.Model
 import org.apache.jena.rdfconnection.RDFConnection
@@ -38,6 +39,10 @@ class FusekiConnectorSpec extends WordSpec with MockFactory {
 
     "succeed if upload the triples to Jena Fuseki is successful" in new TestCase {
 
+      (fusekiConfigProvider.get _)
+        .expects()
+        .returning(IO.pure(fusekiConfig))
+
       createConnection
         .expects(fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName)
         .returning(fusekiConnection)
@@ -52,7 +57,25 @@ class FusekiConnectorSpec extends WordSpec with MockFactory {
       fusekiConnector.upload(rdfTriples).unsafeRunSync() shouldBe ((): Unit)
     }
 
+    "fail if fuseki config finding fails" in new TestCase {
+
+      val exception = exceptions.generateOne
+      (fusekiConfigProvider.get _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      val actual = intercept[Exception] {
+        fusekiConnector.upload(rdfTriples).unsafeRunSync()
+      }
+      actual.getMessage shouldBe "Uploading triples to Jena failed"
+      actual.getCause   shouldBe exception
+    }
+
     "fail if creation connection to Jena fails" in new TestCase {
+
+      (fusekiConfigProvider.get _)
+        .expects()
+        .returning(IO.pure(fusekiConfig))
 
       val exception = exceptions.generateOne
       createConnection
@@ -67,6 +90,10 @@ class FusekiConnectorSpec extends WordSpec with MockFactory {
     }
 
     "fail if upload to Jena Fuseki fails" in new TestCase {
+
+      (fusekiConfigProvider.get _)
+        .expects()
+        .returning(IO.pure(fusekiConfig))
 
       createConnection
         .expects(fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName)
@@ -89,6 +116,10 @@ class FusekiConnectorSpec extends WordSpec with MockFactory {
     }
 
     "fail if closing the connection to fuseki fails" in new TestCase {
+
+      (fusekiConfigProvider.get _)
+        .expects()
+        .returning(IO.pure(fusekiConfig))
 
       createConnection
         .expects(fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName)
@@ -115,12 +146,13 @@ class FusekiConnectorSpec extends WordSpec with MockFactory {
 
   private trait TestCase {
 
-    val rdfTriples: RDFTriples = rdfTriplesSets.generateOne
+    val rdfTriples   = rdfTriplesSets.generateOne
+    val fusekiConfig = fusekiConfigs.generateOne
 
-    val createConnection = mockFunction[ServiceUrl, RDFConnection]
-    val fusekiConnection = mock[RDFConnection]
-    val fusekiConfig     = fusekiConfigs.generateOne
+    val createConnection     = mockFunction[ServiceUrl, RDFConnection]
+    val fusekiConnection     = mock[RDFConnection]
+    val fusekiConfigProvider = mock[IOFusekiConfigProvider]
 
-    val fusekiConnector = new IOFusekiConnector(fusekiConfig, createConnection)
+    val fusekiConnector = new IOFusekiConnector(fusekiConfigProvider, createConnection)
   }
 }

@@ -19,20 +19,19 @@
 package ch.datascience.triplesgenerator.eventprocessing.filelog
 
 import java.io.{BufferedReader, File, FileReader}
-import java.nio.file.Path
 
 import cats.effect.IO._
 import cats.effect._
 import cats.implicits._
-import ch.datascience.triplesgenerator.eventprocessing.EventProcessorRunner
+import ch.datascience.triplesgenerator.eventprocessing.{EventProcessor, EventProcessorRunner}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private[eventprocessing] class FileEventProcessorRunner(
-    eventLogFilePath: Path,
-    eventProcessor:   String => IO[Unit]
+class FileEventProcessorRunner(
+    eventProcessor: EventProcessor[IO],
+    configProvider: LogFileConfigProvider[IO] = new LogFileConfigProvider[IO]()
 )(
     implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext
@@ -42,15 +41,14 @@ private[eventprocessing] class FileEventProcessorRunner(
 
   private implicit val timer: Timer[IO] = IO.timer(executionContext)
 
-  lazy val run: IO[ExitCode] =
+  lazy val run: IO[Unit] =
     for {
       file <- validateFile
       _    <- fileReader(file).bracket(checkForNewLine)(closeReader)
-    } yield ExitCode.Success
+    } yield ()
 
-  private lazy val validateFile: IO[File] = IO {
-    eventLogFilePath.toFile
-  }
+  private lazy val validateFile: IO[File] =
+    configProvider.get.map(_.toFile)
 
   private def fileReader(file: File): IO[BufferedReader] =
     contextShift.shift *> IO(new BufferedReader(new FileReader(file)))

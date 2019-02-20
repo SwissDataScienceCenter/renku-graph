@@ -16,17 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.triplesgenerator.eventprocessing.filelog
 
-import cats.effect.IO
-import cats.implicits._
+import java.nio.file.Path
 
-import scala.util.Try
+import cats.MonadError
+import ch.datascience.config.ConfigLoader
+import com.typesafe.config.{Config, ConfigFactory}
 
-private class TryCommitEventsDeserialiser extends CommitEventsDeserialiser[Try]
-private abstract class TryTriplesFinder   extends TriplesFinder[Try]
-private abstract class TryFusekiConnector extends FusekiConnector[Try]
+import scala.language.higherKinds
 
-abstract class IOEventProcessorRunner(
-    eventProcessor: EventProcessor[IO]
-) extends EventProcessorRunner[IO](eventProcessor)
+private class LogFileConfigProvider[Interpretation[_]](
+    config:    Config = ConfigFactory.load()
+)(implicit ME: MonadError[Interpretation, Throwable])
+    extends ConfigLoader[Interpretation] {
+
+  def get: Interpretation[Path] = find[Path]("file-event-log.file-path", config)
+}

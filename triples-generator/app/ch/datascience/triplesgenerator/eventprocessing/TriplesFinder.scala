@@ -36,10 +36,10 @@ private abstract class TriplesFinder[Interpretation[_]] {
 }
 
 private class IOTriplesFinder(
-    file:      Commands.File,
-    git:       Commands.Git,
-    renku:     Commands.Renku,
-    gitLabUrl: ServiceUrl,
+    gitLabUrlProvider: GitLabUrlProvider[IO],
+    file:              Commands.File = new Commands.File,
+    git:               Commands.Git = new Commands.Git,
+    renku:             Commands.Renku = new Commands.Renku,
     toRdfTriples: InputStream => IO[RDFTriples] = inputStream =>
       IO(RDFTriples(ModelFactory.createDefaultModel.read(inputStream, ""))),
     randomLong:          () => Long = new SecureRandom().nextLong _
@@ -56,7 +56,8 @@ private class IOTriplesFinder(
     createRepositoryDirectory(commit.projectPath)
       .bracket { repositoryDirectory =>
         for {
-          _             <- git cloneRepo (gitRepositoryUrl(commit.projectPath), repositoryDirectory, workDirectory)
+          gitLabUrl     <- gitLabUrlProvider.get
+          _             <- git cloneRepo (gitRepositoryUrl(gitLabUrl, commit.projectPath), repositoryDirectory, workDirectory)
           _             <- git checkout (commit.id, repositoryDirectory)
           triplesStream <- findTriplesStream(commit, repositoryDirectory)
           rdfTriples    <- toRdfTriples(triplesStream)
@@ -74,7 +75,7 @@ private class IOTriplesFinder(
     case repositoryDirectoryFinder(folderName) => folderName
   }
 
-  private def gitRepositoryUrl(projectPath: ProjectPath) =
+  private def gitRepositoryUrl(gitLabUrl: ServiceUrl, projectPath: ProjectPath) =
     gitLabUrl / s"$projectPath.git"
 
   private def findTriplesStream(commit: Commit, repositoryDirectory: Path): IO[InputStream] = {

@@ -47,10 +47,15 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
       "call 'renku log' without --revision when no parent commit, " +
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
+
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
+
+      (gitLabUrlProvider.get _)
+        .expects()
+        .returning(IO.pure(gitLabUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -86,12 +91,15 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
       "call 'renku log' with --revision when there's a parent commit, " +
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
-      val commitWithParent = toCommitWithParent(commitWithoutParent)
 
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
+
+      (gitLabUrlProvider.get _)
+        .expects()
+        .returning(IO.pure(gitLabUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -103,6 +111,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .expects(commitId, repositoryDirectory)
         .returning(IO.pure(successfulCommandResult))
 
+      val commitWithParent = toCommitWithParent(commitWithoutParent)
       (renku
         .log(_: CommitWithParent, _: Path)(_: (CommitWithParent, Path) => CommandResult))
         .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
@@ -122,6 +131,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     }
 
     "fail if temp directory creation fails" in new TestCase {
+
       val exception = exceptions.generateOne
       (file
         .mkdir(_: Path))
@@ -135,11 +145,40 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
       actual.getCause   shouldBe exception
     }
 
-    "fail if cloning the repo fails" in new TestCase {
+    "fail finding GitLabUrl fails" in new TestCase {
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
+
+      val exception = exceptions.generateOne
+      (gitLabUrlProvider.get _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      (file
+        .delete(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
+
+      val actual = intercept[Exception] {
+        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+      }
+      actual.getMessage shouldBe "Triples generation failed"
+      actual.getCause   shouldBe exception
+    }
+
+    "fail if cloning the repo fails" in new TestCase {
+
+      (file
+        .mkdir(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
+
+      (gitLabUrlProvider.get _)
+        .expects()
+        .returning(IO.pure(gitLabUrl))
 
       val exception = exceptions.generateOne
       (git
@@ -161,10 +200,15 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     }
 
     "fail if checking out the sha fails" in new TestCase {
+
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
+
+      (gitLabUrlProvider.get _)
+        .expects()
+        .returning(IO.pure(gitLabUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -191,10 +235,15 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     }
 
     "fail if calling 'renku log' fails" in new TestCase {
+
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
+
+      (gitLabUrlProvider.get _)
+        .expects()
+        .returning(IO.pure(gitLabUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -226,10 +275,15 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     }
 
     "fail if converting the rdf triples stream to rdf triples fails" in new TestCase {
+
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
+
+      (gitLabUrlProvider.get _)
+        .expects()
+        .returning(IO.pure(gitLabUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -265,10 +319,15 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     }
 
     "fail if removing the temp folder fails" in new TestCase {
+
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
+
+      (gitLabUrlProvider.get _)
+        .expects()
+        .returning(IO.pure(gitLabUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -330,13 +389,15 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     val rdfTriplesStream:    InputStream = mock[InputStream]
     val rdfTriples:          RDFTriples  = rdfTriplesSets.generateOne
 
-    val file         = mock[Commands.File]
-    val git          = mock[Commands.Git]
-    val renku        = mock[Commands.Renku]
-    val randomLong   = mockFunction[Long]
-    val toRdfTriples = mockFunction[InputStream, IO[RDFTriples]]
+    class IOGitLabUrlProvider extends GitLabUrlProvider[IO]
+    val gitLabUrlProvider = mock[IOGitLabUrlProvider]
+    val file              = mock[Commands.File]
+    val git               = mock[Commands.Git]
+    val renku             = mock[Commands.Renku]
+    val randomLong        = mockFunction[Long]
+    val toRdfTriples      = mockFunction[InputStream, IO[RDFTriples]]
     randomLong.expects().returning(pathDifferentiator)
 
-    val triplesFinder = new IOTriplesFinder(file, git, renku, gitLabUrl, toRdfTriples, randomLong)
+    val triplesFinder = new IOTriplesFinder(gitLabUrlProvider, file, git, renku, toRdfTriples, randomLong)
   }
 }

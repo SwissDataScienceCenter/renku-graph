@@ -20,7 +20,10 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
 import cats.data.NonEmptyList
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.logging.IOLogger
+import ch.datascience.triplesgenerator.config.FusekiConfigProvider
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import io.chrisdavenport.log4cats.Logger
 
@@ -32,13 +35,14 @@ class CommitEventProcessor[Interpretation[_]](
     triplesFinder:            TriplesFinder[Interpretation],
     fusekiConnector:          FusekiConnector[Interpretation],
     logger:                   Logger[Interpretation]
-)(implicit ME:                MonadError[Interpretation, Throwable]) {
+)(implicit ME:                MonadError[Interpretation, Throwable])
+    extends EventProcessor[Interpretation] {
 
   import commitEventsDeserialiser._
   import fusekiConnector._
   import triplesFinder._
 
-  def toTriplesAndStore(eventJson: String): Interpretation[Unit] = {
+  def apply(eventJson: String): Interpretation[Unit] = {
     for {
       commits <- deserialiseToCommitEvents(eventJson)
       _       <- commits.map(toTriplesAndUpload).sequence
@@ -74,3 +78,11 @@ class CommitEventProcessor[Interpretation[_]](
     case NonFatal(exception) => logger.error(exception)("Commit Event deserialisation failed")
   }
 }
+
+class IOCommitEventProcessor(implicit contextShift: ContextShift[IO])
+    extends CommitEventProcessor[IO](
+      new CommitEventsDeserialiser[IO](),
+      new IOTriplesFinder(new GitLabUrlProvider[IO]()),
+      new IOFusekiConnector(new FusekiConfigProvider[IO]()),
+      new IOLogger()
+    )

@@ -18,15 +18,16 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
-import cats.effect.IO
-import cats.implicits._
+import cats.MonadError
+import ch.datascience.config.{ConfigLoader, ServiceUrl}
+import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.util.Try
+import scala.language.higherKinds
 
-private class TryCommitEventsDeserialiser extends CommitEventsDeserialiser[Try]
-private abstract class TryTriplesFinder   extends TriplesFinder[Try]
-private abstract class TryFusekiConnector extends FusekiConnector[Try]
+private class GitLabUrlProvider[Interpretation[_]](
+    config:    Config = ConfigFactory.load()
+)(implicit ME: MonadError[Interpretation, Throwable])
+    extends ConfigLoader[Interpretation] {
 
-abstract class IOEventProcessorRunner(
-    eventProcessor: EventProcessor[IO]
-) extends EventProcessorRunner[IO](eventProcessor)
+  def get: Interpretation[ServiceUrl] = find[ServiceUrl]("services.gitlab.url", config)
+}
