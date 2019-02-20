@@ -16,17 +16,30 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository
+package ch.datascience.http.server
 
-import cats.effect.Effect
-import org.http4s.HttpRoutes
-import org.http4s.dsl.Http4sDsl
+import cats.effect.IO
+import ch.datascience.http.server.EndpointTester._
+import org.http4s.dsl.io._
+import org.http4s.{Method, Request, Status, Uri}
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
-import scala.language.higherKinds
+class PingEndpointSpec extends WordSpec {
 
-class PingEndpoint[F[_]: Effect] extends Http4sDsl[F] {
+  "ping" should {
 
-  val ping: HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "ping" => Ok("pong")
+    "respond with OK and 'pong' body" in new TestCase {
+      val response = endpoint.call(
+        Request(Method.GET, Uri.uri("/ping"))
+      )
+
+      response.status       shouldBe Status.Ok
+      response.body[String] shouldBe "pong"
+    }
+  }
+
+  private trait TestCase {
+    val endpoint = new PingEndpoint[IO].ping.or(notAvailableResponse)
   }
 }

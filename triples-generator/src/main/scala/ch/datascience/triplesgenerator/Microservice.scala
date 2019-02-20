@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator
 
 import cats.effect.{ExitCode, IO, IOApp}
+import ch.datascience.http.server.PingEndpoint
 import ch.datascience.triplesgenerator.eventprocessing.filelog.FileEventProcessorRunner
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.init.{FusekiDatasetInitializer, IOFusekiDatasetInitializer}
@@ -29,22 +30,27 @@ object Microservice extends IOApp {
 
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
   private val datasetInitializer = new IOFusekiDatasetInitializer
-
+  private val httpServer = new HttpServer[IO](
+    new PingEndpoint[IO]
+  )
   private val eventProcessorRunner = new EventsSource[IO](new FileEventProcessorRunner(_))
     .withEventsProcessor(new IOCommitEventProcessor())
+  private val microserviceRunner = new MicroserviceRunner(datasetInitializer, eventProcessorRunner, httpServer)
 
   override def run(args: List[String]): IO[ExitCode] =
-    new MicroserviceRunner(datasetInitializer, eventProcessorRunner).run(args)
+    microserviceRunner.run(args)
 }
 
 private class MicroserviceRunner(
     datasetInitializer:   FusekiDatasetInitializer[IO],
-    eventProcessorRunner: EventProcessorRunner[IO]
+    eventProcessorRunner: EventProcessorRunner[IO],
+    httpServer:           HttpServer[IO]
 ) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      _      <- datasetInitializer.run
-      result <- eventProcessorRunner.run
+      _ <- datasetInitializer.run
+      _ <- eventProcessorRunner.run
+      _ <- httpServer.run
     } yield ExitCode.Success
 }

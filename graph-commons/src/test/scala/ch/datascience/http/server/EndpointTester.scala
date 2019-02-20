@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.http
-
+package ch.datascience.http.server
 import cats.data.Kleisli
 import cats.effect.IO
 import io.circe.Json
-import org.http4s.circe._
+import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, Request, Response, Status}
 
 object EndpointTester {

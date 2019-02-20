@@ -16,32 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository
+package ch.datascience.triplesgenerator
 
 import cats.effect._
 import ch.datascience.http.server.PingEndpoint
-import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint
-import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
-import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint
 
 import scala.language.higherKinds
 
 private class HttpServer[F[_]: ConcurrentEffect](
-    pingEndpoint:           PingEndpoint[F],
-    fetchTokenEndpoint:     FetchTokenEndpoint[F],
-    associateTokenEndpoint: AssociateTokenEndpoint[F],
-    deleteTokenEndpoint:    DeleteTokenEndpoint[F]
+    pingEndpoint: PingEndpoint[F]
 ) {
   import cats.implicits._
   import org.http4s.server.blaze._
 
   def run: F[ExitCode] =
     BlazeBuilder[F]
-      .bindHttp(9003, "0.0.0.0")
+      .bindHttp(9002, "0.0.0.0")
       .mountService(pingEndpoint.ping, "/")
-      .mountService(fetchTokenEndpoint.fetchToken, "/")
-      .mountService(associateTokenEndpoint.associateToken, "/")
-      .mountService(deleteTokenEndpoint.deleteToken, "/")
       .serve
       .compile
       .drain

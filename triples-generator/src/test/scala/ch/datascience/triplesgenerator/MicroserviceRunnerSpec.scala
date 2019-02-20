@@ -18,20 +18,23 @@
 
 package ch.datascience.triplesgenerator
 
-import cats.effect.{ExitCode, IO}
+import cats.effect.{ContextShift, ExitCode, IO}
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.http.server.PingEndpoint
 import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessorRunner
 import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import ch.datascience.generators.Generators._
-import ch.datascience.generators.Generators.Implicits._
+
+import scala.concurrent.ExecutionContext
 
 class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
   "run" should {
 
-    "return Success ExitCode if dataset verification and starting Event Processor succeed" in new TestCase {
+    "return Success ExitCode if dataset verification, starting Event Processor and http server succeeds" in new TestCase {
       (datasetInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -39,6 +42,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       (eventProcessorRunner.run _)
         .expects()
         .returning(IO.unit)
+
+      (httpServer.run _)
+        .expects()
+        .returning(IO.pure(ExitCode.Success))
 
       microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
     }
@@ -68,11 +75,37 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         microserviceRunner.run(Nil).unsafeRunSync()
       } shouldBe exception
     }
+
+    "fail if starting Http Server fails" in new TestCase {
+      (datasetInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventProcessorRunner.run _)
+        .expects()
+        .returning(IO.unit)
+
+      val exception = exceptions.generateOne
+      (httpServer.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      intercept[Exception] {
+        microserviceRunner.run(Nil).unsafeRunSync()
+      } shouldBe exception
+    }
   }
 
   private trait TestCase {
     val datasetInitializer   = mock[IOFusekiDatasetInitializer]
     val eventProcessorRunner = mock[IOEventProcessorRunner]
-    val microserviceRunner   = new MicroserviceRunner(datasetInitializer, eventProcessorRunner)
+    val httpServer           = mock[IOHttpServer]
+    val microserviceRunner   = new MicroserviceRunner(datasetInitializer, eventProcessorRunner, httpServer)
   }
+
+  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
+  private class IOHttpServer(
+      pingEndpoint: PingEndpoint[IO]
+  ) extends HttpServer[IO](pingEndpoint)
 }

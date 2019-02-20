@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._
 import ch.datascience.graph.events.GraphCommonsGenerators._
 import ch.datascience.graph.events.ProjectId
-import ch.datascience.http.EndpointTester._
+import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.Json

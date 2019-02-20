@@ -19,6 +19,7 @@
 package ch.datascience.tokenrepository
 
 import cats.effect._
+import ch.datascience.http.server.PingEndpoint
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
