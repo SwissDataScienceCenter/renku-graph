@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, ExitCode, IO}
 import cats.implicits._
 import ch.datascience.db.TransactorProvider
-import ch.datascience.tokenrepository.ApplicationLogger
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.ProjectsTokensConfig
 import doobie.util.transactor.Transactor.Aux
 import io.chrisdavenport.log4cats.Logger

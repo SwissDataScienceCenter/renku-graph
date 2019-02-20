@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import ch.datascience.logging.IOLogger
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.triplesgenerator.config.FusekiConfigProvider
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import io.chrisdavenport.log4cats.Logger
@@ -84,5 +84,5 @@ class IOCommitEventProcessor(implicit contextShift: ContextShift[IO])
       new CommitEventsDeserialiser[IO](),
       new IOTriplesFinder(new GitLabUrlProvider[IO]()),
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),
-      new IOLogger()
+      ApplicationLogger
     )

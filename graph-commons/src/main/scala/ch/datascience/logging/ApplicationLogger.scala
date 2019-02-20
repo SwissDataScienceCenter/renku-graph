@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository
+package ch.datascience.logging
 
-import ch.datascience.logging.IOLogger
 import org.slf4j.LoggerFactory
 
 object ApplicationLogger extends IOLogger(LoggerFactory.getLogger("application"))

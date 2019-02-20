@@ -20,9 +20,9 @@ organization := "ch.datascience"
 name := "triples-generator"
 version := "0.1.0-SNAPSHOT"
 
-libraryDependencies += ws
-libraryDependencies += "ch.datascience" %% "renku-commons" % "0.2.0"
-libraryDependencies += "com.lihaoyi"    %% "ammonite-ops"  % "1.4.2"
+libraryDependencies += "ch.datascience" %% "renku-commons"  % "0.2.0"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
+libraryDependencies += "com.lihaoyi"    %% "ammonite-ops"   % "1.4.2"
 
 val circeVersion = "0.10.0"
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion

@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.init
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import ch.datascience.logging.IOLogger
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.triplesgenerator.config.{FusekiConfig, FusekiConfigProvider}
 import io.chrisdavenport.log4cats.Logger
 
@@ -74,5 +74,5 @@ class IOFusekiDatasetInitializer(
       new FusekiConfigProvider[IO](),
       new IODatasetExistenceChecker,
       new IODatasetExistenceCreator,
-      new IOLogger
+      ApplicationLogger
     )

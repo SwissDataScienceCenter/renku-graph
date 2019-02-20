@@ -24,7 +24,7 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.events.ProjectId
-import ch.datascience.tokenrepository.ApplicationLogger
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.ProjectIdPathBinder
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
