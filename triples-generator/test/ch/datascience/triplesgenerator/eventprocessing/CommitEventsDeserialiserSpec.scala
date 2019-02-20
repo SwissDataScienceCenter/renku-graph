@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
+import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.events.CommitId
@@ -36,7 +37,7 @@ class CommitEventsDeserialiserSpec extends WordSpec {
 
     "produce a single CommitEvent if the Json string can be successfully deserialized and there are no parents" in new TestCase {
       deserialiser.deserialiseToCommitEvents(commitEvent(parents = Nil)) shouldBe context.pure(
-        List(
+        NonEmptyList.of(
           CommitWithoutParent(
             commitId,
             projectPath
@@ -49,13 +50,15 @@ class CommitEventsDeserialiserSpec extends WordSpec {
       val parentCommits = parentsIdsLists(minNumber = 1).generateOne
 
       deserialiser.deserialiseToCommitEvents(commitEvent(parentCommits)) shouldBe context.pure(
-        parentCommits map { parentCommitId =>
-          CommitWithParent(
-            commitId,
-            parentCommitId,
-            projectPath
-          )
-        }
+        NonEmptyList.fromListUnsafe(
+          parentCommits map { parentCommitId =>
+            CommitWithParent(
+              commitId,
+              parentCommitId,
+              projectPath
+            )
+          }
+        )
       )
     }
 

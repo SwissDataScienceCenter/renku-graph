@@ -17,23 +17,10 @@
  */
 
 package ch.datascience.triplesgenerator.eventprocessing
-import ch.datascience.graph.events.{CommitId, ProjectPath}
 
-private sealed trait Commit extends Product with Serializable {
-  val id:          CommitId
-  val projectPath: ProjectPath
-}
+import cats.implicits._
+import scala.util.Try
 
-private object Commit {
-
-  final case class CommitWithParent(
-      id:          CommitId,
-      parentId:    CommitId,
-      projectPath: ProjectPath
-  ) extends Commit
-
-  final case class CommitWithoutParent(
-      id:          CommitId,
-      projectPath: ProjectPath
-  ) extends Commit
-}
+private class TryCommitEventsDeserialiser extends CommitEventsDeserialiser[Try]
+private abstract class TryTriplesFinder   extends TriplesFinder[Try]
+private abstract class TryFusekiConnector extends FusekiConnector[Try]

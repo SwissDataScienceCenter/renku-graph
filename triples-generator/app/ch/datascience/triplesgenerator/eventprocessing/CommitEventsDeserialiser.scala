@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
+import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.graph.events.{CommitId, ProjectPath}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
@@ -31,21 +32,21 @@ private class CommitEventsDeserialiser[Interpretation[_]](
     implicit ME: MonadError[Interpretation, Throwable]
 ) {
 
-  def deserialiseToCommitEvents(jsonString: String): Interpretation[List[Commit]] = ME.fromEither {
+  def deserialiseToCommitEvents(jsonString: String): Interpretation[NonEmptyList[Commit]] = ME.fromEither {
     parse(jsonString)
-      .flatMap(_.as[List[Commit]])
+      .flatMap(_.as[NonEmptyList[Commit]])
       .leftMap(toMeaningfulError(jsonString))
   }
 
-  private implicit val commitsDecoder: Decoder[List[Commit]] = (cursor: HCursor) =>
+  private implicit val commitsDecoder: Decoder[NonEmptyList[Commit]] = (cursor: HCursor) =>
     for {
       commitId      <- cursor.downField("id").as[CommitId]
       projectPath   <- cursor.downField("project").downField("path").as[ProjectPath]
       parentCommits <- cursor.downField("parents").as[List[CommitId]]
     } yield
       parentCommits match {
-        case Nil       => List(CommitWithoutParent(commitId, projectPath))
-        case parentIds => parentIds map (CommitWithParent(commitId, _, projectPath))
+        case Nil       => NonEmptyList.one(CommitWithoutParent(commitId, projectPath))
+        case parentIds => NonEmptyList.fromListUnsafe(parentIds map (CommitWithParent(commitId, _, projectPath)))
     }
 
   private def toMeaningfulError(json: String): Error => Error = {
