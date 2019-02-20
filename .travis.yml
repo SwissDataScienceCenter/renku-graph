@@ -42,7 +42,7 @@ install:
   - PATH=`pwd`/linux-amd64/:$PATH
   - helm init --client-only
 script:
-- sbt ++$TRAVIS_SCALA_VERSION test && bash ./.travis/check-code-formatting.sh
+- sbt ++$TRAVIS_SCALA_VERSION test -mem 512M && bash ./.travis/check-code-formatting.sh
 deploy:
   - &script
     provider: script
