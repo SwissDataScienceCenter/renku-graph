@@ -1,7 +1,7 @@
 <!-- https://www.playframework.com/documentation/2.6.x/SettingsLogger -->
 <configuration>
 
-    <conversionRule conversionWord="coloredLevel" converterClass="play.api.libs.logback.ColoredLevel" />
+    <conversionRule conversionWord="coloredLevel" converterClass="play.api.libs.logback.ColoredLevel"/>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -10,17 +10,16 @@
     </appender>
 
     <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
-        <appender-ref ref="STDOUT" />
+        <appender-ref ref="STDOUT"/>
     </appender>
 
-    <logger name="play" level="INFO" />
-    <logger name="application" level="DEBUG" />
+    <logger name="application" level="DEBUG"/>
 
-    <logger name="AccessLoggingFilter" level="INFO" />
+    <logger name="AccessLoggingFilter" level="INFO"/>
 
     <root level="WARN">
         <!--<appender-ref ref="ASYNCFILE" />-->
-        <appender-ref ref="ASYNCSTDOUT" />
+        <appender-ref ref="ASYNCSTDOUT"/>
     </root>
 
 </configuration>

@@ -48,7 +48,6 @@ lazy val triplesGenerator = Project(
   graphCommons % "compile->compile",
   graphCommons % "test->test"
 ).enablePlugins(
-  PlayScala, 
   JavaAppPackaging, 
   AutomateHeaderPlugin
 )
