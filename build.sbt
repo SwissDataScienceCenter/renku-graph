@@ -11,6 +11,7 @@ lazy val root = Project(
   base = file(".")
 ).aggregate(
   graphCommons, 
+  tokenRepository,
   webhookService,
   triplesGenerator
 )
@@ -42,6 +43,19 @@ lazy val webhookService = Project(
 lazy val triplesGenerator = Project(
   id   = "triples-generator",
   base = file("triples-generator")
+).settings(
+  commonSettings
+).dependsOn(
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
+  JavaAppPackaging, 
+  AutomateHeaderPlugin
+)
+
+lazy val tokenRepository = Project(
+  id   = "token-repository",
+  base = file("token-repository")
 ).settings(
   commonSettings
 ).dependsOn(
