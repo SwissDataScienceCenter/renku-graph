@@ -22,7 +22,7 @@ import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.graph.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult

@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.GraphCommonsGenerators._

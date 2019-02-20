@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.clients
+package ch.datascience.http.client
 
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}

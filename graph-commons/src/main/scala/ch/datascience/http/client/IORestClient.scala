@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.clients
+package ch.datascience.http.client
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s._

@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.graph.events.{Project, PushUser}
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.eventprocessing.PushEvent

@@ -18,8 +18,8 @@
 
 package ch.datascience.graph.events
 
-import ch.datascience.clients.{AccessToken, BasicAuthPassword, BasicAuthUsername}
-import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.{AccessToken, BasicAuthPassword, BasicAuthUsername}
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.generators.Generators.nonEmptyStrings
 import org.scalacheck.Gen
 

@@ -20,8 +20,8 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
-import ch.datascience.clients.AccessToken
-import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.events.ProjectId

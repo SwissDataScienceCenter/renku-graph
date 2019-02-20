@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.config
 
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.clients.{BasicAuthPassword, BasicAuthUsername}
+import ch.datascience.http.client.{BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.config.{ConfigLoader, ServiceUrl}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}

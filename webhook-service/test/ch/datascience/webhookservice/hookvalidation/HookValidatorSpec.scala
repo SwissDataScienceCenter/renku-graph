@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookvalidation
 import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.events.GraphCommonsGenerators._

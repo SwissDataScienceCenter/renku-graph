@@ -21,7 +21,7 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.MonadError
 import cats.data.OptionT
 import cats.implicits._
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.events.EventsGenerators._

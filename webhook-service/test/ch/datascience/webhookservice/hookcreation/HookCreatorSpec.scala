@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats._
 import cats.implicits._
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

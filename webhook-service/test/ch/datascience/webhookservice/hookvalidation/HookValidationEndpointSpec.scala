@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookvalidation
 import akka.stream.Materializer
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._

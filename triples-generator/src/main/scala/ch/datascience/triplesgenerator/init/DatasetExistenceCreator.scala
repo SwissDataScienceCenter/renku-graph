@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.init
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.clients.{BasicAuth, IORestClient}
+import ch.datascience.http.client.{BasicAuth, IORestClient}
 import ch.datascience.triplesgenerator.config.{FusekiConfig, FusekiConfigProvider}
 
 import scala.concurrent.ExecutionContext
