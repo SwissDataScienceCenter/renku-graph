@@ -23,6 +23,8 @@ import java.nio.file.{Files, OpenOption, StandardOpenOption}
 import cats.effect._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.triplesgenerator.eventprocessing.EventsSource
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
@@ -62,6 +64,8 @@ class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPati
       eventually {
         accumulator shouldBe (fileLines :+ laterAddedLine)
       }
+
+      logger.loggedOnly(Info("Listening for new events"))
     }
 
     "continue if there is an error during processing" in new TestCase {
@@ -81,12 +85,14 @@ class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPati
       eventually {
         accumulator shouldBe Seq(line1, line3)
       }
+
+      logger.loggedOnly(Info("Listening for new events"))
     }
 
     "fail if the log file cannot be found in the config" in {
       class IOLogFileConfigProvider extends LogFileConfigProvider[IO]
       val configProvider = mock[IOLogFileConfigProvider]
-      val newRunner      = new FileEventProcessorRunner(_, configProvider)
+      val newRunner      = new FileEventProcessorRunner(_, configProvider, TestLogger[IO]())
       val eventsSource   = new EventsSource[IO](newRunner)
       def processor(line: String): IO[Unit] = IO.unit
 
@@ -118,7 +124,8 @@ class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPati
       ).asJava
     )
     private val configProvider = new LogFileConfigProvider[IO](config)
-    private val newRunner      = new FileEventProcessorRunner(_, configProvider)
+    val logger                 = TestLogger[IO]()
+    private val newRunner      = new FileEventProcessorRunner(_, configProvider, logger)
     val eventsSource           = new EventsSource[IO](newRunner)
 
     def writeToFile(item: String): Unit = writeToFile(Seq(item))

@@ -23,7 +23,9 @@ import java.io.{BufferedReader, File, FileReader}
 import cats.effect.IO._
 import cats.effect._
 import cats.implicits._
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.triplesgenerator.eventprocessing.{EventProcessor, EventProcessorRunner}
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -31,7 +33,8 @@ import scala.util.control.NonFatal
 
 class FileEventProcessorRunner(
     eventProcessor: EventProcessor[IO],
-    configProvider: LogFileConfigProvider[IO] = new LogFileConfigProvider[IO]()
+    configProvider: LogFileConfigProvider[IO] = new LogFileConfigProvider[IO](),
+    logger:         Logger[IO] = ApplicationLogger
 )(
     implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext
@@ -44,7 +47,7 @@ class FileEventProcessorRunner(
   lazy val run: IO[Unit] =
     for {
       file <- validateFile
-      _    <- fileReader(file).bracket(checkForNewLine)(closeReader)
+      _    <- fileReader(file).bracket(startProcessingLines)(closeReader)
     } yield ()
 
   private lazy val validateFile: IO[File] =
@@ -53,10 +56,18 @@ class FileEventProcessorRunner(
   private def fileReader(file: File): IO[BufferedReader] =
     contextShift.shift *> IO(new BufferedReader(new FileReader(file)))
 
+  private def startProcessingLines(reader: BufferedReader): IO[Unit] =
+    for {
+      _ <- logger.info("Listening for new events")
+      _ <- checkForNewLine(reader)
+    } yield ()
+
   private def checkForNewLine(reader: BufferedReader): IO[Unit] =
-    IO(Option(reader.readLine()))
-      .flatMap(sleepOrProcessLine)
-      .flatMap(_ => checkForNewLine(reader))
+    for {
+      maybeLine <- IO(Option(reader.readLine()))
+      _         <- sleepOrProcessLine(maybeLine)
+      _         <- checkForNewLine(reader)
+    } yield ()
 
   private lazy val sleepOrProcessLine: Option[String] => IO[Unit] = {
     case None => IO.sleep(interval)
