@@ -71,12 +71,16 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.raiseError(exception))
 
+      (httpServer.run _)
+        .expects()
+        .returning(IO.pure(ExitCode.Success))
+
       intercept[Exception] {
         microserviceRunner.run(Nil).unsafeRunSync()
       } shouldBe exception
     }
 
-    "fail if starting Http Server fails" in new TestCase {
+    "return Success ExitCode regardless of Http Server start-up" in new TestCase {
       (datasetInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -90,9 +94,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.raiseError(exception))
 
-      intercept[Exception] {
-        microserviceRunner.run(Nil).unsafeRunSync()
-      } shouldBe exception
+      microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
     }
   }
 

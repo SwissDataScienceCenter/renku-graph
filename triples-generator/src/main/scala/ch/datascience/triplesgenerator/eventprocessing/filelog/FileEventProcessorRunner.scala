@@ -46,7 +46,7 @@ class FileEventProcessorRunner(
 
   lazy val run: IO[Unit] =
     for {
-      file <- validateFile
+      file <- contextShift.shift *> validateFile
       _    <- fileReader(file).bracket(startProcessingLines)(closeReader)
     } yield ()
 
@@ -54,7 +54,7 @@ class FileEventProcessorRunner(
     configProvider.get.map(_.toFile)
 
   private def fileReader(file: File): IO[BufferedReader] =
-    contextShift.shift *> IO(new BufferedReader(new FileReader(file)))
+    IO(new BufferedReader(new FileReader(file)))
 
   private def startProcessingLines(reader: BufferedReader): IO[Unit] =
     for {

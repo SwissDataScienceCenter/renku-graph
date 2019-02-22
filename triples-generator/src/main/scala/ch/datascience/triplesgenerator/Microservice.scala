@@ -18,10 +18,10 @@
 
 package ch.datascience.triplesgenerator
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect._
 import ch.datascience.http.server.PingEndpoint
-import ch.datascience.triplesgenerator.eventprocessing.filelog.FileEventProcessorRunner
 import ch.datascience.triplesgenerator.eventprocessing._
+import ch.datascience.triplesgenerator.eventprocessing.filelog.FileEventProcessorRunner
 import ch.datascience.triplesgenerator.init.{FusekiDatasetInitializer, IOFusekiDatasetInitializer}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
@@ -45,12 +45,13 @@ private class MicroserviceRunner(
     datasetInitializer:   FusekiDatasetInitializer[IO],
     eventProcessorRunner: EventProcessorRunner[IO],
     httpServer:           HttpServer[IO]
-) {
+)(implicit contextShift:  ContextShift[IO]) {
+
+  import cats.implicits._
 
   def run(args: List[String]): IO[ExitCode] =
     for {
       _ <- datasetInitializer.run
-      _ <- eventProcessorRunner.run
-      _ <- httpServer.run
+      _ <- List(httpServer.run.start, eventProcessorRunner.run).sequence
     } yield ExitCode.Success
 }
