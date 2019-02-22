@@ -36,6 +36,12 @@ abstract class IORestClient(
   protected def validateUri(uri: String): IO[Uri] =
     IO.fromEither(Uri.fromString(uri))
 
+  protected def request(method: Method, uri: Uri): Request[IO] =
+    Request[IO](
+      method = method,
+      uri    = uri
+    )
+
   protected def request(method: Method, uri: Uri, accessToken: AccessToken): Request[IO] =
     Request[IO](
       method  = method,

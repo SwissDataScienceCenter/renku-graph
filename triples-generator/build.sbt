@@ -24,10 +24,6 @@ libraryDependencies += "ch.datascience" %% "renku-commons"  % "0.2.0"
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
 libraryDependencies += "com.lihaoyi"    %% "ammonite-ops"   % "1.4.2"
 
-val circeVersion = "0.10.0"
-libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
-libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
-
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % "3.9.0"
 libraryDependencies += "org.typelevel"   %% "cats-core"         % "1.4.0"
 

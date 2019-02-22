@@ -23,9 +23,11 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.generators.CommonsTypesGenerators._
 import ch.datascience.tinytypes.Sensitive
+import io.circe.DecodingFailure
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
+import io.circe.literal._
 
 class AccessTokenSpec extends WordSpec with PropertyChecks {
 
@@ -64,6 +66,24 @@ class AccessTokenSpec extends WordSpec with PropertyChecks {
       val Left(exception) = OAuthAccessToken.from(" ")
 
       exception shouldBe an[IllegalArgumentException]
+    }
+  }
+
+  "accessTokenDecoder" should {
+
+    "decode OAuthAccessToken from json" in {
+      val accessToken = oauthAccessTokens.generateOne
+      json"""{"oauthAccessToken": ${accessToken.value}}""".as[AccessToken] shouldBe Right(accessToken)
+    }
+
+    "decode PersonalAccessToken from json" in {
+      val accessToken = personalAccessTokens.generateOne
+      json"""{"personalAccessToken": ${accessToken.value}}""".as[AccessToken] shouldBe Right(accessToken)
+    }
+
+    "fail for a invalid access token json" in {
+      val Left(failure) = json"""{"someToken": "value"}""".as[AccessToken]
+      failure shouldBe DecodingFailure("Access token cannot be deserialized", Nil)
     }
   }
 }

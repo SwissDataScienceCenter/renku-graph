@@ -18,8 +18,10 @@
 
 package ch.datascience.http.client
 
+import cats.implicits._
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{Sensitive, TinyType, TinyTypeFactory}
+import io.circe.{Decoder, DecodingFailure, HCursor}
 
 sealed trait AccessToken extends Any with TinyType[String] with Sensitive
 
@@ -32,4 +34,23 @@ object AccessToken {
 
   final class OAuthAccessToken private (val value: String) extends AnyVal with AccessToken
   object OAuthAccessToken extends TinyTypeFactory[String, OAuthAccessToken](new OAuthAccessToken(_)) with NonBlank
+
+  implicit val accessTokenDecoder: Decoder[AccessToken] = (cursor: HCursor) => {
+    for {
+      maybeOauth    <- cursor.downField("oauthAccessToken").as[Option[String]].flatMap(to(OAuthAccessToken.from))
+      maybePersonal <- cursor.downField("personalAccessToken").as[Option[String]].flatMap(to(PersonalAccessToken.from))
+      token <- Either.fromOption(maybeOauth orElse maybePersonal,
+                                 ifNone = DecodingFailure("Access token cannot be deserialized", Nil))
+    } yield token
+  }
+
+  private def to[T <: AccessToken](
+      from: String => Either[IllegalArgumentException, T]
+  ): Option[String] => DecodingFailure Either Option[AccessToken] = {
+    case None => Right(None)
+    case Some(token) =>
+      from(token)
+        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+        .map(Option.apply)
+  }
 }
