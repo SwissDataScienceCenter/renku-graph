@@ -34,6 +34,12 @@ object ServiceUrl extends TinyTypeFactory[URL, ServiceUrl](new ServiceUrl(_)) {
 
   def apply(url: String): ServiceUrl = ServiceUrl(new URL(url))
 
+  final def from(value: String): Either[IllegalArgumentException, ServiceUrl] =
+    Either
+      .fromTry(Try(new URL(value)))
+      .map(ServiceUrl(_))
+      .leftMap(exception => new IllegalArgumentException(s"Cannot instantiate $typeName", exception))
+
   implicit class ServiceUrlOps(serviceUrl: ServiceUrl) {
     def /(value: Any): ServiceUrl = ServiceUrl(
       new URL(s"$serviceUrl/$value")

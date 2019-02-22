@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import io.circe._
@@ -40,7 +40,7 @@ class CommitEventsDeserialiserSpec extends WordSpec {
         NonEmptyList.of(
           CommitWithoutParent(
             commitId,
-            projectPath
+            Project(projectId, projectPath)
           )
         )
       )
@@ -55,7 +55,7 @@ class CommitEventsDeserialiserSpec extends WordSpec {
             CommitWithParent(
               commitId,
               parentCommitId,
-              projectPath
+              Project(projectId, projectPath)
             )
           }
         )
@@ -80,6 +80,7 @@ class CommitEventsDeserialiserSpec extends WordSpec {
     val context = MonadError[Try, Throwable]
 
     val commitId    = commitIds.generateOne
+    val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
     val deserialiser = new CommitEventsDeserialiser[Try]
@@ -90,6 +91,7 @@ class CommitEventsDeserialiserSpec extends WordSpec {
           "id"      -> Json.fromString(commitId.value),
           "parents" -> Json.arr(parents.map(_.value).map(Json.fromString): _*),
           "project" -> Json.obj(
+            "id"   -> Json.fromInt(projectId.value),
             "path" -> Json.fromString(projectPath.value)
           )
         )

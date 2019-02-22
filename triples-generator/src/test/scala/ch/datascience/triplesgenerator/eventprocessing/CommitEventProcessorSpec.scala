@@ -21,10 +21,12 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
+import ch.datascience.generators.CommonsTypesGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.{CommitId, Project, ProjectId}
+import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
@@ -48,17 +50,24 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(eventJson)
         .returning(context.pure(commits))
 
-      commits map succeedTriplesAndUploading
+      val maybeAccessToken = None
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(commits.head.project.id)
+        .returning(context.pure(maybeAccessToken))
+
+      commits map succeedTriplesAndUploading(maybeAccessToken)
 
       eventProcessor(eventJson) shouldBe context.unit
 
+      logNoAccessTokenMessage(commits.head)
       commits.toList foreach logSuccess
     }
 
     "succeed if a commit event in Json can be deserialised, turn into triples and all stored in Jena successfully " +
       "even if some failed in different stages" in new TestCase {
 
-      val commits                                         = commitsLists(Gen.const(4)).generateOne
+      val commits                                         = commitsLists(size = Gen.const(4)).generateOne
       val commit1 +: commit2 +: commit3 +: commit4 +: Nil = commits.toList
 
       (eventsDeserialiser
@@ -66,33 +75,62 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(eventJson)
         .returning(context.pure(commits))
 
-      succeedTriplesAndUploading(commit1)
+      val maybeAccessToken = None
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(commits.head.project.id)
+        .returning(context.pure(maybeAccessToken))
+
+      succeedTriplesAndUploading(maybeAccessToken)(commit1)
 
       val exception2 = exceptions.generateOne
       (triplesFinder
-        .generateTriples(_: Commit))
-        .expects(commit2)
+        .generateTriples(_: Commit, _: Option[AccessToken]))
+        .expects(commit2, maybeAccessToken)
         .returning(context.raiseError(exception2))
 
       val triples3   = rdfTriplesSets.generateOne
       val exception3 = exceptions.generateOne
       (triplesFinder
-        .generateTriples(_: Commit))
-        .expects(commit3)
+        .generateTriples(_: Commit, _: Option[AccessToken]))
+        .expects(commit3, maybeAccessToken)
         .returning(context.pure(triples3))
       (fusekiConnector
         .upload(_: RDFTriples))
         .expects(triples3)
         .returning(context.raiseError(exception3))
 
-      succeedTriplesAndUploading(commit4)
+      succeedTriplesAndUploading(maybeAccessToken)(commit4)
 
       eventProcessor(eventJson) shouldBe context.unit
 
+      logNoAccessTokenMessage(commit1)
       logSuccess(commit1)
       logError(commit2, exception2)
       logError(commit3, exception3)
       logSuccess(commit4)
+    }
+
+    "succeed and do not log token not found message if an access token was found" in new TestCase {
+
+      val commits = commitsLists().generateOne
+      (eventsDeserialiser
+        .deserialiseToCommitEvents(_: String))
+        .expects(eventJson)
+        .returning(context.pure(commits))
+
+      val maybeAccessToken = Some(accessTokens.generateOne)
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(commits.head.project.id)
+        .returning(context.pure(maybeAccessToken))
+
+      commits map succeedTriplesAndUploading(maybeAccessToken)
+
+      eventProcessor(eventJson) shouldBe context.unit
+
+      notLogAccessTokenMessage(commits.head)
+      commits.toList foreach logSuccess
     }
 
     "succeed but log an error if CommitEvent deserialization fails" in new TestCase {
@@ -107,6 +145,25 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(Error("Commit Event deserialisation failed", exception))
     }
+
+    "succeed but log an error if finding an access token fails" in new TestCase {
+
+      val commits = commitsLists(size = Gen.const(1)).generateOne
+      (eventsDeserialiser
+        .deserialiseToCommitEvents(_: String))
+        .expects(eventJson)
+        .returning(context.pure(commits))
+
+      val exception = exceptions.generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(commits.head.project.id)
+        .returning(context.raiseError(exception))
+
+      eventProcessor(eventJson) shouldBe context.unit
+
+      logger.loggedOnly(Error("Commit Event deserialisation failed", exception))
+    }
   }
 
   private trait TestCase {
@@ -115,21 +172,23 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     val eventJson = nonEmptyStrings().generateOne
 
     val eventsDeserialiser = mock[TryCommitEventsDeserialiser]
+    val accessTokenFinder  = mock[TryAccessTokenFinder]
     val triplesFinder      = mock[TryTriplesFinder]
     val fusekiConnector    = mock[TryFusekiConnector]
     val logger             = TestLogger[Try]()
     val eventProcessor = new CommitEventProcessor[Try](
       eventsDeserialiser,
+      accessTokenFinder,
       triplesFinder,
       fusekiConnector,
       logger
     )
 
-    def succeedTriplesAndUploading(commit: Commit): Unit = {
+    def succeedTriplesAndUploading(maybeAccessToken: Option[AccessToken])(commit: Commit): Unit = {
       val triples = rdfTriplesSets.generateOne
       (triplesFinder
-        .generateTriples(_: Commit))
-        .expects(commit)
+        .generateTriples(_: Commit, _: Option[AccessToken]))
+        .expects(commit, maybeAccessToken)
         .returning(context.pure(triples))
 
       (fusekiConnector
@@ -138,35 +197,40 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .returning(context.unit)
     }
 
-    val logSuccess: Commit => Unit = {
-      case CommitWithoutParent(id, projectPath) =>
-        logger.logged(Info(s"Commit Event id: $id, project: $projectPath processed"))
-      case CommitWithParent(id, parentId, projectPath) =>
-        logger.logged(Info(s"Commit Event id: $id, project: $projectPath, parentId: $parentId processed"))
-    }
+    def logNoAccessTokenMessage(commit: Commit): Unit =
+      logger.logged(Info(s"${commonLogMessage(commit)} no access token found so assuming public project"))
 
-    def logError(commit: Commit, exception: Exception): Unit = commit match {
-      case CommitWithoutParent(id, projectPath) =>
-        logger.logged(Error(s"Commit Event id: $id, project: $projectPath failed", exception))
-      case CommitWithParent(id, parentId, projectPath) =>
-        logger.logged(Error(s"Commit Event id: $id, project: $projectPath, parentId: $parentId failed", exception))
+    def notLogAccessTokenMessage(commit: Commit): Unit =
+      logger.notLogged(Info(s"${commonLogMessage(commit)} no access token found so assuming public project"))
+
+    def logSuccess(commit: Commit): Unit =
+      logger.logged(Info(s"${commonLogMessage(commit)} processed"))
+
+    def logError(commit: Commit, exception: Exception): Unit =
+      logger.logged(Error(s"${commonLogMessage(commit)} failed", exception))
+
+    def commonLogMessage: Commit => String = {
+      case CommitWithoutParent(id, project) =>
+        s"Commit Event id: $id, project: ${project.id} ${project.path}"
+      case CommitWithParent(id, parentId, project) =>
+        s"Commit Event id: $id, project: ${project.id} ${project.path}, parentId: $parentId"
     }
   }
 
-  private def commits(commitId: CommitId, projectPath: ProjectPath): Gen[Commit] =
+  private def commits(commitId: CommitId, project: Project): Gen[Commit] =
     for {
       maybeParentId <- Gen.option(commitIds)
     } yield
       maybeParentId match {
-        case None           => CommitWithoutParent(commitId, projectPath)
-        case Some(parentId) => CommitWithParent(commitId, parentId, projectPath)
+        case None           => CommitWithoutParent(commitId, project)
+        case Some(parentId) => CommitWithParent(commitId, parentId, project)
       }
 
-  private def commitsLists(sizeGen: Gen[Int] = positiveInts(max = 5)): Gen[NonEmptyList[Commit]] =
+  private def commitsLists(size: Gen[Int] = positiveInts(max = 5)): Gen[NonEmptyList[Commit]] =
     for {
-      commitId    <- commitIds
-      projectPath <- projectPaths
-      size        <- sizeGen
-      commits     <- Gen.listOfN(size, commits(commitId, projectPath))
+      commitId <- commitIds
+      project  <- projects
+      size     <- size
+      commits  <- Gen.listOfN(size, commits(commitId, project))
     } yield NonEmptyList.fromListUnsafe(commits)
 }

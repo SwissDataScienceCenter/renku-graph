@@ -37,6 +37,9 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
   def logged(expected: LogEntry): Unit =
     invocations should contain(expected)
 
+  def notLogged(expected: LogEntry): Unit =
+    invocations should not contain expected
+
   def loggedOnly(expected: LogEntry*): Unit =
     loggedOnly(expected.toList)
 

@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events._
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}
@@ -41,13 +41,17 @@ private class CommitEventsDeserialiser[Interpretation[_]](
   private implicit val commitsDecoder: Decoder[NonEmptyList[Commit]] = (cursor: HCursor) =>
     for {
       commitId      <- cursor.downField("id").as[CommitId]
+      projectId     <- cursor.downField("project").downField("id").as[ProjectId]
       projectPath   <- cursor.downField("project").downField("path").as[ProjectPath]
       parentCommits <- cursor.downField("parents").as[List[CommitId]]
-    } yield
+    } yield {
+      val project = Project(projectId, projectPath)
       parentCommits match {
-        case Nil       => NonEmptyList.one(CommitWithoutParent(commitId, projectPath))
-        case parentIds => NonEmptyList.fromListUnsafe(parentIds map (CommitWithParent(commitId, _, projectPath)))
-    }
+        case Nil => NonEmptyList.one(CommitWithoutParent(commitId, project))
+        case parentIds =>
+          NonEmptyList.fromListUnsafe(parentIds map (CommitWithParent(commitId, _, project)))
+      }
+  }
 
   private def toMeaningfulError(json: String): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"CommitEvent cannot be deserialised: '$json'")

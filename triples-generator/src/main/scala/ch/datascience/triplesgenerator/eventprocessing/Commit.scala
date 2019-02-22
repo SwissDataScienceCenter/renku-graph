@@ -17,23 +17,23 @@
  */
 
 package ch.datascience.triplesgenerator.eventprocessing
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.{CommitId, Project}
 
 private sealed trait Commit extends Product with Serializable {
-  val id:          CommitId
-  val projectPath: ProjectPath
+  val id:      CommitId
+  val project: Project
 }
 
 private object Commit {
 
   final case class CommitWithParent(
-      id:          CommitId,
-      parentId:    CommitId,
-      projectPath: ProjectPath
+      id:       CommitId,
+      parentId: CommitId,
+      project:  Project
   ) extends Commit
 
   final case class CommitWithoutParent(
-      id:          CommitId,
-      projectPath: ProjectPath
+      id:      CommitId,
+      project: Project
   ) extends Commit
 }

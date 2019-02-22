@@ -20,12 +20,19 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.triplesgenerator.eventprocessing.Commands.GitLabRepoUrlFinder
 
 import scala.util.Try
 
-private class TryCommitEventsDeserialiser extends CommitEventsDeserialiser[Try]
-private abstract class TryTriplesFinder   extends TriplesFinder[Try]
-private abstract class TryFusekiConnector extends FusekiConnector[Try]
+private class TryCommitEventsDeserialiser   extends CommitEventsDeserialiser[Try]
+private abstract class TryAccessTokenFinder extends AccessTokenFinder[Try]
+private abstract class TryTriplesFinder     extends TriplesFinder[Try]
+private abstract class TryFusekiConnector   extends FusekiConnector[Try]
+private abstract class TryGitLabUrlProvider extends GitLabUrlProvider[Try]
+
+private class IOGitLabRepoUrlFinder(
+    gitLabUrlProvider: GitLabUrlProvider[IO]
+) extends GitLabRepoUrlFinder[IO](gitLabUrlProvider)
 
 abstract class IOEventProcessorRunner(
     eventProcessor: EventProcessor[IO]

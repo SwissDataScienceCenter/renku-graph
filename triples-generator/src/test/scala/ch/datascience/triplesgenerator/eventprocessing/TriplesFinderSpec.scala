@@ -23,10 +23,12 @@ import java.io.InputStream
 import ammonite.ops.{CommandResult, root}
 import cats.effect.{ContextShift, IO}
 import ch.datascience.config.ServiceUrl
+import ch.datascience.generators.CommonsTypesGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.{CommitId, Project, ProjectPath}
+import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.scalacheck.Gen
@@ -53,9 +55,10 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
-      (gitLabUrlProvider.get _)
-        .expects()
-        .returning(IO.pure(gitLabUrl))
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -82,7 +85,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync() shouldBe rdfTriples
+      triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync() shouldBe rdfTriples
     }
 
     "create a temp directory, " +
@@ -97,9 +100,10 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
-      (gitLabUrlProvider.get _)
-        .expects()
-        .returning(IO.pure(gitLabUrl))
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -127,7 +131,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesFinder.generateTriples(commitWithParent).unsafeRunSync() shouldBe rdfTriples
+      triplesFinder.generateTriples(commitWithParent, maybeAccessToken).unsafeRunSync() shouldBe rdfTriples
     }
 
     "fail if temp directory creation fails" in new TestCase {
@@ -139,21 +143,23 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .returning(IO.raiseError(exception))
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
     }
 
     "fail finding GitLabUrl fails" in new TestCase {
+
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
       val exception = exceptions.generateOne
-      (gitLabUrlProvider.get _)
-        .expects()
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
         .returning(IO.raiseError(exception))
 
       (file
@@ -163,7 +169,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -176,9 +182,10 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
-      (gitLabUrlProvider.get _)
-        .expects()
-        .returning(IO.pure(gitLabUrl))
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
 
       val exception = exceptions.generateOne
       (git
@@ -193,7 +200,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -206,9 +213,10 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
-      (gitLabUrlProvider.get _)
-        .expects()
-        .returning(IO.pure(gitLabUrl))
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -228,7 +236,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -241,9 +249,10 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
-      (gitLabUrlProvider.get _)
-        .expects()
-        .returning(IO.pure(gitLabUrl))
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -268,7 +277,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -281,9 +290,10 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
-      (gitLabUrlProvider.get _)
-        .expects()
-        .returning(IO.pure(gitLabUrl))
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -312,7 +322,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -325,9 +335,10 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
-      (gitLabUrlProvider.get _)
-        .expects()
-        .returning(IO.pure(gitLabUrl))
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
 
       (git
         .cloneRepo(_: ServiceUrl, _: Path, _: Path))
@@ -356,7 +367,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent).unsafeRunSync()
+        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -368,18 +379,18 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val successfulCommandResult = CommandResult(exitCode = 0, chunks = Nil)
 
-    val gitLabUrl:        ServiceUrl  = serviceUrls.generateOne
-    val repositoryName:   String      = nonEmptyStrings().generateOne
-    val projectPath:      ProjectPath = ProjectPath(s"user/$repositoryName")
-    val gitRepositoryUrl: ServiceUrl  = gitLabUrl / s"$projectPath.git"
+    val repositoryName   = nonEmptyStrings().generateOne
+    val projectPath      = ProjectPath(s"user/$repositoryName")
+    val maybeAccessToken = Gen.option(accessTokens).generateOne
+    val gitRepositoryUrl = serviceUrls.generateOne / s"$projectPath.git"
     val commitWithoutParent @ CommitWithoutParent(commitId, _) =
-      CommitWithoutParent(commitIds.generateOne, projectPath)
+      CommitWithoutParent(commitIds.generateOne, Project(projectIds.generateOne, projectPath))
 
     def toCommitWithParent(commitWithoutParent: CommitWithoutParent): CommitWithParent =
       CommitWithParent(
         commitWithoutParent.id,
         commitIds.generateOne,
-        commitWithoutParent.projectPath
+        commitWithoutParent.project
       )
 
     val pathDifferentiator: Int = Gen.choose(1, 100).generateOne
@@ -390,14 +401,14 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     val rdfTriples:          RDFTriples  = rdfTriplesSets.generateOne
 
     class IOGitLabUrlProvider extends GitLabUrlProvider[IO]
-    val gitLabUrlProvider = mock[IOGitLabUrlProvider]
-    val file              = mock[Commands.File]
-    val git               = mock[Commands.Git]
-    val renku             = mock[Commands.Renku]
-    val randomLong        = mockFunction[Long]
-    val toRdfTriples      = mockFunction[InputStream, IO[RDFTriples]]
+    val gitLabRepoUrlFinder = mock[IOGitLabRepoUrlFinder]
+    val file                = mock[Commands.File]
+    val git                 = mock[Commands.Git]
+    val renku               = mock[Commands.Renku]
+    val randomLong          = mockFunction[Long]
+    val toRdfTriples        = mockFunction[InputStream, IO[RDFTriples]]
     randomLong.expects().returning(pathDifferentiator)
 
-    val triplesFinder = new IOTriplesFinder(gitLabUrlProvider, file, git, renku, toRdfTriples, randomLong)
+    val triplesFinder = new IOTriplesFinder(gitLabRepoUrlFinder, file, git, renku, toRdfTriples, randomLong)
   }
 }

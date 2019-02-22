@@ -21,10 +21,14 @@ package ch.datascience.triplesgenerator.eventprocessing
 import java.io._
 import java.security.SecureRandom
 
+import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.config.ServiceUrl
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.triplesgenerator.eventprocessing.Commands.GitLabRepoUrlFinder
 import ch.datascience.triplesgenerator.eventprocessing.Commit._
 import org.apache.jena.rdf.model.ModelFactory
 
@@ -32,14 +36,14 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private abstract class TriplesFinder[Interpretation[_]] {
-  def generateTriples(commit: Commit): Interpretation[RDFTriples]
+  def generateTriples(commit: Commit, maybeAccessToken: Option[AccessToken]): Interpretation[RDFTriples]
 }
 
 private class IOTriplesFinder(
-    gitLabUrlProvider: GitLabUrlProvider[IO],
-    file:              Commands.File = new Commands.File,
-    git:               Commands.Git = new Commands.Git,
-    renku:             Commands.Renku = new Commands.Renku,
+    gitRepoUrlFinder: GitLabRepoUrlFinder[IO],
+    file:             Commands.File = new Commands.File,
+    git:              Commands.Git = new Commands.Git,
+    renku:            Commands.Renku = new Commands.Renku,
     toRdfTriples: InputStream => IO[RDFTriples] = inputStream =>
       IO(RDFTriples(ModelFactory.createDefaultModel.read(inputStream, ""))),
     randomLong:          () => Long = new SecureRandom().nextLong _
@@ -48,19 +52,20 @@ private class IOTriplesFinder(
 
   import ammonite.ops.{Path, root}
   import file._
+  import gitRepoUrlFinder._
 
   private val workDirectory: Path = root / "tmp"
   private val repositoryDirectoryFinder = ".*/(.*)$".r
 
-  def generateTriples(commit: Commit): IO[RDFTriples] =
-    createRepositoryDirectory(commit.projectPath)
+  def generateTriples(commit: Commit, maybeAccessToken: Option[AccessToken]): IO[RDFTriples] =
+    createRepositoryDirectory(commit.project.path)
       .bracket { repositoryDirectory =>
         for {
-          gitLabUrl     <- gitLabUrlProvider.get
-          _             <- git cloneRepo (gitRepositoryUrl(gitLabUrl, commit.projectPath), repositoryDirectory, workDirectory)
-          _             <- git checkout (commit.id, repositoryDirectory)
-          triplesStream <- findTriplesStream(commit, repositoryDirectory)
-          rdfTriples    <- toRdfTriples(triplesStream)
+          gitRepositoryUrl <- findRepositoryUrl(commit.project.path, maybeAccessToken)
+          _                <- git cloneRepo (gitRepositoryUrl, repositoryDirectory, workDirectory)
+          _                <- git checkout (commit.id, repositoryDirectory)
+          triplesStream    <- findTriplesStream(commit, repositoryDirectory)
+          rdfTriples       <- toRdfTriples(triplesStream)
         } yield rdfTriples
       }(repositoryDirectory => delete(repositoryDirectory))
       .recoverWith(meaningfulError)
@@ -74,9 +79,6 @@ private class IOTriplesFinder(
   private def repositoryNameFrom(projectPath: ProjectPath): String = projectPath.value match {
     case repositoryDirectoryFinder(folderName) => folderName
   }
-
-  private def gitRepositoryUrl(gitLabUrl: ServiceUrl, projectPath: ProjectPath) =
-    gitLabUrl / s"$projectPath.git"
 
   private def findTriplesStream(commit: Commit, repositoryDirectory: Path): IO[InputStream] = {
     import renku._
@@ -94,6 +96,36 @@ private class IOTriplesFinder(
 }
 
 private object Commands {
+
+  class GitLabRepoUrlFinder[Interpretation[_]](
+      gitLabUrlProvider: GitLabUrlProvider[Interpretation]
+  )(implicit ME:         MonadError[Interpretation, Throwable]) {
+
+    import cats.implicits._
+
+    def findRepositoryUrl(projectPath: ProjectPath, maybeAccessToken: Option[AccessToken]): Interpretation[ServiceUrl] =
+      for {
+        gitLabUrl <- gitLabUrlProvider.get
+        urlTokenPart = findUrlTokenPart(maybeAccessToken)
+        finalUrl <- merge(gitLabUrl, urlTokenPart, projectPath)
+      } yield finalUrl
+
+    private lazy val findUrlTokenPart: Option[AccessToken] => String = {
+      case None                             => ""
+      case Some(PersonalAccessToken(token)) => s"gitlab-ci-token:$token@"
+      case Some(OAuthAccessToken(token))    => s"oauth2:$token@"
+    }
+
+    private def merge(serviceUrl:   ServiceUrl,
+                      urlTokenPart: String,
+                      projectPath:  ProjectPath): Interpretation[ServiceUrl] = ME.fromEither {
+      ServiceUrl.from {
+        val url              = serviceUrl.value
+        val serviceWithToken = url.toString.replace(s"${url.getProtocol}//:", s"${url.getProtocol}//:$urlTokenPart")
+        s"$serviceWithToken/$projectPath.git"
+      }
+    }
+  }
 
   import ammonite.ops
   import ammonite.ops._
