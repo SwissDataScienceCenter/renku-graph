@@ -24,7 +24,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.generators.CommonsTypesGenerators._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger

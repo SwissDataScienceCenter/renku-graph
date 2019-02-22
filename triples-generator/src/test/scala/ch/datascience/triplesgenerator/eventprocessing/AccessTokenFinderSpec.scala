@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.config.ServiceUrl
-import ch.datascience.generators.CommonsTypesGenerators._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing

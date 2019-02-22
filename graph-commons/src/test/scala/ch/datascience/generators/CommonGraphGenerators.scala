@@ -23,7 +23,7 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.http.client.{AccessToken, BasicAuthPassword, BasicAuthUsername}
 import org.scalacheck.Gen
 
-object CommonsTypesGenerators {
+object CommonGraphGenerators {
 
   implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
     length <- Gen.choose(5, 40)

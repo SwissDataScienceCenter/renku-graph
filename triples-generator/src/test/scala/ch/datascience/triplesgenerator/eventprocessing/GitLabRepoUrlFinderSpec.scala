@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ServiceUrl
-import ch.datascience.generators.CommonsTypesGenerators._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._

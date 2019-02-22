@@ -23,7 +23,7 @@ import java.io.InputStream
 import ammonite.ops.{CommandResult, root}
 import cats.effect.{ContextShift, IO}
 import ch.datascience.config.ServiceUrl
-import ch.datascience.generators.CommonsTypesGenerators._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
