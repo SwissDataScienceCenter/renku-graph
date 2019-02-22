@@ -21,10 +21,9 @@ package ch.datascience.webhookservice.project
 import cats.effect.IO
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.project.ProjectVisibility
 import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.model.{ProjectInfo, ProjectOwner}
+import ch.datascience.webhookservice.model.{ProjectInfo, ProjectOwner, ProjectVisibility}
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext

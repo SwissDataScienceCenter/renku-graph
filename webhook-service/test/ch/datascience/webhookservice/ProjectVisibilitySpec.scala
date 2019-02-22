@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.project
+package ch.datascience.webhookservice
 
 import io.circe.{DecodingFailure, Json}
+import model._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 

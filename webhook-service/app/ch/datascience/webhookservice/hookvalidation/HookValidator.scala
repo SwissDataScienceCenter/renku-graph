@@ -42,7 +42,7 @@ class HookValidator[Interpretation[_]](
 )(implicit ME:            MonadError[Interpretation, Throwable]) {
 
   import HookValidator.HookValidationResult._
-  import ch.datascience.graph.model.project.ProjectVisibility._
+  import ch.datascience.webhookservice.model.ProjectVisibility._
   import projectHookUrlFinder._
   import projectHookVerifier._
   import projectInfoFinder._

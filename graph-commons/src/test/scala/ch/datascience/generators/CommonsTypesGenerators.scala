@@ -19,7 +19,6 @@
 package ch.datascience.generators
 
 import ch.datascience.generators.Generators.nonEmptyStrings
-import ch.datascience.graph.model.project.ProjectVisibility
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.{AccessToken, BasicAuthPassword, BasicAuthUsername}
 import org.scalacheck.Gen
@@ -43,6 +42,4 @@ object CommonsTypesGenerators {
 
   implicit val basicAuthUsernames: Gen[BasicAuthUsername] = nonEmptyStrings() map BasicAuthUsername.apply
   implicit val basicAuthPasswords: Gen[BasicAuthPassword] = nonEmptyStrings() map BasicAuthPassword.apply
-
-  implicit val projectVisibilities: Gen[ProjectVisibility] = Gen.oneOf(ProjectVisibility.all.toList)
 }
