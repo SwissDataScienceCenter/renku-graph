@@ -20,8 +20,8 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokens
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._

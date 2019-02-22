@@ -21,9 +21,9 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.GraphCommonsGenerators.{accessTokens, oauthAccessTokens, personalAccessTokens}
-import ch.datascience.graph.events.{CommitId, ProjectId, UserId}
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.GraphCommonsGenerators.{accessTokens, oauthAccessTokens, personalAccessTokens}
+import ch.datascience.graph.model.events.{CommitId, ProjectId, UserId}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.GitLabConfig.HostUrl

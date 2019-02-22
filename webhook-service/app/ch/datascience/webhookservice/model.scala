@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice
 
-import ch.datascience.graph.events.{ProjectId, ProjectPath, UserId}
+import ch.datascience.graph.model.events.{ProjectId, ProjectPath, UserId}
 import ch.datascience.graph.model.project.ProjectVisibility
 
 object model {

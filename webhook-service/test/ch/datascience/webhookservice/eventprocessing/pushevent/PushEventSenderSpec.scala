@@ -22,8 +22,8 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events._
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.eventprocessing.PushEvent

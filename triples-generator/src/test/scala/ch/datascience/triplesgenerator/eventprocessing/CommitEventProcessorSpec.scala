@@ -23,8 +23,8 @@ import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}

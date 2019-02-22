@@ -24,7 +24,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository._
 import io.chrisdavenport.log4cats.Logger

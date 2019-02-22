@@ -17,7 +17,7 @@
  */
 
 package ch.datascience.triplesgenerator.eventprocessing
-import ch.datascience.graph.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 
 private sealed trait Commit extends Product with Serializable {
   val id:          CommitId

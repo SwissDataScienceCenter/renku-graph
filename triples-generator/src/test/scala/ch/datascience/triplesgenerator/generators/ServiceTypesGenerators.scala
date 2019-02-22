@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.generators
 
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.GraphCommonsGenerators._
+import ch.datascience.graph.model.events.GraphCommonsGenerators._
 import ch.datascience.triplesgenerator.config.DatasetType.{Mem, TDB}
 import ch.datascience.triplesgenerator.config._
 import ch.datascience.triplesgenerator.eventprocessing.RDFTriples

@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
-import ch.datascience.graph.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}

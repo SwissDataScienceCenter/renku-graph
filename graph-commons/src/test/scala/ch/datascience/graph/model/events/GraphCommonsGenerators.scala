@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.events
+package ch.datascience.graph.model.events
 
 import ch.datascience.http.client.{AccessToken, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}

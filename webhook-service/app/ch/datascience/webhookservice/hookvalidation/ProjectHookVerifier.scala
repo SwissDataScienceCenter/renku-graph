@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookvalidation
 import ProjectHookVerifier.HookIdentifier
 import cats.effect.IO
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl

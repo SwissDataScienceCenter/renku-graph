@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.events
+package ch.datascience.graph.model.events
 
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegative}
 import ch.datascience.tinytypes.json._

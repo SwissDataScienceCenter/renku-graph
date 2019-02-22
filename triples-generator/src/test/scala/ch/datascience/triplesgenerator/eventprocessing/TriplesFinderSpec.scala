@@ -25,8 +25,8 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.scalacheck.Gen

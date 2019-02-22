@@ -24,7 +24,7 @@ import java.security.SecureRandom
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.config.ServiceUrl
-import ch.datascience.graph.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.triplesgenerator.eventprocessing.Commit._
 import org.apache.jena.rdf.model.ModelFactory
 

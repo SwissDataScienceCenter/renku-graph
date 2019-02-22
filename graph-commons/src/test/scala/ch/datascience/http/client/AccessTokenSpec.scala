@@ -21,7 +21,7 @@ package ch.datascience.http.client
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.GraphCommonsGenerators._
+import ch.datascience.graph.model.events.GraphCommonsGenerators._
 import ch.datascience.tinytypes.Sensitive
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

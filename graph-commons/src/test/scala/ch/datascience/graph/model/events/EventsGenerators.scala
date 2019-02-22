@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.events
+package ch.datascience.graph.model.events
 
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen

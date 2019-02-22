@@ -18,7 +18,7 @@
 
 package ch.datascience.tokenrepository.repository
 
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.ProjectId
 
 import scala.util.Try
 

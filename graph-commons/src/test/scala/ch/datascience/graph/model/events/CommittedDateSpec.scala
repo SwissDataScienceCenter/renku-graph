@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.events
+package ch.datascience.graph.model.events
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset.ofHours
