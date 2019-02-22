@@ -16,14 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.graph.model.project
 
-import ch.datascience.webhookservice.model.ProjectVisibility
 import io.circe.{DecodingFailure, Json}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 class ProjectVisibilitySpec extends WordSpec {
+
+  "ProjectVisibility" should {
+
+    "define cases for 'private', 'public' and 'internal'" in {
+      ProjectVisibility.all.map(_.value) should contain only ("private", "public", "internal")
+    }
+  }
 
   "projectVisibilityDecoder" should {
 

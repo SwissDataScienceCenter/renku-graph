@@ -21,6 +21,7 @@ package ch.datascience.graph.events
 import ch.datascience.http.client.{AccessToken, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.graph.model.project.ProjectVisibility
 import org.scalacheck.Gen
 
 object GraphCommonsGenerators {
@@ -42,4 +43,6 @@ object GraphCommonsGenerators {
 
   implicit val basicAuthUsernames: Gen[BasicAuthUsername] = nonEmptyStrings() map BasicAuthUsername.apply
   implicit val basicAuthPasswords: Gen[BasicAuthPassword] = nonEmptyStrings() map BasicAuthPassword.apply
+
+  implicit val projectVisibilities: Gen[ProjectVisibility] = Gen.oneOf(ProjectVisibility.all.toList)
 }

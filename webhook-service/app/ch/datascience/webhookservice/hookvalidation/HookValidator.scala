@@ -22,8 +22,8 @@ import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.http.client.AccessToken
 import ch.datascience.graph.events.ProjectId
+import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.model.ProjectInfo
@@ -42,7 +42,7 @@ class HookValidator[Interpretation[_]](
 )(implicit ME:            MonadError[Interpretation, Throwable]) {
 
   import HookValidator.HookValidationResult._
-  import ch.datascience.webhookservice.model.ProjectVisibility._
+  import ch.datascience.graph.model.project.ProjectVisibility._
   import projectHookUrlFinder._
   import projectHookVerifier._
   import projectInfoFinder._
