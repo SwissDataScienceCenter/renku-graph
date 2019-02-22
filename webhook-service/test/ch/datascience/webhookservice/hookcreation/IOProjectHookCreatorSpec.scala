@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.GraphCommonsGenerators._
+import ch.datascience.generators.CommonsTypesGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.{GitLabConfig, IOGitLabConfigProvider}

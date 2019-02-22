@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.security
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.GraphCommonsGenerators._
+import ch.datascience.generators.CommonsTypesGenerators._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

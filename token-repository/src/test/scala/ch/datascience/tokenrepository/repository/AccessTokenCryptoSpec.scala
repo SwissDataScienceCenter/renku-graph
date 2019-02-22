@@ -23,7 +23,7 @@ import java.util.Base64
 import ch.datascience.http.client.AccessToken
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.GraphCommonsGenerators._
+import ch.datascience.generators.CommonsTypesGenerators._
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import eu.timepit.refined.api.RefType
 import org.scalatest.Matchers._

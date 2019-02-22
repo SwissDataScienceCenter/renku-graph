@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.GraphCommonsGenerators._
+import ch.datascience.generators.CommonsTypesGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.GitLabConfig.HostUrl

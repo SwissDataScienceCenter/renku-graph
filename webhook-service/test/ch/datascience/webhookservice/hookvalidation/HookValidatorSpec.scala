@@ -24,7 +24,7 @@ import cats.implicits._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.events.GraphCommonsGenerators._
+import ch.datascience.generators.CommonsTypesGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.model.project.ProjectVisibility
 import ch.datascience.interpreters.TestLogger

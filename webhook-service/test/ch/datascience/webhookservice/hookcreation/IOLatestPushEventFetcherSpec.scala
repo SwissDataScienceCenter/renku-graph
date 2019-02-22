@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.GraphCommonsGenerators.{accessTokens, oauthAccessTokens, personalAccessTokens}
+import ch.datascience.generators.CommonsTypesGenerators.{accessTokens, oauthAccessTokens, personalAccessTokens}
 import ch.datascience.graph.model.events.{CommitId, ProjectId, UserId}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.IOContextShift

@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.events
+package ch.datascience.generators
 
-import ch.datascience.http.client.{AccessToken, BasicAuthPassword, BasicAuthUsername}
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.project.ProjectVisibility
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.{AccessToken, BasicAuthPassword, BasicAuthUsername}
 import org.scalacheck.Gen
 
-object GraphCommonsGenerators {
+object CommonsTypesGenerators {
 
   implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
     length <- Gen.choose(5, 40)
