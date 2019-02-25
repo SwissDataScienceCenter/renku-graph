@@ -19,6 +19,7 @@
 package ch.datascience.http.server
 
 import cats.effect.Effect
+import ch.datascience.logging.ApplicationLogger
 import org.http4s.HttpRoutes
 import org.http4s.dsl.Http4sDsl
 
@@ -27,6 +28,9 @@ import scala.language.higherKinds
 class PingEndpoint[F[_]: Effect] extends Http4sDsl[F] {
 
   val ping: HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "ping" => Ok("pong")
+    case GET -> Root / "ping" => {
+      ApplicationLogger.info("in ping")
+      Ok("pong")
+    }
   }
 }

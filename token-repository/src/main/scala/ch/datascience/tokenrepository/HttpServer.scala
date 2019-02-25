@@ -20,6 +20,7 @@ package ch.datascience.tokenrepository
 
 import cats.effect._
 import ch.datascience.http.server.PingEndpoint
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint
@@ -53,7 +54,10 @@ private class HttpServer[F[_]: ConcurrentEffect](
   class TestEndpoint[F[_]: Effect] extends Http4sDsl[F] {
 
     val test: HttpRoutes[F] = HttpRoutes.of[F] {
-      case GET -> Root / "test" => Ok("abcdd")
+      case GET -> Root / "test" => {
+        ApplicationLogger.info("in test")
+        Ok("abcdd")
+      }
     }
   }
 
