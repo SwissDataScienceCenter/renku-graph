@@ -23,6 +23,8 @@ import ch.datascience.http.server.PingEndpoint
 import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint
+import org.http4s.HttpRoutes
+import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
@@ -38,6 +40,7 @@ private class HttpServer[F[_]: ConcurrentEffect](
   def run: F[ExitCode] =
     BlazeBuilder[F]
       .bindHttp(9003, "0.0.0.0")
+      .mountService(new TestEndpoint[F].test, "/test")
       .mountService(pingEndpoint.ping, "/")
       .mountService(fetchTokenEndpoint.fetchToken, "/")
       .mountService(associateTokenEndpoint.associateToken, "/")
@@ -46,4 +49,12 @@ private class HttpServer[F[_]: ConcurrentEffect](
       .compile
       .drain
       .as(ExitCode.Success)
+
+  class TestEndpoint[F[_]: Effect] extends Http4sDsl[F] {
+
+    val test: HttpRoutes[F] = HttpRoutes.of[F] {
+      case GET -> Root / "test" => Ok("abcdd")
+    }
+  }
+
 }
