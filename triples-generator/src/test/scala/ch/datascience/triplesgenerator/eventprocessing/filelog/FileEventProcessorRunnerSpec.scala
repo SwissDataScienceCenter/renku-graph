@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.filelog
 
 import java.nio.file.{Files, OpenOption, StandardOpenOption}
+import java.util.concurrent.ConcurrentHashMap
 
 import cats.effect._
 import ch.datascience.generators.Generators.Implicits._
@@ -33,36 +34,42 @@ import org.scalatest.WordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 
-class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPatience with MockFactory {
+class FileEventProcessorRunnerSpec extends WordSpec with Eventually with IntegrationPatience with MockFactory {
 
   private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   "file event source" should {
 
-    "send every new line in a file to the registered processor" in new TestCase {
-      val fileLines = nonEmptyStringsList().generateOne
+    "send every new line in a file to the registered processor and process them concurrently" in new TestCase {
+      val fileLines = nonEmptyStringsList(10).generateOne
 
       writeToFile(fileLines)
 
-      val accumulator = ArrayBuffer.empty[String]
-      def processor(line: String): IO[Unit] = IO(accumulator += line)
+      val accumulator = new ConcurrentHashMap[String, Long]()
+      def processor(line: String): IO[Unit] = {
+        accumulator.put(line, Thread.currentThread().getId)
+        IO.unit
+      }
 
       eventsSource.withEventsProcessor(processor).run.unsafeRunCancelable(_ => Unit)
 
       eventually {
-        accumulator shouldBe fileLines
+        accumulator.keySet().asScala shouldBe fileLines.toSet
       }
 
       val laterAddedLine = nonEmptyStrings().generateOne
       writeToFile(laterAddedLine)
 
       eventually {
-        accumulator shouldBe (fileLines :+ laterAddedLine)
+        accumulator.keySet().asScala shouldBe (fileLines :+ laterAddedLine).toSet
+      }
+
+      withClue("Number of used threads has to be greater than 1, in fact ") {
+        accumulator.values().asScala.toSet.size should be > 1
       }
 
       logger.loggedOnly(Info("Listening for new events"))
@@ -75,15 +82,18 @@ class FileEventsSourceSpec extends WordSpec with Eventually with IntegrationPati
 
       writeToFile(Seq(line1, line2, line3))
 
-      val accumulator = ArrayBuffer.empty[String]
+      val accumulator = new ConcurrentHashMap[String, Long]()
       def processor(line: String): IO[Unit] =
         if (line == line2) IO.raiseError(new Exception("error during processing line2"))
-        else IO(accumulator += line)
+        else {
+          accumulator.put(line, Thread.currentThread().getId)
+          IO.unit
+        }
 
       eventsSource.withEventsProcessor(processor).run.unsafeRunCancelable(_ => Unit)
 
       eventually {
-        accumulator shouldBe Seq(line1, line3)
+        accumulator.keySet().asScala shouldBe Set(line1, line3)
       }
 
       logger.loggedOnly(Info("Listening for new events"))

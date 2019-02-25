@@ -29,7 +29,6 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
-import scala.util.control.NonFatal
 
 class FileEventProcessorRunner(
     eventProcessor: EventProcessor[IO],
@@ -69,12 +68,11 @@ class FileEventProcessorRunner(
       _         <- checkForNewLine(reader)
     } yield ()
 
-  private lazy val sleepOrProcessLine: Option[String] => IO[Unit] = {
+  private lazy val sleepOrProcessLine: Option[String] => IO[_] = {
     case None => IO.sleep(interval)
     case Some(line) =>
-      eventProcessor(line).recoverWith {
-        case NonFatal(_) => IO.unit
-      }
+      contextShift.shift *>
+        (IO.pure() flatMap (_ => eventProcessor(line))).start
   }
 
   private def closeReader(reader: BufferedReader): IO[Unit] =
