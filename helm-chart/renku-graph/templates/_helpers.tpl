@@ -32,6 +32,14 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
+Create token-repository.fullname
+*/}}
+{{- define "token-repository.fullname" -}}
+{{- $graphFullName := include "graph.fullname" . -}}
+{{- printf "%s-%s" $graphFullName "token-repository" }}
+{{- end -}}
+
+{{/*
 Define http scheme
 */}}
 {{- define "http" -}}

@@ -71,7 +71,7 @@ spec:
             - name: FILE_EVENT_LOG_PATH
               value: /events/log.txt
             - name: TOKEN_REPOSITORY_BASE_URL
-              value: "http://{{ template "{{ .Chart.Name }}-token-repository" . }}:{{ .Values.{{ .Chart.Name }}-token-repository.service.port }}"
+              value: "http://{{ template "token-repository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
             - name: JENA_DATASET_NAME
