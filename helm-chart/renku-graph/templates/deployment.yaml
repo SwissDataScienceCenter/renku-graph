@@ -89,7 +89,7 @@ spec:
                   key: jena-admin-password
           ports:
             - name: http1
-              containerPort: 9000
+              containerPort: 9002
               protocol: TCP
           livenessProbe:
             httpGet:
