@@ -12,7 +12,7 @@
     </appender>
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>/tmp/triples-generator-access.log</file>
+        <file>/tmp/microservice-access.log</file>
         <encoder>
             <charset>UTF-8</charset>
             <pattern>%d %-5level %logger{5} - %message%n</pattern>
