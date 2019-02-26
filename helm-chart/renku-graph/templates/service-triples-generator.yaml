@@ -11,7 +11,7 @@ spec:
   type: {{ .Values.triplesGenerator.service.type }}
   ports:
     - port: {{ .Values.triplesGenerator.service.port }}
-      targetPort: http1
+      targetPort: http-triples-gn
       protocol: TCP
       name: http
   selector:
