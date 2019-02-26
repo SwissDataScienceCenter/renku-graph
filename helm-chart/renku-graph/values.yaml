@@ -9,7 +9,7 @@ tokenRepository:
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
-    port: 80
+    port: 9003
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
     ## Generated using: `openssl rand -hex 8|base64`
@@ -22,11 +22,7 @@ triplesGenerator:
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
-    port: 80
-  play:
-    ## A Play app secret used for built in encryption utilities
-    ## Generated using: `sbt playGenerateSecret`
-    secret:
+    port: 9002
 
 webhookService:
   image:

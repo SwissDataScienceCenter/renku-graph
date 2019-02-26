@@ -21,9 +21,9 @@ package ch.datascience.tokenrepository.repository.deletion
 import cats.MonadError
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.EventsGenerators.projectIds
-import ch.datascience.graph.events.ProjectId
-import ch.datascience.http.EndpointTester._
+import ch.datascience.graph.model.events.EventsGenerators.projectIds
+import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import org.http4s.dsl.io._

@@ -21,8 +21,8 @@ package ch.datascience.webhookservice.security
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.clients.AccessToken
-import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import javax.inject.Singleton
 import play.api.mvc.Request

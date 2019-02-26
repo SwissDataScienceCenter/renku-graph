@@ -21,13 +21,13 @@ package ch.datascience.webhookservice.hookcreation
 import akka.stream.Materializer
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.GraphCommonsGenerators._
-import ch.datascience.graph.events._
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.graph.model.events._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.security.IOAccessTokenFinder

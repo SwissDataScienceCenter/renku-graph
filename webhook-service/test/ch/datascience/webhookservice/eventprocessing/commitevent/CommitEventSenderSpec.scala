@@ -22,8 +22,8 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events._
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

@@ -42,5 +42,6 @@ trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll 
 
   override def afterAll {
     server.stop()
+    server.shutdownServer()
   }
 }

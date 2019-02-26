@@ -19,8 +19,9 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
-import ch.datascience.clients.{AccessToken, IORestClient}
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
@@ -49,7 +50,7 @@ private object ProjectHookCreator {
 @Singleton
 private class IOProjectHookCreator @Inject()(
     gitLabConfigProvider:    IOGitLabConfigProvider
-)(implicit executionContext: ExecutionContext)
+)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
     extends IORestClient
     with ProjectHookCreator[IO] {
 
@@ -79,8 +80,8 @@ private class IOProjectHookCreator @Inject()(
 
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[Unit] =
     response.status match {
-      case Created      => F.pure(())
-      case Unauthorized => F.raiseError(UnauthorizedException)
+      case Created      => IO.pure(())
+      case Unauthorized => IO.raiseError(UnauthorizedException)
       case _            => raiseError(request, response)
     }
 }

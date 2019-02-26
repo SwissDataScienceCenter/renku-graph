@@ -20,8 +20,8 @@ package ch.datascience.tokenrepository.repository.association
 
 import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokens
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import doobie.implicits._

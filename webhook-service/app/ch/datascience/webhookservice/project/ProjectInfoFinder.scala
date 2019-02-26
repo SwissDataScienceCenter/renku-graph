@@ -19,8 +19,9 @@
 package ch.datascience.webhookservice.project
 
 import cats.effect.IO
-import ch.datascience.clients.{AccessToken, IORestClient}
-import ch.datascience.graph.events._
+import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.graph.model.events._
+import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.model.{ProjectInfo, ProjectOwner, ProjectVisibility}
 import javax.inject.{Inject, Singleton}
@@ -36,8 +37,9 @@ trait ProjectInfoFinder[Interpretation[_]] {
 }
 
 @Singleton
-class IOProjectInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
-    implicit executionContext:                            ExecutionContext)
+class IOProjectInfoFinder @Inject()(
+    gitLabConfigProvider:    IOGitLabConfigProvider
+)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
     extends IORestClient
     with ProjectInfoFinder[IO] {
 
@@ -60,7 +62,7 @@ class IOProjectInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigProvider
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[ProjectInfo] =
     response.status match {
       case Ok           => response.as[ProjectInfo] handleErrorWith contextToError(request, response)
-      case Unauthorized => F.raiseError(UnauthorizedException)
+      case Unauthorized => IO.raiseError(UnauthorizedException)
       case _            => raiseError(request, response)
     }
 

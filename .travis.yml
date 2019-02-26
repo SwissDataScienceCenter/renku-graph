@@ -20,6 +20,7 @@ env:
     - DOCKER_REPOSITORY=renku/
     - HELM_URL=https://storage.googleapis.com/kubernetes-helm
     - HELM_TGZ=helm-v2.8.2-linux-amd64.tar.gz
+    - SBT_OPTS="-XX:+CMSClassUnloadingEnabled -Xmx1G"
 git:
   depth: false
 addons:
@@ -42,7 +43,7 @@ install:
   - PATH=`pwd`/linux-amd64/:$PATH
   - helm init --client-only
 script:
-- sbt ++$TRAVIS_SCALA_VERSION test && bash ./.travis/check-code-formatting.sh
+- sbt ++$TRAVIS_SCALA_VERSION clean test && bash ./.travis/check-code-formatting.sh
 deploy:
   - &script
     provider: script

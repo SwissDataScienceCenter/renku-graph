@@ -24,7 +24,7 @@ import cats.effect.IO
 import cats.implicits._
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.W

@@ -20,8 +20,9 @@ package ch.datascience.webhookservice.hookvalidation
 
 import ProjectHookVerifier.HookIdentifier
 import cats.effect.IO
-import ch.datascience.clients.{AccessToken, IORestClient}
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import io.circe.Decoder.decodeList
@@ -48,7 +49,7 @@ private object ProjectHookVerifier {
 @Singleton
 private class IOProjectHookVerifier @Inject()(
     gitLabUrlProvider:       IOGitLabConfigProvider
-)(implicit executionContext: ExecutionContext)
+)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
     extends IORestClient
     with ProjectHookVerifier[IO] {
 
@@ -71,7 +72,7 @@ private class IOProjectHookVerifier @Inject()(
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[List[String]] =
     response.status match {
       case Ok           => response.as[List[String]] handleErrorWith contextToError(request, response)
-      case Unauthorized => F.raiseError(UnauthorizedException)
+      case Unauthorized => IO.raiseError(UnauthorizedException)
       case _            => raiseError(request, response)
     }
 

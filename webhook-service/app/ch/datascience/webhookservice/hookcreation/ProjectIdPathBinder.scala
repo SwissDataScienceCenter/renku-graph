@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.implicits._
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.ProjectId
 import play.api.mvc.PathBindable
 
 object ProjectIdPathBinder {

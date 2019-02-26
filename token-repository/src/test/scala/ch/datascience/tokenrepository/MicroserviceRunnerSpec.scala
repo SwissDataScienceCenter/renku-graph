@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.effect._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.http.server.PingEndpoint
 import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint

@@ -21,15 +21,13 @@ package ch.datascience.tokenrepository.repository.association
 import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
-import ch.datascience.clients.AccessToken
-import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.graph.events.ProjectId
-import ch.datascience.tokenrepository.ApplicationLogger
+import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.http.client.AccessToken
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.ProjectIdPathBinder
 import io.chrisdavenport.log4cats.Logger
-import io.circe._
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, HttpRoutes, Response}
@@ -53,25 +51,6 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
         result      <- toHttpResult(projectId)()
       } yield result
     } recoverWith httpResult(projectId)
-  }
-
-  private implicit lazy val accessTokenDecoder: Decoder[AccessToken] = (cursor: HCursor) => {
-    for {
-      maybeOauth    <- cursor.downField("oauthAccessToken").as[Option[String]].flatMap(to(OAuthAccessToken.from))
-      maybePersonal <- cursor.downField("personalAccessToken").as[Option[String]].flatMap(to(PersonalAccessToken.from))
-      token <- Either.fromOption(maybeOauth orElse maybePersonal,
-                                 ifNone = DecodingFailure("Access token cannot be deserialized", Nil))
-    } yield token
-  }
-
-  private def to[T <: AccessToken](
-      from: String => Either[IllegalArgumentException, T]
-  ): Option[String] => DecodingFailure Either Option[AccessToken] = {
-    case None => Right(None)
-    case Some(token) =>
-      from(token)
-        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
-        .map(Option.apply)
   }
 
   private implicit lazy val accessTokenEntityDecoder: EntityDecoder[Interpretation, AccessToken] =

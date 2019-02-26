@@ -40,6 +40,12 @@ object Generators {
     } yield chars.mkString("")
   }
 
+  def nonEmptyStringsList(maxElements: Int = 5): Gen[List[String]] =
+    for {
+      size  <- positiveInts(maxElements)
+      lines <- Gen.listOfN(size, nonEmptyStrings())
+    } yield lines
+
   def positiveInts(max: Int = 1000): Gen[Int] = choose(1, max)
 
   def nonNegativeInts(max: Int = 1000): Gen[Int] = choose(0, max)

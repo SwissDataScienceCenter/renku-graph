@@ -20,11 +20,11 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.GraphCommonsGenerators._
-import ch.datascience.graph.events._
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.graph.model.events._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.webhookservice.eventprocessing.PushEvent

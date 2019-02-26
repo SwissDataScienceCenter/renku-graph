@@ -11,7 +11,7 @@ spec:
   type: {{ .Values.webhookService.service.type }}
   ports:
     - port: {{ .Values.webhookService.service.port }}
-      targetPort: http2
+      targetPort: http-webhook-sv
       protocol: TCP
       name: http
   selector:
