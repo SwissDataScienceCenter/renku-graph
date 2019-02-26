@@ -25,20 +25,21 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import javax.inject.Singleton
-import play.api.mvc.Request
+import org.http4s.{Header, Request}
+import org.http4s.util.CaseInsensitiveString
 
 import scala.language.higherKinds
 
 class AccessTokenFinder[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
-  def findAccessToken(request: Request[_]): Interpretation[AccessToken] = ME.fromEither {
-    convert(request.headers.get("OAUTH-TOKEN"), to = OAuthAccessToken.from)
-      .orElse(convert(request.headers.get("PRIVATE-TOKEN"), to = PersonalAccessToken.from))
+  def findAccessToken(request: Request[Interpretation]): Interpretation[AccessToken] = ME.fromEither {
+    convert(request.headers.get(CaseInsensitiveString("OAUTH-TOKEN")), to = OAuthAccessToken.from)
+      .orElse(convert(request.headers.get(CaseInsensitiveString("PRIVATE-TOKEN")), to = PersonalAccessToken.from))
       .getOrElse(Left(UnauthorizedException))
   }
 
-  private def convert(headers: Option[String], to: String => Either[Exception, AccessToken]) =
-    headers.map {
+  private def convert(header: Option[Header], to: String => Either[Exception, AccessToken]) =
+    header.map(_.value).map {
       to(_).leftMap(_ => UnauthorizedException)
     }
 }

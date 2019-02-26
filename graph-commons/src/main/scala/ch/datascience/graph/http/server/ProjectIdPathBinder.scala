@@ -16,29 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.graph.http.server
+import ch.datascience.graph.model.events.ProjectId
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import scala.util.Try
 
-class ProjectIdPathBinderSpec extends WordSpec {
+object ProjectIdPathBinder {
 
-  "unapply" should {
-
-    "convert valid projectId as string to ProjectId" in {
-      val projectId = projectIds.generateOne
-
-      ProjectIdPathBinder.unapply(projectId.toString) shouldBe Some(projectId)
-    }
-
-    "return None if string value cannot be converted to an int" in {
-      ProjectIdPathBinder.unapply("a") shouldBe None
-    }
-
-    "return None if string value is blank" in {
-      ProjectIdPathBinder.unapply(" ") shouldBe None
-    }
-  }
+  def unapply(value: String): Option[ProjectId] =
+    Try {
+      ProjectId(value.toInt)
+    }.toOption
 }

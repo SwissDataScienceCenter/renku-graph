@@ -16,24 +16,29 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.graph.http.server
 
-import cats.implicits._
-import ch.datascience.graph.model.events.ProjectId
-import play.api.mvc.PathBindable
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.events.EventsGenerators._
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
-object ProjectIdPathBinder {
+class ProjectIdPathBinderSpec extends WordSpec {
 
-  implicit def projectIdPathBinder(implicit intBinder: PathBindable[Int]): PathBindable[ProjectId] =
-    new PathBindable[ProjectId] {
+  "unapply" should {
 
-      override def bind(key: String, value: String): Either[String, ProjectId] =
-        for {
-          id        <- intBinder.bind(key, value)
-          projectId <- ProjectId.from(id) leftMap (_.getMessage)
-        } yield projectId
+    "convert valid projectId as string to ProjectId" in {
+      val projectId = projectIds.generateOne
 
-      override def unbind(key: String, projectId: ProjectId): String =
-        projectId.toString
+      ProjectIdPathBinder.unapply(projectId.toString) shouldBe Some(projectId)
     }
+
+    "return None if string value cannot be converted to an int" in {
+      ProjectIdPathBinder.unapply("a") shouldBe None
+    }
+
+    "return None if string value is blank" in {
+      ProjectIdPathBinder.unapply(" ") shouldBe None
+    }
+  }
 }

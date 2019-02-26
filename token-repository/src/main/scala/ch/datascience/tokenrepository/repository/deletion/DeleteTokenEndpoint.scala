@@ -23,9 +23,9 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.graph.http.server.ProjectIdPathBinder
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.tokenrepository.repository.ProjectIdPathBinder
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{HttpRoutes, Response}

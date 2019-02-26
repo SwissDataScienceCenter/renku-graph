@@ -18,28 +18,28 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
-import akka.stream.Materializer
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.http.client.AccessToken
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators.projectIds
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.http.client.AccessToken
+import ch.datascience.http.server.EndpointTester._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
 import ch.datascience.webhookservice.security.IOAccessTokenFinder
+import io.circe.Json
+import io.circe.syntax._
+import org.http4s.Status._
+import org.http4s.{Method, Request, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatestplus.play.guice.GuiceOneAppPerTest
-import play.api.mvc.{ControllerComponents, Request}
-import play.api.test.Helpers._
-import play.api.test.{FakeRequest, Injecting}
 
-class HookValidationEndpointSpec extends WordSpec with MockFactory with GuiceOneAppPerTest with Injecting {
+class HookValidationEndpointSpec extends WordSpec with MockFactory {
 
   "POST /projects/:id/webhooks/validation" should {
 
@@ -48,7 +48,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory with GuiceOne
 
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: Request[_]))
+        .findAccessToken(_: Request[IO]))
         .expects(*)
         .returning(context.pure(accessToken))
 
@@ -57,17 +57,19 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory with GuiceOne
         .expects(projectId, accessToken)
         .returning(context.pure(HookExists))
 
-      val response = call(validateHook(projectId), request)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      )
 
-      status(response)          shouldBe OK
-      contentAsString(response) shouldBe ""
+      response.status       shouldBe Ok
+      response.body[String] shouldBe ""
     }
 
     "return NOT_FOUND the hook does not exist" in new TestCase {
 
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: Request[_]))
+        .findAccessToken(_: Request[IO]))
         .expects(*)
         .returning(context.pure(accessToken))
 
@@ -76,30 +78,33 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory with GuiceOne
         .expects(projectId, accessToken)
         .returning(context.pure(HookMissing))
 
-      val response = call(validateHook(projectId), request)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      )
 
-      status(response)          shouldBe NOT_FOUND
-      contentAsString(response) shouldBe ""
+      response.status       shouldBe NotFound
+      response.body[String] shouldBe ""
     }
 
     "return UNAUTHORIZED when finding an access token in the headers fails with UnauthorizedException" in new TestCase {
 
       (accessTokenFinder
-        .findAccessToken(_: Request[_]))
+        .findAccessToken(_: Request[IO]))
         .expects(*)
         .returning(context.raiseError(UnauthorizedException))
 
-      val response = call(validateHook(projectId), request)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      )
 
-      status(response)        shouldBe UNAUTHORIZED
-      contentType(response)   shouldBe Some(JSON)
-      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
+      response.status     shouldBe Unauthorized
+      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
 
     "return INTERNAL_SERVER_ERROR when there was an error during hook validation" in new TestCase {
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: Request[_]))
+        .findAccessToken(_: Request[IO]))
         .expects(*)
         .returning(context.pure(accessToken))
 
@@ -109,17 +114,19 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory with GuiceOne
         .expects(projectId, accessToken)
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
-      val response = call(validateHook(projectId), request)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      )
 
-      status(response)        shouldBe INTERNAL_SERVER_ERROR
-      contentType(response)   shouldBe Some(JSON)
-      contentAsJson(response) shouldBe errorMessage.toJson
+      response.status     shouldBe InternalServerError
+      response.body[Json] shouldBe errorMessage.asJson
     }
 
     "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook validation" in new TestCase {
+
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: Request[_]))
+        .findAccessToken(_: Request[IO]))
         .expects(*)
         .returning(context.pure(accessToken))
 
@@ -128,27 +135,25 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory with GuiceOne
         .expects(projectId, accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 
-      val response = call(validateHook(projectId), request)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      )
 
-      status(response)        shouldBe UNAUTHORIZED
-      contentType(response)   shouldBe Some(JSON)
-      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
+      response.status     shouldBe Unauthorized
+      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
   }
 
   private trait TestCase {
-    implicit val materializer: Materializer = app.materializer
     val context = MonadError[IO, Throwable]
 
-    val request   = FakeRequest()
     val projectId = projectIds.generateOne
 
     val hookValidator     = mock[IOHookValidator]
     val accessTokenFinder = mock[IOAccessTokenFinder]
-    val validateHook = new HookValidationEndpoint(
-      inject[ControllerComponents],
+    val endpoint = new HookValidationEndpoint[IO](
       hookValidator,
       accessTokenFinder
-    ).validateHook _
+    ).validateHook.or(notAvailableResponse)
   }
 }

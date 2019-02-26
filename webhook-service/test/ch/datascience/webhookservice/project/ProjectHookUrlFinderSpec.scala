@@ -22,7 +22,6 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.project.SelfUrlConfig.SelfUrl
@@ -37,13 +36,13 @@ class ProjectHookUrlFinderSpec extends WordSpec with MockFactory {
 
   "findProjectHookUrl" should {
 
-    s"return project hook url composed of selfUrl and ${WebhookEventEndpoint.processPushEvent()} " +
+    "return project hook url composed of selfUrl and /webhooks/events " +
       "if selfUrl can be obtained" in new TestCase {
       expectSelfUrlConfig(returning = context.pure(selfUrl))
 
       hookUrlFinder.findProjectHookUrl shouldBe Success(
         ProjectHookUrl(
-          s"$selfUrl${WebhookEventEndpoint.processPushEvent().url}"
+          s"$selfUrl/webhooks/events"
         )
       )
     }

@@ -20,17 +20,16 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import cats.data.OptionT
 import cats.effect.IO
-import ch.datascience.http.client.AccessToken
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.Json
-import org.http4s.dsl.io._
 import org.http4s.{Method, Request, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

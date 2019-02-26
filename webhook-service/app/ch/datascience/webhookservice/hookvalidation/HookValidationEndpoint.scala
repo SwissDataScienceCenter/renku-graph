@@ -18,46 +18,55 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
+import cats.data.NonEmptyList
+import cats.effect.Effect
+import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.http.server.ProjectIdPathBinder
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
-import ch.datascience.webhookservice.security.IOAccessTokenFinder
-import javax.inject.{Inject, Singleton}
-import play.api.mvc._
+import ch.datascience.webhookservice.security.AccessTokenFinder
+import org.http4s.AuthScheme.Basic
+import org.http4s.dsl.Http4sDsl
+import org.http4s.headers.`WWW-Authenticate`
+import org.http4s.{Challenge, HttpRoutes, Response}
 
-import scala.concurrent.ExecutionContext
+import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-@Singleton
-class HookValidationEndpoint @Inject()(
-    cc:                ControllerComponents,
-    hookValidator:     IOHookValidator,
-    accessTokenFinder: IOAccessTokenFinder
-) extends AbstractController(cc) {
+class HookValidationEndpoint[Interpretation[_]: Effect](
+    hookValidator:     HookValidator[Interpretation],
+    accessTokenFinder: AccessTokenFinder[Interpretation]
+) extends Http4sDsl[Interpretation] {
 
   import accessTokenFinder._
 
-  private implicit val executionContext: ExecutionContext = defaultExecutionContext
-
-  def validateHook(projectId: ProjectId): Action[AnyContent] = Action.async { implicit request =>
-    (for {
-      accessToken    <- findAccessToken(request)
-      creationResult <- hookValidator.validateHook(projectId, accessToken)
-    } yield toHttpResult(creationResult))
-      .unsafeToFuture()
-      .recover(withHttpResult)
+  val validateHook: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
+    case request @ POST -> Root / "projects" / ProjectIdPathBinder(projectId) / "webhooks" / "validation" => {
+      for {
+        accessToken    <- findAccessToken(request)
+        creationResult <- hookValidator.validateHook(projectId, accessToken)
+        response       <- toHttpResult(creationResult)
+      } yield response
+    } recoverWith withHttpResult
   }
 
-  private lazy val toHttpResult: HookValidationResult => Result = {
-    case HookExists  => Ok
-    case HookMissing => NotFound
+  private lazy val toHttpResult: HookValidationResult => Interpretation[Response[Interpretation]] = {
+    case HookExists  => Ok()
+    case HookMissing => NotFound()
   }
 
-  private val withHttpResult: PartialFunction[Throwable, Result] = {
-    case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
-    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage).toJson)
+  private lazy val withHttpResult: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+    case ex @ UnauthorizedException =>
+      Unauthorized(
+        `WWW-Authenticate`(
+          NonEmptyList.of(
+            Challenge(scheme = Basic.value, realm = "Please provide valid 'OAUTH-TOKEN' or 'PRIVATE-TOKEN'"))
+        ),
+        ErrorMessage(ex.getMessage)
+      )
+    case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))
   }
 }

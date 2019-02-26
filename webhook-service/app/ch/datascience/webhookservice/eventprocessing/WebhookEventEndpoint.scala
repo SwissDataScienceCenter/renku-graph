@@ -18,106 +18,115 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import cats.effect.IO
+import cats.MonadError
+import cats.data.NonEmptyList
+import cats.effect.Effect
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.model.events._
+import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
-import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
+import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.model.HookToken
-import javax.inject.{Inject, Singleton}
-import play.api.mvc._
+import io.circe.{Decoder, HCursor}
+import org.http4s.circe._
+import org.http4s.dsl.Http4sDsl
+import org.http4s.headers.`WWW-Authenticate`
+import org.http4s.util.CaseInsensitiveString
+import org.http4s.{AuthScheme, Challenge, EntityDecoder, HttpRoutes, Request, Response}
 
-import scala.concurrent.ExecutionContext
+import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-@Singleton
-class WebhookEventEndpoint(
-    cc:              ControllerComponents,
-    hookTokenCrypto: HookTokenCrypto[IO],
-    pushEventSender: PushEventSender[IO]
-) extends AbstractController(cc) {
-
-  @Inject def this(
-      cc:              ControllerComponents,
-      pushEventSender: IOPushEventSender,
-      hookTokenCrypto: IOHookTokenCrypto
-  ) = this(cc, hookTokenCrypto, pushEventSender)
-
-  private implicit val executionContext: ExecutionContext = defaultExecutionContext
+class WebhookEventEndpoint[Interpretation[_]: Effect](
+    hookTokenCrypto: HookTokenCrypto[Interpretation],
+    pushEventSender: PushEventSender[Interpretation]
+)(implicit ME:       MonadError[Interpretation, Throwable])
+    extends Http4sDsl[Interpretation] {
 
   import WebhookEventEndpoint._
   import hookTokenCrypto._
   import pushEventSender._
 
-  val processPushEvent: Action[PushEvent] = Action.async(parse.json[PushEvent]) { implicit request =>
-    (for {
-      authToken <- findAuthToken(request)
-      hookToken <- decrypt(authToken) recoverWith unauthorizedException
-      _         <- validate(hookToken, request.body)
-      _         <- storeCommitsInEventLog(request.body)
-    } yield Accepted)
-      .unsafeToFuture()
-      .recover(mapToResult(request.body))
+  val processPushEvent: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
+    case request @ POST -> Root / "webhooks" / "events" => {
+      for {
+        pushEvent <- request.as[PushEvent] recoverWith badRequest
+        authToken <- findHookToken(request)
+        hookToken <- decrypt(authToken) recoverWith unauthorizedException
+        _         <- validate(hookToken, pushEvent)
+        _         <- storeCommitsInEventLog(pushEvent)
+        response  <- Accepted()
+      } yield response
+    } recoverWith httpResponse
   }
 
-  private def findAuthToken(request: Request[_]): IO[SerializedHookToken] = IO.fromEither {
-    request.headers.get("X-Gitlab-Token") match {
+  private implicit lazy val pushEventEntityDecoder: EntityDecoder[Interpretation, PushEvent] =
+    jsonOf[Interpretation, PushEvent]
+
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[PushEvent]] = {
+    case NonFatal(exception) =>
+      ME.raiseError(BadRequestError(exception))
+  }
+
+  private case class BadRequestError(cause: Throwable) extends Exception(cause)
+
+  private def findHookToken(request: Request[Interpretation]): Interpretation[SerializedHookToken] = ME.fromEither {
+    request.headers.get(CaseInsensitiveString("X-Gitlab-Token")) match {
       case None           => Left(UnauthorizedException)
-      case Some(rawToken) => SerializedHookToken.from(rawToken).leftMap(_ => UnauthorizedException)
+      case Some(rawToken) => SerializedHookToken.from(rawToken.value).leftMap(_ => UnauthorizedException)
     }
   }
 
-  private lazy val unauthorizedException: PartialFunction[Throwable, IO[HookToken]] = {
+  private lazy val unauthorizedException: PartialFunction[Throwable, Interpretation[HookToken]] = {
     case NonFatal(_) =>
-      IO.raiseError(UnauthorizedException)
+      ME.raiseError(UnauthorizedException)
   }
 
-  private def validate(hookToken: HookToken, pushEvent: PushEvent): IO[Unit] = IO.fromEither {
+  private def validate(hookToken: HookToken, pushEvent: PushEvent): Interpretation[Unit] = ME.fromEither {
     if (hookToken.projectId == pushEvent.project.id) Right(())
     else Left(UnauthorizedException)
   }
 
-  private def mapToResult(pushEvent: PushEvent): PartialFunction[Throwable, Result] = {
-    case ex @ UnauthorizedException => Unauthorized(ErrorMessage(ex.getMessage).toJson)
-    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage).toJson)
+  private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+    case BadRequestError(exception) =>
+      BadRequest(ErrorMessage(exception.getMessage))
+    case ex @ UnauthorizedException =>
+      Unauthorized(
+        `WWW-Authenticate`(
+          NonEmptyList.of(Challenge(scheme = AuthScheme.Basic.value, realm = "Please provide a valid 'X-Gitlab-Token'"))
+        ),
+        ErrorMessage(ex.getMessage)
+      )
+    case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))
   }
 }
 
-object WebhookEventEndpoint {
+private object WebhookEventEndpoint {
 
-  import play.api.libs.functional.syntax._
-  import play.api.libs.json.Reads._
-  import play.api.libs.json._
+  private implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) => {
+    for {
+      id   <- cursor.downField("id").as[ProjectId]
+      path <- cursor.downField("path_with_namespace").as[ProjectPath]
+    } yield Project(id, path)
+  }
 
-  private implicit val projectReads: Reads[Project] = (
-    (__ \ "id").read[ProjectId] and
-      (__ \ "path_with_namespace").read[ProjectPath]
-  )(Project.apply _)
-
-  private[webhookservice] implicit val pushEventReads: Reads[PushEvent] = (
-    (__ \ "before").readNullable[CommitId] and
-      (__ \ "after").read[CommitId] and
-      (__ \ "user_id").read[UserId] and
-      (__ \ "user_username").read[Username] and
-      (__ \ "user_email").readNullable[Email] and
-      (__ \ "project").read[Project]
-  )(toPushEvent _)
-
-  private def toPushEvent(
-      maybeCommitFrom: Option[CommitId],
-      commitTo:        CommitId,
-      userId:          UserId,
-      username:        Username,
-      maybeEmail:      Option[Email],
-      project:         Project
-  ): PushEvent = PushEvent(
-    maybeCommitFrom,
-    commitTo,
-    PushUser(userId, username, maybeEmail),
-    project
-  )
+  implicit val pushEventDecoder: Decoder[PushEvent] = (cursor: HCursor) => {
+    for {
+      maybeCommitFrom <- cursor.downField("before").as[Option[CommitId]]
+      commitTo        <- cursor.downField("after").as[CommitId]
+      userId          <- cursor.downField("user_id").as[UserId]
+      username        <- cursor.downField("user_username").as[Username]
+      maybeEmail      <- cursor.downField("user_email").as[Option[Email]]
+      project         <- cursor.downField("project").as[Project]
+    } yield
+      PushEvent(
+        maybeCommitFrom,
+        commitTo,
+        PushUser(userId, username, maybeEmail),
+        project
+      )
+  }
 }

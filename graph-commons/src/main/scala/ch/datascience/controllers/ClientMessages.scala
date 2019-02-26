@@ -25,7 +25,6 @@ import eu.timepit.refined.string.MatchesRegex
 import io.circe.{Encoder, Json => CirceJson}
 import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
-import play.api.libs.json._
 
 import scala.language.higherKinds
 
@@ -41,23 +40,7 @@ object ErrorMessage {
         identity
       )
 
-  def apply(jsError: JsError): ErrorMessage = {
-    val errorMessages = jsError.errors.map {
-      case (JsPath(Nil), pathErrors) => pathErrors.map(_.message).mkString("; ")
-      case (path, pathErrors)        => s"$path -> ${pathErrors.map(_.message).mkString("; ")}"
-    }
-    ErrorMessage(errorMessages.mkString("Json deserialization error(s): ", "; ", ""))
-  }
-
-  private implicit val errorResponseWrites: Writes[ErrorMessage] = Writes[ErrorMessage] { error =>
-    Json.obj("error" -> error.value)
-  }
-
-  implicit class ErrorMessageOps(errorResponse: ErrorMessage) {
-    lazy val toJson: JsValue = Json.toJson(errorResponse)
-  }
-
-  private implicit val encoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
+  implicit val encoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
     CirceJson.obj("message" -> CirceJson.fromString(message.value))
   }
 

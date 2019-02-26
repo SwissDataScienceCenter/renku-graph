@@ -18,7 +18,6 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import akka.stream.Materializer
 import cats.MonadError
 import cats.effect.IO
 import ch.datascience.controllers.ErrorMessage
@@ -26,23 +25,22 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.http.server.EndpointTester._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
 import ch.datascience.webhookservice.model.HookToken
+import io.circe.Json
+import io.circe.syntax._
+import org.http4s.Status._
+import org.http4s.{Header, Headers, Method, Request, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatestplus.play.guice.GuiceOneAppPerTest
-import play.api.libs.json.Json.toJsFieldJsValueWrapper
-import play.api.libs.json.{JsObject, JsString, JsValue, Json}
-import play.api.mvc.ControllerComponents
-import play.api.test.Helpers._
-import play.api.test.{FakeRequest, Injecting}
 
-class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAppPerTest with Injecting {
+class WebhookEventEndpointSpec extends WordSpec with MockFactory {
 
   "POST /webhooks/events" should {
 
@@ -53,16 +51,16 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
         .expects(pushEvent)
         .returning(context.pure(()))
 
-      val request = jsonRequest
-        .withBody(pushEventPayloadFrom(pushEvent))
-        .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString)
-
       expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
-      val response = call(processPushEvent, request)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("webhooks") / "events")
+          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+          .withEntity(pushEventPayloadFrom(pushEvent))
+      )
 
-      status(response)          shouldBe ACCEPTED
-      contentAsString(response) shouldBe ""
+      response.status       shouldBe Accepted
+      response.body[String] shouldBe ""
     }
 
     "return INTERNAL_SERVER_ERROR when storing push event in the event log fails" in new TestCase {
@@ -73,63 +71,59 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
         .expects(pushEvent)
         .returning(context.raiseError(exception))
 
-      val request = jsonRequest
-        .withBody(pushEventPayloadFrom(pushEvent))
-        .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString)
-
       expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
-      val response = call(processPushEvent, request)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("webhooks") / "events")
+          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+          .withEntity(pushEventPayloadFrom(pushEvent))
+      )
 
-      status(response)        shouldBe INTERNAL_SERVER_ERROR
-      contentAsJson(response) shouldBe ErrorMessage(exception.getMessage).toJson
+      response.status     shouldBe InternalServerError
+      response.body[Json] shouldBe ErrorMessage(exception.getMessage).asJson
     }
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
 
-      val request = jsonRequest
-        .withBody(Json.obj())
-        .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("webhooks") / "events")
+          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+          .withEntity(Json.obj())
+      )
 
-      val response = call(processPushEvent, request)
-
-      status(response)        shouldBe BAD_REQUEST
-      contentAsJson(response) shouldBe a[JsValue]
+      response.status     shouldBe BadRequest
+      response.body[Json] shouldBe ErrorMessage("Invalid message body: Could not decode JSON: {}").asJson
     }
 
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
-      val request = jsonRequest
-        .withBody(pushEventPayloadFrom(pushEvent))
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("webhooks") / "events")
+          .withEntity(pushEventPayloadFrom(pushEvent))
+      )
 
-      val response = call(processPushEvent, request)
-
-      status(response)        shouldBe UNAUTHORIZED
-      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
+      response.status     shouldBe Unauthorized
+      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
 
     "return UNAUTHORIZED when user X-Gitlab-Token is invalid" in new TestCase {
-
-      val request = jsonRequest
-        .withBody(pushEventPayloadFrom(pushEvent))
-        .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString)
 
       (hookTokenCrypto
         .decrypt(_: SerializedHookToken))
         .expects(serializedHookToken)
         .returning(context.pure(HookToken(projectIds.generateOne)))
 
-      val response = call(processPushEvent, request)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("webhooks") / "events")
+          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+          .withEntity(pushEventPayloadFrom(pushEvent))
+      )
 
-      status(response)        shouldBe UNAUTHORIZED
-      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
+      response.status     shouldBe Unauthorized
+      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
 
     "return UNAUTHORIZED when X-Gitlab-Token decryption fails" in new TestCase {
-
-      val request = jsonRequest
-        .withBody(pushEventPayloadFrom(pushEvent))
-        .withHeaders("X-Gitlab-Token" -> serializedHookToken.toString)
 
       val exception = new Exception("decryption failure")
       (hookTokenCrypto
@@ -137,19 +131,21 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
         .expects(serializedHookToken)
         .returning(context.raiseError(exception))
 
-      val response = call(processPushEvent, request)
+      val response = endpoint.call(
+        Request(Method.POST, Uri.uri("webhooks") / "events")
+          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+          .withEntity(pushEventPayloadFrom(pushEvent))
+      )
 
-      status(response)        shouldBe UNAUTHORIZED
-      contentAsJson(response) shouldBe ErrorMessage(UnauthorizedException.getMessage).toJson
+      response.status     shouldBe Unauthorized
+      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
   }
 
   private trait TestCase {
-    implicit val materializer: Materializer = app.materializer
     val context = MonadError[IO, Throwable]
 
-    val jsonRequest = FakeRequest().withHeaders(CONTENT_TYPE -> JSON)
-    val pushEvent   = pushEvents.generateOne
+    val pushEvent = pushEvents.generateOne
     val serializedHookToken = nonEmptyStrings().map {
       SerializedHookToken
         .from(_)
@@ -161,26 +157,23 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory with GuiceOneAp
 
     val pushEventSender = mock[IOPushEventSender]
     val hookTokenCrypto = mock[IOHookTokenCrypto]
-    val processPushEvent = new WebhookEventEndpoint(
-      inject[ControllerComponents],
+    val endpoint = new WebhookEventEndpoint[IO](
       hookTokenCrypto,
       pushEventSender
-    ).processPushEvent
+    ).processPushEvent.or(notAvailableResponse)
 
-    def pushEventPayloadFrom(pushEvent: PushEvent): JsObject =
+    def pushEventPayloadFrom(pushEvent: PushEvent) =
       Json.obj(
         Seq(
-          pushEvent.maybeCommitFrom.map(before => "before" -> toJsFieldJsValueWrapper(before.value)),
-          Some("after"         -> toJsFieldJsValueWrapper(pushEvent.commitTo.value)),
-          Some("user_id"       -> toJsFieldJsValueWrapper(pushEvent.pushUser.userId.value)),
-          Some("user_username" -> toJsFieldJsValueWrapper(pushEvent.pushUser.username.value)),
-          pushEvent.pushUser.maybeEmail.map(email => "user_email" -> toJsFieldJsValueWrapper(email.value)),
+          pushEvent.maybeCommitFrom.map(before => "before" -> Json.fromString(before.value)),
+          Some("after"         -> Json.fromString(pushEvent.commitTo.value)),
+          Some("user_id"       -> Json.fromInt(pushEvent.pushUser.userId.value)),
+          Some("user_username" -> Json.fromString(pushEvent.pushUser.username.value)),
+          pushEvent.pushUser.maybeEmail.map(email => "user_email" -> Json.fromString(email.value)),
           Some(
-            "project" -> toJsFieldJsValueWrapper(
-              Json.obj(
-                "id"                  -> toJsFieldJsValueWrapper(pushEvent.project.id.value),
-                "path_with_namespace" -> toJsFieldJsValueWrapper(pushEvent.project.path.value)
-              )
+            "project" -> Json.obj(
+              "id"                  -> Json.fromInt(pushEvent.project.id.value),
+              "path_with_namespace" -> Json.fromString(pushEvent.project.path.value)
             )
           )
         ).flatten: _*

@@ -23,10 +23,10 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.graph.http.server.ProjectIdPathBinder
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.tokenrepository.repository.ProjectIdPathBinder
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -48,15 +48,15 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
       for {
         accessToken <- request.as[AccessToken].recoverWith(badRequest)
         _           <- associate(projectId, accessToken)
-        result      <- toHttpResult(projectId)()
-      } yield result
-    } recoverWith httpResult(projectId)
+        response    <- toHttpResponse(projectId)()
+      } yield response
+    } recoverWith httpResponse(projectId)
   }
 
   private implicit lazy val accessTokenEntityDecoder: EntityDecoder[Interpretation, AccessToken] =
     jsonOf[Interpretation, AccessToken]
 
-  private def toHttpResult(projectId: ProjectId): Unit => Interpretation[Response[Interpretation]] = _ => {
+  private def toHttpResponse(projectId: ProjectId): Unit => Interpretation[Response[Interpretation]] = _ => {
     logger.info(s"Token associated with projectId: $projectId")
     NoContent()
   }
@@ -68,7 +68,7 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
       ME.raiseError(BadRequestError(exception))
   }
 
-  private def httpResult(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private def httpResponse(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case BadRequestError(exception) =>
       BadRequest(ErrorMessage(exception.getMessage))
     case NonFatal(exception) =>

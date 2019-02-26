@@ -23,7 +23,6 @@ import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import ch.datascience.webhookservice.eventprocessing.routes.WebhookEventEndpoint
 import eu.timepit.refined.api.{RefType, Refined}
 import io.circe.Decoder
 import javax.inject.{Inject, Singleton}
@@ -37,7 +36,7 @@ class ProjectHookUrlFinder[Interpretation[_]](
   def findProjectHookUrl: Interpretation[ProjectHookUrl] =
     for {
       selfUrl        <- selfUrlConfig.get()
-      projectHookUrl <- ME.fromEither(ProjectHookUrl.from(s"$selfUrl${WebhookEventEndpoint.processPushEvent().url}"))
+      projectHookUrl <- ME.fromEither(ProjectHookUrl.from(s"$selfUrl/webhooks/events"))
     } yield projectHookUrl
 }
 
