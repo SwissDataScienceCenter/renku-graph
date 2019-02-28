@@ -21,8 +21,8 @@ package ch.datascience.webhookservice.hookcreation
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.ProjectId
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 

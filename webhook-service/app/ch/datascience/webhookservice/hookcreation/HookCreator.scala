@@ -22,8 +22,8 @@ import cats.data.EitherT
 import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
-import ch.datascience.clients.AccessToken
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.http.client.AccessToken
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
 import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, HookCreationResult}

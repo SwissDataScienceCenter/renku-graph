@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.graph.events.{CommitEvent, CommitId}
+import ch.datascience.graph.model.events.{CommitEvent, CommitId}
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import javax.inject.{Inject, Singleton}
 

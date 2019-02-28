@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}

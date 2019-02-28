@@ -18,15 +18,13 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
-import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.EventsGenerators.commitEvents
+import ch.datascience.graph.model.events.EventsGenerators._
 import io.circe.Json
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import ch.datascience.graph.events.EventsGenerators._
 
 import scala.util.{Success, Try}
 

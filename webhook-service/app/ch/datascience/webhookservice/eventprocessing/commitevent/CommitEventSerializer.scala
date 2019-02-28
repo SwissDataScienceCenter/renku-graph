@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.graph.events._
+import ch.datascience.graph.model.events._
 import io.circe.Json
 import javax.inject.Singleton
 

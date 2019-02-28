@@ -21,8 +21,8 @@ package ch.datascience.tokenrepository.repository
 import eu.timepit.refined.pureconfig._
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.clients.AccessToken
-import ch.datascience.clients.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken

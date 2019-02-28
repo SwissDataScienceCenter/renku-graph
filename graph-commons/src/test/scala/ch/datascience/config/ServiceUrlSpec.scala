@@ -50,4 +50,17 @@ class ServiceUrlSpec extends WordSpec with PropertyChecks {
       (url / "path").toString shouldBe s"$url/path"
     }
   }
+
+  "from" should {
+
+    "instantiate for valid urls" in {
+      val serviceUrl = serviceUrls.generateOne
+      ServiceUrl.from(serviceUrl.toString) shouldBe Right(serviceUrl)
+    }
+
+    "fail with IllegalArgumentException for invalid urls" in {
+      val Left(failure) = ServiceUrl.from("dfh://asdf")
+      failure.getMessage shouldBe s"Cannot instantiate ${ServiceUrl.getClass.getName}".replace("$", "")
+    }
+  }
 }

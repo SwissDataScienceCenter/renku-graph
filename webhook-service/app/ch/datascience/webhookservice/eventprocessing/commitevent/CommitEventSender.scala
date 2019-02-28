@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 import cats.effect.IO
 import cats.implicits._
 import cats.{Monad, MonadError}
-import ch.datascience.graph.events.CommitEvent
+import ch.datascience.graph.model.events.CommitEvent
 import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds

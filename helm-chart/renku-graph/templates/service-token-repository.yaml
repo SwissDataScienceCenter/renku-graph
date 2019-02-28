@@ -11,7 +11,7 @@ spec:
   type: {{ .Values.tokenRepository.service.type }}
   ports:
     - port: {{ .Values.tokenRepository.service.port }}
-      targetPort: http2
+      targetPort: http-token-repo
       protocol: TCP
       name: http
   selector:

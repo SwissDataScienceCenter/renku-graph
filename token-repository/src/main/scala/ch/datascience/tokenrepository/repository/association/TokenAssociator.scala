@@ -21,8 +21,8 @@ package ch.datascience.tokenrepository.repository.association
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import ch.datascience.clients.AccessToken
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.http.client.AccessToken
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto
 
 import scala.language.higherKinds

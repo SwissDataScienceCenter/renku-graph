@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.db.TransactorProvider
-import ch.datascience.graph.events.ProjectId
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensConfig
 

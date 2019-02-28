@@ -31,8 +31,13 @@ libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
 libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "0.2.0"
-libraryDependencies += "io.circe"          %% "circe-core"    % "0.10.0"
-libraryDependencies += "org.typelevel"     %% "cats-core"     % "1.5.0"
+
+val circeVersion = "0.10.0"
+libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
+libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
+libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
+
+libraryDependencies += "org.typelevel" %% "cats-core" % "1.5.0"
 
 val http4sVersion = "0.19.0"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client" % http4sVersion

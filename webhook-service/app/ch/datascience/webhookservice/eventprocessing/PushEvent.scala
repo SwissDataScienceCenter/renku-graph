@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import ch.datascience.graph.events.{CommitId, Project, PushUser}
+import ch.datascience.graph.model.events.{CommitId, Project, PushUser}
 
 final case class PushEvent(
     maybeCommitFrom: Option[CommitId],

@@ -21,10 +21,11 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.GraphCommonsGenerators._
-import ch.datascience.graph.events.UserId
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.graph.model.events.UserId
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.webhookservice.IOContextShift
 import ch.datascience.webhookservice.config.GitLabConfig.HostUrl
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
@@ -129,6 +130,8 @@ class IOUserInfoFinderSpec extends WordSpec with MockFactory with ExternalServic
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/users/$userId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
   }
+
+  private implicit val cs: IOContextShift = new IOContextShift(global)
 
   private trait TestCase {
     val gitLabUrl   = url(externalServiceBaseUrl)

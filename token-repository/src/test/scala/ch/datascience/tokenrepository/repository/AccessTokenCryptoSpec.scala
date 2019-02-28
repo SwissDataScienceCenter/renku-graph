@@ -20,10 +20,10 @@ package ch.datascience.tokenrepository.repository
 
 import java.util.Base64
 
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.events.GraphCommonsGenerators._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import eu.timepit.refined.api.RefType
 import org.scalatest.Matchers._

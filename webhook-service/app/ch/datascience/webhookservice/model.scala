@@ -18,9 +18,7 @@
 
 package ch.datascience.webhookservice
 
-import ch.datascience.graph.events.{ProjectId, ProjectPath, UserId}
-import ch.datascience.tinytypes.TinyType
-import io.circe.Decoder
+import ch.datascience.graph.model.events.{ProjectId, ProjectPath, UserId}
 
 object model {
 
@@ -32,7 +30,11 @@ object model {
       id: UserId
   )
 
+  import ch.datascience.tinytypes.TinyType
+  import io.circe.Decoder
+
   sealed trait ProjectVisibility extends TinyType[String] with Product with Serializable
+
   object ProjectVisibility {
 
     val all: Set[ProjectVisibility] = Set(Public, Private, Internal)

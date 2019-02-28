@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import cats.effect.IO
-import ch.datascience.graph.events._
+import ch.datascience.graph.model.events._
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import javax.inject.{Inject, Singleton}
 

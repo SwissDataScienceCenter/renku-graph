@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import cats.effect.IO
 import cats.implicits._
 import cats.{Monad, MonadError}
-import ch.datascience.graph.events.CommitEvent
+import ch.datascience.graph.model.events.CommitEvent
 import ch.datascience.logging.IOLogger
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, IOCommitEventSender}

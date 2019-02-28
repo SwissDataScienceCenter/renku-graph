@@ -20,13 +20,13 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import cats.data.OptionT
 import cats.effect.IO
-import ch.datascience.clients.AccessToken
+import ch.datascience.http.client.AccessToken
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.events.EventsGenerators._
-import ch.datascience.graph.events.GraphCommonsGenerators._
-import ch.datascience.graph.events.ProjectId
-import ch.datascience.http.EndpointTester._
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.Json

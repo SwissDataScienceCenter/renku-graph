@@ -20,12 +20,7 @@ organization := "ch.datascience"
 name := "token-repository"
 version := "0.1.0-SNAPSHOT"
 
-resolvers += Resolver.sonatypeRepo("snapshots")
-
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
-val circeVersion = "0.10.0"
-libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
-libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
 val doobieVersion = "0.6.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
