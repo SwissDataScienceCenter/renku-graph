@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.graph.tokenrepository
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException

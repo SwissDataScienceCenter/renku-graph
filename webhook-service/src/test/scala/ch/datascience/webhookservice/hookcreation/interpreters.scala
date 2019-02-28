@@ -16,18 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
-import ch.datascience.config.{ConfigLoader, ServiceUrl}
-import com.typesafe.config.{Config, ConfigFactory}
+import cats.effect.IO
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
+import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
+import io.chrisdavenport.log4cats.Logger
 
-import scala.language.higherKinds
+import scala.util.Try
 
-private class TokenRepositoryUrlProvider[Interpretation[_]](
-    config:    Config = ConfigFactory.load()
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
+private class TryEventsHistoryLoader(
+    latestPushEventFetcher: LatestPushEventFetcher[Try],
+    userInfoFinder:         UserInfoFinder[Try],
+    pushEventSender:        PushEventSender[Try],
+    logger:                 Logger[Try]
+)(implicit ME:              MonadError[Try, Throwable])
+    extends EventsHistoryLoader[Try](latestPushEventFetcher, userInfoFinder, pushEventSender, logger)
 
-  def get: Interpretation[ServiceUrl] = find[ServiceUrl]("services.token-repository.url", config)
-}
+private class IOTokenRepositoryUrlProvider extends TokenRepositoryUrlProvider[IO]

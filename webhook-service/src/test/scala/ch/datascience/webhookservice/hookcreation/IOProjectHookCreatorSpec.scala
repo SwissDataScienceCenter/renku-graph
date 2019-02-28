@@ -99,7 +99,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
       } shouldBe UnauthorizedException
     }
 
-    "return a RuntimeException if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
+    "return an Exception if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
       expectGitLabHostProvider(returning = IO.pure(gitLabUrl))
       val accessToken = accessTokens.generateOne
 

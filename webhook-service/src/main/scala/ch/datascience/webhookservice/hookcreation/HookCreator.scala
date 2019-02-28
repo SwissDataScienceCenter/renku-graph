@@ -23,6 +23,7 @@ import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
@@ -47,6 +48,7 @@ private class HookCreator[Interpretation[_]: Monad](
     projectInfoFinder:    ProjectInfoFinder[Interpretation],
     hookTokenCrypto:      HookTokenCrypto[Interpretation],
     projectHookCreator:   ProjectHookCreator[Interpretation],
+    accessTokenStorage:   AccessTokenStorage[Interpretation],
     eventsHistoryLoader:  EventsHistoryLoader[Interpretation],
     logger:               Logger[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable]) {
@@ -56,6 +58,7 @@ private class HookCreator[Interpretation[_]: Monad](
   import projectHookCreator.create
   import projectHookUrlFinder._
   import projectHookValidator._
+  import accessTokenStorage._
   import projectInfoFinder._
 
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookCreationResult] = {
@@ -66,6 +69,7 @@ private class HookCreator[Interpretation[_]: Monad](
       projectInfo         <- right(findProjectInfo(projectId, accessToken))
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
       _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
+      _                   <- right(associate(projectId, accessToken))
       _                   <- right(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken))
     } yield ()
   } fold (leftToHookExisted, rightToHookCreated(projectId)) recoverWith loggingError(projectId)
@@ -122,6 +126,7 @@ private class IOHookCreator(implicit executionContext: ExecutionContext, context
       new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
       HookTokenCrypto[IO],
       new IOProjectHookCreator(new GitLabConfigProvider[IO]),
+      new IOAccessTokenStorage(new TokenRepositoryUrlProvider[IO]()),
       new IOEventsHistoryLoader,
       ApplicationLogger
     )

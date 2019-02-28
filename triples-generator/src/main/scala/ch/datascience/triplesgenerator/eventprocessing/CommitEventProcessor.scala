@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.triplesgenerator.config.FusekiConfigProvider

@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
 import ch.datascience.triplesgenerator.eventprocessing.Commands.GitLabRepoUrlFinder
 
 import scala.util.Try

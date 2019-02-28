@@ -16,14 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.crypto
+package ch.datascience.graph.tokenrepository
 
 import cats.MonadError
-import cats.effect.IO
-import ch.datascience.crypto.AesCrypto.Secret
+import ch.datascience.config.{ConfigLoader, ServiceUrl}
+import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.util.Try
+import scala.language.higherKinds
 
-class TryHookTokenCrypto(secret: Secret)(implicit ME: MonadError[Try, Throwable]) extends HookTokenCrypto[Try](secret)
+class TokenRepositoryUrlProvider[Interpretation[_]](
+    config:    Config = ConfigFactory.load()
+)(implicit ME: MonadError[Interpretation, Throwable])
+    extends ConfigLoader[Interpretation] {
 
-class IOHookTokenCrypto(secret: Secret)(implicit ME: MonadError[IO, Throwable]) extends HookTokenCrypto[IO](secret)
+  def get: Interpretation[ServiceUrl] = find[ServiceUrl]("services.token-repository.url", config)
+}

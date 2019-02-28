@@ -77,7 +77,7 @@ private class IOProjectHookCreator(
 
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[Unit] =
     response.status match {
-      case Created      => IO.pure(())
+      case Created      => IO.unit
       case Unauthorized => IO.raiseError(UnauthorizedException)
       case _            => raiseError(request, response)
     }

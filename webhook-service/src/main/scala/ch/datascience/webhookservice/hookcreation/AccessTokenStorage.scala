@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events.ProjectId
@@ -26,37 +26,34 @@ import ch.datascience.http.client.{AccessToken, IORestClient}
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait AccessTokenFinder[Interpretation[_]] {
-  def findAccessToken(projectId: ProjectId): Interpretation[Option[AccessToken]]
+private trait AccessTokenStorage[Interpretation[_]] {
+  def associate(projectId: ProjectId, accessToken: AccessToken): Interpretation[Unit]
 }
 
-private class IOAccessTokenFinder(
+private class IOAccessTokenStorage(
     tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO]
 )(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO])
     extends IORestClient
-    with AccessTokenFinder[IO] {
+    with AccessTokenStorage[IO] {
 
   import cats.effect._
-  import org.http4s.Method.GET
-  import org.http4s._
+  import io.circe.syntax._
+  import org.http4s.Method.PUT
+  import org.http4s.Status.NoContent
   import org.http4s.circe._
-  import org.http4s.dsl.io._
+  import org.http4s.{Request, Response}
 
-  def findAccessToken(projectId: ProjectId): IO[Option[AccessToken]] =
+  override def associate(projectId: ProjectId, accessToken: AccessToken): IO[Unit] =
     for {
       tokenRepositoryUrl <- tokenRepositoryUrlProvider.get
       uri                <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
-      accessToken        <- send(request(GET, uri))(mapResponse)
-    } yield accessToken
+      requestWithPayload = request(PUT, uri).withEntity(accessToken.asJson)
+      _ <- send(requestWithPayload)(mapResponse)
+    } yield ()
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[Option[AccessToken]] =
+  private def mapResponse(request: Request[IO], response: Response[IO]): IO[Unit] =
     response.status match {
-      case Ok       => response.as[Option[AccessToken]] handleErrorWith contextToError(request, response)
-      case NotFound => IO.pure(None)
-      case _        => raiseError(request, response)
+      case NoContent => IO.unit
+      case _         => raiseError(request, response)
     }
-
-  private implicit lazy val accessTokenEntityDecoder: EntityDecoder[IO, Option[AccessToken]] = {
-    jsonOf[IO, AccessToken].map(Option.apply)
-  }
 }
