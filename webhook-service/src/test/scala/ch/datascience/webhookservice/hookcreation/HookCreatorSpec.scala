@@ -35,6 +35,7 @@ import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidation
 import ch.datascience.webhookservice.hookvalidation.TryHookValidator
 import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project._
+import ch.datascience.webhookservice.tokenrepository.AccessTokenAssociator
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -72,7 +73,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(context.unit)
 
-      (accessTokenStorage
+      (accessTokenAssociator
         .associate(_: ProjectId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(context.unit)
@@ -243,7 +244,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
-      (accessTokenStorage
+      (accessTokenAssociator
         .associate(_: ProjectId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(error)
@@ -279,7 +280,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(context.unit)
 
-      (accessTokenStorage
+      (accessTokenAssociator
         .associate(_: ProjectId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(context.unit)
@@ -303,14 +304,14 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     val context = MonadError[Try, Throwable]
 
-    val logger               = TestLogger[Try]()
-    val projectInfoFinder    = mock[ProjectInfoFinder[Try]]
-    val projectHookValidator = mock[TryHookValidator]
-    val projectHookCreator   = mock[ProjectHookCreator[Try]]
-    val projectHookUrlFinder = mock[TryProjectHookUrlFinder]
-    val hookTokenCrypto      = mock[TryHookTokenCrypto]
-    val accessTokenStorage   = mock[AccessTokenStorage[Try]]
-    val eventsHistoryLoader  = mock[TryEventsHistoryLoader]
+    val logger                = TestLogger[Try]()
+    val projectInfoFinder     = mock[ProjectInfoFinder[Try]]
+    val projectHookValidator  = mock[TryHookValidator]
+    val projectHookCreator    = mock[ProjectHookCreator[Try]]
+    val projectHookUrlFinder  = mock[TryProjectHookUrlFinder]
+    val hookTokenCrypto       = mock[TryHookTokenCrypto]
+    val accessTokenAssociator = mock[AccessTokenAssociator[Try]]
+    val eventsHistoryLoader   = mock[TryEventsHistoryLoader]
 
     val hookCreation = new HookCreator[Try](
       projectHookUrlFinder,
@@ -318,7 +319,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       projectInfoFinder,
       hookTokenCrypto,
       projectHookCreator,
-      accessTokenStorage,
+      accessTokenAssociator,
       eventsHistoryLoader,
       logger
     )

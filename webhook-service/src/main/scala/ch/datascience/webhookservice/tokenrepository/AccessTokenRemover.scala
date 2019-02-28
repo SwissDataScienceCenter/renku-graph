@@ -16,39 +16,36 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.tokenrepository
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.IORestClient
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait AccessTokenStorage[Interpretation[_]] {
-  def associate(projectId: ProjectId, accessToken: AccessToken): Interpretation[Unit]
+trait AccessTokenRemover[Interpretation[_]] {
+  def removeAccessToken(projectId: ProjectId): Interpretation[Unit]
 }
 
-private class IOAccessTokenStorage(
+class IOAccessTokenRemover(
     tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO]
 )(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO])
     extends IORestClient
-    with AccessTokenStorage[IO] {
+    with AccessTokenRemover[IO] {
 
   import cats.effect._
-  import io.circe.syntax._
-  import org.http4s.Method.PUT
+  import org.http4s.Method.DELETE
   import org.http4s.Status.NoContent
-  import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  override def associate(projectId: ProjectId, accessToken: AccessToken): IO[Unit] =
+  override def removeAccessToken(projectId: ProjectId): IO[Unit] =
     for {
       tokenRepositoryUrl <- tokenRepositoryUrlProvider.get
       uri                <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
-      requestWithPayload = request(PUT, uri).withEntity(accessToken.asJson)
-      _ <- send(requestWithPayload)(mapResponse)
+      _                  <- send(request(DELETE, uri))(mapResponse)
     } yield ()
 
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[Unit] =

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.tokenrepository
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
@@ -27,6 +27,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.tokenrepository.IOTokenRepositoryUrlProvider
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -40,7 +41,7 @@ import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOAccessTokenStorageSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class IOAccessTokenAssociatorSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
 
   "associate" should {
 
@@ -57,7 +58,7 @@ class IOAccessTokenStorageSpec extends WordSpec with MockFactory with ExternalSe
             .willReturn(noContent())
         }
 
-        storage.associate(projectId, accessToken).unsafeRunSync() shouldBe (): Unit
+        associator.associate(projectId, accessToken).unsafeRunSync() shouldBe (): Unit
       }
     }
 
@@ -71,11 +72,11 @@ class IOAccessTokenStorageSpec extends WordSpec with MockFactory with ExternalSe
         .returning(context.raiseError(exception))
 
       intercept[Exception] {
-        storage.associate(projectId, accessToken).unsafeRunSync()
+        associator.associate(projectId, accessToken).unsafeRunSync()
       } shouldBe exception
     }
 
-    "return an Exception if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
+    "return an Exception if remote client responds with a status other than NO_CONTENT" in new TestCase {
       val accessToken = accessTokens.generateOne
 
       (tokenRepositoryUrlProvider.get _)
@@ -90,7 +91,7 @@ class IOAccessTokenStorageSpec extends WordSpec with MockFactory with ExternalSe
       }
 
       intercept[Exception] {
-        storage.associate(projectId, accessToken).unsafeRunSync()
+        associator.associate(projectId, accessToken).unsafeRunSync()
       }.getMessage shouldBe s"PUT $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.BadRequest}; body: $responseBody"
     }
   }
@@ -105,7 +106,7 @@ class IOAccessTokenStorageSpec extends WordSpec with MockFactory with ExternalSe
     val projectId          = projectIds.generateOne
 
     val tokenRepositoryUrlProvider = mock[IOTokenRepositoryUrlProvider]
-    val storage                    = new IOAccessTokenStorage(tokenRepositoryUrlProvider)
+    val associator                 = new IOAccessTokenAssociator(tokenRepositoryUrlProvider)
   }
 
   private lazy val toJson: AccessToken => String = {

@@ -36,6 +36,7 @@ import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValida
 import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.project._
+import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, IOAccessTokenAssociator}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -43,22 +44,22 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private class HookCreator[Interpretation[_]: Monad](
-    projectHookUrlFinder: ProjectHookUrlFinder[Interpretation],
-    projectHookValidator: HookValidator[Interpretation],
-    projectInfoFinder:    ProjectInfoFinder[Interpretation],
-    hookTokenCrypto:      HookTokenCrypto[Interpretation],
-    projectHookCreator:   ProjectHookCreator[Interpretation],
-    accessTokenStorage:   AccessTokenStorage[Interpretation],
-    eventsHistoryLoader:  EventsHistoryLoader[Interpretation],
-    logger:               Logger[Interpretation]
-)(implicit ME:            MonadError[Interpretation, Throwable]) {
+    projectHookUrlFinder:  ProjectHookUrlFinder[Interpretation],
+    projectHookValidator:  HookValidator[Interpretation],
+    projectInfoFinder:     ProjectInfoFinder[Interpretation],
+    hookTokenCrypto:       HookTokenCrypto[Interpretation],
+    projectHookCreator:    ProjectHookCreator[Interpretation],
+    accessTokenAssociator: AccessTokenAssociator[Interpretation],
+    eventsHistoryLoader:   EventsHistoryLoader[Interpretation],
+    logger:                Logger[Interpretation]
+)(implicit ME:             MonadError[Interpretation, Throwable]) {
 
   import HookCreator.HookCreationResult._
   import hookTokenCrypto._
   import projectHookCreator.create
   import projectHookUrlFinder._
   import projectHookValidator._
-  import accessTokenStorage._
+  import accessTokenAssociator._
   import projectInfoFinder._
 
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookCreationResult] = {
@@ -126,7 +127,7 @@ private class IOHookCreator(implicit executionContext: ExecutionContext, context
       new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
       HookTokenCrypto[IO],
       new IOProjectHookCreator(new GitLabConfigProvider[IO]),
-      new IOAccessTokenStorage(new TokenRepositoryUrlProvider[IO]()),
+      new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO]()),
       new IOEventsHistoryLoader,
       ApplicationLogger
     )

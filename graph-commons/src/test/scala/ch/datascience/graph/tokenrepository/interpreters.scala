@@ -16,18 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.graph.tokenrepository
 
-import cats.MonadError
-import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
-import io.chrisdavenport.log4cats.Logger
+import cats.effect.IO
 
-import scala.util.Try
-
-private class TryEventsHistoryLoader(
-    latestPushEventFetcher: LatestPushEventFetcher[Try],
-    userInfoFinder:         UserInfoFinder[Try],
-    pushEventSender:        PushEventSender[Try],
-    logger:                 Logger[Try]
-)(implicit ME:              MonadError[Try, Throwable])
-    extends EventsHistoryLoader[Try](latestPushEventFetcher, userInfoFinder, pushEventSender, logger)
+class IOTokenRepositoryUrlProvider extends TokenRepositoryUrlProvider[IO]
