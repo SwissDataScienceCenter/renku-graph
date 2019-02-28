@@ -22,7 +22,7 @@ import cats.Applicative
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.MatchesRegex
-import io.circe.{Encoder, Json => CirceJson}
+import io.circe.{Encoder, Json}
 import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
 
@@ -41,7 +41,7 @@ object ErrorMessage {
       )
 
   implicit val encoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
-    CirceJson.obj("message" -> CirceJson.fromString(message.value))
+    Json.obj("message" -> Json.fromString(message.value))
   }
 
   implicit def infoMessageDecoder[F[_]: Applicative]: EntityEncoder[F, ErrorMessage] =
@@ -61,7 +61,7 @@ object InfoMessage {
       )
 
   private implicit val encoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
-    CirceJson.obj("message" -> CirceJson.fromString(message.value))
+    Json.obj("message" -> Json.fromString(message.value))
   }
 
   implicit def infoMessageDecoder[F[_]: Applicative]: EntityEncoder[F, InfoMessage] =

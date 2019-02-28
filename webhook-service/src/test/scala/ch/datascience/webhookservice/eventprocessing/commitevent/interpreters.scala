@@ -16,16 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.pushevent
+package ch.datascience.webhookservice.eventprocessing.commitevent
 import cats.MonadError
-import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender
-import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
-class TryPushEventSender(
-    commitEventsFinder: CommitEventsFinder[Try],
-    commitEventSender:  CommitEventSender[Try],
-    logger:             Logger[Try]
-)(implicit ME:          MonadError[Try, Throwable])
-    extends PushEventSender[Try](commitEventsFinder, commitEventSender, logger)
+class TryCommitEventSender(
+    eventLog:              EventLog[Try],
+    commitEventSerializer: CommitEventSerializer[Try]
+)(implicit ME:             MonadError[Try, Throwable])
+    extends CommitEventSender[Try](eventLog, commitEventSerializer)

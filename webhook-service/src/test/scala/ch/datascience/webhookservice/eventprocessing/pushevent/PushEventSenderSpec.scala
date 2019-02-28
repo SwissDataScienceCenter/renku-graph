@@ -27,7 +27,7 @@ import ch.datascience.graph.model.events._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, CommitEventSerializer, EventLog}
+import ch.datascience.webhookservice.eventprocessing.commitevent._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -137,20 +137,11 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
     val pushEvent = pushEvents.generateOne
 
-    val commitEventSender  = mock[TestCommitEventSender]
-    val commitEventsFinder = mock[TestCommitEventsFinder]
+    val commitEventSender  = mock[TryCommitEventSender]
+    val commitEventsFinder = mock[TryCommitEventsFinder]
     val logger             = TestLogger[Try]()
     val pushEventSender    = new PushEventSender[Try](commitEventsFinder, commitEventSender, logger)
   }
-
-  private class TestCommitEventSender(
-      eventLog:              EventLog[Try],
-      commitEventSerializer: CommitEventSerializer[Try]
-  ) extends CommitEventSender[Try](eventLog, commitEventSerializer)
-
-  private class TestCommitEventsFinder(
-      commitInfoFinder: CommitInfoFinder[Try]
-  ) extends CommitEventsFinder[Try](commitInfoFinder)
 
   private def commitEventsFrom(pushEvent: PushEvent): Gen[Stream[Try[CommitEvent]]] =
     for {

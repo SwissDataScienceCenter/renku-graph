@@ -17,14 +17,12 @@
  */
 
 organization := "ch.datascience"
-version := "0.1.0-SNAPSHOT"
 name := "renku-graph-commons"
+version := "0.1.0-SNAPSHOT"
 
 val pureConfigVersion = "0.10.1"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
-
-libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10"
 
 val refinedVersion = "0.9.3"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
@@ -46,8 +44,7 @@ libraryDependencies += "org.http4s" %% "http4s-circe"        % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-dsl"          % http4sVersion
 
 // Test dependencies
-libraryDependencies += component("play-test")   % Test
-libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.18.0" % Test
-libraryDependencies += "org.scalamock"          %% "scalamock" % "4.1.0" % Test
+libraryDependencies += "com.github.tomakehurst" % "wiremock"    % "2.18.0" % Test
+libraryDependencies += "org.scalamock"          %% "scalamock"  % "4.1.0"  % Test
 libraryDependencies += "org.scalacheck"         %% "scalacheck" % "1.14.0" % Test
-libraryDependencies += "org.scalatest"          %% "scalatest" % "3.0.5" % Test
+libraryDependencies += "org.scalatest"          %% "scalatest"  % "3.0.5"  % Test

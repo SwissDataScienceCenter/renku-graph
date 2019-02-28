@@ -28,7 +28,7 @@ import scala.collection.JavaConverters._
 import scala.language.higherKinds
 import scala.util.Try
 
-private class FileEventLog[Interpretation[_]](
+private[commitevent] class FileEventLog[Interpretation[_]](
     logFileConfigProvider: LogFileConfigProvider[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable])
     extends EventLog[Interpretation] {
@@ -51,7 +51,7 @@ private class FileEventLog[Interpretation[_]](
   )
 }
 
-private object FileEventLog {
+private[commitevent] object FileEventLog {
   def apply[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]): FileEventLog[Interpretation] =
     new FileEventLog[Interpretation](new LogFileConfigProvider[Interpretation])
 }
