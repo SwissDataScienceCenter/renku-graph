@@ -18,13 +18,11 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.IO
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events.{CommitId, ProjectId, UserId}
-import ch.datascience.webhookservice.IOContextShift
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
+import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
-import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -45,10 +43,9 @@ private object LatestPushEventFetcher {
   )
 }
 
-@Singleton
-private class IOLatestPushEventFetcher @Inject()(
-    gitLabConfig:            IOGitLabConfigProvider
-)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
+private class IOLatestPushEventFetcher(
+    gitLabConfig:            GitLabConfigProvider[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends IORestClient
     with LatestPushEventFetcher[IO] {
 
@@ -65,7 +62,7 @@ private class IOLatestPushEventFetcher @Inject()(
       accessToken: AccessToken
   ): IO[Option[PushEventInfo]] =
     for {
-      gitLabHostUrl <- gitLabConfig.get()
+      gitLabHostUrl <- gitLabConfig.get
       uri           <- validateUri(s"$gitLabHostUrl/api/v4/projects/$projectId/events") map (_.withQueryParam("action", "pushed"))
       projectInfo   <- send(request(GET, uri, accessToken))(mapResponse)
     } yield projectInfo
@@ -91,5 +88,4 @@ private class IOLatestPushEventFetcher @Inject()(
 
     jsonOf[IO, Option[PushEventInfo]]
   }
-
 }

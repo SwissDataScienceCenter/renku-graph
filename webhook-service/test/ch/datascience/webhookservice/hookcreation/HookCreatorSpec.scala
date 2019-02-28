@@ -20,22 +20,22 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats._
 import cats.implicits._
-import ch.datascience.http.client.AccessToken
 import ch.datascience.crypto.AesCrypto.Secret
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.hookvalidation.TryHookValidator
-import ch.datascience.webhookservice.model.{HookToken, ProjectInfo}
+import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

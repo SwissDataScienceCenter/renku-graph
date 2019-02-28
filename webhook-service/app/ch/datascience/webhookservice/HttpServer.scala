@@ -19,11 +19,18 @@
 package ch.datascience.webhookservice
 
 import cats.effect._
+import ch.datascience.http.server.PingEndpoint
+import ch.datascience.webhookservice.eventprocessing.HookEventEndpoint
+import ch.datascience.webhookservice.hookcreation.HookCreationEndpoint
+import ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint
 
 import scala.language.higherKinds
 
 private class HttpServer[F[_]: ConcurrentEffect](
-//    pingEndpoint:           PingEndpoint[F],
+    pingEndpoint:           PingEndpoint[F],
+    hookEventEndpoint:      HookEventEndpoint[F],
+    hookCreationEndpoint:   HookCreationEndpoint[F],
+    hookValidationEndpoint: HookValidationEndpoint[F]
 ) {
   import cats.implicits._
   import org.http4s.server.blaze._
@@ -31,7 +38,10 @@ private class HttpServer[F[_]: ConcurrentEffect](
   def run: F[ExitCode] =
     BlazeBuilder[F]
       .bindHttp(9003, "0.0.0.0")
-//      .mountService(pingEndpoint.ping, "/")
+      .mountService(pingEndpoint.ping, "/")
+      .mountService(hookEventEndpoint.processPushEvent, "/")
+      .mountService(hookCreationEndpoint.createHook, "/")
+      .mountService(hookValidationEndpoint.validateHook, "/")
       .serve
       .compile
       .drain

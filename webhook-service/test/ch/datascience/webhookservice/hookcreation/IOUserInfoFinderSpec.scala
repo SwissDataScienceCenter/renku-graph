@@ -18,15 +18,14 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.events.UserId
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.IOContextShift
-import ch.datascience.webhookservice.config.GitLabConfig.HostUrl
+import ch.datascience.webhookservice.config.GitLabConfigProvider.HostUrl
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
@@ -131,7 +130,7 @@ class IOUserInfoFinderSpec extends WordSpec with MockFactory with ExternalServic
     }
   }
 
-  private implicit val cs: IOContextShift = new IOContextShift(global)
+  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
     val gitLabUrl   = url(externalServiceBaseUrl)

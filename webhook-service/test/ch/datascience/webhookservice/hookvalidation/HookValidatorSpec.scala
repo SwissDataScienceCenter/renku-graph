@@ -28,9 +28,8 @@ import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
-import ch.datascience.webhookservice.model.ProjectVisibility
 import ch.datascience.webhookservice.project._
 import io.chrisdavenport.log4cats.Logger
 import org.scalacheck.Arbitrary

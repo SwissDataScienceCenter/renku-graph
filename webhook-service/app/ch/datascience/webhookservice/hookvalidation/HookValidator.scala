@@ -20,17 +20,17 @@ package ch.datascience.webhookservice.hookvalidation
 
 import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.IOLogger
+import ch.datascience.logging.ApplicationLogger
+import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
-import ch.datascience.webhookservice.model.ProjectInfo
 import ch.datascience.webhookservice.project._
 import io.chrisdavenport.log4cats.Logger
-import javax.inject.{Inject, Singleton}
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -42,7 +42,7 @@ class HookValidator[Interpretation[_]](
 )(implicit ME:            MonadError[Interpretation, Throwable]) {
 
   import HookValidator.HookValidationResult._
-  import ch.datascience.webhookservice.model.ProjectVisibility._
+  import ProjectVisibility._
   import projectHookUrlFinder._
   import projectHookVerifier._
   import projectInfoFinder._
@@ -84,10 +84,10 @@ object HookValidator {
   }
 }
 
-@Singleton
-class IOHookValidator @Inject()(
-    projectInfoFinder:    IOProjectInfoFinder,
-    projectHookUrlFinder: IOProjectHookUrlFinder,
-    projectHookVerifier:  IOProjectHookVerifier,
-    logger:               IOLogger
-) extends HookValidator[IO](projectInfoFinder, projectHookUrlFinder, projectHookVerifier, logger)
+class IOHookValidator(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+    extends HookValidator[IO](
+      new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
+      new IOProjectHookUrlFinder,
+      new IOProjectHookVerifier(new GitLabConfigProvider[IO]),
+      ApplicationLogger
+    )

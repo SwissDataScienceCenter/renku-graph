@@ -19,14 +19,12 @@
 package ch.datascience.webhookservice.hookvalidation
 
 import ProjectHookVerifier.HookIdentifier
-import cats.effect.IO
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.webhookservice.IOContextShift
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
+import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import io.circe.Decoder.decodeList
-import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -46,10 +44,9 @@ private object ProjectHookVerifier {
   )
 }
 
-@Singleton
-private class IOProjectHookVerifier @Inject()(
-    gitLabUrlProvider:       IOGitLabConfigProvider
-)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
+private class IOProjectHookVerifier(
+    gitLabUrlProvider:       GitLabConfigProvider[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends IORestClient
     with ProjectHookVerifier[IO] {
 
@@ -64,7 +61,7 @@ private class IOProjectHookVerifier @Inject()(
 
   override def checkProjectHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): IO[Boolean] =
     for {
-      gitLabHostUrl      <- gitLabUrlProvider.get()
+      gitLabHostUrl      <- gitLabUrlProvider.get
       uri                <- validateUri(s"$gitLabHostUrl/api/v4/projects/${projectHookId.projectId}/hooks")
       existingHooksNames <- send(request(GET, uri, accessToken))(mapResponse)
     } yield checkProjectHookExists(existingHooksNames, projectHookId.projectHookUrl)

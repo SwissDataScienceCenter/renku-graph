@@ -16,13 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.eventprocessing.commitevent.filelog
 
-import ch.datascience.graph.model.events.ProjectId
+import java.nio.file.Path
 
-object model {
+import cats.MonadError
+import ch.datascience.config.ConfigLoader
+import com.typesafe.config.{Config, ConfigFactory}
 
-  final case class HookToken(
-      projectId: ProjectId
-  )
+import scala.language.higherKinds
+
+private class LogFileConfigProvider[Interpretation[_]](
+    config:    Config = ConfigFactory.load()
+)(implicit ME: MonadError[Interpretation, Throwable])
+    extends ConfigLoader[Interpretation] {
+
+  def get: Interpretation[Path] = find[Path]("file-event-log.file-path", config)
 }

@@ -21,14 +21,15 @@ package ch.datascience.webhookservice.project
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
+import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import play.api.Configuration
 
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class SelfUrlConfigProviderSpec extends WordSpec {
+class SelfUrlConfigProviderProviderSpec extends WordSpec {
 
   private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
 
@@ -36,41 +37,39 @@ class SelfUrlConfigProviderSpec extends WordSpec {
 
     "return SelfUrl" in {
       val selfUrl = selfUrls.generateOne
-      val config = Configuration.from(
+      val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "self" -> Map(
               "url" -> selfUrl.toString()
-            )
-          )
-        )
+            ).asJava
+          ).asJava
+        ).asJava
       )
 
-      new SelfUrlConfig[Try](config).get() shouldBe Success(selfUrl)
+      new SelfUrlConfigProvider[Try](config).get shouldBe Success(selfUrl)
     }
 
     "fail if the value for 'services.self.url' is invalid" in {
-      val config = Configuration.from(
+      val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "self" -> Map(
               "url" -> "123"
-            )
-          )
-        )
+            ).asJava
+          ).asJava
+        ).asJava
       )
 
-      val Failure(exception) = new SelfUrlConfig[Try](config).get()
+      val Failure(exception) = new SelfUrlConfigProvider[Try](config).get
 
-      exception.getMessage should include(
-        "'123' is not a valid ch.datascience.webhookservice.project.SelfUrlConfig.SelfUrl"
+      exception.getMessage should startWith(
+        "Cannot convert '123'"
       )
     }
 
     "fail if there is no 'services.self.url' in the config" in {
-      val config = Configuration.empty
-
-      new SelfUrlConfig[Try](config).get() shouldBe a[Failure[_]]
+      new SelfUrlConfigProvider[Try](ConfigFactory.empty).get shouldBe a[Failure[_]]
     }
   }
 }

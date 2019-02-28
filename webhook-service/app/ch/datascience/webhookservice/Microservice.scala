@@ -19,22 +19,30 @@
 package ch.datascience.webhookservice
 
 import cats.effect._
+import ch.datascience.http.server.PingEndpoint
+import ch.datascience.webhookservice.eventprocessing.IOHookEventEndpoint
+import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
+import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
 
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.language.higherKinds
 
 object Microservice extends IOApp {
 
+  private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
+
   private val httpServer = new HttpServer[IO](
-//    new PingEndpoint[IO],
+    new PingEndpoint[IO],
+    new IOHookEventEndpoint,
+    new IOHookCreationEndpoint,
+    new IOHookValidationEndpoint
   )
 
   override def run(args: List[String]): IO[ExitCode] =
     new MicroserviceRunner(httpServer).run(args)
 }
 
-class MicroserviceRunner(
-    httpServer: HttpServer[IO]
-) {
+class MicroserviceRunner(httpServer: HttpServer[IO]) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {

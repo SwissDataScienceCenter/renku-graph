@@ -16,15 +16,9 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.config
 
-import javax.inject.{Inject, Singleton}
-import play.api.mvc.{AbstractController, ControllerComponents}
+import cats.MonadError
+import cats.effect.IO
 
-@Singleton
-class HealthCheckController @Inject()(cc: ControllerComponents) extends AbstractController(cc) {
-
-  val ping = Action { _ =>
-    Ok("pong")
-  }
-}
+class IOGitLabConfigProvider(implicit ME: MonadError[IO, Throwable]) extends GitLabConfigProvider[IO]

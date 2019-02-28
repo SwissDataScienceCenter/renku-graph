@@ -20,7 +20,6 @@ package ch.datascience.webhookservice.crypto
 
 import eu.timepit.refined.pureconfig._
 import cats.MonadError
-import cats.effect.IO
 import cats.implicits._
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
@@ -32,8 +31,6 @@ import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.MatchesRegex
 import io.circe.parser._
 import io.circe.{Decoder, HCursor, Json}
-import javax.inject.{Inject, Singleton}
-import play.api.Configuration
 import pureconfig._
 import pureconfig.error.ConfigReaderException
 
@@ -83,6 +80,16 @@ class HookTokenCrypto[Interpretation[_]](
 }
 
 object HookTokenCrypto {
+
+  def apply[Interpretation[_]](
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): HookTokenCrypto[Interpretation] = new HookTokenCrypto[Interpretation](
+    loadConfig[Secret]("services.gitlab.hook-token-secret").fold(
+      failures => throw new ConfigReaderException(failures),
+      identity
+    )
+  )
+
   type SerializedHookToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 
   object SerializedHookToken {
@@ -92,15 +99,4 @@ object HookTokenCrypto {
         .applyRef[SerializedHookToken](value)
         .leftMap(_ => new IllegalArgumentException("A value to create HookToken cannot be blank"))
   }
-}
-
-@Singleton
-class IOHookTokenCrypto(secret: Secret) extends HookTokenCrypto[IO](secret) {
-
-  @Inject def this(configuration: Configuration) = this(
-    loadConfig[Secret](configuration.underlying, "services.gitlab.hook-token-secret").fold(
-      failures => throw new ConfigReaderException(failures),
-      identity
-    )
-  )
 }

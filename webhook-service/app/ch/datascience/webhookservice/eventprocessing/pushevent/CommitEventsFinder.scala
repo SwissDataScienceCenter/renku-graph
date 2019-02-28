@@ -19,16 +19,17 @@
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import cats.MonadError
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.graph.model.events.{CommitEvent, CommitId}
+import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.PushEvent
-import javax.inject.{Inject, Singleton}
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class CommitEventsFinder[Interpretation[_]](
+private class CommitEventsFinder[Interpretation[_]](
     commitInfoFinder: CommitInfoFinder[Interpretation]
 )(implicit ME:        MonadError[Interpretation, Throwable]) {
 
@@ -85,7 +86,7 @@ class CommitEventsFinder[Interpretation[_]](
     )
 }
 
-@Singleton
-class IOCommitEventsFinder @Inject()(
-    commitInfoFinder: IOCommitInfoFinder
-) extends CommitEventsFinder[IO](commitInfoFinder)
+private class IOCommitEventsFinder(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+    extends CommitEventsFinder[IO](
+      new IOCommitInfoFinder(new GitLabConfigProvider())
+    )

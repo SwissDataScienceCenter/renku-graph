@@ -19,30 +19,25 @@
 package ch.datascience.webhookservice.config
 
 import cats.MonadError
-import cats.effect.IO
-import ch.datascience.webhookservice.config.GitLabConfig._
-import eu.timepit.refined.api.Refined
-import javax.inject.{Inject, Singleton}
-import play.api.Configuration
 import ch.datascience.config.ConfigLoader
+import ch.datascience.webhookservice.config.GitLabConfigProvider._
+import com.typesafe.config.{Config, ConfigFactory}
+import eu.timepit.refined.api.Refined
 
 import scala.language.higherKinds
 
-class GitLabConfig[Interpretation[_]](
-    configuration: Configuration
+class GitLabConfigProvider[Interpretation[_]](
+    configuration: Config = ConfigFactory.load()
 )(implicit ME:     MonadError[Interpretation, Throwable])
     extends ConfigLoader[Interpretation] {
   import eu.timepit.refined.pureconfig._
 
-  def get(): Interpretation[HostUrl] = find[HostUrl]("services.gitlab.url", configuration.underlying)
+  def get: Interpretation[HostUrl] = find[HostUrl]("services.gitlab.url", configuration)
 }
 
-object GitLabConfig {
+object GitLabConfigProvider {
 
   import eu.timepit.refined.string.Url
 
   type HostUrl = String Refined Url
 }
-
-@Singleton
-class IOGitLabConfigProvider @Inject()(configuration: Configuration) extends GitLabConfig[IO](configuration)

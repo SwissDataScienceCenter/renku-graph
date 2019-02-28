@@ -18,13 +18,12 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.IOContextShift
-import ch.datascience.webhookservice.config.{GitLabConfig, IOGitLabConfigProvider}
+import ch.datascience.webhookservice.config.{GitLabConfigProvider, IOGitLabConfigProvider}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
@@ -116,7 +115,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
     }
   }
 
-  private implicit val cs: IOContextShift = new IOContextShift(global)
+  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
     val projectHook = projectHooks.generateOne
@@ -136,7 +135,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
     val configProvider = mock[IOGitLabConfigProvider]
     val hookCreator    = new IOProjectHookCreator(configProvider)
 
-    def expectGitLabHostProvider(returning: IO[GitLabConfig.HostUrl]) =
+    def expectGitLabHostProvider(returning: IO[GitLabConfigProvider.HostUrl]) =
       (configProvider.get _)
         .expects()
         .returning(returning)

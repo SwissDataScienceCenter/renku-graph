@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.hookvalidation
 
 import cats.data.NonEmptyList
-import cats.effect.Effect
+import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
@@ -27,18 +27,19 @@ import ch.datascience.graph.http.server.ProjectIdPathBinder
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
-import ch.datascience.webhookservice.security.AccessTokenFinder
+import ch.datascience.webhookservice.security.AccessTokenExtractor
 import org.http4s.AuthScheme.Basic
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`WWW-Authenticate`
 import org.http4s.{Challenge, HttpRoutes, Response}
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class HookValidationEndpoint[Interpretation[_]: Effect](
     hookValidator:     HookValidator[Interpretation],
-    accessTokenFinder: AccessTokenFinder[Interpretation]
+    accessTokenFinder: AccessTokenExtractor[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
   import accessTokenFinder._
@@ -70,3 +71,9 @@ class HookValidationEndpoint[Interpretation[_]: Effect](
     case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))
   }
 }
+
+class IOHookValidationEndpoint(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+    extends HookValidationEndpoint[IO](
+      new IOHookValidator,
+      new AccessTokenExtractor[IO]
+    )

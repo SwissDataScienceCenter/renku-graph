@@ -25,17 +25,16 @@ import cats.implicits._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import eu.timepit.refined.api.{RefType, Refined}
 import io.circe.Decoder
-import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
 
 class ProjectHookUrlFinder[Interpretation[_]](
-    selfUrlConfig: SelfUrlConfig[Interpretation]
+    selfUrlConfig: SelfUrlConfigProvider[Interpretation]
 )(implicit ME:     MonadError[Interpretation, Throwable]) {
 
   def findProjectHookUrl: Interpretation[ProjectHookUrl] =
     for {
-      selfUrl        <- selfUrlConfig.get()
+      selfUrl        <- selfUrlConfig.get
       projectHookUrl <- ME.fromEither(ProjectHookUrl.from(s"$selfUrl/webhooks/events"))
     } yield projectHookUrl
 }
@@ -58,7 +57,4 @@ object ProjectHookUrlFinder {
   }
 }
 
-@Singleton
-class IOProjectHookUrlFinder @Inject()(
-    selfUrlConfig: IOSelfUrlConfigProvider
-) extends ProjectHookUrlFinder[IO](selfUrlConfig)
+class IOProjectHookUrlFinder extends ProjectHookUrlFinder[IO](new SelfUrlConfigProvider[IO])

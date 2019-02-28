@@ -20,19 +20,20 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import ch.datascience.http.client.AccessToken
 import ch.datascience.graph.model.events.{Project, PushUser}
-import ch.datascience.logging.IOLogger
+import ch.datascience.http.client.AccessToken
+import ch.datascience.logging.ApplicationLogger
+import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
 import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
 import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
-import ch.datascience.webhookservice.model.ProjectInfo
+import ch.datascience.webhookservice.project.ProjectInfo
 import io.chrisdavenport.log4cats.Logger
-import javax.inject.{Inject, Singleton}
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -80,10 +81,10 @@ private class EventsHistoryLoader[Interpretation[_]](
   }
 }
 
-@Singleton
-private class IOEventsHistoryLoader @Inject()(
-    latestPushEventFetcher: IOLatestPushEventFetcher,
-    userInfoFinder:         IOUserInfoFinder,
-    pushEventSender:        IOPushEventSender,
-    logger:                 IOLogger
-) extends EventsHistoryLoader[IO](latestPushEventFetcher, userInfoFinder, pushEventSender, logger)
+private class IOEventsHistoryLoader(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+    extends EventsHistoryLoader[IO](
+      new IOLatestPushEventFetcher(new GitLabConfigProvider[IO]),
+      new IOUserInfoFinder(new GitLabConfigProvider[IO]),
+      new IOPushEventSender,
+      ApplicationLogger
+    )

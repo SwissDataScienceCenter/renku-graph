@@ -22,13 +22,12 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
-import ch.datascience.webhookservice.project.SelfUrlConfig.SelfUrl
+import ch.datascience.webhookservice.project.SelfUrlConfigProvider.SelfUrl
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import play.api.Configuration
 
 import scala.util.{Failure, Success, Try}
 
@@ -65,10 +64,7 @@ class ProjectHookUrlFinderSpec extends WordSpec with MockFactory {
         .expects()
         .returning(returning)
 
-    class TestSelfUrlConfig(configuration: Configuration) extends SelfUrlConfig[Try](configuration)
-    val selfUrlConfig = mock[TestSelfUrlConfig]
+    val selfUrlConfig = mock[TrySelfUrlConfigProvider]
     val hookUrlFinder = new ProjectHookUrlFinder[Try](selfUrlConfig)
   }
 }
-
-class TryProjectHookUrlFinder(selfUrlConfig: SelfUrlConfig[Try]) extends ProjectHookUrlFinder[Try](selfUrlConfig)

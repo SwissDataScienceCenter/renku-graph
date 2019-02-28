@@ -18,17 +18,16 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators.projectIds
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.IOContextShift
-import ch.datascience.webhookservice.config.{GitLabConfig, IOGitLabConfigProvider}
+import ch.datascience.webhookservice.config.{GitLabConfigProvider, IOGitLabConfigProvider}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -144,7 +143,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
     }
   }
 
-  private implicit val cs: IOContextShift = new IOContextShift(global)
+  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
     val gitLabUrl     = url(externalServiceBaseUrl)
@@ -154,7 +153,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
 
     val gitLabUrlProvider = mock[IOGitLabConfigProvider]
 
-    def expectGitLabUrlProvider(returning: IO[GitLabConfig.HostUrl]) =
+    def expectGitLabUrlProvider(returning: IO[GitLabConfigProvider.HostUrl]) =
       (gitLabUrlProvider.get _)
         .expects()
         .returning(returning)

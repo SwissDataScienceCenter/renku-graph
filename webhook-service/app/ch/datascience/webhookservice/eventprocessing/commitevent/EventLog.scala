@@ -18,7 +18,8 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
-import cats.effect.IO
+import cats.MonadError
+import ch.datascience.webhookservice.eventprocessing.commitevent.filelog.FileEventLog
 
 import scala.language.higherKinds
 
@@ -26,4 +27,7 @@ trait EventLog[Interpretation[_]] {
   def append(line: String): Interpretation[Unit]
 }
 
-trait IOEventLog extends EventLog[IO]
+object EventLog {
+  def apply[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]): EventLog[Interpretation] =
+    FileEventLog[Interpretation]
+}

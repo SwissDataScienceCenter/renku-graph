@@ -18,13 +18,11 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.IO
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events._
-import ch.datascience.webhookservice.IOContextShift
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
+import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
-import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -44,10 +42,9 @@ private object UserInfoFinder {
   )
 }
 
-@Singleton
-private class IOUserInfoFinder @Inject()(
-    gitLabConfigProvider:    IOGitLabConfigProvider
-)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
+private class IOUserInfoFinder(
+    gitLabConfigProvider:    GitLabConfigProvider[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends IORestClient
     with UserInfoFinder[IO] {
 
@@ -62,7 +59,7 @@ private class IOUserInfoFinder @Inject()(
 
   def findUserInfo(userId: UserId, accessToken: AccessToken): IO[UserInfo] =
     for {
-      gitLabHostUrl <- gitLabConfigProvider.get()
+      gitLabHostUrl <- gitLabConfigProvider.get
       uri           <- validateUri(s"$gitLabHostUrl/api/v4/users/$userId")
       userInfo      <- send(request(GET, uri, accessToken))(mapResponse)
     } yield userInfo

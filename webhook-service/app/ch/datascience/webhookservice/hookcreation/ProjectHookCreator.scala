@@ -18,15 +18,13 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.IO
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.webhookservice.IOContextShift
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
+import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
-import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -47,10 +45,9 @@ private object ProjectHookCreator {
   )
 }
 
-@Singleton
-private class IOProjectHookCreator @Inject()(
-    gitLabConfigProvider:    IOGitLabConfigProvider
-)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
+private class IOProjectHookCreator(
+    gitLabConfigProvider:    GitLabConfigProvider[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends IORestClient
     with ProjectHookCreator[IO] {
 
@@ -64,7 +61,7 @@ private class IOProjectHookCreator @Inject()(
 
   def create(projectHook: ProjectHook, accessToken: AccessToken): IO[Unit] =
     for {
-      gitLabUrl <- gitLabConfigProvider.get()
+      gitLabUrl <- gitLabConfigProvider.get
       uri       <- validateUri(s"$gitLabUrl/api/v4/projects/${projectHook.projectId}/hooks")
       requestWithPayload = request(POST, uri, accessToken).withEntity(payload(projectHook))
       result <- send(requestWithPayload)(mapResponse)

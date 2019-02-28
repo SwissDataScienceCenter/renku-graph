@@ -18,68 +18,47 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events._
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import javax.inject.{Inject, Singleton}
+import ch.datascience.http.client.IORestClient
+import ch.datascience.webhookservice.config.GitLabConfigProvider
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private abstract class CommitInfoFinder[Interpretation[_]] {
+private trait CommitInfoFinder[Interpretation[_]] {
   def findCommitInfo(
       projectId: ProjectId,
       commitId:  CommitId
   ): Interpretation[CommitInfo]
 }
 
-@Singleton
-private class IOCommitInfoFinder @Inject()(gitLabConfigProvider: IOGitLabConfigProvider)(
-    implicit executionContext:                                   ExecutionContext)
-    extends CommitInfoFinder[IO] {
+private class IOCommitInfoFinder(
+    gitLabConfigProvider:    GitLabConfigProvider[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+    extends IORestClient
+    with CommitInfoFinder[IO] {
 
   import CommitInfo._
   import cats.effect._
-  import ch.datascience.webhookservice.config.GitLabConfig._
   import ch.datascience.webhookservice.exceptions.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status.{Ok, Unauthorized}
-  import org.http4s.client.blaze.BlazeClientBuilder
-  import org.http4s.{Request, Response, Uri}
-
-  private implicit val cs: ContextShift[IO] = IO.contextShift(executionContext)
-  private val F = implicitly[ConcurrentEffect[IO]]
+  import org.http4s.{Request, Response}
 
   def findCommitInfo(projectId: ProjectId, commitId: CommitId): IO[CommitInfo] =
     for {
-      gitLabHost <- gitLabConfigProvider.get()
-      uri        <- composeUri(gitLabHost, projectId, commitId)
-      result     <- send(Request[IO](GET, uri))
+      gitLabHost <- gitLabConfigProvider.get
+      uri        <- validateUri(s"$gitLabHost/api/v4/projects/$projectId/repository/commits/$commitId")
+      result     <- send(Request[IO](GET, uri))(mapResponse)
     } yield result
 
-  private def composeUri(gitLabHost: HostUrl, projectId: ProjectId, commitId: CommitId) = F.fromEither(
-    Uri.fromString(s"$gitLabHost/api/v4/projects/$projectId/repository/commits/$commitId")
-  )
-
-  private def send(request: Request[IO]) = BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>
-    httpClient.fetch[CommitInfo](request) { response =>
-      response.status match {
-        case Ok           => response.as[CommitInfo]
-        case Unauthorized => F.raiseError(UnauthorizedException)
-        case _            => raiseError(request, response)
-      }
+  private def mapResponse(request: Request[IO], response: Response[IO]): IO[CommitInfo] =
+    response.status match {
+      case Ok           => response.as[CommitInfo]
+      case Unauthorized => IO.raiseError(UnauthorizedException)
+      case _            => raiseError(request, response)
     }
-  }
-
-  private def raiseError(request: Request[IO], response: Response[IO]): IO[Nothing] =
-    for {
-      bodyAsString <- response.as[String]
-      result <- F.raiseError {
-                 new RuntimeException(
-                   s"${request.method} ${request.uri} returned ${response.status}; body: ${bodyAsString.split('\n').map(_.trim.filter(_ >= ' ')).mkString}"
-                 )
-               }
-    } yield result
 }
 
 private case class CommitInfo(

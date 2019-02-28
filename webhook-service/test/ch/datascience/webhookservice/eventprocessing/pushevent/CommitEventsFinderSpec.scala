@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators.pushEvents
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators.pushEvents
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

@@ -18,22 +18,20 @@
 
 package ch.datascience.webhookservice.project
 
-import SelfUrlConfig.SelfUrl
+import SelfUrlConfigProvider.SelfUrl
 import cats.MonadError
-import cats.effect.IO
 import cats.implicits._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.{RefType, Refined}
-import javax.inject.{Inject, Singleton}
-import play.api.Configuration
 import pureconfig._
 import pureconfig.error.CannotConvert
 
 import scala.language.higherKinds
 
-private class SelfUrlConfig[Interpretation[_]](
-    configuration: Configuration
+private class SelfUrlConfigProvider[Interpretation[_]](
+    configuration: Config = ConfigFactory.load()
 )(implicit ME:     MonadError[Interpretation, Throwable])
     extends ConfigLoader[Interpretation] {
 
@@ -44,13 +42,10 @@ private class SelfUrlConfig[Interpretation[_]](
       }
     }
 
-  def get(): Interpretation[SelfUrl] = find[SelfUrl]("services.self.url", configuration.underlying)
+  def get: Interpretation[SelfUrl] = find[SelfUrl]("services.self.url", configuration)
 }
 
-@Singleton
-private class IOSelfUrlConfigProvider @Inject()(configuration: Configuration) extends SelfUrlConfig[IO](configuration)
-
-object SelfUrlConfig {
+object SelfUrlConfigProvider {
 
   import eu.timepit.refined.string.Url
 

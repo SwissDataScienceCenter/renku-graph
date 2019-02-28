@@ -20,14 +20,14 @@ package ch.datascience.webhookservice.eventprocessing
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.Effect
+import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.model.events._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
+import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.{Decoder, HCursor}
@@ -37,16 +37,17 @@ import org.http4s.headers.`WWW-Authenticate`
 import org.http4s.util.CaseInsensitiveString
 import org.http4s.{AuthScheme, Challenge, EntityDecoder, HttpRoutes, Request, Response}
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class WebhookEventEndpoint[Interpretation[_]: Effect](
+class HookEventEndpoint[Interpretation[_]: Effect](
     hookTokenCrypto: HookTokenCrypto[Interpretation],
     pushEventSender: PushEventSender[Interpretation]
 )(implicit ME:       MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  import WebhookEventEndpoint._
+  import HookEventEndpoint._
   import hookTokenCrypto._
   import pushEventSender._
 
@@ -104,7 +105,7 @@ class WebhookEventEndpoint[Interpretation[_]: Effect](
   }
 }
 
-private object WebhookEventEndpoint {
+private object HookEventEndpoint {
 
   private implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) => {
     for {
@@ -130,3 +131,8 @@ private object WebhookEventEndpoint {
       )
   }
 }
+
+class IOHookEventEndpoint()(
+    implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO]
+) extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOPushEventSender)

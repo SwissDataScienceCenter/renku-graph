@@ -16,15 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.commitevent
+package ch.datascience.webhookservice.eventprocessing.commitevent.filelog
 
 import java.nio.file.attribute.PosixFilePermissions
 import java.nio.file.{AccessDeniedException, Files, Path}
 
+import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
@@ -32,11 +34,13 @@ import org.scalatest.prop.PropertyChecks
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class FileEventLogSpec extends WordSpec with PropertyChecks {
+class FileEventLogSpec extends WordSpec with PropertyChecks with MockFactory {
 
   "append" should {
 
     "append all given lines to an empty file" in new TestCase {
+
+      givenConfigProviderReturning(context.pure(pathToEventLogFile))
 
       val linesToAppend: List[String] = lines.generateOne
 
@@ -48,6 +52,8 @@ class FileEventLogSpec extends WordSpec with PropertyChecks {
     }
 
     "append given lines to a non-empty file" in new TestCase {
+
+      givenConfigProviderReturning(context.pure(pathToEventLogFile))
 
       val initialLines = Seq(nonEmptyStrings().generateOne)
       val fileWriter   = Files.write(pathToEventLogFile, initialLines.asJava)
@@ -64,21 +70,42 @@ class FileEventLogSpec extends WordSpec with PropertyChecks {
 
     "fail if there are problems with writing to the file" in new TestCase {
 
+      givenConfigProviderReturning(context.pure(pathToEventLogFile))
+
       Files.setPosixFilePermissions(pathToEventLogFile, PosixFilePermissions.fromString("r--r--r--"))
 
       val Failure(exception) = eventLog.append("line")
 
       exception shouldBe an[AccessDeniedException]
     }
+
+    "fail if the log file path cannot be found" in new TestCase {
+
+      val exception = exceptions.generateOne
+      givenConfigProviderReturning(context.raiseError(exception))
+
+      eventLog.append("line") shouldBe context.raiseError(exception)
+    }
   }
 
   private trait TestCase {
-    val pathToEventLogFile: Path = Files.createTempFile("renku-event", "log")
-    val eventLog = new FileEventLog[Try](pathToEventLogFile)
+    val context = MonadError[Try, Throwable]
+
+    val pathToEventLogFile    = Files.createTempFile("renku-event", "log")
+    val logFileConfigProvider = mock[TryLogFileConfigProvider]
+    val eventLog              = new FileEventLog[Try](logFileConfigProvider)
+
+    def givenConfigProviderReturning(maybeLogFilePath: Try[Path]) =
+      (logFileConfigProvider.get _)
+        .expects()
+        .returning(maybeLogFilePath)
+        .atLeastOnce()
   }
 
   private val lines: Gen[List[String]] = for {
     linesNumber <- positiveInts(100)
     lines       <- Gen.listOfN(linesNumber, nonEmptyStrings(maxLength = 100))
   } yield lines
+
+  private class TryLogFileConfigProvider extends LogFileConfigProvider[Try]
 }

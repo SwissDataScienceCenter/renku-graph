@@ -20,15 +20,15 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import java.time.{LocalDateTime, ZoneOffset}
 
-import cats.effect.{IO, Sync}
+import cats.effect.{ContextShift, IO}
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.config.GitLabConfig._
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
+import ch.datascience.webhookservice.config.{GitLabConfigProvider, IOGitLabConfigProvider}
+import ch.datascience.webhookservice.config.GitLabConfigProvider._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
@@ -114,6 +114,8 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.NotFound}; body: some message"
     }
   }
+
+  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
     val gitLabUrl     = url(externalServiceBaseUrl)

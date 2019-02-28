@@ -22,10 +22,11 @@ import cats.data.EitherT
 import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
-import ch.datascience.http.client.AccessToken
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.logging.IOLogger
-import ch.datascience.webhookservice.crypto.{HookTokenCrypto, IOHookTokenCrypto}
+import ch.datascience.http.client.AccessToken
+import ch.datascience.logging.ApplicationLogger
+import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, HookCreationResult}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
@@ -35,8 +36,8 @@ import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.project._
 import io.chrisdavenport.log4cats.Logger
-import javax.inject.{Inject, Singleton}
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -114,21 +115,13 @@ private object HookCreator {
   )
 }
 
-@Singleton
-private class IOHookCreator @Inject()(
-    projectHookUrlFinder: IOProjectHookUrlFinder,
-    projectHookValidator: IOHookValidator,
-    projectInfoFinder:    IOProjectInfoFinder,
-    hookTokenCrypto:      IOHookTokenCrypto,
-    projectHookCreator:   IOProjectHookCreator,
-    eventsHistoryLoader:  IOEventsHistoryLoader,
-    logger:               IOLogger
-) extends HookCreator[IO](
-      projectHookUrlFinder,
-      projectHookValidator,
-      projectInfoFinder,
-      hookTokenCrypto,
-      projectHookCreator,
-      eventsHistoryLoader,
-      logger
+private class IOHookCreator(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+    extends HookCreator[IO](
+      new IOProjectHookUrlFinder,
+      new IOHookValidator,
+      new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
+      HookTokenCrypto[IO],
+      new IOProjectHookCreator(new GitLabConfigProvider[IO]),
+      new IOEventsHistoryLoader,
+      ApplicationLogger
     )

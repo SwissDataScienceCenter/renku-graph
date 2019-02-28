@@ -30,7 +30,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
-import ch.datascience.webhookservice.security.IOAccessTokenFinder
+import ch.datascience.webhookservice.security.IOAccessTokenExtractor
 import io.circe.Json
 import io.circe.syntax._
 import org.http4s.Status._
@@ -152,7 +152,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
     val projectId = projectIds.generateOne
 
     val hookCreator       = mock[IOHookCreator]
-    val accessTokenFinder = mock[IOAccessTokenFinder]
+    val accessTokenFinder = mock[IOAccessTokenExtractor]
     val endpoint = new HookCreationEndpoint[IO](
       hookCreator,
       accessTokenFinder

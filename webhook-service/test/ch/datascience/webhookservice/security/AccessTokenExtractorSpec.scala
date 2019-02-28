@@ -29,7 +29,7 @@ import org.scalatest.WordSpec
 
 import scala.util.Try
 
-class AccessTokenFinderSpec extends WordSpec {
+class AccessTokenExtractorSpec extends WordSpec {
 
   "findAccessToken" should {
 
@@ -89,6 +89,6 @@ class AccessTokenFinderSpec extends WordSpec {
 
     val request = Request[Try]()
 
-    val finder = new AccessTokenFinder[Try]()
+    val finder = new AccessTokenExtractor[Try]()
   }
 }

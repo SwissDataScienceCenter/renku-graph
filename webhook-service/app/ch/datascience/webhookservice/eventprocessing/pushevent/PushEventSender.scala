@@ -18,16 +18,16 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.graph.model.events.CommitEvent
-import ch.datascience.logging.IOLogger
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.eventprocessing.commitevent.{CommitEventSender, IOCommitEventSender}
+import ch.datascience.webhookservice.eventprocessing.commitevent._
 import io.chrisdavenport.log4cats.Logger
-import javax.inject.{Inject, Singleton}
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -106,12 +106,11 @@ class PushEventSender[Interpretation[_]: Monad](
       s"project: ${pushEvent.project.id}" +
       s"${maybeCommitEvent.map(_.id).map(id => s", CommitEvent id: $id").getOrElse("")}" +
       s": $message"
-
 }
 
-@Singleton
-class IOPushEventSender @Inject()(
-    commitEventFinder: IOCommitEventsFinder,
-    commitEventSender: IOCommitEventSender,
-    logger:            IOLogger
-) extends PushEventSender[IO](commitEventFinder, commitEventSender, logger)
+class IOPushEventSender(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+    extends PushEventSender[IO](
+      new IOCommitEventsFinder(),
+      new IOCommitEventSender,
+      ApplicationLogger
+    )

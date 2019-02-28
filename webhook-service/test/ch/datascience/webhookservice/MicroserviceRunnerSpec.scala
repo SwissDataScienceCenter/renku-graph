@@ -22,6 +22,10 @@ import cats.MonadError
 import cats.effect._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators
+import ch.datascience.http.server.PingEndpoint
+import ch.datascience.webhookservice.eventprocessing.HookEventEndpoint
+import ch.datascience.webhookservice.hookcreation.HookCreationEndpoint
+import ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -63,5 +67,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
   private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
-  private class IOHttpServer() extends HttpServer[IO]()
+  private class IOHttpServer(
+      pingEndpoint:           PingEndpoint[IO],
+      hookEventEndpoint:      HookEventEndpoint[IO],
+      hookCreationEndpoint:   HookCreationEndpoint[IO],
+      hookValidationEndpoint: HookValidationEndpoint[IO]
+  ) extends HttpServer[IO](pingEndpoint, hookEventEndpoint, hookCreationEndpoint, hookValidationEndpoint)
 }

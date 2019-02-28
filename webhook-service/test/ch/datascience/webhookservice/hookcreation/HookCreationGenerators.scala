@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.hookcreation
 
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo

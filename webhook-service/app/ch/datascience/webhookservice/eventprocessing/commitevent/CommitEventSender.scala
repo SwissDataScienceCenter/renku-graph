@@ -22,7 +22,6 @@ import cats.effect.IO
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.graph.model.events.CommitEvent
-import javax.inject.{Inject, Singleton}
 
 import scala.language.higherKinds
 
@@ -40,8 +39,5 @@ class CommitEventSender[Interpretation[_]: Monad](
     } yield ()
 }
 
-@Singleton
-class IOCommitEventSender @Inject()(
-    eventLog:              IOEventLog,
-    commitEventSerializer: IOCommitEventSerializer,
-) extends CommitEventSender[IO](eventLog, commitEventSerializer)
+class IOCommitEventSender(implicit ME: MonadError[IO, Throwable])
+    extends CommitEventSender[IO](EventLog[IO], new CommitEventSerializer[IO])

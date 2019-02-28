@@ -16,13 +16,9 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.security
 
-import ch.datascience.graph.model.events.ProjectId
+import cats.MonadError
+import cats.effect.IO
 
-object model {
-
-  final case class HookToken(
-      projectId: ProjectId
-  )
-}
+class IOAccessTokenExtractor(implicit ME: MonadError[IO, Throwable]) extends AccessTokenExtractor[IO]

@@ -16,46 +16,44 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.config
+package ch.datascience.webhookservice.eventprocessing.commitevent.filelog
 
-import cats.MonadError
+import java.nio.file.Paths
+
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import ch.datascience.generators.Generators.relativePaths
+import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import play.api.Configuration
 
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class GitLabConfigProviderSpec extends WordSpec {
-
-  private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+class LogFileConfigProviderSpec extends WordSpec {
 
   "get" should {
 
-    "return HostUrl" in {
-      val gitLabUrl = validatedUrls.generateOne
-      val config = Configuration.from(
+    "read 'file-event-log.file-path' from the config" in {
+      val pathAsString = relativePaths().generateOne
+      val config = ConfigFactory.parseMap(
         Map(
-          "services" -> Map(
-            "gitlab" -> Map(
-              "url" -> gitLabUrl.toString()
-            )
-          )
-        )
+          "file-event-log" -> Map(
+            "file-path" -> pathAsString
+          ).asJava
+        ).asJava
       )
 
-      new GitLabConfig[Try](config).get() shouldBe Success(gitLabUrl)
+      new LogFileConfigProvider[Try](config).get shouldBe Success(Paths.get(pathAsString))
     }
 
-    "fail if there is no 'services.gitlab.url' in the config" in {
-      val config = Configuration.empty
+    "fail if there's no 'file-event-log.file-path' entry" in {
+      val config = ConfigFactory.empty()
 
-      val Failure(exception) = new GitLabConfig[Try](config).get()
+      val Failure(exception) = new LogFileConfigProvider[Try](config).get
 
-      exception shouldBe a[ConfigLoadingException]
+      exception shouldBe an[ConfigLoadingException]
     }
   }
 }

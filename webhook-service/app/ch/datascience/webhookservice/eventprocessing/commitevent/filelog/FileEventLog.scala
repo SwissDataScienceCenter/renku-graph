@@ -16,28 +16,32 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.commitevent
+package ch.datascience.webhookservice.eventprocessing.commitevent.filelog
 
-import java.nio.file.{Files, OpenOption, Path, StandardOpenOption}
+import java.nio.file._
 
 import cats.MonadError
-import cats.effect.IO
-import javax.inject.{Inject, Named, Singleton}
+import cats.implicits._
+import ch.datascience.webhookservice.eventprocessing.commitevent.EventLog
 
 import scala.collection.JavaConverters._
 import scala.language.higherKinds
 import scala.util.Try
 
-class FileEventLog[Interpretation[_]](
-    eventLogFilePath: Path
-)(implicit ME:        MonadError[Interpretation, Throwable])
+private class FileEventLog[Interpretation[_]](
+    logFileConfigProvider: LogFileConfigProvider[Interpretation]
+)(implicit ME:             MonadError[Interpretation, Throwable])
     extends EventLog[Interpretation] {
 
-  override def append(line: String): Interpretation[Unit] = ME.fromTry {
-    Try {
-      Files.write(eventLogFilePath, Seq(line).asJava, openOptions: _*)
-    }
-  }
+  override def append(line: String): Interpretation[Unit] =
+    for {
+      eventLogFilePath <- logFileConfigProvider.get
+      _ <- ME.fromTry {
+            Try {
+              Files.write(eventLogFilePath, Seq(line).asJava, openOptions: _*)
+            }
+          }
+    } yield ()
 
   private val openOptions: Seq[OpenOption] = Seq(
     StandardOpenOption.WRITE,
@@ -47,8 +51,7 @@ class FileEventLog[Interpretation[_]](
   )
 }
 
-@Singleton
-class FileIOEventLog @Inject()(
-    @Named("event-log-file-path") eventLogFilePath: Path
-) extends FileEventLog[IO](eventLogFilePath)
-    with IOEventLog // this mixin is just to make Guice be able to inject EventLog[IO]
+private object FileEventLog {
+  def apply[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]): FileEventLog[Interpretation] =
+    new FileEventLog[Interpretation](new LogFileConfigProvider[Interpretation])
+}

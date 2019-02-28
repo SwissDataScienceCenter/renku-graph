@@ -20,22 +20,20 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.http.client.AccessToken
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.events._
+import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender
-import ch.datascience.webhookservice.eventprocessing.pushevent.{CommitEventsFinder, PushEventSender}
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.eventprocessing.pushevent.TryPushEventSender
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
 import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
 import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
-import ch.datascience.webhookservice.model.ProjectInfo
-import io.chrisdavenport.log4cats.Logger
+import ch.datascience.webhookservice.project.ProjectInfo
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -152,14 +150,9 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
     val context = MonadError[Try, Throwable]
 
     val latestPushEventFetcher = mock[LatestPushEventFetcher[Try]]
-    class TryPushEventSender(
-        commitEventsFinder: CommitEventsFinder[Try],
-        commitEventSender:  CommitEventSender[Try],
-        logger:             Logger[Try]
-    ) extends PushEventSender[Try](commitEventsFinder, commitEventSender, logger)
-    val userInfoFinder  = mock[UserInfoFinder[Try]]
-    val pushEventSender = mock[TryPushEventSender]
-    val logger          = TestLogger[Try]()
+    val userInfoFinder         = mock[UserInfoFinder[Try]]
+    val pushEventSender        = mock[TryPushEventSender]
+    val logger                 = TestLogger[Try]()
     val eventsHistoryLoader = new EventsHistoryLoader[Try](
       latestPushEventFetcher,
       userInfoFinder,

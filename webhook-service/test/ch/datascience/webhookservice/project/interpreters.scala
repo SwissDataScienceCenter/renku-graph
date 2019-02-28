@@ -16,23 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.project
 
-import ch.datascience.service.utils.AccessLoggingFilter
-import javax.inject.Inject
-import play.api.http.DefaultHttpFilters
-import play.filters.cors.CORSFilter
-import play.filters.headers.SecurityHeadersFilter
-import play.filters.hosts.AllowedHostsFilter
+import cats.MonadError
+import com.typesafe.config.Config
 
-class Filters @Inject()(
-    allowedHostsFilter:    AllowedHostsFilter,
-    corsFilter:            CORSFilter,
-    securityHeadersFilter: SecurityHeadersFilter,
-    accessLoggingFilter:   AccessLoggingFilter
-) extends DefaultHttpFilters(
-      allowedHostsFilter,
-      corsFilter,
-      securityHeadersFilter,
-      accessLoggingFilter
-    )
+import scala.util.Try
+
+private class TrySelfUrlConfigProvider(configuration: Config)(implicit ME: MonadError[Try, Throwable])
+    extends SelfUrlConfigProvider[Try](configuration)
+
+class TryProjectHookUrlFinder(selfUrlConfig: SelfUrlConfigProvider[Try])(implicit ME: MonadError[Try, Throwable])
+    extends ProjectHookUrlFinder[Try](selfUrlConfig)

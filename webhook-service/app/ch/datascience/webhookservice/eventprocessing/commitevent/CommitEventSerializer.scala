@@ -19,15 +19,13 @@
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
-import cats.effect.IO
 import ch.datascience.graph.model.events._
 import io.circe.Json
-import javax.inject.Singleton
 
 import scala.language.higherKinds
 import scala.util.Try
 
-class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
+private class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
   def serialiseToJsonString(commitEvent: CommitEvent): Interpretation[String] =
     ME.fromTry {
@@ -65,6 +63,3 @@ class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpret
       ).flatten: _*
     )
 }
-
-@Singleton
-private class IOCommitEventSerializer extends CommitEventSerializer[IO]

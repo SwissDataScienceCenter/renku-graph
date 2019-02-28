@@ -30,7 +30,7 @@ import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
-import ch.datascience.webhookservice.generators.ServiceTypesGenerators._
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.Json
 import io.circe.syntax._
@@ -40,7 +40,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class WebhookEventEndpointSpec extends WordSpec with MockFactory {
+class HookEventEndpointSpec extends WordSpec with MockFactory {
 
   "POST /webhooks/events" should {
 
@@ -157,7 +157,7 @@ class WebhookEventEndpointSpec extends WordSpec with MockFactory {
 
     val pushEventSender = mock[IOPushEventSender]
     val hookTokenCrypto = mock[IOHookTokenCrypto]
-    val endpoint = new WebhookEventEndpoint[IO](
+    val endpoint = new HookEventEndpoint[IO](
       hookTokenCrypto,
       pushEventSender
     ).processPushEvent.or(notAvailableResponse)

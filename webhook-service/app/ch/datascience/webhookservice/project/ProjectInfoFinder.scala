@@ -18,13 +18,10 @@
 
 package ch.datascience.webhookservice.project
 
-import cats.effect.IO
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events._
-import ch.datascience.webhookservice.IOContextShift
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.model.{ProjectInfo, ProjectOwner, ProjectVisibility}
-import javax.inject.{Inject, Singleton}
+import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.webhookservice.config.GitLabConfigProvider
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -36,10 +33,9 @@ trait ProjectInfoFinder[Interpretation[_]] {
   ): Interpretation[ProjectInfo]
 }
 
-@Singleton
-class IOProjectInfoFinder @Inject()(
-    gitLabConfigProvider:    IOGitLabConfigProvider
-)(implicit executionContext: ExecutionContext, contextShift: IOContextShift)
+class IOProjectInfoFinder(
+    gitLabConfigProvider:    GitLabConfigProvider[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends IORestClient
     with ProjectInfoFinder[IO] {
 
@@ -54,7 +50,7 @@ class IOProjectInfoFinder @Inject()(
 
   def findProjectInfo(projectId: ProjectId, accessToken: AccessToken): IO[ProjectInfo] =
     for {
-      gitLabHostUrl <- gitLabConfigProvider.get()
+      gitLabHostUrl <- gitLabConfigProvider.get
       uri           <- validateUri(s"$gitLabHostUrl/api/v4/projects/$projectId")
       projectInfo   <- send(request(GET, uri, accessToken))(mapResponse)
     } yield projectInfo

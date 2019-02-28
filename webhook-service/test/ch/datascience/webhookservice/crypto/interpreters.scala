@@ -16,13 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.webhookservice.crypto
 
-import ch.datascience.graph.model.events.ProjectId
+import cats.MonadError
+import cats.effect.IO
+import ch.datascience.crypto.AesCrypto.Secret
 
-object model {
-
-  final case class HookToken(
-      projectId: ProjectId
-  )
-}
+class IOHookTokenCrypto(secret: Secret)(implicit ME: MonadError[IO, Throwable]) extends HookTokenCrypto[IO](secret)

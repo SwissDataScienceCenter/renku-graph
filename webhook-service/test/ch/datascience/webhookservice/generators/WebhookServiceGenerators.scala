@@ -24,11 +24,12 @@ import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.model._
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
-import ch.datascience.webhookservice.project.SelfUrlConfig.SelfUrl
+import ch.datascience.webhookservice.project.SelfUrlConfigProvider.SelfUrl
+import ch.datascience.webhookservice.project._
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 
-object ServiceTypesGenerators {
+object WebhookServiceGenerators {
 
   implicit val pushEvents: Gen[PushEvent] = for {
     maybeBefore <- Gen.option(commitIds)
