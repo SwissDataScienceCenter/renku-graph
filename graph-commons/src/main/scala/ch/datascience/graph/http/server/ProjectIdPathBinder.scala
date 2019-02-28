@@ -17,6 +17,7 @@
  */
 
 package ch.datascience.graph.http.server
+
 import ch.datascience.graph.model.events.ProjectId
 
 import scala.util.Try
