@@ -30,7 +30,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait ProjectHookVerifier[Interpretation[_]] {
-  def checkProjectHookPresence(
+  def checkHookPresence(
       projectHookId: HookIdentifier,
       accessToken:   AccessToken
   ): Interpretation[Boolean]
@@ -59,7 +59,7 @@ private class IOProjectHookVerifier(
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  override def checkProjectHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): IO[Boolean] =
+  override def checkHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): IO[Boolean] =
     for {
       gitLabHostUrl      <- gitLabUrlProvider.get
       uri                <- validateUri(s"$gitLabHostUrl/api/v4/projects/${projectHookId.projectId}/hooks")

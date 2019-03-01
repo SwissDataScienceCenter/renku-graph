@@ -44,7 +44,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
 
-  "checkProjectHookPresence" should {
+  "checkHookPresence" should {
 
     "return true if there's a hook with url pointing to expected project hook url - personal access token case" in new TestCase {
       expectGitLabUrlProvider(returning = IO.pure(gitLabUrl))
@@ -56,7 +56,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
           .willReturn(okJson(withHooks(projectId, oneHookUrl = projectHookId.projectHookUrl)))
       }
 
-      verifier.checkProjectHookPresence(projectHookId, personalAccessToken).unsafeRunSync() shouldBe true
+      verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync() shouldBe true
     }
 
     "return true if there's a hook with url pointing to expected project hook url - oauth token case" in new TestCase {
@@ -69,7 +69,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
           .willReturn(okJson(withHooks(projectId, oneHookUrl = projectHookId.projectHookUrl)))
       }
 
-      verifier.checkProjectHookPresence(projectHookId, oauthAccessToken).unsafeRunSync() shouldBe true
+      verifier.checkHookPresence(projectHookId, oauthAccessToken).unsafeRunSync() shouldBe true
     }
 
     "return false if there's no hook with url pointing to expected project hook url" in new TestCase {
@@ -83,7 +83,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
             withHooks(projectId, oneHookUrl = projectHookUrls generateDifferentThan projectHookId.projectHookUrl)))
       }
 
-      verifier.checkProjectHookPresence(projectHookId, oauthAccessToken).unsafeRunSync() shouldBe false
+      verifier.checkHookPresence(projectHookId, oauthAccessToken).unsafeRunSync() shouldBe false
     }
 
     "fail if fetching the GitLab url fails" in new TestCase {
@@ -93,7 +93,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
       expectGitLabUrlProvider(returning = IO.raiseError(exception))
 
       intercept[Exception] {
-        verifier.checkProjectHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
+        verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
       } shouldBe exception
     }
 
@@ -108,7 +108,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
       }
 
       intercept[Exception] {
-        verifier.checkProjectHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
+        verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -123,7 +123,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
       }
 
       intercept[Exception] {
-        verifier.checkProjectHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
+        verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.ServiceUnavailable}; body: some error"
     }
 
@@ -138,7 +138,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
       }
 
       intercept[Exception] {
-        verifier.checkProjectHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
+        verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
   }

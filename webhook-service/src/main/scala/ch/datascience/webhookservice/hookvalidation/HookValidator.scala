@@ -23,10 +23,11 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository._
@@ -40,6 +41,7 @@ class HookValidator[Interpretation[_]](
     projectInfoFinder:     ProjectInfoFinder[Interpretation],
     projectHookUrlFinder:  ProjectHookUrlFinder[Interpretation],
     projectHookVerifier:   ProjectHookVerifier[Interpretation],
+    accessTokenFinder:     AccessTokenFinder[Interpretation],
     accessTokenAssociator: AccessTokenAssociator[Interpretation],
     accessTokenRemover:    AccessTokenRemover[Interpretation],
     logger:                Logger[Interpretation]
@@ -47,48 +49,70 @@ class HookValidator[Interpretation[_]](
 
   import HookValidator.HookValidationResult._
   import ProjectVisibility._
+  import Token._
+  import accessTokenAssociator._
+  import accessTokenFinder._
+  import accessTokenRemover._
   import projectHookUrlFinder._
   import projectHookVerifier._
   import projectInfoFinder._
-  import accessTokenAssociator._
-  import accessTokenRemover._
 
-  def validateHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookValidationResult] = {
-    for {
-      projectInfo             <- findProjectInfo(projectId, accessToken)
-      hookUrl                 <- findProjectHookUrl
-      hookPresent             <- checkProjectHookPresence(HookIdentifier(projectId, hookUrl), accessToken)
-      afterVisibilityCheck    <- failIfNot(Public or Private, hookPresent, projectInfo)
-      afterTokenReAssociation <- associateTokenIfPrivateAndHookExists(afterVisibilityCheck, projectInfo, accessToken)
-      afterTokenDeletion      <- deleteTokenIfPrivateAndHookDoesNotExist(afterTokenReAssociation, projectInfo)
-      validationResult        <- toValidationResult(afterTokenDeletion, projectId)
-    } yield validationResult
-  } recoverWith loggingError(projectId)
+  def validateHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookValidationResult] =
+    findVisibilityAndToken(projectId, accessToken) flatMap {
+      case (Public, token) =>
+        for {
+          hookUrl          <- findProjectHookUrl
+          hookPresent      <- checkHookPresence(HookIdentifier(projectId, hookUrl), token.value)
+          validationResult <- toValidationResult(hookPresent, projectId)
+        } yield validationResult
+      case (Private, GivenToken(token)) =>
+        for {
+          hookUrl          <- findProjectHookUrl
+          hookPresent      <- checkHookPresence(HookIdentifier(projectId, hookUrl), token)
+          _                <- if (hookPresent) associate(projectId, token) else ME.unit
+          _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
+          validationResult <- toValidationResult(hookPresent, projectId)
+        } yield validationResult
+      case (Private, StoredToken(token)) =>
+        for {
+          hookUrl          <- findProjectHookUrl
+          hookPresent      <- checkHookPresence(HookIdentifier(projectId, hookUrl), token)
+          _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
+          validationResult <- toValidationResult(hookPresent, projectId)
+        } yield validationResult
+      case (Internal, _) =>
+        ME.raiseError[HookValidationResult](
+          new UnsupportedOperationException(s"Hook validation not supported for '$Internal' projects")
+        )
+    } recoverWith loggingError(projectId)
 
-  private def failIfNot(validVisibilities:  Set[ProjectVisibility],
-                        projectHookPresent: Boolean,
-                        projectInfo:        ProjectInfo): Interpretation[Boolean] =
-    if (validVisibilities contains projectInfo.visibility)
-      ME.pure(projectHookPresent)
-    else
-      ME.raiseError(
-        new UnsupportedOperationException(s"Hook validation not supported for '${projectInfo.visibility}' projects")
-      )
+  private def findVisibilityAndToken(projectId:   ProjectId,
+                                     accessToken: AccessToken): Interpretation[(ProjectVisibility, Token)] =
+    findProjectInfo(projectId, accessToken)
+      .map(_.visibility -> (GivenToken(accessToken): Token))
+      .recoverWith(visibilityAndStoredToken(projectId))
 
-  private def associateTokenIfPrivateAndHookExists(hookPresent: Boolean,
-                                                   projectInfo: ProjectInfo,
-                                                   accessToken: AccessToken): Interpretation[Boolean] =
-    if (hookPresent && projectInfo.visibility == Private)
-      associate(projectInfo.id, accessToken) map (_ => hookPresent)
-    else
-      ME.pure(hookPresent)
+  private def visibilityAndStoredToken(
+      projectId: ProjectId
+  ): PartialFunction[Throwable, Interpretation[(ProjectVisibility, Token)]] = {
+    case UnauthorizedException => {
+      for {
+        storedAccessToken <- findAccessToken(projectId) flatMap getOrError(projectId)
+        projectInfo       <- findProjectInfo(projectId, storedAccessToken.value)
+      } yield projectInfo.visibility -> storedAccessToken
+    } recoverWith storedAccessTokenError(projectId)
+  }
 
-  private def deleteTokenIfPrivateAndHookDoesNotExist(hookPresent: Boolean,
-                                                      projectInfo: ProjectInfo): Interpretation[Boolean] =
-    if (!hookPresent && projectInfo.visibility == Private)
-      removeAccessToken(projectInfo.id) map (_ => false)
-    else
-      ME.pure(hookPresent)
+  private def getOrError(projectId: ProjectId): Option[AccessToken] => Interpretation[Token] = {
+    case Some(token) => ME.pure(StoredToken(token))
+    case None        => ME.raiseError[Token](new Exception(s"No access token found for projectId $projectId"))
+  }
+
+  private def storedAccessTokenError(
+      projectId: ProjectId
+  ): PartialFunction[Throwable, Interpretation[(ProjectVisibility, Token)]] = {
+    case UnauthorizedException => ME.raiseError(new Exception(s"Stored access token for $projectId is invalid"))
+  }
 
   private def toValidationResult(projectHookPresent: Boolean,
                                  projectId:          ProjectId): Interpretation[HookValidationResult] =
@@ -103,9 +127,10 @@ class HookValidator[Interpretation[_]](
       ME.raiseError(exception)
   }
 
-  private implicit class ReadablityImprover(visibility: ProjectVisibility) {
-    def or(orVisibility: ProjectVisibility): Set[ProjectVisibility] =
-      Set(visibility, orVisibility)
+  private sealed abstract class Token(val value: AccessToken)
+  private object Token {
+    final case class GivenToken(override val value:  AccessToken) extends Token(value)
+    final case class StoredToken(override val value: AccessToken) extends Token(value)
   }
 }
 
@@ -123,6 +148,7 @@ class IOHookValidator(implicit executionContext: ExecutionContext, contextShift:
       new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
       new IOProjectHookUrlFinder,
       new IOProjectHookVerifier(new GitLabConfigProvider[IO]),
+      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]),
       new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO]),
       new IOAccessTokenRemover(new TokenRepositoryUrlProvider[IO]),
       ApplicationLogger

@@ -49,12 +49,12 @@ class HookValidationEndpoint[Interpretation[_]: Effect](
       for {
         accessToken    <- findAccessToken(request)
         creationResult <- hookValidator.validateHook(projectId, accessToken)
-        response       <- toHttpResult(creationResult)
+        response       <- toHttpResponse(creationResult)
       } yield response
     } recoverWith withHttpResult
   }
 
-  private lazy val toHttpResult: HookValidationResult => Interpretation[Response[Interpretation]] = {
+  private lazy val toHttpResponse: HookValidationResult => Interpretation[Response[Interpretation]] = {
     case HookExists  => Ok()
     case HookMissing => NotFound()
   }

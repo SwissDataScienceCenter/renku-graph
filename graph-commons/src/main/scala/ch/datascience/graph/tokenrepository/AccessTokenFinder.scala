@@ -16,21 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.graph.tokenrepository
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
 import ch.datascience.http.client.{AccessToken, IORestClient}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait AccessTokenFinder[Interpretation[_]] {
+trait AccessTokenFinder[Interpretation[_]] {
   def findAccessToken(projectId: ProjectId): Interpretation[Option[AccessToken]]
 }
 
-private class IOAccessTokenFinder(
+class IOAccessTokenFinder(
     tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO]
 )(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO])
     extends IORestClient

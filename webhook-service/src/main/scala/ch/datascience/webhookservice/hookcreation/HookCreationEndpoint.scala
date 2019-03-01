@@ -49,12 +49,12 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
       for {
         accessToken    <- findAccessToken(request)
         creationResult <- hookCreator.createHook(projectId, accessToken)
-        response       <- toHttpResult(creationResult)
+        response       <- toHttpResponse(creationResult)
       } yield response
     } recoverWith withHttpResult
   }
 
-  private lazy val toHttpResult: HookCreationResult => Interpretation[Response[Interpretation]] = {
+  private lazy val toHttpResponse: HookCreationResult => Interpretation[Response[Interpretation]] = {
     case HookCreated => Created()
     case HookExisted => Ok()
   }
