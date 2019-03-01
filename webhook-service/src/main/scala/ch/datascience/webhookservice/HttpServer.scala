@@ -37,7 +37,7 @@ private class HttpServer[F[_]: ConcurrentEffect](
 
   def run: F[ExitCode] =
     BlazeBuilder[F]
-      .bindHttp(9003, "0.0.0.0")
+      .bindHttp(9001, "0.0.0.0")
       .mountService(pingEndpoint.ping, "/")
       .mountService(hookEventEndpoint.processPushEvent, "/")
       .mountService(hookCreationEndpoint.createHook, "/")
