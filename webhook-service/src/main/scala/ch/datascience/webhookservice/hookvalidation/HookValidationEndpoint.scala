@@ -18,7 +18,6 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
-import cats.data.NonEmptyList
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
@@ -28,10 +27,8 @@ import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
 import ch.datascience.webhookservice.security.AccessTokenExtractor
-import org.http4s.AuthScheme.Basic
 import org.http4s.dsl.Http4sDsl
-import org.http4s.headers.`WWW-Authenticate`
-import org.http4s.{Challenge, HttpRoutes, Response}
+import org.http4s.{HttpRoutes, Response, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -61,13 +58,9 @@ class HookValidationEndpoint[Interpretation[_]: Effect](
 
   private lazy val withHttpResult: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case ex @ UnauthorizedException =>
-      Unauthorized(
-        `WWW-Authenticate`(
-          NonEmptyList.of(
-            Challenge(scheme = Basic.value, realm = "Please provide valid 'OAUTH-TOKEN' or 'PRIVATE-TOKEN'"))
-        ),
-        ErrorMessage(ex.getMessage)
-      )
+      Response[Interpretation](Status.Unauthorized)
+        .withEntity[ErrorMessage](ErrorMessage(ex.getMessage))
+        .pure[Interpretation]
     case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))
   }
 }

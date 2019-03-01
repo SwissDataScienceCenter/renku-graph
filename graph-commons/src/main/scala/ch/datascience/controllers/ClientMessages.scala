@@ -22,7 +22,7 @@ import cats.Applicative
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.MatchesRegex
-import io.circe.{Encoder, Json}
+import io.circe._
 import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
 
@@ -40,11 +40,11 @@ object ErrorMessage {
         identity
       )
 
-  implicit val encoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
+  implicit val errorMessageEncoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
     Json.obj("message" -> Json.fromString(message.value))
   }
 
-  implicit def infoMessageDecoder[F[_]: Applicative]: EntityEncoder[F, ErrorMessage] =
+  implicit def errorMessageEntityEncoder[F[_]: Applicative]: EntityEncoder[F, ErrorMessage] =
     jsonEncoderOf[F, ErrorMessage]
 }
 
@@ -60,10 +60,10 @@ object InfoMessage {
         identity
       )
 
-  private implicit val encoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
+  private implicit val infoMessageEncoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
     Json.obj("message" -> Json.fromString(message.value))
   }
 
-  implicit def infoMessageDecoder[F[_]: Applicative]: EntityEncoder[F, InfoMessage] =
+  implicit def infoMessageEntityEncoder[F[_]: Applicative]: EntityEncoder[F, InfoMessage] =
     jsonEncoderOf[F, InfoMessage]
 }

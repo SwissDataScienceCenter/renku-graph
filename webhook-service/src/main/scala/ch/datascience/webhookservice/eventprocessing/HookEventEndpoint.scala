@@ -19,7 +19,6 @@
 package ch.datascience.webhookservice.eventprocessing
 
 import cats.MonadError
-import cats.data.NonEmptyList
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
@@ -33,9 +32,8 @@ import ch.datascience.webhookservice.model.HookToken
 import io.circe.{Decoder, HCursor}
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.headers.`WWW-Authenticate`
 import org.http4s.util.CaseInsensitiveString
-import org.http4s.{AuthScheme, Challenge, EntityDecoder, HttpRoutes, Request, Response}
+import org.http4s.{EntityDecoder, HttpRoutes, Request, Response, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -95,12 +93,9 @@ class HookEventEndpoint[Interpretation[_]: Effect](
     case BadRequestError(exception) =>
       BadRequest(ErrorMessage(exception.getMessage))
     case ex @ UnauthorizedException =>
-      Unauthorized(
-        `WWW-Authenticate`(
-          NonEmptyList.of(Challenge(scheme = AuthScheme.Basic.value, realm = "Please provide a valid 'X-Gitlab-Token'"))
-        ),
-        ErrorMessage(ex.getMessage)
-      )
+      Response[Interpretation](Status.Unauthorized)
+        .withEntity[ErrorMessage](ErrorMessage(ex.getMessage))
+        .pure[Interpretation]
     case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))
   }
 }
