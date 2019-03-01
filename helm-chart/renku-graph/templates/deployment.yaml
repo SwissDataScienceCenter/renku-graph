@@ -47,7 +47,6 @@ spec:
               {{- end }}
           command:
             - bin/webhook-service
-            - -Dhttp.port=9001
           ports:
             - name: http-webhook-sv
               containerPort: 9001
