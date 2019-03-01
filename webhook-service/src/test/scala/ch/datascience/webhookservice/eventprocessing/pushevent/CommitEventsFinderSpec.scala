@@ -27,6 +27,8 @@ import ch.datascience.graph.model.events._
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators.pushEvents
 import org.scalacheck.Gen
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.http.client.AccessToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -42,11 +44,11 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       val commitInfo = commitInfos(pushEvent.commitTo, noParents).generateOne
 
       (commitInfoFinder
-        .findCommitInfo(_: ProjectId, _: CommitId))
-        .expects(pushEvent.project.id, pushEvent.commitTo)
+        .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+        .expects(pushEvent.project.id, pushEvent.commitTo, maybeAccessToken)
         .returning(context.pure(commitInfo))
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(
         Seq(commitEventFrom(pushEvent, commitInfo))
       )
     }
@@ -66,12 +68,12 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
 
       (Seq(firstCommitInfo) ++ secondLevelCommitInfos ++ thirdLevelCommitInfos) foreach { commitInfo =>
         (commitInfoFinder
-          .findCommitInfo(_: ProjectId, _: CommitId))
-          .expects(pushEvent.project.id, commitInfo.id)
+          .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+          .expects(pushEvent.project.id, commitInfo.id, maybeAccessToken)
           .returning(context.pure(commitInfo))
       }
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(
         Seq(commitEventFrom(pushEvent, firstCommitInfo)),
         secondLevelCommitInfos map (commitEventFrom(pushEvent, _)),
         secondLevelCommitInfos.flatMap(_.parents) map commitEventFrom(pushEvent, thirdLevelCommitInfos)
@@ -97,11 +99,11 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       )
 
       (commitInfoFinder
-        .findCommitInfo(_: ProjectId, _: CommitId))
-        .expects(pushEvent.project.id, firstCommitInfo.id)
+        .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+        .expects(pushEvent.project.id, firstCommitInfo.id, maybeAccessToken)
         .returning(context.pure(firstCommitInfo))
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(
         Seq(commitEventFrom(pushEvent, firstCommitInfo))
       )
     }
@@ -124,12 +126,12 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       val commitInfosUpToCommitFrom = secondLevelCommitInfos.takeWhile(_.id != commitFrom)
       (Seq(firstCommitInfo) ++ commitInfosUpToCommitFrom) foreach { commitInfo =>
         (commitInfoFinder
-          .findCommitInfo(_: ProjectId, _: CommitId))
-          .expects(pushEvent.project.id, commitInfo.id)
+          .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+          .expects(pushEvent.project.id, commitInfo.id, maybeAccessToken)
           .returning(context.pure(commitInfo))
       }
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe toSuccess(
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(
         Seq(commitEventFrom(pushEvent, firstCommitInfo)),
         commitInfosUpToCommitFrom map (commitEventFrom(pushEvent, _))
       )
@@ -140,11 +142,11 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (commitInfoFinder
-        .findCommitInfo(_: ProjectId, _: CommitId))
-        .expects(pushEvent.project.id, pushEvent.commitTo)
+        .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+        .expects(pushEvent.project.id, pushEvent.commitTo, maybeAccessToken)
         .returning(context.raiseError(exception))
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe Success(
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe Success(
         Seq(
           Failure(exception)
         )
@@ -163,18 +165,18 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
 
       Seq(firstCommitInfo, secondLevelCommitInfo2) foreach { commitInfo =>
         (commitInfoFinder
-          .findCommitInfo(_: ProjectId, _: CommitId))
-          .expects(pushEvent.project.id, commitInfo.id)
+          .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+          .expects(pushEvent.project.id, commitInfo.id, maybeAccessToken)
           .returning(context.pure(commitInfo))
       }
 
       val exception = exceptions.generateOne
       (commitInfoFinder
-        .findCommitInfo(_: ProjectId, _: CommitId))
-        .expects(pushEvent.project.id, secondLevelCommitInfo1.id)
+        .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+        .expects(pushEvent.project.id, secondLevelCommitInfo1.id, maybeAccessToken)
         .returning(context.raiseError(exception))
 
-      commitEventFinder.findCommitEvents(pushEvent).map(_.toList) shouldBe Success(
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe Success(
         Seq(
           Success(commitEventFrom(pushEvent, firstCommitInfo)),
           Failure(exception),
@@ -186,6 +188,8 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
 
   private trait TestCase {
     val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+
+    val maybeAccessToken = Gen.option(accessTokens).generateOne
 
     val commitInfoFinder  = mock[CommitInfoFinder[Try]]
     val commitEventFinder = new CommitEventsFinder[Try](commitInfoFinder)

@@ -20,10 +20,13 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import cats.MonadError
 import cats.implicits._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.webhookservice.eventprocessing.PushEvent
@@ -43,9 +46,15 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
     "convert the given push event into commit events and store them in the event log" in new TestCase {
       val commitEventsStream = commitEventsFrom(pushEvent).generateOne
 
+      val maybeAccessToken = Gen.option(accessTokens).generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(projectId)
+        .returning(context.pure(maybeAccessToken))
+
       (commitEventsFinder
-        .findCommitEvents(_: PushEvent))
-        .expects(pushEvent)
+        .findCommitEvents(_: PushEvent, _: Option[AccessToken]))
+        .expects(pushEvent, maybeAccessToken)
         .returning(context.pure(commitEventsStream))
 
       val commitEvents = toList(commitEventsStream)
@@ -58,17 +67,20 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Success(())
 
-      logger.loggedOnly(
+      if (maybeAccessToken.isEmpty)
+        logger.logged(Info(noAccessToken(pushEvent)))
+      logger.logged(
         commitEvents.map(event => Info(successfulStoring(pushEvent, event))) :+
-          Info(successfulStoring(pushEvent))
+          Info(successfulStoring(pushEvent)): _*
       )
     }
 
-    "fail if finding commit events stream fails" in new TestCase {
+    "fail if finding access token fails" in new TestCase {
+
       val exception = exceptions.generateOne
-      (commitEventsFinder
-        .findCommitEvents(_: PushEvent))
-        .expects(pushEvent)
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(projectId)
         .returning(context.raiseError(exception))
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Failure(exception)
@@ -76,12 +88,38 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(failedStoring(pushEvent), exception))
     }
 
+    "fail if finding commit events stream fails" in new TestCase {
+
+      val maybeAccessToken = Gen.option(accessTokens).generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(projectId)
+        .returning(context.pure(maybeAccessToken))
+
+      val exception = exceptions.generateOne
+      (commitEventsFinder
+        .findCommitEvents(_: PushEvent, _: Option[AccessToken]))
+        .expects(pushEvent, maybeAccessToken)
+        .returning(context.raiseError(exception))
+
+      pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Failure(exception)
+
+      logger.logged(Error(failedStoring(pushEvent), exception))
+    }
+
     "store all non failing events and log errors for these for which fetching fail" in new TestCase {
+
+      val maybeAccessToken = Gen.option(accessTokens).generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(projectId)
+        .returning(context.pure(maybeAccessToken))
+
       val exception          = exceptions.generateOne
       val commitEventsStream = Failure(exception) #:: commitEventsFrom(pushEvent).generateOne
       (commitEventsFinder
-        .findCommitEvents(_: PushEvent))
-        .expects(pushEvent)
+        .findCommitEvents(_: PushEvent, _: Option[AccessToken]))
+        .expects(pushEvent, maybeAccessToken)
         .returning(context.pure(commitEventsStream))
 
       val commitEvents = toList(commitEventsStream)
@@ -94,18 +132,24 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Success(())
 
-      logger.loggedOnly(
+      logger.logged(
         Error(failedFetching(pushEvent), exception) +:
           commitEvents.map(event => Info(successfulStoring(pushEvent, event))) :+
-          Info(successfulStoring(pushEvent))
+          Info(successfulStoring(pushEvent)): _*
       )
     }
 
     "store all non failing events and log errors for these for which storing fail" in new TestCase {
+      val maybeAccessToken = Gen.option(accessTokens).generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(projectId)
+        .returning(context.pure(maybeAccessToken))
+
       val commitEventsStream = commitEventsFrom(pushEvent).generateOne
       (commitEventsFinder
-        .findCommitEvents(_: PushEvent))
-        .expects(pushEvent)
+        .findCommitEvents(_: PushEvent, _: Option[AccessToken]))
+        .expects(pushEvent, maybeAccessToken)
         .returning(context.pure(commitEventsStream))
 
       val failingEvent +: passingEvents = toList(commitEventsStream)
@@ -124,10 +168,10 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Success(())
 
-      logger.loggedOnly(
+      logger.logged(
         Error(failedStoring(pushEvent, failingEvent), exception) +:
           passingEvents.map(event => Info(successfulStoring(pushEvent, event))) :+
-          Info(successfulStoring(pushEvent))
+          Info(successfulStoring(pushEvent)): _*
       )
     }
   }
@@ -136,11 +180,13 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
     val context = MonadError[Try, Throwable]
 
     val pushEvent = pushEvents.generateOne
+    val projectId = pushEvent.project.id
 
+    val accessTokenFinder  = mock[AccessTokenFinder[Try]]
     val commitEventSender  = mock[TryCommitEventSender]
     val commitEventsFinder = mock[TryCommitEventsFinder]
     val logger             = TestLogger[Try]()
-    val pushEventSender    = new PushEventSender[Try](commitEventsFinder, commitEventSender, logger)
+    val pushEventSender    = new PushEventSender[Try](accessTokenFinder, commitEventsFinder, commitEventSender, logger)
   }
 
   private def commitEventsFrom(pushEvent: PushEvent): Gen[Stream[Try[CommitEvent]]] =
@@ -200,4 +246,7 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
   private def successfulStoring(pushEvent: PushEvent): String =
     s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: stored in event log"
+
+  private def noAccessToken(pushEvent: PushEvent): String =
+    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: no access token found so assuming public project"
 }

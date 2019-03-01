@@ -17,18 +17,21 @@
  */
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
+
 import cats.MonadError
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender
 import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
 class TryPushEventSender(
+    accessTokenFinder:  AccessTokenFinder[Try],
     commitEventsFinder: CommitEventsFinder[Try],
     commitEventSender:  CommitEventSender[Try],
     logger:             Logger[Try]
 )(implicit ME:          MonadError[Try, Throwable])
-    extends PushEventSender[Try](commitEventsFinder, commitEventSender, logger)
+    extends PushEventSender[Try](accessTokenFinder, commitEventsFinder, commitEventSender, logger)
 
 private class TryCommitEventsFinder(
     commitInfoFinder: CommitInfoFinder[Try]

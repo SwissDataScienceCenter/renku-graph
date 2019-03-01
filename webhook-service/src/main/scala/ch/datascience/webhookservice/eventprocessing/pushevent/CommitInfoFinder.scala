@@ -20,16 +20,18 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events._
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
+import org.http4s.{Method, Uri}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait CommitInfoFinder[Interpretation[_]] {
   def findCommitInfo(
-      projectId: ProjectId,
-      commitId:  CommitId
+      projectId:        ProjectId,
+      commitId:         CommitId,
+      maybeAccessToken: Option[AccessToken]
   ): Interpretation[CommitInfo]
 }
 
@@ -46,12 +48,18 @@ private class IOCommitInfoFinder(
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.{Request, Response}
 
-  def findCommitInfo(projectId: ProjectId, commitId: CommitId): IO[CommitInfo] =
+  def findCommitInfo(projectId: ProjectId, commitId: CommitId, maybeAccessToken: Option[AccessToken]): IO[CommitInfo] =
     for {
       gitLabHost <- gitLabConfigProvider.get
       uri        <- validateUri(s"$gitLabHost/api/v4/projects/$projectId/repository/commits/$commitId")
-      result     <- send(Request[IO](GET, uri))(mapResponse)
+      result     <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield result
+
+  private def request(method: Method, uri: Uri, maybeAccessToken: Option[AccessToken]): Request[IO] =
+    maybeAccessToken match {
+      case Some(accessToken) => request(method, uri, accessToken)
+      case None              => Request[IO](GET, uri)
+    }
 
   private def mapResponse(request: Request[IO], response: Response[IO]): IO[CommitInfo] =
     response.status match {

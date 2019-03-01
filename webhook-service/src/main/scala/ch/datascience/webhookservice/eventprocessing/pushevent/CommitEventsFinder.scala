@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.graph.model.events.{CommitEvent, CommitId}
+import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 
@@ -38,39 +39,49 @@ private class CommitEventsFinder[Interpretation[_]](
   import Stream._
   type CommitEventsStream = Interpretation[Stream[Interpretation[CommitEvent]]]
 
-  def findCommitEvents(pushEvent: PushEvent): CommitEventsStream =
-    stream(List(pushEvent.commitTo), pushEvent)
+  def findCommitEvents(pushEvent: PushEvent, maybeAccessToken: Option[AccessToken]): CommitEventsStream =
+    stream(List(pushEvent.commitTo), pushEvent, maybeAccessToken)
 
-  private def stream(commitIds: List[CommitId], pushEvent: PushEvent): CommitEventsStream =
+  private def stream(commitIds:        List[CommitId],
+                     pushEvent:        PushEvent,
+                     maybeAccessToken: Option[AccessToken]): CommitEventsStream =
     commitIds match {
-      case Nil                                 => ME.pure(Stream.empty[Interpretation[CommitEvent]])
-      case commitId +: commitIdsStillToProcess => nextElement(commitId, commitIdsStillToProcess, pushEvent)
+      case Nil => ME.pure(Stream.empty[Interpretation[CommitEvent]])
+      case commitId +: commitIdsStillToProcess =>
+        nextElement(commitId, commitIdsStillToProcess, pushEvent, maybeAccessToken)
     }
 
-  private def nextElement(commitId: CommitId, commitIdsStillToProcess: List[CommitId], pushEvent: PushEvent) = {
+  private def nextElement(commitId:                CommitId,
+                          commitIdsStillToProcess: List[CommitId],
+                          pushEvent:               PushEvent,
+                          maybeAccessToken:        Option[AccessToken]) = {
     for {
-      commitEvent <- findCommitEvent(commitId, pushEvent)
+      commitEvent <- findCommitEvent(commitId, pushEvent, maybeAccessToken)
       commitIdsToProcess = findCommitIdsToProcess(commitIdsStillToProcess,
                                                   commitEvent.parents,
                                                   pushEvent.maybeCommitFrom)
-      nextCommitEvent <- stream(commitIdsToProcess, pushEvent)
+      nextCommitEvent <- stream(commitIdsToProcess, pushEvent, maybeAccessToken)
     } yield ME.pure(commitEvent) #:: nextCommitEvent
-  } recoverWith elementForFailure(commitIdsStillToProcess, pushEvent)
+  } recoverWith elementForFailure(commitIdsStillToProcess, pushEvent, maybeAccessToken)
 
   private def findCommitIdsToProcess(commitsToProcess:    List[CommitId],
                                      parentCommits:       List[CommitId],
                                      maybeEarliestCommit: Option[CommitId]): List[CommitId] =
-    (commitsToProcess ++ parentCommits).takeWhile(commitId => !maybeEarliestCommit.contains(commitId))
+    commitsToProcess ++ parentCommits takeWhile (commitId => !maybeEarliestCommit.contains(commitId))
 
-  private def elementForFailure(commitIdsToProcess: List[CommitId],
-                                pushEvent:          PushEvent): PartialFunction[Throwable, CommitEventsStream] = {
+  private def elementForFailure(
+      commitIdsToProcess: List[CommitId],
+      pushEvent:          PushEvent,
+      maybeAccessToken:   Option[AccessToken]): PartialFunction[Throwable, CommitEventsStream] = {
     case NonFatal(exception) =>
-      stream(commitIdsToProcess, pushEvent) map (ME.raiseError[CommitEvent](exception) #:: _)
+      stream(commitIdsToProcess, pushEvent, maybeAccessToken) map (ME.raiseError[CommitEvent](exception) #:: _)
   }
 
-  private def findCommitEvent(commitId: CommitId, pushEvent: PushEvent): Interpretation[CommitEvent] =
+  private def findCommitEvent(commitId:         CommitId,
+                              pushEvent:        PushEvent,
+                              maybeAccessToken: Option[AccessToken]): Interpretation[CommitEvent] =
     for {
-      commitInfo <- findCommitInfo(pushEvent.project.id, commitId)
+      commitInfo <- findCommitInfo(pushEvent.project.id, commitId, maybeAccessToken)
     } yield merge(commitInfo, pushEvent)
 
   private def merge(commitInfo: CommitInfo, pushEvent: PushEvent): CommitEvent =

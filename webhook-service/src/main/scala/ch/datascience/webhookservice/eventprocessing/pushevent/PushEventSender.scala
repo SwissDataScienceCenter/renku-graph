@@ -22,6 +22,8 @@ import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.graph.model.events.CommitEvent
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
+import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent._
@@ -32,21 +34,33 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class PushEventSender[Interpretation[_]: Monad](
+    accessTokenFinder:  AccessTokenFinder[Interpretation],
     commitEventsFinder: CommitEventsFinder[Interpretation],
     commitEventSender:  CommitEventSender[Interpretation],
     logger:             Logger[Interpretation]
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
+  import accessTokenFinder._
   import commitEventSender._
   import commitEventsFinder._
 
   def storeCommitsInEventLog(pushEvent: PushEvent): Interpretation[Unit] = {
     for {
-      commitEventsStream <- findCommitEvents(pushEvent)
+      maybeAccessToken   <- findAccessToken(pushEvent.project.id) map loggingInfoIfNoToken(pushEvent)
+      commitEventsStream <- findCommitEvents(pushEvent, maybeAccessToken)
       _                  <- (commitEventsStream map sendEvent(pushEvent)).sequence
       _                  <- logger.info(logMessageFor(pushEvent, "stored in event log"))
     } yield ()
   } recoverWith loggingError(pushEvent)
+
+  private def loggingInfoIfNoToken(pushEvent: PushEvent)(maybeAccessToken: Option[AccessToken]): Option[AccessToken] =
+    maybeAccessToken match {
+      case None =>
+        logger.info(logMessageFor(pushEvent, "no access token found so assuming public project"))
+        maybeAccessToken
+      case _ =>
+        maybeAccessToken
+    }
 
   private def sendEvent(pushEvent: PushEvent)(maybeCommitEvent: Interpretation[CommitEvent]) = {
     for {
@@ -110,6 +124,7 @@ class PushEventSender[Interpretation[_]: Monad](
 
 class IOPushEventSender(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends PushEventSender[IO](
+      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
       new IOCommitEventsFinder(),
       new IOCommitEventSender,
       ApplicationLogger

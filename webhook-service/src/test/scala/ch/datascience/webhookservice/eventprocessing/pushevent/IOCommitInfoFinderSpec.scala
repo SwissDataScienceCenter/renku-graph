@@ -27,8 +27,8 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.config.{GitLabConfigProvider, IOGitLabConfigProvider}
 import ch.datascience.webhookservice.config.GitLabConfigProvider._
+import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
@@ -46,17 +46,60 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
   "findCommitInfo" should {
 
     "fetch commit info from the configured url " +
-      "and return CommitInfo if OK returned with valid body" in new TestCase {
+      "and return CommitInfo if OK returned with valid body - case with Personal Access Token" in new TestCase {
 
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
-      val personalAccessToken = personalAccessTokens.generateOne
+      val accessToken = personalAccessTokens.generateOne
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+          .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
+          .willReturn(okJson(responseJson.toString()))
+      }
+
+      finder.findCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+        id            = commitId,
+        message       = commitMessage,
+        committedDate = committedDate,
+        author        = author,
+        committer     = committer,
+        parents       = parents
+      )
+    }
+
+    "fetch commit info from the configured url " +
+      "and return CommitInfo if OK returned with valid body - case with OAuth Access Token" in new TestCase {
+
+      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
+      val accessToken = oauthAccessTokens.generateOne
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+          .withHeader("Authorization", equalTo(s"Bearer ${accessToken.value}"))
+          .willReturn(okJson(responseJson.toString()))
+      }
+
+      finder.findCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+        id            = commitId,
+        message       = commitMessage,
+        committedDate = committedDate,
+        author        = author,
+        committer     = committer,
+        parents       = parents
+      )
+    }
+
+    "fetch commit info from the configured url " +
+      "and return CommitInfo if OK returned with valid body - case with no access token" in new TestCase {
+
+      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
           .willReturn(okJson(responseJson.toString()))
       }
 
-      finder.findCommitInfo(projectId, commitId).unsafeRunSync() shouldBe CommitInfo(
+      finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
         id            = commitId,
         message       = commitMessage,
         committedDate = committedDate,
@@ -71,7 +114,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
       expectGitLabConfigProvider(returning = IO.raiseError(exception))
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
       } shouldBe exception
     }
 
@@ -84,7 +127,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
       }
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -97,7 +140,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
       }
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
       }.getMessage should startWith("Invalid message body")
     }
 
@@ -110,7 +153,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
       }
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.NotFound}; body: some message"
     }
   }
