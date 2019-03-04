@@ -20,17 +20,12 @@ package ch.datascience.webhookservice
 
 import cats.MonadError
 import cats.effect._
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators
-import ch.datascience.http.server.PingEndpoint
-import ch.datascience.webhookservice.eventprocessing.HookEventEndpoint
-import ch.datascience.webhookservice.hookcreation.HookCreationEndpoint
-import ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.http.server.IOHttpServer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-
-import scala.concurrent.ExecutionContext
 
 class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
@@ -64,13 +59,4 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
     val httpServer = mock[IOHttpServer]
     val runner     = new MicroserviceRunner(httpServer)
   }
-
-  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-
-  private class IOHttpServer(
-      pingEndpoint:           PingEndpoint[IO],
-      hookEventEndpoint:      HookEventEndpoint[IO],
-      hookCreationEndpoint:   HookCreationEndpoint[IO],
-      hookValidationEndpoint: HookValidationEndpoint[IO]
-  ) extends HttpServer[IO](pingEndpoint, hookEventEndpoint, hookCreationEndpoint, hookValidationEndpoint)
 }

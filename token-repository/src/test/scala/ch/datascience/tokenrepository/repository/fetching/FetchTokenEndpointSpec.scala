@@ -48,12 +48,12 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
-      val response = endpoint.call(
-        Request(Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
-      )
+      val request = Request[IO](Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
 
-      response.status     shouldBe Status.Ok
-      response.body[Json] shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
+      val response = fetchToken(projectId).unsafeRunSync()
+
+      response.status                 shouldBe Status.Ok
+      response.as[Json].unsafeRunSync shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
 
       logger.loggedOnly(Info(s"Token for projectId: $projectId found"))
     }
@@ -67,12 +67,12 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
-      val response = endpoint.call(
-        Request(Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
-      )
+      val request = Request[IO](Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
 
-      response.status     shouldBe Status.Ok
-      response.body[Json] shouldBe Json.obj("personalAccessToken" -> Json.fromString(accessToken.value))
+      val response = fetchToken(projectId).unsafeRunSync()
+
+      response.status                 shouldBe Status.Ok
+      response.as[Json].unsafeRunSync shouldBe Json.obj("personalAccessToken" -> Json.fromString(accessToken.value))
 
       logger.loggedOnly(Info(s"Token for projectId: $projectId found"))
     }
@@ -86,12 +86,13 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(OptionT.none[IO, AccessToken])
 
-      val response = endpoint.call(
-        Request(Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
-      )
+      val request = Request[IO](Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
 
-      response.status     shouldBe Status.NotFound
-      response.body[Json] shouldBe Json.obj("message" -> Json.fromString(s"Token for projectId: $projectId not found"))
+      val response = fetchToken(projectId).unsafeRunSync()
+
+      response.status shouldBe Status.NotFound
+      response.as[Json].unsafeRunSync shouldBe Json.obj(
+        "message" -> Json.fromString(s"Token for projectId: $projectId not found"))
 
       logger.loggedOnly(Info(s"Token for projectId: $projectId not found"))
     }
@@ -106,12 +107,12 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(OptionT(IO.raiseError[Option[AccessToken]](exception)))
 
-      val response = endpoint.call(
-        Request(Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
-      )
+      val request = Request[IO](Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
+
+      val response = fetchToken(projectId).unsafeRunSync()
 
       response.status shouldBe Status.InternalServerError
-      response.body[Json] shouldBe Json.obj(
+      response.as[Json].unsafeRunSync shouldBe Json.obj(
         "message" -> Json.fromString(s"Finding token for projectId: $projectId failed")
       )
 
@@ -124,6 +125,6 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
     val tokensFinder = mock[IOTokenFinder]
     val logger       = TestLogger[IO]()
-    val endpoint     = new FetchTokenEndpoint[IO](tokensFinder, logger).fetchToken.or(notAvailableResponse)
+    val fetchToken   = new FetchTokenEndpoint[IO](tokensFinder, logger).fetchToken _
   }
 }

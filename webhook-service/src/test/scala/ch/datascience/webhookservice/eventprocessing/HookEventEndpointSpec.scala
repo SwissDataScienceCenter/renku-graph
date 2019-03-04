@@ -42,7 +42,7 @@ import org.scalatest.WordSpec
 
 class HookEventEndpointSpec extends WordSpec with MockFactory {
 
-  "POST /webhooks/events" should {
+  "processPushEvent" should {
 
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
@@ -53,14 +53,14 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("webhooks") / "events")
-          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
-          .withEntity(pushEventPayloadFrom(pushEvent))
-      )
+      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
+        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
-      response.status       shouldBe Accepted
-      response.body[String] shouldBe ""
+      val response = processPushEvent(request).unsafeRunSync()
+
+      response.status                   shouldBe Accepted
+      response.as[String].unsafeRunSync shouldBe ""
     }
 
     "return INTERNAL_SERVER_ERROR when storing push event in the event log fails" in new TestCase {
@@ -73,37 +73,37 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("webhooks") / "events")
-          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
-          .withEntity(pushEventPayloadFrom(pushEvent))
-      )
+      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
+        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
-      response.status     shouldBe InternalServerError
-      response.body[Json] shouldBe ErrorMessage(exception.getMessage).asJson
+      val response = processPushEvent(request).unsafeRunSync()
+
+      response.status                 shouldBe InternalServerError
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception.getMessage).asJson
     }
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("webhooks") / "events")
-          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
-          .withEntity(Json.obj())
-      )
+      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
+        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+        .withEntity(Json.obj())
 
-      response.status     shouldBe BadRequest
-      response.body[Json] shouldBe ErrorMessage("Invalid message body: Could not decode JSON: {}").asJson
+      val response = processPushEvent(request).unsafeRunSync()
+
+      response.status                 shouldBe BadRequest
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage("Invalid message body: Could not decode JSON: {}").asJson
     }
 
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("webhooks") / "events")
-          .withEntity(pushEventPayloadFrom(pushEvent))
-      )
+      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
-      response.status     shouldBe Unauthorized
-      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      val response = processPushEvent(request).unsafeRunSync()
+
+      response.status                 shouldBe Unauthorized
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
 
     "return UNAUTHORIZED when user X-Gitlab-Token is invalid" in new TestCase {
@@ -113,14 +113,14 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
         .expects(serializedHookToken)
         .returning(context.pure(HookToken(projectIds.generateOne)))
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("webhooks") / "events")
-          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
-          .withEntity(pushEventPayloadFrom(pushEvent))
-      )
+      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
+        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
-      response.status     shouldBe Unauthorized
-      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      val response = processPushEvent(request).unsafeRunSync()
+
+      response.status                 shouldBe Unauthorized
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
 
     "return UNAUTHORIZED when X-Gitlab-Token decryption fails" in new TestCase {
@@ -131,14 +131,14 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
         .expects(serializedHookToken)
         .returning(context.raiseError(exception))
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("webhooks") / "events")
-          .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
-          .withEntity(pushEventPayloadFrom(pushEvent))
-      )
+      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
+        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
-      response.status     shouldBe Unauthorized
-      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      val response = processPushEvent(request).unsafeRunSync()
+
+      response.status                 shouldBe Unauthorized
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
   }
 
@@ -176,10 +176,10 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
     val pushEventSender = mock[IOPushEventSender]
     val hookTokenCrypto = mock[IOHookTokenCrypto]
-    val endpoint = new HookEventEndpoint[IO](
+    val processPushEvent = new HookEventEndpoint[IO](
       hookTokenCrypto,
       pushEventSender
-    ).processPushEvent.or(notAvailableResponse)
+    ).processPushEvent _
 
     def pushEventPayloadFrom(pushEvent: PushEvent) =
       Json.obj(

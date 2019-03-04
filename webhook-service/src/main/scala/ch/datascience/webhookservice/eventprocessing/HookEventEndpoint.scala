@@ -33,7 +33,7 @@ import io.circe.{Decoder, HCursor}
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.util.CaseInsensitiveString
-import org.http4s.{EntityDecoder, HttpRoutes, Request, Response, Status}
+import org.http4s.{EntityDecoder, Request, Response, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -49,18 +49,16 @@ class HookEventEndpoint[Interpretation[_]: Effect](
   import hookTokenCrypto._
   import pushEventSender._
 
-  val processPushEvent: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
-    case request @ POST -> Root / "webhooks" / "events" => {
-      for {
-        pushEvent <- request.as[PushEvent] recoverWith badRequest
-        authToken <- findHookToken(request)
-        hookToken <- decrypt(authToken) recoverWith unauthorizedException
-        _         <- validate(hookToken, pushEvent)
-        _         <- storeCommitsInEventLog(pushEvent)
-        response  <- Accepted()
-      } yield response
-    } recoverWith httpResponse
-  }
+  def processPushEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+    for {
+      pushEvent <- request.as[PushEvent] recoverWith badRequest
+      authToken <- findHookToken(request)
+      hookToken <- decrypt(authToken) recoverWith unauthorizedException
+      _         <- validate(hookToken, pushEvent)
+      _         <- storeCommitsInEventLog(pushEvent)
+      response  <- Accepted()
+    } yield response
+  } recoverWith httpResponse
 
   private implicit lazy val pushEventEntityDecoder: EntityDecoder[Interpretation, PushEvent] =
     jsonOf[Interpretation, PushEvent]

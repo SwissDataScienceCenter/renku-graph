@@ -41,7 +41,7 @@ import org.scalatest.WordSpec
 
 class HookCreationEndpointSpec extends WordSpec with MockFactory {
 
-  "POST /projects/:id/webhooks" should {
+  "createHook" should {
 
     "return CREATED when a valid access token is present in the header " +
       "and webhook is successfully created for project with the given id in in GitLab" in new TestCase {
@@ -57,12 +57,12 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.pure(HookCreated))
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
-      )
+      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
 
-      response.status       shouldBe Created
-      response.body[String] shouldBe ""
+      val response = createHook(projectId, request).unsafeRunSync
+
+      response.status                   shouldBe Created
+      response.as[String].unsafeRunSync shouldBe ""
     }
 
     "return OK when hook was already created" in new TestCase {
@@ -78,12 +78,12 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.pure(HookExisted))
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
-      )
+      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
 
-      response.status       shouldBe Ok
-      response.body[String] shouldBe ""
+      val response = createHook(projectId, request).unsafeRunSync()
+
+      response.status                   shouldBe Ok
+      response.as[String].unsafeRunSync shouldBe ""
     }
 
     "return UNAUTHORIZED when finding an access token in the headers fails with UnauthorizedException" in new TestCase {
@@ -93,12 +93,12 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(*)
         .returning(context.raiseError(UnauthorizedException))
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
-      )
+      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
 
-      response.status     shouldBe Unauthorized
-      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      val response = createHook(projectId, request).unsafeRunSync()
+
+      response.status                 shouldBe Unauthorized
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
 
     "return INTERNAL_SERVER_ERROR when there was an error during hook creation" in new TestCase {
@@ -115,12 +115,12 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
-      )
+      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
 
-      response.status     shouldBe InternalServerError
-      response.body[Json] shouldBe errorMessage.asJson
+      val response = createHook(projectId, request).unsafeRunSync()
+
+      response.status                 shouldBe InternalServerError
+      response.as[Json].unsafeRunSync shouldBe errorMessage.asJson
     }
 
     "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook creation" in new TestCase {
@@ -137,12 +137,12 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 
-      val response = endpoint.call(
-        Request(Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
-      )
+      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
 
-      response.status     shouldBe Unauthorized
-      response.body[Json] shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      val response = createHook(projectId, request).unsafeRunSync()
+
+      response.status                 shouldBe Unauthorized
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
   }
 
@@ -153,9 +153,9 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
 
     val hookCreator       = mock[IOHookCreator]
     val accessTokenFinder = mock[IOAccessTokenExtractor]
-    val endpoint = new HookCreationEndpoint[IO](
+    val createHook = new HookCreationEndpoint[IO](
       hookCreator,
       accessTokenFinder
-    ).createHook.or(notAvailableResponse)
+    ).createHook _
   }
 }

@@ -22,15 +22,14 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.graph.http.server.ProjectIdPathBinder
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import io.chrisdavenport.log4cats.Logger
 import io.circe.syntax._
+import org.http4s.Response
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{HttpRoutes, Response}
 
 import scala.language.higherKinds
 import scala.util.control.NonFatal
@@ -40,14 +39,12 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
     logger:      Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
-  val fetchToken: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
-    case GET -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
-      tokenFinder
-        .findToken(projectId)
-        .value
-        .flatMap(toHttpResult(projectId))
-        .recoverWith(httpResult(projectId))
-  }
+  def fetchToken(projectId: ProjectId): Interpretation[Response[Interpretation]] =
+    tokenFinder
+      .findToken(projectId)
+      .value
+      .flatMap(toHttpResult(projectId))
+      .recoverWith(httpResult(projectId))
 
   private def toHttpResult(projectId: ProjectId): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
     case Some(token) =>

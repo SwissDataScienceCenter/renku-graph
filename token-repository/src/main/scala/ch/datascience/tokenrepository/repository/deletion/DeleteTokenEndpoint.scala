@@ -23,12 +23,11 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.graph.http.server.ProjectIdPathBinder
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.logging.ApplicationLogger
 import io.chrisdavenport.log4cats.Logger
+import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{HttpRoutes, Response}
 
 import scala.language.higherKinds
 import scala.util.control.NonFatal
@@ -39,13 +38,11 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
 )(implicit ME:    MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  val deleteToken: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
-    case DELETE -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
-      tokenRemover
-        .delete(projectId)
-        .flatMap(toHttpResult(projectId))
-        .recoverWith(httpResult(projectId))
-  }
+  def deleteToken(projectId: ProjectId): Interpretation[Response[Interpretation]] =
+    tokenRemover
+      .delete(projectId)
+      .flatMap(toHttpResult(projectId))
+      .recoverWith(httpResult(projectId))
 
   private def toHttpResult(projectId: ProjectId): Unit => Interpretation[Response[Interpretation]] = _ => {
     logger.info(s"Token deleted for projectId: $projectId")

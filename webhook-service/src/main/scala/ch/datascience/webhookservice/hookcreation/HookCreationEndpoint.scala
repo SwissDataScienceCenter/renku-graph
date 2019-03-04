@@ -22,13 +22,13 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.graph.http.server.ProjectIdPathBinder
+import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.security.AccessTokenExtractor
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{HttpRoutes, Response, Status}
+import org.http4s.{Request, Response, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -41,15 +41,13 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 
   import accessTokenFinder._
 
-  val createHook: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
-    case request @ POST -> Root / "projects" / ProjectIdPathBinder(projectId) / "webhooks" => {
-      for {
-        accessToken    <- findAccessToken(request)
-        creationResult <- hookCreator.createHook(projectId, accessToken)
-        response       <- toHttpResponse(creationResult)
-      } yield response
-    } recoverWith httpResponse
-  }
+  def createHook(projectId: ProjectId, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+    for {
+      accessToken    <- findAccessToken(request)
+      creationResult <- hookCreator.createHook(projectId, accessToken)
+      response       <- toHttpResponse(creationResult)
+    } yield response
+  } recoverWith httpResponse
 
   private lazy val toHttpResponse: HookCreationResult => Interpretation[Response[Interpretation]] = {
     case HookCreated => Created()

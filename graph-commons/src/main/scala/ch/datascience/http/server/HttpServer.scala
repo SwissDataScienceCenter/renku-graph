@@ -18,15 +18,22 @@
 
 package ch.datascience.http.server
 
-import cats.effect.Effect
+import cats.effect._
+import cats.implicits._
 import org.http4s.HttpRoutes
-import org.http4s.dsl.Http4sDsl
+import org.http4s.server.blaze._
+import org.http4s.syntax.kleisli._
 
 import scala.language.higherKinds
 
-class PingEndpoint[F[_]: Effect] extends Http4sDsl[F] {
+class HttpServer[F[_]: ConcurrentEffect](serverPort: Int, serviceRoutes: HttpRoutes[F]) {
 
-  val ping: HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "ping" => Ok("pong")
-  }
+  def run: F[ExitCode] =
+    BlazeServerBuilder[F]
+      .bindHttp(serverPort, "0.0.0.0")
+      .withHttpApp(serviceRoutes.orNotFound)
+      .serve
+      .compile
+      .drain
+      .as(ExitCode.Success)
 }

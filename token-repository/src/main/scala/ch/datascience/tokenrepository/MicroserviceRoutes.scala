@@ -18,32 +18,31 @@
 
 package ch.datascience.tokenrepository
 
-import cats.effect._
-import ch.datascience.http.server.PingEndpoint
+import cats.effect.ConcurrentEffect
+import ch.datascience.graph.http.server.ProjectIdPathBinder
 import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint
+import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
-private class HttpServer[F[_]: ConcurrentEffect](
-    pingEndpoint:           PingEndpoint[F],
+private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     fetchTokenEndpoint:     FetchTokenEndpoint[F],
     associateTokenEndpoint: AssociateTokenEndpoint[F],
     deleteTokenEndpoint:    DeleteTokenEndpoint[F]
-) {
-  import cats.implicits._
-  import org.http4s.server.blaze._
+) extends Http4sDsl[F] {
 
-  def run: F[ExitCode] =
-    BlazeBuilder[F]
-      .bindHttp(9003, "0.0.0.0")
-      .mountService(pingEndpoint.ping, "/")
-      .mountService(fetchTokenEndpoint.fetchToken, "/")
-      .mountService(associateTokenEndpoint.associateToken, "/")
-      .mountService(deleteTokenEndpoint.deleteToken, "/")
-      .serve
-      .compile
-      .drain
-      .as(ExitCode.Success)
+  import org.http4s.HttpRoutes
+
+  lazy val routes: HttpRoutes[F] = HttpRoutes
+    .of[F] {
+      case GET -> Root / "ping" => Ok("pong")
+      case GET -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
+        fetchTokenEndpoint.fetchToken(projectId)
+      case request @ PUT -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
+        associateTokenEndpoint.associateToken(projectId, request)
+      case DELETE -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
+        deleteTokenEndpoint.deleteToken(projectId)
+    }
 }

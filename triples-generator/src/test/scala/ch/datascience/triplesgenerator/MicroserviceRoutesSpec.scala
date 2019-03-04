@@ -18,23 +18,28 @@
 
 package ch.datascience.triplesgenerator
 
-import cats.effect._
-import ch.datascience.http.server.PingEndpoint
+import cats.effect.IO
+import ch.datascience.http.server.EndpointTester._
+import org.http4s.Status._
+import org.http4s.{Method, Request, Uri}
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
-import scala.language.higherKinds
+class MicroserviceRoutesSpec extends WordSpec {
 
-private class HttpServer[F[_]: ConcurrentEffect](
-    pingEndpoint: PingEndpoint[F]
-) {
-  import cats.implicits._
-  import org.http4s.server.blaze._
+  "routes" should {
 
-  def run: F[ExitCode] =
-    BlazeBuilder[F]
-      .bindHttp(9002, "0.0.0.0")
-      .mountService(pingEndpoint.ping, "/")
-      .serve
-      .compile
-      .drain
-      .as(ExitCode.Success)
+    "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
+      val response = routes.call(
+        Request(Method.GET, Uri.uri("ping"))
+      )
+
+      response.status       shouldBe Ok
+      response.body[String] shouldBe "pong"
+    }
+  }
+
+  private trait TestCase {
+    val routes = new MicroserviceRoutes[IO].routes.or(notAvailableResponse)
+  }
 }

@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice
 
 import cats.effect._
-import ch.datascience.http.server.PingEndpoint
+import ch.datascience.http.server.HttpServer
 import ch.datascience.webhookservice.eventprocessing.IOHookEventEndpoint
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
@@ -32,10 +32,12 @@ object Microservice extends IOApp {
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
 
   private val httpServer = new HttpServer[IO](
-    new PingEndpoint[IO],
-    new IOHookEventEndpoint,
-    new IOHookCreationEndpoint,
-    new IOHookValidationEndpoint
+    serverPort = 9001,
+    serviceRoutes = new MicroserviceRoutes[IO](
+      new IOHookEventEndpoint,
+      new IOHookCreationEndpoint,
+      new IOHookValidationEndpoint
+    ).routes
   )
 
   override def run(args: List[String]): IO[ExitCode] =

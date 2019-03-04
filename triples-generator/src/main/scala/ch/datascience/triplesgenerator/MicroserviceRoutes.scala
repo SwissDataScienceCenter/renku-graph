@@ -16,30 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.http.server
+package ch.datascience.triplesgenerator
 
-import cats.effect.IO
-import ch.datascience.http.server.EndpointTester._
-import org.http4s.dsl.io._
-import org.http4s.{Method, Request, Status, Uri}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import cats.effect.ConcurrentEffect
+import org.http4s.dsl.Http4sDsl
 
-class PingEndpointSpec extends WordSpec {
+import scala.language.higherKinds
 
-  "ping" should {
+private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect] extends Http4sDsl[Interpretation] {
 
-    "respond with OK and 'pong' body" in new TestCase {
-      val response = endpoint.call(
-        Request(Method.GET, Uri.uri("/ping"))
-      )
+  import org.http4s.HttpRoutes
 
-      response.status       shouldBe Status.Ok
-      response.body[String] shouldBe "pong"
+  lazy val routes: HttpRoutes[Interpretation] = HttpRoutes
+    .of[Interpretation] {
+      case GET -> Root / "ping" => Ok("pong")
     }
-  }
-
-  private trait TestCase {
-    val endpoint = new PingEndpoint[IO].ping.or(notAvailableResponse)
-  }
 }

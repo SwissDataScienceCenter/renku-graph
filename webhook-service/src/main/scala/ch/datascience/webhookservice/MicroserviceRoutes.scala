@@ -18,32 +18,31 @@
 
 package ch.datascience.webhookservice
 
-import cats.effect._
-import ch.datascience.http.server.PingEndpoint
+import cats.effect.ConcurrentEffect
+import ch.datascience.graph.http.server.ProjectIdPathBinder
 import ch.datascience.webhookservice.eventprocessing.HookEventEndpoint
 import ch.datascience.webhookservice.hookcreation.HookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint
+import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
-private class HttpServer[F[_]: ConcurrentEffect](
-    pingEndpoint:           PingEndpoint[F],
+private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     hookEventEndpoint:      HookEventEndpoint[F],
     hookCreationEndpoint:   HookCreationEndpoint[F],
     hookValidationEndpoint: HookValidationEndpoint[F]
-) {
-  import cats.implicits._
-  import org.http4s.server.blaze._
+) extends Http4sDsl[F] {
 
-  def run: F[ExitCode] =
-    BlazeBuilder[F]
-      .bindHttp(9001, "0.0.0.0")
-      .mountService(pingEndpoint.ping, "/")
-      .mountService(hookEventEndpoint.processPushEvent, "/")
-      .mountService(hookCreationEndpoint.createHook, "/")
-      .mountService(hookValidationEndpoint.validateHook, "/")
-      .serve
-      .compile
-      .drain
-      .as(ExitCode.Success)
+  import org.http4s.HttpRoutes
+
+  lazy val routes: HttpRoutes[F] = HttpRoutes
+    .of[F] {
+      case GET -> Root / "ping" => Ok("pong")
+      case request @ POST -> Root / "webhooks" / "events" =>
+        hookEventEndpoint.processPushEvent(request)
+      case request @ POST -> Root / "projects" / ProjectIdPathBinder(projectId) / "webhooks" =>
+        hookCreationEndpoint.createHook(projectId, request)
+      case request @ POST -> Root / "projects" / ProjectIdPathBinder(projectId) / "webhooks" / "validation" =>
+        hookValidationEndpoint.validateHook(projectId, request)
+    }
 }

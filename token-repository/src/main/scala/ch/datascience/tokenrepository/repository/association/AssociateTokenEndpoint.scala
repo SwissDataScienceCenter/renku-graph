@@ -23,14 +23,13 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.graph.http.server.ProjectIdPathBinder
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{EntityDecoder, HttpRoutes, Response}
+import org.http4s.{EntityDecoder, Request, Response}
 
 import scala.language.higherKinds
 import scala.util.control.NonFatal
@@ -43,15 +42,13 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 
   import tokenAssociator._
 
-  val associateToken: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
-    case request @ PUT -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" => {
-      for {
-        accessToken <- request.as[AccessToken].recoverWith(badRequest)
-        _           <- associate(projectId, accessToken)
-        response    <- toHttpResponse(projectId)()
-      } yield response
-    } recoverWith httpResponse(projectId)
-  }
+  def associateToken(projectId: ProjectId, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+    for {
+      accessToken <- request.as[AccessToken].recoverWith(badRequest)
+      _           <- associate(projectId, accessToken)
+      response    <- toHttpResponse(projectId)()
+    } yield response
+  } recoverWith httpResponse(projectId)
 
   private implicit lazy val accessTokenEntityDecoder: EntityDecoder[Interpretation, AccessToken] =
     jsonOf[Interpretation, AccessToken]
