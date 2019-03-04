@@ -102,6 +102,8 @@ class HookEventEndpoint[Interpretation[_]: Effect](
 
 private object HookEventEndpoint {
 
+  import io.circe.DecodingFailure
+
   private implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) => {
     for {
       id   <- cursor.downField("id").as[ProjectId]
@@ -115,7 +117,7 @@ private object HookEventEndpoint {
       commitTo        <- cursor.downField("after").as[CommitId]
       userId          <- cursor.downField("user_id").as[UserId]
       username        <- cursor.downField("user_username").as[Username]
-      maybeEmail      <- cursor.downField("user_email").as[Option[Email]]
+      maybeEmail      <- cursor.downField("user_email").as[Option[String]].flatMap(emptyToNone)
       project         <- cursor.downField("project").as[Project]
     } yield
       PushEvent(
@@ -124,6 +126,16 @@ private object HookEventEndpoint {
         PushUser(userId, username, maybeEmail),
         project
       )
+  }
+
+  private lazy val emptyToNone: Option[String] => Either[DecodingFailure, Option[Email]] = {
+    case Some("") => Right(None)
+    case None     => Right(None)
+    case Some(nonBlankEmail) =>
+      Email
+        .from(nonBlankEmail)
+        .map(Some(_))
+        .leftMap(exception => DecodingFailure.apply(exception.getMessage, Nil))
   }
 }
 

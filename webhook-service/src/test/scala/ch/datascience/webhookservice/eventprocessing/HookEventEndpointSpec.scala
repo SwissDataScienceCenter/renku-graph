@@ -142,6 +142,25 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
     }
   }
 
+  "PushEvent deserialization" should {
+
+    "work if 'user_email' is present" in new TestCase {
+      import HookEventEndpoint.pushEventDecoder
+
+      val pushEventWithEmail = pushEvent.copy(pushUser = pushEvent.pushUser.copy(maybeEmail = Some(emails.generateOne)))
+
+      pushEventPayloadFrom(pushEventWithEmail).as[PushEvent] shouldBe Right(pushEventWithEmail)
+    }
+
+    "work if 'user_email' is empty" in new TestCase {
+      import HookEventEndpoint.pushEventDecoder
+
+      val pushEventWithEmail = pushEvent.copy(pushUser = pushEvent.pushUser.copy(maybeEmail = None))
+
+      pushEventPayloadFrom(pushEventWithEmail).as[PushEvent] shouldBe Right(pushEventWithEmail)
+    }
+  }
+
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
@@ -169,7 +188,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
           Some("after"         -> Json.fromString(pushEvent.commitTo.value)),
           Some("user_id"       -> Json.fromInt(pushEvent.pushUser.userId.value)),
           Some("user_username" -> Json.fromString(pushEvent.pushUser.username.value)),
-          pushEvent.pushUser.maybeEmail.map(email => "user_email" -> Json.fromString(email.value)),
+          Some("user_email"    -> Json.fromString(pushEvent.pushUser.maybeEmail.map(_.value).getOrElse(""))),
           Some(
             "project" -> Json.obj(
               "id"                  -> Json.fromInt(pushEvent.project.id.value),
