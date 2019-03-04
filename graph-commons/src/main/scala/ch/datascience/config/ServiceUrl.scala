@@ -28,25 +28,20 @@ import pureconfig.error.CannotConvert
 import scala.language.implicitConversions
 import scala.util.Try
 
-class ServiceUrl private (val value: URL) extends AnyVal with TinyType[URL]
+class ServiceUrl private (val value: String) extends AnyVal with TinyType[String]
 
-object ServiceUrl extends TinyTypeFactory[URL, ServiceUrl](new ServiceUrl(_)) {
+object ServiceUrl extends TinyTypeFactory[String, ServiceUrl](new ServiceUrl(_)) {
 
-  def apply(url: String): ServiceUrl = ServiceUrl(new URL(url))
-
-  final def from(value: String): Either[IllegalArgumentException, ServiceUrl] =
-    Either
-      .fromTry(Try(new URL(value)))
-      .map(ServiceUrl(_))
-      .leftMap(exception => new IllegalArgumentException(s"Cannot instantiate $typeName", exception))
+  addConstraint(
+    check   = url => Try(new URL(url)).isSuccess,
+    message = (_: String) => s"Cannot instantiate $typeName"
+  )
 
   implicit class ServiceUrlOps(serviceUrl: ServiceUrl) {
     def /(value: Any): ServiceUrl = ServiceUrl(
-      new URL(s"$serviceUrl/$value")
+      s"$serviceUrl/$value"
     )
   }
-
-  implicit def asString(serviceUrl: ServiceUrl): String = serviceUrl.toString
 
   implicit val serviceUrlReader: ConfigReader[ServiceUrl] =
     ConfigReader.fromString[ServiceUrl] { value =>
