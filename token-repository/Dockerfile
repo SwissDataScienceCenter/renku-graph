@@ -1,13 +1,13 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
-FROM openjdk:8 as builder
+FROM openjdk:8-jre as builder
 
 # Get SBT
 RUN set -e \
   ; echo "deb http://dl.bintray.com/sbt/debian /" | tee -a /etc/apt/sources.list.d/sbt.list \
   ; apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823 \
   ; apt-get update \
-  ; apt-get install sbt \
+  ; apt-get install -y sbt \
   ;
 
 WORKDIR /work
