@@ -18,11 +18,11 @@
 
 package ch.datascience.http.server
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import org.http4s.HttpRoutes
 
 class IOHttpServer(
-    serverPort:          Int,
-    serviceRoutes:       HttpRoutes[IO]
-)(implicit contextShift: ContextShift[IO])
+    serverPort:    Int,
+    serviceRoutes: HttpRoutes[IO]
+)(implicit timer:  Timer[IO], contextShift: ContextShift[IO])
     extends HttpServer[IO](serverPort, serviceRoutes)

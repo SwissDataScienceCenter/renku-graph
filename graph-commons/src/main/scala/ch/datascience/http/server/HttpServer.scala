@@ -26,7 +26,10 @@ import org.http4s.syntax.kleisli._
 
 import scala.language.higherKinds
 
-class HttpServer[F[_]: ConcurrentEffect](serverPort: Int, serviceRoutes: HttpRoutes[F]) {
+class HttpServer[F[_]: ConcurrentEffect](
+    serverPort:    Int,
+    serviceRoutes: HttpRoutes[F]
+)(implicit timer:  Timer[F]) {
 
   def run: F[ExitCode] =
     BlazeServerBuilder[F]
