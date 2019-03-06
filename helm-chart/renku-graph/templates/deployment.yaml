@@ -51,7 +51,7 @@ spec:
               value: {{ printf "http://$(SELF_IP):9001" | quote }}
               {{- end }}
             - name: JAVA_OPTS
-              value: -Xmx100m
+              value: -Xmx100m -XX:+UseG1GC
           command:
             - bin/webhook-service
             - -Dhttp.port=9001
@@ -96,7 +96,7 @@ spec:
                   name: {{ template "jena.fullname" . }}
                   key: jena-admin-password
             - name: JAVA_OPTS
-              value: -Xmx100m
+              value: -Xmx100m -XX:+UseG1GC
           ports:
             - name: http-triples-gn
               containerPort: 9002
@@ -143,7 +143,7 @@ spec:
                   name: {{ template "renku.fullname" . }}
                   key: tokenRepository-postgresPassword
             - name: JAVA_OPTS
-              value: -Xmx100m
+              value: -Xmx100m -XX:+UseG1GC
           ports:
             - name: http-token-repo
               containerPort: 9003
