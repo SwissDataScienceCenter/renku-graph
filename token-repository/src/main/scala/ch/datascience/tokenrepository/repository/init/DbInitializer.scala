@@ -51,7 +51,7 @@ class DbInitializer[Interpretation[_]](
     sql"""
          |CREATE TABLE IF NOT EXISTS projects_tokens(
          | project_id int4 PRIMARY KEY,
-         | token VARCHAR (100) NOT NULL
+         | token VARCHAR NOT NULL
          |);
        """.stripMargin.update.run
       .transact(transactor)
