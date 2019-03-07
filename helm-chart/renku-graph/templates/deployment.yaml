@@ -93,6 +93,8 @@ spec:
                 secretKeyRef:
                   name: {{ template "jena.fullname" . }}
                   key: jena-admin-password
+            - name: SENTRY_DSN
+              value: {{ .Values.triplesGenerator.renku.sentryDsn }}
           ports:
             - name: http-triples-gn
               containerPort: 9002
