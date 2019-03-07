@@ -20,12 +20,12 @@ package ch.datascience.tokenrepository.repository.association
 
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.http.client.AccessToken
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
@@ -49,13 +49,13 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(()))
 
-      val response = endpoint.call(
-        Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
-          .withEntity(json"""{"personalAccessToken": ${accessToken.value}}""")
-      )
+      val request = Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
+        .withEntity(json"""{"personalAccessToken": ${accessToken.value}}""")
 
-      response.status       shouldBe Status.NoContent
-      response.body[String] shouldBe ""
+      val response = associateToken(projectId, request).unsafeRunSync()
+
+      response.status                   shouldBe Status.NoContent
+      response.as[String].unsafeRunSync shouldBe ""
 
       logger.loggedOnly(Info(s"Token associated with projectId: $projectId"))
     }
@@ -69,25 +69,25 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(()))
 
-      val response = endpoint.call(
-        Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
-          .withEntity(json"""{"oauthAccessToken": ${accessToken.value}}""")
-      )
+      val request = Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
+        .withEntity(json"""{"oauthAccessToken": ${accessToken.value}}""")
 
-      response.status       shouldBe Status.NoContent
-      response.body[String] shouldBe ""
+      val response = associateToken(projectId, request).unsafeRunSync()
+
+      response.status                   shouldBe Status.NoContent
+      response.as[String].unsafeRunSync shouldBe ""
 
       logger.loggedOnly(Info(s"Token associated with projectId: $projectId"))
     }
 
     "respond with BAD_REQUEST if the request body is invalid" in new TestCase {
 
-      val response = endpoint.call(
-        Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
-      )
+      val request = Request[IO](Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
 
-      response.status     shouldBe Status.BadRequest
-      response.body[Json] shouldBe json"""{"message": "Malformed message body: Invalid JSON: empty body"}"""
+      val response = associateToken(projectId, request).unsafeRunSync()
+
+      response.status                 shouldBe Status.BadRequest
+      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Malformed message body: Invalid JSON: empty body"}"""
 
       logger.expectNoLogs()
     }
@@ -102,14 +102,14 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.raiseError(exception))
 
-      val response = endpoint.call(
-        Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
-          .withEntity(json"""{"personalAccessToken": ${accessToken.value}}""")
-      )
+      val request = Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
+        .withEntity(json"""{"personalAccessToken": ${accessToken.value}}""")
+
+      val response = associateToken(projectId, request).unsafeRunSync()
 
       response.status shouldBe Status.InternalServerError
       val expectedMessage = s"Associating token with projectId: $projectId failed"
-      response.body[Json] shouldBe json"""{"message": $expectedMessage}"""
+      response.as[Json].unsafeRunSync shouldBe json"""{"message": $expectedMessage}"""
 
       logger.loggedOnly(Error(expectedMessage, exception))
     }
@@ -123,6 +123,6 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
 
     val tokensAssociator = mock[IOTokenAssociator]
     val logger           = TestLogger[IO]()
-    val endpoint         = new AssociateTokenEndpoint[IO](tokensAssociator, logger).associateToken.or(notAvailableResponse)
+    val associateToken   = new AssociateTokenEndpoint[IO](tokensAssociator, logger).associateToken _
   }
 }

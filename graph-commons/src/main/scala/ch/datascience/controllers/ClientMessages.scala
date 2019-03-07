@@ -22,10 +22,9 @@ import cats.Applicative
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.MatchesRegex
-import io.circe.{Encoder, Json => CirceJson}
+import io.circe._
 import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
-import play.api.libs.json._
 
 import scala.language.higherKinds
 
@@ -41,27 +40,11 @@ object ErrorMessage {
         identity
       )
 
-  def apply(jsError: JsError): ErrorMessage = {
-    val errorMessages = jsError.errors.map {
-      case (JsPath(Nil), pathErrors) => pathErrors.map(_.message).mkString("; ")
-      case (path, pathErrors)        => s"$path -> ${pathErrors.map(_.message).mkString("; ")}"
-    }
-    ErrorMessage(errorMessages.mkString("Json deserialization error(s): ", "; ", ""))
+  implicit val errorMessageEncoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
+    Json.obj("message" -> Json.fromString(message.value))
   }
 
-  private implicit val errorResponseWrites: Writes[ErrorMessage] = Writes[ErrorMessage] { error =>
-    Json.obj("error" -> error.value)
-  }
-
-  implicit class ErrorMessageOps(errorResponse: ErrorMessage) {
-    lazy val toJson: JsValue = Json.toJson(errorResponse)
-  }
-
-  private implicit val encoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
-    CirceJson.obj("message" -> CirceJson.fromString(message.value))
-  }
-
-  implicit def infoMessageDecoder[F[_]: Applicative]: EntityEncoder[F, ErrorMessage] =
+  implicit def errorMessageEntityEncoder[F[_]: Applicative]: EntityEncoder[F, ErrorMessage] =
     jsonEncoderOf[F, ErrorMessage]
 }
 
@@ -77,10 +60,10 @@ object InfoMessage {
         identity
       )
 
-  private implicit val encoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
-    CirceJson.obj("message" -> CirceJson.fromString(message.value))
+  private implicit val infoMessageEncoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
+    Json.obj("message" -> Json.fromString(message.value))
   }
 
-  implicit def infoMessageDecoder[F[_]: Applicative]: EntityEncoder[F, InfoMessage] =
+  implicit def infoMessageEntityEncoder[F[_]: Applicative]: EntityEncoder[F, InfoMessage] =
     jsonEncoderOf[F, InfoMessage]
 }

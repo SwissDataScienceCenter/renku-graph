@@ -40,9 +40,9 @@ object Generators {
     } yield chars.mkString("")
   }
 
-  def nonEmptyStringsList(maxElements: Int = 5): Gen[List[String]] =
+  def nonEmptyStringsList(minElements: Int = 1, maxElements: Int = 5): Gen[List[String]] =
     for {
-      size  <- positiveInts(maxElements)
+      size  <- choose(minElements, maxElements)
       lines <- Gen.listOfN(size, nonEmptyStrings())
     } yield lines
 

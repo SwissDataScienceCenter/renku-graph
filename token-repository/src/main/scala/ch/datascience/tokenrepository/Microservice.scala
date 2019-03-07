@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository
 
 import cats.effect._
-import ch.datascience.http.server.PingEndpoint
+import ch.datascience.http.server.HttpServer
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
@@ -31,10 +31,12 @@ object Microservice extends IOApp {
 
   private val dbInitializer = new IODbInitializer
   private val httpServer = new HttpServer[IO](
-    new PingEndpoint[IO],
-    new IOFetchTokenEndpoint,
-    new IOAssociateTokenEndpoint,
-    new IODeleteTokenEndpoint
+    serverPort = 9003,
+    serviceRoutes = new MicroserviceRoutes[IO](
+      new IOFetchTokenEndpoint,
+      new IOAssociateTokenEndpoint,
+      new IODeleteTokenEndpoint
+    ).routes
   )
 
   override def run(args: List[String]): IO[ExitCode] =
