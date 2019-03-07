@@ -16,8 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.http.client
 
-object exceptions {
-  final case object UnauthorizedException extends RuntimeException("Unauthorized")
+trait RestClientError extends Exception
+
+object RestClientError {
+
+  final case class UnexpectedResponseError(
+      message: String
+  ) extends Exception(message)
+      with RestClientError
+
+  final case class MappingError(
+      message: String,
+      cause:   Throwable
+  ) extends Exception(message, cause)
+      with RestClientError
+
+  final case object UnauthorizedException extends RuntimeException("Unauthorized") with RestClientError
 }

@@ -29,7 +29,7 @@ import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfigProvider._
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
@@ -141,7 +141,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
 
       intercept[Exception] {
         finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
-      }.getMessage should startWith("Invalid message body")
+      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
 
     "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {

@@ -48,12 +48,10 @@ class IOAccessTokenFinder(
       accessToken        <- send(request(GET, uri))(mapResponse)
     } yield accessToken
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[Option[AccessToken]] =
-    response.status match {
-      case Ok       => response.as[Option[AccessToken]] handleErrorWith contextToError(request, response)
-      case NotFound => IO.pure(None)
-      case _        => raiseError(request, response)
-    }
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[AccessToken]]] = {
+    case (Ok, _, response) => response.as[Option[AccessToken]]
+    case (NotFound, _, _)  => IO.pure(None)
+  }
 
   private implicit lazy val accessTokenEntityDecoder: EntityDecoder[IO, Option[AccessToken]] = {
     jsonOf[IO, AccessToken].map(Option.apply)

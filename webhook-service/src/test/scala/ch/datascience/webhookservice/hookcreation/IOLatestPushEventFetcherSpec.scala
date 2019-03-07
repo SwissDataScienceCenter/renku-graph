@@ -27,7 +27,7 @@ import ch.datascience.graph.model.events.{CommitId, ProjectId, UserId}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfigProvider.HostUrl
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
@@ -135,7 +135,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
       } shouldBe UnauthorizedException
     }
 
-    "return a RuntimeException if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
+    "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
       val personalAccessToken = personalAccessTokens.generateOne
 
@@ -150,7 +150,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/events?action=pushed returned ${Status.BadRequest}; body: some error"
     }
 
-    "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
+    "return an Exception if remote client responds with unexpected body" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
       val personalAccessToken = personalAccessTokens.generateOne
 

@@ -22,6 +22,7 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
 import ch.datascience.http.client.{AccessToken, IORestClient}
+import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -51,9 +52,7 @@ class IOAccessTokenAssociator(
       _ <- send(requestWithPayload)(mapResponse)
     } yield ()
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[Unit] =
-    response.status match {
-      case NoContent => IO.unit
-      case _         => raiseError(request, response)
-    }
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+    case (NoContent, _, _) => IO.unit
+  }
 }

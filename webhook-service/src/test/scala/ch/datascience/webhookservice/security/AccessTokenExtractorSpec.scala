@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import org.http4s.{Header, Headers, Request}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
