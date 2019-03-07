@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator
 
 import cats.effect._
-import ch.datascience.http.server.PingEndpoint
+import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.eventprocessing.filelog.FileEventProcessorRunner
 import ch.datascience.triplesgenerator.init.{FusekiDatasetInitializer, IOFusekiDatasetInitializer}
@@ -31,7 +31,8 @@ object Microservice extends IOApp {
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
   private val datasetInitializer = new IOFusekiDatasetInitializer
   private val httpServer = new HttpServer[IO](
-    new PingEndpoint[IO]
+    serverPort    = 9002,
+    serviceRoutes = new MicroserviceRoutes[IO].routes
   )
   private val eventProcessorRunner = new EventsSource[IO](new FileEventProcessorRunner(_))
     .withEventsProcessor(new IOCommitEventProcessor())

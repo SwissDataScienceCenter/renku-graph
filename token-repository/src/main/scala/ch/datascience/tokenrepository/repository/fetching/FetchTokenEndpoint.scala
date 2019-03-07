@@ -20,18 +20,16 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.controllers.InfoMessage._
+import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.tokenrepository.repository._
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Json
+import io.circe.syntax._
+import org.http4s.Response
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{HttpRoutes, Response}
 
 import scala.language.higherKinds
 import scala.util.control.NonFatal
@@ -41,35 +39,28 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
     logger:      Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
-  val fetchToken: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
-    case GET -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
-      tokenFinder
-        .findToken(projectId)
-        .value
-        .flatMap(toHttpResult(projectId))
-        .recoverWith(httpResult(projectId))
-  }
+  def fetchToken(projectId: ProjectId): Interpretation[Response[Interpretation]] =
+    tokenFinder
+      .findToken(projectId)
+      .value
+      .flatMap(toHttpResult(projectId))
+      .recoverWith(httpResult(projectId))
 
   private def toHttpResult(projectId: ProjectId): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
     case Some(token) =>
       logger.info(s"Token for projectId: $projectId found")
-      Ok(toJson(token))
+      Ok(token.asJson)
     case None =>
       val message = InfoMessage(s"Token for projectId: $projectId not found")
       logger.info(message.value)
-      NotFound(message)
-  }
-
-  private def toJson: AccessToken => Json = {
-    case PersonalAccessToken(token) => Json.obj("personalAccessToken" -> Json.fromString(token))
-    case OAuthAccessToken(token)    => Json.obj("oauthAccessToken"    -> Json.fromString(token))
+      NotFound(message.asJson)
   }
 
   private def httpResult(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Finding token for projectId: $projectId failed")
       logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+      InternalServerError(errorMessage.asJson)
   }
 }
 

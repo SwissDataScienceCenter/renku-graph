@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator
 import cats.effect.{ContextShift, ExitCode, IO}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.http.server.PingEndpoint
+import ch.datascience.http.server.IOHttpServer
 import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessorRunner
 import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
 import org.scalamock.scalatest.MockFactory
@@ -106,8 +106,4 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   }
 
   private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-
-  private class IOHttpServer(
-      pingEndpoint: PingEndpoint[IO]
-  ) extends HttpServer[IO](pingEndpoint)
 }

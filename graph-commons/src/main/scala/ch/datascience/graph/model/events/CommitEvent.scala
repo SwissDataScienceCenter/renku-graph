@@ -21,10 +21,8 @@ package ch.datascience.graph.model.events
 import java.time.Instant
 
 import ch.datascience.tinytypes.constraints.{GitSha, InstantInThePast, NonBlank}
-import ch.datascience.tinytypes.json._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import io.circe.Decoder
-import play.api.libs.json.Format
 
 final case class CommitEvent(
     id:            CommitId,
@@ -39,19 +37,16 @@ final case class CommitEvent(
 
 final class CommitId private (val value: String) extends AnyVal with TinyType[String]
 object CommitId extends TinyTypeFactory[String, CommitId](new CommitId(_)) with GitSha {
-  implicit lazy val commitIdFormat:  Format[CommitId]  = TinyTypeFormat(CommitId.apply)
   implicit lazy val commitIdDecoder: Decoder[CommitId] = Decoder.decodeString.map(CommitId.apply)
 }
 
 final class CommitMessage private (val value: String) extends AnyVal with TinyType[String]
 object CommitMessage extends TinyTypeFactory[String, CommitMessage](new CommitMessage(_)) with NonBlank {
-  implicit lazy val commitMessageFormat:  Format[CommitMessage]  = TinyTypeFormat(CommitMessage.apply)
   implicit lazy val commitMessageDecoder: Decoder[CommitMessage] = Decoder.decodeString.map(CommitMessage.apply)
 }
 
 final class CommittedDate private (val value: Instant) extends AnyVal with TinyType[Instant]
 object CommittedDate extends TinyTypeFactory[Instant, CommittedDate](new CommittedDate(_)) with InstantInThePast {
-  implicit lazy val committedDateFormat: Format[CommittedDate] = TinyTypeFormat(CommittedDate.apply)
   implicit lazy val committedDateDecoder: Decoder[CommittedDate] =
     Decoder.decodeZonedDateTime.map(t => CommittedDate(t.toInstant))
 }

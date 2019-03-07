@@ -21,18 +21,18 @@ package ch.datascience.tokenrepository.repository.deletion
 import cats.MonadError
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators.projectIds
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import io.circe.Json
+import io.circe.literal._
 import org.http4s.dsl.io._
 import org.http4s.{Method, Request, Status, Uri}
 import org.scalamock.scalatest.MockFactory
-import io.circe.literal._
 import org.scalatest.Matchers._
-import ch.datascience.generators.Generators._
-import io.circe.Json
 import org.scalatest.WordSpec
 
 class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
@@ -46,12 +46,12 @@ class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(context.pure(()))
 
-      val response = endpoint.call(
-        Request(Method.DELETE, Uri.uri("projects") / projectId.toString / "tokens")
-      )
+      val request = Request[IO](Method.DELETE, Uri.uri("projects") / projectId.toString / "tokens")
 
-      response.status       shouldBe Status.NoContent
-      response.body[String] shouldBe ""
+      val response = deleteToken(projectId).unsafeRunSync()
+
+      response.status                   shouldBe Status.NoContent
+      response.as[String].unsafeRunSync shouldBe ""
 
       logger.loggedOnly(Info(s"Token deleted for projectId: $projectId"))
     }
@@ -64,13 +64,13 @@ class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(context.raiseError(exception))
 
-      val response = endpoint.call(
-        Request(Method.DELETE, Uri.uri("projects") / projectId.toString / "tokens")
-      )
+      val request = Request[IO](Method.DELETE, Uri.uri("projects") / projectId.toString / "tokens")
+
+      val response = deleteToken(projectId).unsafeRunSync()
 
       response.status shouldBe Status.InternalServerError
       val expectedMessage = s"Deleting token for projectId: $projectId failed"
-      response.body[Json] shouldBe json"""{"message": $expectedMessage}"""
+      response.as[Json].unsafeRunSync shouldBe json"""{"message": $expectedMessage}"""
 
       logger.loggedOnly(Error(expectedMessage, exception))
     }
@@ -84,6 +84,6 @@ class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
 
     val tokenRemover = mock[IOTokenRemover]
     val logger       = TestLogger[IO]()
-    val endpoint     = new DeleteTokenEndpoint[IO](tokenRemover, logger).deleteToken.or(notAvailableResponse)
+    val deleteToken  = new DeleteTokenEndpoint[IO](tokenRemover, logger).deleteToken _
   }
 }

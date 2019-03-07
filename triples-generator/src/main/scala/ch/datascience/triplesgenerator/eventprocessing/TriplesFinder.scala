@@ -101,6 +101,8 @@ private object Commands {
       gitLabUrlProvider: GitLabUrlProvider[Interpretation]
   )(implicit ME:         MonadError[Interpretation, Throwable]) {
 
+    import java.net.URL
+
     import cats.implicits._
 
     def findRepositoryUrl(projectPath: ProjectPath, maybeAccessToken: Option[AccessToken]): Interpretation[ServiceUrl] =
@@ -121,7 +123,8 @@ private object Commands {
                       projectPath:  ProjectPath): Interpretation[ServiceUrl] = ME.fromEither {
       ServiceUrl.from {
         val url              = serviceUrl.value
-        val serviceWithToken = url.toString.replace(s"${url.getProtocol}//:", s"${url.getProtocol}//:$urlTokenPart")
+        val protocol         = new URL(url).getProtocol
+        val serviceWithToken = url.toString.replace(s"$protocol://", s"$protocol://$urlTokenPart")
         s"$serviceWithToken/$projectPath.git"
       }
     }

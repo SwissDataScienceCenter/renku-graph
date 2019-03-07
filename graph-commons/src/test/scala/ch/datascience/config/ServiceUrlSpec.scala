@@ -37,7 +37,7 @@ class ServiceUrlSpec extends WordSpec with PropertyChecks {
     }
 
     "fail for invalid urls" in {
-      an[MalformedURLException] should be thrownBy {
+      an[IllegalArgumentException] should be thrownBy {
         ServiceUrl("invalid url")
       }
     }
@@ -61,6 +61,29 @@ class ServiceUrlSpec extends WordSpec with PropertyChecks {
     "fail with IllegalArgumentException for invalid urls" in {
       val Left(failure) = ServiceUrl.from("dfh://asdf")
       failure.getMessage shouldBe s"Cannot instantiate ${ServiceUrl.getClass.getName}".replace("$", "")
+    }
+  }
+
+  "equal" should {
+
+    "return true when representing the same url" in {
+      ServiceUrl("http://localhost:9000/abc") shouldBe ServiceUrl("http://localhost:9000/abc")
+    }
+
+    "return false when representing different url" in {
+      ServiceUrl("http://localhost:9000/abcs") should not be ServiceUrl("http://localhost:9000/abc")
+    }
+
+    "return true when representing the same url and having the same pre-host clauses" in {
+      ServiceUrl("http://key:value@localhost:9000/abc") shouldBe ServiceUrl(
+        "http://key:value@localhost:9000/abc"
+      )
+    }
+
+    "return false when representing the same url but having different pre-host clauses" in {
+      ServiceUrl("http://key:value1@localhost:9000/abc") should not be ServiceUrl(
+        "http://key:value2@localhost:9000/abc"
+      )
     }
   }
 }

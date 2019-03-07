@@ -33,11 +33,8 @@ spec:
                   key: webhookService-hookToken-secret
             - name: FILE_EVENT_LOG_PATH
               value: /events/log.txt
-            - name: PLAY_APPLICATION_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ template "graph.fullname" . }}
-                  key: webhookService-play-secret
+            - name: TOKEN_REPOSITORY_BASE_URL
+              value: "http://{{ template "token-repository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
             - name: SELF_IP
@@ -52,7 +49,6 @@ spec:
               {{- end }}
           command:
             - bin/webhook-service
-            - -Dhttp.port=9001
           ports:
             - name: http-webhook-sv
               containerPort: 9001
