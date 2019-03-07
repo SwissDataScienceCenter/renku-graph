@@ -45,7 +45,7 @@ class FileEventProcessorRunnerSpec extends WordSpec with Eventually with Integra
   "file event source" should {
 
     "send every new line in a file to the registered processor and process them concurrently" in new TestCase {
-      val fileLines = nonEmptyStringsList(minElements = 40, maxElements = 50).generateOne
+      val fileLines = nonEmptyStringsList(minElements = 200, maxElements = 300).generateOne
 
       writeToFile(fileLines)
 
