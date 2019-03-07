@@ -12,7 +12,7 @@ tokenRepository:
     port: 9003
   resources:
     limits:
-      memory: "250Mi"
+      memory: "400Mi"
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
     ## Generated using: `openssl rand -hex 8|base64`
@@ -25,7 +25,7 @@ triplesGenerator:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      memory: "300Mi"
+      memory: "400Mi"
   service:
     type: ClusterIP
     port: 9002
@@ -44,7 +44,7 @@ webhookService:
     secret:
   resources:
     limits:
-      memory: "250Mi"
+      memory: "400Mi"
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
