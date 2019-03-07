@@ -1,16 +1,16 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
-FROM openjdk:8-jre-alpine3.9 as builder
 
-# Getting SBT
-RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
-    apk add --no-cache sbt
+FROM openjdk:8-jre-alpine3.9 as builder
 
 WORKDIR /work
 
-# Building microservice
 COPY . .
-RUN sbt "project token-repository" stage
+
+RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
+    apk add --no-cache --virtual .build-dependencies sbt && \
+    sbt "project token-repository" stage && \
+    apk del .build-dependencies
 
 FROM openjdk:8-jre-alpine3.9
 
