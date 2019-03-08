@@ -38,8 +38,8 @@ webhookService:
     secret:
 
 sentry:
-  graphSentryDsn: ''
-  pythonSentryDsn: ''
+  sentryDsnRenkuGraph: ''
+  sentryDsnRenkuPython: ''
 
 nameOverride: ''
 fullnameOverride: ''
