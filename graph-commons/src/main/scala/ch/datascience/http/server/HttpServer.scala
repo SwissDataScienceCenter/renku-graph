@@ -18,11 +18,13 @@
 
 package ch.datascience.http.server
 
+import cats.data.Kleisli
 import cats.effect._
 import cats.implicits._
-import org.http4s.HttpRoutes
+import ch.datascience.controllers.InfoMessage
+import ch.datascience.controllers.InfoMessage._
+import org.http4s.{HttpRoutes, Request, Response, Status}
 import org.http4s.server.blaze._
-import org.http4s.syntax.kleisli._
 
 import scala.language.higherKinds
 
@@ -39,4 +41,13 @@ class HttpServer[F[_]: ConcurrentEffect](
       .compile
       .drain
       .as(ExitCode.Success)
+
+  private implicit class RoutesOps(routes: HttpRoutes[F]) {
+    def orNotFound: Kleisli[F, Request[F], Response[F]] =
+      Kleisli { a =>
+        routes
+          .run(a)
+          .getOrElse(Response(Status.NotFound) withEntity InfoMessage("Resource not found"))
+      }
+  }
 }

@@ -21,8 +21,8 @@ package ch.datascience.webhookservice.eventprocessing
 import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
-import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.events._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
@@ -56,7 +56,7 @@ class HookEventEndpoint[Interpretation[_]: Effect](
       hookToken <- decrypt(authToken) recoverWith unauthorizedException
       _         <- validate(hookToken, pushEvent)
       _         <- storeCommitsInEventLog(pushEvent)
-      response  <- Accepted()
+      response  <- Accepted(InfoMessage("Event accepted"))
     } yield response
   } recoverWith httpResponse
 

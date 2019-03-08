@@ -33,9 +33,11 @@ import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.Json
+import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
-import org.http4s.{Header, Headers, Method, Request, Uri}
+import org.http4s.headers.`Content-Type`
+import org.http4s.{Header, Headers, MediaType, Method, Request, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -59,8 +61,9 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       val response = processPushEvent(request).unsafeRunSync()
 
-      response.status                   shouldBe Accepted
-      response.as[String].unsafeRunSync shouldBe ""
+      response.status                 shouldBe Accepted
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Event accepted"}"""
     }
 
     "return INTERNAL_SERVER_ERROR when storing push event in the event log fails" in new TestCase {
@@ -80,6 +83,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
       val response = processPushEvent(request).unsafeRunSync()
 
       response.status                 shouldBe InternalServerError
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception.getMessage).asJson
     }
 
@@ -92,6 +96,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
       val response = processPushEvent(request).unsafeRunSync()
 
       response.status                 shouldBe BadRequest
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe ErrorMessage("Invalid message body: Could not decode JSON: {}").asJson
     }
 
@@ -103,6 +108,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
       val response = processPushEvent(request).unsafeRunSync()
 
       response.status                 shouldBe Unauthorized
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
 
@@ -120,6 +126,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
       val response = processPushEvent(request).unsafeRunSync()
 
       response.status                 shouldBe Unauthorized
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
 
@@ -138,6 +145,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
       val response = processPushEvent(request).unsafeRunSync()
 
       response.status                 shouldBe Unauthorized
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
   }

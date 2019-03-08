@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookvalidation
 
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
-import ch.datascience.controllers.ErrorMessage
+import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.webhookservice.exceptions.UnauthorizedException
@@ -50,8 +50,8 @@ class HookValidationEndpoint[Interpretation[_]: Effect](
   } recoverWith withHttpResult
 
   private lazy val toHttpResponse: HookValidationResult => Interpretation[Response[Interpretation]] = {
-    case HookExists  => Ok()
-    case HookMissing => NotFound()
+    case HookExists  => Ok(InfoMessage("Hook valid"))
+    case HookMissing => NotFound(InfoMessage("Hook not found"))
   }
 
   private lazy val withHttpResult: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
