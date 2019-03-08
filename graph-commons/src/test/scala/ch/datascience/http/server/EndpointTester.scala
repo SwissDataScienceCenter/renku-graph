@@ -17,13 +17,18 @@
  */
 
 package ch.datascience.http.server
+
 import cats.data.Kleisli
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import io.circe.Json
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, Request, Response, Status}
 
+import scala.concurrent.ExecutionContext
+
 object EndpointTester {
+
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   implicit val jsonEntityDecoder: EntityDecoder[IO, Json] = jsonOf[IO, Json]
   implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]

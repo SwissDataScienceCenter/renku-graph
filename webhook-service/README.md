@@ -110,7 +110,7 @@ docker build -f webhook-service/Dockerfile -t webhook-service .
 - run the service
 
 ```bash
-docker run --rm -e 'PLAY_APPLICATION_SECRET=tLm_qFcq]L2>s>s`xd6iu6R[BHfK]>hgd/=HOx][][Yldf@kQIvrh:;C6P08?Fmh' -e 'GITLAB_BASE_URL=<gitlab-url>' -p 9001:9000 webhook-service
+docker run --rm -e 'HOOK_TOKEN_SECRET=<generated with openssl rand -hex 8|base64>' -e 'GITLAB_BASE_URL=<gitlab-url>' -p 9001:9000 webhook-service
 ```
 
 - play with the endpoint

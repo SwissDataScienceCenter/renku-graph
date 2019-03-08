@@ -22,16 +22,11 @@ import cats.MonadError
 import cats.effect._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.http.server.PingEndpoint
-import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint
-import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
-import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint
+import ch.datascience.http.server.IOHttpServer
 import ch.datascience.tokenrepository.repository.init.IODbInitializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-
-import scala.concurrent.ExecutionContext
 
 class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
@@ -86,18 +81,4 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
     val httpServer    = mock[IOHttpServer]
     val runner        = new MicroserviceRunner(dbInitializer, httpServer)
   }
-
-  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-
-  private class IOHttpServer(
-      pingEndpoint:           PingEndpoint[IO],
-      fetchTokenEndpoint:     FetchTokenEndpoint[IO],
-      associateTokenEndpoint: AssociateTokenEndpoint[IO],
-      deleteTokenEndpoint:    DeleteTokenEndpoint[IO]
-  ) extends HttpServer[IO](
-        pingEndpoint,
-        fetchTokenEndpoint,
-        associateTokenEndpoint,
-        deleteTokenEndpoint
-      )
 }

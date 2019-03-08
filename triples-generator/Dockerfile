@@ -23,7 +23,7 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 # Installing Renku
 RUN apk add --no-cache git curl bash python3-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev && \
-    python3 -m pip install --pre renku && \
+    python3 -m pip install --pre renku sentry-sdk && \
     chown -R daemon:daemon .
 
 ENTRYPOINT ["bin/triples-generator"]

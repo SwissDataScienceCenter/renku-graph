@@ -20,7 +20,6 @@ package ch.datascience.controllers
 
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import play.api.libs.json._
 
 class ErrorMessageSpec extends WordSpec {
 
@@ -40,27 +39,6 @@ class ErrorMessageSpec extends WordSpec {
       intercept[IllegalArgumentException] {
         ErrorMessage(" ")
       }.getMessage shouldBe "Error message cannot be blank"
-    }
-
-    "be instantiatable from a JsError without path" in {
-      val jsError = JsError("json error")
-      ErrorMessage(jsError).value shouldBe "Json deserialization error(s): json error"
-    }
-
-    "be instantiatable from a JsError with path" in {
-      val jsError = JsError(JsPath(List(KeyPathNode("key"))), "json error")
-      ErrorMessage(jsError).value shouldBe "Json deserialization error(s): /key -> json error"
-    }
-  }
-
-  "extension method toJson" should {
-
-    import ErrorMessage._
-
-    "deserialize ErrorMessage to JsValue" in {
-      ErrorMessage("error message").toJson shouldBe Json.obj(
-        "error" -> "error message"
-      )
     }
   }
 }

@@ -20,7 +20,6 @@ lazy val graphCommons = Project(
   id   = "graph-commons",
   base = file("graph-commons")
 ).settings(
-  libraryDependencies += playCore,
   commonSettings
 ).enablePlugins(
   AutomateHeaderPlugin
@@ -35,7 +34,6 @@ lazy val webhookService = Project(
   graphCommons % "compile->compile",
   graphCommons % "test->test"
 ).enablePlugins(
-  PlayScala, 
   JavaAppPackaging, 
   AutomateHeaderPlugin
 )

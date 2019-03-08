@@ -28,6 +28,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.prop.PropertyChecks
 import io.circe.literal._
+import io.circe.syntax._
 
 class AccessTokenSpec extends WordSpec with PropertyChecks {
 
@@ -69,14 +70,14 @@ class AccessTokenSpec extends WordSpec with PropertyChecks {
     }
   }
 
-  "accessTokenDecoder" should {
+  "accessToken json decoder" should {
 
-    "decode OAuthAccessToken from json" in {
+    "decode OAuthAccessToken" in {
       val accessToken = oauthAccessTokens.generateOne
       json"""{"oauthAccessToken": ${accessToken.value}}""".as[AccessToken] shouldBe Right(accessToken)
     }
 
-    "decode PersonalAccessToken from json" in {
+    "decode PersonalAccessToken" in {
       val accessToken = personalAccessTokens.generateOne
       json"""{"personalAccessToken": ${accessToken.value}}""".as[AccessToken] shouldBe Right(accessToken)
     }
@@ -84,6 +85,19 @@ class AccessTokenSpec extends WordSpec with PropertyChecks {
     "fail for a invalid access token json" in {
       val Left(failure) = json"""{"someToken": "value"}""".as[AccessToken]
       failure shouldBe DecodingFailure("Access token cannot be deserialized", Nil)
+    }
+  }
+
+  "accessToken json encoder" should {
+
+    "encode OAuthAccessToken" in {
+      val accessToken: AccessToken = oauthAccessTokens.generateOne
+      accessToken.asJson shouldBe json"""{"oauthAccessToken": ${accessToken.value}}"""
+    }
+
+    "encode PersonalAccessToken" in {
+      val accessToken: AccessToken = personalAccessTokens.generateOne
+      accessToken.asJson shouldBe json"""{"personalAccessToken": ${accessToken.value}}"""
     }
   }
 }
