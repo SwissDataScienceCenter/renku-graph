@@ -57,7 +57,7 @@ RUN apt-get update --fix-missing && \
     apt-get install -y gcc && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install --pre renku
+    pip install --pre renku sentry-sdk
 
 RUN set -e \
   ; chown -R daemon:daemon . \
