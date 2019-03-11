@@ -22,7 +22,6 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import io.sentry.Sentry
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -33,8 +32,8 @@ class SentryInitializerSpec extends WordSpec with MockFactory {
 
   "run" should {
 
-    "initialise Sentry and succeed if 'GRAPH_SENTRY_DSN' is non-blank" in new TestCase {
-      val sentryDns = nonEmptyStrings().generateOne
+    "initialise Sentry and succeed if 'GRAPH_SENTRY_DSN' is non-blank and does not start with ?" in new TestCase {
+      val sentryDns = httpUrls.generateOne
       getEnvVariable.expects("GRAPH_SENTRY_DSN").returning(Some(sentryDns))
 
       initSentry.expects(sentryDns)
@@ -46,12 +45,16 @@ class SentryInitializerSpec extends WordSpec with MockFactory {
       getEnvVariable.expects("GRAPH_SENTRY_DSN").returning(Some("  "))
 
       sentryInitializer.run shouldBe context.unit
+    }
 
-      Sentry.getStoredClient.getServerName
+    "do nothing if 'GRAPH_SENTRY_DSN' starts with '?'" in new TestCase {
+      getEnvVariable.expects("GRAPH_SENTRY_DSN").returning(Some("  ?key=value"))
+
+      sentryInitializer.run shouldBe context.unit
     }
 
     "fail if Sentry initialisation fails" in new TestCase {
-      val sentryDns = nonEmptyStrings().generateOne
+      val sentryDns = httpUrls.generateOne
       getEnvVariable.expects("GRAPH_SENTRY_DSN").returning(Some(sentryDns))
 
       val exception = exceptions.generateOne
