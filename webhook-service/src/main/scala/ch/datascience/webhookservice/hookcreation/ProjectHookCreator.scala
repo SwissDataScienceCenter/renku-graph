@@ -25,6 +25,7 @@ import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
+import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -52,7 +53,7 @@ private class IOProjectHookCreator(
     with ProjectHookCreator[IO] {
 
   import cats.effect._
-  import ch.datascience.webhookservice.exceptions.UnauthorizedException
+  import ch.datascience.http.client.RestClientError.UnauthorizedException
   import io.circe.Json
   import org.http4s.Method.POST
   import org.http4s.Status.{Created, Unauthorized}
@@ -75,10 +76,8 @@ private class IOProjectHookCreator(
       "token"       -> Json.fromString(projectHook.serializedHookToken.value)
     )
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[Unit] =
-    response.status match {
-      case Created      => IO.unit
-      case Unauthorized => IO.raiseError(UnauthorizedException)
-      case _            => raiseError(request, response)
-    }
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+    case (Created, _, _)      => IO.unit
+    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+  }
 }

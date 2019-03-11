@@ -29,8 +29,6 @@ triplesGenerator:
   resources:
     limits:
       memory: "400Mi"
-  renku:
-    sentryDsn: ''
 
 webhookService:
   image:
@@ -47,6 +45,10 @@ webhookService:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
     secret:
+
+sentry:
+  sentryDsnRenkuGraph: ''
+  sentryDsnRenkuPython: ''
 
 nameOverride: ''
 fullnameOverride: ''

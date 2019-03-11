@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import org.http4s.{Method, Uri}
+import org.http4s.{Method, Status, Uri}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -43,7 +43,7 @@ private class IOCommitInfoFinder(
 
   import CommitInfo._
   import cats.effect._
-  import ch.datascience.webhookservice.exceptions.UnauthorizedException
+  import ch.datascience.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.{Request, Response}
@@ -61,12 +61,10 @@ private class IOCommitInfoFinder(
       case None              => Request[IO](GET, uri)
     }
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[CommitInfo] =
-    response.status match {
-      case Ok           => response.as[CommitInfo]
-      case Unauthorized => IO.raiseError(UnauthorizedException)
-      case _            => raiseError(request, response)
-    }
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[CommitInfo]] = {
+    case (Ok, _, response)    => response.as[CommitInfo]
+    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+  }
 }
 
 private case class CommitInfo(

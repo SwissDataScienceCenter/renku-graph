@@ -18,12 +18,21 @@
 
 package ch.datascience.triplesgenerator.init
 
-import cats.effect.IO
+import cats.MonadError
+import io.sentry.Sentry
 
-import scala.util.Try
+import scala.language.higherKinds
+import scala.util.{Properties, Try}
 
-private abstract class TryDatasetExistenceChecker extends DatasetExistenceChecker[Try]
+class SentryInitializer[Interpretation[_]](
+    initSentry:     String => Unit = dns => Sentry.init(dns),
+    getEnvVariable: String => Option[String] = Properties.envOrNone _
+)(implicit ME:      MonadError[Interpretation, Throwable]) {
 
-private abstract class TryDatasetExistenceCreator extends DatasetExistenceCreator[Try]
-
-abstract class IOSentryInitializer extends SentryInitializer[IO]
+  def run: Interpretation[Unit] =
+    getEnvVariable("GRAPH_SENTRY_DSN").map(_.trim) match {
+      case Some("")        => ME.unit
+      case Some(sentryDns) => ME.fromTry(Try(initSentry(sentryDns)))
+      case None            => ME.unit
+    }
+}

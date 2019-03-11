@@ -22,27 +22,33 @@ import cats.effect._
 import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.eventprocessing.filelog.FileEventProcessorRunner
-import ch.datascience.triplesgenerator.init.{FusekiDatasetInitializer, IOFusekiDatasetInitializer}
+import ch.datascience.triplesgenerator.init.{FusekiDatasetInitializer, IOFusekiDatasetInitializer, SentryInitializer}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 object Microservice extends IOApp {
 
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
-  private val datasetInitializer = new IOFusekiDatasetInitializer
+
   private val httpServer = new HttpServer[IO](
     serverPort    = 9002,
     serviceRoutes = new MicroserviceRoutes[IO].routes
   )
   private val eventProcessorRunner = new EventsSource[IO](new FileEventProcessorRunner(_))
     .withEventsProcessor(new IOCommitEventProcessor())
-  private val microserviceRunner = new MicroserviceRunner(datasetInitializer, eventProcessorRunner, httpServer)
+  private val microserviceRunner = new MicroserviceRunner(
+    new SentryInitializer[IO],
+    new IOFusekiDatasetInitializer,
+    eventProcessorRunner,
+    httpServer
+  )
 
   override def run(args: List[String]): IO[ExitCode] =
     microserviceRunner.run(args)
 }
 
 private class MicroserviceRunner(
+    sentryInitializer:    SentryInitializer[IO],
     datasetInitializer:   FusekiDatasetInitializer[IO],
     eventProcessorRunner: EventProcessorRunner[IO],
     httpServer:           HttpServer[IO]
@@ -52,6 +58,7 @@ private class MicroserviceRunner(
 
   def run(args: List[String]): IO[ExitCode] =
     for {
+      _ <- sentryInitializer.run
       _ <- datasetInitializer.run
       _ <- List(httpServer.run.start, eventProcessorRunner.run).sequence
     } yield ExitCode.Success

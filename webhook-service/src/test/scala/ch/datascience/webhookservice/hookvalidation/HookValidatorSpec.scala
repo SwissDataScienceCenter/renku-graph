@@ -29,7 +29,7 @@ import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.project.ProjectVisibility._

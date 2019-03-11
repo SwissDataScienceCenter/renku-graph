@@ -51,7 +51,7 @@ private class IOProjectHookVerifier(
     with ProjectHookVerifier[IO] {
 
   import cats.effect._
-  import ch.datascience.webhookservice.exceptions.UnauthorizedException
+  import ch.datascience.http.client.RestClientError.UnauthorizedException
   import io.circe._
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
@@ -66,12 +66,10 @@ private class IOProjectHookVerifier(
       existingHooksNames <- send(request(GET, uri, accessToken))(mapResponse)
     } yield checkProjectHookExists(existingHooksNames, projectHookId.projectHookUrl)
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[List[String]] =
-    response.status match {
-      case Ok           => response.as[List[String]] handleErrorWith contextToError(request, response)
-      case Unauthorized => IO.raiseError(UnauthorizedException)
-      case _            => raiseError(request, response)
-    }
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[List[String]]] = {
+    case (Ok, _, response)    => response.as[List[String]]
+    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+  }
 
   private implicit lazy val hooksUrlsDecoder: EntityDecoder[IO, List[String]] = {
     implicit val hookNameDecoder: Decoder[List[String]] = decodeList {

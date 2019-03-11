@@ -49,7 +49,7 @@ private class IOUserInfoFinder(
     with UserInfoFinder[IO] {
 
   import cats.effect._
-  import ch.datascience.webhookservice.exceptions.UnauthorizedException
+  import ch.datascience.http.client.RestClientError.UnauthorizedException
   import io.circe._
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
@@ -64,12 +64,10 @@ private class IOUserInfoFinder(
       userInfo      <- send(request(GET, uri, accessToken))(mapResponse)
     } yield userInfo
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[UserInfo] =
-    response.status match {
-      case Ok           => response.as[UserInfo] handleErrorWith contextToError(request, response)
-      case Unauthorized => IO.raiseError(UnauthorizedException)
-      case _            => raiseError(request, response)
-    }
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[UserInfo]] = {
+    case (Ok, _, response)    => response.as[UserInfo]
+    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+  }
 
   private implicit lazy val userInfoDecoder: EntityDecoder[IO, UserInfo] = {
     implicit val hookNameDecoder: Decoder[UserInfo] = (cursor: HCursor) =>

@@ -29,7 +29,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.Json

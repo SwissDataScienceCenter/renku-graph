@@ -26,7 +26,7 @@ import ch.datascience.graph.model.events.EventsGenerators.projectIds
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.{GitLabConfigProvider, IOGitLabConfigProvider}
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
