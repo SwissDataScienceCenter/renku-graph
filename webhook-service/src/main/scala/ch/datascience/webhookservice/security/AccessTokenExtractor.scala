@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import org.http4s.util.CaseInsensitiveString
 import org.http4s.{Header, Request}
 

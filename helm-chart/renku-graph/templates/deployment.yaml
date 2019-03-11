@@ -47,6 +47,8 @@ spec:
               {{- else }}
               value: {{ printf "http://$(SELF_IP):9001" | quote }}
               {{- end }}
+            - name: SENTRY_DSN
+              value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=webhook-service&environment={{ .Release.Namespace }}
           command:
             - bin/webhook-service
           ports:
@@ -90,7 +92,9 @@ spec:
                   name: {{ template "jena.fullname" . }}
                   key: jena-admin-password
             - name: SENTRY_DSN
-              value: {{ .Values.triplesGenerator.renku.sentryDsn }}
+              value: {{ .Values.sentry.sentryDsnRenkuPython }}
+            - name: GRAPH_SENTRY_DSN
+              value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=triples-generator&environment={{ .Release.Namespace }}
           ports:
             - name: http-triples-gn
               containerPort: 9002
@@ -136,6 +140,8 @@ spec:
                 secretKeyRef:
                   name: {{ template "renku.fullname" . }}
                   key: tokenRepository-postgresPassword
+            - name: SENTRY_DSN
+              value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=token-repository&environment={{ .Release.Namespace }}
           ports:
             - name: http-token-repo
               containerPort: 9003

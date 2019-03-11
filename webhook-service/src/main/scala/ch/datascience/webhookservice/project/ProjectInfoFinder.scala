@@ -40,7 +40,7 @@ class IOProjectInfoFinder(
     with ProjectInfoFinder[IO] {
 
   import cats.effect._
-  import ch.datascience.webhookservice.exceptions.UnauthorizedException
+  import ch.datascience.http.client.RestClientError.UnauthorizedException
   import io.circe._
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
@@ -55,12 +55,10 @@ class IOProjectInfoFinder(
       projectInfo   <- send(request(GET, uri, accessToken))(mapResponse)
     } yield projectInfo
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[ProjectInfo] =
-    response.status match {
-      case Ok           => response.as[ProjectInfo] handleErrorWith contextToError(request, response)
-      case Unauthorized => IO.raiseError(UnauthorizedException)
-      case _            => raiseError(request, response)
-    }
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ProjectInfo]] = {
+    case (Ok, _, response)    => response.as[ProjectInfo]
+    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+  }
 
   private implicit lazy val projectInfoDecoder: EntityDecoder[IO, ProjectInfo] = {
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>

@@ -22,7 +22,9 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events.{CommitId, ProjectId, UserId}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.eventprocessing.pushevent.CommitInfo
 import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
+import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -50,7 +52,7 @@ private class IOLatestPushEventFetcher(
     with LatestPushEventFetcher[IO] {
 
   import cats.implicits._
-  import ch.datascience.webhookservice.exceptions.UnauthorizedException
+  import ch.datascience.http.client.RestClientError.UnauthorizedException
   import io.circe.{Decoder, HCursor}
   import org.http4s.Method.GET
   import org.http4s.Status._
@@ -67,13 +69,11 @@ private class IOLatestPushEventFetcher(
       projectInfo   <- send(request(GET, uri, accessToken))(mapResponse)
     } yield projectInfo
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[Option[PushEventInfo]] =
-    response.status match {
-      case Ok           => response.as[Option[PushEventInfo]] handleErrorWith contextToError(request, response)
-      case NotFound     => IO.pure(None)
-      case Unauthorized => IO.raiseError(UnauthorizedException)
-      case _            => raiseError(request, response)
-    }
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[PushEventInfo]]] = {
+    case (Ok, _, response)    => response.as[Option[PushEventInfo]]
+    case (NotFound, _, _)     => IO.pure(None)
+    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+  }
 
   private implicit lazy val pushEventInfoDecoder: EntityDecoder[IO, Option[PushEventInfo]] = {
     implicit val hookNameDecoder: Decoder[Option[PushEventInfo]] = (cursor: HCursor) =>
