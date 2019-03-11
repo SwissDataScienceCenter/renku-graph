@@ -34,4 +34,5 @@ object RestClientError {
       with RestClientError
 
   final case object UnauthorizedException extends RuntimeException("Unauthorized") with RestClientError
+  type UnauthorizedException = UnauthorizedException.type
 }

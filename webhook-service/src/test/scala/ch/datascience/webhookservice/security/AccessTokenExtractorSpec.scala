@@ -23,6 +23,9 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import org.http4s.AuthScheme._
+import org.http4s.Credentials.Token
+import org.http4s.headers.Authorization
 import org.http4s.{Header, Headers, Request}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -39,6 +42,15 @@ class AccessTokenExtractorSpec extends WordSpec {
 
       finder.findAccessToken(
         request.withHeaders(Headers(Header("PRIVATE-TOKEN", accessToken.value)))
+      ) shouldBe context.pure(accessToken)
+    }
+
+    "return oauth access token when 'Authorization: Bearer <token>' is present in the header" in new TestCase {
+
+      val accessToken = oauthAccessTokens.generateOne
+
+      finder.findAccessToken(
+        request.withHeaders(Authorization(Token(Bearer, accessToken.value)))
       ) shouldBe context.pure(accessToken)
     }
 
@@ -61,7 +73,7 @@ class AccessTokenExtractorSpec extends WordSpec {
           .withHeaders(
             Headers(
               Header("OAUTH-TOKEN", oauthAccessToken.value),
-              Header("PRIVATE-TOKEN", personalAccessToken.value)
+              Authorization(Token(Bearer, oauthAccessToken.value))
             )
           )
       ) shouldBe context.pure(oauthAccessToken)
@@ -74,6 +86,15 @@ class AccessTokenExtractorSpec extends WordSpec {
     "fail with UNAUTHORIZED when PRIVATE-TOKEN is invalid" in new TestCase {
       finder.findAccessToken(
         request.withHeaders(Headers(Header("PRIVATE-TOKEN", "")))
+      ) shouldBe context.raiseError(UnauthorizedException)
+    }
+
+    "fail with UNAUTHORIZED when token in the 'Authorization' header is invalid" in new TestCase {
+
+      val accessToken = oauthAccessTokens.generateOne
+
+      finder.findAccessToken(
+        request.withHeaders(Authorization(Token(Basic, accessToken.value)))
       ) shouldBe context.raiseError(UnauthorizedException)
     }
 
