@@ -31,8 +31,8 @@ class SentryInitializer[Interpretation[_]](
 
   def run: Interpretation[Unit] =
     getEnvVariable("GRAPH_SENTRY_DSN").map(_.trim) match {
-      case Some("")        => ME.unit
-      case Some(sentryDns) => ME.fromTry(Try(initSentry(sentryDns)))
-      case None            => ME.unit
+      case Some("")                           => ME.unit
+      case Some(dsn) if !(dsn startsWith "?") => ME.fromTry(Try(initSentry(dsn)))
+      case _                                  => ME.unit
     }
 }
