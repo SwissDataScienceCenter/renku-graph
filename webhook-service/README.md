@@ -31,9 +31,10 @@ Creates a webhook for a project with the given `project id`.
 
 **Request format**
 
-The endpoint requires an authorization token. It has to be
-- either `PRIVATE-TOKEN` with user's personal access token in GitLab
-- or `OAUTH-TOKEN` with oauth token obtained from GitLab
+The endpoint requires an authorization token. It can be passed in the request header as:
+- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+- `OAUTH-TOKEN: <token>` with OAuth Token obtained from GitLab (deprecated)
 
 **Response**
 
@@ -53,9 +54,10 @@ Validates the webhook for the project with the given `project id`. It succeeds (
 
 **Request format**
 
-The endpoint requires an authorization token. It has to be
-- either `PRIVATE-TOKEN` with user's personal access token in GitLab
-- or `OAUTH-TOKEN` with oauth token obtained from GitLab
+The endpoint requires an authorization token. It can be passed in the request header as:
+- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+- `OAUTH-TOKEN: <token>` with OAuth Token obtained from GitLab (deprecated)
 
 **Response**
 
