@@ -133,7 +133,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       commits.toList foreach logSuccess
     }
 
-    "succeed but log an error if CommitEvent deserialization fails" in new TestCase {
+    "succeed but log an error if CommitEvent processing fails" in new TestCase {
 
       val exception = exceptions.generateOne
       (eventsDeserialiser
@@ -143,7 +143,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       eventProcessor(eventJson) shouldBe context.unit
 
-      logger.loggedOnly(Error("Commit Event deserialisation failed", exception))
+      logger.loggedOnly(Error(s"Commit Event processing failure: $eventJson", exception))
     }
 
     "succeed but log an error if finding an access token fails" in new TestCase {
@@ -162,7 +162,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       eventProcessor(eventJson) shouldBe context.unit
 
-      logger.loggedOnly(Error("Commit Event deserialisation failed", exception))
+      logger.loggedOnly(Error(s"Commit Event processing failure: $eventJson", exception))
     }
   }
 

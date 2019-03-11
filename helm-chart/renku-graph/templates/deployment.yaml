@@ -49,8 +49,8 @@ spec:
               {{- end }}
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=webhook-service&environment={{ .Release.Namespace }}
-          command:
-            - bin/webhook-service
+            - name: JAVA_OPTS
+              value: -Xmx100m -XX:+UseG1GC
           ports:
             - name: http-webhook-sv
               containerPort: 9001
@@ -67,7 +67,7 @@ spec:
             - name: file-event-log
               mountPath: /events
           resources:
-  {{ toYaml .Values.resources | indent 12 }}
+{{ toYaml .Values.webhookService.resources | indent 12 }}
         - name: {{ .Chart.Name }}-triples-generator
           image: "{{ .Values.triplesGenerator.image.repository }}:{{ .Values.triplesGenerator.image.tag }}"
           imagePullPolicy: {{ .Values.triplesGenerator.image.pullPolicy }}
@@ -95,6 +95,8 @@ spec:
               value: {{ .Values.sentry.sentryDsnRenkuPython }}
             - name: GRAPH_SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=triples-generator&environment={{ .Release.Namespace }}
+            - name: JAVA_OPTS
+              value: -Xmx100m -XX:+UseG1GC
           ports:
             - name: http-triples-gn
               containerPort: 9002
@@ -117,7 +119,7 @@ spec:
             - name: file-event-log
               mountPath: /events
           resources:
-  {{ toYaml .Values.resources | indent 12 }}
+{{ toYaml .Values.triplesGenerator.resources | indent 12 }}
         - name: {{ .Chart.Name }}-token-repository
           image: "{{ .Values.tokenRepository.image.repository }}:{{ .Values.tokenRepository.image.tag }}"
           imagePullPolicy: {{ .Values.tokenRepository.image.pullPolicy }}
@@ -142,6 +144,8 @@ spec:
                   key: tokenRepository-postgresPassword
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=token-repository&environment={{ .Release.Namespace }}
+            - name: JAVA_OPTS
+              value: -Xmx100m -XX:+UseG1GC
           ports:
             - name: http-token-repo
               containerPort: 9003
@@ -161,7 +165,7 @@ spec:
             successThreshold: 1
             failureThreshold: 3
           resources:
-{{ toYaml .Values.resources | indent 12 }}
+{{ toYaml .Values.tokenRepository.resources | indent 12 }}
       volumes:
         - name: file-event-log
         {{- if .Values.persistence.enabled }}

@@ -10,7 +10,7 @@ lazy val root = Project(
   id   = "renku-graph",
   base = file(".")
 ).aggregate(
-  graphCommons, 
+  graphCommons,
   tokenRepository,
   webhookService,
   triplesGenerator
@@ -67,7 +67,10 @@ lazy val tokenRepository = Project(
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
   scalaVersion := "2.12.8",
-
+  
+  publishArtifact in (Compile, packageDoc) := false,
+  publishArtifact in (Compile, packageSrc) := false,
+  
   scalacOptions += "-Ypartial-unification",
     
   organizationName := "Swiss Data Science Center (SDSC)",
@@ -91,4 +94,3 @@ lazy val commonSettings = Seq(
       |limitations under the License.""".stripMargin
   ))
 )
-
