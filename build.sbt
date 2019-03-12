@@ -1,6 +1,7 @@
+// format: off
 organization := "ch.datascience"
-name := "renku-graph"
-version := "0.0.1-SNAPSHOT"
+name         := "renku-graph"
+version      := "0.0.1-SNAPSHOT"
 scalaVersion := "2.12.8"
 
 // This project contains nothing to package, like pure POM maven project
@@ -11,6 +12,7 @@ lazy val root = Project(
   base = file(".")
 ).aggregate(
   graphCommons,
+  dbEventLog,
   tokenRepository,
   webhookService,
   triplesGenerator
@@ -25,6 +27,18 @@ lazy val graphCommons = Project(
   AutomateHeaderPlugin
 )
 
+lazy val dbEventLog = Project(
+  id   = "db-event-log",
+  base = file("db-event-log")
+).settings(
+  commonSettings
+).dependsOn(
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
+  AutomateHeaderPlugin
+)
+
 lazy val webhookService = Project(
   id   = "webhook-service",
   base = file("webhook-service")
@@ -32,9 +46,10 @@ lazy val webhookService = Project(
   commonSettings
 ).dependsOn(
   graphCommons % "compile->compile",
-  graphCommons % "test->test"
+  graphCommons % "test->test",
+  dbEventLog
 ).enablePlugins(
-  JavaAppPackaging, 
+  JavaAppPackaging,
   AutomateHeaderPlugin
 )
 
@@ -45,9 +60,10 @@ lazy val triplesGenerator = Project(
   commonSettings
 ).dependsOn(
   graphCommons % "compile->compile",
-  graphCommons % "test->test"
+  graphCommons % "test->test",
+  dbEventLog
 ).enablePlugins(
-  JavaAppPackaging, 
+  JavaAppPackaging,
   AutomateHeaderPlugin
 )
 
@@ -60,19 +76,19 @@ lazy val tokenRepository = Project(
   graphCommons % "compile->compile",
   graphCommons % "test->test"
 ).enablePlugins(
-  JavaAppPackaging, 
+  JavaAppPackaging,
   AutomateHeaderPlugin
 )
 
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
   scalaVersion := "2.12.8",
-  
+
   publishArtifact in (Compile, packageDoc) := false,
   publishArtifact in (Compile, packageSrc) := false,
-  
+
   scalacOptions += "-Ypartial-unification",
-    
+
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
@@ -94,3 +110,4 @@ lazy val commonSettings = Seq(
       |limitations under the License.""".stripMargin
   ))
 )
+// format: on

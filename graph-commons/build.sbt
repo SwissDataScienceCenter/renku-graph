@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-organization := "ch.datascience"
-name := "renku-graph-commons"
+name := "graph-commons"
 
 val pureConfigVersion = "0.10.2"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
