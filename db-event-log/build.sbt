@@ -17,11 +17,3 @@
  */
 
 name := "db-event-log"
-
-val doobieVersion = "0.6.0"
-libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
-libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
-
-//Test dependencies
-libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
-libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test
