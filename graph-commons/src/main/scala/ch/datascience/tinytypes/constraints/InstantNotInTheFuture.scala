@@ -16,18 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.commitevent
+package ch.datascience.tinytypes.constraints
 
-import cats.MonadError
-import ch.datascience.webhookservice.eventprocessing.commitevent.filelog.FileEventLog
+import java.time.Instant
 
-import scala.language.higherKinds
+import ch.datascience.tinytypes.Constraints
 
-trait EventLog[Interpretation[_]] {
-  def append(line: String): Interpretation[Unit]
-}
+trait InstantNotInTheFuture extends Constraints[Instant] {
+  protected[this] def now: Instant = Instant.now()
 
-object EventLog {
-  def apply[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]): EventLog[Interpretation] =
-    FileEventLog[Interpretation]
+  addConstraint(
+    check   = _.compareTo(now) <= 0,
+    message = (_: Instant) => s"$typeName has to be in the past"
+  )
 }

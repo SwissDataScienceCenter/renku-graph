@@ -18,26 +18,30 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
+import ch.datascience.dbeventlog.EventBody
+import ch.datascience.dbeventlog.commands.{EventLogAdd, IOEventLogAdd}
 import ch.datascience.graph.model.events.CommitEvent
 
 import scala.language.higherKinds
 
 class CommitEventSender[Interpretation[_]: Monad](
-    eventLog:              EventLog[Interpretation],
-    commitEventSerializer: CommitEventSerializer[Interpretation]
+    commitEventSerializer: CommitEventSerializer[Interpretation],
+    eventLogAdd:           EventLogAdd[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
 
   import commitEventSerializer._
+  import eventLogAdd._
 
   def send(commitEvent: CommitEvent): Interpretation[Unit] =
     for {
       serialisedEvent <- serialiseToJsonString(commitEvent)
-      _               <- eventLog.append(serialisedEvent)
+      eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
+      _               <- storeNewEvent(commitEvent.id, commitEvent.project.id, eventBody)
     } yield ()
 }
 
-class IOCommitEventSender(implicit ME: MonadError[IO, Throwable])
-    extends CommitEventSender[IO](EventLog[IO], new CommitEventSerializer[IO])
+class IOCommitEventSender(implicit contextShift: ContextShift[IO], ME: MonadError[IO, Throwable])
+    extends CommitEventSender[IO](new CommitEventSerializer[IO], new IOEventLogAdd)

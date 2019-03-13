@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.TransactorProvider
-import ch.datascience.dbeventlog.EventLogDbConfig
+import ch.datascience.dbeventlog.IOTransactorProvider
 import ch.datascience.logging.ApplicationLogger
 import doobie.util.fragment.Fragment
 import doobie.util.transactor.Transactor.Aux
@@ -78,6 +78,6 @@ class EventLogDbInitializer[Interpretation[_]](
 
 class IOEventLogDbInitializer(implicit contextShift: ContextShift[IO])
     extends EventLogDbInitializer[IO](
-      transactorProvider = new TransactorProvider[IO](new EventLogDbConfig[IO]),
+      transactorProvider = new IOTransactorProvider,
       logger             = ApplicationLogger
     )

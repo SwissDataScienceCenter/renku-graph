@@ -16,28 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.dbeventlog
 
-import cats.effect.IO
-import ch.datascience.db.DbSpec
-import doobie.implicits._
-import doobie.util.transactor.Transactor.Aux
+import ch.datascience.generators.Generators.jsons
+import org.scalacheck.Gen
 
-trait InMemoryProjectsTokens {
-  self: DbSpec =>
+object DbEventLogGenerators {
 
-  protected def initDb(transactor: Aux[IO, Unit]): Unit =
-    sql"""
-         |CREATE TABLE projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | token VARCHAR NOT NULL
-         |);
-       """.stripMargin.update.run
-      .transact(transactor)
-      .unsafeRunSync()
-
-  protected def prepareDbForTest(transactor: Aux[IO, Unit]): Unit =
-    sql"TRUNCATE TABLE projects_tokens".update.run
-      .transact(transactor)
-      .unsafeRunSync()
+  implicit val eventBodies: Gen[EventBody] = jsons.map(_.noSpaces).map(EventBody.apply)
 }

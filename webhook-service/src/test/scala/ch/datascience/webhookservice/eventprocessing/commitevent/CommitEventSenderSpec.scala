@@ -20,6 +20,9 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
 import cats.implicits._
+import ch.datascience.db.TransactorProvider
+import ch.datascience.dbeventlog.EventBody
+import ch.datascience.dbeventlog.commands.EventLogAdd
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
@@ -34,7 +37,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
 
   "send" should {
 
-    "succeed when delivering the event to the storage was successful" in new TestCase {
+    "succeed when delivering the event to the Event Log was successful" in new TestCase {
 
       val serializedEvent = serialize(commitEvent)
       (eventSerializer
@@ -42,10 +45,10 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
         .expects(commitEvent)
         .returning(context.pure(serializedEvent))
 
-      (eventLog
-        .append(_: String))
-        .expects(serializedEvent)
-        .returning(context.pure(()))
+      (eventAdd
+        .storeNewEvent(_: CommitId, _: ProjectId, _: EventBody))
+        .expects(commitEvent.id, commitEvent.project.id, EventBody(serializedEvent))
+        .returning(context.unit)
 
       eventSender.send(commitEvent) shouldBe Success(())
     }
@@ -61,7 +64,7 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
       eventSender.send(commitEvent) shouldBe Failure(exception)
     }
 
-    "fail when delivering the event to the storage return an error" in new TestCase {
+    "fail when delivering the event to the Event Log fails" in new TestCase {
 
       val serializedEvent = serialize(commitEvent)
       (eventSerializer
@@ -70,9 +73,9 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
         .returning(context.pure(serializedEvent))
 
       val exception = exceptions.generateOne
-      (eventLog
-        .append(_: String))
-        .expects(serialize(commitEvent))
+      (eventAdd
+        .storeNewEvent(_: CommitId, _: ProjectId, _: EventBody))
+        .expects(commitEvent.id, commitEvent.project.id, EventBody(serializedEvent))
         .returning(context.raiseError(exception))
 
       eventSender.send(commitEvent) shouldBe Failure(exception)
@@ -85,9 +88,10 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
     val commitEvent = commitEvents.generateOne
 
     class TestCommitEventSerializer extends CommitEventSerializer[Try]
+    class TestEventLogAdd(transactorProvider: TransactorProvider[Try]) extends EventLogAdd[Try](transactorProvider)
     val eventSerializer = mock[TestCommitEventSerializer]
-    val eventLog        = mock[EventLog[Try]]
-    val eventSender     = new CommitEventSender[Try](eventLog, eventSerializer)
+    val eventAdd        = mock[TestEventLogAdd]
+    val eventSender     = new CommitEventSender[Try](eventSerializer, eventAdd)
   }
 
   private def serialize(commitEvent: CommitEvent): String =

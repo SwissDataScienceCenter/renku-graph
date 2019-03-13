@@ -24,11 +24,11 @@ import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class InstantInThePastSpec extends WordSpec with PropertyChecks {
+class InstantNotInTheFutureSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  "InstantInThePast" should {
+  "InstantNotInTheFuture" should {
 
     "be instantiatable when values are Instants in the past" in {
       forAll(timestampsNotInTheFuture) { someValue =>
@@ -36,32 +36,30 @@ class InstantInThePastSpec extends WordSpec with PropertyChecks {
       }
     }
 
-    "throw an IllegalArgumentException for instants the future" in {
-      intercept[IllegalArgumentException] {
-        InstantInThePastType(Instant.now().plusSeconds(10))
-      }.getMessage shouldBe "ch.datascience.tinytypes.constraints.InstantInThePastType has to be in the past"
-    }
-
-    "throw an IllegalArgumentException for instant equal to Instant.now" in {
+    "be instantiatable when values are Instants from now" in {
       val systemZone = ZoneId.systemDefault
       val fixedNow   = Instant.now
 
-      InstantInThePastType.clock = Clock.fixed(fixedNow, systemZone)
+      InstantNotInTheFutureType.clock = Clock.fixed(fixedNow, systemZone)
 
+      InstantInThePastType(fixedNow).value shouldBe fixedNow
+
+      InstantNotInTheFutureType.clock = Clock.system(systemZone)
+    }
+
+    "throw an IllegalArgumentException for instants from the future" in {
       intercept[IllegalArgumentException] {
-        InstantInThePastType(fixedNow)
-      }.getMessage shouldBe "ch.datascience.tinytypes.constraints.InstantInThePastType has to be in the past"
-
-      InstantInThePastType.clock = Clock.system(systemZone)
+        InstantNotInTheFutureType(Instant.now().plusSeconds(10))
+      }.getMessage shouldBe "ch.datascience.tinytypes.constraints.InstantNotInTheFutureType has to be in the past"
     }
   }
 }
 
-private class InstantInThePastType private (val value: Instant) extends AnyVal with TinyType[Instant]
+private class InstantNotInTheFutureType private (val value: Instant) extends AnyVal with TinyType[Instant]
 
-private object InstantInThePastType
-    extends TinyTypeFactory[Instant, InstantInThePastType](new InstantInThePastType(_))
-    with InstantInThePast {
+private object InstantNotInTheFutureType
+    extends TinyTypeFactory[Instant, InstantNotInTheFutureType](new InstantNotInTheFutureType(_))
+    with InstantNotInTheFuture {
 
   var clock:                  Clock   = Clock.systemDefaultZone()
   protected override def now: Instant = clock.instant()

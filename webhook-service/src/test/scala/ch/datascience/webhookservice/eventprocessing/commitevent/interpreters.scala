@@ -18,11 +18,12 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 import cats.MonadError
+import ch.datascience.dbeventlog.commands.EventLogAdd
 
 import scala.util.Try
 
 class TryCommitEventSender(
-    eventLog:              EventLog[Try],
-    commitEventSerializer: CommitEventSerializer[Try]
+    commitEventSerializer: CommitEventSerializer[Try],
+    eventLogAdd:           EventLogAdd[Try]
 )(implicit ME:             MonadError[Try, Throwable])
-    extends CommitEventSender[Try](eventLog, commitEventSerializer)
+    extends CommitEventSender[Try](commitEventSerializer, eventLogAdd)

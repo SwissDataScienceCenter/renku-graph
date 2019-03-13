@@ -16,28 +16,33 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.dbeventlog.commands
 
 import cats.effect.IO
 import ch.datascience.db.DbSpec
 import doobie.implicits._
 import doobie.util.transactor.Transactor.Aux
 
-trait InMemoryProjectsTokens {
+trait InMemoryEventLogDb {
   self: DbSpec =>
 
   protected def initDb(transactor: Aux[IO, Unit]): Unit =
     sql"""
-         |CREATE TABLE projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | token VARCHAR NOT NULL
+         |CREATE TABLE IF NOT EXISTS event_log(
+         | event_id varchar PRIMARY KEY,
+         | project_id int4 NOT NULL,
+         | status varchar NOT NULL,
+         | created_date timestamp NOT NULL,
+         | execution_date timestamp NOT NULL,
+         | event_body text NOT NULL,
+         | message varchar
          |);
-       """.stripMargin.update.run
+      """.stripMargin.update.run
       .transact(transactor)
       .unsafeRunSync()
 
   protected def prepareDbForTest(transactor: Aux[IO, Unit]): Unit =
-    sql"TRUNCATE TABLE projects_tokens".update.run
+    sql"TRUNCATE TABLE event_log".update.run
       .transact(transactor)
       .unsafeRunSync()
 }

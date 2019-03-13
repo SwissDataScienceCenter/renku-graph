@@ -16,20 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.commitevent.filelog
+package ch.datascience.dbeventlog
 
-import java.nio.file.Path
+import cats.effect.{ContextShift, IO}
+import ch.datascience.db.TransactorProvider
 
-import cats.MonadError
-import ch.datascience.config.ConfigLoader
-import com.typesafe.config.{Config, ConfigFactory}
-
-import scala.language.higherKinds
-
-private class LogFileConfigProvider[Interpretation[_]](
-    config:    Config = ConfigFactory.load()
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
-
-  def get: Interpretation[Path] = find[Path]("file-event-log.file-path", config)
-}
+class IOTransactorProvider(implicit conextShift: ContextShift[IO])
+    extends TransactorProvider[IO](new EventLogDbConfig[IO])
