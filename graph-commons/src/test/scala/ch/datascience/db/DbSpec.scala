@@ -42,7 +42,7 @@ trait DbSpec extends BeforeAndAfterAll with BeforeAndAfter {
     override def get() = IO.pure(
       DBConfig(
         driver = "org.h2.Driver",
-        url    = toUrl(s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1"),
+        url    = toUrl(s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"),
         user   = "user",
         pass   = ""
       )
