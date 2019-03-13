@@ -140,7 +140,7 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "renku.fullname" . }}
+                  name: {{ template "graph.fullname" . }}
                   key: tokenRepository-postgresPassword
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=token-repository&environment={{ .Release.Namespace }}
