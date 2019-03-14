@@ -27,14 +27,20 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
 
+  import EventStatus._
+
   "EventStatus" should {
 
-    "NEW" +: Nil foreach { value =>
-      s"be instantiatable from any of '$value'" in {
-        val Right(status) = EventStatus.from(value)
+    val scenarios = Table(
+      "String Value"          -> "Expected EventStatus",
+      "NEW"                   -> New,
+      "PROCESSING"            -> Processing,
+      "TRIPLES_STORE_FAILURE" -> TriplesStoreFailure
+    )
 
-        status       shouldBe EventStatus.New
-        status.value shouldBe value
+    forAll(scenarios) { (stringValue, expectedStatus) =>
+      s"be instantiatable from '$stringValue'" in {
+        EventStatus.from(stringValue) shouldBe Right(expectedStatus)
       }
     }
 

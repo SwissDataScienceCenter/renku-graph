@@ -18,10 +18,11 @@
 
 package ch.datascience.dbeventlog
 
-import ch.datascience.generators.Generators.jsons
+import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
 
 object DbEventLogGenerators {
 
-  implicit val eventBodies: Gen[EventBody] = jsons.map(_.noSpaces).map(EventBody.apply)
+  implicit val eventBodies:  Gen[EventBody]   = jsons.map(_.noSpaces).map(EventBody.apply)
+  implicit val createdDates: Gen[CreatedDate] = timestampsNotInTheFuture.map(CreatedDate.apply)
 }

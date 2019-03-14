@@ -40,10 +40,19 @@ object EventStatus extends TinyTypeFactory[String, EventStatus](EventStatusInsta
   final case object New extends EventStatus {
     override val value: String = "NEW"
   }
+  final case object Processing extends EventStatus {
+    override val value: String = "PROCESSING"
+  }
+  final case object TriplesStoreFailure extends EventStatus {
+    override val value: String = "TRIPLES_STORE_FAILURE"
+  }
 }
 private object EventStatusInstantiator extends (String => EventStatus) {
-  override def apply(value: String): EventStatus = value match {
-    case EventStatus.New.value => EventStatus.New
-    case other                 => throw new IllegalArgumentException(s"'$other' unknown EventStatus")
+  import EventStatus._
+
+  private val allStatuses = Set(New, Processing, TriplesStoreFailure)
+
+  override def apply(value: String): EventStatus = allStatuses.find(_.value == value).getOrElse {
+    throw new IllegalArgumentException(s"'$value' unknown EventStatus")
   }
 }

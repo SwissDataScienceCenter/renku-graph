@@ -27,7 +27,6 @@ import ch.datascience.orchestration.Provider
 import doobie.util.transactor.Transactor.Aux
 import eu.timepit.refined.api.RefType
 import eu.timepit.refined.auto._
-import org.scalactic.source.Position
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, TestSuite}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -59,8 +58,7 @@ trait DbSpec extends BeforeAndAfterAll with BeforeAndAfter {
     initDb(transactor)
   }
 
-  protected override def before(fun: => Any)(implicit pos: Position): Unit = {
-    super.before(fun)
+  before {
     prepareDbForTest(transactor)
   }
 
