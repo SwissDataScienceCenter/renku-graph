@@ -36,8 +36,6 @@ import org.scalatest.WordSpec
 
 class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb with MockFactory {
 
-  import ModelReadsAndWrites._
-
   "findEventToProcess" should {
 
     "find event with execution date farthest in the past " +
@@ -141,10 +139,10 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
         .transact(transactor)
         .unsafeRunSync()
 
-    def findEvent(eventStatus: EventStatus): List[(CommitId, Instant)] =
+    def findEvent(status: EventStatus): List[(CommitId, Instant)] =
       sql"""select event_id, execution_date
            |from event_log 
-           |where status = ${Processing: EventStatus}
+           |where status = $status
            |  and execution_date >= ${now() minus (10, MINUTES)}
          """.stripMargin
         .query[(CommitId, Instant)]

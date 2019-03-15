@@ -35,7 +35,8 @@ class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
       "String Value"          -> "Expected EventStatus",
       "NEW"                   -> New,
       "PROCESSING"            -> Processing,
-      "TRIPLES_STORE_FAILURE" -> TriplesStoreFailure
+      "TRIPLES_STORE_FAILURE" -> TriplesStoreFailure,
+      "TRIPLES_STORE"         -> TriplesStore
     )
 
     forAll(scenarios) { (stringValue, expectedStatus) =>

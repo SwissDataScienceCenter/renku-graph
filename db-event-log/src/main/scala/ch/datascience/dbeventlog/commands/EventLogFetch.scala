@@ -46,7 +46,6 @@ class EventLogFetch[Interpretation[_]](
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
   import EventLogFetch._
-  import ModelReadsAndWrites._
 
   def findEventToProcess: Interpretation[Option[EventBody]] =
     for {

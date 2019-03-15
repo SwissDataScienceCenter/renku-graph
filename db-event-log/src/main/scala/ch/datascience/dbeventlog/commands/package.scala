@@ -16,16 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
-
+package ch.datascience.dbeventlog
 import java.time.Instant
 
-import ch.datascience.dbeventlog._
 import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import doobie.util.{Get, Put}
 
-object ModelReadsAndWrites {
-
+package object commands {
   implicit val eventIdGet: Get[CommitId] = Get[String].tmap(CommitId.apply)
   implicit val eventIdPut: Put[CommitId] = Put[String].contramap(_.value)
 

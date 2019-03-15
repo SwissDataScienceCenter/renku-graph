@@ -33,8 +33,6 @@ import DbEventLogGenerators._
 
 class EventLogAddSpec extends WordSpec with DbSpec with InMemoryEventLogDb with MockFactory {
 
-  import ModelReadsAndWrites._
-
   "storeNewEvent" should {
 
     "succeed if there is no event with the given id" in new TestCase {

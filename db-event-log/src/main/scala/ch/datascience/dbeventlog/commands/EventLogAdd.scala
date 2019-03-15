@@ -37,8 +37,6 @@ class EventLogAdd[Interpretation[_]](
     now:                () => Instant = Instant.now
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
-  import ModelReadsAndWrites._
-
   def storeNewEvent(eventId: CommitId, projectId: ProjectId, eventBody: EventBody): Interpretation[Unit] =
     for {
       transactor <- transactorProvider.transactor
