@@ -23,6 +23,7 @@ import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.dbeventlog.EventBody
+import ch.datascience.dbeventlog.commands.{EventLogMarkDone, IOEventLogMarkDone}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
@@ -40,6 +41,7 @@ class CommitEventProcessor[Interpretation[_]](
     accessTokenFinder:        AccessTokenFinder[Interpretation],
     triplesFinder:            TriplesFinder[Interpretation],
     fusekiConnector:          FusekiConnector[Interpretation],
+    eventLogMarkDone:         EventLogMarkDone[Interpretation],
     logger:                   Logger[Interpretation]
 )(implicit ME:                MonadError[Interpretation, Throwable])
     extends EventProcessor[Interpretation] {
@@ -48,12 +50,13 @@ class CommitEventProcessor[Interpretation[_]](
   import commitEventsDeserialiser._
   import fusekiConnector._
   import triplesFinder._
+  import eventLogMarkDone._
 
   def apply(eventBody: EventBody): Interpretation[Unit] = {
     for {
       commits          <- deserialiseToCommitEvents(eventBody)
       maybeAccessToken <- findAccessToken(commits.head.project.id) flatMap logIfNoAccessToken(commits.head)
-      _                <- commits.map(commit => toTriplesAndUpload(commit, maybeAccessToken)).sequence
+      _                <- (commits map (commit => toTriplesAndUpload(commit, maybeAccessToken))).sequence
       _                <- logEventProcessed(commits)
     } yield ()
   } recoverWith logEventProcessingError(eventBody)
@@ -68,8 +71,9 @@ class CommitEventProcessor[Interpretation[_]](
   private def toTriplesAndUpload(commit: Commit, maybeAccessToken: Option[AccessToken]): Interpretation[Unit] = {
     for {
       triples <- generateTriples(commit, maybeAccessToken)
-      result  <- upload(triples)
-    } yield result
+      _       <- upload(triples)
+      _       <- markEventDone(commit.id)
+    } yield ()
   } recoverWith logError(commit)
 
   private def logError(commit: Commit): PartialFunction[Throwable, Interpretation[Unit]] = {
@@ -100,5 +104,6 @@ class IOCommitEventProcessor(implicit contextShift: ContextShift[IO], executionC
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
       new IOTriplesFinder(new GitLabRepoUrlFinder[IO](new GitLabUrlProvider[IO]())),
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),
+      new IOEventLogMarkDone,
       ApplicationLogger
     )

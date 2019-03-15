@@ -21,9 +21,10 @@ package ch.datascience.dbeventlog.commands
 import java.time.Instant
 
 import cats.MonadError
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.TransactorProvider
-import ch.datascience.dbeventlog.EventStatus
+import ch.datascience.dbeventlog.{EventStatus, IOTransactorProvider}
 import ch.datascience.dbeventlog.EventStatus.{Processing, TriplesStore}
 import ch.datascience.graph.model.events.CommitId
 import doobie.implicits._
@@ -35,7 +36,7 @@ class EventLogMarkDone[Interpretation[_]](
     now:                () => Instant = Instant.now
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
-  def markDone(eventId: CommitId): Interpretation[Unit] =
+  def markEventDone(eventId: CommitId): Interpretation[Unit] =
     for {
       transactor     <- transactorProvider.transactor
       updatedRecords <- update(eventId, newStatus = TriplesStore).transact(transactor)
@@ -58,3 +59,7 @@ class EventLogMarkDone[Interpretation[_]](
     case _ => ME.unit
   }
 }
+
+class IOEventLogMarkDone(
+    implicit contextShift: ContextShift[IO]
+) extends EventLogMarkDone[IO](new IOTransactorProvider)

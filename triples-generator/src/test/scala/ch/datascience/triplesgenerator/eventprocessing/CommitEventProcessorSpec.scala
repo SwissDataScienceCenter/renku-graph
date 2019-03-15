@@ -69,8 +69,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     "succeed if a commit event in Json can be deserialised, turn into triples and all stored in Jena successfully " +
       "even if some failed in different stages" in new TestCase {
 
-      val commits                                         = commitsLists(size = Gen.const(4)).generateOne
-      val commit1 +: commit2 +: commit3 +: commit4 +: Nil = commits.toList
+      val commits                                                    = commitsLists(size = Gen.const(5)).generateOne
+      val commit1 +: commit2 +: commit3 +: commit4 +: commit5 +: Nil = commits.toList
 
       (eventsDeserialiser
         .deserialiseToCommitEvents(_: EventBody))
@@ -102,7 +102,22 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(triples3)
         .returning(context.raiseError(exception3))
 
-      succeedTriplesAndUploading(maybeAccessToken)(commit4)
+      val triples4   = rdfTriplesSets.generateOne
+      val exception4 = exceptions.generateOne
+      (triplesFinder
+        .generateTriples(_: Commit, _: Option[AccessToken]))
+        .expects(commit4, maybeAccessToken)
+        .returning(context.pure(triples4))
+      (fusekiConnector
+        .upload(_: RDFTriples))
+        .expects(triples4)
+        .returning(context.unit)
+      (eventLogMarkDone
+        .markEventDone(_: CommitId))
+        .expects(commit4.id)
+        .returning(context.raiseError(exception4))
+
+      succeedTriplesAndUploading(maybeAccessToken)(commit5)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -110,7 +125,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       logSuccess(commit1)
       logError(commit2, exception2)
       logError(commit3, exception3)
-      logSuccess(commit4)
+      logError(commit4, exception4)
+      logSuccess(commit5)
     }
 
     "succeed and do not log token not found message if an access token was found" in new TestCase {
@@ -177,12 +193,14 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     val accessTokenFinder  = mock[TryAccessTokenFinder]
     val triplesFinder      = mock[TryTriplesFinder]
     val fusekiConnector    = mock[TryFusekiConnector]
+    val eventLogMarkDone   = mock[TryEventLogMarkDone]
     val logger             = TestLogger[Try]()
     val eventProcessor = new CommitEventProcessor[Try](
       eventsDeserialiser,
       accessTokenFinder,
       triplesFinder,
       fusekiConnector,
+      eventLogMarkDone,
       logger
     )
 
@@ -196,6 +214,11 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       (fusekiConnector
         .upload(_: RDFTriples))
         .expects(triples)
+        .returning(context.unit)
+
+      (eventLogMarkDone
+        .markEventDone(_: CommitId))
+        .expects(commit.id)
         .returning(context.unit)
     }
 

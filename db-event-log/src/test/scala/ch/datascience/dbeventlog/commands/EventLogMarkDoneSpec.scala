@@ -34,7 +34,7 @@ import org.scalatest.WordSpec
 
 class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb with MockFactory {
 
-  "markDone" should {
+  "markEventDone" should {
 
     s"set event with the given id status $TriplesStore " +
       s"if the event has status $Processing" in new TestCase {
@@ -51,7 +51,7 @@ class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb 
                  executionDates.generateOne,
                  eventBodies.generateOne)
 
-      eventLogMarkDone.markDone(eventId).unsafeRunSync() shouldBe ()
+      eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ()
 
       findEvent(status = TriplesStore) shouldBe List(eventId -> ExecutionDate(currentNow))
     }
@@ -64,7 +64,7 @@ class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb 
       storeEvent(eventId, projectIds.generateOne, eventStatus, executionDate, eventBodies.generateOne)
 
       intercept[RuntimeException] {
-        eventLogMarkDone.markDone(eventId).unsafeRunSync()
+        eventLogMarkDone.markEventDone(eventId).unsafeRunSync()
       }.getMessage shouldBe s"Event with id = $eventId couldn't be updated; Either no event or not with status $Processing"
 
       findEvent(status = eventStatus) shouldBe List(eventId -> executionDate)
