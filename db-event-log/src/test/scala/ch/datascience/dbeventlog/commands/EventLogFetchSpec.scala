@@ -18,13 +18,14 @@
 
 package ch.datascience.dbeventlog.commands
 
-import java.time.Instant.now
+import java.time.Instant
 import java.time.temporal.ChronoUnit._
 
 import cats.implicits._
 import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
+import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projectIds}
 import ch.datascience.graph.model.events.{CommitId, ProjectId}
@@ -39,17 +40,23 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
 
   "findEventToProcess" should {
 
-    s"find the oldest event with status ${EventStatus.New} and execution date in the past and mark it as PROCESSING" in new TestCase {
+    "find event with execution date farthest in the past " +
+      s"and status $New or $TriplesStoreFailure " +
+      s"and mark it as $Processing" in new TestCase {
 
       val eventId1   = commitIds.generateOne
       val eventBody1 = eventBodies.generateOne
-      storeEvent(eventId1, projectIds.generateOne, EventStatus.New, ExecutionDate(now().minus(5, SECONDS)), eventBody1)
+      storeEvent(eventId1,
+                 projectIds.generateOne,
+                 EventStatus.New,
+                 ExecutionDate(currentNow minus (5, SECONDS)),
+                 eventBody1)
 
       val eventBody2 = eventBodies.generateOne
       storeEvent(commitIds.generateOne,
                  projectIds.generateOne,
                  EventStatus.New,
-                 ExecutionDate(now().plus(5, HOURS)),
+                 ExecutionDate(currentNow plus (5, HOURS)),
                  eventBody2)
 
       val eventId3   = commitIds.generateOne
@@ -57,18 +64,46 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
       storeEvent(eventId3,
                  projectIds.generateOne,
                  EventStatus.TriplesStoreFailure,
-                 ExecutionDate(now().minus(5, HOURS)),
+                 ExecutionDate(currentNow minus (5, HOURS)),
                  eventBody3)
 
       findEvent(EventStatus.Processing) shouldBe List.empty
 
       concurrentFindEventToProcess.unsafeRunSync()
 
-      findEvent(EventStatus.Processing) shouldBe List(eventId3)
+      findEvent(EventStatus.Processing) shouldBe List(eventId3 -> currentNow)
 
       eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe Some(eventBody1)
 
-      findEvent(EventStatus.Processing) shouldBe List(eventId3, eventId1)
+      findEvent(EventStatus.Processing) shouldBe List(eventId3 -> currentNow, eventId1 -> currentNow)
+
+      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
+    }
+
+    s"find event with the $Processing status " +
+      "and execution date older than 10 mins" in new TestCase {
+
+      val eventId   = commitIds.generateOne
+      val eventBody = eventBodies.generateOne
+      storeEvent(eventId,
+                 projectIds.generateOne,
+                 EventStatus.Processing,
+                 ExecutionDate(currentNow minus (11, MINUTES)),
+                 eventBody)
+
+      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe Some(eventBody)
+
+      findEvent(EventStatus.Processing) shouldBe List(eventId -> currentNow)
+    }
+
+    s"find no event when there there's one with $Processing status " +
+      "but execution date from less than from 10 mins ago" in new TestCase {
+
+      storeEvent(commitIds.generateOne,
+                 projectIds.generateOne,
+                 EventStatus.Processing,
+                 ExecutionDate(currentNow minus (9, MINUTES)),
+                 eventBodies.generateOne)
 
       eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
     }
@@ -78,7 +113,7 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
       storeEvent(commitIds.generateOne,
                  projectIds.generateOne,
                  EventStatus.New,
-                 ExecutionDate(now().plus(5, HOURS)),
+                 ExecutionDate(currentNow plus (5, HOURS)),
                  eventBodies.generateOne)
 
       eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
@@ -87,7 +122,11 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
 
   private trait TestCase {
 
-    val eventLogFetch = new EventLogFetch(transactorProvider)
+    val now           = mockFunction[Instant]
+    val eventLogFetch = new EventLogFetch(transactorProvider, now)
+
+    val currentNow = Instant.now()
+    now.expects().returning(currentNow).anyNumberOfTimes()
 
     def storeEvent(eventId:       CommitId,
                    projectId:     ProjectId,
@@ -102,12 +141,13 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
         .transact(transactor)
         .unsafeRunSync()
 
-    def findEvent(eventStatus: EventStatus): List[CommitId] =
-      sql"""select event_id
+    def findEvent(eventStatus: EventStatus): List[(CommitId, Instant)] =
+      sql"""select event_id, execution_date
            |from event_log 
-           |where status = ${EventStatus.Processing: EventStatus}
+           |where status = ${Processing: EventStatus}
+           |  and execution_date >= ${now() minus (10, MINUTES)}
          """.stripMargin
-        .query[CommitId]
+        .query[(CommitId, Instant)]
         .to[List]
         .transact(transactor)
         .unsafeRunSync()

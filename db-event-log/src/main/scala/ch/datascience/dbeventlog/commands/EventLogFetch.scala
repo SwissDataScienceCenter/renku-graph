@@ -18,7 +18,8 @@
 
 package ch.datascience.dbeventlog.commands
 
-import java.time.Instant
+import java.time.temporal.ChronoUnit.MINUTES
+import java.time.{Duration, Instant}
 
 import cats.MonadError
 import cats.data.NonEmptyList
@@ -26,7 +27,7 @@ import cats.effect.{ContextShift, IO}
 import cats.free.Free
 import cats.implicits._
 import ch.datascience.db.TransactorProvider
-import ch.datascience.dbeventlog.EventStatus.{New, TriplesStoreFailure}
+import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.{EventBody, EventStatus, IOTransactorProvider}
 import ch.datascience.graph.model.events.CommitId
 import doobie.free.connection.ConnectionOp
@@ -35,11 +36,16 @@ import doobie.util.fragments._
 
 import scala.language.higherKinds
 
+private object EventLogFetch {
+  val MaxProcessingTime: Duration = Duration.of(10, MINUTES)
+}
+
 class EventLogFetch[Interpretation[_]](
     transactorProvider: TransactorProvider[Interpretation],
     now:                () => Instant = Instant.now
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
+  import EventLogFetch._
   import ModelReadsAndWrites._
 
   def findEventToProcess: Interpretation[Option[EventBody]] =
@@ -58,8 +64,8 @@ class EventLogFetch[Interpretation[_]](
   private def findOldestEvent = {
     fr"""select event_id, event_body
          from event_log
-         where """ ++ `status IN`(New, TriplesStoreFailure) ++ fr"""
-           and execution_date < ${now()}
+         where (""" ++ `status IN`(New, TriplesStoreFailure) ++ fr""" and execution_date < ${now()})
+           or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
          order by execution_date asc
          limit 1"""
   }.query[(CommitId, EventBody)].option
@@ -72,8 +78,9 @@ class EventLogFetch[Interpretation[_]](
     case None => Free.pure[ConnectionOp, Option[EventBody]](None)
     case Some((eventId, eventBody)) =>
       sql"""update event_log 
-           |set status = ${EventStatus.Processing: EventStatus}
-           |where event_id = $eventId and status <> ${EventStatus.Processing: EventStatus}
+           |set status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
+           |where (event_id = $eventId and status <> ${Processing: EventStatus})
+           |  or (event_id = $eventId and status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
            |""".stripMargin.update.run
         .map(toNoneIfEventAlreadyTaken(eventBody))
   }
