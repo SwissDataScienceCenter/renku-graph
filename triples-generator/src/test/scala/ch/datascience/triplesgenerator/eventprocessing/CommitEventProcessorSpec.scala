@@ -22,7 +22,8 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.EventBody
+import ch.datascience.dbeventlog.{EventBody, EventMessage}
+import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -69,8 +70,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     "succeed if a commit event in Json can be deserialised, turn into triples and all stored in Jena successfully " +
       "even if some failed in different stages" in new TestCase {
 
-      val commits                                                    = commitsLists(size = Gen.const(5)).generateOne
-      val commit1 +: commit2 +: commit3 +: commit4 +: commit5 +: Nil = commits.toList
+      val commits                              = commitsLists(size = Gen.const(3)).generateOne
+      val commit1 +: commit2 +: commit3 +: Nil = commits.toList
 
       (eventsDeserialiser
         .deserialiseToCommitEvents(_: EventBody))
@@ -90,43 +91,124 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .generateTriples(_: Commit, _: Option[AccessToken]))
         .expects(commit2, maybeAccessToken)
         .returning(context.raiseError(exception2))
+      expectEventMarkedFailed(commit2.id, NonRecoverableFailure, exception2)
 
-      val triples3   = rdfTriplesSets.generateOne
-      val exception3 = exceptions.generateOne
-      (triplesFinder
-        .generateTriples(_: Commit, _: Option[AccessToken]))
-        .expects(commit3, maybeAccessToken)
-        .returning(context.pure(triples3))
-      (fusekiConnector
-        .upload(_: RDFTriples))
-        .expects(triples3)
-        .returning(context.raiseError(exception3))
-
-      val triples4   = rdfTriplesSets.generateOne
-      val exception4 = exceptions.generateOne
-      (triplesFinder
-        .generateTriples(_: Commit, _: Option[AccessToken]))
-        .expects(commit4, maybeAccessToken)
-        .returning(context.pure(triples4))
-      (fusekiConnector
-        .upload(_: RDFTriples))
-        .expects(triples4)
-        .returning(context.unit)
-      (eventLogMarkDone
-        .markEventDone(_: CommitId))
-        .expects(commit4.id)
-        .returning(context.raiseError(exception4))
-
-      succeedTriplesAndUploading(maybeAccessToken)(commit5)
+      succeedTriplesAndUploading(maybeAccessToken)(commit3)
 
       eventProcessor(eventBody) shouldBe context.unit
 
       logNoAccessTokenMessage(commit1)
       logSuccess(commit1)
       logError(commit2, exception2)
-      logError(commit3, exception3)
-      logError(commit4, exception4)
-      logSuccess(commit5)
+      logSuccess(commit3)
+    }
+
+    s"succeed and mark event with $NonRecoverableFailure if finding triples fails" in new TestCase {
+
+      val commits       = commitsLists(size = Gen.const(1)).generateOne
+      val commit +: Nil = commits.toList
+
+      (eventsDeserialiser
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
+        .returning(context.pure(commits))
+
+      val maybeAccessToken = None
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(commits.head.project.id)
+        .returning(context.pure(maybeAccessToken))
+
+      val exception = exceptions.generateOne
+      (triplesFinder
+        .generateTriples(_: Commit, _: Option[AccessToken]))
+        .expects(commit, maybeAccessToken)
+        .returning(context.raiseError(exception))
+
+      expectEventMarkedFailed(commit.id, NonRecoverableFailure, exception)
+
+      eventProcessor(eventBody) shouldBe context.unit
+
+      logNoAccessTokenMessage(commits.head)
+      logError(commits.head, exception)
+      logSuccess(commits.head)
+    }
+
+    s"succeed and mark event with $TriplesStoreFailure if uploading triples to dataset fails" in new TestCase {
+
+      val commits       = commitsLists(size = Gen.const(1)).generateOne
+      val commit +: Nil = commits.toList
+
+      (eventsDeserialiser
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
+        .returning(context.pure(commits))
+
+      val maybeAccessToken = None
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(commits.head.project.id)
+        .returning(context.pure(maybeAccessToken))
+
+      val triples = rdfTriplesSets.generateOne
+      (triplesFinder
+        .generateTriples(_: Commit, _: Option[AccessToken]))
+        .expects(commit, maybeAccessToken)
+        .returning(context.pure(triples))
+
+      val exception = exceptions.generateOne
+      (fusekiConnector
+        .upload(_: RDFTriples))
+        .expects(triples)
+        .returning(context.raiseError(exception))
+
+      expectEventMarkedFailed(commit.id, TriplesStoreFailure, exception)
+
+      eventProcessor(eventBody) shouldBe context.unit
+
+      logNoAccessTokenMessage(commits.head)
+      logError(commits.head, exception)
+      logSuccess(commits.head)
+    }
+
+    s"succeed and log error if marking event in as $TriplesStore fails" in new TestCase {
+
+      val commits       = commitsLists(size = Gen.const(1)).generateOne
+      val commit +: Nil = commits.toList
+
+      (eventsDeserialiser
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
+        .returning(context.pure(commits))
+
+      val maybeAccessToken = None
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(commits.head.project.id)
+        .returning(context.pure(maybeAccessToken))
+
+      val triples = rdfTriplesSets.generateOne
+      (triplesFinder
+        .generateTriples(_: Commit, _: Option[AccessToken]))
+        .expects(commit, maybeAccessToken)
+        .returning(context.pure(triples))
+
+      (fusekiConnector
+        .upload(_: RDFTriples))
+        .expects(triples)
+        .returning(context.unit)
+
+      val exception = exceptions.generateOne
+      (eventLogMarkDone
+        .markEventDone(_: CommitId))
+        .expects(commit.id)
+        .returning(context.raiseError(exception))
+
+      eventProcessor(eventBody) shouldBe context.unit
+
+      logNoAccessTokenMessage(commits.head)
+      logError(commits.head, exception, s"failed to mark as $TriplesStore in the Event Log")
+      logSuccess(commits.head)
     }
 
     "succeed and do not log token not found message if an access token was found" in new TestCase {
@@ -194,6 +276,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     val triplesFinder      = mock[TryTriplesFinder]
     val fusekiConnector    = mock[TryFusekiConnector]
     val eventLogMarkDone   = mock[TryEventLogMarkDone]
+    val eventLogMarkFailed = mock[TryEventLogMarkFailed]
     val logger             = TestLogger[Try]()
     val eventProcessor = new CommitEventProcessor[Try](
       eventsDeserialiser,
@@ -201,6 +284,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       triplesFinder,
       fusekiConnector,
       eventLogMarkDone,
+      eventLogMarkFailed,
       logger
     )
 
@@ -222,6 +306,12 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .returning(context.unit)
     }
 
+    def expectEventMarkedFailed(eventId: CommitId, status: FailureStatus, exception: Throwable) =
+      (eventLogMarkFailed
+        .markEventFailed(_: CommitId, _: FailureStatus, _: Option[EventMessage]))
+        .expects(eventId, status, EventMessage(exception))
+        .returning(context.unit)
+
     def logNoAccessTokenMessage(commit: Commit): Unit =
       logger.logged(Info(s"${commonLogMessage(commit)} no access token found so assuming public project"))
 
@@ -231,8 +321,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     def logSuccess(commit: Commit): Unit =
       logger.logged(Info(s"${commonLogMessage(commit)} processed"))
 
-    def logError(commit: Commit, exception: Exception): Unit =
-      logger.logged(Error(s"${commonLogMessage(commit)} failed", exception))
+    def logError(commit: Commit, exception: Exception, message: String = "failed"): Unit =
+      logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
 
     def commonLogMessage: Commit => String = {
       case CommitWithoutParent(id, project) =>

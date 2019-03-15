@@ -18,8 +18,12 @@
 
 package ch.datascience.dbeventlog.commands
 
+import ch.datascience.generators.Generators.Implicits._
 import cats.effect.IO
 import ch.datascience.db.DbSpec
+import ch.datascience.dbeventlog.DbEventLogGenerators.createdDates
+import ch.datascience.dbeventlog._
+import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import doobie.implicits._
 import doobie.util.transactor.Transactor.Aux
 
@@ -43,6 +47,30 @@ trait InMemoryEventLogDb {
 
   protected def prepareDbForTest(transactor: Aux[IO, Unit]): Unit =
     sql"TRUNCATE TABLE event_log".update.run
+      .transact(transactor)
+      .unsafeRunSync()
+
+  protected def storeEvent(eventId:       CommitId,
+                           projectId:     ProjectId,
+                           eventStatus:   EventStatus,
+                           executionDate: ExecutionDate,
+                           eventBody:     EventBody,
+                           createdDate:   CreatedDate = createdDates.generateOne): Unit =
+    sql"""insert into 
+         |event_log (event_id, project_id, status, created_date, execution_date, event_body) 
+         |values ($eventId, $projectId, $eventStatus, $createdDate, $executionDate, $eventBody)
+      """.stripMargin.update.run
+      .map(_ => ())
+      .transact(transactor)
+      .unsafeRunSync()
+
+  protected def findEvent(status: EventStatus): List[(CommitId, ExecutionDate)] =
+    sql"""select event_id, execution_date
+         |from event_log 
+         |where status = $status
+         """.stripMargin
+      .query[(CommitId, ExecutionDate)]
+      .to[List]
       .transact(transactor)
       .unsafeRunSync()
 }

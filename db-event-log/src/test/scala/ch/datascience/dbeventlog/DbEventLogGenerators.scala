@@ -25,7 +25,8 @@ import org.scalacheck.Gen
 object DbEventLogGenerators {
 
   implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
-  implicit val createdDates:   Gen[CreatedDate]   = timestampsNotInTheFuture.map(CreatedDate.apply)
-  implicit val executionDates: Gen[ExecutionDate] = timestamps.map(ExecutionDate.apply)
+  implicit val createdDates:   Gen[CreatedDate]   = timestampsNotInTheFuture map CreatedDate.apply
+  implicit val executionDates: Gen[ExecutionDate] = timestamps map ExecutionDate.apply
   implicit val eventStatuses:  Gen[EventStatus]   = Gen.oneOf(New, Processing, TriplesStore, TriplesStoreFailure)
+  implicit val eventMessages:  Gen[EventMessage]  = nonEmptyStrings() map EventMessage.apply
 }

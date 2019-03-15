@@ -22,12 +22,10 @@ import java.time.Instant
 
 import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.{EventBody, EventStatus, ExecutionDate}
-import EventStatus.{Processing, _}
+import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
+import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projectIds}
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
-import doobie.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -78,28 +76,5 @@ class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb 
 
     val currentNow = Instant.now()
     now.expects().returning(currentNow).anyNumberOfTimes()
-
-    def storeEvent(eventId:       CommitId,
-                   projectId:     ProjectId,
-                   eventStatus:   EventStatus,
-                   executionDate: ExecutionDate,
-                   eventBody:     EventBody): Unit =
-      sql"""insert into 
-           |event_log (event_id, project_id, status, created_date, execution_date, event_body) 
-           |values ($eventId, $projectId, $eventStatus, ${createdDates.generateOne}, $executionDate, $eventBody)
-      """.stripMargin.update.run
-        .map(_ => ())
-        .transact(transactor)
-        .unsafeRunSync()
-
-    def findEvent(status: EventStatus): List[(CommitId, ExecutionDate)] =
-      sql"""select event_id, execution_date
-           |from event_log 
-           |where status = $status
-         """.stripMargin
-        .query[(CommitId, ExecutionDate)]
-        .to[List]
-        .transact(transactor)
-        .unsafeRunSync()
   }
 }

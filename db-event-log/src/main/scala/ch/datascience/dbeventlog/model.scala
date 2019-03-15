@@ -32,8 +32,13 @@ object CreatedDate extends TinyTypeFactory[Instant, CreatedDate](new CreatedDate
 final class ExecutionDate private (val value: Instant) extends AnyVal with TinyType[Instant]
 object ExecutionDate extends TinyTypeFactory[Instant, ExecutionDate](new ExecutionDate(_))
 
-final class Message private (val value: String) extends AnyVal with TinyType[String]
-object Message extends TinyTypeFactory[String, Message](new Message(_)) with NonBlank
+final class EventMessage private (val value: String) extends AnyVal with TinyType[String]
+object EventMessage extends TinyTypeFactory[String, EventMessage](new EventMessage(_)) with NonBlank {
+  def apply(exception: Throwable): Option[EventMessage] = from(exception.getMessage).fold(
+    _ => None,
+    Option.apply
+  )
+}
 
 sealed trait EventStatus extends TinyType[String] with Product with Serializable
 object EventStatus extends TinyTypeFactory[String, EventStatus](EventStatusInstantiator) {
@@ -43,17 +48,26 @@ object EventStatus extends TinyTypeFactory[String, EventStatus](EventStatusInsta
   final case object Processing extends EventStatus {
     override val value: String = "PROCESSING"
   }
-  final case object TriplesStoreFailure extends EventStatus {
-    override val value: String = "TRIPLES_STORE_FAILURE"
-  }
   final case object TriplesStore extends EventStatus {
     override val value: String = "TRIPLES_STORE"
   }
+
+  sealed trait FailureStatus extends EventStatus
+
+  final case object TriplesStoreFailure extends FailureStatus {
+    override val value: String = "TRIPLES_STORE_FAILURE"
+  }
+  type TriplesStoreFailure = TriplesStoreFailure.type
+
+  final case object NonRecoverableFailure extends FailureStatus {
+    override val value: String = "NON_RECOVERABLE_FAILURE"
+  }
+  type NonRecoverableFailure = NonRecoverableFailure.type
 }
 private object EventStatusInstantiator extends (String => EventStatus) {
   import EventStatus._
 
-  private val allStatuses = Set(New, Processing, TriplesStoreFailure, TriplesStore)
+  private val allStatuses = Set(New, Processing, TriplesStoreFailure, TriplesStore, NonRecoverableFailure)
 
   override def apply(value: String): EventStatus = allStatuses.find(_.value == value).getOrElse {
     throw new IllegalArgumentException(s"'$value' unknown EventStatus")

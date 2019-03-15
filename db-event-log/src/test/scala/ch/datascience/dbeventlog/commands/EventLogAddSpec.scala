@@ -89,12 +89,12 @@ class EventLogAddSpec extends WordSpec with DbSpec with InMemoryEventLogDb with 
 
     def storedEvent(
         eventId: CommitId
-    ): (CommitId, ProjectId, EventStatus, CreatedDate, ExecutionDate, EventBody, Option[Message]) =
+    ): (CommitId, ProjectId, EventStatus, CreatedDate, ExecutionDate, EventBody, Option[EventMessage]) =
       sql"""select event_id, project_id, status, created_date, execution_date, event_body, message
            |from event_log  
            |where event_id = ${eventId.value}
          """.stripMargin
-        .query[(CommitId, ProjectId, EventStatus, CreatedDate, ExecutionDate, EventBody, Option[Message])]
+        .query[(CommitId, ProjectId, EventStatus, CreatedDate, ExecutionDate, EventBody, Option[EventMessage])]
         .unique
         .transact(transactor)
         .unsafeRunSync()

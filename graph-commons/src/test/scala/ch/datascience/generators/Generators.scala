@@ -139,6 +139,9 @@ object Generators {
         if (generated == value) generateDifferentThan(value)
         else generated
       }
+
     }
+
+    implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)
   }
 }

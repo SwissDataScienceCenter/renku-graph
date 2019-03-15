@@ -22,8 +22,9 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import ch.datascience.dbeventlog.EventBody
-import ch.datascience.dbeventlog.commands.{EventLogMarkDone, IOEventLogMarkDone}
+import ch.datascience.dbeventlog.EventStatus._
+import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed, IOEventLogMarkDone, IOEventLogMarkFailed}
+import ch.datascience.dbeventlog.{EventBody, EventMessage}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
@@ -42,15 +43,17 @@ class CommitEventProcessor[Interpretation[_]](
     triplesFinder:            TriplesFinder[Interpretation],
     fusekiConnector:          FusekiConnector[Interpretation],
     eventLogMarkDone:         EventLogMarkDone[Interpretation],
+    eventLogMarkFailed:       EventLogMarkFailed[Interpretation],
     logger:                   Logger[Interpretation]
 )(implicit ME:                MonadError[Interpretation, Throwable])
     extends EventProcessor[Interpretation] {
 
   import accessTokenFinder._
   import commitEventsDeserialiser._
+  import eventLogMarkDone._
+  import eventLogMarkFailed._
   import fusekiConnector._
   import triplesFinder._
-  import eventLogMarkDone._
 
   def apply(eventBody: EventBody): Interpretation[Unit] = {
     for {
@@ -71,14 +74,36 @@ class CommitEventProcessor[Interpretation[_]](
   private def toTriplesAndUpload(commit: Commit, maybeAccessToken: Option[AccessToken]): Interpretation[Unit] = {
     for {
       triples <- generateTriples(commit, maybeAccessToken)
-      _       <- upload(triples)
-      _       <- markEventDone(commit.id)
+      _       <- upload(triples) recoverWith markEventWithTriplesStoreFailure(commit)
+      _       <- markEventDone(commit.id) recoverWith logError(commit)
     } yield ()
-  } recoverWith logError(commit)
+  } recoverWith markEventWithNonRecoverableFailure(commit)
+
+  private def markEventWithTriplesStoreFailure(commit: Commit): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"${logMessageCommon(commit)} failed")
+      for {
+        _ <- markEventFailed(commit.id, TriplesStoreFailure, EventMessage(exception)) recoverWith uploadError(exception)
+        _ <- ME.raiseError[Unit](UploadError(exception))
+      } yield ()
+  }
+
+  private def uploadError(exception: Throwable): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(_) => ME.raiseError(UploadError(exception))
+  }
+
+  private case class UploadError(cause: Throwable) extends Exception(cause)
+
+  private def markEventWithNonRecoverableFailure(commit: Commit): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case UploadError(_) => ME.unit
+    case NonFatal(exception) =>
+      logger.error(exception)(s"${logMessageCommon(commit)} failed")
+      markEventFailed(commit.id, NonRecoverableFailure, EventMessage(exception))
+  }
 
   private def logError(commit: Commit): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
-      logger.error(exception)(s"${logMessageCommon(commit)} failed")
+      logger.error(exception)(s"${logMessageCommon(commit)} failed to mark as $TriplesStore in the Event Log")
   }
 
   private def logEventProcessed(commits: NonEmptyList[Commit]): Interpretation[_] =
@@ -105,5 +130,6 @@ class IOCommitEventProcessor(implicit contextShift: ContextShift[IO], executionC
       new IOTriplesFinder(new GitLabRepoUrlFinder[IO](new GitLabUrlProvider[IO]())),
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),
       new IOEventLogMarkDone,
+      new IOEventLogMarkFailed,
       ApplicationLogger
     )

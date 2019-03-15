@@ -38,8 +38,8 @@ package object commands {
   implicit val executionDateGet: Get[ExecutionDate] = Get[Instant].tmap(ExecutionDate.apply)
   implicit val executionDatePut: Put[ExecutionDate] = Put[Instant].contramap(_.value)
 
-  implicit val messageGet: Get[Message] = Get[String].tmap(Message.apply)
-  implicit val messagePut: Put[Message] = Put[String].contramap(_.value)
+  implicit val eventMessageGet: Get[EventMessage] = Get[String].tmap(EventMessage.apply)
+  implicit val eventMessagePut: Put[EventMessage] = Put[String].contramap(_.value)
 
   implicit val eventStatusGet: Get[EventStatus] = Get[String].tmap(EventStatus.apply)
   implicit val eventStatusPut: Put[EventStatus] = Put[String].contramap(_.value)

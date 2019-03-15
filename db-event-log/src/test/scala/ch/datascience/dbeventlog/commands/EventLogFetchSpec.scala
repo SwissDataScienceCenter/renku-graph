@@ -28,8 +28,6 @@ import ch.datascience.dbeventlog._
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projectIds}
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
-import doobie.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -69,11 +67,12 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
 
       concurrentFindEventToProcess.unsafeRunSync()
 
-      findEvent(EventStatus.Processing) shouldBe List(eventId3 -> currentNow)
+      findEvent(EventStatus.Processing) shouldBe List(eventId3 -> ExecutionDate(currentNow))
 
       eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe Some(eventBody1)
 
-      findEvent(EventStatus.Processing) shouldBe List(eventId3 -> currentNow, eventId1 -> currentNow)
+      findEvent(EventStatus.Processing) shouldBe List(eventId3 -> ExecutionDate(currentNow),
+                                                      eventId1 -> ExecutionDate(currentNow))
 
       eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
     }
@@ -91,7 +90,7 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
 
       eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe Some(eventBody)
 
-      findEvent(EventStatus.Processing) shouldBe List(eventId -> currentNow)
+      findEvent(EventStatus.Processing) shouldBe List(eventId -> ExecutionDate(currentNow))
     }
 
     s"find no event when there there's one with $Processing status " +
@@ -125,30 +124,6 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
 
     val currentNow = Instant.now()
     now.expects().returning(currentNow).anyNumberOfTimes()
-
-    def storeEvent(eventId:       CommitId,
-                   projectId:     ProjectId,
-                   eventStatus:   EventStatus,
-                   executionDate: ExecutionDate,
-                   eventBody:     EventBody): Unit =
-      sql"""insert into 
-           |event_log (event_id, project_id, status, created_date, execution_date, event_body) 
-           |values ($eventId, $projectId, $eventStatus, ${createdDates.generateOne}, $executionDate, $eventBody)
-      """.stripMargin.update.run
-        .map(_ => ())
-        .transact(transactor)
-        .unsafeRunSync()
-
-    def findEvent(status: EventStatus): List[(CommitId, Instant)] =
-      sql"""select event_id, execution_date
-           |from event_log 
-           |where status = $status
-           |  and execution_date >= ${now() minus (10, MINUTES)}
-         """.stripMargin
-        .query[(CommitId, Instant)]
-        .to[List]
-        .transact(transactor)
-        .unsafeRunSync()
 
     def concurrentFindEventToProcess =
       for {

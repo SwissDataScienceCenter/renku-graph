@@ -21,5 +21,5 @@ package ch.datascience.dbeventlog
 import cats.effect.{ContextShift, IO}
 import ch.datascience.db.TransactorProvider
 
-class IOTransactorProvider(implicit conextShift: ContextShift[IO])
+class IOTransactorProvider(implicit contextShift: ContextShift[IO])
     extends TransactorProvider[IO](new EventLogDbConfig[IO])

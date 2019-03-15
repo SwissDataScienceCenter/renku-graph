@@ -32,11 +32,12 @@ class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
   "EventStatus" should {
 
     val scenarios = Table(
-      "String Value"          -> "Expected EventStatus",
-      "NEW"                   -> New,
-      "PROCESSING"            -> Processing,
-      "TRIPLES_STORE_FAILURE" -> TriplesStoreFailure,
-      "TRIPLES_STORE"         -> TriplesStore
+      "String Value"            -> "Expected EventStatus",
+      "NEW"                     -> New,
+      "PROCESSING"              -> Processing,
+      "TRIPLES_STORE"           -> TriplesStore,
+      "TRIPLES_STORE_FAILURE"   -> TriplesStoreFailure,
+      "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
     )
 
     forAll(scenarios) { (stringValue, expectedStatus) =>
@@ -99,17 +100,17 @@ class ExecutionDateSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class MessageSpec extends WordSpec with ScalaCheckPropertyChecks {
+class EventMessageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "Message" should {
 
     "have the NonBlank constraint" in {
-      Message shouldBe an[NonBlank]
+      EventMessage shouldBe an[NonBlank]
     }
 
     "be instantiatable from any non-blank string" in {
       forAll(nonEmptyStrings()) { body =>
-        Message.from(body).map(_.value) shouldBe Right(body)
+        EventMessage.from(body).map(_.value) shouldBe Right(body)
       }
     }
   }
