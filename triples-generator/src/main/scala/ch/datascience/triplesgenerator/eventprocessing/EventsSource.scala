@@ -18,6 +18,8 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
+import ch.datascience.dbeventlog.EventBody
+
 import scala.language.higherKinds
 
 class EventsSource[Interpretation[_]](
@@ -28,7 +30,7 @@ class EventsSource[Interpretation[_]](
     newRunner(eventProcessor)
 }
 
-abstract class EventProcessor[Interpretation[_]] extends (String => Interpretation[Unit])
+abstract class EventProcessor[Interpretation[_]] extends (EventBody => Interpretation[Unit])
 
 abstract class EventProcessorRunner[Interpretation[_]](eventProcessor: EventProcessor[Interpretation]) {
   def run: Interpretation[Unit]

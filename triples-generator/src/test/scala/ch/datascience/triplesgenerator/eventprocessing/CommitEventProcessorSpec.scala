@@ -21,6 +21,8 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
+import ch.datascience.dbeventlog.DbEventLogGenerators._
+import ch.datascience.dbeventlog.EventBody
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -46,8 +48,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       val commits = commitsLists().generateOne
       (eventsDeserialiser
-        .deserialiseToCommitEvents(_: String))
-        .expects(eventJson)
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
         .returning(context.pure(commits))
 
       val maybeAccessToken = None
@@ -58,7 +60,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       commits map succeedTriplesAndUploading(maybeAccessToken)
 
-      eventProcessor(eventJson) shouldBe context.unit
+      eventProcessor(eventBody) shouldBe context.unit
 
       logNoAccessTokenMessage(commits.head)
       commits.toList foreach logSuccess
@@ -71,8 +73,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       val commit1 +: commit2 +: commit3 +: commit4 +: Nil = commits.toList
 
       (eventsDeserialiser
-        .deserialiseToCommitEvents(_: String))
-        .expects(eventJson)
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
         .returning(context.pure(commits))
 
       val maybeAccessToken = None
@@ -102,7 +104,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       succeedTriplesAndUploading(maybeAccessToken)(commit4)
 
-      eventProcessor(eventJson) shouldBe context.unit
+      eventProcessor(eventBody) shouldBe context.unit
 
       logNoAccessTokenMessage(commit1)
       logSuccess(commit1)
@@ -115,8 +117,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       val commits = commitsLists().generateOne
       (eventsDeserialiser
-        .deserialiseToCommitEvents(_: String))
-        .expects(eventJson)
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
         .returning(context.pure(commits))
 
       val maybeAccessToken = Some(accessTokens.generateOne)
@@ -127,7 +129,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       commits map succeedTriplesAndUploading(maybeAccessToken)
 
-      eventProcessor(eventJson) shouldBe context.unit
+      eventProcessor(eventBody) shouldBe context.unit
 
       notLogAccessTokenMessage(commits.head)
       commits.toList foreach logSuccess
@@ -137,21 +139,21 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (eventsDeserialiser
-        .deserialiseToCommitEvents(_: String))
-        .expects(eventJson)
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
         .returning(context.raiseError(exception))
 
-      eventProcessor(eventJson) shouldBe context.unit
+      eventProcessor(eventBody) shouldBe context.unit
 
-      logger.loggedOnly(Error(s"Commit Event processing failure: $eventJson", exception))
+      logger.loggedOnly(Error(s"Commit Event processing failure: $eventBody", exception))
     }
 
     "succeed but log an error if finding an access token fails" in new TestCase {
 
       val commits = commitsLists(size = Gen.const(1)).generateOne
       (eventsDeserialiser
-        .deserialiseToCommitEvents(_: String))
-        .expects(eventJson)
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
         .returning(context.pure(commits))
 
       val exception = exceptions.generateOne
@@ -160,16 +162,16 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(commits.head.project.id)
         .returning(context.raiseError(exception))
 
-      eventProcessor(eventJson) shouldBe context.unit
+      eventProcessor(eventBody) shouldBe context.unit
 
-      logger.loggedOnly(Error(s"Commit Event processing failure: $eventJson", exception))
+      logger.loggedOnly(Error(s"Commit Event processing failure: $eventBody", exception))
     }
   }
 
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
-    val eventJson = nonEmptyStrings().generateOne
+    val eventBody = eventBodies.generateOne
 
     val eventsDeserialiser = mock[TryCommitEventsDeserialiser]
     val accessTokenFinder  = mock[TryAccessTokenFinder]

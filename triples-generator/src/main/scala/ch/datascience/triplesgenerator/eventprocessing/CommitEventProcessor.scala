@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.dbeventlog.EventBody
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
@@ -48,14 +49,14 @@ class CommitEventProcessor[Interpretation[_]](
   import fusekiConnector._
   import triplesFinder._
 
-  def apply(eventJson: String): Interpretation[Unit] = {
+  def apply(eventBody: EventBody): Interpretation[Unit] = {
     for {
-      commits          <- deserialiseToCommitEvents(eventJson)
+      commits          <- deserialiseToCommitEvents(eventBody)
       maybeAccessToken <- findAccessToken(commits.head.project.id) flatMap logIfNoAccessToken(commits.head)
       _                <- commits.map(commit => toTriplesAndUpload(commit, maybeAccessToken)).sequence
       _                <- logEventProcessed(commits)
     } yield ()
-  } recoverWith logEventProcessingError(eventJson)
+  } recoverWith logEventProcessingError(eventBody)
 
   private def logIfNoAccessToken(commit: Commit): Option[AccessToken] => Interpretation[Option[AccessToken]] = {
     case found @ Some(_) => ME.pure(found)
@@ -88,8 +89,8 @@ class CommitEventProcessor[Interpretation[_]](
       s"Commit Event id: $id, project: ${project.id} ${project.path}, parentId: $parentId"
   }
 
-  private def logEventProcessingError(eventJson: String): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) => logger.error(exception)(s"Commit Event processing failure: $eventJson")
+  private def logEventProcessingError(eventBody: EventBody): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) => logger.error(exception)(s"Commit Event processing failure: $eventBody")
   }
 }
 

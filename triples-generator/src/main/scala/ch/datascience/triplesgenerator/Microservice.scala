@@ -19,10 +19,10 @@
 package ch.datascience.triplesgenerator
 
 import cats.effect._
+import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
-import ch.datascience.triplesgenerator.eventprocessing.filelog.FileEventProcessorRunner
 import ch.datascience.triplesgenerator.init.{FusekiDatasetInitializer, IOFusekiDatasetInitializer, SentryInitializer}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
@@ -35,7 +35,7 @@ object Microservice extends IOApp {
     serverPort    = 9002,
     serviceRoutes = new MicroserviceRoutes[IO].routes
   )
-  private val eventProcessorRunner = new EventsSource[IO](new FileEventProcessorRunner(_))
+  private val eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch))
     .withEventsProcessor(new IOCommitEventProcessor())
   private val microserviceRunner = new MicroserviceRunner(
     new SentryInitializer[IO],

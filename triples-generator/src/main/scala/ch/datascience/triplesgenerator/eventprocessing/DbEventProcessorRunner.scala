@@ -16,70 +16,55 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.filelog
-
-import java.io.{BufferedReader, File, FileReader}
+package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.IO._
 import cats.effect._
 import cats.implicits._
+import ch.datascience.dbeventlog.EventBody
+import ch.datascience.dbeventlog.commands.EventLogFetch
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.triplesgenerator.eventprocessing.{EventProcessor, EventProcessorRunner}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-class FileEventProcessorRunner(
+class DbEventProcessorRunner(
     eventProcessor: EventProcessor[IO],
-    configProvider: LogFileConfigProvider[IO] = new LogFileConfigProvider[IO](),
+    eventLogFetch:  EventLogFetch[IO],
     logger:         Logger[IO] = ApplicationLogger
 )(
     implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext
 ) extends EventProcessorRunner[IO](eventProcessor) {
 
-  import FileEventProcessorRunner.interval
+  import DbEventProcessorRunner.interval
+  import eventLogFetch._
 
   private implicit val timer: Timer[IO] = IO.timer(executionContext)
 
   lazy val run: IO[Unit] =
     for {
-      file <- contextShift.shift *> validateFile
-      _    <- fileReader(file).bracket(startProcessingLines)(closeReader)
+      _ <- logger.info("Waiting for new events")
+      _ <- checkForNewLine
     } yield ()
 
-  private lazy val validateFile: IO[File] =
-    configProvider.get.map(_.toFile)
-
-  private def fileReader(file: File): IO[BufferedReader] =
-    IO(new BufferedReader(new FileReader(file)))
-
-  private def startProcessingLines(reader: BufferedReader): IO[Unit] =
+  private def checkForNewLine: IO[Unit] =
     for {
-      _ <- logger.info("Listening for new events")
-      _ <- checkForNewLine(reader)
+      maybeEvent <- findEventToProcess
+      _          <- sleepOrProcessEvent(maybeEvent)
+      _          <- checkForNewLine
     } yield ()
 
-  private def checkForNewLine(reader: BufferedReader): IO[Unit] =
-    for {
-      maybeLine <- IO(Option(reader.readLine()))
-      _         <- sleepOrProcessLine(maybeLine)
-      _         <- checkForNewLine(reader)
-    } yield ()
-
-  private lazy val sleepOrProcessLine: Option[String] => IO[_] = {
+  private lazy val sleepOrProcessEvent: Option[EventBody] => IO[_] = {
     case None => IO.sleep(interval)
-    case Some(line) =>
+    case Some(eventBody) =>
       contextShift.shift *>
-        (IO.pure() flatMap (_ => eventProcessor(line))).start
+        (IO.unit flatMap (_ => eventProcessor(eventBody))).start
   }
-
-  private def closeReader(reader: BufferedReader): IO[Unit] =
-    IO(reader.close())
 }
 
-private object FileEventProcessorRunner {
+private object DbEventProcessorRunner {
   import scala.concurrent.duration._
   import scala.language.postfixOps
 
