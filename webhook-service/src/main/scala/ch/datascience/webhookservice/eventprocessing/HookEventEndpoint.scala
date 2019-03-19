@@ -24,10 +24,10 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.events._
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.{Decoder, HCursor}
 import org.http4s.circe._

@@ -10,6 +10,9 @@ tokenRepository:
   service:
     type: ClusterIP
     port: 9003
+  resources:
+    limits:
+      memory: "400Mi"
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
     ## Generated using: `openssl rand -hex 8|base64`
@@ -23,8 +26,9 @@ triplesGenerator:
   service:
     type: ClusterIP
     port: 9002
-  renku:
-    sentryDsn: ''
+  resources:
+    limits:
+      memory: "400Mi"
 
 webhookService:
   image:
@@ -34,10 +38,17 @@ webhookService:
   service:
     type: ClusterIP
     port: 80
+  resources:
+    limits:
+      memory: "400Mi"
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
     secret:
+
+sentry:
+  sentryDsnRenkuGraph: ''
+  sentryDsnRenkuPython: ''
 
 nameOverride: ''
 fullnameOverride: ''
@@ -76,8 +87,8 @@ resources: {}
   #  cpu: 100m
   #  memory: 128Mi
   # requests:
-#  cpu: 100m
-#  memory: 128Mi
+  #  cpu: 100m
+  #  memory: 128Mi
 
 nodeSelector: {}
 

@@ -55,7 +55,7 @@ class CommitEventProcessor[Interpretation[_]](
       _                <- commits.map(commit => toTriplesAndUpload(commit, maybeAccessToken)).sequence
       _                <- logEventProcessed(commits)
     } yield ()
-  } recoverWith logDeserialisationError
+  } recoverWith logEventProcessingError(eventJson)
 
   private def logIfNoAccessToken(commit: Commit): Option[AccessToken] => Interpretation[Option[AccessToken]] = {
     case found @ Some(_) => ME.pure(found)
@@ -88,8 +88,8 @@ class CommitEventProcessor[Interpretation[_]](
       s"Commit Event id: $id, project: ${project.id} ${project.path}, parentId: $parentId"
   }
 
-  private lazy val logDeserialisationError: PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) => logger.error(exception)("Commit Event deserialisation failed")
+  private def logEventProcessingError(eventJson: String): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) => logger.error(exception)(s"Commit Event processing failure: $eventJson")
   }
 }
 

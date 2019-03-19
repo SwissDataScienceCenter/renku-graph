@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.init
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.http.client.{BasicAuth, IORestClient}
-import ch.datascience.triplesgenerator.config.{FusekiConfig, FusekiConfigProvider}
+import ch.datascience.triplesgenerator.config.FusekiConfig
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -55,9 +55,7 @@ private class IODatasetExistenceCreator(
         )
       )
 
-  private def mapResponse(request: Request[IO], response: Response[IO]): IO[Unit] =
-    response.status match {
-      case Ok => IO.unit
-      case _  => raiseError(request, response)
-    }
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+    case (Ok, _, _) => IO.unit
+  }
 }

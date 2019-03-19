@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.security.AccessTokenExtractor

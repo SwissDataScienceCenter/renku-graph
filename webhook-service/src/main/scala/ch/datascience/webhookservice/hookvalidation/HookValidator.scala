@@ -27,7 +27,7 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository._

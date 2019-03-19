@@ -16,8 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice
+package ch.datascience.triplesgenerator.init
 
-object exceptions {
-  final case object UnauthorizedException extends RuntimeException("Unauthorized")
+import cats.MonadError
+import io.sentry.Sentry
+
+import scala.language.higherKinds
+import scala.util.{Properties, Try}
+
+class SentryInitializer[Interpretation[_]](
+    initSentry:     String => Unit = dns => Sentry.init(dns),
+    getEnvVariable: String => Option[String] = Properties.envOrNone _
+)(implicit ME:      MonadError[Interpretation, Throwable]) {
+
+  def run: Interpretation[Unit] =
+    getEnvVariable("GRAPH_SENTRY_DSN").map(_.trim) match {
+      case Some("")                           => ME.unit
+      case Some(dsn) if !(dsn startsWith "?") => ME.fromTry(Try(initSentry(dsn)))
+      case _                                  => ME.unit
+    }
 }

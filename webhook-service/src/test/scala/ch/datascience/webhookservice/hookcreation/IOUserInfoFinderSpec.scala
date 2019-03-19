@@ -27,7 +27,7 @@ import ch.datascience.graph.model.events.UserId
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfigProvider.HostUrl
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.exceptions.UnauthorizedException
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
 import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
 import com.github.tomakehurst.wiremock.client.WireMock._

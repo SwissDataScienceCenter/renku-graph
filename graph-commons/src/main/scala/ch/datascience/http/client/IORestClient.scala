@@ -18,8 +18,10 @@
 
 package ch.datascience.http.client
 
+import cats.implicits._
 import cats.effect.{ContextShift, IO}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.RestClientError.{MappingError, UnexpectedResponseError}
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s._
@@ -27,6 +29,7 @@ import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.headers.Authorization
 
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 abstract class IORestClient(
     implicit executionContext: ExecutionContext,
@@ -65,50 +68,47 @@ abstract class IORestClient(
     Headers(Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value)))
 
   protected def send[ResultType](request: Request[IO])(
-      mapResponse:                        (Request[IO], Response[IO]) => IO[ResultType]): IO[ResultType] =
+      mapResponse:                        PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]): IO[ResultType] =
     BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>
-      httpClient.fetch[ResultType](request)(mapResponse(request, _))
-    }
-
-  protected def raiseError[T](request: Request[IO], response: Response[IO]): IO[T] =
-    response
-      .as[String]
-      .flatMap { bodyAsString =>
-        IO.raiseError {
-          new RuntimeException(
-            exceptionMessage(request, response, MessageDetails(bodyAsString)),
-          )
+      httpClient
+        .fetch[ResultType](request) { response =>
+          (mapResponse orElse raiseUnexpectedResponseError)(response.status, request, response)
+            .recoverWith(mappingError(request, response))
         }
-      }
-
-  protected def contextToError[T](request: Request[IO], response: Response[IO])(cause: Throwable): IO[T] =
-    IO.raiseError {
-      new RuntimeException(
-        exceptionMessage(request, response, MessageDetails(cause)),
-        cause
-      )
+        .recoverWith(connectionError(request))
     }
 
-  private sealed trait MessageDetails
-  private object MessageDetails {
-
-    def apply(cause: Throwable): MessageDetails = ExceptionMessage(cause.getMessage)
-    def apply(body:  String):    MessageDetails = ResponseBody(body)
-
-    final case class ExceptionMessage(message: String) extends MessageDetails
-    final case class ResponseBody(message:     String) extends MessageDetails
+  private def raiseUnexpectedResponseError[T]: PartialFunction[(Status, Request[IO], Response[IO]), IO[T]] = {
+    case (_, request, response) =>
+      response
+        .as[String]
+        .flatMap { bodyAsString =>
+          IO.raiseError(UnexpectedResponseError(ExceptionMessage(request, response, bodyAsString)))
+        }
   }
 
-  private def exceptionMessage(request: Request[IO], response: Response[IO], messageDetails: MessageDetails): String = {
-    import MessageDetails._
+  private def mappingError[T](request: Request[IO], response: Response[IO]): PartialFunction[Throwable, IO[T]] = {
+    case error: RestClientError => IO.raiseError(error)
+    case NonFatal(cause) => IO.raiseError(MappingError(ExceptionMessage(request, response, cause), cause))
+  }
 
-    def toSingleLine(string: String): String = string.split('\n').map(_.trim.filter(_ >= ' ')).mkString
+  private def connectionError[T](request: Request[IO]): PartialFunction[Throwable, IO[T]] = {
+    case error: RestClientError => IO.raiseError(error)
+    case NonFatal(cause) =>
+      IO.raiseError(new RuntimeException(ExceptionMessage(request, cause), cause))
+  }
 
-    val details = messageDetails match {
-      case ExceptionMessage(message) => s"error: ${toSingleLine(message)}"
-      case ResponseBody(message)     => s"body: ${toSingleLine(message)}"
-    }
+  private object ExceptionMessage {
 
-    s"${request.method} ${request.uri} returned ${response.status}; $details"
+    def apply(request: Request[IO], cause: Throwable): String =
+      s"${request.method} ${request.uri} error: ${toSingleLine(cause.getMessage)}"
+
+    def apply(request: Request[IO], response: Response[IO], responseBody: String): String =
+      s"${request.method} ${request.uri} returned ${response.status}; body: ${toSingleLine(responseBody)}"
+
+    def apply(request: Request[IO], response: Response[IO], cause: Throwable): String =
+      s"${request.method} ${request.uri} returned ${response.status}; error: ${toSingleLine(cause.getMessage)}"
+
+    private def toSingleLine(string: String): String = string.split('\n').map(_.trim.filter(_ >= ' ')).mkString
   }
 }

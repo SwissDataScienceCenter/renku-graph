@@ -16,14 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.init
+package ch.datascience.http.client
 
-import cats.effect.IO
+trait RestClientError extends Exception
 
-import scala.util.Try
+object RestClientError {
 
-private abstract class TryDatasetExistenceChecker extends DatasetExistenceChecker[Try]
+  final case class UnexpectedResponseError(
+      message: String
+  ) extends Exception(message)
+      with RestClientError
 
-private abstract class TryDatasetExistenceCreator extends DatasetExistenceCreator[Try]
+  final case class MappingError(
+      message: String,
+      cause:   Throwable
+  ) extends Exception(message, cause)
+      with RestClientError
 
-abstract class IOSentryInitializer extends SentryInitializer[IO]
+  final case object UnauthorizedException extends RuntimeException("Unauthorized") with RestClientError
+  type UnauthorizedException = UnauthorizedException.type
+}
