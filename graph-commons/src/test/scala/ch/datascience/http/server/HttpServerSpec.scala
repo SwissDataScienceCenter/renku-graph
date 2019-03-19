@@ -1,0 +1,73 @@
+/*
+ * Copyright 2019 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.datascience.http.server
+
+import cats.effect._
+import ch.datascience.http.server.EndpointTester._
+import io.circe.Json
+import io.circe.literal._
+import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.dsl.Http4sDsl
+import org.http4s.headers.`Content-Type`
+import org.http4s.{HttpRoutes, MediaType, Method, Request, Response, Status, Uri}
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+
+import scala.concurrent.ExecutionContext.global
+
+class HttpServerSpec extends WordSpec with Http4sDsl[IO] {
+
+  "run" should {
+
+    "create an http server to serve the given routes" in {
+
+      val response = execute(Request[IO](Method.GET, baseUri / "resource"))
+
+      response.status                     shouldBe Status.Ok
+      response.as[String].unsafeRunSync() shouldBe "response"
+    }
+
+    "create an http server which responds with NOT_FOUND and JSON body for non-existing resource" in {
+
+      val response = execute(Request[IO](Method.GET, baseUri / "non-existing"))
+
+      response.status                 shouldBe Status.NotFound
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Resource not found"}"""
+    }
+  }
+
+  private def execute(request: Request[IO]): Response[IO] =
+    BlazeClientBuilder[IO](global).resource
+      .use { httpClient =>
+        httpClient.fetch[Response[IO]](request) { response =>
+          IO.pure(response)
+        }
+      }
+      .unsafeRunSync()
+
+  private implicit val timer:        Timer[IO]        = IO.timer(global)
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+
+  private val baseUri = Uri.uri("http://localhost:9999")
+  private val routes = HttpRoutes.of[IO] {
+    case GET -> Root / "resource" => Ok("response")
+  }
+  new HttpServer[IO](9999, routes).run.unsafeRunAsyncAndForget()
+}

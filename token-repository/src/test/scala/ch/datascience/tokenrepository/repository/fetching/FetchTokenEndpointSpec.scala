@@ -30,7 +30,8 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.Json
-import org.http4s.{Method, Request, Status, Uri}
+import org.http4s.headers.`Content-Type`
+import org.http4s.{MediaType, Method, Request, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -53,6 +54,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
       val response = fetchToken(projectId).unsafeRunSync()
 
       response.status                 shouldBe Status.Ok
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
 
       logger.loggedOnly(Info(s"Token for projectId: $projectId found"))
@@ -72,6 +74,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
       val response = fetchToken(projectId).unsafeRunSync()
 
       response.status                 shouldBe Status.Ok
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe Json.obj("personalAccessToken" -> Json.fromString(accessToken.value))
 
       logger.loggedOnly(Info(s"Token for projectId: $projectId found"))
@@ -90,7 +93,8 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
       val response = fetchToken(projectId).unsafeRunSync()
 
-      response.status shouldBe Status.NotFound
+      response.status      shouldBe Status.NotFound
+      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe Json.obj(
         "message" -> Json.fromString(s"Token for projectId: $projectId not found"))
 
@@ -111,7 +115,8 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
       val response = fetchToken(projectId).unsafeRunSync()
 
-      response.status shouldBe Status.InternalServerError
+      response.status      shouldBe Status.InternalServerError
+      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe Json.obj(
         "message" -> Json.fromString(s"Finding token for projectId: $projectId failed")
       )
