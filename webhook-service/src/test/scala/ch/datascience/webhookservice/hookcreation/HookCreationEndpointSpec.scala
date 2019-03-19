@@ -32,9 +32,11 @@ import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.security.IOAccessTokenExtractor
 import io.circe.Json
+import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
-import org.http4s.{Method, Request, Uri}
+import org.http4s.headers.`Content-Type`
+import org.http4s.{MediaType, Method, Request, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -61,8 +63,9 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
 
       val response = createHook(projectId, request).unsafeRunSync
 
-      response.status                   shouldBe Created
-      response.as[String].unsafeRunSync shouldBe ""
+      response.status                 shouldBe Created
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Hook created"}"""
     }
 
     "return OK when hook was already created" in new TestCase {
@@ -82,8 +85,9 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
 
       val response = createHook(projectId, request).unsafeRunSync()
 
-      response.status                   shouldBe Ok
-      response.as[String].unsafeRunSync shouldBe ""
+      response.status                 shouldBe Ok
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Hook already existed"}"""
     }
 
     "return UNAUTHORIZED when finding an access token in the headers fails with UnauthorizedException" in new TestCase {
@@ -98,6 +102,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
       val response = createHook(projectId, request).unsafeRunSync()
 
       response.status                 shouldBe Unauthorized
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
 
@@ -120,6 +125,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
       val response = createHook(projectId, request).unsafeRunSync()
 
       response.status                 shouldBe InternalServerError
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe errorMessage.asJson
     }
 
@@ -142,6 +148,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
       val response = createHook(projectId, request).unsafeRunSync()
 
       response.status                 shouldBe Unauthorized
+      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
     }
   }

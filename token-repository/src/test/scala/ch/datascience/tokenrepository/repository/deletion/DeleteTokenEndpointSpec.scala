@@ -29,8 +29,8 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.Json
 import io.circe.literal._
-import org.http4s.dsl.io._
-import org.http4s.{Method, Request, Status, Uri}
+import org.http4s.headers.`Content-Type`
+import org.http4s.{MediaType, Method, Request, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -50,8 +50,8 @@ class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
 
       val response = deleteToken(projectId).unsafeRunSync()
 
-      response.status                   shouldBe Status.NoContent
-      response.as[String].unsafeRunSync shouldBe ""
+      response.status                              shouldBe Status.NoContent
+      response.body.compile.toVector.unsafeRunSync shouldBe empty
 
       logger.loggedOnly(Info(s"Token deleted for projectId: $projectId"))
     }
@@ -68,7 +68,8 @@ class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
 
       val response = deleteToken(projectId).unsafeRunSync()
 
-      response.status shouldBe Status.InternalServerError
+      response.status      shouldBe Status.InternalServerError
+      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
       val expectedMessage = s"Deleting token for projectId: $projectId failed"
       response.as[Json].unsafeRunSync shouldBe json"""{"message": $expectedMessage}"""
 

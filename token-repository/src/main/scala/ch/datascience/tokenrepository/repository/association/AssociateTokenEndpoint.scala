@@ -44,7 +44,7 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 
   def associateToken(projectId: ProjectId, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
-      accessToken <- request.as[AccessToken].recoverWith(badRequest)
+      accessToken <- request.as[AccessToken] recoverWith badRequest
       _           <- associate(projectId, accessToken)
       response    <- toHttpResponse(projectId)()
     } yield response

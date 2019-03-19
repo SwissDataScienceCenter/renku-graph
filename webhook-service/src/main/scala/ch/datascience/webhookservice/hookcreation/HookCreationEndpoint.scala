@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
-import ch.datascience.controllers.ErrorMessage
+import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.RestClientError.UnauthorizedException
@@ -50,8 +50,8 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
   } recoverWith httpResponse
 
   private lazy val toHttpResponse: HookCreationResult => Interpretation[Response[Interpretation]] = {
-    case HookCreated => Created()
-    case HookExisted => Ok()
+    case HookCreated => Created(InfoMessage("Hook created"))
+    case HookExisted => Ok(InfoMessage("Hook already existed"))
   }
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
