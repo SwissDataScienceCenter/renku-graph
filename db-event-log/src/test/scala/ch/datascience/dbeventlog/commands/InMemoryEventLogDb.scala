@@ -18,11 +18,11 @@
 
 package ch.datascience.dbeventlog.commands
 
-import ch.datascience.generators.Generators.Implicits._
 import cats.effect.IO
 import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators.createdDates
 import ch.datascience.dbeventlog._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.{CommitId, CommittedDate, ProjectId}
 import doobie.implicits._
 import doobie.util.transactor.Transactor.Aux

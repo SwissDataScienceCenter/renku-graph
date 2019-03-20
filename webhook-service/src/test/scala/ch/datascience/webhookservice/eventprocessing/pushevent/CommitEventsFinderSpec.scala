@@ -20,15 +20,15 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import cats.MonadError
 import cats.implicits._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events._
+import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators.pushEvents
 import org.scalacheck.Gen
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.http.client.AccessToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -39,106 +39,136 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
 
   "findCommitEvents" should {
 
-    "return single commit event if finding commit info returns no parents" in new TestCase {
-      val pushEvent  = pushEvents.generateOne
-      val commitInfo = commitInfos(pushEvent.commitTo, noParents).generateOne
+    "return single commit event " +
+      "if found commit info has no parents " +
+      "and there are no events in the Event Log" in new TestCase {
 
-      (commitInfoFinder
-        .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
-        .expects(pushEvent.project.id, pushEvent.commitTo, maybeAccessToken)
-        .returning(context.pure(commitInfo))
+      givenLatestEventInTheLog(None)
+
+      val commitInfo = commitInfos(pushEvent.commitTo, noParents).generateOne
+      givenFindingCommitInfoReturns(commitInfo)
 
       commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(
-        Seq(commitEventFrom(pushEvent, commitInfo))
+        List(commitEventFrom(pushEvent, commitInfo))
       )
     }
 
-    "return commit events starting from the 'commitTo' until commit info with no parents" in new TestCase {
-      val pushEvent = pushEvents.generateOne.copy(maybeCommitFrom = None)
+    "return no commit events " +
+      "if Push Event's 'commitTo' matches the youngest event from the Event Log" in new TestCase {
 
-      val firstCommitInfo = commitInfos(pushEvent.commitTo, parentsIdsLists(minNumber = 1)).generateOne
+      givenLatestEventInTheLog(Some(pushEvent.commitTo))
 
-      val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(List.empty)
+    }
+
+    "return commit events starting from the 'commitTo' to the youngest event in the Event Log" in new TestCase {
+
+      val level1Info = commitInfos(pushEvent.commitTo, singleParent).generateOne
+
+      val level2Infos = level1Info.parents map { parentId =>
         commitInfos(parentId, singleParent).generateOne
       }
 
-      val thirdLevelCommitInfos = secondLevelCommitInfos.flatMap(_.parents) map { parentId =>
+      val level3Infos = level2Infos.flatMap(_.parents) map { parentId =>
         commitInfos(parentId, noParents).generateOne
       }
 
-      (Seq(firstCommitInfo) ++ secondLevelCommitInfos ++ thirdLevelCommitInfos) foreach { commitInfo =>
-        (commitInfoFinder
-          .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
-          .expects(pushEvent.project.id, commitInfo.id, maybeAccessToken)
-          .returning(context.pure(commitInfo))
-      }
+      givenLatestEventInTheLog(level3Infos.headOption.map(_.id))
+
+      givenFindingCommitInfoReturns(level1Info, level2Infos)
 
       commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(
-        Seq(commitEventFrom(pushEvent, firstCommitInfo)),
-        secondLevelCommitInfos map (commitEventFrom(pushEvent, _)),
-        secondLevelCommitInfos.flatMap(_.parents) map commitEventFrom(pushEvent, thirdLevelCommitInfos)
+        List(commitEventFrom(pushEvent, level1Info)),
+        level2Infos map (commitEventFrom(pushEvent, _))
       )
     }
 
-    "return a single commit event for 'commitTo' when `commitFrom` is the first parent of `commitTo`" in new TestCase {
-      val commitTo   = commitIds.generateOne
-      val commitFrom = commitIds.generateOne
+    "return commit events starting from the 'commitTo' to the oldest ancestor " +
+      "if there are no events in the Event Log" in new TestCase {
 
-      val firstCommitInfo = {
-        val info = commitInfos(commitTo, parentsIdsLists(minNumber = 2)).generateOne
-        info.copy(parents = commitFrom +: info.parents)
+      givenLatestEventInTheLog(None)
+
+      val level1Info = commitInfos(pushEvent.commitTo, singleParent).generateOne
+
+      val level2Infos = level1Info.parents map { parentId =>
+        commitInfos(parentId, singleParent).generateOne
       }
 
-      val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
+      val level3Infos = level2Infos.flatMap(_.parents) map { parentId =>
         commitInfos(parentId, noParents).generateOne
       }
 
-      val pushEvent = pushEvents.generateOne.copy(
-        maybeCommitFrom = Some(commitFrom),
-        commitTo        = commitTo
-      )
-
-      (commitInfoFinder
-        .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
-        .expects(pushEvent.project.id, firstCommitInfo.id, maybeAccessToken)
-        .returning(context.pure(firstCommitInfo))
+      givenFindingCommitInfoReturns(level1Info, level2Infos, level3Infos)
 
       commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(
-        Seq(commitEventFrom(pushEvent, firstCommitInfo))
+        List(commitEventFrom(pushEvent, level1Info)),
+        level2Infos map (commitEventFrom(pushEvent, _)),
+        level2Infos.flatMap(_.parents) map commitEventFrom(pushEvent, level3Infos)
       )
     }
 
-    "return commit events starting from the 'commitTo' until found commit id matches the `commitTo`" in new TestCase {
-      val commitTo = commitIds.generateOne
+    "return commit events starting from the 'commitTo' to the oldest ancestor and multiple parents, " +
+      "skipping ids already in the Event Log" in new TestCase {
 
-      val firstCommitInfo = commitInfos(commitTo, parentsIdsLists(minNumber = 3)).generateOne
+      val level1Parent1 = commitIds.generateOne
+      val level1Parent2 = commitIds.generateOne
+      val level1Info    = commitInfos(pushEvent.commitTo, level1Parent1, level1Parent2).generateOne
 
-      val secondLevelCommitInfos = firstCommitInfo.parents map { parentId =>
-        commitInfos(parentId, noParents).generateOne
-      }
-
-      val commitFrom = firstCommitInfo.parents(firstCommitInfo.parents.size - 2)
-      val pushEvent = pushEvents.generateOne.copy(
-        maybeCommitFrom = Some(commitFrom),
-        commitTo        = commitTo
+      val level2Commit2Parent = commitIds.generateOne
+      val level2Infos @ _ +: level2Info2 +: Nil = List(
+        commitInfos(level1Parent1, parents = commitIds.generateOne).generateOne,
+        commitInfos(level1Parent2, parents = level2Commit2Parent).generateOne
       )
 
-      val commitInfosUpToCommitFrom = secondLevelCommitInfos.takeWhile(_.id != commitFrom)
-      (Seq(firstCommitInfo) ++ commitInfosUpToCommitFrom) foreach { commitInfo =>
-        (commitInfoFinder
-          .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
-          .expects(pushEvent.project.id, commitInfo.id, maybeAccessToken)
-          .returning(context.pure(commitInfo))
-      }
+      givenLatestEventInTheLog(Some(level2Commit2Parent))
+
+      givenFindingCommitInfoReturns(level1Info, level2Info2)
+
+      (eventLogVerifyExistence
+        .filterNotExistingInLog(_: List[CommitId], _: ProjectId))
+        .expects(List(level1Parent1, level1Parent2), pushEvent.project.id)
+        .returning(context.pure(List(level1Parent2)))
 
       commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(
-        Seq(commitEventFrom(pushEvent, firstCommitInfo)),
-        commitInfosUpToCommitFrom map (commitEventFrom(pushEvent, _))
+        List(
+          commitEventFrom(pushEvent, level1Info),
+          commitEventFrom(pushEvent, level2Info2)
+        )
       )
     }
 
-    "fail if finding the first commit info fails" in new TestCase {
-      val pushEvent = pushEvents.generateOne
+    "fail if verifying existence of parent ids in the Event Log fails" in new TestCase {
+
+      givenLatestEventInTheLog(None)
+
+      val parents    = parentsIdsLists(minNumber = 2).generateOne
+      val commitInfo = commitInfos(pushEvent.commitTo, parents: _*).generateOne
+
+      givenFindingCommitInfoReturns(commitInfo)
+
+      val exception = exceptions.generateOne
+      (eventLogVerifyExistence
+        .filterNotExistingInLog(_: List[CommitId], _: ProjectId))
+        .expects(parents, pushEvent.project.id)
+        .returning(context.raiseError(exception))
+
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken) shouldBe context.raiseError(exception)
+    }
+
+    "fail if finding the latest event in Event Log fails" in new TestCase {
+
+      val exception = exceptions.generateOne
+      (eventLogLatestEvent
+        .findYoungestEventInLog(_: ProjectId))
+        .expects(pushEvent.project.id)
+        .returning(context.raiseError(exception))
+
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken) shouldBe context.raiseError(exception)
+    }
+
+    "return a stream with a single failure item if finding the first commit info fails" in new TestCase {
+
+      givenLatestEventInTheLog(None)
 
       val exception = exceptions.generateOne
       (commitInfoFinder
@@ -153,46 +183,67 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       )
     }
 
-    "fail if finding one of the commit info fails" in new TestCase {
-      val pushEvent = pushEvents.generateOne
+    "return commit events and a failure item for commit for which finding the commit info failed" in new TestCase {
 
-      val firstCommitInfo =
-        commitInfos(pushEvent.commitTo, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
+      givenLatestEventInTheLog(None)
 
-      val secondLevelCommitInfo1 +: secondLevelCommitInfo2 +: Nil = firstCommitInfo.parents map { parentId =>
+      val level1Info = commitInfos(pushEvent.commitTo, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
+
+      (eventLogVerifyExistence
+        .filterNotExistingInLog(_: List[CommitId], _: ProjectId))
+        .expects(level1Info.parents, pushEvent.project.id)
+        .returning(context.pure(level1Info.parents))
+
+      val level2Info1 +: level2Info2 +: Nil = level1Info.parents map { parentId =>
         commitInfos(parentId, noParents).generateOne
       }
 
-      Seq(firstCommitInfo, secondLevelCommitInfo2) foreach { commitInfo =>
-        (commitInfoFinder
-          .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
-          .expects(pushEvent.project.id, commitInfo.id, maybeAccessToken)
-          .returning(context.pure(commitInfo))
-      }
+      givenFindingCommitInfoReturns(level1Info, level2Info2)
 
       val exception = exceptions.generateOne
       (commitInfoFinder
         .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
-        .expects(pushEvent.project.id, secondLevelCommitInfo1.id, maybeAccessToken)
+        .expects(pushEvent.project.id, level2Info1.id, maybeAccessToken)
         .returning(context.raiseError(exception))
 
       commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe Success(
         Seq(
-          Success(commitEventFrom(pushEvent, firstCommitInfo)),
+          Success(commitEventFrom(pushEvent, level1Info)),
           Failure(exception),
-          Success(commitEventFrom(pushEvent, secondLevelCommitInfo2))
+          Success(commitEventFrom(pushEvent, level2Info2))
         )
       )
     }
   }
 
   private trait TestCase {
-    val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+    val context = MonadError[Try, Throwable]
 
+    val pushEvent        = pushEvents.generateOne
     val maybeAccessToken = Gen.option(accessTokens).generateOne
 
-    val commitInfoFinder  = mock[CommitInfoFinder[Try]]
-    val commitEventFinder = new CommitEventsFinder[Try](commitInfoFinder)
+    val commitInfoFinder        = mock[CommitInfoFinder[Try]]
+    val eventLogLatestEvent     = mock[TryEventLogLatestEvent]
+    val eventLogVerifyExistence = mock[TryEventLogVerifyExistence]
+    val commitEventFinder       = new CommitEventsFinder[Try](commitInfoFinder, eventLogLatestEvent, eventLogVerifyExistence)
+
+    def givenLatestEventInTheLog(maybeEventId: Option[CommitId]): Unit =
+      (eventLogLatestEvent
+        .findYoungestEventInLog(_: ProjectId))
+        .expects(pushEvent.project.id)
+        .returning(context.pure(maybeEventId))
+
+    def givenFindingCommitInfoReturns(commitInfo: CommitInfo, otherInfos: Seq[CommitInfo]*): Unit =
+      givenFindingCommitInfoReturns(commitInfo +: otherInfos.flatten: _*)
+
+    def givenFindingCommitInfoReturns(commitInfos: CommitInfo*): Unit =
+      commitInfos foreach { commitInfo =>
+        (commitInfoFinder
+          .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+          .expects(pushEvent.project.id, commitInfo.id, maybeAccessToken)
+          .returning(context.pure(commitInfo))
+
+      }
   }
 
   private def commitEventFrom(pushEvent: PushEvent, commitInfo: CommitInfo) =
@@ -218,9 +269,12 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
         .getOrElse(throw new Exception(s"No commitInfo for $parentId"))
     )
 
-  private def toSuccess(commitEvents: Seq[CommitEvent]*) = Success(
+  private def toSuccess(commitEvents: List[CommitEvent]*) = Success(
     commitEvents.flatten map Success.apply
   )
+
+  private def commitInfos(commitId: CommitId, parents: CommitId*): Gen[CommitInfo] =
+    commitInfos(commitId, Gen.const(parents.toList))
 
   private def commitInfos(commitId: CommitId, parentsGenerator: Gen[List[CommitId]]): Gen[CommitInfo] =
     for {
