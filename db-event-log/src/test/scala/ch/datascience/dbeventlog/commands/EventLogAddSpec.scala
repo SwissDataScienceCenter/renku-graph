@@ -24,7 +24,7 @@ import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events.{CommitId, CommittedDate, ProjectId}
 import doobie.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -37,17 +37,15 @@ class EventLogAddSpec extends WordSpec with DbSpec with InMemoryEventLogDb with 
 
     "succeed if there is no event with the given id" in new TestCase {
 
-      val currentNow = Instant.now()
-      now.expects().returning(currentNow)
-
-      eventLogAdd.storeNewEvent(eventId, projectId, eventBody).unsafeRunSync shouldBe ()
+      eventLogAdd.storeNewEvent(commitEvent, eventBody).unsafeRunSync shouldBe ()
 
       storedEvent(eventId) shouldBe (
-        eventId,
-        projectId,
+        commitEvent.id,
+        commitEvent.project.id,
         EventStatus.New,
         CreatedDate(currentNow),
         ExecutionDate(currentNow),
+        commitEvent.committedDate,
         eventBody,
         None
       )
@@ -55,22 +53,20 @@ class EventLogAddSpec extends WordSpec with DbSpec with InMemoryEventLogDb with 
 
     "succeed and do nothing if there is event with the given id in the db already" in new TestCase {
 
-      val currentNow = Instant.now()
-      now.expects().returning(currentNow)
-
-      eventLogAdd.storeNewEvent(eventId, projectId, eventBody).unsafeRunSync shouldBe ()
+      eventLogAdd.storeNewEvent(commitEvent, eventBody).unsafeRunSync shouldBe ()
 
       storedEvent(eventId)._1 shouldBe eventId
 
       val otherBody = eventBodies.generateOne
-      eventLogAdd.storeNewEvent(eventId, projectId, otherBody).unsafeRunSync shouldBe ()
+      eventLogAdd.storeNewEvent(commitEvent, otherBody).unsafeRunSync shouldBe ()
 
       storedEvent(eventId) shouldBe (
-        eventId,
-        projectId,
+        commitEvent.id,
+        commitEvent.project.id,
         EventStatus.New,
         CreatedDate(currentNow),
         ExecutionDate(currentNow),
+        commitEvent.committedDate,
         eventBody,
         None
       )
@@ -79,22 +75,31 @@ class EventLogAddSpec extends WordSpec with DbSpec with InMemoryEventLogDb with 
 
   private trait TestCase {
 
-    val eventId   = commitIds.generateOne
-    val projectId = projectIds.generateOne
-    val eventBody = eventBodies.generateOne
+    val commitEvent = commitEvents.generateOne
+    val eventId     = commitEvent.id
+    val eventBody   = eventBodies.generateOne
 
-    val now = mockFunction[Instant]
-
+    val now         = mockFunction[Instant]
     val eventLogAdd = new EventLogAdd(transactorProvider, now)
+
+    val currentNow = Instant.now()
+    now.expects().returning(currentNow)
 
     def storedEvent(
         eventId: CommitId
-    ): (CommitId, ProjectId, EventStatus, CreatedDate, ExecutionDate, EventBody, Option[EventMessage]) =
-      sql"""select event_id, project_id, status, created_date, execution_date, event_body, message
+    ): (CommitId, ProjectId, EventStatus, CreatedDate, ExecutionDate, CommittedDate, EventBody, Option[EventMessage]) =
+      sql"""select event_id, project_id, status, created_date, execution_date, event_date, event_body, message
            |from event_log  
            |where event_id = ${eventId.value}
          """.stripMargin
-        .query[(CommitId, ProjectId, EventStatus, CreatedDate, ExecutionDate, EventBody, Option[EventMessage])]
+        .query[(CommitId,
+                ProjectId,
+                EventStatus,
+                CreatedDate,
+                ExecutionDate,
+                CommittedDate,
+                EventBody,
+                Option[EventMessage])]
         .unique
         .transact(transactor)
         .unsafeRunSync()

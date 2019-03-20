@@ -23,7 +23,7 @@ import cats.effect.IO
 import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators.createdDates
 import ch.datascience.dbeventlog._
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events.{CommitId, CommittedDate, ProjectId}
 import doobie.implicits._
 import doobie.util.transactor.Transactor.Aux
 
@@ -38,6 +38,7 @@ trait InMemoryEventLogDb {
          | status varchar NOT NULL,
          | created_date timestamp NOT NULL,
          | execution_date timestamp NOT NULL,
+         | event_date timestamp NOT NULL,
          | event_body text NOT NULL,
          | message varchar
          |);
@@ -54,11 +55,12 @@ trait InMemoryEventLogDb {
                            projectId:     ProjectId,
                            eventStatus:   EventStatus,
                            executionDate: ExecutionDate,
+                           eventDate:     CommittedDate,
                            eventBody:     EventBody,
                            createdDate:   CreatedDate = createdDates.generateOne): Unit =
     sql"""insert into 
-         |event_log (event_id, project_id, status, created_date, execution_date, event_body) 
-         |values ($eventId, $projectId, $eventStatus, $createdDate, $executionDate, $eventBody)
+         |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
+         |values ($eventId, $projectId, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
       """.stripMargin.update.run
       .map(_ => ())
       .transact(transactor)

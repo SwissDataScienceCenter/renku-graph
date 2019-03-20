@@ -83,6 +83,7 @@ class EventLogDbInitializerSpec extends WordSpec with DbSpec with MockFactory {
       verifyTrue(sql"DROP INDEX idx_project_id;")
       verifyTrue(sql"DROP INDEX idx_status;")
       verifyTrue(sql"DROP INDEX idx_execution_date;")
+      verifyTrue(sql"DROP INDEX idx_event_date;")
     }
   }
 
@@ -119,6 +120,7 @@ class EventLogDbInitializerSpec extends WordSpec with DbSpec with MockFactory {
          | status varchar NOT NULL,
          | created_date timestamp NOT NULL,
          | execution_date timestamp NOT NULL,
+         | event_date timestamp NOT NULL,
          | event_body text NOT NULL,
          | message varchar
          |);

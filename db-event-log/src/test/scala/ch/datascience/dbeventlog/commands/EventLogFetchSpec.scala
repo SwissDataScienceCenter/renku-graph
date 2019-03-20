@@ -27,7 +27,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projectIds}
+import ch.datascience.graph.model.events.EventsGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -46,6 +46,7 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
                  projectIds.generateOne,
                  EventStatus.New,
                  ExecutionDate(currentNow minus (5, SECONDS)),
+                 committedDates.generateOne,
                  eventBody1)
 
       val eventBody2 = eventBodies.generateOne
@@ -53,6 +54,7 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
                  projectIds.generateOne,
                  EventStatus.New,
                  ExecutionDate(currentNow plus (5, HOURS)),
+                 committedDates.generateOne,
                  eventBody2)
 
       val eventId3   = commitIds.generateOne
@@ -61,6 +63,7 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
                  projectIds.generateOne,
                  EventStatus.TriplesStoreFailure,
                  ExecutionDate(currentNow minus (5, HOURS)),
+                 committedDates.generateOne,
                  eventBody3)
 
       findEvent(EventStatus.Processing) shouldBe List.empty
@@ -86,6 +89,7 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
                  projectIds.generateOne,
                  EventStatus.Processing,
                  ExecutionDate(currentNow minus (11, MINUTES)),
+                 committedDates.generateOne,
                  eventBody)
 
       eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe Some(eventBody)
@@ -96,22 +100,28 @@ class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb wit
     s"find no event when there there's one with $Processing status " +
       "but execution date from less than from 10 mins ago" in new TestCase {
 
-      storeEvent(commitIds.generateOne,
-                 projectIds.generateOne,
-                 EventStatus.Processing,
-                 ExecutionDate(currentNow minus (9, MINUTES)),
-                 eventBodies.generateOne)
+      storeEvent(
+        commitIds.generateOne,
+        projectIds.generateOne,
+        EventStatus.Processing,
+        ExecutionDate(currentNow minus (9, MINUTES)),
+        committedDates.generateOne,
+        eventBodies.generateOne
+      )
 
       eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
     }
 
     "find no events when there any matching the criteria" in new TestCase {
 
-      storeEvent(commitIds.generateOne,
-                 projectIds.generateOne,
-                 EventStatus.New,
-                 ExecutionDate(currentNow plus (5, HOURS)),
-                 eventBodies.generateOne)
+      storeEvent(
+        commitIds.generateOne,
+        projectIds.generateOne,
+        EventStatus.New,
+        ExecutionDate(currentNow plus (5, HOURS)),
+        committedDates.generateOne,
+        eventBodies.generateOne
+      )
 
       eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
     }

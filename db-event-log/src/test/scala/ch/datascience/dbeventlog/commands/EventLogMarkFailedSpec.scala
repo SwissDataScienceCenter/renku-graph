@@ -24,7 +24,7 @@ import ch.datascience.dbeventlog._
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projectIds}
+import ch.datascience.graph.model.events.EventsGenerators.{commitIds, committedDates, projectIds}
 import doobie.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -44,6 +44,7 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
                  projectIds.generateOne,
                  EventStatus.Processing,
                  executionDate,
+                 committedDates.generateOne,
                  eventBodies.generateOne,
                  createdDate)
 
@@ -66,6 +67,7 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
                  projectIds.generateOne,
                  EventStatus.Processing,
                  executionDate,
+                 committedDates.generateOne,
                  eventBodies.generateOne,
                  createdDate)
 
@@ -84,7 +86,13 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
     s"do nothing when setting $TriplesStoreFailure and event status is different than $Processing" in new TestCase {
 
       val eventStatus = eventStatuses generateDifferentThan Processing
-      storeEvent(eventId, projectIds.generateOne, eventStatus, executionDate, eventBodies.generateOne, createdDate)
+      storeEvent(eventId,
+                 projectIds.generateOne,
+                 eventStatus,
+                 executionDate,
+                 committedDates.generateOne,
+                 eventBodies.generateOne,
+                 createdDate)
 
       val message          = eventMessages.generateOne
       val newExecutionDate = executionDates.generateOne
@@ -101,7 +109,13 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
     s"do nothing when setting $NonRecoverableFailure and event status is different than $Processing" in new TestCase {
 
       val eventStatus = eventStatuses generateDifferentThan Processing
-      storeEvent(eventId, projectIds.generateOne, eventStatus, executionDate, eventBodies.generateOne, createdDate)
+      storeEvent(eventId,
+                 projectIds.generateOne,
+                 eventStatus,
+                 executionDate,
+                 committedDates.generateOne,
+                 eventBodies.generateOne,
+                 createdDate)
 
       val message          = eventMessages.generateOne
       val newExecutionDate = executionDates.generateOne

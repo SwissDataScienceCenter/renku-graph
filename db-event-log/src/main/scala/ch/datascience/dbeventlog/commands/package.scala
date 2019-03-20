@@ -19,7 +19,7 @@
 package ch.datascience.dbeventlog
 import java.time.Instant
 
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events.{CommitId, CommittedDate, ProjectId}
 import doobie.util.{Get, Put}
 
 package object commands {
@@ -37,6 +37,9 @@ package object commands {
 
   implicit val executionDateGet: Get[ExecutionDate] = Get[Instant].tmap(ExecutionDate.apply)
   implicit val executionDatePut: Put[ExecutionDate] = Put[Instant].contramap(_.value)
+
+  implicit val eventDateGet: Get[CommittedDate] = Get[Instant].tmap(CommittedDate.apply)
+  implicit val eventDatePut: Put[CommittedDate] = Put[Instant].contramap(_.value)
 
   implicit val eventMessageGet: Get[EventMessage] = Get[String].tmap(EventMessage.apply)
   implicit val eventMessagePut: Put[EventMessage] = Put[String].contramap(_.value)

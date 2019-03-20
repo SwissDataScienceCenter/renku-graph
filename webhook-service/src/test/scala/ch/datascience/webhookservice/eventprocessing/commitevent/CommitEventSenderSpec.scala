@@ -46,8 +46,8 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
         .returning(context.pure(serializedEvent))
 
       (eventAdd
-        .storeNewEvent(_: CommitId, _: ProjectId, _: EventBody))
-        .expects(commitEvent.id, commitEvent.project.id, EventBody(serializedEvent))
+        .storeNewEvent(_: CommitEvent, _: EventBody))
+        .expects(commitEvent, EventBody(serializedEvent))
         .returning(context.unit)
 
       eventSender.send(commitEvent) shouldBe Success(())
@@ -74,8 +74,8 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (eventAdd
-        .storeNewEvent(_: CommitId, _: ProjectId, _: EventBody))
-        .expects(commitEvent.id, commitEvent.project.id, EventBody(serializedEvent))
+        .storeNewEvent(_: CommitEvent, _: EventBody))
+        .expects(commitEvent, EventBody(serializedEvent))
         .returning(context.raiseError(exception))
 
       eventSender.send(commitEvent) shouldBe Failure(exception)

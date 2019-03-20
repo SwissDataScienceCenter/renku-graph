@@ -25,7 +25,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projectIds}
+import ch.datascience.graph.model.events.EventsGenerators.{commitIds, committedDates, projectIds}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -42,11 +42,13 @@ class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb 
                  projectIds.generateOne,
                  EventStatus.Processing,
                  executionDates.generateOne,
+                 committedDates.generateOne,
                  eventBodies.generateOne)
       storeEvent(commitIds.generateOne,
                  projectIds.generateOne,
                  EventStatus.Processing,
                  executionDates.generateOne,
+                 committedDates.generateOne,
                  eventBodies.generateOne)
 
       eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ()
@@ -59,7 +61,12 @@ class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb 
       val eventId       = commitIds.generateOne
       val eventStatus   = eventStatuses generateDifferentThan Processing
       val executionDate = executionDates.generateOne
-      storeEvent(eventId, projectIds.generateOne, eventStatus, executionDate, eventBodies.generateOne)
+      storeEvent(eventId,
+                 projectIds.generateOne,
+                 eventStatus,
+                 executionDate,
+                 committedDates.generateOne,
+                 eventBodies.generateOne)
 
       intercept[RuntimeException] {
         eventLogMarkDone.markEventDone(eventId).unsafeRunSync()

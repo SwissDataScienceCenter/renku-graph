@@ -26,7 +26,7 @@ import cats.free.Free
 import cats.implicits._
 import ch.datascience.db.TransactorProvider
 import ch.datascience.dbeventlog.{EventBody, EventStatus, IOTransactorProvider}
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events._
 import doobie.free.connection
 import doobie.implicits._
 
@@ -37,26 +37,25 @@ class EventLogAdd[Interpretation[_]](
     now:                () => Instant = Instant.now
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
-  def storeNewEvent(eventId: CommitId, projectId: ProjectId, eventBody: EventBody): Interpretation[Unit] =
+  def storeNewEvent(commitEvent: CommitEvent, eventBody: EventBody): Interpretation[Unit] =
     for {
       transactor <- transactorProvider.transactor
-      _ <- sql"select event_id from event_log where event_id = $eventId"
+      _ <- sql"select event_id from event_log where event_id = ${commitEvent.id}"
             .query[String]
             .option
             .flatMap {
-              case None => insert(eventId, projectId, eventBody)
+              case None => insert(commitEvent, eventBody)
               case _    => Free.pure(())
             }
             .transact(transactor)
     } yield ()
 
-  private def insert(eventId:   CommitId,
-                     projectId: ProjectId,
-                     eventBody: EventBody): Free[connection.ConnectionOp, Unit] = {
+  private def insert(commitEvent: CommitEvent, eventBody: EventBody): Free[connection.ConnectionOp, Unit] = {
+    import commitEvent._
     val currentTime = now()
     sql"""insert into 
-          event_log (event_id, project_id, status, created_date, execution_date, event_body) 
-          values ($eventId, $projectId, ${EventStatus.New: EventStatus}, $currentTime, $currentTime, $eventBody)
+          event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
+          values ($id, ${project.id}, ${EventStatus.New: EventStatus}, $currentTime, $currentTime, $committedDate, $eventBody)
       """.update.run.map(_ => ())
   }
 }

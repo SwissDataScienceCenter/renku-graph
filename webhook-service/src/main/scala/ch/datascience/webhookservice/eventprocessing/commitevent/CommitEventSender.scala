@@ -39,7 +39,7 @@ class CommitEventSender[Interpretation[_]: Monad](
     for {
       serialisedEvent <- serialiseToJsonString(commitEvent)
       eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
-      _               <- storeNewEvent(commitEvent.id, commitEvent.project.id, eventBody)
+      _               <- storeNewEvent(commitEvent, eventBody)
     } yield ()
 }
 
