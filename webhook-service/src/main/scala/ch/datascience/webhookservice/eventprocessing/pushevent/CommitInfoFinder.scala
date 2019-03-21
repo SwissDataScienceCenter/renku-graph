@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import org.http4s.{Method, Status, Uri}
+import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -54,12 +54,6 @@ private class IOCommitInfoFinder(
       uri        <- validateUri(s"$gitLabHost/api/v4/projects/$projectId/repository/commits/$commitId")
       result     <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield result
-
-  private def request(method: Method, uri: Uri, maybeAccessToken: Option[AccessToken]): Request[IO] =
-    maybeAccessToken match {
-      case Some(accessToken) => request(method, uri, accessToken)
-      case None              => Request[IO](GET, uri)
-    }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[CommitInfo]] = {
     case (Ok, _, response)    => response.as[CommitInfo]

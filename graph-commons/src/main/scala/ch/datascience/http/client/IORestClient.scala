@@ -52,6 +52,12 @@ abstract class IORestClient(
       headers = authHeader(accessToken)
     )
 
+  protected def request(method: Method, uri: Uri, maybeAccessToken: Option[AccessToken]): Request[IO] =
+    maybeAccessToken match {
+      case Some(accessToken) => request(method, uri, accessToken)
+      case _                 => request(method, uri)
+    }
+
   protected def request(method: Method, uri: Uri, basicAuth: BasicAuth): Request[IO] =
     Request[IO](
       method  = method,

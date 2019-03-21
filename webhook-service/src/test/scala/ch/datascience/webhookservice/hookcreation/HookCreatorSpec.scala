@@ -59,8 +59,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
       (hookTokenCrypto
@@ -146,8 +146,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(error)
 
       hookCreation.createHook(projectId, accessToken) shouldBe error
@@ -167,8 +167,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
       val exception: Exception    = exceptions.generateOne
@@ -195,8 +195,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
       (hookTokenCrypto
@@ -228,8 +228,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
       (hookTokenCrypto
@@ -266,8 +266,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
       (hookTokenCrypto

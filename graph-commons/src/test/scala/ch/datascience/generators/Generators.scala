@@ -47,6 +47,12 @@ object Generators {
       lines <- Gen.listOfN(size, nonEmptyStrings())
     } yield lines
 
+  def nonEmptyList[T](generator: Gen[T], minElements: Int = 1, maxElements: Int = 5): Gen[List[T]] =
+    for {
+      size <- choose(minElements, maxElements)
+      list <- Gen.listOfN(size, generator)
+    } yield list
+
   def positiveInts(max: Int = 1000): Gen[Int] = choose(1, max)
 
   def nonNegativeInts(max: Int = 1000): Gen[Int] = choose(0, max)

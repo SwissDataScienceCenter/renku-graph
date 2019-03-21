@@ -23,10 +23,10 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfigProvider.HostUrl
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
@@ -53,7 +53,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
           .willReturn(okJson(projectJson))
       }
 
-      projectInfoFinder.findProjectInfo(projectId, personalAccessToken).unsafeRunSync() shouldBe ProjectInfo(
+      projectInfoFinder.findProjectInfo(projectId, Some(personalAccessToken)).unsafeRunSync() shouldBe ProjectInfo(
         projectId,
         projectVisibility,
         projectPath,
@@ -71,7 +71,24 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
           .willReturn(okJson(projectJson))
       }
 
-      projectInfoFinder.findProjectInfo(projectId, oauthAccessToken).unsafeRunSync() shouldBe ProjectInfo(
+      projectInfoFinder.findProjectInfo(projectId, Some(oauthAccessToken)).unsafeRunSync() shouldBe ProjectInfo(
+        projectId,
+        projectVisibility,
+        projectPath,
+        ProjectOwner(userId)
+      )
+    }
+
+    "return fetched project info if service responds with 200 and a valid body - no token case" in new TestCase {
+      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
+      val oauthAccessToken = oauthAccessTokens.generateOne
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId")
+          .willReturn(okJson(projectJson))
+      }
+
+      projectInfoFinder.findProjectInfo(projectId, maybeAccessToken = None).unsafeRunSync() shouldBe ProjectInfo(
         projectId,
         projectVisibility,
         projectPath,
@@ -80,58 +97,50 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
     }
 
     "fail if fetching the the config fails" in new TestCase {
-      val personalAccessToken = personalAccessTokens.generateOne
-      val exception           = exceptions.generateOne
-
+      val exception = exceptions.generateOne
       expectGitLabConfigProvider(returning = IO.raiseError(exception))
 
       intercept[Exception] {
-        projectInfoFinder.findProjectInfo(projectId, personalAccessToken).unsafeRunSync()
+        projectInfoFinder.findProjectInfo(projectId, maybeAccessToken = None).unsafeRunSync()
       } shouldBe exception
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
-      val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(unauthorized())
       }
 
       intercept[Exception] {
-        projectInfoFinder.findProjectInfo(projectId, personalAccessToken).unsafeRunSync()
+        projectInfoFinder.findProjectInfo(projectId, maybeAccessToken = None).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
     "return a RuntimeException if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
-      val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(notFound().withBody("some error"))
       }
 
       intercept[Exception] {
-        projectInfoFinder.findProjectInfo(projectId, personalAccessToken).unsafeRunSync()
+        projectInfoFinder.findProjectInfo(projectId, maybeAccessToken = None).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId returned ${Status.NotFound}; body: some error"
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
-      val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson("{}"))
       }
 
       intercept[Exception] {
-        projectInfoFinder.findProjectInfo(projectId, personalAccessToken).unsafeRunSync()
+        projectInfoFinder.findProjectInfo(projectId, maybeAccessToken = None).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
   }

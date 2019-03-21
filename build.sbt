@@ -47,7 +47,8 @@ lazy val webhookService = Project(
 ).dependsOn(
   graphCommons % "compile->compile",
   graphCommons % "test->test",
-  dbEventLog
+  dbEventLog   % "compile->compile",
+  dbEventLog   % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
@@ -61,8 +62,8 @@ lazy val triplesGenerator = Project(
 ).dependsOn(
   graphCommons % "compile->compile",
   graphCommons % "test->test",
-  dbEventLog % "compile->compile",
-  dbEventLog % "test->test"
+  dbEventLog   % "compile->compile",
+  dbEventLog   % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin

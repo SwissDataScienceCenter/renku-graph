@@ -22,15 +22,15 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import ch.datascience.graph.model.events.{Project, PushUser}
+import ch.datascience.graph.model.events.Project
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
-import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
-import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
 import ch.datascience.webhookservice.project.ProjectInfo
+import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
+import ch.datascience.webhookservice.pushevents._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -39,20 +39,17 @@ import scala.util.control.NonFatal
 
 private class EventsHistoryLoader[Interpretation[_]](
     latestPushEventFetcher: LatestPushEventFetcher[Interpretation],
-    userInfoFinder:         UserInfoFinder[Interpretation],
     pushEventSender:        PushEventSender[Interpretation],
     logger:                 Logger[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable]) {
 
   import latestPushEventFetcher._
   import pushEventSender._
-  import userInfoFinder._
 
   def loadAllEvents(projectInfo: ProjectInfo, accessToken: AccessToken): Interpretation[Unit] = {
     for {
-      latestPushEvent <- OptionT(fetchLatestPushEvent(projectInfo.id, accessToken))
-      userInfo        <- OptionT.liftF(findUserInfo(latestPushEvent.authorId, accessToken))
-      pushEvent       <- OptionT.liftF(pushEventFrom(latestPushEvent, projectInfo, userInfo))
+      latestPushEvent <- OptionT(fetchLatestPushEvent(projectInfo.id, Some(accessToken)))
+      pushEvent       <- OptionT.liftF(pushEventFrom(latestPushEvent, projectInfo))
       _               <- OptionT.liftF(storeCommitsInEventLog(pushEvent))
       _               <- OptionT.liftF(logger.info(s"Project: ${projectInfo.id}: events history sent to the Event Log"))
     } yield ()
@@ -60,11 +57,11 @@ private class EventsHistoryLoader[Interpretation[_]](
     .flatMap(logNoEventsSent(projectInfo))
     .recoverWith(loggingError(projectInfo))
 
-  private def pushEventFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo, userInfo: UserInfo) = ME.pure {
+  private def pushEventFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = ME.pure {
     PushEvent(
       maybeCommitFrom = None,
       commitTo        = pushEventInfo.commitTo,
-      pushUser        = PushUser(userInfo.userId, userInfo.username, maybeEmail = None),
+      pushUser        = pushEventInfo.pushUser,
       project         = Project(projectInfo.id, projectInfo.path)
     )
   }
@@ -84,7 +81,6 @@ private class EventsHistoryLoader[Interpretation[_]](
 private class IOEventsHistoryLoader(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends EventsHistoryLoader[IO](
       new IOLatestPushEventFetcher(new GitLabConfigProvider[IO]),
-      new IOUserInfoFinder(new GitLabConfigProvider[IO]),
       new IOPushEventSender,
       ApplicationLogger
     )

@@ -30,10 +30,9 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.pushevent.TryPushEventSender
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
-import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
-import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
-import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
 import ch.datascience.webhookservice.project.ProjectInfo
+import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher
+import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -48,19 +47,13 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
 
       val pushEventInfo = pushEventInfoFrom(projectInfo)
       (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(Some(pushEventInfo)))
-
-      val userInfo = userInfoWith(pushEventInfo.authorId)
-      (userInfoFinder
-        .findUserInfo(_: UserId, _: AccessToken))
-        .expects(pushEventInfo.authorId, accessToken)
-        .returning(context.pure(userInfo))
 
       (pushEventSender
         .storeCommitsInEventLog(_: PushEvent))
-        .expects(pushEventFrom(pushEventInfo, projectInfo, userInfo))
+        .expects(pushEventFrom(pushEventInfo, projectInfo))
         .returning(context.pure(()))
 
       eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe Success(())
@@ -72,8 +65,8 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
 
       val pushEventInfo = pushEventInfoFrom(projectInfo)
       (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(None))
 
       eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe Success(())
@@ -86,28 +79,8 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
       val error     = context.raiseError(exception)
       (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(error)
-
-      eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe error
-
-      logger.loggedOnly(Error(s"Project: ${projectInfo.id}: Sending events to the Event Log failed", exception))
-    }
-
-    "fail if fetching user info fails" in new TestCase {
-
-      val pushEventInfo = pushEventInfoFrom(projectInfo)
-      (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(context.pure(Some(pushEventInfo)))
-
-      val exception = exceptions.generateOne
-      val error     = context.raiseError(exception)
-      (userInfoFinder
-        .findUserInfo(_: UserId, _: AccessToken))
-        .expects(pushEventInfo.authorId, accessToken)
+        .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(error)
 
       eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe error
@@ -119,15 +92,9 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
 
       val pushEventInfo = pushEventInfoFrom(projectInfo)
       (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(Some(pushEventInfo)))
-
-      val userInfo = userInfoWith(pushEventInfo.authorId)
-      (userInfoFinder
-        .findUserInfo(_: UserId, _: AccessToken))
-        .expects(pushEventInfo.authorId, accessToken)
-        .returning(context.pure(userInfo))
 
       val exception = exceptions.generateOne
       val error     = context.raiseError(exception)
@@ -150,12 +117,10 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
     val context = MonadError[Try, Throwable]
 
     val latestPushEventFetcher = mock[LatestPushEventFetcher[Try]]
-    val userInfoFinder         = mock[UserInfoFinder[Try]]
     val pushEventSender        = mock[TryPushEventSender]
     val logger                 = TestLogger[Try]()
     val eventsHistoryLoader = new EventsHistoryLoader[Try](
       latestPushEventFetcher,
-      userInfoFinder,
       pushEventSender,
       logger
     )
@@ -165,18 +130,11 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
     pushEventInfos.generateOne
       .copy(projectId = projectInfo.id)
 
-  private def userInfoWith(userId: UserId) =
-    userInfos.generateOne
-      .copy(userId = userId)
-
-  private def pushEventFrom(
-      pushEventInfo: PushEventInfo,
-      projectInfo:   ProjectInfo,
-      userInfo:      UserInfo
-  ) = PushEvent(
-    maybeCommitFrom = None,
-    commitTo        = pushEventInfo.commitTo,
-    pushUser        = PushUser(pushEventInfo.authorId, userInfo.username, maybeEmail = None),
-    project         = Project(projectInfo.id, projectInfo.path)
-  )
+  private def pushEventFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) =
+    PushEvent(
+      maybeCommitFrom = None,
+      commitTo        = pushEventInfo.commitTo,
+      pushUser        = pushEventInfo.pushUser,
+      project         = Project(projectInfo.id, projectInfo.path)
+    )
 }

@@ -67,7 +67,7 @@ private class HookCreator[Interpretation[_]: Monad](
       projectHookUrl      <- right(findProjectHookUrl)
       hookValidation      <- right(validateHook(projectId, accessToken))
       _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
-      projectInfo         <- right(findProjectInfo(projectId, accessToken))
+      projectInfo         <- right(findProjectInfo(projectId, Some(accessToken)))
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
       _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
       _                   <- right(associate(projectId, accessToken))

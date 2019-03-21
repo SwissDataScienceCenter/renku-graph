@@ -28,8 +28,8 @@ import scala.language.higherKinds
 
 trait ProjectInfoFinder[Interpretation[_]] {
   def findProjectInfo(
-      projectId:   ProjectId,
-      accessToken: AccessToken
+      projectId:        ProjectId,
+      maybeAccessToken: Option[AccessToken]
   ): Interpretation[ProjectInfo]
 }
 
@@ -48,11 +48,11 @@ class IOProjectInfoFinder(
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: ProjectId, accessToken: AccessToken): IO[ProjectInfo] =
+  def findProjectInfo(projectId: ProjectId, maybeAccessToken: Option[AccessToken]): IO[ProjectInfo] =
     for {
       gitLabHostUrl <- gitLabConfigProvider.get
       uri           <- validateUri(s"$gitLabHostUrl/api/v4/projects/$projectId")
-      projectInfo   <- send(request(GET, uri, accessToken))(mapResponse)
+      projectInfo   <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield projectInfo
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ProjectInfo]] = {

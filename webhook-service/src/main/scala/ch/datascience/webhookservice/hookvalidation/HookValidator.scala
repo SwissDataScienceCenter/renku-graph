@@ -88,7 +88,7 @@ class HookValidator[Interpretation[_]](
 
   private def findVisibilityAndToken(projectId:   ProjectId,
                                      accessToken: AccessToken): Interpretation[(ProjectVisibility, Token)] =
-    findProjectInfo(projectId, accessToken)
+    findProjectInfo(projectId, Some(accessToken))
       .map(_.visibility -> (GivenToken(accessToken): Token))
       .recoverWith(visibilityAndStoredToken(projectId))
 
@@ -98,7 +98,7 @@ class HookValidator[Interpretation[_]](
     case UnauthorizedException => {
       for {
         storedAccessToken <- findAccessToken(projectId) flatMap getOrError(projectId)
-        projectInfo       <- findProjectInfo(projectId, storedAccessToken.value)
+        projectInfo       <- findProjectInfo(projectId, Some(storedAccessToken.value))
       } yield projectInfo.visibility -> storedAccessToken
     } recoverWith storedAccessTokenError(projectId)
   }

@@ -22,16 +22,18 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.EventsGenerators.projectIds
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.{GitLabConfigProvider, IOGitLabConfigProvider}
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.webhookservice.hookcreation.HookCreationGenerators._
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators.{projectHookUrls, serializedHookTokens}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
 import io.circe.Json
 import org.http4s.Status
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -145,4 +147,10 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
         .applyRef[String Refined Url](value)
         .getOrElse(throw new IllegalArgumentException("Invalid url value"))
   }
+
+  private implicit val projectHooks: Gen[ProjectHook] = for {
+    projectId           <- projectIds
+    hookUrl             <- projectHookUrls
+    serializedHookToken <- serializedHookTokens
+  } yield ProjectHook(projectId, hookUrl, serializedHookToken)
 }
