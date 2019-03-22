@@ -49,18 +49,13 @@ object WebhookServiceGenerators {
     projectId <- projectIds
   } yield HookToken(projectId)
 
-  implicit val projectOwner: Gen[ProjectOwner] = for {
-    id <- userIds
-  } yield ProjectOwner(id)
-
   implicit val projectVisibilities: Gen[ProjectVisibility] = Gen.oneOf(ProjectVisibility.all.toList)
 
   implicit val projectInfos: Gen[ProjectInfo] = for {
     id         <- projectIds
     visibility <- projectVisibilities
     path       <- projectPaths
-    owner      <- projectOwner
-  } yield ProjectInfo(id, visibility, path, owner)
+  } yield ProjectInfo(id, visibility, path)
 
   implicit val selfUrls: Gen[SelfUrl] =
     validatedUrls map (url => SelfUrl.apply(url.value))

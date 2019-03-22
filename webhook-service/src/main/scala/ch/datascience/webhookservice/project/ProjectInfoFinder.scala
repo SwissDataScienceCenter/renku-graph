@@ -22,6 +22,7 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.project.ProjectVisibility.Public
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -64,11 +65,13 @@ class IOProjectInfoFinder(
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
       for {
         id         <- cursor.downField("id").as[ProjectId]
-        visibility <- cursor.downField("visibility").as[ProjectVisibility]
+        visibility <- cursor.downField("visibility").as[Option[ProjectVisibility]] map defaultToPublic
         path       <- cursor.downField("path_with_namespace").as[ProjectPath]
-        ownerId    <- cursor.downField("owner").downField("id").as[UserId]
-      } yield ProjectInfo(id, visibility, path, ProjectOwner(ownerId))
+      } yield ProjectInfo(id, visibility, path)
 
     jsonOf[IO, ProjectInfo]
   }
+
+  private def defaultToPublic(maybeVisibility: Option[ProjectVisibility]): ProjectVisibility =
+    maybeVisibility getOrElse Public
 }
