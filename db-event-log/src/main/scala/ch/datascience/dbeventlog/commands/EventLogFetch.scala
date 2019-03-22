@@ -29,7 +29,7 @@ import cats.implicits._
 import ch.datascience.db.TransactorProvider
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.{EventBody, EventStatus, IOTransactorProvider}
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.CommitEventId
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
 import doobie.util.fragments._
@@ -55,31 +55,31 @@ class EventLogFetch[Interpretation[_]](
 
   private def findEventAndUpdateForProcessing =
     for {
-      maybeIdAndBody <- findOldestEvent
-      maybeBody      <- markAsProcessing(maybeIdAndBody)
+      maybeIdAndProjectAndBody <- findOldestEvent
+      maybeBody                <- markAsProcessing(maybeIdAndProjectAndBody)
     } yield maybeBody
 
   // format: off
   private def findOldestEvent = {
-    fr"""select event_id, event_body
+    fr"""select event_id, project_id, event_body
          from event_log
          where (""" ++ `status IN`(New, TriplesStoreFailure) ++ fr""" and execution_date < ${now()})
            or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
          order by execution_date asc
          limit 1"""
-  }.query[(CommitId, EventBody)].option
+  }.query[EventIdAndBody].option
   // format: on
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
 
-  private lazy val markAsProcessing: Option[(CommitId, EventBody)] => Free[ConnectionOp, Option[EventBody]] = {
+  private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventBody]] = {
     case None => Free.pure[ConnectionOp, Option[EventBody]](None)
-    case Some((eventId, eventBody)) =>
+    case Some((commitEventId, eventBody)) =>
       sql"""update event_log 
            |set status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
-           |where (event_id = $eventId and status <> ${Processing: EventStatus})
-           |  or (event_id = $eventId and status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
+           |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
+           |  or (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
            |""".stripMargin.update.run
         .map(toNoneIfEventAlreadyTaken(eventBody))
   }
@@ -88,6 +88,8 @@ class EventLogFetch[Interpretation[_]](
     case 0 => None
     case 1 => Some(eventBody)
   }
+
+  private type EventIdAndBody = (CommitEventId, EventBody)
 }
 
 class IOEventLogFetch(implicit contextShift: ContextShift[IO]) extends EventLogFetch[IO](new IOTransactorProvider)

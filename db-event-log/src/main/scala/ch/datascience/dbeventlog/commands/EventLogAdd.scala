@@ -27,7 +27,7 @@ import cats.implicits._
 import ch.datascience.db.TransactorProvider
 import ch.datascience.dbeventlog.{EventBody, EventStatus, IOTransactorProvider}
 import ch.datascience.graph.model.events._
-import doobie.free.connection
+import doobie.free.connection.ConnectionOp
 import doobie.implicits._
 
 import scala.language.higherKinds
@@ -40,17 +40,24 @@ class EventLogAdd[Interpretation[_]](
   def storeNewEvent(commitEvent: CommitEvent, eventBody: EventBody): Interpretation[Unit] =
     for {
       transactor <- transactorProvider.transactor
-      _ <- sql"select event_id from event_log where event_id = ${commitEvent.id}"
-            .query[String]
-            .option
-            .flatMap {
-              case None => insert(commitEvent, eventBody)
-              case _    => Free.pure(())
-            }
-            .transact(transactor)
+      _          <- insertIfNotDuplicate(commitEvent, eventBody).transact(transactor)
     } yield ()
 
-  private def insert(commitEvent: CommitEvent, eventBody: EventBody): Free[connection.ConnectionOp, Unit] = {
+  private def insertIfNotDuplicate(commitEvent: CommitEvent, eventBody: EventBody) =
+    for {
+      maybeEventId <- checkIfExists(commitEvent)
+      _            <- if (maybeEventId.isEmpty) insert(commitEvent, eventBody) else Free.pure[ConnectionOp, Unit]()
+    } yield ()
+
+  private def checkIfExists(commitEvent: CommitEvent) =
+    sql"""
+         |select event_id 
+         |from event_log 
+         |where event_id = ${commitEvent.id} and project_id = ${commitEvent.project.id}""".stripMargin
+      .query[String]
+      .option
+
+  private def insert(commitEvent: CommitEvent, eventBody: EventBody) = {
     import commitEvent._
     val currentTime = now()
     sql"""insert into 

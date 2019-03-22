@@ -23,8 +23,8 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventsGenerators.{commitIds, committedDates, projectIds}
+import ch.datascience.graph.model.events.CommitEventId
+import ch.datascience.graph.model.events.EventsGenerators.{commitEventIds, committedDates}
 import doobie.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -37,11 +37,16 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
 
   "markEventFailed" should {
 
-    s"set event with the given id, the given $TriplesStoreFailure status and message " +
+    s"set the given $TriplesStoreFailure status and message on event with the given id and project " +
       s"if the event has status $Processing" in new TestCase {
 
+      storeEvent(commitEventIds.generateOne.copy(id = eventId.id),
+                 EventStatus.Processing,
+                 executionDate,
+                 committedDates.generateOne,
+                 eventBodies.generateOne,
+                 createdDate)
       storeEvent(eventId,
-                 projectIds.generateOne,
                  EventStatus.Processing,
                  executionDate,
                  committedDates.generateOne,
@@ -55,16 +60,23 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
         .expects(createdDate, executionDate, triplesStoreFailureCalculator)
         .returning(newExecutionDate)
 
-      eventLogMarkFailed.markEventFailed(eventId, TriplesStoreFailure, maybeMessage).unsafeRunSync() shouldBe ()
+      eventLogMarkFailed
+        .markEventFailed(eventId, TriplesStoreFailure, maybeMessage)
+        .unsafeRunSync() shouldBe ()
 
       findEvent(eventId) shouldBe (newExecutionDate, TriplesStoreFailure, maybeMessage)
     }
 
-    s"set event with the given id, the given $NonRecoverableFailure status and message " +
+    s"set the given $NonRecoverableFailure status and message on event with the given id and project " +
       s"if the event has status $Processing" in new TestCase {
 
+      storeEvent(commitEventIds.generateOne.copy(id = eventId.id),
+                 EventStatus.Processing,
+                 executionDate,
+                 committedDates.generateOne,
+                 eventBodies.generateOne,
+                 createdDate)
       storeEvent(eventId,
-                 projectIds.generateOne,
                  EventStatus.Processing,
                  executionDate,
                  committedDates.generateOne,
@@ -78,7 +90,9 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
         .expects(createdDate, executionDate, nonRecoverableFailureCalculator)
         .returning(newExecutionDate)
 
-      eventLogMarkFailed.markEventFailed(eventId, NonRecoverableFailure, maybeMessage).unsafeRunSync() shouldBe ()
+      eventLogMarkFailed
+        .markEventFailed(eventId, NonRecoverableFailure, maybeMessage)
+        .unsafeRunSync() shouldBe ()
 
       findEvent(eventId) shouldBe (newExecutionDate, NonRecoverableFailure, maybeMessage)
     }
@@ -86,13 +100,7 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
     s"do nothing when setting $TriplesStoreFailure and event status is different than $Processing" in new TestCase {
 
       val eventStatus = eventStatuses generateDifferentThan Processing
-      storeEvent(eventId,
-                 projectIds.generateOne,
-                 eventStatus,
-                 executionDate,
-                 committedDates.generateOne,
-                 eventBodies.generateOne,
-                 createdDate)
+      storeEvent(eventId, eventStatus, executionDate, committedDates.generateOne, eventBodies.generateOne, createdDate)
 
       val message          = eventMessages.generateOne
       val newExecutionDate = executionDates.generateOne
@@ -101,7 +109,9 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
         .expects(createdDate, executionDate, triplesStoreFailureCalculator)
         .returning(newExecutionDate)
 
-      eventLogMarkFailed.markEventFailed(eventId, TriplesStoreFailure, Some(message)).unsafeRunSync() shouldBe ()
+      eventLogMarkFailed
+        .markEventFailed(eventId, TriplesStoreFailure, Some(message))
+        .unsafeRunSync() shouldBe ()
 
       findEvent(eventId) shouldBe (executionDate, eventStatus, None)
     }
@@ -109,13 +119,7 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
     s"do nothing when setting $NonRecoverableFailure and event status is different than $Processing" in new TestCase {
 
       val eventStatus = eventStatuses generateDifferentThan Processing
-      storeEvent(eventId,
-                 projectIds.generateOne,
-                 eventStatus,
-                 executionDate,
-                 committedDates.generateOne,
-                 eventBodies.generateOne,
-                 createdDate)
+      storeEvent(eventId, eventStatus, executionDate, committedDates.generateOne, eventBodies.generateOne, createdDate)
 
       val message          = eventMessages.generateOne
       val newExecutionDate = executionDates.generateOne
@@ -124,7 +128,9 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
         .expects(createdDate, executionDate, nonRecoverableFailureCalculator)
         .returning(newExecutionDate)
 
-      eventLogMarkFailed.markEventFailed(eventId, NonRecoverableFailure, Some(message)).unsafeRunSync() shouldBe ()
+      eventLogMarkFailed
+        .markEventFailed(eventId, NonRecoverableFailure, Some(message))
+        .unsafeRunSync() shouldBe ()
 
       findEvent(eventId) shouldBe (executionDate, eventStatus, None)
     }
@@ -132,17 +138,17 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
 
   private trait TestCase {
 
-    val eventId       = commitIds.generateOne
+    val eventId       = commitEventIds.generateOne
     val createdDate   = createdDates.generateOne
     val executionDate = executionDates.generateOne
 
     val executionDateCalculator = mock[ExecutionDateCalculator]
     val eventLogMarkFailed      = new EventLogMarkFailed(transactorProvider, executionDateCalculator)
 
-    def findEvent(eventId: CommitId): (ExecutionDate, EventStatus, Option[EventMessage]) =
+    def findEvent(eventId: CommitEventId): (ExecutionDate, EventStatus, Option[EventMessage]) =
       sql"""select execution_date, status, message
            |from event_log 
-           |where event_id = $eventId
+           |where event_id = ${eventId.id} and project_id = ${eventId.projectId}
          """.stripMargin
         .query[(ExecutionDate, EventStatus, Option[EventMessage])]
         .unique

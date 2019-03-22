@@ -53,14 +53,15 @@ class EventLogDbInitializer[Interpretation[_]](
   private def createTable(transactor: Aux[Interpretation, Unit]): Interpretation[Unit] =
     sql"""
          |CREATE TABLE IF NOT EXISTS event_log(
-         | event_id varchar PRIMARY KEY,
+         | event_id varchar NOT NULL,
          | project_id int4 NOT NULL,
          | status varchar NOT NULL,
          | created_date timestamp NOT NULL,
          | execution_date timestamp NOT NULL,
          | event_date timestamp NOT NULL,
          | event_body text NOT NULL,
-         | message varchar
+         | message varchar,
+         | PRIMARY KEY (event_id, project_id)
          |);
        """.stripMargin.update.run
       .transact(transactor)

@@ -24,9 +24,9 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.TransactorProvider
-import ch.datascience.dbeventlog.{EventStatus, IOTransactorProvider}
 import ch.datascience.dbeventlog.EventStatus.{Processing, TriplesStore}
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.dbeventlog.{EventStatus, IOTransactorProvider}
+import ch.datascience.graph.model.events.CommitEventId
 import doobie.implicits._
 
 import scala.language.higherKinds
@@ -36,27 +36,27 @@ class EventLogMarkDone[Interpretation[_]](
     now:                () => Instant = Instant.now
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
-  def markEventDone(eventId: CommitId): Interpretation[Unit] =
+  def markEventDone(commitEventId: CommitEventId): Interpretation[Unit] =
     for {
       transactor     <- transactorProvider.transactor
-      updatedRecords <- update(eventId, newStatus = TriplesStore).transact(transactor)
-      _              <- failIfNoRecordsUpdated(eventId)(updatedRecords)
+      updatedRecords <- update(commitEventId, newStatus = TriplesStore).transact(transactor)
+      _              <- failIfNoRecordsUpdated(commitEventId)(updatedRecords)
     } yield ()
 
-  private def update(eventId: CommitId, newStatus: EventStatus) =
+  private def update(commitEventId: CommitEventId, newStatus: EventStatus) =
     sql"""update event_log 
          |set status = $newStatus, execution_date = ${now()}
-         |where event_id = $eventId and status = ${Processing: EventStatus}
+         |where event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus}
          |""".stripMargin.update.run
 
-  private def failIfNoRecordsUpdated(eventId: CommitId): Int => Interpretation[Unit] = {
-    case 0 =>
+  private def failIfNoRecordsUpdated(commitEventId: CommitEventId): Int => Interpretation[Unit] = {
+    case 1 => ME.unit
+    case _ =>
       ME.raiseError(
         new RuntimeException(
-          s"Event with id = $eventId couldn't be updated; Either no event or not with status $Processing"
+          s"Event with id = ${commitEventId.id}, projectId = ${commitEventId.projectId} couldn't be updated; either no event or not with status $Processing"
         )
       )
-    case _ => ME.unit
   }
 }
 

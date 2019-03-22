@@ -18,12 +18,12 @@
 
 package ch.datascience.dbeventlog.commands
 
-import ch.datascience.generators.Generators.Implicits._
+import java.time.Instant
+
 import cats.effect.IO
 import ch.datascience.db.DbSpec
-import ch.datascience.dbeventlog.DbEventLogGenerators.createdDates
 import ch.datascience.dbeventlog._
-import ch.datascience.graph.model.events.{CommitId, CommittedDate, ProjectId}
+import ch.datascience.graph.model.events._
 import doobie.implicits._
 import doobie.util.transactor.Transactor.Aux
 
@@ -33,14 +33,15 @@ trait InMemoryEventLogDb {
   protected def initDb(transactor: Aux[IO, Unit]): Unit =
     sql"""
          |CREATE TABLE IF NOT EXISTS event_log(
-         | event_id varchar PRIMARY KEY,
+         | event_id varchar NOT NULL,
          | project_id int4 NOT NULL,
          | status varchar NOT NULL,
          | created_date timestamp NOT NULL,
          | execution_date timestamp NOT NULL,
          | event_date timestamp NOT NULL,
          | event_body text NOT NULL,
-         | message varchar
+         | message varchar,
+         | PRIMARY KEY (event_id, project_id)
          |);
       """.stripMargin.update.run
       .transact(transactor)
@@ -51,27 +52,27 @@ trait InMemoryEventLogDb {
       .transact(transactor)
       .unsafeRunSync()
 
-  protected def storeEvent(eventId:       CommitId,
-                           projectId:     ProjectId,
+  protected def storeEvent(commitEventId: CommitEventId,
                            eventStatus:   EventStatus,
                            executionDate: ExecutionDate,
                            eventDate:     CommittedDate,
                            eventBody:     EventBody,
-                           createdDate:   CreatedDate = createdDates.generateOne): Unit =
+                           createdDate:   CreatedDate = CreatedDate(Instant.now)): Unit =
     sql"""insert into 
          |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
-         |values ($eventId, $projectId, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
+         |values (${commitEventId.id}, ${commitEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
       """.stripMargin.update.run
       .map(_ => ())
       .transact(transactor)
       .unsafeRunSync()
 
-  protected def findEvent(status: EventStatus): List[(CommitId, ExecutionDate)] =
-    sql"""select event_id, execution_date
+  protected def findEvents(status: EventStatus): List[(CommitEventId, ExecutionDate)] =
+    sql"""select event_id, project_id, execution_date
          |from event_log 
          |where status = $status
+         |order by created_date asc
          """.stripMargin
-      .query[(CommitId, ExecutionDate)]
+      .query[(CommitEventId, ExecutionDate)]
       .to[List]
       .transact(transactor)
       .unsafeRunSync()
