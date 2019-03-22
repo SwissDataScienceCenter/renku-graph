@@ -18,9 +18,7 @@
 
 package ch.datascience.webhookservice.missedevents
 
-import java.time.{Duration, Instant}
-
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Clock, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.dbeventlog.commands.EventLogLatestEvents
 import ch.datascience.dbeventlog.commands.EventLogLatestEvents.LatestEvent
@@ -34,6 +32,7 @@ import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher
 import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
 import io.chrisdavenport.log4cats.Logger
 
+import scala.concurrent.duration._
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -48,10 +47,11 @@ class IOMissedEventsLoader(
     projectInfoFinder:      ProjectInfoFinder[IO],
     pushEventSender:        PushEventSender[IO],
     logger:                 Logger[IO],
-    now:                    () => Instant = Instant.now
+    clock:                  Clock[IO]
 )(implicit contextShift:    ContextShift[IO])
     extends MissedEventsLoader[IO] {
 
+  import UpdateResult._
   import accessTokenFinder._
   import eventLogLatestEvents._
   import latestPushEventFetcher._
@@ -62,38 +62,42 @@ class IOMissedEventsLoader(
     measureExecutionTime {
       for {
         latestLogEvents <- findAllLatestEvents
-        _               <- if (latestLogEvents.isEmpty) IO.unit else (latestLogEvents map loadEvents).parSequence
-      } yield latestLogEvents.size
+        updateSummary <- if (latestLogEvents.isEmpty) IO.pure(UpdateSummary())
+                        else (latestLogEvents map loadEvents).parSequence.map(toUpdateSummary)
+      } yield updateSummary
     } flatMap logSummary
   } recoverWith loggingError
 
-  private lazy val logSummary: ((Instant, Instant, Int)) => IO[Unit] = {
-    case (startTime, endTime, processedEvents) =>
+  private lazy val logSummary: ((Long, Long, UpdateSummary)) => IO[Unit] = {
+    case (startTime, endTime, updateSummary) =>
       logger.info(
-        s"Synchronized $processedEvents events with GitLab in ${Duration.between(startTime, endTime).getSeconds}s"
+        s"Synchronized events with GitLab in ${endTime - startTime}s: " +
+          s"${updateSummary(Updated)} updates, " +
+          s"${updateSummary(Skipped)} skipped, " +
+          s"${updateSummary(Failed)} failed"
       )
   }
 
-  private def loadEvents(latestLogEvent: LatestEvent) = {
+  private def loadEvents(latestLogEvent: LatestEvent): IO[UpdateResult] = {
     for {
       maybeAccessToken   <- findAccessToken(latestLogEvent.projectId)
       maybePushEventInfo <- fetchLatestPushEvent(latestLogEvent.projectId, maybeAccessToken)
-      _                  <- addEventsIfMissing(latestLogEvent, maybePushEventInfo, maybeAccessToken)
-    } yield ()
+      updateResult       <- addEventsIfMissing(latestLogEvent, maybePushEventInfo, maybeAccessToken)
+    } yield updateResult
   } recoverWith loggingWarning(latestLogEvent)
 
   private def addEventsIfMissing(latestLogEvent:     LatestEvent,
                                  maybePushEventInfo: Option[PushEventInfo],
                                  maybeAccessToken:   Option[AccessToken]) =
     maybePushEventInfo match {
-      case None                                              => IO.unit
-      case Some(PushEventInfo(_, _, latestLogEvent.eventId)) => IO.unit
+      case None                                              => IO.pure(Skipped)
+      case Some(PushEventInfo(_, _, latestLogEvent.eventId)) => IO.pure(Skipped)
       case Some(pushEventInfo) =>
         for {
           projectInfo <- findProjectInfo(latestLogEvent.projectId, maybeAccessToken)
           pushEvent   <- constructPushEvent(pushEventInfo, projectInfo)
           _           <- storeCommitsInEventLog(pushEvent)
-        } yield ()
+        } yield Updated
     }
 
   private def constructPushEvent(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = IO.pure {
@@ -105,9 +109,10 @@ class IOMissedEventsLoader(
     )
   }
 
-  private def loggingWarning(latestLogEvent: LatestEvent): PartialFunction[Throwable, IO[Unit]] = {
+  private def loggingWarning(latestLogEvent: LatestEvent): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
       logger.warn(exception)(s"Synchronizing events for project ${latestLogEvent.projectId} failed")
+      IO.pure(Failed)
   }
 
   private lazy val loggingError: PartialFunction[Throwable, IO[Unit]] = {
@@ -116,10 +121,25 @@ class IOMissedEventsLoader(
       IO.raiseError(exception)
   }
 
-  private def measureExecutionTime(function: => IO[Int]): IO[(Instant, Instant, Int)] =
+  private def measureExecutionTime(function: => IO[UpdateSummary]): IO[(Long, Long, UpdateSummary)] =
     for {
-      startTime <- IO.pure(now())
-      result    <- function
-      endTime   <- IO.pure(now())
-    } yield (startTime, endTime, result)
+      startTime <- clock monotonic SECONDS
+      summary   <- function
+      endTime   <- clock monotonic SECONDS
+    } yield (startTime, endTime, summary)
+
+  private sealed trait UpdateResult extends Product with Serializable
+  private object UpdateResult {
+    final case object Skipped extends UpdateResult
+    final case object Updated extends UpdateResult
+    final case object Failed  extends UpdateResult
+  }
+
+  private case class UpdateSummary(state: Map[UpdateResult, Int] = Map.empty) {
+    def apply(updateResult: UpdateResult): Int = state.getOrElse(updateResult, 0)
+  }
+
+  private def toUpdateSummary(updateResults: List[UpdateResult]) = UpdateSummary(
+    updateResults.groupBy(identity).mapValues(_.size)
+  )
 }

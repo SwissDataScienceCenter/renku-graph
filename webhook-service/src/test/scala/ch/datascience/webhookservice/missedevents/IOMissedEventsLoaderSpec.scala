@@ -18,11 +18,8 @@
 
 package ch.datascience.webhookservice.missedevents
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit.SECONDS
-
 import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Clock, ContextShift, IO}
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.commands.EventLogLatestEvents.LatestEvent
 import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
@@ -45,6 +42,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.global
+import scala.concurrent.duration._
 
 class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
@@ -56,7 +54,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
-      logger.logged(Info("Synchronized 0 events with GitLab in 10s"))
+      logger.logged(Info("Synchronized events with GitLab in 10s: 0 updates, 0 skipped, 0 failed"))
     }
 
     "do nothing if the latest eventIds in the Event Log " +
@@ -70,7 +68,9 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
-      logger.logged(Info(s"Synchronized ${latestEventsList.size} events with GitLab in 10s"))
+      logger.logged(
+        Info(s"Synchronized events with GitLab in 10s: 0 updates, ${latestEventsList.size} skipped, 0 failed")
+      )
     }
 
     "add missing events to the Event Log " +
@@ -101,7 +101,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
-      logger.logged(Info(s"Synchronized ${latestEventsList.size} events with GitLab in 10s"))
+      logger.logged(Info("Synchronized events with GitLab in 10s: 1 updates, 2 skipped, 0 failed"))
     }
 
     "do nothing if the latest PushEvent does not exists" in new TestCase {
@@ -119,7 +119,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
-      logger.logged(Info(s"Synchronized ${latestEventsList.size} events with GitLab in 10s"))
+      logger.logged(Info("Synchronized events with GitLab in 10s: 0 updates, 2 skipped, 0 failed"))
     }
 
     "not break processing if finding Access Token for one of the event(s) fails" in new TestCase {
@@ -143,7 +143,9 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       latestEventsList.headOption.foreach { event =>
         logger.logged(Warn(s"Synchronizing events for project ${event.projectId} failed", exception))
       }
-      logger.logged(Info(s"Synchronized ${latestEventsList.size} events with GitLab in 10s"))
+      logger.logged(
+        Info(s"Synchronized events with GitLab in 10s: 0 updates, ${latestEventsList.tail.size} skipped, 1 failed")
+      )
     }
 
     "not break processing if finding the latest Push Event for one of the events fails" in new TestCase {
@@ -165,7 +167,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Warn(s"Synchronizing events for project ${event1.projectId} failed", exception),
-        Info(s"Synchronized ${latestEventsList.size} events with GitLab in 10s")
+        Info("Synchronized events with GitLab in 10s: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -191,7 +193,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Warn(s"Synchronizing events for project ${event1.projectId} failed", exception),
-        Info(s"Synchronized ${latestEventsList.size} events with GitLab in 10s")
+        Info("Synchronized events with GitLab in 10s: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -224,7 +226,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Warn(s"Synchronizing events for project ${event1.projectId} failed", exception),
-        Info(s"Synchronized ${latestEventsList.size} events with GitLab in 10s")
+        Info("Synchronized events with GitLab in 10s: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -252,7 +254,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     val projectInfoFinder      = mock[ProjectInfoFinder[IO]]
     val pushEventSender        = mock[IOPushEventSender]
     val logger                 = TestLogger[IO]()
-    val now                    = mockFunction[Instant]
+    val clock                  = mock[Clock[IO]]
     val eventsLoader = new IOMissedEventsLoader(
       eventLogLatestEvents,
       accessTokenFinder,
@@ -260,13 +262,11 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       projectInfoFinder,
       pushEventSender,
       logger,
-      now
+      clock
     )
 
-    val startTime = Instant.now()
-    val endTime   = startTime plus (10, SECONDS)
-    now.expects().returning(startTime)
-    now.expects().returning(endTime).noMoreThanOnce()
+    (clock.monotonic(_: TimeUnit)).expects(SECONDS).returning(context.pure(1000L))
+    (clock.monotonic(_: TimeUnit)).expects(SECONDS).returning(context.pure(1010L)).noMoreThanOnce()
 
     def givenFetchLogLatestEvents =
       (eventLogLatestEvents.findAllLatestEvents _)
