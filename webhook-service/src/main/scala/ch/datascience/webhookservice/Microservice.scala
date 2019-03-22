@@ -24,6 +24,7 @@ import ch.datascience.http.server.HttpServer
 import ch.datascience.webhookservice.eventprocessing.IOHookEventEndpoint
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
+import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, IOEventsSynchronizationScheduler}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.language.higherKinds
@@ -32,7 +33,8 @@ object Microservice extends IOApp {
 
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
 
-  private val eventLogDbInitializer = new IOEventLogDbInitializer
+  private val eventLogDbInitializer          = new IOEventLogDbInitializer
+  private val eventsSynchronizationScheduler = new IOEventsSynchronizationScheduler
   private val httpServer = new HttpServer[IO](
     serverPort = 9001,
     serviceRoutes = new MicroserviceRoutes[IO](
@@ -43,14 +45,17 @@ object Microservice extends IOApp {
   )
 
   override def run(args: List[String]): IO[ExitCode] =
-    new MicroserviceRunner(eventLogDbInitializer, httpServer).run(args)
+    new MicroserviceRunner(eventLogDbInitializer, eventsSynchronizationScheduler, httpServer).run(args)
 }
 
-class MicroserviceRunner(eventLogDbInitializer: IOEventLogDbInitializer, httpServer: HttpServer[IO]) {
+class MicroserviceRunner(eventLogDbInitializer:          IOEventLogDbInitializer,
+                         eventsSynchronizationScheduler: EventsSynchronizationScheduler[IO],
+                         httpServer:                     HttpServer[IO])(implicit contextShift: ContextShift[IO]) {
+  import cats.implicits._
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      _      <- eventLogDbInitializer.run
-      result <- httpServer.run
-    } yield result
+      _ <- eventLogDbInitializer.run
+      _ <- List(httpServer.run.start, eventsSynchronizationScheduler.run).sequence
+    } yield ExitCode.Success
 }

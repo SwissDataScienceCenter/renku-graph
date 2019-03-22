@@ -36,19 +36,18 @@ import scala.concurrent.duration._
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-abstract class MissedEventsLoader[Interpretation[_]] {
+private abstract class MissedEventsLoader[Interpretation[_]] {
   def loadMissedEvents: Interpretation[Unit]
 }
 
-class IOMissedEventsLoader(
+private class IOMissedEventsLoader(
     eventLogLatestEvents:   EventLogLatestEvents[IO],
     accessTokenFinder:      AccessTokenFinder[IO],
     latestPushEventFetcher: LatestPushEventFetcher[IO],
     projectInfoFinder:      ProjectInfoFinder[IO],
     pushEventSender:        PushEventSender[IO],
-    logger:                 Logger[IO],
-    clock:                  Clock[IO]
-)(implicit contextShift:    ContextShift[IO])
+    logger:                 Logger[IO]
+)(implicit contextShift:    ContextShift[IO], clock: Clock[IO])
     extends MissedEventsLoader[IO] {
 
   import UpdateResult._

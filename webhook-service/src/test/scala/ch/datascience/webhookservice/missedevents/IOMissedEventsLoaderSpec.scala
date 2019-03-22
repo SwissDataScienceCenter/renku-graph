@@ -248,13 +248,16 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
+    private implicit val clock: Clock[IO] = mock[Clock[IO]]
+    (clock.monotonic(_: TimeUnit)).expects(SECONDS).returning(context.pure(1000L))
+    (clock.monotonic(_: TimeUnit)).expects(SECONDS).returning(context.pure(1010L)).noMoreThanOnce()
+
     val eventLogLatestEvents   = mock[IOEventLogLatestEvents]
     val accessTokenFinder      = mock[AccessTokenFinder[IO]]
     val latestPushEventFetcher = mock[LatestPushEventFetcher[IO]]
     val projectInfoFinder      = mock[ProjectInfoFinder[IO]]
     val pushEventSender        = mock[IOPushEventSender]
     val logger                 = TestLogger[IO]()
-    val clock                  = mock[Clock[IO]]
     val eventsLoader = new IOMissedEventsLoader(
       eventLogLatestEvents,
       accessTokenFinder,
@@ -262,11 +265,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       projectInfoFinder,
       pushEventSender,
       logger,
-      clock
     )
-
-    (clock.monotonic(_: TimeUnit)).expects(SECONDS).returning(context.pure(1000L))
-    (clock.monotonic(_: TimeUnit)).expects(SECONDS).returning(context.pure(1010L)).noMoreThanOnce()
 
     def givenFetchLogLatestEvents =
       (eventLogLatestEvents.findAllLatestEvents _)

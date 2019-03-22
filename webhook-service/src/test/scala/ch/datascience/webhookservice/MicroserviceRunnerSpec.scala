@@ -24,17 +24,28 @@ import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.http.server.IOHttpServer
+import ch.datascience.webhookservice.missedevents._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
   "run" should {
 
-    "return Success Exit Code if Event Log db verification and http server start-up are successful" in new TestCase {
+    "return Success Exit Code if all " +
+      "Event Log db verification and " +
+      "Events Synchronization Scheduler and " +
+      "Http Server " +
+      "start up successfully" in new TestCase {
 
       (eventLogDbInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventsSynchronizationScheduler.run _)
         .expects()
         .returning(IO.unit)
 
@@ -57,7 +68,27 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if starting up http server fails" in new TestCase {
+    "fail if starting up Events Synchronization Scheduler fails" in new TestCase {
+
+      (eventLogDbInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (httpServer.run _)
+        .expects()
+        .returning(context.pure(ExitCode.Success))
+
+      val exception = Generators.exceptions.generateOne
+      (eventsSynchronizationScheduler.run _)
+        .expects()
+        .returning(context.raiseError(exception))
+
+      intercept[Exception] {
+        runner.run(Nil).unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "return Success ExitCode regardless of Http Server start-up" in new TestCase {
 
       (eventLogDbInitializer.run _)
         .expects()
@@ -68,17 +99,26 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(context.raiseError(exception))
 
-      intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
-      } shouldBe exception
+      (eventsSynchronizationScheduler.run _)
+        .expects()
+        .returning(context.unit)
+
+      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
     }
   }
+
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val eventLogDbInitializer = mock[IOEventLogDbInitializer]
-    val httpServer            = mock[IOHttpServer]
-    val runner                = new MicroserviceRunner(eventLogDbInitializer, httpServer)
+    val eventLogDbInitializer          = mock[IOEventLogDbInitializer]
+    val eventsSynchronizationScheduler = mock[TestIOEventsSynchronizationScheduler]
+    val httpServer                     = mock[IOHttpServer]
+    val runner = new MicroserviceRunner(
+      eventLogDbInitializer,
+      eventsSynchronizationScheduler,
+      httpServer
+    )
   }
 }
