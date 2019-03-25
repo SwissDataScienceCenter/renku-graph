@@ -23,7 +23,7 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
 import ch.datascience.graph.tokenrepository.{IOAccessTokenFinder, TokenRepositoryUrlProvider}
-import ch.datascience.logging.ApplicationLogger
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
 import ch.datascience.webhookservice.project.IOProjectInfoFinder
@@ -77,6 +77,7 @@ class IOEventsSynchronizationScheduler(
         new IOLatestPushEventFetcher(new GitLabConfigProvider[IO]),
         new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
         new IOPushEventSender,
-        ApplicationLogger
+        ApplicationLogger,
+        new ExecutionTimeRecorder[IO]
       )
     )

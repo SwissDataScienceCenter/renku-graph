@@ -18,12 +18,14 @@
 
 package ch.datascience.webhookservice.missedevents
 
-import cats.effect.{Clock, ContextShift, IO}
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.dbeventlog.commands.EventLogLatestEvents
 import ch.datascience.graph.model.events.{CommitEventId, Project}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
+import ch.datascience.logging.ExecutionTimeRecorder
+import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
 import ch.datascience.webhookservice.project.{ProjectInfo, ProjectInfoFinder}
@@ -31,7 +33,6 @@ import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher
 import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
 import io.chrisdavenport.log4cats.Logger
 
-import scala.concurrent.duration._
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -45,13 +46,15 @@ private class IOMissedEventsLoader(
     latestPushEventFetcher: LatestPushEventFetcher[IO],
     projectInfoFinder:      ProjectInfoFinder[IO],
     pushEventSender:        PushEventSender[IO],
-    logger:                 Logger[IO]
-)(implicit contextShift:    ContextShift[IO], clock: Clock[IO])
+    logger:                 Logger[IO],
+    executionTimeRecorder:  ExecutionTimeRecorder[IO]
+)(implicit contextShift:    ContextShift[IO])
     extends MissedEventsLoader[IO] {
 
   import UpdateResult._
   import accessTokenFinder._
   import eventLogLatestEvents._
+  import executionTimeRecorder._
   import latestPushEventFetcher._
   import projectInfoFinder._
   import pushEventSender._
@@ -66,10 +69,10 @@ private class IOMissedEventsLoader(
     } flatMap logSummary
   } recoverWith loggingError
 
-  private lazy val logSummary: ((Long, Long, UpdateSummary)) => IO[Unit] = {
-    case (startTime, endTime, updateSummary) =>
+  private lazy val logSummary: ((ElapsedTime, UpdateSummary)) => IO[Unit] = {
+    case (elapsedTime, updateSummary) =>
       logger.info(
-        s"Synchronized events with GitLab in ${endTime - startTime}s: " +
+        s"Synchronized events with GitLab in ${elapsedTime}ms: " +
           s"${updateSummary(Updated)} updates, " +
           s"${updateSummary(Skipped)} skipped, " +
           s"${updateSummary(Failed)} failed"
@@ -118,13 +121,6 @@ private class IOMissedEventsLoader(
       logger.error(exception)("Synchronizing events with GitLab failed")
       IO.raiseError(exception)
   }
-
-  private def measureExecutionTime(function: => IO[UpdateSummary]): IO[(Long, Long, UpdateSummary)] =
-    for {
-      startTime <- clock monotonic SECONDS
-      summary   <- function
-      endTime   <- clock monotonic SECONDS
-    } yield (startTime, endTime, summary)
 
   private sealed trait UpdateResult extends Product with Serializable
   private object UpdateResult {
