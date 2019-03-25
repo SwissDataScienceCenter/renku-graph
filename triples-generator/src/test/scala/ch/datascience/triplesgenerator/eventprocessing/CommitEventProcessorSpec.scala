@@ -28,7 +28,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, Project, ProjectId}
+import ch.datascience.graph.model.events._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
@@ -91,7 +91,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .generateTriples(_: Commit, _: Option[AccessToken]))
         .expects(commit2, maybeAccessToken)
         .returning(context.raiseError(exception2))
-      expectEventMarkedFailed(commit2.id, NonRecoverableFailure, exception2)
+      expectEventMarkedFailed(commit2.commitEventId, NonRecoverableFailure, exception2)
 
       succeedTriplesAndUploading(maybeAccessToken)(commit3)
 
@@ -125,7 +125,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(commit, maybeAccessToken)
         .returning(context.raiseError(exception))
 
-      expectEventMarkedFailed(commit.id, NonRecoverableFailure, exception)
+      expectEventMarkedFailed(commit.commitEventId, NonRecoverableFailure, exception)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -162,7 +162,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(triples)
         .returning(context.raiseError(exception))
 
-      expectEventMarkedFailed(commit.id, TriplesStoreFailure, exception)
+      expectEventMarkedFailed(commit.commitEventId, TriplesStoreFailure, exception)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -200,8 +200,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (eventLogMarkDone
-        .markEventDone(_: CommitId))
-        .expects(commit.id)
+        .markEventDone(_: CommitEventId))
+        .expects(commit.commitEventId)
         .returning(context.raiseError(exception))
 
       eventProcessor(eventBody) shouldBe context.unit
@@ -301,15 +301,15 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .returning(context.unit)
 
       (eventLogMarkDone
-        .markEventDone(_: CommitId))
-        .expects(commit.id)
+        .markEventDone(_: CommitEventId))
+        .expects(commit.commitEventId)
         .returning(context.unit)
     }
 
-    def expectEventMarkedFailed(eventId: CommitId, status: FailureStatus, exception: Throwable) =
+    def expectEventMarkedFailed(commitEventId: CommitEventId, status: FailureStatus, exception: Throwable) =
       (eventLogMarkFailed
-        .markEventFailed(_: CommitId, _: FailureStatus, _: Option[EventMessage]))
-        .expects(eventId, status, EventMessage(exception))
+        .markEventFailed(_: CommitEventId, _: FailureStatus, _: Option[EventMessage]))
+        .expects(commitEventId, status, EventMessage(exception))
         .returning(context.unit)
 
     def logNoAccessTokenMessage(commit: Commit): Unit =

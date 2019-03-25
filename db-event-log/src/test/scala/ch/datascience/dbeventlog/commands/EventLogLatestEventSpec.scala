@@ -24,7 +24,7 @@ import java.time.temporal.ChronoUnit._
 import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.CommittedDate
+import ch.datascience.graph.model.events.{CommitEventId, CommittedDate}
 import ch.datascience.graph.model.events.EventsGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -39,8 +39,7 @@ class EventLogLatestEventSpec extends WordSpec with DbSpec with InMemoryEventLog
 
     "return eventId of the event with the youngest event_date for the given projectId" in new TestCase {
       storeEvent(
-        commitIds.generateOne,
-        projectId,
+        commitEventIds.generateOne.copy(projectId = projectId),
         eventStatuses.generateOne,
         executionDates.generateOne,
         CommittedDate(now minus (20, DAYS)),
@@ -49,8 +48,7 @@ class EventLogLatestEventSpec extends WordSpec with DbSpec with InMemoryEventLog
 
       val youngestEventId = commitIds.generateOne
       storeEvent(
-        youngestEventId,
-        projectId,
+        CommitEventId(youngestEventId, projectId),
         eventStatuses.generateOne,
         executionDates.generateOne,
         CommittedDate(now minus (3, DAYS)),
@@ -58,11 +56,18 @@ class EventLogLatestEventSpec extends WordSpec with DbSpec with InMemoryEventLog
       )
 
       storeEvent(
-        commitIds.generateOne,
-        projectIds.generateOne,
+        commitEventIds.generateOne.copy(id = youngestEventId),
         eventStatuses.generateOne,
         executionDates.generateOne,
         CommittedDate(now minus (2, DAYS)),
+        eventBodies.generateOne
+      )
+
+      storeEvent(
+        commitEventIds.generateOne,
+        eventStatuses.generateOne,
+        executionDates.generateOne,
+        CommittedDate(now minus (1, DAYS)),
         eventBodies.generateOne
       )
 

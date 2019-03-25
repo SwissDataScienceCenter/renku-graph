@@ -75,7 +75,7 @@ class CommitEventProcessor[Interpretation[_]](
     for {
       triples <- generateTriples(commit, maybeAccessToken)
       _       <- upload(triples) recoverWith markEventWithTriplesStoreFailure(commit)
-      _       <- markEventDone(commit.id) recoverWith logError(commit)
+      _       <- markEventDone(commit.commitEventId) recoverWith logError(commit)
     } yield ()
   } recoverWith markEventWithNonRecoverableFailure(commit)
 
@@ -83,7 +83,8 @@ class CommitEventProcessor[Interpretation[_]](
     case NonFatal(exception) =>
       logger.error(exception)(s"${logMessageCommon(commit)} failed")
       for {
-        _ <- markEventFailed(commit.id, TriplesStoreFailure, EventMessage(exception)) recoverWith uploadError(exception)
+        _ <- markEventFailed(commit.commitEventId, TriplesStoreFailure, EventMessage(exception)) recoverWith uploadError(
+              exception)
         _ <- ME.raiseError[Unit](UploadError(exception))
       } yield ()
   }
@@ -98,7 +99,7 @@ class CommitEventProcessor[Interpretation[_]](
     case UploadError(_) => ME.unit
     case NonFatal(exception) =>
       logger.error(exception)(s"${logMessageCommon(commit)} failed")
-      markEventFailed(commit.id, NonRecoverableFailure, EventMessage(exception))
+      markEventFailed(commit.commitEventId, NonRecoverableFailure, EventMessage(exception))
   }
 
   private def logError(commit: Commit): PartialFunction[Throwable, Interpretation[Unit]] = {

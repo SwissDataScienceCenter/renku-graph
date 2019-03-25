@@ -19,8 +19,8 @@
 package ch.datascience.dbeventlog
 import java.time.Instant
 
-import ch.datascience.graph.model.events.{CommitId, CommittedDate, ProjectId}
-import doobie.util.{Get, Put}
+import ch.datascience.graph.model.events._
+import doobie.util._
 
 package object commands {
   implicit val eventIdGet: Get[CommitId] = Get[String].tmap(CommitId.apply)
@@ -46,4 +46,8 @@ package object commands {
 
   implicit val eventStatusGet: Get[EventStatus] = Get[String].tmap(EventStatus.apply)
   implicit val eventStatusPut: Put[EventStatus] = Put[String].contramap(_.value)
+
+  implicit val commitEventIdRead: Read[CommitEventId] = Read[(CommitId, ProjectId)].map {
+    case (commitId, projectId) => CommitEventId(commitId, projectId)
+  }
 }

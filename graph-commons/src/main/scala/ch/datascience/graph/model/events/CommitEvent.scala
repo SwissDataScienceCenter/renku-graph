@@ -35,6 +35,16 @@ final case class CommitEvent(
     project:       Project
 )
 
+object CommitEvent {
+  implicit class CommitEventOps(commitEvent: CommitEvent) {
+    lazy val commitEventId: CommitEventId = CommitEventId(commitEvent.id, commitEvent.project.id)
+  }
+}
+
+final case class CommitEventId(id: CommitId, projectId: ProjectId) {
+  override lazy val toString: String = s"id = $id, projectId = $projectId"
+}
+
 final class CommitId private (val value: String) extends AnyVal with TinyType[String]
 object CommitId extends TinyTypeFactory[String, CommitId](new CommitId(_)) with GitSha {
   implicit lazy val commitIdDecoder: Decoder[CommitId] = Decoder.decodeString.map(CommitId.apply)

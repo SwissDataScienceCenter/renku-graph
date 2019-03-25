@@ -25,7 +25,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators.{commitIds, committedDates, projectIds}
+import ch.datascience.graph.model.events.EventsGenerators.{commitEventIds, committedDates}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -34,18 +34,21 @@ class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb 
 
   "markEventDone" should {
 
-    s"set event with the given id status $TriplesStore " +
+    s"set status $TriplesStore on the event with the given id and project " +
       s"if the event has status $Processing" in new TestCase {
 
-      val eventId = commitIds.generateOne
+      val eventId = commitEventIds.generateOne
       storeEvent(eventId,
-                 projectIds.generateOne,
                  EventStatus.Processing,
                  executionDates.generateOne,
                  committedDates.generateOne,
                  eventBodies.generateOne)
-      storeEvent(commitIds.generateOne,
-                 projectIds.generateOne,
+      storeEvent(commitEventIds.generateOne.copy(id = eventId.id),
+                 EventStatus.Processing,
+                 executionDates.generateOne,
+                 committedDates.generateOne,
+                 eventBodies.generateOne)
+      storeEvent(commitEventIds.generateOne,
                  EventStatus.Processing,
                  executionDates.generateOne,
                  committedDates.generateOne,
@@ -53,35 +56,30 @@ class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb 
 
       eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ()
 
-      findEvent(status = TriplesStore) shouldBe List(eventId -> ExecutionDate(currentNow))
+      findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now)))
     }
 
     s"fail when updating event with status different than $Processing" in new TestCase {
 
-      val eventId       = commitIds.generateOne
+      val eventId       = commitEventIds.generateOne
       val eventStatus   = eventStatuses generateDifferentThan Processing
       val executionDate = executionDates.generateOne
-      storeEvent(eventId,
-                 projectIds.generateOne,
-                 eventStatus,
-                 executionDate,
-                 committedDates.generateOne,
-                 eventBodies.generateOne)
+      storeEvent(eventId, eventStatus, executionDate, committedDates.generateOne, eventBodies.generateOne)
 
       intercept[RuntimeException] {
         eventLogMarkDone.markEventDone(eventId).unsafeRunSync()
-      }.getMessage shouldBe s"Event with id = $eventId couldn't be updated; Either no event or not with status $Processing"
+      }.getMessage shouldBe s"Event with $eventId couldn't be updated; either no event or not with status $Processing"
 
-      findEvent(status = eventStatus) shouldBe List(eventId -> executionDate)
+      findEvents(status = eventStatus) shouldBe List((eventId, executionDate))
     }
   }
 
   private trait TestCase {
 
-    val now              = mockFunction[Instant]
-    val eventLogMarkDone = new EventLogMarkDone(transactorProvider, now)
+    val currentTime      = mockFunction[Instant]
+    val eventLogMarkDone = new EventLogMarkDone(transactorProvider, currentTime)
 
-    val currentNow = Instant.now()
-    now.expects().returning(currentNow).anyNumberOfTimes()
+    val now = Instant.now()
+    currentTime.expects().returning(now).anyNumberOfTimes()
   }
 }

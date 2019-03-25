@@ -63,6 +63,11 @@ object EventsGenerators {
     } yield parents
   }
 
+  implicit val commitEventIds: Gen[CommitEventId] = for {
+    eventId   <- commitIds
+    projectId <- projectIds
+  } yield CommitEventId(eventId, projectId)
+
   implicit val commitEvents: Gen[CommitEvent] = for {
     commitId      <- commitIds
     message       <- commitMessages
