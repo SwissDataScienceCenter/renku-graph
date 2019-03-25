@@ -23,7 +23,6 @@ import java.time.temporal.ChronoUnit._
 
 import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.commands.EventLogLatestEvents.LatestEvent
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.events.EventsGenerators._
@@ -42,29 +41,25 @@ class EventLogLatestEventsSpec extends WordSpec with DbSpec with InMemoryEventLo
       "for all the projects in the db" in new TestCase {
       val projectId1 = projectIds.generateOne
       storeEvent(
-        commitIds.generateOne,
-        projectId1,
+        commitEventIds.generateOne.copy(projectId = projectId1),
         eventStatuses.generateOne,
         executionDates.generateOne,
         CommittedDate(now minus (20, DAYS)),
         eventBodies.generateOne
       )
 
-      val youngestEventIdProjectId1 = commitIds.generateOne
+      val youngestCommitEventIdProject1 = commitEventIds.generateOne.copy(projectId = projectId1)
       storeEvent(
-        youngestEventIdProjectId1,
-        projectId1,
+        youngestCommitEventIdProject1,
         eventStatuses.generateOne,
         executionDates.generateOne,
         CommittedDate(now minus (3, DAYS)),
         eventBodies.generateOne
       )
 
-      val eventIdProjectId2 = commitIds.generateOne
-      val projectId2        = projectIds.generateOne
+      val onlyCommitEventIdProject2 = commitEventIds.generateOne
       storeEvent(
-        eventIdProjectId2,
-        projectId2,
+        onlyCommitEventIdProject2,
         eventStatuses.generateOne,
         executionDates.generateOne,
         CommittedDate(now minus (2, DAYS)),
@@ -72,8 +67,8 @@ class EventLogLatestEventsSpec extends WordSpec with DbSpec with InMemoryEventLo
       )
 
       latestEventsFinder.findAllLatestEvents.unsafeRunSync() shouldBe List(
-        LatestEvent(projectId1, youngestEventIdProjectId1),
-        LatestEvent(projectId2, eventIdProjectId2)
+        youngestCommitEventIdProject1,
+        onlyCommitEventIdProject2
       )
     }
   }

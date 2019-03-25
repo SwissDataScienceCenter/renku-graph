@@ -20,12 +20,11 @@ package ch.datascience.webhookservice.missedevents
 
 import cats.MonadError
 import cats.effect.{Clock, ContextShift, IO}
-import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.commands.EventLogLatestEvents.LatestEvent
 import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
@@ -60,7 +59,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     "do nothing if the latest eventIds in the Event Log " +
       "matches the latest commits in GitLab for relevant projects" in new TestCase {
 
-      val latestEventsList = nonEmptyList(latestEvents).generateOne
+      val latestEventsList = nonEmptyList(commitEventIds).generateOne
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -77,7 +76,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       "for projects with the latest eventIds different than the latest commits in GitLab" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: event3 +: Nil =
-        nonEmptyList(latestEvents, minElements = 3, maxElements = 3).generateOne
+        nonEmptyList(commitEventIds, minElements = 3, maxElements = 3).generateOne
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -106,7 +105,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
     "do nothing if the latest PushEvent does not exists" in new TestCase {
       val latestEventsList @ event1 +: event2 +: Nil =
-        nonEmptyList(latestEvents, minElements = 2, maxElements = 2).generateOne
+        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -124,7 +123,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
     "not break processing if finding Access Token for one of the event(s) fails" in new TestCase {
 
-      val latestEventsList = nonEmptyList(latestEvents, minElements = 2).generateOne
+      val latestEventsList = nonEmptyList(commitEventIds, minElements = 2).generateOne
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -151,7 +150,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     "not break processing if finding the latest Push Event for one of the events fails" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: Nil =
-        nonEmptyList(latestEvents, minElements = 2, maxElements = 2).generateOne
+        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -174,7 +173,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     "not break processing if finding Project Info for one of the events fails" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: Nil =
-        nonEmptyList(latestEvents, minElements = 2, maxElements = 2).generateOne
+        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -200,7 +199,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     "not break processing if storing Push Event for one of the events fails" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: Nil =
-        nonEmptyList(latestEvents, minElements = 2, maxElements = 2).generateOne
+        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -271,17 +270,17 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       (eventLogLatestEvents.findAllLatestEvents _)
         .expects()
 
-    def givenPushAndLogEventsMatch(latestEvents: LatestEvent*): Unit =
+    def givenPushAndLogEventsMatch(latestEvents: CommitEventId*): Unit =
       latestEvents foreach { latestEvent =>
         val maybeAccessToken = Gen.option(accessTokens).generateOne
         givenAccessToken(latestEvent.projectId, maybeAccessToken)
 
-        val pushEventInfo = pushEventInfos.generateOne.copy(latestEvent.projectId, commitTo = latestEvent.eventId)
+        val pushEventInfo = pushEventInfos.generateOne.copy(latestEvent.projectId, commitTo = latestEvent.id)
         givenFetchLatestPushEvent(latestEvent, maybeAccessToken)
           .returning(context.pure(Some(pushEventInfo)))
       }
 
-    def givenFetchLatestPushEvent(latestEvent: LatestEvent, maybeAccessToken: Option[AccessToken]) =
+    def givenFetchLatestPushEvent(latestEvent: CommitEventId, maybeAccessToken: Option[AccessToken]) =
       (latestPushEventFetcher
         .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
         .expects(latestEvent.projectId, maybeAccessToken)
@@ -292,7 +291,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(context.pure(maybeAccessToken))
 
-    def givenFindingProjectInfo(latestEvent: LatestEvent, maybeAccessToken: Option[AccessToken]) =
+    def givenFindingProjectInfo(latestEvent: CommitEventId, maybeAccessToken: Option[AccessToken]) =
       (projectInfoFinder
         .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
         .expects(latestEvent.projectId, maybeAccessToken)

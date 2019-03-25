@@ -21,8 +21,7 @@ package ch.datascience.webhookservice.missedevents
 import cats.effect.{Clock, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.dbeventlog.commands.EventLogLatestEvents
-import ch.datascience.dbeventlog.commands.EventLogLatestEvents.LatestEvent
-import ch.datascience.graph.model.events.Project
+import ch.datascience.graph.model.events.{CommitEventId, Project}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.eventprocessing.PushEvent
@@ -77,7 +76,7 @@ private class IOMissedEventsLoader(
       )
   }
 
-  private def loadEvents(latestLogEvent: LatestEvent): IO[UpdateResult] = {
+  private def loadEvents(latestLogEvent: CommitEventId): IO[UpdateResult] = {
     for {
       maybeAccessToken   <- findAccessToken(latestLogEvent.projectId)
       maybePushEventInfo <- fetchLatestPushEvent(latestLogEvent.projectId, maybeAccessToken)
@@ -85,12 +84,12 @@ private class IOMissedEventsLoader(
     } yield updateResult
   } recoverWith loggingWarning(latestLogEvent)
 
-  private def addEventsIfMissing(latestLogEvent:     LatestEvent,
+  private def addEventsIfMissing(latestLogEvent:     CommitEventId,
                                  maybePushEventInfo: Option[PushEventInfo],
                                  maybeAccessToken:   Option[AccessToken]) =
     maybePushEventInfo match {
-      case None                                              => IO.pure(Skipped)
-      case Some(PushEventInfo(_, _, latestLogEvent.eventId)) => IO.pure(Skipped)
+      case None                                         => IO.pure(Skipped)
+      case Some(PushEventInfo(_, _, latestLogEvent.id)) => IO.pure(Skipped)
       case Some(pushEventInfo) =>
         for {
           projectInfo <- findProjectInfo(latestLogEvent.projectId, maybeAccessToken)
@@ -108,7 +107,7 @@ private class IOMissedEventsLoader(
     )
   }
 
-  private def loggingWarning(latestLogEvent: LatestEvent): PartialFunction[Throwable, IO[UpdateResult]] = {
+  private def loggingWarning(latestLogEvent: CommitEventId): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
       logger.warn(exception)(s"Synchronizing events for project ${latestLogEvent.projectId} failed")
       IO.pure(Failed)

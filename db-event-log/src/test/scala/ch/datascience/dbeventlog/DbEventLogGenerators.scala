@@ -19,9 +19,7 @@
 package ch.datascience.dbeventlog
 
 import EventStatus._
-import ch.datascience.dbeventlog.commands.EventLogLatestEvents.LatestEvent
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventsGenerators._
 import org.scalacheck.Gen
 
 object DbEventLogGenerators {
@@ -31,8 +29,4 @@ object DbEventLogGenerators {
   implicit val executionDates: Gen[ExecutionDate] = timestamps map ExecutionDate.apply
   implicit val eventStatuses:  Gen[EventStatus]   = Gen.oneOf(New, Processing, TriplesStore, TriplesStoreFailure)
   implicit val eventMessages:  Gen[EventMessage]  = nonEmptyStrings() map EventMessage.apply
-  implicit val latestEvents: Gen[LatestEvent] = for {
-    projectId <- projectIds
-    eventId   <- commitIds
-  } yield LatestEvent(projectId, eventId)
 }

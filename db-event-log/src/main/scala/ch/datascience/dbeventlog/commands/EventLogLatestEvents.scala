@@ -23,8 +23,7 @@ import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.TransactorProvider
 import ch.datascience.dbeventlog.IOTransactorProvider
-import ch.datascience.dbeventlog.commands.EventLogLatestEvents.LatestEvent
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events.CommitEventId
 import doobie.implicits._
 
 import scala.language.higherKinds
@@ -33,27 +32,18 @@ class EventLogLatestEvents[Interpretation[_]](
     transactorProvider: TransactorProvider[Interpretation]
 )(implicit ME:          MonadError[Interpretation, Throwable]) {
 
-  def findAllLatestEvents: Interpretation[List[LatestEvent]] =
+  def findAllLatestEvents: Interpretation[List[CommitEventId]] =
     for {
       transactor <- transactorProvider.transactor
       maybeEventId <- sql"""
-                           |select log.project_id, log.event_id 
+                           |select log.event_id, log.project_id 
                            |from event_log log, (select project_id, max(event_date) max_event_date from event_log group by project_id) aggregate
                            |where log.project_id = aggregate.project_id and log.event_date = aggregate.max_event_date
                            |""".stripMargin
-                       .query[(ProjectId, CommitId)]
-                       .map(tuplesToLatestEvent)
+                       .query[CommitEventId]
                        .to[List]
                        .transact(transactor)
     } yield maybeEventId
-
-  private lazy val tuplesToLatestEvent: ((ProjectId, CommitId)) => LatestEvent = {
-    case (projectId, eventId) => LatestEvent(projectId, eventId)
-  }
-}
-
-object EventLogLatestEvents {
-  final case class LatestEvent(projectId: ProjectId, eventId: CommitId)
 }
 
 class IOEventLogLatestEvents(
