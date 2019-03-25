@@ -31,8 +31,7 @@ class EventLogVerifyExistenceSpec extends WordSpec with DbSpec with InMemoryEven
 
     "return an empty list if an empty list given" in new TestCase {
       storeEvent(
-        commitIds.generateOne,
-        projectId,
+        commitEventIds.generateOne.copy(projectId = projectId),
         eventStatuses.generateOne,
         executionDates.generateOne,
         committedDates.generateOne,
@@ -43,19 +42,17 @@ class EventLogVerifyExistenceSpec extends WordSpec with DbSpec with InMemoryEven
     }
 
     "return an empty list if all ids from the list exist in the Log" in new TestCase {
-      val eventId1 = commitIds.generateOne
+      val eventId1 = commitEventIds.generateOne.copy(projectId = projectId)
       storeEvent(
         eventId1,
-        projectId,
         eventStatuses.generateOne,
         executionDates.generateOne,
         committedDates.generateOne,
         eventBodies.generateOne
       )
-      val eventId2 = commitIds.generateOne
+      val eventId2 = commitEventIds.generateOne.copy(projectId = projectId)
       storeEvent(
         eventId2,
-        projectId,
         eventStatuses.generateOne,
         executionDates.generateOne,
         committedDates.generateOne,
@@ -63,33 +60,38 @@ class EventLogVerifyExistenceSpec extends WordSpec with DbSpec with InMemoryEven
       )
 
       existenceVerification
-        .filterNotExistingInLog(List(eventId1, eventId2), projectId)
+        .filterNotExistingInLog(List(eventId1.id, eventId2.id), projectId)
         .unsafeRunSync() shouldBe List.empty
     }
 
-    "return a list with ids which do not exist in the Log" in new TestCase {
-      val eventId1 = commitIds.generateOne
+    "return a list with ids which do not exist in the Log for the specified project" in new TestCase {
+      val eventId1 = commitEventIds.generateOne.copy(projectId = projectId)
       storeEvent(
         eventId1,
-        projectId,
         eventStatuses.generateOne,
         executionDates.generateOne,
         committedDates.generateOne,
         eventBodies.generateOne
       )
-      val eventId2 = commitIds.generateOne
+      val eventId2 = commitEventIds.generateOne
       storeEvent(
         eventId2,
-        projectIds.generateOne,
         eventStatuses.generateOne,
         executionDates.generateOne,
         committedDates.generateOne,
         eventBodies.generateOne
       )
-      val eventId3 = commitIds.generateOne
+      val eventId3 = commitEventIds.generateOne.copy(projectId = projectId)
       storeEvent(
         eventId3,
-        projectId,
+        eventStatuses.generateOne,
+        executionDates.generateOne,
+        committedDates.generateOne,
+        eventBodies.generateOne
+      )
+      val eventId4 = commitEventIds.generateOne.copy(id = eventId1.id)
+      storeEvent(
+        eventId4,
         eventStatuses.generateOne,
         executionDates.generateOne,
         committedDates.generateOne,
@@ -97,23 +99,24 @@ class EventLogVerifyExistenceSpec extends WordSpec with DbSpec with InMemoryEven
       )
 
       existenceVerification
-        .filterNotExistingInLog(List(eventId1, eventId2), projectId)
-        .unsafeRunSync() shouldBe List(eventId2)
+        .filterNotExistingInLog(List(eventId1.id, eventId2.id), projectId)
+        .unsafeRunSync() shouldBe List(eventId2.id)
     }
 
-    "return all the given ids if there are they belongs to a different project" in new TestCase {
-      val eventId1 = commitIds.generateOne
+    "return all the given ids if they belong to a different project" in new TestCase {
+      val eventId1 = commitEventIds.generateOne
 
       storeEvent(
-        commitIds.generateOne,
-        projectIds.generateOne,
+        commitEventIds.generateOne.copy(id = eventId1.id),
         eventStatuses.generateOne,
         executionDates.generateOne,
         committedDates.generateOne,
         eventBodies.generateOne
       )
 
-      existenceVerification.filterNotExistingInLog(List(eventId1), projectId).unsafeRunSync() shouldBe List(eventId1)
+      existenceVerification.filterNotExistingInLog(List(eventId1.id), projectId).unsafeRunSync() shouldBe List(
+        eventId1.id
+      )
     }
   }
 

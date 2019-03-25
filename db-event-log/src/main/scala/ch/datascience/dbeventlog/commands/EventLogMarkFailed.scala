@@ -27,7 +27,7 @@ import ch.datascience.db.TransactorProvider
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
 import ch.datascience.dbeventlog.commands.ExecutionDateCalculator.StatusBasedCalculator
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events._
 import doobie.implicits._
 
 import scala.language.higherKinds
@@ -39,26 +39,28 @@ class EventLogMarkFailed[Interpretation[_]](
 
   import executionDateCalculator._
 
-  def markEventFailed(eventId:      CommitId,
-                      status:       FailureStatus,
-                      maybeMessage: Option[EventMessage]): Interpretation[Unit] =
+  def markEventFailed(commitEventId: CommitEventId,
+                      status:        FailureStatus,
+                      maybeMessage:  Option[EventMessage]): Interpretation[Unit] =
     for {
       transactor <- transactorProvider.transactor
-      _          <- findEventAndUpdate(eventId, status, maybeMessage).transact(transactor)
+      _          <- findEventAndUpdate(commitEventId, status, maybeMessage).transact(transactor)
     } yield ()
 
-  private def findEventAndUpdate(eventId: CommitId, status: FailureStatus, maybeMessage: Option[EventMessage]) =
+  private def findEventAndUpdate(commitEventId: CommitEventId,
+                                 status:        FailureStatus,
+                                 maybeMessage:  Option[EventMessage]) =
     for {
-      createdAndExecution <- findEventDates(eventId)
+      createdAndExecution <- findEventDates(commitEventId)
       executionDate = findExecutionDate(createdAndExecution, status)
-      _ <- updateEvent(eventId, status, executionDate, maybeMessage)
+      _ <- updateEvent(commitEventId, status, executionDate, maybeMessage)
     } yield ()
 
-  private def findEventDates(eventId: CommitId): doobie.ConnectionIO[(CreatedDate, ExecutionDate)] =
+  private def findEventDates(commitEventId: CommitEventId): doobie.ConnectionIO[(CreatedDate, ExecutionDate)] =
     sql"""
          |select created_date, execution_date
          |from event_log
-         |where event_id = $eventId""".stripMargin
+         |where event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId}""".stripMargin
       .query[(CreatedDate, ExecutionDate)]
       .unique
 
@@ -70,13 +72,13 @@ class EventLogMarkFailed[Interpretation[_]](
     }
   }
 
-  private def updateEvent(eventId:       CommitId,
+  private def updateEvent(commitEventId: CommitEventId,
                           newStatus:     FailureStatus,
                           executionDate: ExecutionDate,
                           maybeMessage:  Option[EventMessage]) =
     sql"""update event_log 
          |set status = ${newStatus: EventStatus}, execution_date = $executionDate, message = $maybeMessage
-         |where event_id = $eventId and status = ${Processing: EventStatus}
+         |where event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus}
          |""".stripMargin.update.run
 }
 

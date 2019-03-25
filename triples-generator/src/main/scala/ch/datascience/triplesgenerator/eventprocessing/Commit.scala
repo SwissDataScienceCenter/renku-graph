@@ -17,7 +17,8 @@
  */
 
 package ch.datascience.triplesgenerator.eventprocessing
-import ch.datascience.graph.model.events.{CommitId, Project}
+
+import ch.datascience.graph.model.events._
 
 private sealed trait Commit extends Product with Serializable {
   val id:      CommitId
@@ -36,4 +37,8 @@ private object Commit {
       id:      CommitId,
       project: Project
   ) extends Commit
+
+  implicit class CommitOps(commit: Commit) {
+    lazy val commitEventId: CommitEventId = CommitEventId(commit.id, commit.project.id)
+  }
 }
