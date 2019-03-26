@@ -59,15 +59,14 @@ private class IOMissedEventsLoader(
   import projectInfoFinder._
   import pushEventSender._
 
-  def loadMissedEvents: IO[Unit] = {
+  def loadMissedEvents: IO[Unit] =
     measureExecutionTime {
       for {
         latestLogEvents <- findAllLatestEvents
         updateSummary <- if (latestLogEvents.isEmpty) IO.pure(UpdateSummary())
                         else (latestLogEvents map loadEvents).parSequence.map(toUpdateSummary)
       } yield updateSummary
-    } flatMap logSummary
-  } recoverWith loggingError
+    } flatMap logSummary recoverWith loggingError
 
   private lazy val logSummary: ((ElapsedTime, UpdateSummary)) => IO[Unit] = {
     case (elapsedTime, updateSummary) =>
