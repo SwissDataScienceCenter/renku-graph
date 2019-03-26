@@ -29,6 +29,7 @@ import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
+import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
@@ -67,11 +68,10 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Success(())
 
-      if (maybeAccessToken.isEmpty)
-        logger.logged(Info(noAccessToken(pushEvent)))
-      logger.logged(
-        commitEvents.map(event => Info(successfulStoring(pushEvent, event))) :+
-          Info(successfulStoring(pushEvent)): _*
+      logger.loggedOnly(
+        Info(
+          successfulStoring(pushEvent, commitEvents = commitEvents.size, stored = commitEvents.size, failed = 0)
+        )
       )
     }
 
@@ -104,7 +104,7 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Failure(exception)
 
-      logger.logged(Error(failedStoring(pushEvent), exception))
+      logger.loggedOnly(Error(failedStoring(pushEvent), exception))
     }
 
     "store all non failing events and log errors for these for which fetching fail" in new TestCase {
@@ -132,10 +132,9 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Success(())
 
-      logger.logged(
-        Error(failedFetching(pushEvent), exception) +:
-          commitEvents.map(event => Info(successfulStoring(pushEvent, event))) :+
-          Info(successfulStoring(pushEvent)): _*
+      logger.loggedOnly(
+        Error(failedFetching(pushEvent), exception),
+        Info(successfulStoring(pushEvent, commitEventsStream.size, stored = commitEventsStream.size - 1, failed = 1))
       )
     }
 
@@ -168,10 +167,9 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Success(())
 
-      logger.logged(
-        Error(failedStoring(pushEvent, failingEvent), exception) +:
-          passingEvents.map(event => Info(successfulStoring(pushEvent, event))) :+
-          Info(successfulStoring(pushEvent)): _*
+      logger.loggedOnly(
+        Error(failedStoring(pushEvent, failingEvent), exception),
+        Info(successfulStoring(pushEvent, commitEventsStream.size, stored = commitEventsStream.size - 1, failed = 1))
       )
     }
   }
@@ -179,14 +177,38 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
-    val pushEvent = pushEvents.generateOne
-    val projectId = pushEvent.project.id
+    val pushEvent   = pushEvents.generateOne
+    val projectId   = pushEvent.project.id
+    val elapsedTime = elapsedTimes.generateOne
 
-    val accessTokenFinder  = mock[AccessTokenFinder[Try]]
-    val commitEventSender  = mock[TryCommitEventSender]
-    val commitEventsFinder = mock[TryCommitEventsFinder]
-    val logger             = TestLogger[Try]()
-    val pushEventSender    = new PushEventSender[Try](accessTokenFinder, commitEventsFinder, commitEventSender, logger)
+    val accessTokenFinder     = mock[AccessTokenFinder[Try]]
+    val commitEventSender     = mock[TryCommitEventSender]
+    val commitEventsFinder    = mock[TryCommitEventsFinder]
+    val logger                = TestLogger[Try]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[Try](expected = elapsedTime)
+    val pushEventSender = new PushEventSender[Try](
+      accessTokenFinder,
+      commitEventsFinder,
+      commitEventSender,
+      logger,
+      executionTimeRecorder
+    )
+
+    def successfulStoring(pushEvent: PushEvent, commitEvents: Int, stored: Int, failed: Int): String =
+      s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: " +
+        s"$commitEvents Commit Events generated, $stored stored in the Event Log, $failed failed in ${elapsedTime}ms"
+
+    def failedFetching(pushEvent: PushEvent): String =
+      s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: " +
+        "fetching one of the commit events failed"
+
+    def failedStoring(pushEvent: PushEvent): String =
+      s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: " +
+        "storing in event log failed"
+
+    def failedStoring(pushEvent: PushEvent, commitEvent: CommitEvent): String =
+      s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}, CommitEvent id: ${commitEvent.id}: " +
+        "storing in event log failed"
   }
 
   private def commitEventsFrom(pushEvent: PushEvent): Gen[Stream[Try[CommitEvent]]] =
@@ -231,22 +253,4 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
       case (allEvents, Success(event)) => allEvents :+ event
       case (allEvents, Failure(_))     => allEvents
     }
-
-  private def failedFetching(pushEvent: PushEvent): String =
-    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: fetching one of the commit events failed"
-
-  private def failedStoring(pushEvent: PushEvent): String =
-    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: storing in event log failed"
-
-  private def failedStoring(pushEvent: PushEvent, commitEvent: CommitEvent): String =
-    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}, CommitEvent id: ${commitEvent.id}: storing in event log failed"
-
-  private def successfulStoring(pushEvent: PushEvent, commitEvent: CommitEvent): String =
-    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}, CommitEvent id: ${commitEvent.id}: stored in event log"
-
-  private def successfulStoring(pushEvent: PushEvent): String =
-    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: stored in event log"
-
-  private def noAccessToken(pushEvent: PushEvent): String =
-    s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: no access token found so assuming public project"
 }

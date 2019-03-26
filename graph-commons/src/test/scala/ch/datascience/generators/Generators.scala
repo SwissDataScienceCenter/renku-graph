@@ -22,6 +22,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit.DAYS
 
 import ch.datascience.config.ServiceUrl
+import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
@@ -94,11 +95,9 @@ object Generators {
       .choose(Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
-  implicit val exceptions: Gen[Exception] =
-    nonEmptyStrings(20).map(new Exception(_))
-
-  implicit val serviceUrls: Gen[ServiceUrl] =
-    httpUrls.map(ServiceUrl.apply)
+  implicit val exceptions:   Gen[Exception]   = nonEmptyStrings(20).map(new Exception(_))
+  implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls.map(ServiceUrl.apply)
+  implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
 
   implicit val jsons: Gen[Json] = {
     import io.circe.syntax._

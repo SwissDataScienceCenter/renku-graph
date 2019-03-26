@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.eventprocessing
 
 import cats.MonadError
-import cats.effect.{ContextShift, Effect, IO}
+import cats.effect._
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -139,5 +139,6 @@ private object HookEventEndpoint {
 
 class IOHookEventEndpoint()(
     implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO]
+    contextShift:              ContextShift[IO],
+    clock:                     Clock[IO]
 ) extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOPushEventSender)

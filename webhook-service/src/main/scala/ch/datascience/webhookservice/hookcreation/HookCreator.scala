@@ -120,8 +120,11 @@ private object HookCreator {
   )
 }
 
-private class IOHookCreator(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends HookCreator[IO](
+private class IOHookCreator(
+    implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    clock:                     Clock[IO]
+) extends HookCreator[IO](
       new IOProjectHookUrlFinder,
       new IOHookValidator,
       new IOProjectInfoFinder(new GitLabConfigProvider[IO]),

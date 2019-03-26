@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Clock, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.graph.model.events.Project
 import ch.datascience.http.client.AccessToken
@@ -78,8 +78,11 @@ private class EventsHistoryLoader[Interpretation[_]](
   }
 }
 
-private class IOEventsHistoryLoader(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends EventsHistoryLoader[IO](
+private class IOEventsHistoryLoader(
+    implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    clock:                     Clock[IO]
+) extends EventsHistoryLoader[IO](
       new IOLatestPushEventFetcher(new GitLabConfigProvider[IO]),
       new IOPushEventSender,
       ApplicationLogger
