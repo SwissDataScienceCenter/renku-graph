@@ -72,7 +72,7 @@ private class IOMissedEventsLoader(
   private lazy val logSummary: ((ElapsedTime, UpdateSummary)) => IO[Unit] = {
     case (elapsedTime, updateSummary) =>
       logger.info(
-        s"Synchronized events with GitLab in ${elapsedTime}ms: " +
+        s"Synchronized Push Events with GitLab in ${elapsedTime}ms: " +
           s"${updateSummary(Updated)} updates, " +
           s"${updateSummary(Skipped)} skipped, " +
           s"${updateSummary(Failed)} failed"
@@ -112,13 +112,13 @@ private class IOMissedEventsLoader(
 
   private def loggingWarning(latestLogEvent: CommitEventId): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
-      logger.warn(exception)(s"Synchronizing events for project ${latestLogEvent.projectId} failed")
+      logger.warn(exception)(s"Synchronizing Push Events for project ${latestLogEvent.projectId} failed")
       IO.pure(Failed)
   }
 
   private lazy val loggingError: PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
-      logger.error(exception)("Synchronizing events with GitLab failed")
+      logger.error(exception)("Synchronizing Push Events with GitLab failed")
       IO.raiseError(exception)
   }
 

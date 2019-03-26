@@ -54,7 +54,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
-      logger.logged(Info("Synchronized events with GitLab in 10ms: 0 updates, 0 skipped, 0 failed"))
+      logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 0 skipped, 0 failed"))
     }
 
     "do nothing if the latest eventIds in the Event Log " +
@@ -69,7 +69,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
       logger.logged(
-        Info(s"Synchronized events with GitLab in 10ms: 0 updates, ${latestEventsList.size} skipped, 0 failed")
+        Info(s"Synchronized Push Events with GitLab in 10ms: 0 updates, ${latestEventsList.size} skipped, 0 failed")
       )
     }
 
@@ -101,7 +101,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
-      logger.logged(Info("Synchronized events with GitLab in 10ms: 1 updates, 2 skipped, 0 failed"))
+      logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 1 updates, 2 skipped, 0 failed"))
     }
 
     "do nothing if the latest PushEvent does not exists" in new TestCase {
@@ -119,7 +119,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
-      logger.logged(Info("Synchronized events with GitLab in 10ms: 0 updates, 2 skipped, 0 failed"))
+      logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 2 skipped, 0 failed"))
     }
 
     "not break processing if finding Access Token for one of the event(s) fails" in new TestCase {
@@ -141,10 +141,11 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
       latestEventsList.headOption.foreach { event =>
-        logger.logged(Warn(s"Synchronizing events for project ${event.projectId} failed", exception))
+        logger.logged(Warn(s"Synchronizing Push Events for project ${event.projectId} failed", exception))
       }
       logger.logged(
-        Info(s"Synchronized events with GitLab in 10ms: 0 updates, ${latestEventsList.tail.size} skipped, 1 failed")
+        Info(
+          s"Synchronized Push Events with GitLab in 10ms: 0 updates, ${latestEventsList.tail.size} skipped, 1 failed")
       )
     }
 
@@ -166,8 +167,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Warn(s"Synchronizing events for project ${event1.projectId} failed", exception),
-        Info("Synchronized events with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
+        Warn(s"Synchronizing Push Events for project ${event1.projectId} failed", exception),
+        Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -192,8 +193,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Warn(s"Synchronizing events for project ${event1.projectId} failed", exception),
-        Info("Synchronized events with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
+        Warn(s"Synchronizing Push Events for project ${event1.projectId} failed", exception),
+        Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -225,8 +226,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Warn(s"Synchronizing events for project ${event1.projectId} failed", exception),
-        Info("Synchronized events with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
+        Warn(s"Synchronizing Push Events for project ${event1.projectId} failed", exception),
+        Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -239,7 +240,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         eventsLoader.loadMissedEvents.unsafeRunSync()
       } shouldBe exception
 
-      logger.loggedOnly(Error("Synchronizing events with GitLab failed", exception))
+      logger.loggedOnly(Error("Synchronizing Push Events with GitLab failed", exception))
     }
   }
 
