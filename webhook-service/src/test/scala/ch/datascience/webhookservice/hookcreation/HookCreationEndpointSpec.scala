@@ -29,7 +29,7 @@ import ch.datascience.graph.model.events._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
+import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.security.IOAccessTokenExtractor
 import io.circe.Json
 import io.circe.literal._

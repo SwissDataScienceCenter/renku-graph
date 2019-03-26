@@ -26,10 +26,10 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level._
+import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.webhookservice.crypto.TryHookTokenCrypto
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
+import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.hookvalidation.TryHookValidator
@@ -82,7 +82,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       hookCreation.createHook(projectId, accessToken) shouldBe context.pure(HookCreated)
 
-      logger.loggedOnly(Info(s"Hook created for project with id $projectId"))
+      logger.expectNoLogs()
     }
 
     "return HookExisted if hook was already created for that project" in new TestCase {
@@ -98,7 +98,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       hookCreation.createHook(projectId, accessToken) shouldBe context.pure(HookExisted)
 
-      logger.loggedOnly(Info(s"Hook already created for projectId: $projectId, url: $projectHookUrl"))
+      logger.expectNoLogs()
     }
 
     "log an error if finding project hook url fails" in new TestCase {

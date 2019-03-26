@@ -24,8 +24,8 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
+import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult
+import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.security.AccessTokenExtractor
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response, Status}
@@ -49,7 +49,7 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
     } yield response
   } recoverWith httpResponse
 
-  private lazy val toHttpResponse: HookCreationResult => Interpretation[Response[Interpretation]] = {
+  private lazy val toHttpResponse: CreationResult => Interpretation[Response[Interpretation]] = {
     case HookCreated => Created(InfoMessage("Hook created"))
     case HookExisted => Ok(InfoMessage("Hook already existed"))
   }

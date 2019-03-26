@@ -28,7 +28,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
-import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, HookCreationResult}
+import ch.datascience.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.HookMissing
@@ -54,7 +54,7 @@ private class HookCreator[Interpretation[_]: Monad](
     logger:                Logger[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
 
-  import HookCreator.HookCreationResult._
+  import HookCreator.CreationResult._
   import hookTokenCrypto._
   import projectHookCreator.create
   import projectHookUrlFinder._
@@ -62,7 +62,7 @@ private class HookCreator[Interpretation[_]: Monad](
   import accessTokenAssociator._
   import projectInfoFinder._
 
-  def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookCreationResult] = {
+  def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[CreationResult] = {
     for {
       projectHookUrl      <- right(findProjectHookUrl)
       hookValidation      <- right(validateHook(projectId, accessToken))
@@ -73,7 +73,7 @@ private class HookCreator[Interpretation[_]: Monad](
       _                   <- right(associate(projectId, accessToken))
       _                   <- right(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken))
     } yield ()
-  } fold (leftToHookExisted, rightToHookCreated(projectId)) recoverWith loggingError(projectId)
+  } fold [CreationResult] (_ => HookExisted, _ => HookCreated) recoverWith loggingError(projectId)
 
   private def leftIfProjectHookExists(
       hookValidation: HookValidationResult,
@@ -84,19 +84,7 @@ private class HookCreator[Interpretation[_]: Monad](
     right = ()
   )
 
-  private lazy val leftToHookExisted: HookAlreadyCreated => HookCreationResult = hookAlreadyCreated => {
-    logger.info(
-      s"Hook already created for projectId: ${hookAlreadyCreated.projectId}, url: ${hookAlreadyCreated.projectHookUrl}"
-    )
-    HookExisted
-  }
-
-  private def rightToHookCreated(projectId: ProjectId): Unit => HookCreationResult = _ => {
-    logger.info(s"Hook created for project with id $projectId")
-    HookCreated
-  }
-
-  private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[HookCreationResult]] = {
+  private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[CreationResult]] = {
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
       ME.raiseError(exception)
@@ -108,10 +96,10 @@ private class HookCreator[Interpretation[_]: Monad](
 
 private object HookCreator {
 
-  sealed trait HookCreationResult
-  object HookCreationResult {
-    final case object HookCreated extends HookCreationResult
-    final case object HookExisted extends HookCreationResult
+  sealed trait CreationResult extends Product with Serializable
+  object CreationResult {
+    final case object HookCreated extends CreationResult
+    final case object HookExisted extends CreationResult
   }
 
   private case class HookAlreadyCreated(
