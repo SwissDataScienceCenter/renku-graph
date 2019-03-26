@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.pushevent.TryPushEventSender
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
@@ -57,8 +57,6 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
         .returning(context.pure(()))
 
       eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe Success(())
-
-      logger.loggedOnly(Info(s"Project: ${projectInfo.id}: events history sent to the Event Log"))
     }
 
     "do nothing if there's no latest push event" in new TestCase {
@@ -70,8 +68,6 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
         .returning(context.pure(None))
 
       eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe Success(())
-
-      logger.loggedOnly(Info(s"Project: ${projectInfo.id}: No events to be sent to the Event Log"))
     }
 
     "fail if fetching latest push event fails" in new TestCase {

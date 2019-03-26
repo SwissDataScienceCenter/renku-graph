@@ -51,10 +51,9 @@ private class EventsHistoryLoader[Interpretation[_]](
       latestPushEvent <- OptionT(fetchLatestPushEvent(projectInfo.id, Some(accessToken)))
       pushEvent       <- OptionT.liftF(pushEventFrom(latestPushEvent, projectInfo))
       _               <- OptionT.liftF(storeCommitsInEventLog(pushEvent))
-      _               <- OptionT.liftF(logger.info(s"Project: ${projectInfo.id}: events history sent to the Event Log"))
     } yield ()
   }.value
-    .flatMap(logNoEventsSent(projectInfo))
+    .flatMap(_ => ME.unit)
     .recoverWith(loggingError(projectInfo))
 
   private def pushEventFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = ME.pure {
@@ -64,11 +63,6 @@ private class EventsHistoryLoader[Interpretation[_]](
       pushUser        = pushEventInfo.pushUser,
       project         = Project(projectInfo.id, projectInfo.path)
     )
-  }
-
-  private def logNoEventsSent(projectInfo: ProjectInfo): Option[Unit] => Interpretation[Unit] = {
-    case None => logger.info(s"Project: ${projectInfo.id}: No events to be sent to the Event Log")
-    case _    => ME.pure(())
   }
 
   private def loggingError(projectInfo: ProjectInfo): PartialFunction[Throwable, Interpretation[Unit]] = {
