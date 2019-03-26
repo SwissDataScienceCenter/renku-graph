@@ -46,17 +46,12 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
     for {
       accessToken <- request.as[AccessToken] recoverWith badRequest
       _           <- associate(projectId, accessToken)
-      response    <- toHttpResponse(projectId)()
+      response    <- NoContent()
     } yield response
   } recoverWith httpResponse(projectId)
 
   private implicit lazy val accessTokenEntityDecoder: EntityDecoder[Interpretation, AccessToken] =
     jsonOf[Interpretation, AccessToken]
-
-  private def toHttpResponse(projectId: ProjectId): Unit => Interpretation[Response[Interpretation]] = _ => {
-    logger.info(s"Token associated with projectId: $projectId")
-    NoContent()
-  }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 

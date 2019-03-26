@@ -28,7 +28,7 @@ import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
 import io.circe.literal._
 import org.http4s.headers.`Content-Type`
@@ -57,7 +57,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
       response.status                              shouldBe Status.NoContent
       response.body.compile.toVector.unsafeRunSync shouldBe empty
 
-      logger.loggedOnly(Info(s"Token associated with projectId: $projectId"))
+      logger.expectNoLogs()
     }
 
     "respond with NO_CONTENT if the OAuth Access Token association was successful" in new TestCase {
@@ -77,7 +77,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
       response.status                              shouldBe Status.NoContent
       response.body.compile.toVector.unsafeRunSync shouldBe empty
 
-      logger.loggedOnly(Info(s"Token associated with projectId: $projectId"))
+      logger.expectNoLogs()
     }
 
     "respond with BAD_REQUEST if the request body is invalid" in new TestCase {

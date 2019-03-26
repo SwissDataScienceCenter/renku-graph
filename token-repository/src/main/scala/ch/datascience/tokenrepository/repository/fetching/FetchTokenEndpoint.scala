@@ -48,19 +48,16 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
 
   private def toHttpResult(projectId: ProjectId): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
     case Some(token) =>
-      logger.info(s"Token for projectId: $projectId found")
       Ok(token.asJson)
     case None =>
-      val message = InfoMessage(s"Token for projectId: $projectId not found")
-      logger.info(message.value)
-      NotFound(message.asJson)
+      NotFound(InfoMessage(s"Token for projectId: $projectId not found"))
   }
 
   private def httpResult(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Finding token for projectId: $projectId failed")
       logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage.asJson)
+      InternalServerError(errorMessage)
   }
 }
 

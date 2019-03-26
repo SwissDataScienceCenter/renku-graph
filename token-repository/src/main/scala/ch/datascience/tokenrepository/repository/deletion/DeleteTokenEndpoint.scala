@@ -41,13 +41,8 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
   def deleteToken(projectId: ProjectId): Interpretation[Response[Interpretation]] =
     tokenRemover
       .delete(projectId)
-      .flatMap(toHttpResult(projectId))
+      .flatMap(_ => NoContent())
       .recoverWith(httpResult(projectId))
-
-  private def toHttpResult(projectId: ProjectId): Unit => Interpretation[Response[Interpretation]] = _ => {
-    logger.info(s"Token deleted for projectId: $projectId")
-    NoContent()
-  }
 
   private def httpResult(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
