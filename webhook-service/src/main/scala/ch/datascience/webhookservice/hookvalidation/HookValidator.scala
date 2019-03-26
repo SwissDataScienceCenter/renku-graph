@@ -117,9 +117,9 @@ class HookValidator[Interpretation[_]](
   private def toValidationResult(projectHookPresent: Boolean,
                                  projectId:          ProjectId): Interpretation[HookValidationResult] =
     if (projectHookPresent)
-      logger.info(s"Hook exists for project with id $projectId").map(_ => HookExists)
+      ME.pure(HookExists)
     else
-      logger.info(s"Hook missing for project with id $projectId").map(_ => HookMissing)
+      ME.pure(HookMissing)
 
   private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[HookValidationResult]] = {
     case NonFatal(exception) =>

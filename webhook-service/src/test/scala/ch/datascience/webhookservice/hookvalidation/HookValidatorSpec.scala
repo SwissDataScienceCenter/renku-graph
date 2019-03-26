@@ -27,9 +27,9 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.project.ProjectVisibility._
@@ -223,7 +223,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookExists)
 
-      logger.loggedOnly(Info(s"Hook exists for project with id $projectId"))
+      logger.expectNoLogs()
     }
 
     "succeed with HookMissing if there's no hook" in new TestCase {
@@ -248,7 +248,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookMissing)
 
-      logger.loggedOnly(Info(s"Hook missing for project with id $projectId"))
+      logger.expectNoLogs()
     }
 
     "fail if finding project hook url fails" in new TestCase {
@@ -329,7 +329,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookExists)
 
-      logger.loggedOnly(Info(s"Hook exists for project with id $projectId"))
+      logger.expectNoLogs()
     }
 
     "succeed with HookMissing and delete the access token if there's no hook" in new TestCase {
@@ -359,7 +359,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookMissing)
 
-      logger.loggedOnly(Info(s"Hook missing for project with id $projectId"))
+      logger.expectNoLogs()
     }
 
     "fail if finding project hook url fails" in new TestCase {
@@ -507,7 +507,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookExists)
 
-      logger.loggedOnly(Info(s"Hook exists for project with id $projectId"))
+      logger.expectNoLogs()
     }
 
     "succeed with HookMissing and delete the access token if there's no hook" in new TestCase {
@@ -545,7 +545,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookMissing)
 
-      logger.loggedOnly(Info(s"Hook missing for project with id $projectId"))
+      logger.expectNoLogs()
     }
 
     "fail if finding project hook url fails" in new TestCase {
