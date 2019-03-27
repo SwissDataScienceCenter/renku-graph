@@ -23,6 +23,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CommitEventId
 import ch.datascience.graph.model.events.EventsGenerators.{commitEventIds, committedDates}
 import doobie.implicits._
@@ -83,7 +84,7 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
                  eventBodies.generateOne,
                  createdDate)
 
-      val maybeMessage     = Gen.option(eventMessages).generateOne
+      val maybeMessage     = nestedExceptions.map(EventMessage.apply).generateOne
       val newExecutionDate = executionDates.generateOne
       (executionDateCalculator
         .newExecutionDate(_: CreatedDate, _: ExecutionDate)(_: StatusBasedCalculator[NonRecoverableFailure]))

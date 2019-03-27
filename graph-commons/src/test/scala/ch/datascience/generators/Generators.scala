@@ -95,9 +95,18 @@ object Generators {
       .choose(Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
-  implicit val exceptions:   Gen[Exception]   = nonEmptyStrings(20).map(new Exception(_))
   implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls.map(ServiceUrl.apply)
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
+  implicit val exceptions:   Gen[Exception]   = nonEmptyStrings(20).map(new Exception(_))
+  implicit val nestedExceptions: Gen[Exception] = for {
+    nestLevels <- positiveInts(5)
+    rootCause  <- exceptions
+  } yield {
+    import Implicits._
+    (1 to nestLevels).foldLeft(rootCause) { (nestedException, _) =>
+      new Exception(nonEmptyStrings().generateOne, nestedException)
+    }
+  }
 
   implicit val jsons: Gen[Json] = {
     import io.circe.syntax._

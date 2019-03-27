@@ -113,5 +113,17 @@ class EventMessageSpec extends WordSpec with ScalaCheckPropertyChecks {
         EventMessage.from(body).map(_.value) shouldBe Right(body)
       }
     }
+
+    "be instantiatable from an exception and contain the stack trace" in {
+      import java.io._
+
+      forAll(nestedExceptions) { exception =>
+        val exceptionAsString = new StringWriter
+        exception.printStackTrace(new PrintWriter(exceptionAsString))
+        exceptionAsString.flush()
+
+        EventMessage(exception).map(_.value) shouldBe Some(exceptionAsString.toString)
+      }
+    }
   }
 }

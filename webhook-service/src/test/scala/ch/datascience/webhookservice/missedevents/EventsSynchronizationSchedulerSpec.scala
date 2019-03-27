@@ -72,7 +72,7 @@ class EventsSynchronizationSchedulerSpec extends WordSpec with MockFactory with 
       val callCounter = new AtomicInteger(0)
 
       override def loadMissedEvents = {
-        Thread.sleep(3)
+        Thread.sleep(5)
         callCounter.incrementAndGet()
         if (callCounter.get() == 5) context.raiseError(exceptions.generateOne)
         else context.unit
