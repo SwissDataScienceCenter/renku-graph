@@ -1,9 +1,9 @@
 # webhook-service
 
-This is a microservice which:
+This microservice:
 - consumes Git push events,
-- translate them to commit events,
-- uploads the events to the Event Log
+- creates webhooks,
+- validates webhooks
 
 ## API
 
