@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice.project
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
@@ -158,7 +159,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
         .expects()
         .returning(returning)
 
-    val projectInfoFinder = new IOProjectInfoFinder(configProvider)
+    val projectInfoFinder = new IOProjectInfoFinder(configProvider, Throttler.noThrottling)
 
     def projectJson(maybeAccessToken: Option[AccessToken]): String = maybeAccessToken match {
       case Some(_) =>

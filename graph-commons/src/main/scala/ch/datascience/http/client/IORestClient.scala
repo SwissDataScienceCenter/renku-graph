@@ -20,20 +20,22 @@ package ch.datascience.http.client
 
 import cats.implicits._
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.RestClientError.{MappingError, UnexpectedResponseError}
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s._
+import org.http4s.client.Client
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.headers.Authorization
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-abstract class IORestClient(
-    implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO]
+abstract class IORestClient[ThrottlingTarget](throttler: Throttler[IO, ThrottlingTarget])(
+    implicit executionContext:                           ExecutionContext,
+    contextShift:                                        ContextShift[IO]
 ) {
 
   protected def validateUri(uri: String): IO[Uri] =
@@ -73,16 +75,26 @@ abstract class IORestClient(
   private def basicAuthHeader(basicAuth: BasicAuth): Headers =
     Headers(Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value)))
 
-  protected def send[ResultType](request: Request[IO])(
-      mapResponse:                        PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]): IO[ResultType] =
+  protected def send[ResultType](request: Request[IO])(mapResponse: ResponseMapping[ResultType]): IO[ResultType] =
     BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>
-      httpClient
-        .fetch[ResultType](request) { response =>
-          (mapResponse orElse raiseUnexpectedResponseError)(response.status, request, response)
-            .recoverWith(mappingError(request, response))
-        }
-        .recoverWith(connectionError(request))
+      for {
+        _          <- throttler.acquire
+        callResult <- callRemote(httpClient, request, mapResponse)
+        _          <- throttler.release
+      } yield callResult
     }
+
+  private def callRemote[ResultType](httpClient:  Client[IO],
+                                     request:     Request[IO],
+                                     mapResponse: ResponseMapping[ResultType]) =
+    httpClient
+      .fetch[ResultType](request)(processResponse(request, mapResponse))
+      .recoverWith(connectionError(request))
+
+  private def processResponse[ResultType](request: Request[IO], mapResponse: ResponseMapping[ResultType])(
+      response:                                    Response[IO]) =
+    (mapResponse orElse raiseUnexpectedResponseError)(response.status, request, response)
+      .recoverWith(mappingError(request, response))
 
   private def raiseUnexpectedResponseError[T]: PartialFunction[(Status, Request[IO], Response[IO]), IO[T]] = {
     case (_, request, response) =>
@@ -99,10 +111,13 @@ abstract class IORestClient(
   }
 
   private def connectionError[T](request: Request[IO]): PartialFunction[Throwable, IO[T]] = {
-    case error: RestClientError => IO.raiseError(error)
+    case error: RestClientError =>
+      throttler.release *> IO.raiseError(error)
     case NonFatal(cause) =>
-      IO.raiseError(new RuntimeException(ExceptionMessage(request, cause), cause))
+      throttler.release *> IO.raiseError(new RuntimeException(ExceptionMessage(request, cause), cause))
   }
+
+  private type ResponseMapping[ResultType] = PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
 
   private object ExceptionMessage {
 

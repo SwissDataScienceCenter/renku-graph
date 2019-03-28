@@ -20,16 +20,18 @@ package ch.datascience.http.client
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.config.ServiceUrl
+import ch.datascience.control.Throttler
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.http4s.Method.GET
-import org.http4s.{Request, Response, Status, Uri}
+import org.http4s.{Request, Response, Status}
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IORestClientSpec extends WordSpec with ExternalServiceStubbing {
+class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFactory {
 
   "send" should {
 
@@ -40,6 +42,8 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing {
         get("/resource")
           .willReturn(ok("1"))
       }
+
+      verifyThrottling()
 
       client.callRemote.unsafeRunSync() shouldBe 1
     }
@@ -55,6 +59,8 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing {
           )
       }
 
+      verifyThrottling()
+
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.NotFound}; body: some body"
@@ -66,6 +72,8 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing {
         get("/resource")
           .willReturn(ok("non int"))
       }
+
+      verifyThrottling()
 
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
@@ -79,6 +87,8 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing {
           .willReturn(noContent())
       }
 
+      verifyThrottling()
+
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.NoContent}; body: "
@@ -86,19 +96,26 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing {
 
     "fail if there are connectivity problems" in {
       intercept[Exception] {
-        new TestRestClient(ServiceUrl("http://localhost:1024")).callRemote.unsafeRunSync()
+        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling).callRemote.unsafeRunSync()
       }.getMessage shouldBe s"GET http://localhost:1024/resource error: Connection refused"
     }
   }
 
   private trait TestCase {
-    val client = new TestRestClient(hostUrl)
+    val throttler = mock[Throttler[IO, Any]]
+    val client    = new TestRestClient(hostUrl, throttler)
+
+    def verifyThrottling(): Unit =
+      inSequence {
+        (throttler.acquire _).expects().returning(IO.unit)
+        (throttler.release _).expects().returning(IO.unit)
+      }
   }
 
   private implicit val cs: ContextShift[IO] = IO.contextShift(global)
   private val hostUrl = ServiceUrl(externalServiceBaseUrl)
 
-  private class TestRestClient(hostUrl: ServiceUrl) extends IORestClient {
+  private class TestRestClient(hostUrl: ServiceUrl, throttler: Throttler[IO, Any]) extends IORestClient(throttler) {
 
     def callRemote: IO[Int] =
       for {

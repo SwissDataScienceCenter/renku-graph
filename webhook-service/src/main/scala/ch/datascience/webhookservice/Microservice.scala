@@ -20,6 +20,7 @@ package ch.datascience.webhookservice
 
 import cats.effect._
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
+import ch.datascience.graph.gitlab.GitLabThrottler
 import ch.datascience.http.server.HttpServer
 import ch.datascience.webhookservice.eventprocessing.IOHookEventEndpoint
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
@@ -33,19 +34,26 @@ object Microservice extends IOApp {
 
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
 
-  private val eventLogDbInitializer          = new IOEventLogDbInitializer
-  private val eventsSynchronizationScheduler = new IOEventsSynchronizationScheduler
-  private val httpServer = new HttpServer[IO](
-    serverPort = 9001,
-    serviceRoutes = new MicroserviceRoutes[IO](
-      new IOHookEventEndpoint,
-      new IOHookCreationEndpoint,
-      new IOHookValidationEndpoint
-    ).routes
-  )
+  private val eventLogDbInitializer = new IOEventLogDbInitializer
+
+  private val microserviceInstantiator = for {
+    gitLabThrottler <- GitLabThrottler[IO]
+    eventsSynchronizationScheduler = new IOEventsSynchronizationScheduler(gitLabThrottler)
+    httpServer = new HttpServer[IO](
+      serverPort = 9001,
+      serviceRoutes = new MicroserviceRoutes[IO](
+        new IOHookEventEndpoint(gitLabThrottler),
+        new IOHookCreationEndpoint(gitLabThrottler),
+        new IOHookValidationEndpoint(gitLabThrottler)
+      ).routes
+    )
+  } yield new MicroserviceRunner(eventLogDbInitializer, eventsSynchronizationScheduler, httpServer)
 
   override def run(args: List[String]): IO[ExitCode] =
-    new MicroserviceRunner(eventLogDbInitializer, eventsSynchronizationScheduler, httpServer).run(args)
+    for {
+      microservice <- microserviceInstantiator
+      exitCode     <- microservice.run(args)
+    } yield exitCode
 }
 
 class MicroserviceRunner(eventLogDbInitializer:          IOEventLogDbInitializer,

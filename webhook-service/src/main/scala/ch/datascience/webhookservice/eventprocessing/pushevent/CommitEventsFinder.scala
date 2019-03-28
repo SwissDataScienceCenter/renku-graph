@@ -21,7 +21,9 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.control.Throttler
 import ch.datascience.dbeventlog.commands._
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.{CommitEvent, CommitId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.config.GitLabConfigProvider
@@ -119,9 +121,11 @@ private class CommitEventsFinder[Interpretation[_]](
   }
 }
 
-private class IOCommitEventsFinder(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+private class IOCommitEventsFinder(
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends CommitEventsFinder[IO](
-      new IOCommitInfoFinder(new GitLabConfigProvider()),
+      new IOCommitInfoFinder(new GitLabConfigProvider(), gitLabThrottler),
       new IOEventLogLatestEvent,
       new IOEventLogVerifyExistence
     )

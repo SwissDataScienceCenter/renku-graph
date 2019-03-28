@@ -20,8 +20,10 @@ package ch.datascience.webhookservice.hookvalidation
 
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
+import ch.datascience.control.Throttler
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
@@ -63,8 +65,10 @@ class HookValidationEndpoint[Interpretation[_]: Effect](
   }
 }
 
-class IOHookValidationEndpoint(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+class IOHookValidationEndpoint(
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends HookValidationEndpoint[IO](
-      new IOHookValidator,
+      new IOHookValidator(gitLabThrottler),
       new AccessTokenExtractor[IO]
     )

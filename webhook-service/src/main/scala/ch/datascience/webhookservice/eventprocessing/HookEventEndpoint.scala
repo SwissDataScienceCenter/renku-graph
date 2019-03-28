@@ -21,8 +21,10 @@ package ch.datascience.webhookservice.eventprocessing
 import cats.MonadError
 import cats.effect._
 import cats.implicits._
+import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
@@ -137,8 +139,10 @@ private object HookEventEndpoint {
   }
 }
 
-class IOHookEventEndpoint()(
+class IOHookEventEndpoint(
+    gitLabThrottler: Throttler[IO, GitLab]
+)(
     implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     clock:                     Clock[IO]
-) extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOPushEventSender)
+) extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOPushEventSender(gitLabThrottler))

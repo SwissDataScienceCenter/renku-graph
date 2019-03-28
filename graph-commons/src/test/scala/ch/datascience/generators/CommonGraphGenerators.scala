@@ -18,6 +18,7 @@
 
 package ch.datascience.generators
 
+import ch.datascience.control.RateLimit
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.{AccessToken, BasicAuthPassword, BasicAuthUsername}
@@ -42,4 +43,12 @@ object CommonGraphGenerators {
 
   implicit val basicAuthUsernames: Gen[BasicAuthUsername] = nonEmptyStrings() map BasicAuthUsername.apply
   implicit val basicAuthPasswords: Gen[BasicAuthPassword] = nonEmptyStrings() map BasicAuthPassword.apply
+
+  implicit val rateLimits: Gen[RateLimit] = for {
+    items <- Gen.choose(1L, 50000L)
+    unit  <- Gen.oneOf("sec", "min", "hour", "day")
+  } yield
+    RateLimit.from(s"$items/$unit").getOrElse {
+      throw new IllegalArgumentException("Problems with rateLimits generator")
+    }
 }

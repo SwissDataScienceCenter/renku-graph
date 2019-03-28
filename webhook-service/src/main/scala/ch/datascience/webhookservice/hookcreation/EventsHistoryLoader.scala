@@ -22,6 +22,8 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Clock, ContextShift, IO}
 import cats.implicits._
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.Project
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
@@ -73,11 +75,13 @@ private class EventsHistoryLoader[Interpretation[_]](
 }
 
 private class IOEventsHistoryLoader(
+    gitLabThrottler: Throttler[IO, GitLab]
+)(
     implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     clock:                     Clock[IO]
 ) extends EventsHistoryLoader[IO](
-      new IOLatestPushEventFetcher(new GitLabConfigProvider[IO]),
-      new IOPushEventSender,
+      new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler),
+      new IOPushEventSender(gitLabThrottler),
       ApplicationLogger
     )

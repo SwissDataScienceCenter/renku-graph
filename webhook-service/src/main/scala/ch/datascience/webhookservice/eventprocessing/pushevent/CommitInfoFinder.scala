@@ -19,6 +19,8 @@
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
@@ -36,9 +38,10 @@ private trait CommitInfoFinder[Interpretation[_]] {
 }
 
 private class IOCommitInfoFinder(
-    gitLabConfigProvider:    GitLabConfigProvider[IO]
+    gitLabConfigProvider:    GitLabConfigProvider[IO],
+    gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient
+    extends IORestClient(gitLabThrottler)
     with CommitInfoFinder[IO] {
 
   import CommitInfo._

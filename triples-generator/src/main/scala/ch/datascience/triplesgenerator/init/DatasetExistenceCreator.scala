@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.init
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.http.client.{BasicAuth, IORestClient}
 import ch.datascience.triplesgenerator.config.FusekiConfig
 
@@ -32,7 +33,7 @@ private trait DatasetExistenceCreator[Interpretation[_]] {
 private class IODatasetExistenceCreator(
     implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO]
-) extends IORestClient
+) extends IORestClient(Throttler.noThrottling)
     with DatasetExistenceCreator[IO] {
 
   import cats.effect._

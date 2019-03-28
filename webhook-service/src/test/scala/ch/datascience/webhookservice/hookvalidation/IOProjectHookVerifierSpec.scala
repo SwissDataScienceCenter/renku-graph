@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice.hookvalidation
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -158,7 +159,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
         .expects()
         .returning(returning)
 
-    val verifier = new IOProjectHookVerifier(gitLabUrlProvider)
+    val verifier = new IOProjectHookVerifier(gitLabUrlProvider, Throttler.noThrottling)
   }
 
   private def withHooks(projectId: ProjectId, oneHookUrl: ProjectHookUrl): String =

@@ -22,6 +22,8 @@ import cats.data.EitherT
 import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
 import ch.datascience.http.client.AccessToken
@@ -109,16 +111,18 @@ private object HookCreator {
 }
 
 private class IOHookCreator(
+    gitLabThrottler: Throttler[IO, GitLab]
+)(
     implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     clock:                     Clock[IO]
 ) extends HookCreator[IO](
       new IOProjectHookUrlFinder,
-      new IOHookValidator,
-      new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
+      new IOHookValidator(gitLabThrottler),
+      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
       HookTokenCrypto[IO],
-      new IOProjectHookCreator(new GitLabConfigProvider[IO]),
+      new IOProjectHookCreator(new GitLabConfigProvider[IO], gitLabThrottler),
       new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO]()),
-      new IOEventsHistoryLoader,
+      new IOEventsHistoryLoader(gitLabThrottler),
       ApplicationLogger
     )

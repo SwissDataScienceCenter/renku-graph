@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice.pushevents
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{accessTokens, oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -186,7 +187,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
         .expects()
         .returning(returning)
 
-    val pushEventFetcher = new IOLatestPushEventFetcher(configProvider)
+    val pushEventFetcher = new IOLatestPushEventFetcher(configProvider, Throttler.noThrottling)
   }
 
   private def pushEvents(projectId: ProjectId, commitIds: Seq[CommitId]) =

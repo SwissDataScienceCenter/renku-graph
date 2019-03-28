@@ -21,7 +21,9 @@ package ch.datascience.webhookservice.missedevents
 import cats.MonadError
 import cats.effect._
 import cats.implicits._
+import ch.datascience.control.Throttler
 import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.tokenrepository.{IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
@@ -68,15 +70,16 @@ class EventsSynchronizationScheduler[Interpretation[_]](
 }
 
 class IOEventsSynchronizationScheduler(
-    )(implicit timer: Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
+    gitLabThrottler: Throttler[IO, GitLab]
+)(implicit timer:    Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
     extends EventsSynchronizationScheduler[IO](
       new SchedulerConfigProvider[IO](),
       new IOMissedEventsLoader(
         new IOEventLogLatestEvents,
         new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
-        new IOLatestPushEventFetcher(new GitLabConfigProvider[IO]),
-        new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
-        new IOPushEventSender,
+        new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler),
+        new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
+        new IOPushEventSender(gitLabThrottler),
         ApplicationLogger,
         new ExecutionTimeRecorder[IO]
       )

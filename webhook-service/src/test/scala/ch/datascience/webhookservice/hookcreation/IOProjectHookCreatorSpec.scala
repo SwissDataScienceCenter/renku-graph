@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -135,7 +136,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
         .toString()
 
     val configProvider = mock[IOGitLabConfigProvider]
-    val hookCreator    = new IOProjectHookCreator(configProvider)
+    val hookCreator    = new IOProjectHookCreator(configProvider, Throttler.noThrottling)
 
     def expectGitLabHostProvider(returning: IO[GitLabConfigProvider.HostUrl]) =
       (configProvider.get _)

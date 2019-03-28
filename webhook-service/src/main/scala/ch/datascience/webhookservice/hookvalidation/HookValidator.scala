@@ -22,6 +22,8 @@ import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
@@ -143,11 +145,13 @@ object HookValidator {
   }
 }
 
-class IOHookValidator(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+class IOHookValidator(
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends HookValidator[IO](
-      new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
+      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
       new IOProjectHookUrlFinder,
-      new IOProjectHookVerifier(new GitLabConfigProvider[IO]),
+      new IOProjectHookVerifier(new GitLabConfigProvider[IO], gitLabThrottler),
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]),
       new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO]),
       new IOAccessTokenRemover(new TokenRepositoryUrlProvider[IO]),

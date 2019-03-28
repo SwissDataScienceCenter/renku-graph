@@ -21,6 +21,8 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import cats.effect.{Clock, ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.CommitEvent
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
@@ -137,12 +139,14 @@ class PushEventSender[Interpretation[_]: Monad](
 }
 
 class IOPushEventSender(
+    gitLabThrottler: Throttler[IO, GitLab]
+)(
     implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     clock:                     Clock[IO]
 ) extends PushEventSender[IO](
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
-      new IOCommitEventsFinder(),
+      new IOCommitEventsFinder(gitLabThrottler),
       new IOCommitEventSender,
       ApplicationLogger,
       new ExecutionTimeRecorder[IO]

@@ -19,6 +19,8 @@
 package ch.datascience.webhookservice.project
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
@@ -35,9 +37,10 @@ trait ProjectInfoFinder[Interpretation[_]] {
 }
 
 class IOProjectInfoFinder(
-    gitLabConfigProvider:    GitLabConfigProvider[IO]
+    gitLabConfigProvider:    GitLabConfigProvider[IO],
+    gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient
+    extends IORestClient(gitLabThrottler)
     with ProjectInfoFinder[IO] {
 
   import cats.effect._
