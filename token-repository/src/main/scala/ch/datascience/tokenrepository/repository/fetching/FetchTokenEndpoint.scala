@@ -22,9 +22,11 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.db.DBConfigProvider.DBConfig
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import io.circe.syntax._
 import org.http4s.Response
@@ -61,8 +63,10 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
   }
 }
 
-class IOFetchTokenEndpoint(implicit contextShift: ContextShift[IO])
+class IOFetchTokenEndpoint(
+    dbConfig:            DBConfig[ProjectsTokensDB]
+)(implicit contextShift: ContextShift[IO])
     extends FetchTokenEndpoint[IO](
-      new IOTokenFinder,
+      new IOTokenFinder(dbConfig),
       ApplicationLogger
     )

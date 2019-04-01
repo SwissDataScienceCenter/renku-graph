@@ -22,7 +22,6 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit._
 
 import cats.implicits._
-import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
@@ -32,7 +31,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogFetchSpec extends WordSpec with DbSpec with InMemoryEventLogDb with MockFactory {
+class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "findEventToProcess" should {
 

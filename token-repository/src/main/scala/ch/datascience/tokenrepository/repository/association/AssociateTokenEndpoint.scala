@@ -23,9 +23,11 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.db.DBConfigProvider.DBConfig
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -70,8 +72,10 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
   }
 }
 
-class IOAssociateTokenEndpoint(implicit contextShift: ContextShift[IO])
+class IOAssociateTokenEndpoint(
+    dbConfig:            DBConfig[ProjectsTokensDB]
+)(implicit contextShift: ContextShift[IO])
     extends AssociateTokenEndpoint[IO](
-      new IOTokenAssociator,
+      new IOTokenAssociator(dbConfig),
       ApplicationLogger
     )

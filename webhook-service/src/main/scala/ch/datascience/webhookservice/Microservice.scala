@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice
 
 import cats.effect._
+import ch.datascience.dbeventlog.EventLogDbConfigProvider
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.graph.gitlab.GitLabThrottler
 import ch.datascience.http.server.HttpServer
@@ -34,16 +35,17 @@ object Microservice extends IOApp {
 
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
 
-  private val eventLogDbInitializer = new IOEventLogDbInitializer
-
   private val microserviceInstantiator = for {
+    eventLogDbConfig <- new EventLogDbConfigProvider[IO].get()
+    eventLogDbInitializer = new IOEventLogDbInitializer(eventLogDbConfig)
+
     gitLabThrottler <- GitLabThrottler[IO]
-    eventsSynchronizationScheduler = new IOEventsSynchronizationScheduler(gitLabThrottler)
+    eventsSynchronizationScheduler = new IOEventsSynchronizationScheduler(eventLogDbConfig, gitLabThrottler)
     httpServer = new HttpServer[IO](
       serverPort = 9001,
       serviceRoutes = new MicroserviceRoutes[IO](
-        new IOHookEventEndpoint(gitLabThrottler),
-        new IOHookCreationEndpoint(gitLabThrottler),
+        new IOHookEventEndpoint(eventLogDbConfig, gitLabThrottler),
+        new IOHookCreationEndpoint(eventLogDbConfig, gitLabThrottler),
         new IOHookValidationEndpoint(gitLabThrottler)
       ).routes
     )

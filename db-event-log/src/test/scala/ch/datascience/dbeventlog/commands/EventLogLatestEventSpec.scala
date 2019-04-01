@@ -21,15 +21,14 @@ package ch.datascience.dbeventlog.commands
 import java.time.Instant.now
 import java.time.temporal.ChronoUnit._
 
-import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.{CommitEventId, CommittedDate}
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.{CommitEventId, CommittedDate}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogLatestEventSpec extends WordSpec with DbSpec with InMemoryEventLogDb {
+class EventLogLatestEventSpec extends WordSpec with InMemoryEventLogDbSpec {
 
   "findYoungestEventInLog" should {
 

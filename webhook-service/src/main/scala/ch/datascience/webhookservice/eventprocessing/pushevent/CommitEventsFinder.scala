@@ -22,6 +22,8 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.control.Throttler
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands._
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.{CommitEvent, CommitId}
@@ -122,10 +124,11 @@ private class CommitEventsFinder[Interpretation[_]](
 }
 
 private class IOCommitEventsFinder(
+    dbConfig:                DBConfig[EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends CommitEventsFinder[IO](
       new IOCommitInfoFinder(new GitLabConfigProvider(), gitLabThrottler),
-      new IOEventLogLatestEvent,
-      new IOEventLogVerifyExistence
+      new IOEventLogLatestEvent(dbConfig),
+      new IOEventLogVerifyExistence(dbConfig)
     )

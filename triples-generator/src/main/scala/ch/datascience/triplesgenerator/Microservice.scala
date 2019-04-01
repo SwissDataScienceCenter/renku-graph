@@ -19,11 +19,12 @@
 package ch.datascience.triplesgenerator
 
 import cats.effect._
+import ch.datascience.dbeventlog.EventLogDbConfigProvider
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
-import ch.datascience.triplesgenerator.init.{FusekiDatasetInitializer, IOFusekiDatasetInitializer, SentryInitializer}
+import ch.datascience.triplesgenerator.init._
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
@@ -31,22 +32,30 @@ object Microservice extends IOApp {
 
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
 
-  private val httpServer = new HttpServer[IO](
-    serverPort    = 9002,
-    serviceRoutes = new MicroserviceRoutes[IO].routes
-  )
-  private val eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch))
-    .withEventsProcessor(new IOCommitEventProcessor())
-  private val microserviceRunner = new MicroserviceRunner(
-    new SentryInitializer[IO],
-    new IOEventLogDbInitializer,
-    new IOFusekiDatasetInitializer,
-    eventProcessorRunner,
-    httpServer
-  )
+  private val microserviceInstantiator = for {
+    eventLogDbConfig <- new EventLogDbConfigProvider[IO].get()
+    eventLogDbInitializer = new IOEventLogDbInitializer(eventLogDbConfig)
+
+    httpServer = new HttpServer[IO](
+      serverPort = 9002,
+      new MicroserviceRoutes[IO].routes
+    )
+    eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch(eventLogDbConfig)))
+      .withEventsProcessor(new IOCommitEventProcessor(eventLogDbConfig))
+  } yield
+    new MicroserviceRunner(
+      new SentryInitializer[IO],
+      eventLogDbInitializer,
+      new IOFusekiDatasetInitializer,
+      eventProcessorRunner,
+      httpServer
+    )
 
   override def run(args: List[String]): IO[ExitCode] =
-    microserviceRunner.run(args)
+    for {
+      microservice <- microserviceInstantiator
+      exitCode     <- microservice.run(args)
+    } yield exitCode
 }
 
 private class MicroserviceRunner(

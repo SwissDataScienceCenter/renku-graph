@@ -21,14 +21,13 @@ package ch.datascience.dbeventlog.commands
 import java.time.temporal.ChronoUnit.MINUTES
 import java.time.{Duration, Instant}
 
-import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
-import cats.implicits._
-import ch.datascience.db.TransactorProvider
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactorProvider
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.{EventBody, EventStatus, IOTransactorProvider}
+import ch.datascience.dbeventlog._
 import ch.datascience.graph.model.events.CommitEventId
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
@@ -41,17 +40,16 @@ private object EventLogFetch {
 }
 
 class EventLogFetch[Interpretation[_]](
-    transactorProvider: TransactorProvider[Interpretation],
+    transactorProvider: DbTransactorProvider[Interpretation, EventLogDB],
     now:                () => Instant = Instant.now
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+)(implicit ME:          Bracket[Interpretation, Throwable]) {
 
   import EventLogFetch._
 
   def findEventToProcess: Interpretation[Option[EventBody]] =
-    for {
-      transactor     <- transactorProvider.transactor
-      maybeEventBody <- findEventAndUpdateForProcessing.transact(transactor)
-    } yield maybeEventBody
+    transactorProvider.transactorResource.use { transactor =>
+      findEventAndUpdateForProcessing.transact(transactor)
+    }
 
   private def findEventAndUpdateForProcessing =
     for {
@@ -92,4 +90,7 @@ class EventLogFetch[Interpretation[_]](
   private type EventIdAndBody = (CommitEventId, EventBody)
 }
 
-class IOEventLogFetch(implicit contextShift: ContextShift[IO]) extends EventLogFetch[IO](new IOTransactorProvider)
+class IOEventLogFetch(
+    dbConfig:            DBConfig[EventLogDB]
+)(implicit contextShift: ContextShift[IO])
+    extends EventLogFetch[IO](new DbTransactorProvider(dbConfig))

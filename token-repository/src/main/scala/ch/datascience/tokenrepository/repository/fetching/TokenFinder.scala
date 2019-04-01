@@ -21,6 +21,7 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
+import ch.datascience.db.DBConfigProvider.DBConfig
 import ch.datascience.http.client.AccessToken
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository._
@@ -42,5 +43,9 @@ private class TokenFinder[Interpretation[_]](
 }
 
 private class IOTokenFinder(
-    implicit contextShift: ContextShift[IO]
-) extends TokenFinder[IO](new IOPersistedTokensFinder, AccessTokenCrypto[IO]())
+    dbConfig:            DBConfig[ProjectsTokensDB]
+)(implicit contextShift: ContextShift[IO])
+    extends TokenFinder[IO](
+      new IOPersistedTokensFinder(dbConfig),
+      AccessTokenCrypto[IO]()
+    )

@@ -21,7 +21,6 @@ package ch.datascience.dbeventlog.commands
 import java.time.Instant.now
 import java.time.temporal.ChronoUnit._
 
-import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.CommittedDate
@@ -29,7 +28,7 @@ import ch.datascience.graph.model.events.EventsGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogLatestEventsSpec extends WordSpec with DbSpec with InMemoryEventLogDb {
+class EventLogLatestEventsSpec extends WordSpec with InMemoryEventLogDbSpec {
 
   "findAllLatestEvents" should {
 

@@ -18,17 +18,14 @@
 
 package ch.datascience.tokenrepository.repository.association
 
-import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.tokenrepository.repository.InMemoryProjectsTokens
+import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
-import doobie.implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class AssociationPersisterSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
+class AssociationPersisterSpec extends WordSpec with InMemoryProjectsTokensDbSpec {
 
   "persistAssociation" should {
 
@@ -61,15 +58,5 @@ class AssociationPersisterSpec extends WordSpec with DbSpec with InMemoryProject
     val projectId = projectIds.generateOne
 
     val associator = new AssociationPersister(transactorProvider)
-
-    def findToken(projectId: ProjectId): Option[String] =
-      sql"""select token 
-            from projects_tokens  
-            where project_id = ${projectId.value}
-         """
-        .query[String]
-        .option
-        .transact(transactor)
-        .unsafeRunSync()
   }
 }

@@ -20,7 +20,6 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
-import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
@@ -30,7 +29,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb with MockFactory {
+class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "markEventDone" should {
 

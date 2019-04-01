@@ -22,9 +22,10 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.{Clock, ContextShift, IO}
 import cats.implicits._
+import ch.datascience.db.DBConfigProvider.DBConfig
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed, IOEventLogMarkDone, IOEventLogMarkFailed}
-import ch.datascience.dbeventlog.{EventBody, EventMessage}
+import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
@@ -145,16 +146,15 @@ class CommitEventProcessor[Interpretation[_]](
 }
 
 class IOCommitEventProcessor(
-    implicit contextShift: ContextShift[IO],
-    executionContext:      ExecutionContext,
-    clock:                 Clock[IO]
-) extends CommitEventProcessor[IO](
+    dbConfig:            DBConfig[EventLogDB]
+)(implicit contextShift: ContextShift[IO], executionContext: ExecutionContext, clock: Clock[IO])
+    extends CommitEventProcessor[IO](
       new CommitEventsDeserialiser[IO](),
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
       new IOTriplesFinder(new GitLabRepoUrlFinder[IO](new GitLabUrlProvider[IO]())),
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),
-      new IOEventLogMarkDone,
-      new IOEventLogMarkFailed,
+      new IOEventLogMarkDone(dbConfig),
+      new IOEventLogMarkFailed(dbConfig),
       ApplicationLogger,
       new ExecutionTimeRecorder[IO]
     )

@@ -18,17 +18,24 @@
 
 package ch.datascience.tokenrepository.repository
 
-import cats.MonadError
-import ch.datascience.db.DBConfigProvider
-import eu.timepit.refined.auto._
+import cats.effect.{ContextShift, IO, Resource}
+import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.TestDbConfig.newDbConfig
+import doobie.free.connection.ConnectionIO
+import doobie.hikari.HikariTransactor
+import doobie.implicits._
 
-import scala.language.higherKinds
+import scala.concurrent.ExecutionContext.Implicits.global
 
-private class ProjectsTokensConfig[Interpretation[_]](
-    implicit ME: MonadError[Interpretation, Throwable]
-) extends DBConfigProvider[Interpretation](
-      namespace = "projects-tokens",
-      driver    = "org.postgresql.Driver",
-      dbName    = "projects_tokens",
-      urlPrefix = "jdbc:postgresql"
-    )
+trait InMemoryProjectsTokensDb {
+
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+
+  lazy val transactorProvider = new DbTransactorProvider[IO, ProjectsTokensDB](newDbConfig[ProjectsTokensDB])
+  lazy val transactorResource: Resource[IO, HikariTransactor[IO]] = transactorProvider.transactorResource
+
+  def execute[O](query: ConnectionIO[O]): O =
+    transactorResource
+      .use(query.transact(_))
+      .unsafeRunSync()
+}

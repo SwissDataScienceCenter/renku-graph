@@ -21,9 +21,10 @@ package ch.datascience.tokenrepository.repository.association
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.db.DBConfigProvider.DBConfig
 import ch.datascience.http.client.AccessToken
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.tokenrepository.repository.AccessTokenCrypto
+import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 
 import scala.language.higherKinds
 
@@ -43,8 +44,9 @@ private class TokenAssociator[Interpretiation[_]](
 }
 
 private class IOTokenAssociator(
-    implicit contextShift: ContextShift[IO]
-) extends TokenAssociator[IO](
+    dbConfig:            DBConfig[ProjectsTokensDB]
+)(implicit contextShift: ContextShift[IO])
+    extends TokenAssociator[IO](
       AccessTokenCrypto[IO](),
-      new IOAssociationPersister
+      new IOAssociationPersister(dbConfig)
     )

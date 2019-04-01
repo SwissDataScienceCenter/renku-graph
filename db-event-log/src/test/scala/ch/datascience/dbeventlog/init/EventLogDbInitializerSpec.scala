@@ -18,24 +18,17 @@
 
 package ch.datascience.dbeventlog.init
 
-import cats.MonadError
 import cats.effect._
 import cats.implicits._
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.{DbSpec, TransactorProvider}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import ch.datascience.dbeventlog.InMemoryEventLogDb
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.orchestration.Provider
+import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
 import doobie.util.fragment.Fragment
-import doobie.util.transactor.Transactor.Aux
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogDbInitializerSpec extends WordSpec with DbSpec with MockFactory {
+class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
 
   "run" should {
 
@@ -63,19 +56,6 @@ class EventLogDbInitializerSpec extends WordSpec with DbSpec with MockFactory {
       logger.loggedOnly(Info("Event Log database initialization success"))
     }
 
-    "fail if table creation process fails" in new MockTestCase {
-      val exception = exceptions.generateOne
-      (dbConfigProvider.get _)
-        .expects()
-        .returning(context.raiseError(exception))
-
-      intercept[Exception] {
-        dbInitializer.run.unsafeRunSync()
-      } shouldBe exception
-
-      logger.loggedOnly(Error("Event Log database initialization failure", exception))
-    }
-
     "assures there are indexes created for project_id, status and execution_date" in new TestCase {
 
       dbInitializer.run.unsafeRunSync() shouldBe ()
@@ -92,27 +72,17 @@ class EventLogDbInitializerSpec extends WordSpec with DbSpec with MockFactory {
     val dbInitializer = new EventLogDbInitializer[IO](transactorProvider, logger)
   }
 
-  private trait MockTestCase {
-    val context = MonadError[IO, Throwable]
-
-    val logger           = TestLogger[IO]()
-    val dbConfigProvider = mock[Provider[IO, DBConfig]]
-    val dbInitializer = new EventLogDbInitializer[IO](
-      new TransactorProvider[IO](dbConfigProvider),
-      logger
-    )
-  }
-
   private def tableExists(): Boolean =
-    sql"""select exists (select * from event_log);""".query.option
-      .transact(transactor)
-      .recover {
-        case _ => None
+    transactorResource
+      .use { transactor =>
+        sql"""select exists (select * from event_log);""".query.option
+          .transact(transactor)
+          .recover { case _ => None }
       }
       .unsafeRunSync()
       .isDefined
 
-  private def createTable(): Unit =
+  private def createTable(): Unit = execute {
     sql"""
          |CREATE TABLE event_log(
          | event_id varchar NOT NULL,
@@ -126,19 +96,13 @@ class EventLogDbInitializerSpec extends WordSpec with DbSpec with MockFactory {
          | PRIMARY KEY (event_id, project_id)
          |);
        """.stripMargin.update.run
-      .transact(transactor)
-      .unsafeRunSync()
+  }
 
-  protected def dropTable(): Unit =
+  protected def dropTable(): Unit = execute {
     sql"DROP TABLE IF EXISTS event_log".update.run
-      .transact(transactor)
-      .unsafeRunSync()
+  }
 
-  protected def verifyTrue(sql: Fragment): Unit =
+  protected def verifyTrue(sql: Fragment): Unit = execute {
     sql.update.run
-      .transact(transactor)
-      .unsafeRunSync()
-
-  protected override def initDb(transactor:           Aux[IO, Unit]): Unit = ()
-  protected override def prepareDbForTest(transactor: Aux[IO, Unit]): Unit = ()
+  }
 }

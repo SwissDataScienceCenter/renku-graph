@@ -18,8 +18,23 @@
 
 package ch.datascience.dbeventlog
 
-import cats.effect.{ContextShift, IO}
-import ch.datascience.db.TransactorProvider
+import cats.effect.{ContextShift, IO, Resource}
+import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.TestDbConfig._
+import doobie.free.connection.ConnectionIO
+import doobie.hikari.HikariTransactor
+import doobie.implicits._
+import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOTransactorProvider(implicit contextShift: ContextShift[IO])
-    extends TransactorProvider[IO](new EventLogDbConfig[IO])
+trait InMemoryEventLogDb {
+
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+
+  lazy val transactorProvider = new DbTransactorProvider[IO, EventLogDB](newDbConfig[EventLogDB])
+  lazy val transactorResource: Resource[IO, HikariTransactor[IO]] = transactorProvider.transactorResource
+
+  def execute[O](query: ConnectionIO[O]): O =
+    transactorResource
+      .use(query.transact(_))
+      .unsafeRunSync()
+}

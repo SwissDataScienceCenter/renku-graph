@@ -19,9 +19,10 @@
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
+import cats.effect.Bracket
 import cats.implicits._
-import ch.datascience.db.TransactorProvider
-import ch.datascience.dbeventlog.EventBody
+import ch.datascience.db.DbTransactorProvider
+import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.dbeventlog.commands.EventLogAdd
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -88,7 +89,10 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
     val commitEvent = commitEvents.generateOne
 
     class TestCommitEventSerializer extends CommitEventSerializer[Try]
-    class TestEventLogAdd(transactorProvider: TransactorProvider[Try]) extends EventLogAdd[Try](transactorProvider)
+    class TestEventLogAdd(
+        transactorProvider: DbTransactorProvider[Try, EventLogDB]
+    )(implicit ME:          Bracket[Try, Throwable])
+        extends EventLogAdd[Try](transactorProvider)
     val eventSerializer = mock[TestCommitEventSerializer]
     val eventAdd        = mock[TestEventLogAdd]
     val eventSender     = new CommitEventSender[Try](eventSerializer, eventAdd)

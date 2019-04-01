@@ -20,10 +20,9 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
-import cats.implicits._
-import ch.datascience.db.TransactorProvider
+import cats.effect.{Bracket, ContextShift, IO}
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactorProvider
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
 import ch.datascience.dbeventlog.commands.ExecutionDateCalculator.StatusBasedCalculator
@@ -33,19 +32,18 @@ import doobie.implicits._
 import scala.language.higherKinds
 
 class EventLogMarkFailed[Interpretation[_]](
-    transactorProvider:      TransactorProvider[Interpretation],
+    transactorProvider:      DbTransactorProvider[Interpretation, EventLogDB],
     executionDateCalculator: ExecutionDateCalculator = new ExecutionDateCalculator()
-)(implicit ME:               MonadError[Interpretation, Throwable]) {
+)(implicit ME:               Bracket[Interpretation, Throwable]) {
 
   import executionDateCalculator._
 
   def markEventFailed(commitEventId: CommitEventId,
                       status:        FailureStatus,
                       maybeMessage:  Option[EventMessage]): Interpretation[Unit] =
-    for {
-      transactor <- transactorProvider.transactor
-      _          <- findEventAndUpdate(commitEventId, status, maybeMessage).transact(transactor)
-    } yield ()
+    transactorProvider.transactorResource.use { transactor =>
+      findEventAndUpdate(commitEventId, status, maybeMessage).transact(transactor)
+    }
 
   private def findEventAndUpdate(commitEventId: CommitEventId,
                                  status:        FailureStatus,
@@ -113,5 +111,6 @@ object ExecutionDateCalculator {
 }
 
 class IOEventLogMarkFailed(
-    implicit contextShift: ContextShift[IO]
-) extends EventLogMarkFailed[IO](new IOTransactorProvider)
+    dbConfig:            DBConfig[EventLogDB]
+)(implicit contextShift: ContextShift[IO])
+    extends EventLogMarkFailed[IO](new DbTransactorProvider(dbConfig))

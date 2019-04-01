@@ -18,18 +18,17 @@
 
 package ch.datascience.tokenrepository.repository.deletion
 
-import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import ch.datascience.tokenrepository.repository.InMemoryProjectsTokens
+import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import doobie.implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class TokenRemoverSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
+class TokenRemoverSpec extends WordSpec with InMemoryProjectsTokensDbSpec {
 
   "delete" should {
 
@@ -55,24 +54,13 @@ class TokenRemoverSpec extends WordSpec with DbSpec with InMemoryProjectsTokens 
 
     val remover = new TokenRemover(transactorProvider)
 
-    def findToken(projectId: ProjectId): Option[String] =
-      sql"""select token 
-            from projects_tokens  
-            where project_id = ${projectId.value}
-         """
-        .query[String]
-        .option
-        .transact(transactor)
-        .unsafeRunSync()
-
-    def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit =
+    def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit = execute {
       sql"""insert into 
             projects_tokens (project_id, token) 
             values (${projectId.value}, ${encryptedToken.value})
          """.update.run
         .map(assureInserted)
-        .transact(transactor)
-        .unsafeRunSync()
+    }
 
     private lazy val assureInserted: Int => Unit = {
       case 1 => ()

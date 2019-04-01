@@ -19,32 +19,30 @@
 package ch.datascience.tokenrepository.repository.fetching
 
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import cats.{Monad, MonadError}
-import ch.datascience.db.TransactorProvider
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactorProvider
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import ch.datascience.tokenrepository.repository.ProjectsTokensConfig
+import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
 import scala.language.higherKinds
 
-private class PersistedTokensFinder[Interpretation[_]: Monad](
-    transactorProvider: TransactorProvider[Interpretation]
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+private class PersistedTokensFinder[Interpretation[_]](
+    transactorProvider: DbTransactorProvider[Interpretation, ProjectsTokensDB]
+)(implicit ME:          Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
   def findToken(projectId: ProjectId): OptionT[Interpretation, EncryptedAccessToken] = OptionT {
-    for {
-      transactor <- transactorProvider.transactor
-      token <- sql"select token from projects_tokens where project_id = ${projectId.value}"
-                .query[String]
-                .option
-                .transact(transactor)
-                .flatMap(toSerializedAccessToken(projectId))
-
-    } yield token
+    transactorProvider.transactorResource.use { transactor =>
+      sql"select token from projects_tokens where project_id = ${projectId.value}"
+        .query[String]
+        .option
+        .transact(transactor)
+        .flatMap(toSerializedAccessToken(projectId))
+    }
   }
 
   private def toSerializedAccessToken(
@@ -58,5 +56,7 @@ private class PersistedTokensFinder[Interpretation[_]: Monad](
   }
 }
 
-private class IOPersistedTokensFinder(implicit contextShift: ContextShift[IO])
-    extends PersistedTokensFinder[IO](new TransactorProvider[IO](new ProjectsTokensConfig[IO]))
+private class IOPersistedTokensFinder(
+    dbConfig:            DBConfig[ProjectsTokensDB]
+)(implicit contextShift: ContextShift[IO])
+    extends PersistedTokensFinder[IO](new DbTransactorProvider(dbConfig))

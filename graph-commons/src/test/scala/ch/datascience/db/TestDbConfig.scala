@@ -18,27 +18,28 @@
 
 package ch.datascience.db
 
-import cats.effect.{Async, ContextShift}
-import cats.implicits._
 import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.orchestration.Provider
-import doobie.util.transactor.Transactor
-import doobie.util.transactor.Transactor.Aux
+import ch.datascience.db.DBConfigProvider.DBConfig.Url
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.nonEmptyStrings
+import eu.timepit.refined.api.RefType
+import eu.timepit.refined.auto._
 
-import scala.language.higherKinds
+object TestDbConfig {
 
-class TransactorProvider[Interpretation[_]](
-    dbConfigProvider: Provider[Interpretation, DBConfig]
-)(implicit async:     Async[Interpretation], cs: ContextShift[Interpretation]) {
+  def newDbConfig[TargetDb]: DBConfig[TargetDb] = {
+    val dbName = nonEmptyStrings().map(suffix => s"db_$suffix").generateOne
+    DBConfig[TargetDb](
+      driver         = "org.h2.Driver",
+      url            = toUrl(s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"),
+      user           = "user",
+      pass           = "",
+      connectionPool = 20
+    )
+  }
 
-  lazy val transactor: Interpretation[Aux[Interpretation, Unit]] =
-    for {
-      dbConfig <- dbConfigProvider.get()
-    } yield
-      Transactor.fromDriverManager[Interpretation](
-        driver = dbConfig.driver.value,
-        url    = dbConfig.url.value,
-        user   = dbConfig.user.value,
-        pass   = dbConfig.pass
-      )
+  private def toUrl(value: String): Url =
+    RefType
+      .applyRef[Url](value)
+      .getOrElse(throw new IllegalArgumentException("Invalid db driver url value"))
 }

@@ -18,34 +18,33 @@
 
 package ch.datascience.tokenrepository.repository.association
 
-import cats.effect.{ContextShift, IO}
-import cats.implicits._
-import cats.{Monad, MonadError}
-import ch.datascience.db.TransactorProvider
+import cats.Monad
+import cats.effect.{Bracket, ContextShift, IO}
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactorProvider
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import ch.datascience.tokenrepository.repository.ProjectsTokensConfig
+import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
 import scala.language.higherKinds
 
 private class AssociationPersister[Interpretation[_]: Monad](
-    transactorProvider: TransactorProvider[Interpretation]
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+    transactorProvider: DbTransactorProvider[Interpretation, ProjectsTokensDB]
+)(implicit ME:          Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
   def persistAssociation(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
-    for {
-      transactor <- transactorProvider.transactor
-      _ <- sql"select token from projects_tokens where project_id = ${projectId.value}"
-            .query[String]
-            .option
-            .flatMap {
-              case Some(_) => update(projectId, encryptedToken)
-              case None    => insert(projectId, encryptedToken)
-            }
-            .transact(transactor)
-    } yield ()
+    transactorProvider.transactorResource.use { transactor =>
+      sql"select token from projects_tokens where project_id = ${projectId.value}"
+        .query[String]
+        .option
+        .flatMap {
+          case Some(_) => update(projectId, encryptedToken)
+          case None    => insert(projectId, encryptedToken)
+        }
+        .transact(transactor)
+    }
 
   private def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken) =
     sql"""insert into 
@@ -65,5 +64,7 @@ private class AssociationPersister[Interpretation[_]: Monad](
   }
 }
 
-private class IOAssociationPersister(implicit contextShift: ContextShift[IO])
-    extends AssociationPersister[IO](new TransactorProvider[IO](new ProjectsTokensConfig[IO]))
+private class IOAssociationPersister(
+    dbConfig:            DBConfig[ProjectsTokensDB]
+)(implicit contextShift: ContextShift[IO])
+    extends AssociationPersister[IO](new DbTransactorProvider(dbConfig))

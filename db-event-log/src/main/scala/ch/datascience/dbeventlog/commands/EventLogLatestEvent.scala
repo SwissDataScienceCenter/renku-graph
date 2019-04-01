@@ -18,35 +18,34 @@
 
 package ch.datascience.dbeventlog.commands
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
-import cats.implicits._
-import ch.datascience.db.TransactorProvider
-import ch.datascience.dbeventlog.IOTransactorProvider
+import cats.effect.{Bracket, ContextShift, IO}
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactorProvider
+import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import doobie.implicits._
 
 import scala.language.higherKinds
 
 class EventLogLatestEvent[Interpretation[_]](
-    transactorProvider: TransactorProvider[Interpretation]
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+    transactorProvider: DbTransactorProvider[Interpretation, EventLogDB],
+)(implicit ME:          Bracket[Interpretation, Throwable]) {
 
   def findYoungestEventInLog(projectId: ProjectId): Interpretation[Option[CommitId]] =
-    for {
-      transactor <- transactorProvider.transactor
-      maybeEventId <- sql"""
-                           |select event_id
-                           |from event_log
-                           |where project_id = $projectId
-                           |order by event_date desc
-                           |limit 1""".stripMargin
-                       .query[CommitId]
-                       .option
-                       .transact(transactor)
-    } yield maybeEventId
+    transactorProvider.transactorResource.use { transactor =>
+      sql"""
+           |select event_id
+           |from event_log
+           |where project_id = $projectId
+           |order by event_date desc
+           |limit 1""".stripMargin
+        .query[CommitId]
+        .option
+        .transact(transactor)
+    }
 }
 
 class IOEventLogLatestEvent(
-    implicit contextShift: ContextShift[IO]
-) extends EventLogLatestEvent[IO](new IOTransactorProvider)
+    dbConfig:            DBConfig[EventLogDB]
+)(implicit contextShift: ContextShift[IO])
+    extends EventLogLatestEvent[IO](new DbTransactorProvider(dbConfig))

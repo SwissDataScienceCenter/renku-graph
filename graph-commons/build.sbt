@@ -35,6 +35,7 @@ libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
 val doobieVersion = "0.6.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
+libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.6.0"

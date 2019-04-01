@@ -24,6 +24,8 @@ import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
@@ -140,9 +142,7 @@ private object HookEventEndpoint {
 }
 
 class IOHookEventEndpoint(
-    gitLabThrottler: Throttler[IO, GitLab]
-)(
-    implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    clock:                     Clock[IO]
-) extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOPushEventSender(gitLabThrottler))
+    dbConfig:                DBConfig[EventLogDB],
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
+    extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOPushEventSender(dbConfig, gitLabThrottler))

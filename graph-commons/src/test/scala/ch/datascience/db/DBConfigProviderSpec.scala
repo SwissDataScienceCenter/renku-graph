@@ -35,102 +35,124 @@ import scala.util.{Failure, Success, Try}
 
 class DBConfigProviderSpec extends WordSpec {
 
-  private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
-
   "get" should {
 
     "return db config read from the configuration" in new TestCase {
-      val namespace = nonEmptyStrings().generateOne
-      val host      = hosts.generateOne
-      val user      = nonEmptyStrings().generateOne
-      val password  = nonEmptyStrings().generateOne
+      val host           = hosts.generateOne
+      val user           = nonEmptyStrings().generateOne
+      val password       = nonEmptyStrings().generateOne
+      val connectionPool = positiveInts().generateOne
 
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host" -> host.value,
-            "db-user" -> user,
-            "db-pass" -> password
+            "db-host"         -> host.value,
+            "db-user"         -> user,
+            "db-pass"         -> password,
+            "connection-pool" -> connectionPool
           ).asJava
         ).asJava
       )
 
-      val Success(dbConfig) = new DBConfigProvider[Try](namespace, driver, dbName, urlPrefix, config).get()
+      val Success(dbConfig) = new DBConfigProvider[Try, TestDB](namespace, driver, dbName, urlPrefix, config).get()
 
-      dbConfig.driver     shouldBe driver
-      dbConfig.url.value  shouldBe s"$urlPrefix://$host/$dbName"
-      dbConfig.user.value shouldBe user
-      dbConfig.pass       shouldBe password
+      dbConfig.driver               shouldBe driver
+      dbConfig.url.value            shouldBe s"$urlPrefix://$host/$dbName"
+      dbConfig.user.value           shouldBe user
+      dbConfig.pass                 shouldBe password
+      dbConfig.connectionPool.value shouldBe connectionPool
     }
 
     "fail if there is no db config namespace in the config" in new TestCase {
       val Failure(exception) =
-        new DBConfigProvider[Try]("unknown", driver, dbName, urlPrefix, ConfigFactory.empty()).get()
+        new DBConfigProvider[Try, TestDB](namespace, driver, dbName, urlPrefix, ConfigFactory.empty()).get()
 
       exception shouldBe a[ConfigLoadingException]
     }
 
     "fail if there is no '<config-namespace>.db-host' in the config" in new TestCase {
-      val namespace = nonEmptyStrings().generateOne
       val config = ConfigFactory.parseMap(
         Map(
-          "projects-tokens" -> Map(
-            "db-host" -> "",
+          namespace -> Map(
+            "db-host"         -> "",
+            "db-user"         -> nonEmptyStrings().generateOne,
+            "db-pass"         -> nonEmptyStrings().generateOne,
+            "connection-pool" -> positiveInts().generateOne
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, driver, dbName, urlPrefix, config).get()
+
+      exception shouldBe a[ConfigLoadingException]
+    }
+
+    "fail if there is no '<config-namespace>.db-user' in the config" in new TestCase {
+      val config = ConfigFactory.parseMap(
+        Map(
+          namespace -> Map(
+            "db-host"         -> hosts.generateOne.value,
+            "db-user"         -> "",
+            "db-pass"         -> nonEmptyStrings().generateOne,
+            "connection-pool" -> positiveInts().generateOne
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, driver, dbName, urlPrefix, config).get()
+
+      exception shouldBe a[ConfigLoadingException]
+    }
+
+    "fail if there is no '<config-namespace>.db-pass' in the config" in new TestCase {
+      val config = ConfigFactory.parseMap(
+        Map(
+          namespace -> Map(
+            "db-host"         -> hosts.generateOne.value,
+            "db-user"         -> nonEmptyStrings().generateOne,
+            "connection-pool" -> positiveInts().generateOne
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, driver, dbName, urlPrefix, config).get()
+
+      exception shouldBe a[ConfigLoadingException]
+    }
+
+    "fail if there is no '<config-namespace>.connection-pool' in the config" in new TestCase {
+      val config = ConfigFactory.parseMap(
+        Map(
+          namespace -> Map(
+            "db-host" -> hosts.generateOne.value,
             "db-user" -> nonEmptyStrings().generateOne,
             "db-pass" -> nonEmptyStrings().generateOne
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = new DBConfigProvider[Try](namespace, driver, dbName, urlPrefix, config).get()
-
-      exception shouldBe a[ConfigLoadingException]
-    }
-
-    "fail if there is no '<config-namespace>.db-user' in the config" in new TestCase {
-      val namespace = nonEmptyStrings().generateOne
-      val config = ConfigFactory.parseMap(
-        Map(
-          "projects-tokens" -> Map(
-            "db-host" -> hosts.generateOne.value,
-            "db-user" -> "",
-            "db-pass" -> nonEmptyStrings().generateOne
-          ).asJava
-        ).asJava
-      )
-
-      val Failure(exception) = new DBConfigProvider[Try](namespace, driver, dbName, urlPrefix, config).get()
-
-      exception shouldBe a[ConfigLoadingException]
-    }
-
-    "fail if there is no '<config-namespace>.db-pass' in the config" in new TestCase {
-      val namespace = nonEmptyStrings().generateOne
-      val config = ConfigFactory.parseMap(
-        Map(
-          "projects-tokens" -> Map(
-            "db-host" -> hosts.generateOne.value,
-            "db-user" -> nonEmptyStrings().generateOne
-          ).asJava
-        ).asJava
-      )
-
-      val Failure(exception) = new DBConfigProvider[Try](namespace, driver, dbName, urlPrefix, config).get()
+      val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, driver, dbName, urlPrefix, config).get()
 
       exception shouldBe a[ConfigLoadingException]
     }
   }
 
+  private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+
   private trait TestCase {
+    sealed trait TestDB
+
+    val namespace = nonEmptyStrings().generateOne
+
     val driver = RefType
       .applyRef[Driver](nonEmptyStrings().generateOne)
       .getOrElse(throw new IllegalArgumentException("Invalid driver value"))
     val dbName = RefType
       .applyRef[DbName](nonEmptyStrings().generateOne)
-      .getOrElse(throw new IllegalArgumentException("Invalid url value"))
+      .getOrElse(throw new IllegalArgumentException("Invalid dbName value"))
     val urlPrefix = RefType
       .applyRef[UrlPrefix](nonEmptyStrings().generateOne)
-      .getOrElse(throw new IllegalArgumentException("Invalid url value"))
+      .getOrElse(throw new IllegalArgumentException("Invalid urlPrefix value"))
 
     val hosts: Gen[Host] = for {
       hostname <- nonEmptyStrings()
@@ -138,6 +160,6 @@ class DBConfigProviderSpec extends WordSpec {
     } yield
       RefType
         .applyRef[Host](s"$hostname:$port")
-        .getOrElse(throw new IllegalArgumentException("Invalid url value"))
+        .getOrElse(throw new IllegalArgumentException("Invalid host` value"))
   }
 }

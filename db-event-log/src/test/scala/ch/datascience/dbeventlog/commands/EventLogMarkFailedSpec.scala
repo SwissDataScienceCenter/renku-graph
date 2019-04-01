@@ -18,7 +18,6 @@
 
 package ch.datascience.dbeventlog.commands
 
-import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
@@ -32,7 +31,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogDb with MockFactory {
+class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   import ExecutionDateCalculator._
 
@@ -146,14 +145,13 @@ class EventLogMarkFailedSpec extends WordSpec with DbSpec with InMemoryEventLogD
     val executionDateCalculator = mock[ExecutionDateCalculator]
     val eventLogMarkFailed      = new EventLogMarkFailed(transactorProvider, executionDateCalculator)
 
-    def findEvent(eventId: CommitEventId): (ExecutionDate, EventStatus, Option[EventMessage]) =
+    def findEvent(eventId: CommitEventId): (ExecutionDate, EventStatus, Option[EventMessage]) = execute {
       sql"""select execution_date, status, message
            |from event_log 
            |where event_id = ${eventId.id} and project_id = ${eventId.projectId}
          """.stripMargin
         .query[(ExecutionDate, EventStatus, Option[EventMessage])]
         .unique
-        .transact(transactor)
-        .unsafeRunSync()
+    }
   }
 }

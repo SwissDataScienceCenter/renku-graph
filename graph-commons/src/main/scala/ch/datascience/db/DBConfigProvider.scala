@@ -23,33 +23,33 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.orchestration.Provider
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
+import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.string.MatchesRegex
 
 import scala.language.higherKinds
 
-class DBConfigProvider[Interpretation[_]](
+class DBConfigProvider[Interpretation[_], TargetDB](
     namespace: String,
     driver:    DBConfig.Driver,
     dbName:    DBConfig.DbName,
     urlPrefix: DBConfig.UrlPrefix,
     config:    Config = ConfigFactory.load()
 )(implicit ME: MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation]
-    with Provider[Interpretation, DBConfig] {
+    extends ConfigLoader[Interpretation] {
 
   import DBConfigProvider._
 
-  override def get(): Interpretation[DBConfig] =
+  def get(): Interpretation[DBConfig[TargetDB]] =
     for {
-      host <- find[DBConfig.Host](s"$namespace.db-host", config)
-      user <- find[DBConfig.User](s"$namespace.db-user", config)
-      pass <- find[DBConfig.Pass](s"$namespace.db-pass", config)
-      url  <- findUrl(host)
-    } yield DBConfig(driver, url, user, pass)
+      host           <- find[DBConfig.Host](s"$namespace.db-host", config)
+      user           <- find[DBConfig.User](s"$namespace.db-user", config)
+      pass           <- find[DBConfig.Pass](s"$namespace.db-pass", config)
+      connectionPool <- find[DBConfig.ConnectionPool](s"$namespace.connection-pool", config)
+      url            <- findUrl(host)
+    } yield DBConfig(driver, url, user, pass, connectionPool)
 
   private def findUrl(host: DBConfig.Host): Interpretation[DBConfig.Url] = ME.fromEither {
     RefType
@@ -61,14 +61,19 @@ class DBConfigProvider[Interpretation[_]](
 object DBConfigProvider {
   import DBConfig._
 
-  case class DBConfig(driver: Driver, url: Url, user: User, pass: Pass)
+  case class DBConfig[TargetDB](driver:         Driver,
+                                url:            Url,
+                                user:           User,
+                                pass:           Pass,
+                                connectionPool: DBConfig.ConnectionPool)
   object DBConfig {
-    type Driver    = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type Url       = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type Host      = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type UrlPrefix = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type DbName    = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type User      = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type Pass      = String
+    type Driver         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type Url            = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type Host           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type UrlPrefix      = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type DbName         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type User           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type Pass           = String
+    type ConnectionPool = Int Refined Positive
   }
 }

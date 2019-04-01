@@ -16,10 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.orchestration
+package ch.datascience.tokenrepository.repository
+
+import cats.MonadError
+import ch.datascience.db.DBConfigProvider
+import eu.timepit.refined.auto._
 
 import scala.language.higherKinds
 
-trait Provider[Interpretation[_], T] {
-  def get(): Interpretation[T]
-}
+sealed trait ProjectsTokensDB
+
+class ProjectsTokensDbConfigProvider[Interpretation[_]](
+    implicit ME: MonadError[Interpretation, Throwable]
+) extends DBConfigProvider[Interpretation, ProjectsTokensDB](
+      namespace = "projects-tokens",
+      driver    = "org.postgresql.Driver",
+      dbName    = "projects_tokens",
+      urlPrefix = "jdbc:postgresql"
+    )

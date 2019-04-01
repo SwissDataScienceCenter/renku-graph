@@ -18,23 +18,16 @@
 
 package ch.datascience.tokenrepository.repository.init
 
-import cats.MonadError
 import cats.effect._
 import cats.implicits._
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.{DbSpec, TransactorProvider}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.orchestration.Provider
+import ch.datascience.interpreters.TestLogger.Level.Info
+import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDb
 import doobie.implicits._
-import doobie.util.transactor.Transactor.Aux
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class DbInitializerSpec extends WordSpec with DbSpec with MockFactory {
+class DbInitializerSpec extends WordSpec with InMemoryProjectsTokensDb {
 
   "run" should {
 
@@ -47,7 +40,7 @@ class DbInitializerSpec extends WordSpec with DbSpec with MockFactory {
 
       tableExists() shouldBe true
 
-      logger.loggedOnly(Info("Database initialization success"))
+      logger.loggedOnly(Info("Projects Tokens database initialization success"))
     }
 
     "create the projects_tokens table if id does not exist" in new TestCase {
@@ -59,20 +52,7 @@ class DbInitializerSpec extends WordSpec with DbSpec with MockFactory {
 
       tableExists() shouldBe true
 
-      logger.loggedOnly(Info("Database initialization success"))
-    }
-
-    "fail if table creation process fails" in new MockTestCase {
-      val exception = exceptions.generateOne
-      (dbConfigProvider.get _)
-        .expects()
-        .returning(context.raiseError(exception))
-
-      intercept[Exception] {
-        dbInitializer.run.unsafeRunSync()
-      } shouldBe exception
-
-      logger.loggedOnly(Error("Database initialization failure", exception))
+      logger.loggedOnly(Info("Projects Tokens database initialization success"))
     }
   }
 
@@ -81,41 +61,28 @@ class DbInitializerSpec extends WordSpec with DbSpec with MockFactory {
     val dbInitializer = new DbInitializer[IO](transactorProvider, logger)
   }
 
-  private trait MockTestCase {
-    val context = MonadError[IO, Throwable]
-
-    val logger           = TestLogger[IO]()
-    val dbConfigProvider = mock[Provider[IO, DBConfig]]
-    val dbInitializer = new DbInitializer[IO](
-      new TransactorProvider[IO](dbConfigProvider),
-      logger
-    )
-  }
-
   private def tableExists(): Boolean =
-    sql"""select exists (select * from projects_tokens);""".query.option
-      .transact(transactor)
+    transactorResource
+      .use { transactor =>
+        sql"""select exists (select * from projects_tokens);""".query.option
+          .transact(transactor)
+      }
       .recover {
         case _ => None
       }
       .unsafeRunSync()
       .isDefined
 
-  private def createTable(): Unit =
+  private def createTable(): Unit = execute {
     sql"""
          |CREATE TABLE projects_tokens(
          | project_id int4 PRIMARY KEY,
          | token VARCHAR NOT NULL
          |);
        """.stripMargin.update.run
-      .transact(transactor)
-      .unsafeRunSync()
+  }
 
-  protected def dropTable(): Unit =
+  protected def dropTable(): Unit = execute {
     sql"DROP TABLE IF EXISTS projects_tokens".update.run
-      .transact(transactor)
-      .unsafeRunSync()
-
-  protected override def initDb(transactor:           Aux[IO, Unit]): Unit = ()
-  protected override def prepareDbForTest(transactor: Aux[IO, Unit]): Unit = ()
+  }
 }

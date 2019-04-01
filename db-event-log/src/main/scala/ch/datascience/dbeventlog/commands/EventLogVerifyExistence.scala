@@ -18,12 +18,12 @@
 
 package ch.datascience.dbeventlog.commands
 
-import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.db.TransactorProvider
-import ch.datascience.dbeventlog.IOTransactorProvider
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactorProvider
+import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import doobie.implicits._
 import doobie.util.fragments.in
@@ -31,8 +31,8 @@ import doobie.util.fragments.in
 import scala.language.higherKinds
 
 class EventLogVerifyExistence[Interpretation[_]](
-    transactorProvider: TransactorProvider[Interpretation]
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+    transactorProvider: DbTransactorProvider[Interpretation, EventLogDB]
+)(implicit ME:          Bracket[Interpretation, Throwable]) {
 
   def filterNotExistingInLog(eventIds: List[CommitId], projectId: ProjectId): Interpretation[List[CommitId]] =
     eventIds match {
@@ -40,24 +40,23 @@ class EventLogVerifyExistence[Interpretation[_]](
       case head +: tail => checkInDB(NonEmptyList.of(head, tail: _*), projectId)
     }
 
-  // format: off
   private def checkInDB(eventIds: NonEmptyList[CommitId], projectId: ProjectId) =
-    for {
-      transactor       <- transactorProvider.transactor
-      existingEventIds <- { fr"""
-                              select event_id
-                              from event_log
-                              where project_id = $projectId""" ++ `and event_id IN`(eventIds) }
-                            .query[CommitId]
-                            .to[List]
-                            .transact(transactor)
-    } yield eventIds.toList diff existingEventIds
-  // format: on
+    transactorProvider.transactorResource.use { transactor =>
+      { fr"""
+          select event_id
+          from event_log
+          where project_id = $projectId""" ++ `and event_id IN`(eventIds) }
+        .query[CommitId]
+        .to[List]
+        .transact(transactor)
+        .map(existingEventIds => eventIds.toList diff existingEventIds)
+    }
 
   private def `and event_id IN`(eventIds: NonEmptyList[CommitId]) =
     fr" and " ++ in(fr"event_id", eventIds)
 }
 
 class IOEventLogVerifyExistence(
-    implicit contextShift: ContextShift[IO]
-) extends EventLogVerifyExistence[IO](new IOTransactorProvider)
+    dbConfig:            DBConfig[EventLogDB]
+)(implicit contextShift: ContextShift[IO])
+    extends EventLogVerifyExistence[IO](new DbTransactorProvider(dbConfig))

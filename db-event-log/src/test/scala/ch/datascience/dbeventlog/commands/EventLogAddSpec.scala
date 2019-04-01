@@ -20,7 +20,6 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
-import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog._
 import DbEventLogGenerators._
 import ch.datascience.dbeventlog.EventStatus.New
@@ -32,7 +31,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogAddSpec extends WordSpec with DbSpec with InMemoryEventLogDb with MockFactory {
+class EventLogAddSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "storeNewEvent" should {
 
@@ -118,13 +117,19 @@ class EventLogAddSpec extends WordSpec with DbSpec with InMemoryEventLogDb with 
     def storedEvent(
         commitEventId: CommitEventId
     ): (CommitEventId, EventStatus, CreatedDate, ExecutionDate, CommittedDate, EventBody, Option[EventMessage]) =
-      sql"""select event_id, project_id, status, created_date, execution_date, event_date, event_body, message
-           |from event_log  
-           |where event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId}
+      execute {
+        sql"""select event_id, project_id, status, created_date, execution_date, event_date, event_body, message
+             |from event_log  
+             |where event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId}
          """.stripMargin
-        .query[(CommitEventId, EventStatus, CreatedDate, ExecutionDate, CommittedDate, EventBody, Option[EventMessage])]
-        .unique
-        .transact(transactor)
-        .unsafeRunSync()
+          .query[(CommitEventId,
+                  EventStatus,
+                  CreatedDate,
+                  ExecutionDate,
+                  CommittedDate,
+                  EventBody,
+                  Option[EventMessage])]
+          .unique
+      }
   }
 }

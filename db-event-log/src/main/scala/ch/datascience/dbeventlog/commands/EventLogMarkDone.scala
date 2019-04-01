@@ -20,28 +20,29 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.db.TransactorProvider
+import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactorProvider
 import ch.datascience.dbeventlog.EventStatus.{Processing, TriplesStore}
-import ch.datascience.dbeventlog.{EventStatus, IOTransactorProvider}
+import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import ch.datascience.graph.model.events.CommitEventId
 import doobie.implicits._
 
 import scala.language.higherKinds
 
 class EventLogMarkDone[Interpretation[_]](
-    transactorProvider: TransactorProvider[Interpretation],
+    transactorProvider: DbTransactorProvider[Interpretation, EventLogDB],
     now:                () => Instant = Instant.now
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+)(implicit ME:          Bracket[Interpretation, Throwable]) {
 
   def markEventDone(commitEventId: CommitEventId): Interpretation[Unit] =
-    for {
-      transactor     <- transactorProvider.transactor
-      updatedRecords <- update(commitEventId, newStatus = TriplesStore).transact(transactor)
-      _              <- failIfNoRecordsUpdated(commitEventId)(updatedRecords)
-    } yield ()
+    transactorProvider.transactorResource.use { transactor =>
+      for {
+        updatedRecords <- update(commitEventId, newStatus = TriplesStore).transact(transactor)
+        _              <- failIfNoRecordsUpdated(commitEventId)(updatedRecords)
+      } yield ()
+    }
 
   private def update(commitEventId: CommitEventId, newStatus: EventStatus) =
     sql"""update event_log 
@@ -61,5 +62,6 @@ class EventLogMarkDone[Interpretation[_]](
 }
 
 class IOEventLogMarkDone(
-    implicit contextShift: ContextShift[IO]
-) extends EventLogMarkDone[IO](new IOTransactorProvider)
+    dbConfig:            DBConfig[EventLogDB]
+)(implicit contextShift: ContextShift[IO])
+    extends EventLogMarkDone[IO](new DbTransactorProvider(dbConfig))

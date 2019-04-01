@@ -18,26 +18,30 @@
 
 package ch.datascience.tokenrepository.repository
 
-import cats.effect.IO
 import ch.datascience.db.DbSpec
+import ch.datascience.graph.model.events.ProjectId
 import doobie.implicits._
-import doobie.util.transactor.Transactor.Aux
+import org.scalatest.TestSuite
 
-trait InMemoryProjectsTokens {
-  self: DbSpec =>
+trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb {
+  self: TestSuite =>
 
-  protected def initDb(transactor: Aux[IO, Unit]): Unit =
-    sql"""
-         |CREATE TABLE projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | token VARCHAR NOT NULL
-         |);
-       """.stripMargin.update.run
-      .transact(transactor)
-      .unsafeRunSync()
+  protected def initDb(): Unit = execute {
+    sql"""|CREATE TABLE projects_tokens(
+          | project_id int4 PRIMARY KEY,
+          | token VARCHAR NOT NULL
+          |);""".stripMargin.update.run
+  }
 
-  protected def prepareDbForTest(transactor: Aux[IO, Unit]): Unit =
+  protected def prepareDbForTest(): Unit = execute {
     sql"TRUNCATE TABLE projects_tokens".update.run
-      .transact(transactor)
-      .unsafeRunSync()
+  }
+
+  protected def findToken(projectId: ProjectId): Option[String] = execute {
+    sql"""select token 
+          from projects_tokens  
+          where project_id = ${projectId.value}"""
+      .query[String]
+      .option
+  }
 }
