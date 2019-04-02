@@ -18,6 +18,8 @@
 
 package ch.datascience.triplesgenerator
 
+import java.util.concurrent.Executors.newFixedThreadPool
+
 import cats.effect._
 import ch.datascience.dbeventlog.EventLogDbConfigProvider
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
@@ -25,12 +27,20 @@ import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.init._
+import pureconfig._
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.ExecutionContext
 
 object Microservice extends IOApp {
 
-  private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
+  private implicit val executionContext: ExecutionContext =
+    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
+
+  protected implicit override def contextShift: ContextShift[IO] =
+    IO.contextShift(executionContext)
+
+  protected implicit override def timer: Timer[IO] =
+    IO.timer(executionContext)
 
   private val microserviceInstantiator = for {
     eventLogDbConfig <- new EventLogDbConfigProvider[IO].get()

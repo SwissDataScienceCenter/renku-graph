@@ -18,6 +18,8 @@
 
 package ch.datascience.webhookservice
 
+import java.util.concurrent.Executors.newFixedThreadPool
+
 import cats.effect._
 import ch.datascience.dbeventlog.EventLogDbConfigProvider
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
@@ -27,13 +29,21 @@ import ch.datascience.webhookservice.eventprocessing.IOHookEventEndpoint
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
 import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, IOEventsSynchronizationScheduler}
+import pureconfig.loadConfigOrThrow
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 object Microservice extends IOApp {
 
-  private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
+  private implicit val executionContext: ExecutionContext =
+    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
+
+  protected implicit override def contextShift: ContextShift[IO] =
+    IO.contextShift(executionContext)
+
+  protected implicit override def timer: Timer[IO] =
+    IO.timer(executionContext)
 
   private val microserviceInstantiator = for {
     eventLogDbConfig <- new EventLogDbConfigProvider[IO].get()
