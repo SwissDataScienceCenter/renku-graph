@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-organization := "ch.datascience"
-name := "renku-graph-commons"
+name := "graph-commons"
 
 val pureConfigVersion = "0.10.2"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
@@ -34,6 +33,10 @@ libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
+val doobieVersion = "0.6.0"
+libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
+libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
+
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.6.0"
 
 val http4sVersion = "0.20.0-M6"
@@ -47,3 +50,6 @@ libraryDependencies += "com.github.tomakehurst" % "wiremock"    % "2.21.0" % Tes
 libraryDependencies += "org.scalamock"          %% "scalamock"  % "4.1.0"  % Test
 libraryDependencies += "org.scalacheck"         %% "scalacheck" % "1.14.0" % Test
 libraryDependencies += "org.scalatest"          %% "scalatest"  % "3.0.6"  % Test
+
+libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
+libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test

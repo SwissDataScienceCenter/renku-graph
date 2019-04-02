@@ -33,6 +33,10 @@ trait Sensitive extends Any {
 
 abstract class TinyTypeFactory[V, TT <: TinyType[V]](instantiate: V => TT) extends Constraints[V] with TypeName {
 
+  import cats.implicits._
+
+  import scala.util.Try
+
   final def apply(value: V): TT = from(value).fold(
     exception => throw exception,
     identity
@@ -42,8 +46,13 @@ abstract class TinyTypeFactory[V, TT <: TinyType[V]](instantiate: V => TT) exten
 
   final def from(value: V): Either[IllegalArgumentException, TT] = {
     val maybeErrors = validateConstraints(value)
-    if (maybeErrors.isEmpty) Right(instantiate(value))
+    if (maybeErrors.isEmpty) Either.fromTry[TT](Try(instantiate(value))) leftMap flattenErrors
     else Left(new IllegalArgumentException(maybeErrors.mkString("; ")))
+  }
+
+  private lazy val flattenErrors: Throwable => IllegalArgumentException = {
+    case exception: IllegalArgumentException => exception
+    case exception => new IllegalArgumentException(exception)
   }
 }
 

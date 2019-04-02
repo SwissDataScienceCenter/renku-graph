@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice
 
 import cats.effect._
+import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.http.server.HttpServer
 import ch.datascience.webhookservice.eventprocessing.IOHookEventEndpoint
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
@@ -31,6 +32,7 @@ object Microservice extends IOApp {
 
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
 
+  private val eventLogDbInitializer = new IOEventLogDbInitializer
   private val httpServer = new HttpServer[IO](
     serverPort = 9001,
     serviceRoutes = new MicroserviceRoutes[IO](
@@ -41,13 +43,14 @@ object Microservice extends IOApp {
   )
 
   override def run(args: List[String]): IO[ExitCode] =
-    new MicroserviceRunner(httpServer).run(args)
+    new MicroserviceRunner(eventLogDbInitializer, httpServer).run(args)
 }
 
-class MicroserviceRunner(httpServer: HttpServer[IO]) {
+class MicroserviceRunner(eventLogDbInitializer: IOEventLogDbInitializer, httpServer: HttpServer[IO]) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
+      _      <- eventLogDbInitializer.run
       result <- httpServer.run
     } yield result
 }

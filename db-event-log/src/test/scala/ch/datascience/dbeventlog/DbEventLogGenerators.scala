@@ -16,20 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.commitevent.filelog
+package ch.datascience.dbeventlog
 
-import java.nio.file.Path
+import EventStatus._
+import ch.datascience.generators.Generators._
+import org.scalacheck.Gen
 
-import cats.MonadError
-import ch.datascience.config.ConfigLoader
-import com.typesafe.config.{Config, ConfigFactory}
+object DbEventLogGenerators {
 
-import scala.language.higherKinds
-
-private class LogFileConfigProvider[Interpretation[_]](
-    config:    Config = ConfigFactory.load()
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
-
-  def get: Interpretation[Path] = find[Path]("file-event-log.file-path", config)
+  implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
+  implicit val createdDates:   Gen[CreatedDate]   = timestampsNotInTheFuture map CreatedDate.apply
+  implicit val executionDates: Gen[ExecutionDate] = timestamps map ExecutionDate.apply
+  implicit val eventStatuses:  Gen[EventStatus]   = Gen.oneOf(New, Processing, TriplesStore, TriplesStoreFailure)
+  implicit val eventMessages:  Gen[EventMessage]  = nonEmptyStrings() map EventMessage.apply
 }

@@ -22,6 +22,9 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.dbeventlog.EventStatus._
+import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed, IOEventLogMarkDone, IOEventLogMarkFailed}
+import ch.datascience.dbeventlog.{EventBody, EventMessage}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
@@ -39,23 +42,27 @@ class CommitEventProcessor[Interpretation[_]](
     accessTokenFinder:        AccessTokenFinder[Interpretation],
     triplesFinder:            TriplesFinder[Interpretation],
     fusekiConnector:          FusekiConnector[Interpretation],
+    eventLogMarkDone:         EventLogMarkDone[Interpretation],
+    eventLogMarkFailed:       EventLogMarkFailed[Interpretation],
     logger:                   Logger[Interpretation]
 )(implicit ME:                MonadError[Interpretation, Throwable])
     extends EventProcessor[Interpretation] {
 
   import accessTokenFinder._
   import commitEventsDeserialiser._
+  import eventLogMarkDone._
+  import eventLogMarkFailed._
   import fusekiConnector._
   import triplesFinder._
 
-  def apply(eventJson: String): Interpretation[Unit] = {
+  def apply(eventBody: EventBody): Interpretation[Unit] = {
     for {
-      commits          <- deserialiseToCommitEvents(eventJson)
+      commits          <- deserialiseToCommitEvents(eventBody)
       maybeAccessToken <- findAccessToken(commits.head.project.id) flatMap logIfNoAccessToken(commits.head)
-      _                <- commits.map(commit => toTriplesAndUpload(commit, maybeAccessToken)).sequence
+      _                <- (commits map (commit => toTriplesAndUpload(commit, maybeAccessToken))).sequence
       _                <- logEventProcessed(commits)
     } yield ()
-  } recoverWith logEventProcessingError(eventJson)
+  } recoverWith logEventProcessingError(eventBody)
 
   private def logIfNoAccessToken(commit: Commit): Option[AccessToken] => Interpretation[Option[AccessToken]] = {
     case found @ Some(_) => ME.pure(found)
@@ -67,13 +74,37 @@ class CommitEventProcessor[Interpretation[_]](
   private def toTriplesAndUpload(commit: Commit, maybeAccessToken: Option[AccessToken]): Interpretation[Unit] = {
     for {
       triples <- generateTriples(commit, maybeAccessToken)
-      result  <- upload(triples)
-    } yield result
-  } recoverWith logError(commit)
+      _       <- upload(triples) recoverWith markEventWithTriplesStoreFailure(commit)
+      _       <- markEventDone(commit.commitEventId) recoverWith logError(commit)
+    } yield ()
+  } recoverWith markEventWithNonRecoverableFailure(commit)
+
+  private def markEventWithTriplesStoreFailure(commit: Commit): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"${logMessageCommon(commit)} failed")
+      for {
+        _ <- markEventFailed(commit.commitEventId, TriplesStoreFailure, EventMessage(exception)) recoverWith uploadError(
+              exception)
+        _ <- ME.raiseError[Unit](UploadError(exception))
+      } yield ()
+  }
+
+  private def uploadError(exception: Throwable): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(_) => ME.raiseError(UploadError(exception))
+  }
+
+  private case class UploadError(cause: Throwable) extends Exception(cause)
+
+  private def markEventWithNonRecoverableFailure(commit: Commit): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case UploadError(_) => ME.unit
+    case NonFatal(exception) =>
+      logger.error(exception)(s"${logMessageCommon(commit)} failed")
+      markEventFailed(commit.commitEventId, NonRecoverableFailure, EventMessage(exception))
+  }
 
   private def logError(commit: Commit): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
-      logger.error(exception)(s"${logMessageCommon(commit)} failed")
+      logger.error(exception)(s"${logMessageCommon(commit)} failed to mark as $TriplesStore in the Event Log")
   }
 
   private def logEventProcessed(commits: NonEmptyList[Commit]): Interpretation[_] =
@@ -88,8 +119,8 @@ class CommitEventProcessor[Interpretation[_]](
       s"Commit Event id: $id, project: ${project.id} ${project.path}, parentId: $parentId"
   }
 
-  private def logEventProcessingError(eventJson: String): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) => logger.error(exception)(s"Commit Event processing failure: $eventJson")
+  private def logEventProcessingError(eventBody: EventBody): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) => logger.error(exception)(s"Commit Event processing failure: $eventBody")
   }
 }
 
@@ -99,5 +130,7 @@ class IOCommitEventProcessor(implicit contextShift: ContextShift[IO], executionC
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
       new IOTriplesFinder(new GitLabRepoUrlFinder[IO](new GitLabUrlProvider[IO]())),
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),
+      new IOEventLogMarkDone,
+      new IOEventLogMarkFailed,
       ApplicationLogger
     )

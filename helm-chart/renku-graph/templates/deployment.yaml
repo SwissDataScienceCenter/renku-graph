@@ -31,8 +31,15 @@ spec:
                 secretKeyRef:
                   name: {{ template "graph.fullname" . }}
                   key: webhookService-hookToken-secret
-            - name: FILE_EVENT_LOG_PATH
-              value: /events/log.txt
+            - name: EVENT_LOG_POSTGRES_HOST
+              value: "{{ template "postgresql.fullname" . }}:5432"
+            - name: EVENT_LOG_POSTGRES_USER
+              value: {{ .Values.global.graph.dbEventLog.postgresUser }}
+            - name: EVENT_LOG_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "graph.fullname" . }}
+                  key: dbEventLog-postgresPassword
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "token-repository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: GITLAB_BASE_URL
@@ -63,19 +70,23 @@ spec:
             httpGet:
               path: /ping
               port: http-webhook-sv
-          volumeMounts:
-            - name: file-event-log
-              mountPath: /events
           resources:
 {{ toYaml .Values.webhookService.resources | indent 12 }}
         - name: {{ .Chart.Name }}-triples-generator
           image: "{{ .Values.triplesGenerator.image.repository }}:{{ .Values.triplesGenerator.image.tag }}"
           imagePullPolicy: {{ .Values.triplesGenerator.image.pullPolicy }}
           env:
-            - name: FILE_EVENT_LOG_PATH
-              value: /events/log.txt
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "token-repository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
+            - name: EVENT_LOG_POSTGRES_HOST
+              value: "{{ template "postgresql.fullname" . }}:5432"
+            - name: EVENT_LOG_POSTGRES_USER
+              value: {{ .Values.global.graph.dbEventLog.postgresUser }}
+            - name: EVENT_LOG_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "graph.fullname" . }}
+                  key: dbEventLog-postgresPassword
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
             - name: JENA_DATASET_NAME
@@ -115,9 +126,6 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 3
-          volumeMounts:
-            - name: file-event-log
-              mountPath: /events
           resources:
 {{ toYaml .Values.triplesGenerator.resources | indent 12 }}
         - name: {{ .Chart.Name }}-token-repository
@@ -129,15 +137,11 @@ spec:
                 secretKeyRef:
                   name: {{ template "graph.fullname" . }}
                   key: tokenRepository-tokenEncryption-secret
-            - name: POSTGRES_HOST
+            - name: TOKEN_REPOSITORY_POSTGRES_HOST
               value: "{{ template "postgresql.fullname" . }}:5432"
-            - name: POSTGRES_USER
-              {{- if .Values.global.graph.tokenRepository.postgresUser }}
+            - name: TOKEN_REPOSITORY_POSTGRES_USER
               value: {{ .Values.global.graph.tokenRepository.postgresUser }}
-              {{- else }}
-              value: tokenstorage
-              {{- end }}
-            - name: POSTGRES_PASSWORD
+            - name: TOKEN_REPOSITORY_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ template "graph.fullname" . }}
@@ -166,14 +170,6 @@ spec:
             failureThreshold: 3
           resources:
 {{ toYaml .Values.tokenRepository.resources | indent 12 }}
-      volumes:
-        - name: file-event-log
-        {{- if .Values.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ .Values.persistence.existingClaim | default (include "graph.fullname" .) }}
-        {{- else }}
-          emptyDir: {}
-        {{- end }}
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}

@@ -24,6 +24,7 @@ import java.time.temporal.ChronoUnit.DAYS
 import ch.datascience.config.ServiceUrl
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
+import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -82,7 +83,7 @@ object Generators {
       .choose(Instant.EPOCH.toEpochMilli, Instant.now().plus(2000, DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)
 
-  val timestampsInThePast: Gen[Instant] =
+  val timestampsNotInTheFuture: Gen[Instant] =
     Gen
       .choose(Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli)
       .map(Instant.ofEpochMilli)
@@ -92,6 +93,40 @@ object Generators {
 
   implicit val serviceUrls: Gen[ServiceUrl] =
     httpUrls.map(ServiceUrl.apply)
+
+  implicit val jsons: Gen[Json] = {
+    import io.circe.syntax._
+
+    val tuples = for {
+      key <- nonEmptyStrings(maxLength = 5)
+      value <- Gen.oneOf(nonEmptyStrings(maxLength = 5),
+                         Arbitrary.arbNumber.arbitrary,
+                         Arbitrary.arbBool.arbitrary,
+                         Gen.nonEmptyListOf(nonEmptyStrings()))
+    } yield key -> value
+
+    val objects = for {
+      propertiesNumber <- positiveInts(5)
+      tuples           <- Gen.listOfN(propertiesNumber, tuples)
+    } yield Map(tuples: _*)
+
+    implicit val mapEncoder: Encoder[Map[String, Any]] = Encoder.instance[Map[String, Any]] { map =>
+      Json.obj(
+        map.map {
+          case (key, value: String)  => key -> Json.fromString(value)
+          case (key, value: Number)  => key -> Json.fromBigDecimal(value.doubleValue())
+          case (key, value: Boolean) => key -> Json.fromBoolean(value)
+          case (key, value: List[_]) => key -> Json.arr(value.map(_.toString).map(Json.fromString): _*)
+          case (_, value) =>
+            throw new NotImplementedError(
+              s"Add support for values of type '${value.getClass}' in the jsons generator"
+            )
+        }.toSeq: _*
+      )
+    }
+
+    objects.map(_.asJson)
+  }
 
   object Implicits {
 
@@ -104,6 +139,9 @@ object Generators {
         if (generated == value) generateDifferentThan(value)
         else generated
       }
+
     }
+
+    implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)
   }
 }

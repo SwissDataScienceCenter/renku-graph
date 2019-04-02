@@ -16,18 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.commitevent
+package ch.datascience.dbeventlog
 
 import cats.MonadError
-import ch.datascience.webhookservice.eventprocessing.commitevent.filelog.FileEventLog
+import ch.datascience.db.DBConfigProvider
+import eu.timepit.refined.auto._
 
 import scala.language.higherKinds
 
-trait EventLog[Interpretation[_]] {
-  def append(line: String): Interpretation[Unit]
-}
-
-object EventLog {
-  def apply[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]): EventLog[Interpretation] =
-    FileEventLog[Interpretation]
-}
+private class EventLogDbConfig[Interpretation[_]](
+    implicit ME: MonadError[Interpretation, Throwable]
+) extends DBConfigProvider[Interpretation](
+      namespace = "db-event-log",
+      driver    = "org.postgresql.Driver",
+      dbName    = "event_log",
+      urlPrefix = "jdbc:postgresql"
+    )

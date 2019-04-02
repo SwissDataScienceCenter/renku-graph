@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 
-organization := "ch.datascience"
 name := "token-repository"
 
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"

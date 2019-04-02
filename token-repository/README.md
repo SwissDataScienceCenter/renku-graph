@@ -94,5 +94,5 @@ docker build -f token-repository/Dockerfile -t token-repository .
 - run the service
 
 ```bash
-docker run --rm -p 9003:9003 token-repository
+docker run --rm -e 'TOKEN_REPOSITORY_POSTGRES_HOST=<postgres-host>' -e 'TOKEN_REPOSITORY_POSTGRES_USER=<user>' -e 'TOKEN_REPOSITORY_POSTGRES_PASSWORD=<password>' -e 'TOKEN_ENCRYPTION_SECRET=<openssl rand -hex 8|base64>' -p 9003:9003 token-repository
 ```

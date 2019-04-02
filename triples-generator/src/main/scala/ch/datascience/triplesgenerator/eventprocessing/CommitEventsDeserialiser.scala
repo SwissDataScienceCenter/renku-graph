@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
+import ch.datascience.dbeventlog.EventBody
 import ch.datascience.graph.model.events._
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import io.circe.parser._
@@ -32,10 +33,10 @@ private class CommitEventsDeserialiser[Interpretation[_]](
     implicit ME: MonadError[Interpretation, Throwable]
 ) {
 
-  def deserialiseToCommitEvents(jsonString: String): Interpretation[NonEmptyList[Commit]] = ME.fromEither {
-    parse(jsonString)
+  def deserialiseToCommitEvents(eventBody: EventBody): Interpretation[NonEmptyList[Commit]] = ME.fromEither {
+    parse(eventBody.value)
       .flatMap(_.as[NonEmptyList[Commit]])
-      .leftMap(toMeaningfulError(jsonString))
+      .leftMap(toMeaningfulError(eventBody))
   }
 
   private implicit val commitsDecoder: Decoder[NonEmptyList[Commit]] = (cursor: HCursor) =>
@@ -53,8 +54,8 @@ private class CommitEventsDeserialiser[Interpretation[_]](
       }
   }
 
-  private def toMeaningfulError(json: String): Error => Error = {
-    case failure: DecodingFailure => failure.withMessage(s"CommitEvent cannot be deserialised: '$json'")
-    case failure: ParsingFailure  => ParsingFailure(s"CommitEvent cannot be deserialised: '$json'", failure)
+  private def toMeaningfulError(eventBody: EventBody): Error => Error = {
+    case failure: DecodingFailure => failure.withMessage(s"CommitEvent cannot be deserialised: '$eventBody'")
+    case failure: ParsingFailure  => ParsingFailure(s"CommitEvent cannot be deserialised: '$eventBody'", failure)
   }
 }

@@ -19,9 +19,10 @@
 package ch.datascience.triplesgenerator
 
 import cats.effect._
+import ch.datascience.dbeventlog.commands.IOEventLogFetch
+import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
-import ch.datascience.triplesgenerator.eventprocessing.filelog.FileEventProcessorRunner
 import ch.datascience.triplesgenerator.init.{FusekiDatasetInitializer, IOFusekiDatasetInitializer, SentryInitializer}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
@@ -34,10 +35,11 @@ object Microservice extends IOApp {
     serverPort    = 9002,
     serviceRoutes = new MicroserviceRoutes[IO].routes
   )
-  private val eventProcessorRunner = new EventsSource[IO](new FileEventProcessorRunner(_))
+  private val eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch))
     .withEventsProcessor(new IOCommitEventProcessor())
   private val microserviceRunner = new MicroserviceRunner(
     new SentryInitializer[IO],
+    new IOEventLogDbInitializer,
     new IOFusekiDatasetInitializer,
     eventProcessorRunner,
     httpServer
@@ -48,17 +50,19 @@ object Microservice extends IOApp {
 }
 
 private class MicroserviceRunner(
-    sentryInitializer:    SentryInitializer[IO],
-    datasetInitializer:   FusekiDatasetInitializer[IO],
-    eventProcessorRunner: EventProcessorRunner[IO],
-    httpServer:           HttpServer[IO]
-)(implicit contextShift:  ContextShift[IO]) {
+    sentryInitializer:     SentryInitializer[IO],
+    eventLogDbInitializer: IOEventLogDbInitializer,
+    datasetInitializer:    FusekiDatasetInitializer[IO],
+    eventProcessorRunner:  EventProcessorRunner[IO],
+    httpServer:            HttpServer[IO]
+)(implicit contextShift:   ContextShift[IO]) {
 
   import cats.implicits._
 
   def run(args: List[String]): IO[ExitCode] =
     for {
       _ <- sentryInitializer.run
+      _ <- eventLogDbInitializer.run
       _ <- datasetInitializer.run
       _ <- List(httpServer.run.start, eventProcessorRunner.run).sequence
     } yield ExitCode.Success

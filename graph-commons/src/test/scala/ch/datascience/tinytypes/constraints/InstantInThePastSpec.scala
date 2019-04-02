@@ -31,7 +31,7 @@ class InstantInThePastSpec extends WordSpec with PropertyChecks {
   "InstantInThePast" should {
 
     "be instantiatable when values are Instants in the past" in {
-      forAll(timestampsInThePast) { someValue =>
+      forAll(timestampsNotInTheFuture) { someValue =>
         InstantInThePastType(someValue).value shouldBe someValue
       }
     }
