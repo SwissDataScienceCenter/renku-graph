@@ -50,8 +50,10 @@ object Microservice extends IOApp {
       serverPort = 9002,
       new MicroserviceRoutes[IO].routes
     )
+
+    renkuLogTimeout <- new RenkuLogTimeoutConfigProvider[IO].get
     eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch(eventLogDbConfig)))
-      .withEventsProcessor(new IOCommitEventProcessor(eventLogDbConfig))
+      .withEventsProcessor(new IOCommitEventProcessor(eventLogDbConfig, renkuLogTimeout))
   } yield
     new MicroserviceRunner(
       new SentryInitializer[IO],

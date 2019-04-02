@@ -57,10 +57,8 @@ class DbEventProcessorRunner(
     } yield ()
 
   private lazy val sleepOrProcessEvent: Option[EventBody] => IO[_] = {
-    case None => IO.sleep(interval)
-    case Some(eventBody) =>
-      contextShift.shift *>
-        (IO.unit flatMap (_ => eventProcessor(eventBody))).start
+    case None            => IO.sleep(interval)
+    case Some(eventBody) => contextShift.shift *> eventProcessor(eventBody).start
   }
 }
 

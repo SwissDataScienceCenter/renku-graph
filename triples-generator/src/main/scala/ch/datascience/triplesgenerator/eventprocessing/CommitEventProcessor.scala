@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.{Clock, ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DBConfigProvider.DBConfig
 import ch.datascience.dbeventlog.EventStatus._
@@ -36,6 +36,7 @@ import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent,
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -146,12 +147,14 @@ class CommitEventProcessor[Interpretation[_]](
 }
 
 class IOCommitEventProcessor(
-    dbConfig:            DBConfig[EventLogDB]
-)(implicit contextShift: ContextShift[IO], executionContext: ExecutionContext, clock: Clock[IO])
+    dbConfig:            DBConfig[EventLogDB],
+    renkuLogTimeout:     FiniteDuration
+)(implicit contextShift: ContextShift[IO], executionContext: ExecutionContext, timer: Timer[IO])
     extends CommitEventProcessor[IO](
       new CommitEventsDeserialiser[IO](),
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
-      new IOTriplesFinder(new GitLabRepoUrlFinder[IO](new GitLabUrlProvider[IO]())),
+      new IOTriplesFinder(new GitLabRepoUrlFinder[IO](new GitLabUrlProvider[IO]()),
+                          new Commands.Renku(renkuLogTimeout)),
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),
       new IOEventLogMarkDone(dbConfig),
       new IOEventLogMarkFailed(dbConfig),
