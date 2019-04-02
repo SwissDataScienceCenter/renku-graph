@@ -28,7 +28,7 @@ triplesGenerator:
     port: 9002
   resources:
     limits:
-      memory: "400Mi"
+      memory: "600Mi"
 
 webhookService:
   image:
@@ -40,7 +40,7 @@ webhookService:
     port: 80
   resources:
     limits:
-      memory: "400Mi"
+      memory: "600Mi"
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`

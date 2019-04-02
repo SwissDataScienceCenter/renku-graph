@@ -69,7 +69,7 @@ spec:
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=webhook-service&environment={{ .Release.Namespace }}
             - name: JAVA_OPTS
-              value: -Xmx100m -XX:+UseG1GC
+              value: -Xmx200m -XX:+UseG1GC
           ports:
             - name: http-webhook-sv
               containerPort: 9001
@@ -119,7 +119,7 @@ spec:
             - name: GRAPH_SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=triples-generator&environment={{ .Release.Namespace }}
             - name: JAVA_OPTS
-              value: -Xmx100m -XX:+UseG1GC
+              value: -Xmx200m -XX:+UseG1GC
           ports:
             - name: http-triples-gn
               containerPort: 9002
