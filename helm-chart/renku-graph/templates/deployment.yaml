@@ -66,8 +66,20 @@ spec:
               {{- else }}
               value: 1 hour
               {{- end }}
+            - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
+              {{- if .Values.webhookService.dbEventLog.connectionPool }}
+              value: {{ .Values.webhookService.dbEventLog.connectionPool }}
+              {{- else }}
+              value: 3
+              {{- end }}
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=webhook-service&environment={{ .Release.Namespace }}
+            - name: THREADS_NUMBER
+              {{- if .Values.webhookService.threadsNumber }}
+              value: {{ .Values.webhookService.threadsNumber }}
+              {{- else }}
+              value: 5
+              {{- end }}
             - name: JAVA_OPTS
               value: -Xmx200m -XX:+UseG1GC
           ports:
@@ -99,6 +111,12 @@ spec:
                 secretKeyRef:
                   name: {{ template "graph.fullname" . }}
                   key: dbEventLog-postgresPassword
+            - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
+              {{- if .Values.triplesGenerator.dbEventLog.connectionPool }}
+              value: {{ .Values.triplesGenerator.dbEventLog.connectionPool }}
+              {{- else }}
+              value: 3
+              {{- end }}
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
             - name: JENA_DATASET_NAME
@@ -114,10 +132,22 @@ spec:
                 secretKeyRef:
                   name: {{ template "jena.fullname" . }}
                   key: jena-admin-password
+            - name: RENKU_LOG_TIMEOUT
+              {{- if .Values.triplesGenerator.renkuLogTimeout }}
+              value: {{ .Values.triplesGenerator.renkuLogTimeout }}
+              {{- else }}
+              value: 3 minutes
+              {{- end }}
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuPython }}
             - name: GRAPH_SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=triples-generator&environment={{ .Release.Namespace }}
+            - name: THREADS_NUMBER
+              {{- if .Values.triplesGenerator.threadsNumber }}
+              value: {{ .Values.triplesGenerator.threadsNumber }}
+              {{- else }}
+              value: 5
+              {{- end }}
             - name: JAVA_OPTS
               value: -Xmx200m -XX:+UseG1GC
           ports:
@@ -158,6 +188,12 @@ spec:
                 secretKeyRef:
                   name: {{ template "graph.fullname" . }}
                   key: tokenRepository-postgresPassword
+            - name: TOKEN_REPOSITORY_POSTGRES_CONNECTION_POOL
+              {{- if .Values.tokenRepository.connectionPool }}
+              value: {{ .Values.tokenRepository.connectionPool }}
+              {{- else }}
+              value: 5
+              {{- end }}
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=token-repository&environment={{ .Release.Namespace }}
             - name: JAVA_OPTS
