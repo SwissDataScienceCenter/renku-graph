@@ -19,9 +19,9 @@
 package ch.datascience.tokenrepository.repository.deletion
 
 import cats.effect.IO
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
 private class IOTokenRemover(
-    transactorProvider: DbTransactorProvider[IO, ProjectsTokensDB]
-) extends TokenRemover[IO](transactorProvider)
+    transactor: DbTransactor[IO, ProjectsTokensDB]
+) extends TokenRemover[IO](transactor)

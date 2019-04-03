@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.{Bracket, IO}
 import cats.implicits._
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, TokenRepositoryUrlProvider}
@@ -34,13 +34,13 @@ private abstract class TryTriplesFinder     extends TriplesFinder[Try]
 private abstract class TryFusekiConnector   extends FusekiConnector[Try]
 private abstract class TryGitLabUrlProvider extends GitLabUrlProvider[Try]
 private abstract class TryEventLogMarkDone(
-    transactorProvider: DbTransactorProvider[Try, EventLogDB]
-)(implicit ME:          Bracket[Try, Throwable])
-    extends EventLogMarkDone[Try](transactorProvider)
+    transactor: DbTransactor[Try, EventLogDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends EventLogMarkDone[Try](transactor)
 private abstract class TryEventLogMarkFailed(
-    transactorProvider: DbTransactorProvider[Try, EventLogDB]
-)(implicit ME:          Bracket[Try, Throwable])
-    extends EventLogMarkFailed[Try](transactorProvider)
+    transactor: DbTransactor[Try, EventLogDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends EventLogMarkFailed[Try](transactor)
 
 private class IOGitLabRepoUrlFinder(
     gitLabUrlProvider: GitLabUrlProvider[IO]

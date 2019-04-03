@@ -109,7 +109,7 @@ class EventLogAddSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
     val eventBody   = eventBodies.generateOne
 
     val currentTime = mockFunction[Instant]
-    val eventLogAdd = new EventLogAdd(transactorProvider, currentTime)
+    val eventLogAdd = new EventLogAdd(transactor, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now)

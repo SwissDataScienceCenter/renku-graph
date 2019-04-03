@@ -69,16 +69,13 @@ class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
 
   private trait TestCase {
     val logger        = TestLogger[IO]()
-    val dbInitializer = new EventLogDbInitializer[IO](transactorProvider, logger)
+    val dbInitializer = new EventLogDbInitializer[IO](transactor, logger)
   }
 
   private def tableExists(): Boolean =
-    transactorResource
-      .use { transactor =>
-        sql"""select exists (select * from event_log);""".query.option
-          .transact(transactor)
-          .recover { case _ => None }
-      }
+    sql"""select exists (select * from event_log);""".query.option
+      .transact(transactor.get)
+      .recover { case _ => None }
       .unsafeRunSync()
       .isDefined
 

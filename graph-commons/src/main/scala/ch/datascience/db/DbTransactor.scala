@@ -16,34 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog
+package ch.datascience.db
 
-import cats.effect.{ContextShift, IO}
-import ch.datascience.db.DbTransactor
-import ch.datascience.db.TestDbConfig._
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
 import doobie.util.transactor.Transactor
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.language.higherKinds
 
-trait InMemoryEventLogDb {
-
-  implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
-
-  private val dbConfig = newDbConfig[EventLogDB]
-
-  lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB](
-    Transactor.fromDriverManager[IO](
-      dbConfig.driver.value,
-      dbConfig.url.value,
-      dbConfig.user.value,
-      dbConfig.pass
-    )
-  )
-
-  def execute[O](query: ConnectionIO[O]): O =
-    query
-      .transact(transactor.get)
-      .unsafeRunSync()
-}
+case class DbTransactor[Interpretation[_], TargetDB](get: Transactor.Aux[Interpretation, _])

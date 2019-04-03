@@ -21,13 +21,14 @@ package ch.datascience.triplesgenerator.eventprocessing
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 
 import cats.effect._
-import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
+import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
+import doobie.util.transactor.Transactor
 import org.scalacheck.Gen.listOfN
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -102,8 +103,9 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   private trait TestCase {
-    private val dbConfig = mock[DBConfig[EventLogDB]]
-    val eventLogFetch = new IOEventLogFetch(dbConfig) {
+    class TestDbTransactor(transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, EventLogDB](transactor)
+    private val transactor = mock[TestDbTransactor]
+    val eventLogFetch = new IOEventLogFetch(transactor) {
       private val eventsQueue = new ConcurrentLinkedQueue[EventBody]()
 
       def addEventsToReturn(events: Seq[EventBody]): Unit =

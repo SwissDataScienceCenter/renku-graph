@@ -22,7 +22,7 @@ import cats.effect.{Clock, ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.control.Throttler
-import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.CommitEvent
@@ -141,13 +141,13 @@ class PushEventSender[Interpretation[_]: Monad](
 }
 
 class IOPushEventSender(
-    dbConfig:                DBConfig[EventLogDB],
+    transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
     extends PushEventSender[IO](
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
-      new IOCommitEventsFinder(dbConfig, gitLabThrottler),
-      new IOCommitEventSender(dbConfig),
+      new IOCommitEventsFinder(transactor, gitLabThrottler),
+      new IOCommitEventSender(transactor),
       ApplicationLogger,
       new ExecutionTimeRecorder[IO]
     )

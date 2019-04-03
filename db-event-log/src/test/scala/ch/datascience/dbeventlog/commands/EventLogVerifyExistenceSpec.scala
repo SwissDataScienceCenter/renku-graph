@@ -122,6 +122,6 @@ class EventLogVerifyExistenceSpec extends WordSpec with InMemoryEventLogDbSpec {
   private trait TestCase {
     val projectId = projectIds.generateOne
 
-    val existenceVerification = new EventLogVerifyExistence(transactorProvider)
+    val existenceVerification = new EventLogVerifyExistence(transactor)
   }
 }

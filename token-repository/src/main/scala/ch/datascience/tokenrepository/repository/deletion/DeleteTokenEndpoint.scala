@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
@@ -55,6 +55,6 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
 }
 
 class IODeleteTokenEndpoint(
-    dbConfig:            DBConfig[ProjectsTokensDB]
+    transactor:          DbTransactor[IO, ProjectsTokensDB]
 )(implicit contextShift: ContextShift[IO])
-    extends DeleteTokenEndpoint[IO](new IOTokenRemover(dbConfig), ApplicationLogger)
+    extends DeleteTokenEndpoint[IO](new IOTokenRemover(transactor), ApplicationLogger)

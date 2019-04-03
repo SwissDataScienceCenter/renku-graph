@@ -21,9 +21,10 @@ package ch.datascience.triplesgenerator
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
-import ch.datascience.dbeventlog.EventLogDbConfigProvider
+import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
+import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.init._
@@ -42,32 +43,29 @@ object Microservice extends IOApp {
   protected implicit override def timer: Timer[IO] =
     IO.timer(executionContext)
 
-  private val microserviceInstantiator = for {
-    eventLogDbConfig <- new EventLogDbConfigProvider[IO].get()
-    eventLogDbInitializer = new IOEventLogDbInitializer(eventLogDbConfig)
-
-    httpServer = new HttpServer[IO](
-      serverPort = 9002,
-      new MicroserviceRoutes[IO].routes
-    )
-
-    renkuLogTimeout <- new RenkuLogTimeoutConfigProvider[IO].get
-    eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch(eventLogDbConfig)))
-      .withEventsProcessor(new IOCommitEventProcessor(eventLogDbConfig, renkuLogTimeout))
-  } yield
-    new MicroserviceRunner(
-      new SentryInitializer[IO],
-      eventLogDbInitializer,
-      new IOFusekiDatasetInitializer,
-      eventProcessorRunner,
-      httpServer
-    )
-
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      microservice <- microserviceInstantiator
-      exitCode     <- microservice.run(args)
+      transactorResource <- new EventLogDbConfigProvider[IO] map DbTransactorResource[IO, EventLogDB]
+      exitCode           <- runMicroservice(transactorResource, args)
     } yield exitCode
+
+  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
+    transactorResource.use { transactor =>
+      for {
+        renkuLogTimeout <- new RenkuLogTimeoutConfigProvider[IO].get
+
+        eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
+          .withEventsProcessor(new IOCommitEventProcessor(transactor, renkuLogTimeout))
+
+        exitCode <- new MicroserviceRunner(
+                     new SentryInitializer[IO],
+                     new IOEventLogDbInitializer(transactor),
+                     new IOFusekiDatasetInitializer,
+                     eventProcessorRunner,
+                     new HttpServer[IO](serverPort = 9002, new MicroserviceRoutes[IO].routes)
+                   ) run args
+      } yield exitCode
+    }
 }
 
 private class MicroserviceRunner(

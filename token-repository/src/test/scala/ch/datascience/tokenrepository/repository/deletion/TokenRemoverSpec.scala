@@ -52,7 +52,7 @@ class TokenRemoverSpec extends WordSpec with InMemoryProjectsTokensDbSpec {
 
     val projectId = projectIds.generateOne
 
-    val remover = new TokenRemover(transactorProvider)
+    val remover = new TokenRemover(transactor)
 
     def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit = execute {
       sql"""insert into 

@@ -21,8 +21,7 @@ package ch.datascience.dbeventlog.commands
 import java.time.Instant
 
 import cats.effect.{Bracket, ContextShift, IO}
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
 import ch.datascience.dbeventlog.commands.ExecutionDateCalculator.StatusBasedCalculator
@@ -32,7 +31,7 @@ import doobie.implicits._
 import scala.language.higherKinds
 
 class EventLogMarkFailed[Interpretation[_]](
-    transactorProvider:      DbTransactorProvider[Interpretation, EventLogDB],
+    transactor:              DbTransactor[Interpretation, EventLogDB],
     executionDateCalculator: ExecutionDateCalculator = new ExecutionDateCalculator()
 )(implicit ME:               Bracket[Interpretation, Throwable]) {
 
@@ -41,9 +40,7 @@ class EventLogMarkFailed[Interpretation[_]](
   def markEventFailed(commitEventId: CommitEventId,
                       status:        FailureStatus,
                       maybeMessage:  Option[EventMessage]): Interpretation[Unit] =
-    transactorProvider.transactorResource.use { transactor =>
-      findEventAndUpdate(commitEventId, status, maybeMessage).transact(transactor)
-    }
+    findEventAndUpdate(commitEventId, status, maybeMessage).transact(transactor.get)
 
   private def findEventAndUpdate(commitEventId: CommitEventId,
                                  status:        FailureStatus,
@@ -111,6 +108,6 @@ object ExecutionDateCalculator {
 }
 
 class IOEventLogMarkFailed(
-    dbConfig:            DBConfig[EventLogDB]
+    transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogMarkFailed[IO](new DbTransactorProvider(dbConfig))
+    extends EventLogMarkFailed[IO](transactor)

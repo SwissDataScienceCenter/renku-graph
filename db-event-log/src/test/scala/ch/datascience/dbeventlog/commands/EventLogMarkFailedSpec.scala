@@ -143,7 +143,7 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
     val executionDate = executionDates.generateOne
 
     val executionDateCalculator = mock[ExecutionDateCalculator]
-    val eventLogMarkFailed      = new EventLogMarkFailed(transactorProvider, executionDateCalculator)
+    val eventLogMarkFailed      = new EventLogMarkFailed(transactor, executionDateCalculator)
 
     def findEvent(eventId: CommitEventId): (ExecutionDate, EventStatus, Option[EventMessage]) = execute {
       sql"""select execution_date, status, message

@@ -24,8 +24,7 @@ import java.time.{Duration, Instant}
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
 import ch.datascience.graph.model.events.CommitEventId
@@ -40,16 +39,14 @@ private object EventLogFetch {
 }
 
 class EventLogFetch[Interpretation[_]](
-    transactorProvider: DbTransactorProvider[Interpretation, EventLogDB],
-    now:                () => Instant = Instant.now
-)(implicit ME:          Bracket[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, EventLogDB],
+    now:        () => Instant = Instant.now
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   import EventLogFetch._
 
   def findEventToProcess: Interpretation[Option[EventBody]] =
-    transactorProvider.transactorResource.use { transactor =>
-      findEventAndUpdateForProcessing.transact(transactor)
-    }
+    findEventAndUpdateForProcessing.transact(transactor.get)
 
   private def findEventAndUpdateForProcessing =
     for {
@@ -91,6 +88,6 @@ class EventLogFetch[Interpretation[_]](
 }
 
 class IOEventLogFetch(
-    dbConfig:            DBConfig[EventLogDB]
+    transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogFetch[IO](new DbTransactorProvider(dbConfig))
+    extends EventLogFetch[IO](transactor)

@@ -18,31 +18,46 @@
 
 package ch.datascience.db
 
-import cats.effect.{Async, ContextShift, Resource}
+import cats.effect._
 import ch.datascience.db.DBConfigProvider.DBConfig
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 
 import scala.language.higherKinds
 
-class DbTransactorProvider[Interpretation[_], TargetDB](
+class DbTransactorResource[Interpretation[_], TargetDB](
     dbConfig:     DBConfig[TargetDB]
 )(implicit async: Async[Interpretation], cs: ContextShift[Interpretation]) {
 
   import ExecutionContexts._
   import HikariTransactor._
 
-  lazy val transactorResource: Resource[Interpretation, HikariTransactor[Interpretation]] =
+  def use[B](
+      runWithTransactor: DbTransactor[Interpretation, TargetDB] => Interpretation[B]
+  )(implicit ME:         Bracket[Interpretation, Throwable]): Interpretation[B] =
+    transactorResource.use { transactor =>
+      runWithTransactor(new DbTransactor[Interpretation, TargetDB](transactor))
+    }
+
+  private lazy val transactorResource: Resource[Interpretation, HikariTransactor[Interpretation]] =
     for {
       connectionsThreadPool  <- fixedThreadPool[Interpretation](dbConfig.connectionPool.value)
       transactionsThreadPool <- cachedThreadPool[Interpretation]
       transactor <- newHikariTransactor[Interpretation](
                      dbConfig.driver.value,
                      dbConfig.url.value,
-                     user       = dbConfig.user.value,
-                     pass       = dbConfig.pass,
-                     connectEC  = connectionsThreadPool,
-                     transactEC = transactionsThreadPool
+                     dbConfig.user.value,
+                     dbConfig.pass,
+                     connectionsThreadPool,
+                     transactionsThreadPool
                    )
     } yield transactor
+}
+
+object DbTransactorResource {
+  def apply[Interpretation[_], TargetDB](
+      dbConfig:     DBConfig[TargetDB]
+  )(implicit async: Async[Interpretation],
+    cs:             ContextShift[Interpretation]): DbTransactorResource[Interpretation, TargetDB] =
+    new DbTransactorResource[Interpretation, TargetDB](dbConfig)
 }

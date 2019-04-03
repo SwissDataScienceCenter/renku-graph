@@ -76,7 +76,7 @@ class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with Moc
   private trait TestCase {
 
     val currentTime      = mockFunction[Instant]
-    val eventLogMarkDone = new EventLogMarkDone(transactorProvider, currentTime)
+    val eventLogMarkDone = new EventLogMarkDone(transactor, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

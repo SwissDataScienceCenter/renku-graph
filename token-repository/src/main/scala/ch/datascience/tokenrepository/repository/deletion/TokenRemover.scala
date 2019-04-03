@@ -19,30 +19,26 @@
 package ch.datascience.tokenrepository.repository.deletion
 
 import cats.effect.{Bracket, ContextShift, IO}
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
 import scala.language.higherKinds
 
 private class TokenRemover[Interpretation[_]](
-    transactorProvider: DbTransactorProvider[Interpretation, ProjectsTokensDB]
-)(implicit ME:          Bracket[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, ProjectsTokensDB]
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
   def delete(projectId: ProjectId): Interpretation[Unit] =
-    transactorProvider.transactorResource.use { transactor =>
-      sql"""
+    sql"""
           delete 
           from projects_tokens 
           where project_id = ${projectId.value}
           """.update.run
-        .map(failIfMultiUpdate(projectId))
-        .transact(transactor)
-
-    }
+      .map(failIfMultiUpdate(projectId))
+      .transact(transactor.get)
 
   private def failIfMultiUpdate(projectId: ProjectId): Int => Unit = {
     case 0 => ()
@@ -52,6 +48,6 @@ private class TokenRemover[Interpretation[_]](
 }
 
 private class IOTokenRemover(
-    dbConfig:            DBConfig[ProjectsTokensDB]
+    transactor:          DbTransactor[IO, ProjectsTokensDB]
 )(implicit contextShift: ContextShift[IO])
-    extends TokenRemover[IO](new DbTransactorProvider(dbConfig))
+    extends TokenRemover[IO](transactor)

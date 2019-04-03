@@ -23,7 +23,7 @@ import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.control.Throttler
-import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
@@ -59,11 +59,11 @@ private class HookCreator[Interpretation[_]: Monad](
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
 
   import HookCreator.CreationResult._
+  import accessTokenAssociator._
   import hookTokenCrypto._
   import projectHookCreator.create
   import projectHookUrlFinder._
   import projectHookValidator._
-  import accessTokenAssociator._
   import projectInfoFinder._
 
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[CreationResult] = {
@@ -113,7 +113,7 @@ private object HookCreator {
 }
 
 private class IOHookCreator(
-    dbConfig:                DBConfig[EventLogDB],
+    transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
     extends HookCreator[IO](
@@ -123,6 +123,6 @@ private class IOHookCreator(
       HookTokenCrypto[IO],
       new IOProjectHookCreator(new GitLabConfigProvider[IO], gitLabThrottler),
       new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO]()),
-      new IOEventsHistoryLoader(dbConfig, gitLabThrottler),
+      new IOEventsHistoryLoader(transactor, gitLabThrottler),
       ApplicationLogger
     )

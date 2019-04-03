@@ -21,8 +21,7 @@ package ch.datascience.dbeventlog.commands
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import doobie.implicits._
@@ -31,8 +30,8 @@ import doobie.util.fragments.in
 import scala.language.higherKinds
 
 class EventLogVerifyExistence[Interpretation[_]](
-    transactorProvider: DbTransactorProvider[Interpretation, EventLogDB]
-)(implicit ME:          Bracket[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, EventLogDB]
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   def filterNotExistingInLog(eventIds: List[CommitId], projectId: ProjectId): Interpretation[List[CommitId]] =
     eventIds match {
@@ -40,23 +39,21 @@ class EventLogVerifyExistence[Interpretation[_]](
       case head +: tail => checkInDB(NonEmptyList.of(head, tail: _*), projectId)
     }
 
-  private def checkInDB(eventIds: NonEmptyList[CommitId], projectId: ProjectId) =
-    transactorProvider.transactorResource.use { transactor =>
-      { fr"""
-          select event_id
-          from event_log
-          where project_id = $projectId""" ++ `and event_id IN`(eventIds) }
-        .query[CommitId]
-        .to[List]
-        .transact(transactor)
-        .map(existingEventIds => eventIds.toList diff existingEventIds)
-    }
+  private def checkInDB(eventIds: NonEmptyList[CommitId], projectId: ProjectId) = {
+    fr"""
+    select event_id
+    from event_log
+    where project_id = $projectId""" ++ `and event_id IN`(eventIds)
+  }.query[CommitId]
+    .to[List]
+    .transact(transactor.get)
+    .map(existingEventIds => eventIds.toList diff existingEventIds)
 
   private def `and event_id IN`(eventIds: NonEmptyList[CommitId]) =
     fr" and " ++ in(fr"event_id", eventIds)
 }
 
 class IOEventLogVerifyExistence(
-    dbConfig:            DBConfig[EventLogDB]
+    transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogVerifyExistence[IO](new DbTransactorProvider(dbConfig))
+    extends EventLogVerifyExistence[IO](transactor)

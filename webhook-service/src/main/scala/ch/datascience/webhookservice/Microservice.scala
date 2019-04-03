@@ -21,7 +21,8 @@ package ch.datascience.webhookservice
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
-import ch.datascience.dbeventlog.EventLogDbConfigProvider
+import ch.datascience.db.DbTransactorResource
+import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.graph.gitlab.GitLabThrottler
 import ch.datascience.http.server.HttpServer
@@ -45,27 +46,33 @@ object Microservice extends IOApp {
   protected implicit override def timer: Timer[IO] =
     IO.timer(executionContext)
 
-  private val microserviceInstantiator = for {
-    eventLogDbConfig <- new EventLogDbConfigProvider[IO].get()
-    eventLogDbInitializer = new IOEventLogDbInitializer(eventLogDbConfig)
-
-    gitLabThrottler <- GitLabThrottler[IO]
-    eventsSynchronizationScheduler = new IOEventsSynchronizationScheduler(eventLogDbConfig, gitLabThrottler)
-    httpServer = new HttpServer[IO](
-      serverPort = 9001,
-      serviceRoutes = new MicroserviceRoutes[IO](
-        new IOHookEventEndpoint(eventLogDbConfig, gitLabThrottler),
-        new IOHookCreationEndpoint(eventLogDbConfig, gitLabThrottler),
-        new IOHookValidationEndpoint(gitLabThrottler)
-      ).routes
-    )
-  } yield new MicroserviceRunner(eventLogDbInitializer, eventsSynchronizationScheduler, httpServer)
-
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      microservice <- microserviceInstantiator
-      exitCode     <- microservice.run(args)
+      transactorResource <- new EventLogDbConfigProvider[IO] map DbTransactorResource[IO, EventLogDB]
+      exitCode           <- runMicroservice(transactorResource, args)
     } yield exitCode
+
+  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
+    transactorResource.use { transactor =>
+      for {
+        gitLabThrottler <- GitLabThrottler[IO]
+
+        httpServer = new HttpServer[IO](
+          serverPort = 9001,
+          serviceRoutes = new MicroserviceRoutes[IO](
+            new IOHookEventEndpoint(transactor, gitLabThrottler),
+            new IOHookCreationEndpoint(transactor, gitLabThrottler),
+            new IOHookValidationEndpoint(gitLabThrottler)
+          ).routes
+        )
+
+        exitCode <- new MicroserviceRunner(
+                     new IOEventLogDbInitializer(transactor),
+                     new IOEventsSynchronizationScheduler(transactor, gitLabThrottler),
+                     httpServer
+                   ) run args
+      } yield exitCode
+    }
 }
 
 class MicroserviceRunner(eventLogDbInitializer:          IOEventLogDbInitializer,

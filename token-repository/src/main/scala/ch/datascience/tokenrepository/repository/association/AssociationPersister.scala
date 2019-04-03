@@ -20,8 +20,7 @@ package ch.datascience.tokenrepository.repository.association
 
 import cats.Monad
 import cats.effect.{Bracket, ContextShift, IO}
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
@@ -29,22 +28,20 @@ import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import scala.language.higherKinds
 
 private class AssociationPersister[Interpretation[_]: Monad](
-    transactorProvider: DbTransactorProvider[Interpretation, ProjectsTokensDB]
-)(implicit ME:          Bracket[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, ProjectsTokensDB]
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
   def persistAssociation(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
-    transactorProvider.transactorResource.use { transactor =>
-      sql"select token from projects_tokens where project_id = ${projectId.value}"
-        .query[String]
-        .option
-        .flatMap {
-          case Some(_) => update(projectId, encryptedToken)
-          case None    => insert(projectId, encryptedToken)
-        }
-        .transact(transactor)
-    }
+    sql"select token from projects_tokens where project_id = ${projectId.value}"
+      .query[String]
+      .option
+      .flatMap {
+        case Some(_) => update(projectId, encryptedToken)
+        case None    => insert(projectId, encryptedToken)
+      }
+      .transact(transactor.get)
 
   private def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken) =
     sql"""insert into 
@@ -65,6 +62,6 @@ private class AssociationPersister[Interpretation[_]: Monad](
 }
 
 private class IOAssociationPersister(
-    dbConfig:            DBConfig[ProjectsTokensDB]
+    transactor:          DbTransactor[IO, ProjectsTokensDB]
 )(implicit contextShift: ContextShift[IO])
-    extends AssociationPersister[IO](new DbTransactorProvider(dbConfig))
+    extends AssociationPersister[IO](transactor)

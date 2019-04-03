@@ -19,15 +19,15 @@
 package ch.datascience.tokenrepository.repository.fetching
 
 import cats.effect.{Bracket, IO}
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 
 import scala.util.Try
 
 private class TryPersistedTokensFinder(
-    transactorProvider: DbTransactorProvider[Try, ProjectsTokensDB]
-)(implicit ME:          Bracket[Try, Throwable])
-    extends PersistedTokensFinder[Try](transactorProvider)
+    transactor: DbTransactor[Try, ProjectsTokensDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends PersistedTokensFinder[Try](transactor)
 
 private class IOTokenFinder(
     tokenInRepoFinder: PersistedTokensFinder[IO],

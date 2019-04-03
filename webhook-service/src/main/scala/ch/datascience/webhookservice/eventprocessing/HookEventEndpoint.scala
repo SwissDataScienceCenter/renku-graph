@@ -24,7 +24,7 @@ import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
@@ -142,7 +142,7 @@ private object HookEventEndpoint {
 }
 
 class IOHookEventEndpoint(
-    dbConfig:                DBConfig[EventLogDB],
+    transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
-    extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOPushEventSender(dbConfig, gitLabThrottler))
+    extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOPushEventSender(transactor, gitLabThrottler))

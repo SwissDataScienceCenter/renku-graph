@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import cats.effect.Bracket
 import cats.implicits._
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogLatestEvent, EventLogVerifyExistence}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
@@ -49,11 +49,11 @@ private class TryCommitEventsFinder(
 ) extends CommitEventsFinder[Try](commitInfoFinder, latestEventFinder, eventLogVerifyExistence)
 
 private class TryEventLogLatestEvent(
-    transactorProvider: DbTransactorProvider[Try, EventLogDB]
-)(implicit ME:          Bracket[Try, Throwable])
-    extends EventLogLatestEvent[Try](transactorProvider)
+    transactor: DbTransactor[Try, EventLogDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends EventLogLatestEvent[Try](transactor)
 
 private class TryEventLogVerifyExistence(
-    transactorProvider: DbTransactorProvider[Try, EventLogDB]
-)(implicit ME:          Bracket[Try, Throwable])
-    extends EventLogVerifyExistence[Try](transactorProvider)
+    transactor: DbTransactor[Try, EventLogDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends EventLogVerifyExistence[Try](transactor)

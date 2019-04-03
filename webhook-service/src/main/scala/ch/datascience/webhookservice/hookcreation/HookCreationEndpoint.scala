@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
@@ -68,10 +68,10 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 }
 
 class IOHookCreationEndpoint(
-    dbConfig:                DBConfig[EventLogDB],
+    transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
     extends HookCreationEndpoint[IO](
-      new IOHookCreator(dbConfig, gitLabThrottler),
+      new IOHookCreator(transactor, gitLabThrottler),
       new AccessTokenExtractor[IO]
     )

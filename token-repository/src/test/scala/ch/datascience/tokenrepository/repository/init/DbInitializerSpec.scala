@@ -58,18 +58,13 @@ class DbInitializerSpec extends WordSpec with InMemoryProjectsTokensDb {
 
   private trait TestCase {
     val logger        = TestLogger[IO]()
-    val dbInitializer = new DbInitializer[IO](transactorProvider, logger)
+    val dbInitializer = new DbInitializer[IO](transactor, logger)
   }
 
   private def tableExists(): Boolean =
-    transactorResource
-      .use { transactor =>
-        sql"""select exists (select * from projects_tokens);""".query.option
-          .transact(transactor)
-      }
-      .recover {
-        case _ => None
-      }
+    sql"""select exists (select * from projects_tokens);""".query.option
+      .transact(transactor.get)
+      .recover { case _ => None }
       .unsafeRunSync()
       .isDefined
 

@@ -42,6 +42,9 @@ class DBConfigProvider[Interpretation[_], TargetDB](
 
   import DBConfigProvider._
 
+  def map[Out](f: DBConfig[TargetDB] => Out): Interpretation[Out] =
+    get() map f
+
   def get(): Interpretation[DBConfig[TargetDB]] =
     for {
       host           <- find[DBConfig.Host](s"$namespace.db-host", config)

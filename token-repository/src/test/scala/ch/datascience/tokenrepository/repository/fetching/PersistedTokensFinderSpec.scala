@@ -50,7 +50,7 @@ class PersistedTokensFinderSpec extends WordSpec with InMemoryProjectsTokensDbSp
 
     val projectId = projectIds.generateOne
 
-    val finder = new PersistedTokensFinder(transactorProvider)
+    val finder = new PersistedTokensFinder(transactor)
 
     def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit = execute {
       sql"""insert into 

@@ -77,6 +77,6 @@ class EventLogLatestEventSpec extends WordSpec with InMemoryEventLogDbSpec {
   private trait TestCase {
     val projectId = projectIds.generateOne
 
-    val latestEventFinder = new EventLogLatestEvent(transactorProvider)
+    val latestEventFinder = new EventLogLatestEvent(transactor)
   }
 }

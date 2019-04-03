@@ -22,8 +22,7 @@ import java.time.Instant
 
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventStatus}
 import ch.datascience.graph.model.events._
 import doobie.free.connection.ConnectionOp
@@ -32,14 +31,12 @@ import doobie.implicits._
 import scala.language.higherKinds
 
 class EventLogAdd[Interpretation[_]](
-    transactorProvider: DbTransactorProvider[Interpretation, EventLogDB],
-    now:                () => Instant = Instant.now
-)(implicit ME:          Bracket[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, EventLogDB],
+    now:        () => Instant = Instant.now
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   def storeNewEvent(commitEvent: CommitEvent, eventBody: EventBody): Interpretation[Unit] =
-    transactorProvider.transactorResource.use { transactor =>
-      insertIfNotDuplicate(commitEvent, eventBody).transact(transactor)
-    }
+    insertIfNotDuplicate(commitEvent, eventBody).transact(transactor.get)
 
   private def insertIfNotDuplicate(commitEvent: CommitEvent, eventBody: EventBody) =
     for {
@@ -66,6 +63,6 @@ class EventLogAdd[Interpretation[_]](
 }
 
 class IOEventLogAdd(
-    dbConfig:            DBConfig[EventLogDB]
+    transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogAdd[IO](new DbTransactorProvider(dbConfig))
+    extends EventLogAdd[IO](transactor)

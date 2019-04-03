@@ -19,15 +19,15 @@
 package ch.datascience.tokenrepository.repository.association
 
 import cats.effect.{Bracket, IO}
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 
 import scala.util.Try
 
 private class TryAssociationPersister(
-    transactorProvider: DbTransactorProvider[Try, ProjectsTokensDB]
-)(implicit ME:          Bracket[Try, Throwable])
-    extends AssociationPersister[Try](transactorProvider)
+    transactor: DbTransactor[Try, ProjectsTokensDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends AssociationPersister[Try](transactor)
 
 private class IOTokenAssociator(
     accessTokenCrypto:    AccessTokenCrypto[IO],

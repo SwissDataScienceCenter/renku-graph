@@ -20,8 +20,7 @@ package ch.datascience.tokenrepository.repository.init
 
 import cats.effect._
 import cats.implicits._
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
@@ -30,26 +29,25 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class DbInitializer[Interpretation[_]](
-    transactorProvider: DbTransactorProvider[Interpretation, ProjectsTokensDB],
-    logger:             Logger[Interpretation]
-)(implicit ME:          Bracket[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, ProjectsTokensDB],
+    logger:     Logger[Interpretation]
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
-  def run: Interpretation[ExitCode] =
-    transactorProvider.transactorResource.use { transactor =>
-      sql"""
-           |CREATE TABLE IF NOT EXISTS projects_tokens(
-           | project_id int4 PRIMARY KEY,
-           | token VARCHAR NOT NULL
-           |);
+  def run: Interpretation[ExitCode] = {
+    sql"""
+         |CREATE TABLE IF NOT EXISTS projects_tokens(
+         | project_id int4 PRIMARY KEY,
+         | token VARCHAR NOT NULL
+         |);
        """.stripMargin.update.run
-        .transact(transactor)
-        .map { _ =>
-          logger.info("Projects Tokens database initialization success")
-          ExitCode.Success
-        }
-    } recoverWith logging
+      .transact(transactor.get)
+      .map { _ =>
+        logger.info("Projects Tokens database initialization success")
+        ExitCode.Success
+      }
+  } recoverWith logging
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[ExitCode]] = {
     case NonFatal(exception) =>
@@ -59,9 +57,9 @@ class DbInitializer[Interpretation[_]](
 }
 
 class IODbInitializer(
-    dbConfig:            DBConfig[ProjectsTokensDB]
+    transactor:          DbTransactor[IO, ProjectsTokensDB]
 )(implicit contextShift: ContextShift[IO])
     extends DbInitializer[IO](
-      transactorProvider = new DbTransactorProvider(dbConfig),
-      logger             = ApplicationLogger
+      transactor,
+      ApplicationLogger
     )

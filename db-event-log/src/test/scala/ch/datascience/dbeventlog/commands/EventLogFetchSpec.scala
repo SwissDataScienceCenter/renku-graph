@@ -148,7 +148,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
   private trait TestCase {
 
     val currentTime   = mockFunction[Instant]
-    val eventLogFetch = new EventLogFetch(transactorProvider, currentTime)
+    val eventLogFetch = new EventLogFetch(transactor, currentTime)
 
     val now           = Instant.now()
     val executionDate = ExecutionDate(now)

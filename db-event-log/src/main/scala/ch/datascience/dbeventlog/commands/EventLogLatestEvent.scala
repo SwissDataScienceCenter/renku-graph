@@ -19,8 +19,7 @@
 package ch.datascience.dbeventlog.commands
 
 import cats.effect.{Bracket, ContextShift, IO}
-import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.DbTransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import doobie.implicits._
@@ -28,24 +27,22 @@ import doobie.implicits._
 import scala.language.higherKinds
 
 class EventLogLatestEvent[Interpretation[_]](
-    transactorProvider: DbTransactorProvider[Interpretation, EventLogDB],
-)(implicit ME:          Bracket[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, EventLogDB],
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   def findYoungestEventInLog(projectId: ProjectId): Interpretation[Option[CommitId]] =
-    transactorProvider.transactorResource.use { transactor =>
-      sql"""
-           |select event_id
-           |from event_log
-           |where project_id = $projectId
-           |order by event_date desc
-           |limit 1""".stripMargin
-        .query[CommitId]
-        .option
-        .transact(transactor)
-    }
+    sql"""
+         |select event_id
+         |from event_log
+         |where project_id = $projectId
+         |order by event_date desc
+         |limit 1""".stripMargin
+      .query[CommitId]
+      .option
+      .transact(transactor.get)
 }
 
 class IOEventLogLatestEvent(
-    dbConfig:            DBConfig[EventLogDB]
+    transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogLatestEvent[IO](new DbTransactorProvider(dbConfig))
+    extends EventLogLatestEvent[IO](transactor)

@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect._
 import cats.implicits._
 import ch.datascience.control.Throttler
-import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
 import ch.datascience.graph.gitlab.GitLab
@@ -72,17 +72,17 @@ class EventsSynchronizationScheduler[Interpretation[_]](
 }
 
 class IOEventsSynchronizationScheduler(
-    dbConfig:        DBConfig[EventLogDB],
+    transactor:      DbTransactor[IO, EventLogDB],
     gitLabThrottler: Throttler[IO, GitLab]
 )(implicit timer:    Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
     extends EventsSynchronizationScheduler[IO](
       new SchedulerConfigProvider[IO](),
       new IOMissedEventsLoader(
-        new IOEventLogLatestEvents(dbConfig),
+        new IOEventLogLatestEvents(transactor),
         new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
         new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler),
         new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
-        new IOPushEventSender(dbConfig, gitLabThrottler),
+        new IOPushEventSender(transactor, gitLabThrottler),
         ApplicationLogger,
         new ExecutionTimeRecorder[IO]
       )

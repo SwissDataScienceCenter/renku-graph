@@ -54,9 +54,7 @@ class AssociationPersisterSpec extends WordSpec with InMemoryProjectsTokensDbSpe
   }
 
   private trait TestCase {
-
-    val projectId = projectIds.generateOne
-
-    val associator = new AssociationPersister(transactorProvider)
+    val projectId  = projectIds.generateOne
+    val associator = new AssociationPersister(transactor)
   }
 }

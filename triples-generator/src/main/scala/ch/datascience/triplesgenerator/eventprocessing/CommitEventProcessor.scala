@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.db.DBConfigProvider.DBConfig
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed, IOEventLogMarkDone, IOEventLogMarkFailed}
 import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
@@ -147,7 +147,7 @@ class CommitEventProcessor[Interpretation[_]](
 }
 
 class IOCommitEventProcessor(
-    dbConfig:            DBConfig[EventLogDB],
+    transactor:          DbTransactor[IO, EventLogDB],
     renkuLogTimeout:     FiniteDuration
 )(implicit contextShift: ContextShift[IO], executionContext: ExecutionContext, timer: Timer[IO])
     extends CommitEventProcessor[IO](
@@ -156,8 +156,8 @@ class IOCommitEventProcessor(
       new IOTriplesFinder(new GitLabRepoUrlFinder[IO](new GitLabUrlProvider[IO]()),
                           new Commands.Renku(renkuLogTimeout)),
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),
-      new IOEventLogMarkDone(dbConfig),
-      new IOEventLogMarkFailed(dbConfig),
+      new IOEventLogMarkDone(transactor),
+      new IOEventLogMarkFailed(transactor),
       ApplicationLogger,
       new ExecutionTimeRecorder[IO]
     )
