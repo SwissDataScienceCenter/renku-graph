@@ -129,7 +129,7 @@ spec:
             - name: THREADS_NUMBER
               value: "{{ .Values.triplesGenerator.threadsNumber }}"
             - name: JAVA_OPTS
-              value: -Xmx200m -XX:+UseG1GC
+              value: -Xmx300m -XX:+UseG1GC
           ports:
             - name: http-triples-gn
               containerPort: 9002

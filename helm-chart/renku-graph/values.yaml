@@ -29,9 +29,9 @@ triplesGenerator:
     port: 9002
   resources:
     limits:
-      memory: 600Mi
+      memory: 900Mi
   renkuLogTimeout: 3 minutes
-  threadsNumber: 4
+  threadsNumber: 2
   dbEventLog:
     connectionPool: 3
 

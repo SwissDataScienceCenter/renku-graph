@@ -33,7 +33,76 @@ import org.scalatest.WordSpec
 
 class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
-  "findEventToProcess" should {
+  import EventLogFetch._
+
+  "isEventToProcess" should {
+
+    s"return true if there are events with with status $New and execution date in the past" in new TestCase {
+      storeEvent(commitEventIds.generateOne,
+                 EventStatus.New,
+                 ExecutionDate(now minus (5, SECONDS)),
+                 committedDates.generateOne,
+                 eventBodies.generateOne)
+
+      eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
+    }
+
+    s"return true if there are events with with status $TriplesStoreFailure and execution date in the past" in new TestCase {
+      storeEvent(commitEventIds.generateOne,
+                 EventStatus.TriplesStoreFailure,
+                 ExecutionDate(now minus (5, SECONDS)),
+                 committedDates.generateOne,
+                 eventBodies.generateOne)
+
+      eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
+    }
+
+    s"return true if there are events with with status $Processing and execution date older than $MaxProcessingTime" in new TestCase {
+      storeEvent(
+        commitEventIds.generateOne,
+        EventStatus.Processing,
+        ExecutionDate(now minus (MaxProcessingTime.toMinutes + 1, MINUTES)),
+        committedDates.generateOne,
+        eventBodies.generateOne
+      )
+
+      eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
+    }
+
+    s"return false for other cases" in new TestCase {
+      storeEvent(
+        commitEventIds.generateOne,
+        EventStatus.Processing,
+        ExecutionDate(now minus (MaxProcessingTime.toMinutes - 1, MINUTES)),
+        committedDates.generateOne,
+        eventBodies.generateOne
+      )
+      storeEvent(commitEventIds.generateOne,
+                 EventStatus.New,
+                 ExecutionDate(now plus (5, SECONDS)),
+                 committedDates.generateOne,
+                 eventBodies.generateOne)
+      storeEvent(commitEventIds.generateOne,
+                 EventStatus.TriplesStoreFailure,
+                 ExecutionDate(now plus (5, SECONDS)),
+                 committedDates.generateOne,
+                 eventBodies.generateOne)
+      storeEvent(commitEventIds.generateOne,
+                 EventStatus.NonRecoverableFailure,
+                 ExecutionDate(now minus (5, SECONDS)),
+                 committedDates.generateOne,
+                 eventBodies.generateOne)
+      storeEvent(commitEventIds.generateOne,
+                 EventStatus.TriplesStore,
+                 ExecutionDate(now minus (5, SECONDS)),
+                 committedDates.generateOne,
+                 eventBodies.generateOne)
+
+      eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe false
+    }
+  }
+
+  "popEventToProcess" should {
 
     "find event with execution date farthest in the past " +
       s"and status $New or $TriplesStoreFailure " +
@@ -65,11 +134,11 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       findEvents(EventStatus.Processing) shouldBe List((event3Id, executionDate))
 
-      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe Some(event1Body)
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(event1Body)
 
       findEvents(EventStatus.Processing) shouldBe List((event1Id, executionDate), (event3Id, executionDate))
 
-      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
 
     "find event with execution date farthest in the past " +
@@ -90,29 +159,29 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe Some(eventBody2)
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody2)
 
       findEvents(EventStatus.Processing) shouldBe List((event2Id, executionDate))
 
-      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe Some(eventBody1)
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody1)
 
       findEvents(EventStatus.Processing) shouldBe List((event1Id, executionDate), (event2Id, executionDate))
 
-      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
 
     s"find event with the $Processing status " +
-      "and execution date older than 10 mins" in new TestCase {
+      s"and execution date older than $MaxProcessingTime" in new TestCase {
 
       val eventId   = commitEventIds.generateOne
       val eventBody = eventBodies.generateOne
       storeEvent(eventId,
                  EventStatus.Processing,
-                 ExecutionDate(now minus (11, MINUTES)),
+                 ExecutionDate(now minus (MaxProcessingTime.toMinutes + 1, MINUTES)),
                  committedDates.generateOne,
                  eventBody)
 
-      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe Some(eventBody)
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody)
 
       findEvents(EventStatus.Processing) shouldBe List((eventId, executionDate))
     }
@@ -128,7 +197,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
         eventBodies.generateOne
       )
 
-      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
 
     "find no events when there are no events matching the criteria" in new TestCase {
@@ -141,7 +210,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
         eventBodies.generateOne
       )
 
-      eventLogFetch.findEventToProcess.unsafeRunSync() shouldBe None
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
   }
 
@@ -156,8 +225,8 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
     def concurrentFindEventToProcess =
       for {
-        _ <- contextShift.shift *> eventLogFetch.findEventToProcess.start
-        _ <- contextShift.shift *> eventLogFetch.findEventToProcess
+        _ <- contextShift.shift *> eventLogFetch.popEventToProcess.start
+        _ <- contextShift.shift *> eventLogFetch.popEventToProcess
       } yield ()
   }
 }

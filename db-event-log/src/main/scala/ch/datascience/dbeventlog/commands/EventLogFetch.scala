@@ -24,6 +24,7 @@ import java.time.{Duration, Instant}
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
+import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
@@ -45,7 +46,10 @@ class EventLogFetch[Interpretation[_]](
 
   import EventLogFetch._
 
-  def findEventToProcess: Interpretation[Option[EventBody]] =
+  def isEventToProcess: Interpretation[Boolean] =
+    findOldestEvent.transact(transactor.get).map(_.isDefined)
+
+  def popEventToProcess: Interpretation[Option[EventBody]] =
     findEventAndUpdateForProcessing.transact(transactor.get)
 
   private def findEventAndUpdateForProcessing =

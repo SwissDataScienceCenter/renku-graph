@@ -101,6 +101,7 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
     class TestDbTransactor(transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, EventLogDB](transactor)
@@ -111,8 +112,12 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
       def addEventsToReturn(events: Seq[EventBody]): Unit =
         eventsQueue addAll events.asJava
 
-      override def findEventToProcess: IO[Option[EventBody]] = IO.pure {
+      override def popEventToProcess: IO[Option[EventBody]] = IO.pure {
         Option(eventsQueue.poll())
+      }
+
+      override def isEventToProcess: IO[Boolean] = IO.pure {
+        !eventsQueue.isEmpty
       }
     }
     val logger              = TestLogger[IO]()
