@@ -61,6 +61,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       commitsAndTriples.toList foreach successfulTriplesGenerationAndUpload
 
+      expectEventMarkedDone(commits.head.commitEventId)
+
       eventProcessor(eventBody) shouldBe context.unit
 
       logSummary(commits, triples = commitsAndTriples.map(_._2).toList, uploaded = commitsAndTriples.size, failed = 0)
@@ -89,6 +91,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .generateTriples(_: Commit, _: Option[AccessToken]))
         .expects(commit2, maybeAccessToken)
         .returning(context.raiseError(exception2))
+
       expectEventMarkedFailed(commit2.commitEventId, NonRecoverableFailure, exception2)
 
       eventProcessor(eventBody) shouldBe context.unit
@@ -127,10 +130,11 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       logSummary(commits, triples = List.empty, uploaded = 0, failed = 1)
     }
 
-    s"succeed and mark event with $TriplesStoreFailure if uploading triples to dataset fails" in new TestCase {
+    s"succeed and mark event with $TriplesStoreFailure if uploading triples to dataset fails " +
+      "for at least one event" in new TestCase {
 
-      val commits       = commitsLists(size = Gen.const(1)).generateOne
-      val commit +: Nil = commits.toList
+      val commits                   = commitsLists(size = Gen.const(2)).generateOne
+      val commit1 +: commit2 +: Nil = commits.toList
 
       (eventsDeserialiser
         .deserialiseToCommitEvents(_: EventBody))
@@ -140,24 +144,30 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       givenFetchingAccessToken(forProjectId = commits.head.project.id)
         .returning(context.pure(maybeAccessToken))
 
-      val triples = rdfTriplesSets.generateOne
+      val triples1 = rdfTriplesSets.generateOne
       (triplesFinder
         .generateTriples(_: Commit, _: Option[AccessToken]))
-        .expects(commit, maybeAccessToken)
-        .returning(context.pure(triples))
+        .expects(commit1, maybeAccessToken)
+        .returning(context.pure(triples1))
 
-      val exception = exceptions.generateOne
+      val exception1 = exceptions.generateOne
       (fusekiConnector
         .upload(_: RDFTriples))
-        .expects(triples)
-        .returning(context.raiseError(exception))
+        .expects(triples1)
+        .returning(context.raiseError(exception1))
 
-      expectEventMarkedFailed(commit.commitEventId, TriplesStoreFailure, exception)
+      val exception2 = exceptions.generateOne
+      (triplesFinder
+        .generateTriples(_: Commit, _: Option[AccessToken]))
+        .expects(commit2, maybeAccessToken)
+        .returning(context.raiseError(exception2))
+
+      expectEventMarkedFailed(commit1.commitEventId, TriplesStoreFailure, exception1)
 
       eventProcessor(eventBody) shouldBe context.unit
 
-      logError(commits.head, exception)
-      logSummary(commits, triples = List.empty, uploaded = 0, failed = 1)
+      logError(commits.head, exception1)
+      logSummary(commits, triples = List.empty, uploaded = 0, failed = 2)
     }
 
     s"succeed and log error if marking event in as $TriplesStore fails" in new TestCase {
@@ -272,12 +282,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .upload(_: RDFTriples))
         .expects(triples)
         .returning(context.unit)
+    }
 
+    def expectEventMarkedDone(commitEventId: CommitEventId) =
       (eventLogMarkDone
         .markEventDone(_: CommitEventId))
-        .expects(commit.commitEventId)
+        .expects(commitEventId)
         .returning(context.unit)
-    }
 
     def expectEventMarkedFailed(commitEventId: CommitEventId, status: FailureStatus, exception: Throwable) =
       (eventLogMarkFailed
