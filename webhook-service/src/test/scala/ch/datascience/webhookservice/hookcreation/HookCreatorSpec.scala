@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats._
-import cats.implicits._
+import cats.effect.{ConcurrentEffect, ContextShift, IO}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -27,12 +27,12 @@ import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.webhookservice.crypto.TryHookTokenCrypto
+import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
-import ch.datascience.webhookservice.hookvalidation.TryHookValidator
+import ch.datascience.webhookservice.hookvalidation.IOHookValidator
 import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository.AccessTokenAssociator
@@ -40,8 +40,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
-import scala.util.Try
 
 class HookCreatorSpec extends WordSpec with MockFactory {
 
@@ -80,7 +80,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       expectEventsHistoryLoader(returning = context.unit)
 
-      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(HookCreated)
+      hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookCreated
 
       logger.expectNoLogs()
     }
@@ -96,20 +96,21 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(HookExists))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe context.pure(HookExisted)
+      hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookExisted
 
       logger.expectNoLogs()
     }
 
     "log an error if finding project hook url fails" in new TestCase {
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val exception = exceptions.generateOne
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
-        .returning(error)
+        .returning(context.raiseError(exception))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe error
+      intercept[Exception] {
+        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+      } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
@@ -120,14 +121,15 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects()
         .returning(context.pure(projectHookUrl))
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val exception = exceptions.generateOne
       (projectHookValidator
         .validateHook(_: ProjectId, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(error)
+        .returning(context.raiseError(exception))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe error
+      intercept[Exception] {
+        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+      } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
@@ -143,14 +145,15 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(HookMissing))
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val exception = exceptions.generateOne
       (projectInfoFinder
         .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(error)
+        .returning(context.raiseError(exception))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe error
+      intercept[Exception] {
+        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+      } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
@@ -171,14 +174,15 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val exception = exceptions.generateOne
       (hookTokenCrypto
         .encrypt(_: HookToken))
         .expects(HookToken(projectId))
-        .returning(error)
+        .returning(context.raiseError(exception))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe error
+      intercept[Exception] {
+        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+      } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
@@ -204,14 +208,15 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(HookToken(projectId))
         .returning(context.pure(serializedHookToken))
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val exception = exceptions.generateOne
       (projectHookCreator
         .create(_: ProjectHook, _: AccessToken))
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-        .returning(error)
+        .returning(context.raiseError(exception))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe error
+      intercept[Exception] {
+        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+      } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
@@ -242,19 +247,20 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
         .returning(context.unit)
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val exception = exceptions.generateOne
       (accessTokenAssociator
         .associate(_: ProjectId, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(error)
+        .returning(context.raiseError(exception))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe error
+      intercept[Exception] {
+        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+      } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
-    "log an error if loading all events fails" in new TestCase {
+    "return either HookExisted/HookCreated if loading all events fails" in new TestCase {
 
       (projectHookUrlFinder.findProjectHookUrl _)
         .expects()
@@ -285,15 +291,16 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.unit)
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      expectEventsHistoryLoader(returning = error)
+      expectEventsHistoryLoader(returning = context.raiseError(exceptions.generateOne))
 
-      hookCreation.createHook(projectId, accessToken) shouldBe error
+      hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookCreated
 
-      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
+      logger.expectNoLogs()
     }
   }
+
+  private implicit val contextShift: ContextShift[IO]     = IO.contextShift(ExecutionContext.global)
+  private implicit val concurrent:   ConcurrentEffect[IO] = IO.ioConcurrentEffect
 
   private trait TestCase {
     val projectInfo         = projectInfos.generateOne
@@ -302,18 +309,18 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     val serializedHookToken = serializedHookTokens.generateOne
     val accessToken         = accessTokens.generateOne
 
-    val context = MonadError[Try, Throwable]
+    val context: MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-    val logger                = TestLogger[Try]()
-    val projectInfoFinder     = mock[ProjectInfoFinder[Try]]
-    val projectHookValidator  = mock[TryHookValidator]
-    val projectHookCreator    = mock[ProjectHookCreator[Try]]
-    val projectHookUrlFinder  = mock[TryProjectHookUrlFinder]
-    val hookTokenCrypto       = mock[TryHookTokenCrypto]
-    val accessTokenAssociator = mock[AccessTokenAssociator[Try]]
-    val eventsHistoryLoader   = mock[TryEventsHistoryLoader]
+    val logger                = TestLogger[IO]()
+    val projectInfoFinder     = mock[ProjectInfoFinder[IO]]
+    val projectHookValidator  = mock[IOHookValidator]
+    val projectHookCreator    = mock[ProjectHookCreator[IO]]
+    val projectHookUrlFinder  = mock[IOProjectHookUrlFinder]
+    val hookTokenCrypto       = mock[IOHookTokenCrypto]
+    val accessTokenAssociator = mock[AccessTokenAssociator[IO]]
+    val eventsHistoryLoader   = mock[IOEventsHistoryLoader]
 
-    val hookCreation = new HookCreator[Try](
+    val hookCreation = new HookCreator[IO](
       projectHookUrlFinder,
       projectHookValidator,
       projectInfoFinder,
@@ -324,7 +331,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger
     )
 
-    def expectEventsHistoryLoader(returning: Try[Unit]): Unit =
+    def expectEventsHistoryLoader(returning: IO[Unit]): Unit =
       (eventsHistoryLoader
         .loadAllEvents(_: ProjectInfo, _: AccessToken))
         .expects(projectInfo, accessToken)

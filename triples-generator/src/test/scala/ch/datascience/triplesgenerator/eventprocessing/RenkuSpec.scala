@@ -59,7 +59,6 @@ class RenkuSpec extends WordSpec {
     }
 
     "get terminated if calling 'renku log' takes longer than the defined timeout" in new TestCase {
-
       intercept[Exception] {
         renku.log(commit, path)(triplesGenerationTakingTooLong).unsafeRunSync()
       }.getMessage shouldBe s"'renku log' execution for commit: ${commit.id}, project: ${commit.project.id} " +
@@ -74,7 +73,7 @@ class RenkuSpec extends WordSpec {
     val commit = commits.generateOne
     val path   = paths.generateOne
 
-    val renkuLogTimeout = 1 second
+    val renkuLogTimeout = 1500 millis
     val renku           = new Renku(renkuLogTimeout)
 
     def triplesGeneration(returning: CommandResult): (Commit, Path) => CommandResult =

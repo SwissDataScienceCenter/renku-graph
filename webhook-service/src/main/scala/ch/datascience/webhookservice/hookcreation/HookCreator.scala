@@ -47,7 +47,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private class HookCreator[Interpretation[_]: Monad](
+private class HookCreator[Interpretation[_]](
     projectHookUrlFinder:  ProjectHookUrlFinder[Interpretation],
     projectHookValidator:  HookValidator[Interpretation],
     projectInfoFinder:     ProjectInfoFinder[Interpretation],
@@ -56,7 +56,9 @@ private class HookCreator[Interpretation[_]: Monad](
     accessTokenAssociator: AccessTokenAssociator[Interpretation],
     eventsHistoryLoader:   EventsHistoryLoader[Interpretation],
     logger:                Logger[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable]) {
+)(implicit ME:             MonadError[Interpretation, Throwable],
+  contextShift:            ContextShift[Interpretation],
+  concurrent:              Concurrent[Interpretation]) {
 
   import HookCreator.CreationResult._
   import accessTokenAssociator._
@@ -75,7 +77,7 @@ private class HookCreator[Interpretation[_]: Monad](
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
       _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
       _                   <- right(associate(projectId, accessToken))
-      _                   <- right(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken))
+      _                   <- right(contextShift.shift *> concurrent.start(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken)))
     } yield ()
   } fold [CreationResult] (_ => HookExisted, _ => HookCreated) recoverWith loggingError(projectId)
 
