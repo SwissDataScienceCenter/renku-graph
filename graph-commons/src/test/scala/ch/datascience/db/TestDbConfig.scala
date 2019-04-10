@@ -25,6 +25,9 @@ import ch.datascience.generators.Generators.nonEmptyStrings
 import eu.timepit.refined.api.RefType
 import eu.timepit.refined.auto._
 
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
 object TestDbConfig {
 
   def newDbConfig[TargetDb]: DBConfig[TargetDb] = {
@@ -34,7 +37,8 @@ object TestDbConfig {
       url            = toUrl(s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"),
       user           = "user",
       pass           = "",
-      connectionPool = 20
+      connectionPool = 20,
+      maxLifetime    = 5 seconds
     )
   }
 

@@ -31,6 +31,8 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
 class DBConfigProviderSpec extends WordSpec {
@@ -42,14 +44,16 @@ class DBConfigProviderSpec extends WordSpec {
       val user           = nonEmptyStrings().generateOne
       val password       = nonEmptyStrings().generateOne
       val connectionPool = positiveInts().generateOne
+      val maxLifetime    = durations(30 minutes).generateOne
 
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"         -> host.value,
-            "db-user"         -> user,
-            "db-pass"         -> password,
-            "connection-pool" -> connectionPool
+            "db-host"                 -> host.value,
+            "db-user"                 -> user,
+            "db-pass"                 -> password,
+            "connection-pool"         -> connectionPool,
+            "max-connection-lifetime" -> maxLifetime.toString()
           ).asJava
         ).asJava
       )
@@ -61,6 +65,7 @@ class DBConfigProviderSpec extends WordSpec {
       dbConfig.user.value           shouldBe user
       dbConfig.pass                 shouldBe password
       dbConfig.connectionPool.value shouldBe connectionPool
+      dbConfig.maxLifetime          shouldBe maxLifetime
     }
 
     "fail if there is no db config namespace in the config" in new TestCase {
@@ -74,10 +79,11 @@ class DBConfigProviderSpec extends WordSpec {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"         -> "",
-            "db-user"         -> nonEmptyStrings().generateOne,
-            "db-pass"         -> nonEmptyStrings().generateOne,
-            "connection-pool" -> positiveInts().generateOne
+            "db-host"                 -> "",
+            "db-user"                 -> nonEmptyStrings().generateOne,
+            "db-pass"                 -> nonEmptyStrings().generateOne,
+            "connection-pool"         -> positiveInts().generateOne,
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -91,10 +97,11 @@ class DBConfigProviderSpec extends WordSpec {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"         -> hosts.generateOne.value,
-            "db-user"         -> "",
-            "db-pass"         -> nonEmptyStrings().generateOne,
-            "connection-pool" -> positiveInts().generateOne
+            "db-host"                 -> hosts.generateOne.value,
+            "db-user"                 -> "",
+            "db-pass"                 -> nonEmptyStrings().generateOne,
+            "connection-pool"         -> positiveInts().generateOne,
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -108,9 +115,10 @@ class DBConfigProviderSpec extends WordSpec {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"         -> hosts.generateOne.value,
-            "db-user"         -> nonEmptyStrings().generateOne,
-            "connection-pool" -> positiveInts().generateOne
+            "db-host"                 -> hosts.generateOne.value,
+            "db-user"                 -> nonEmptyStrings().generateOne,
+            "connection-pool"         -> positiveInts().generateOne,
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -124,9 +132,27 @@ class DBConfigProviderSpec extends WordSpec {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host" -> hosts.generateOne.value,
-            "db-user" -> nonEmptyStrings().generateOne,
-            "db-pass" -> nonEmptyStrings().generateOne
+            "db-host"                 -> hosts.generateOne.value,
+            "db-user"                 -> nonEmptyStrings().generateOne,
+            "db-pass"                 -> nonEmptyStrings().generateOne,
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, driver, dbName, urlPrefix, config).get()
+
+      exception shouldBe a[ConfigLoadingException]
+    }
+
+    "fail if there is no '<config-namespace>.max-connection-lifetime' in the config" in new TestCase {
+      val config = ConfigFactory.parseMap(
+        Map(
+          namespace -> Map(
+            "db-host"         -> hosts.generateOne.value,
+            "db-user"         -> nonEmptyStrings().generateOne,
+            "db-pass"         -> nonEmptyStrings().generateOne,
+            "connection-pool" -> positiveInts().generateOne
           ).asJava
         ).asJava
       )

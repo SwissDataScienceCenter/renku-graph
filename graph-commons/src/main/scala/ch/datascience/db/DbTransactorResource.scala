@@ -23,6 +23,7 @@ import ch.datascience.db.DBConfigProvider.DBConfig
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 class DbTransactorResource[Interpretation[_], TargetDB](
@@ -43,14 +44,24 @@ class DbTransactorResource[Interpretation[_], TargetDB](
     for {
       connectionsThreadPool  <- fixedThreadPool[Interpretation](dbConfig.connectionPool.value)
       transactionsThreadPool <- cachedThreadPool[Interpretation]
-      transactor <- newHikariTransactor[Interpretation](
-                     dbConfig.driver.value,
-                     dbConfig.url.value,
-                     dbConfig.user.value,
-                     dbConfig.pass,
-                     connectionsThreadPool,
-                     transactionsThreadPool
-                   )
+      transactor             <- createHikariTransactor(connectionsThreadPool, transactionsThreadPool)
+    } yield transactor
+
+  private def createHikariTransactor(connectionsThreadPool:  ExecutionContext,
+                                     transactionsThreadPool: ExecutionContext) =
+    for {
+      _          <- Resource.liftF(Async[Interpretation].delay(Class.forName(dbConfig.driver.value)))
+      transactor <- initial[Interpretation](connectionsThreadPool, transactionsThreadPool)
+      _ <- Resource.liftF {
+            transactor.configure { dataSource =>
+              Async[Interpretation].delay {
+                dataSource setJdbcUrl dbConfig.url.value
+                dataSource setUsername dbConfig.user.value
+                dataSource setPassword dbConfig.pass
+                dataSource setMaxLifetime dbConfig.maxLifetime.toMillis
+              }
+            }
+          }
     } yield transactor
 }
 

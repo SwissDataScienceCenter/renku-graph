@@ -29,7 +29,9 @@ import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
-import scala.language.implicitConversions
+import scala.concurrent.duration._
+import scala.concurrent.duration.FiniteDuration
+import scala.language.{implicitConversions, postfixOps}
 
 object Generators {
 
@@ -55,6 +57,10 @@ object Generators {
     } yield list
 
   def positiveInts(max: Int = 1000): Gen[Int] = choose(1, max)
+
+  def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
+    choose(1, max.toMillis)
+      .map(FiniteDuration(_, MILLISECONDS))
 
   def nonNegativeInts(max: Int = 1000): Gen[Int] = choose(0, max)
 

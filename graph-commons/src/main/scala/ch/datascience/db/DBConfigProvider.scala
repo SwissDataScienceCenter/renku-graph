@@ -29,6 +29,7 @@ import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.string.MatchesRegex
 
+import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
 class DBConfigProvider[Interpretation[_], TargetDB](
@@ -51,8 +52,9 @@ class DBConfigProvider[Interpretation[_], TargetDB](
       user           <- find[DBConfig.User](s"$namespace.db-user", config)
       pass           <- find[DBConfig.Pass](s"$namespace.db-pass", config)
       connectionPool <- find[DBConfig.ConnectionPool](s"$namespace.connection-pool", config)
+      maxLifetime    <- find[DBConfig.MaxLifetime](s"$namespace.max-connection-lifetime", config)
       url            <- findUrl(host)
-    } yield DBConfig(driver, url, user, pass, connectionPool)
+    } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime)
 
   private def findUrl(host: DBConfig.Host): Interpretation[DBConfig.Url] = ME.fromEither {
     RefType
@@ -68,7 +70,8 @@ object DBConfigProvider {
                                 url:            Url,
                                 user:           User,
                                 pass:           Pass,
-                                connectionPool: DBConfig.ConnectionPool)
+                                connectionPool: ConnectionPool,
+                                maxLifetime:    MaxLifetime)
   object DBConfig {
     type Driver         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Url            = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
@@ -78,5 +81,6 @@ object DBConfigProvider {
     type User           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Pass           = String
     type ConnectionPool = Int Refined Positive
+    type MaxLifetime    = FiniteDuration
   }
 }

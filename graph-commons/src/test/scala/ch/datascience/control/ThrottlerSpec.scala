@@ -60,7 +60,7 @@ class ThrottlerSpec extends WordSpec {
           case (diffs, item) => diffs :+ item - diffs.sum
         }
       startDelays foreach { delay =>
-        delay should be > 500L
+        delay should be >= 500L
       }
 
       val totalTime = register.asScala.values
