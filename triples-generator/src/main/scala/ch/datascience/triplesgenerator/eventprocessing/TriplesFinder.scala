@@ -233,7 +233,7 @@ private object Commands {
 
     private implicit class StreamValueOps(streamValue: StreamValue) {
       lazy val toInputStream: InputStream =
-        new ByteArrayInputStream(streamValue.chunks.flatMap(_.array).toArray)
+        new ByteArrayInputStream(streamValue.string.trim.getBytes)
     }
   }
 }
