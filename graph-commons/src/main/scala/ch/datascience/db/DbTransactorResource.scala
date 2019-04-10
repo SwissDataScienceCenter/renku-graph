@@ -20,11 +20,13 @@ package ch.datascience.db
 
 import cats.effect._
 import ch.datascience.db.DBConfigProvider.DBConfig
+import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
+import scala.concurrent.duration._
+import scala.language.{higherKinds, postfixOps}
 
 class DbTransactorResource[Interpretation[_], TargetDB](
     dbConfig:     DBConfig[TargetDB]
@@ -59,10 +61,16 @@ class DbTransactorResource[Interpretation[_], TargetDB](
                 dataSource setUsername dbConfig.user.value
                 dataSource setPassword dbConfig.pass
                 dataSource setMaxLifetime dbConfig.maxLifetime.toMillis
+                dataSource setIdleTimeout (dbConfig.maxLifetime - (30 seconds)).toMillis
+                dataSource setMinimumIdle calculateMinimumIdle(dataSource)
               }
             }
           }
     } yield transactor
+
+  private def calculateMinimumIdle(dataSource: HikariDataSource) =
+    if (dataSource.getMaximumPoolSize > 2) dataSource.getMaximumPoolSize - 2
+    else dataSource.getMaximumPoolSize
 }
 
 object DbTransactorResource {
