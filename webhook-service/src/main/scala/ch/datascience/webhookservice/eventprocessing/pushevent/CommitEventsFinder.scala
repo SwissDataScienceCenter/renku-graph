@@ -47,6 +47,7 @@ private class CommitEventsFinder[Interpretation[_]](
 
   import Stream._
   type EventsStream = Stream[Interpretation[CommitEvent]]
+  private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
   def findCommitEvents(pushEvent: PushEvent, maybeAccessToken: Option[AccessToken]): Interpretation[EventsStream] =
     for {
@@ -65,8 +66,9 @@ private class CommitEventsFinder[Interpretation[_]](
 
     private def stream(commitIds: List[CommitId]): Interpretation[EventsStream] =
       commitIds match {
-        case Nil                       => ME.pure(Stream.empty)
-        case commitId +: leftToProcess => nextElement(commitId, leftToProcess)
+        case Nil                               => ME.pure(Stream.empty)
+        case DontCareCommitId +: leftToProcess => stream(leftToProcess)
+        case commitId +: leftToProcess         => nextElement(commitId, leftToProcess)
       }
 
     private def nextElement(commitId: CommitId, leftToProcess: List[CommitId]) = {
@@ -89,7 +91,7 @@ private class CommitEventsFinder[Interpretation[_]](
         pushUser      = pushEvent.pushUser,
         author        = commitInfo.author,
         committer     = commitInfo.committer,
-        parents       = commitInfo.parents,
+        parents       = commitInfo.parents.filterNot(_ == DontCareCommitId),
         project       = pushEvent.project
       )
 

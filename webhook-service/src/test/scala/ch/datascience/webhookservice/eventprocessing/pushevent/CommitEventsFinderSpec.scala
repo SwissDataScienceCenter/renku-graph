@@ -137,6 +137,26 @@ class CommitEventsFinderSpec extends WordSpec with MockFactory {
       )
     }
 
+    "return commit events starting from the 'commitTo' to the oldest ancestor " +
+      "skipping commits with the 'don't care' 0000000000000000000000000000000000000000 ref" in new TestCase {
+
+      givenLatestEventInTheLog(None)
+
+      val level1Parent1 = CommitId("0000000000000000000000000000000000000000")
+      val level1Parent2 = commitIds.generateOne
+      val level1Info    = commitInfos(pushEvent.commitTo, level1Parent1, level1Parent2).generateOne
+      val level2Info    = commitInfos(level1Parent2, noParents).generateOne
+
+      givenFindingCommitInfoReturns(level1Info, level2Info)
+
+      commitEventFinder.findCommitEvents(pushEvent, maybeAccessToken).map(_.toList) shouldBe toSuccess(
+        List(
+          commitEventFrom(pushEvent, level1Info.copy(parents = List(level1Parent2))),
+          commitEventFrom(pushEvent, level2Info),
+        )
+      )
+    }
+
     "fail if verifying existence of parent ids in the Event Log fails" in new TestCase {
 
       givenLatestEventInTheLog(None)
