@@ -1,0 +1,89 @@
+/*
+ * Copyright 2019 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.datascience.db
+
+import DbConfigGenerator._
+import ch.datascience.db.DBConfigProvider.DBConfig._
+import ch.datascience.generators.Generators.Implicits._
+import com.zaxxer.hikari.HikariDataSource
+import eu.timepit.refined.api.RefType
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
+class DataSourceUpdaterSpec extends WordSpec with MockFactory {
+
+  "DataSourceUpdater" should {
+
+    "set JDBC url on the data source" in new TestCase {
+      updater(dataSource)
+      (dataSource.setJdbcUrl(_: String)) verify dbConfig.url.value
+    }
+
+    "set username on the data source" in new TestCase {
+      updater(dataSource)
+      (dataSource.setUsername(_: String)) verify dbConfig.user.value
+    }
+
+    "set password on the data source" in new TestCase {
+      updater(dataSource)
+      (dataSource.setPassword(_: String)) verify dbConfig.pass
+    }
+
+    "set maximumPoolSize on the data source" in new TestCase {
+      updater(dataSource)
+      (dataSource.setMaximumPoolSize(_: Int)) verify dbConfig.connectionPool.value
+    }
+
+    "set minimumIdle on the data source as 75% of connection pool" in new TestCase {
+      updater(dataSource)
+      (dataSource.setMinimumIdle(_: Int)) verify (dbConfig.connectionPool.value * 0.75).ceil.toInt
+    }
+
+    "set minimumIdle on the data source as not less than 1" in new TestCase {
+      new DataSourceUpdater(dbConfig.copy(connectionPool = RefType.applyRef[ConnectionPool](1).getOrError))(dataSource)
+      (dataSource.setMinimumIdle(_: Int)) verify 1
+    }
+
+    "set maxLifetime on the data source" in new TestCase {
+      updater(dataSource)
+      (dataSource.setMaxLifetime(_: Long)) verify dbConfig.maxLifetime.toMillis
+    }
+
+    "set idleTimeout on the data source as (maxLifetime - 30s) if maxLifetime > 30s" in new TestCase {
+      new DataSourceUpdater(dbConfig.copy(maxLifetime = 35 seconds))(dataSource)
+      (dataSource.setIdleTimeout(_: Long)) verify (5 seconds).toMillis
+    }
+
+    "set idleTimeout on the data source to maxLifetime if maxLifetime <= 30s" in new TestCase {
+      new DataSourceUpdater(dbConfig.copy(maxLifetime = 30 seconds))(dataSource)
+      (dataSource.setIdleTimeout(_: Long)) verify (30 seconds).toMillis
+    }
+  }
+
+  private trait TestCase {
+    val dbConfig   = dbConfigs.generateOne
+    val dataSource = stub[HikariDataSource]
+
+    val updater = new DataSourceUpdater(dbConfig)
+  }
+}

@@ -39,6 +39,7 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget](
     extends Throttler[Interpretation, ThrottlingTarget] {
 
   private val NextAttemptSleep: FiniteDuration = 100 millis
+  private val MinTimeGap = rateLimit.items.toDouble / rateLimit.per.toMillis
 
   import timer.clock
 
@@ -52,7 +53,7 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget](
 
   private def verifyThroughput(startTimes: List[Long], now: Long) = {
     val oldest = startTimes.head
-    if (startTimes.size.toDouble / (now - oldest) <= rateLimit.items.toDouble / rateLimit.per.toMillis)
+    if (startTimes.size.toDouble / (now - oldest) <= MinTimeGap)
       workersStartTimes.modify(old => (startTimes :+ now) -> old) *> semaphore.release
     else semaphore.release *> timer.sleep(NextAttemptSleep) *> acquire
   }
