@@ -29,8 +29,9 @@ import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 
 class DbTransactorResource[Interpretation[_], TargetDB](
-    dbConfig:     DBConfig[TargetDB]
-)(implicit async: Async[Interpretation], cs: ContextShift[Interpretation]) {
+    dbConfig:          DBConfig[TargetDB],
+    dataSourceUpdater: HikariDataSource => Unit
+)(implicit async:      Async[Interpretation], cs: ContextShift[Interpretation]) {
 
   import ExecutionContexts._
   import HikariTransactor._
@@ -52,25 +53,35 @@ class DbTransactorResource[Interpretation[_], TargetDB](
   private def createHikariTransactor(connectionsThreadPool:  ExecutionContext,
                                      transactionsThreadPool: ExecutionContext) =
     for {
-      _          <- Resource.liftF(Async[Interpretation].delay(Class.forName(dbConfig.driver.value)))
+      _          <- Resource.liftF(Async[Interpretation] delay Class.forName(dbConfig.driver.value))
       transactor <- initial[Interpretation](connectionsThreadPool, transactionsThreadPool)
       _ <- Resource.liftF {
             transactor.configure { dataSource =>
-              Async[Interpretation].delay {
-                dataSource setJdbcUrl dbConfig.url.value
-                dataSource setUsername dbConfig.user.value
-                dataSource setPassword dbConfig.pass
-                dataSource setMaxLifetime dbConfig.maxLifetime.toMillis
-                dataSource setIdleTimeout (dbConfig.maxLifetime - (30 seconds)).toMillis
-                dataSource setMinimumIdle calculateMinimumIdle(dataSource)
-              }
+              Async[Interpretation] delay dataSourceUpdater(dataSource)
             }
           }
     } yield transactor
+}
 
-  private def calculateMinimumIdle(dataSource: HikariDataSource) =
-    if (dataSource.getMaximumPoolSize > 2) dataSource.getMaximumPoolSize - 2
-    else dataSource.getMaximumPoolSize
+private class DataSourceUpdater[TargetDB](dbConfig: DBConfig[TargetDB]) extends (HikariDataSource => Unit) {
+
+  override def apply(dataSource: HikariDataSource): Unit = {
+    dataSource setJdbcUrl dbConfig.url.value
+    dataSource setUsername dbConfig.user.value
+    dataSource setPassword dbConfig.pass
+    dataSource setMaximumPoolSize dbConfig.connectionPool.value
+    dataSource setMaxLifetime dbConfig.maxLifetime.toMillis
+    dataSource setIdleTimeout {
+      if (dbConfig.maxLifetime.toMillis > (30 seconds).toMillis) (dbConfig.maxLifetime - (30 seconds)).toMillis
+      else dbConfig.maxLifetime.toMillis
+    }
+
+    {
+      val minimumIdle = (dbConfig.connectionPool.value * 0.75).ceil.toInt
+      if (minimumIdle < dbConfig.connectionPool.value)
+        dataSource setMinimumIdle minimumIdle
+    }
+  }
 }
 
 object DbTransactorResource {
@@ -78,5 +89,5 @@ object DbTransactorResource {
       dbConfig:     DBConfig[TargetDB]
   )(implicit async: Async[Interpretation],
     cs:             ContextShift[Interpretation]): DbTransactorResource[Interpretation, TargetDB] =
-    new DbTransactorResource[Interpretation, TargetDB](dbConfig)
+    new DbTransactorResource[Interpretation, TargetDB](dbConfig, new DataSourceUpdater[TargetDB](dbConfig))
 }
