@@ -18,15 +18,30 @@
 
 package ch.datascience.dbeventlog
 
+import cats.implicits._
 import EventStatus._
+import ch.datascience.dbeventlog.commands.ProcessingStatus
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
+
+import scala.util.Try
 
 object DbEventLogGenerators {
 
   implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
   implicit val createdDates:   Gen[CreatedDate]   = timestampsNotInTheFuture map CreatedDate.apply
   implicit val executionDates: Gen[ExecutionDate] = timestamps map ExecutionDate.apply
-  implicit val eventStatuses:  Gen[EventStatus]   = Gen.oneOf(New, Processing, TriplesStore, TriplesStoreFailure)
-  implicit val eventMessages:  Gen[EventMessage]  = nonEmptyStrings() map EventMessage.apply
+  implicit val eventStatuses: Gen[EventStatus] = Gen.oneOf(
+    New,
+    Processing,
+    TriplesStore,
+    TriplesStoreFailure,
+    NonRecoverableFailure
+  )
+  implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
+  implicit val processingStatuses: Gen[ProcessingStatus] =
+    for {
+      total <- positiveInts(max = Integer.MAX_VALUE)
+      done  <- positiveInts(max = total)
+    } yield ProcessingStatus.from[Try](done, total).fold(throw _, identity)
 }

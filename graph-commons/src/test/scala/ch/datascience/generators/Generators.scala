@@ -21,6 +21,7 @@ package ch.datascience.generators
 import java.time.Instant
 import java.time.temporal.ChronoUnit.DAYS
 
+import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import eu.timepit.refined.api.{RefType, Refined}
@@ -50,19 +51,21 @@ object Generators {
       lines <- Gen.listOfN(size, nonEmptyStrings())
     } yield lines
 
-  def nonEmptyList[T](generator: Gen[T], minElements: Int = 1, maxElements: Int = 5): Gen[List[T]] =
+  def nonEmptyList[T](generator: Gen[T], minElements: Int = 1, maxElements: Int = 5): Gen[NonEmptyList[T]] =
     for {
       size <- choose(minElements, maxElements)
       list <- Gen.listOfN(size, generator)
-    } yield list
+    } yield NonEmptyList.fromListUnsafe(list)
 
   def positiveInts(max: Int = 1000): Gen[Int] = choose(1, max)
+
+  def nonNegativeInts(max: Int = 1000): Gen[Int] = choose(0, max)
+
+  def negativeInts(min: Int = -1000): Gen[Int] = choose(min, 0)
 
   def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
     choose(1, max.toMillis)
       .map(FiniteDuration(_, MILLISECONDS))
-
-  def nonNegativeInts(max: Int = 1000): Gen[Int] = choose(0, max)
 
   def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] =
     for {
