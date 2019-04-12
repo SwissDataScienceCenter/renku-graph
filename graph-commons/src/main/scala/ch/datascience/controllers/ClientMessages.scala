@@ -60,7 +60,7 @@ object InfoMessage {
         identity
       )
 
-  private implicit val infoMessageEncoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
+  implicit val infoMessageEncoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
     Json.obj("message" -> Json.fromString(message.value))
   }
 

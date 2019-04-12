@@ -7,12 +7,13 @@ This microservice:
 
 ## API
 
-| Method | Path                                      | Description                                    |
-|--------|-------------------------------------------|------------------------------------------------|
-|  GET   | ```/ping```                               | To check if service is healthy                 |
-|  POST  | ```/projects/:id/webhooks```              | Creates a webhook for a project in GitLab      |
-|  POST  | ```/projects/:id/webhooks/validation```   | Validates the project's webhook                |
-|  POST  | ```/webhooks/events```                    | Consumes push events sent from GitLab          |
+| Method | Path                                      | Description                                           |
+|--------|-------------------------------------------|-------------------------------------------------------|
+|  GET   | ```/ping```                               | To check if service is healthy                        |
+|  GET   | ```/projects/:id/events/status```         | Gives info about processing progress of recent events |
+|  POST  | ```/projects/:id/webhooks```              | Creates a webhook for a project in GitLab             |
+|  POST  | ```/projects/:id/webhooks/validation```   | Validates the project's webhook                       |
+|  POST  | ```/webhooks/events```                    | Consumes push events sent from GitLab                 |
      
 #### GET /ping
 
@@ -24,6 +25,27 @@ Verifies service health.
 |----------------------------|-------------------------|
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
+
+#### GET /projects/:id/events/status
+
+Fetches information about processing progress of project events.
+
+**Response**
+
+| Status                     | Description                                                                   |
+|----------------------------|-------------------------------------------------------------------------------|
+| OK (200)                   | When there are recent events                                                  |
+| NOT_FOUND (404)            | When there is either no recent events for a project or project does not exist |
+| INTERNAL SERVER ERROR (500)| When there are problems with finding the status                               |
+
+Example of a valid response:
+```
+{
+  "done": 10,
+  "total": 20,
+  "progress": 50.00
+}
+```
 
 #### POST /projects/:id/webhooks
 
