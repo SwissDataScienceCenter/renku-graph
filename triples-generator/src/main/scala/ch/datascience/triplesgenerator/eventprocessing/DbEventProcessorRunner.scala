@@ -48,13 +48,10 @@ class DbEventProcessorRunner(
     } yield ()
 
   private def checkForNewEvent: IO[Unit] =
-    for {
-      _ <- contextShift.shift *> popEvent.start
-      _ <- isEventToProcess flatMap {
-            case true  => checkForNewEvent
-            case false => timer.sleep(interval) *> checkForNewEvent
-          }
-    } yield ()
+    isEventToProcess flatMap {
+      case true  => List(popEvent, checkForNewEvent).parSequence *> IO.unit
+      case false => timer.sleep(interval) *> checkForNewEvent
+    }
 
   private def popEvent: IO[Unit] = popEventToProcess flatMap {
     case Some(eventBody) => eventProcessor(eventBody)
