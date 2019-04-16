@@ -31,6 +31,8 @@ triplesGenerator:
     limits:
       memory: 900Mi
   renkuLogTimeout: 3 minutes
+  gitlab:
+    rateLimit: 2/sec
   threadsNumber: 4
   dbEventLog:
     connectionPool: 5
@@ -46,6 +48,8 @@ webhookService:
   resources:
     limits:
       memory: 600Mi
+  gitlab:
+    rateLimit: 2/sec
   threadsNumber: 4
   dbEventLog:
     connectionPool: 5
