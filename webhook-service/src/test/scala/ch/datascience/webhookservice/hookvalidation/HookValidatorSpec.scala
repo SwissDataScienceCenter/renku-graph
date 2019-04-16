@@ -167,38 +167,6 @@ class HookValidatorSpec extends WordSpec with MockFactory {
     }
   }
 
-  "validateHook - neither Private nor Public project" should {
-
-    "fail with unsupported error" in new TestCase {
-
-      val projectInfo = projectInfos.generateOne.copy(visibility = Internal)
-      val projectId   = projectInfo.id
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.raiseError(UnauthorizedException))
-
-      val storedAccessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(context.pure(Some(storedAccessToken)))
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(storedAccessToken))
-        .returning(context.pure(projectInfo))
-
-      val Failure(exception) = validator.validateHook(projectId, givenAccessToken)
-
-      exception            shouldBe an[UnsupportedOperationException]
-      exception.getMessage shouldBe s"Hook validation not supported for '${projectInfo.visibility}' projects"
-
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
-    }
-  }
-
   "validateHook - Public project" should {
 
     "succeed with HookExists if there's a hook" in new TestCase {
@@ -300,356 +268,358 @@ class HookValidatorSpec extends WordSpec with MockFactory {
     }
   }
 
-  "validateHook - Private project and valid given access token" should {
+  Private +: Internal +: Nil foreach { visibility =>
+    s"validateHook - $visibility project and valid given access token" should {
 
-    "succeed with HookExists and re-associate access token if there's a hook" in new TestCase {
+      "succeed with HookExists and re-associate access token if there's a hook" in new TestCase {
 
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
 
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.pure(projectInfo))
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(givenAccessToken))
+          .returning(context.pure(projectInfo))
 
-      val projectHookUrl = projectHookUrls.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
+        val projectHookUrl = projectHookUrls.generateOne
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(context.pure(projectHookUrl))
 
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(true))
+        (projectHookVerifier
+          .checkHookPresence(_: HookIdentifier, _: AccessToken))
+          .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
+          .returning(context.pure(true))
 
-      (accessTokenAssociator
-        .associate(_: ProjectId, _: AccessToken))
-        .expects(projectId, givenAccessToken)
-        .returning(context.unit)
+        (accessTokenAssociator
+          .associate(_: ProjectId, _: AccessToken))
+          .expects(projectId, givenAccessToken)
+          .returning(context.unit)
 
-      validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookExists)
+        validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookExists)
 
-      logger.expectNoLogs()
+        logger.expectNoLogs()
+      }
+
+      "succeed with HookMissing and delete the access token if there's no hook" in new TestCase {
+
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
+
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(givenAccessToken))
+          .returning(context.pure(projectInfo))
+
+        val projectHookUrl = projectHookUrls.generateOne
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(context.pure(projectHookUrl))
+
+        (projectHookVerifier
+          .checkHookPresence(_: HookIdentifier, _: AccessToken))
+          .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
+          .returning(context.pure(false))
+
+        (accessTokenRemover
+          .removeAccessToken(_: ProjectId))
+          .expects(projectId)
+          .returning(context.unit)
+
+        validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookMissing)
+
+        logger.expectNoLogs()
+      }
+
+      "fail if finding project hook url fails" in new TestCase {
+
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
+
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(givenAccessToken))
+          .returning(context.pure(projectInfo))
+
+        val exception: Exception    = exceptions.generateOne
+        val error:     Try[Nothing] = context.raiseError(exception)
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(error)
+
+        validator.validateHook(projectId, givenAccessToken) shouldBe error
+
+        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      }
+
+      "fail if finding hook verification fails" in new TestCase {
+
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
+
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(givenAccessToken))
+          .returning(context.pure(projectInfo))
+
+        val projectHookUrl = projectHookUrls.generateOne
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(context.pure(projectHookUrl))
+
+        val exception: Exception    = exceptions.generateOne
+        val error:     Try[Nothing] = context.raiseError(exception)
+        (projectHookVerifier
+          .checkHookPresence(_: HookIdentifier, _: AccessToken))
+          .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
+          .returning(error)
+
+        validator.validateHook(projectId, givenAccessToken) shouldBe error
+
+        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      }
+
+      "fail if access token re-association fails" in new TestCase {
+
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
+
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(givenAccessToken))
+          .returning(context.pure(projectInfo))
+
+        val projectHookUrl = projectHookUrls.generateOne
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(context.pure(projectHookUrl))
+
+        (projectHookVerifier
+          .checkHookPresence(_: HookIdentifier, _: AccessToken))
+          .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
+          .returning(context.pure(true))
+
+        val exception: Exception    = exceptions.generateOne
+        val error:     Try[Nothing] = context.raiseError(exception)
+        (accessTokenAssociator
+          .associate(_: ProjectId, _: AccessToken))
+          .expects(projectId, givenAccessToken)
+          .returning(error)
+
+        validator.validateHook(projectId, givenAccessToken) shouldBe error
+
+        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      }
+
+      "fail if access token removal fails" in new TestCase {
+
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
+
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(givenAccessToken))
+          .returning(context.pure(projectInfo))
+
+        val projectHookUrl = projectHookUrls.generateOne
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(context.pure(projectHookUrl))
+
+        (projectHookVerifier
+          .checkHookPresence(_: HookIdentifier, _: AccessToken))
+          .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
+          .returning(context.pure(false))
+
+        val exception: Exception    = exceptions.generateOne
+        val error:     Try[Nothing] = context.raiseError(exception)
+        (accessTokenRemover
+          .removeAccessToken(_: ProjectId))
+          .expects(projectId)
+          .returning(error)
+
+        validator.validateHook(projectId, givenAccessToken) shouldBe error
+
+        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      }
     }
 
-    "succeed with HookMissing and delete the access token if there's no hook" in new TestCase {
+    s"validateHook - $visibility project and valid stored access token" should {
 
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
+      "succeed with HookExists if there's a hook" in new TestCase {
 
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.pure(projectInfo))
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
 
-      val projectHookUrl = projectHookUrls.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
+        assumeGivenAccessTokenInvalid(projectId)
 
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(false))
+        val storedAccessToken = accessTokens.generateOne
+        (accessTokenFinder
+          .findAccessToken(_: ProjectId))
+          .expects(projectId)
+          .returning(context.pure(Some(storedAccessToken)))
 
-      (accessTokenRemover
-        .removeAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(context.unit)
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(storedAccessToken))
+          .returning(context.pure(projectInfo))
 
-      validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookMissing)
+        val projectHookUrl = projectHookUrls.generateOne
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(context.pure(projectHookUrl))
 
-      logger.expectNoLogs()
-    }
+        (projectHookVerifier
+          .checkHookPresence(_: HookIdentifier, _: AccessToken))
+          .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
+          .returning(context.pure(true))
 
-    "fail if finding project hook url fails" in new TestCase {
+        validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookExists)
 
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
+        logger.expectNoLogs()
+      }
 
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.pure(projectInfo))
+      "succeed with HookMissing and delete the access token if there's no hook" in new TestCase {
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(error)
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
 
-      validator.validateHook(projectId, givenAccessToken) shouldBe error
+        assumeGivenAccessTokenInvalid(projectId)
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
-    }
+        val storedAccessToken = accessTokens.generateOne
+        (accessTokenFinder
+          .findAccessToken(_: ProjectId))
+          .expects(projectId)
+          .returning(context.pure(Some(storedAccessToken)))
 
-    "fail if finding hook verification fails" in new TestCase {
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(storedAccessToken))
+          .returning(context.pure(projectInfo))
 
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
+        val projectHookUrl = projectHookUrls.generateOne
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(context.pure(projectHookUrl))
 
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.pure(projectInfo))
+        (projectHookVerifier
+          .checkHookPresence(_: HookIdentifier, _: AccessToken))
+          .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
+          .returning(context.pure(false))
 
-      val projectHookUrl = projectHookUrls.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
+        (accessTokenRemover
+          .removeAccessToken(_: ProjectId))
+          .expects(projectId)
+          .returning(context.unit)
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(error)
+        validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookMissing)
 
-      validator.validateHook(projectId, givenAccessToken) shouldBe error
+        logger.expectNoLogs()
+      }
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
-    }
+      "fail if finding project hook url fails" in new TestCase {
 
-    "fail if access token re-association fails" in new TestCase {
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
 
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
+        assumeGivenAccessTokenInvalid(projectId)
 
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.pure(projectInfo))
+        val storedAccessToken = accessTokens.generateOne
+        (accessTokenFinder
+          .findAccessToken(_: ProjectId))
+          .expects(projectId)
+          .returning(context.pure(Some(storedAccessToken)))
 
-      val projectHookUrl = projectHookUrls.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(storedAccessToken))
+          .returning(context.pure(projectInfo))
 
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(true))
+        val exception: Exception    = exceptions.generateOne
+        val error:     Try[Nothing] = context.raiseError(exception)
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(error)
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (accessTokenAssociator
-        .associate(_: ProjectId, _: AccessToken))
-        .expects(projectId, givenAccessToken)
-        .returning(error)
+        validator.validateHook(projectId, givenAccessToken) shouldBe error
 
-      validator.validateHook(projectId, givenAccessToken) shouldBe error
+        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      }
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
-    }
+      "fail if finding hook verification fails" in new TestCase {
 
-    "fail if access token removal fails" in new TestCase {
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
 
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
+        assumeGivenAccessTokenInvalid(projectId)
 
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.pure(projectInfo))
+        val storedAccessToken = accessTokens.generateOne
+        (accessTokenFinder
+          .findAccessToken(_: ProjectId))
+          .expects(projectId)
+          .returning(context.pure(Some(storedAccessToken)))
 
-      val projectHookUrl = projectHookUrls.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(storedAccessToken))
+          .returning(context.pure(projectInfo))
 
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(false))
+        val projectHookUrl = projectHookUrls.generateOne
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(context.pure(projectHookUrl))
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (accessTokenRemover
-        .removeAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(error)
+        val exception: Exception    = exceptions.generateOne
+        val error:     Try[Nothing] = context.raiseError(exception)
+        (projectHookVerifier
+          .checkHookPresence(_: HookIdentifier, _: AccessToken))
+          .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
+          .returning(error)
 
-      validator.validateHook(projectId, givenAccessToken) shouldBe error
+        validator.validateHook(projectId, givenAccessToken) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
-    }
-  }
+        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      }
 
-  "validateHook - Private project and valid stored access token" should {
+      "fail if access token removal fails" in new TestCase {
 
-    "succeed with HookExists if there's a hook" in new TestCase {
+        val projectInfo = projectInfos.generateOne.copy(visibility = visibility)
+        val projectId   = projectInfo.id
 
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
+        assumeGivenAccessTokenInvalid(projectId)
 
-      assumeGivenAccessTokenInvalid(projectId)
+        val storedAccessToken = accessTokens.generateOne
+        (accessTokenFinder
+          .findAccessToken(_: ProjectId))
+          .expects(projectId)
+          .returning(context.pure(Some(storedAccessToken)))
 
-      val storedAccessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(context.pure(Some(storedAccessToken)))
+        (projectInfoFinder
+          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .expects(projectId, Some(storedAccessToken))
+          .returning(context.pure(projectInfo))
 
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(storedAccessToken))
-        .returning(context.pure(projectInfo))
+        val projectHookUrl = projectHookUrls.generateOne
+        (projectHookUrlFinder.findProjectHookUrl _)
+          .expects()
+          .returning(context.pure(projectHookUrl))
 
-      val projectHookUrl = projectHookUrls.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
+        (projectHookVerifier
+          .checkHookPresence(_: HookIdentifier, _: AccessToken))
+          .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
+          .returning(context.pure(false))
 
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(context.pure(true))
+        val exception: Exception    = exceptions.generateOne
+        val error:     Try[Nothing] = context.raiseError(exception)
+        (accessTokenRemover
+          .removeAccessToken(_: ProjectId))
+          .expects(projectId)
+          .returning(error)
 
-      validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookExists)
+        validator.validateHook(projectId, givenAccessToken) shouldBe error
 
-      logger.expectNoLogs()
-    }
-
-    "succeed with HookMissing and delete the access token if there's no hook" in new TestCase {
-
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
-
-      assumeGivenAccessTokenInvalid(projectId)
-
-      val storedAccessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(context.pure(Some(storedAccessToken)))
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(storedAccessToken))
-        .returning(context.pure(projectInfo))
-
-      val projectHookUrl = projectHookUrls.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
-
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(context.pure(false))
-
-      (accessTokenRemover
-        .removeAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(context.unit)
-
-      validator.validateHook(projectId, givenAccessToken) shouldBe context.pure(HookMissing)
-
-      logger.expectNoLogs()
-    }
-
-    "fail if finding project hook url fails" in new TestCase {
-
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
-
-      assumeGivenAccessTokenInvalid(projectId)
-
-      val storedAccessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(context.pure(Some(storedAccessToken)))
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(storedAccessToken))
-        .returning(context.pure(projectInfo))
-
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(error)
-
-      validator.validateHook(projectId, givenAccessToken) shouldBe error
-
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
-    }
-
-    "fail if finding hook verification fails" in new TestCase {
-
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
-
-      assumeGivenAccessTokenInvalid(projectId)
-
-      val storedAccessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(context.pure(Some(storedAccessToken)))
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(storedAccessToken))
-        .returning(context.pure(projectInfo))
-
-      val projectHookUrl = projectHookUrls.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
-
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(error)
-
-      validator.validateHook(projectId, givenAccessToken) shouldBe error
-
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
-    }
-
-    "fail if access token removal fails" in new TestCase {
-
-      val projectInfo = projectInfos.generateOne.copy(visibility = Private)
-      val projectId   = projectInfo.id
-
-      assumeGivenAccessTokenInvalid(projectId)
-
-      val storedAccessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(context.pure(Some(storedAccessToken)))
-
-      (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, Some(storedAccessToken))
-        .returning(context.pure(projectInfo))
-
-      val projectHookUrl = projectHookUrls.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
-
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(context.pure(false))
-
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (accessTokenRemover
-        .removeAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(error)
-
-      validator.validateHook(projectId, givenAccessToken) shouldBe error
-
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      }
     }
   }
 

@@ -27,9 +27,9 @@ import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository._
@@ -67,7 +67,7 @@ class HookValidator[Interpretation[_]](
           hookPresent      <- checkHookPresence(HookIdentifier(projectId, hookUrl), token.value)
           validationResult <- toValidationResult(hookPresent, projectId)
         } yield validationResult
-      case (Private, GivenToken(token)) =>
+      case (_: TokenProtectedProject, GivenToken(token)) =>
         for {
           hookUrl          <- findProjectHookUrl
           hookPresent      <- checkHookPresence(HookIdentifier(projectId, hookUrl), token)
@@ -75,17 +75,13 @@ class HookValidator[Interpretation[_]](
           _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
           validationResult <- toValidationResult(hookPresent, projectId)
         } yield validationResult
-      case (Private, StoredToken(token)) =>
+      case (_: TokenProtectedProject, StoredToken(token)) =>
         for {
           hookUrl          <- findProjectHookUrl
           hookPresent      <- checkHookPresence(HookIdentifier(projectId, hookUrl), token)
           _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
           validationResult <- toValidationResult(hookPresent, projectId)
         } yield validationResult
-      case (Internal, _) =>
-        ME.raiseError[HookValidationResult](
-          new UnsupportedOperationException(s"Hook validation not supported for '$Internal' projects")
-        )
     } recoverWith loggingError(projectId)
 
   private def findVisibilityAndToken(projectId:   ProjectId,

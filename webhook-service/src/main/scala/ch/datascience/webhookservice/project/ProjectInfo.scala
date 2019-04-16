@@ -39,14 +39,16 @@ object ProjectVisibility {
       }
     }
 
-  final case object Private extends ProjectVisibility {
-    override val value: String = "private"
-  }
-  final case object Internal extends ProjectVisibility {
-    override val value: String = "internal"
-  }
   final case object Public extends ProjectVisibility {
     override val value: String = "public"
+  }
+
+  sealed trait TokenProtectedProject extends ProjectVisibility
+  final case object Private extends TokenProtectedProject {
+    override val value: String = "private"
+  }
+  final case object Internal extends TokenProtectedProject {
+    override val value: String = "internal"
   }
 }
 
