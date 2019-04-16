@@ -181,7 +181,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
       .toString()
 
   private def hook(projectId: ProjectId, url: ProjectHookUrl): Json = Json.obj(
-    "id"         -> Json.fromInt(positiveInts().generateOne),
+    "id"         -> Json.fromInt(positiveInts().generateOne.value),
     "url"        -> Json.fromString(url.value),
     "project_id" -> Json.fromInt(projectId.value)
   )

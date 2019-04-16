@@ -20,6 +20,7 @@ package ch.datascience.webhookservice.missedevents
 
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.control.Throttler
 import ch.datascience.dbeventlog.commands.EventLogLatestEvents
 import ch.datascience.graph.model.events.{CommitEventId, Project}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
@@ -46,6 +47,7 @@ private class IOMissedEventsLoader(
     latestPushEventFetcher: LatestPushEventFetcher[IO],
     projectInfoFinder:      ProjectInfoFinder[IO],
     pushEventSender:        PushEventSender[IO],
+    throttler:              Throttler[IO, EventsSynchronization],
     logger:                 Logger[IO],
     executionTimeRecorder:  ExecutionTimeRecorder[IO]
 )(implicit contextShift:    ContextShift[IO])
@@ -64,7 +66,7 @@ private class IOMissedEventsLoader(
       for {
         latestLogEvents <- findAllLatestEvents
         updateSummary <- if (latestLogEvents.isEmpty) IO.pure(UpdateSummary())
-                        else (latestLogEvents map loadEvents).parSequence.map(toUpdateSummary)
+                        else (latestLogEvents map loadEvents).parSequence map toUpdateSummary
       } yield updateSummary
     } flatMap logSummary recoverWith loggingError
 
@@ -80,9 +82,11 @@ private class IOMissedEventsLoader(
 
   private def loadEvents(latestLogEvent: CommitEventId): IO[UpdateResult] = {
     for {
+      _                  <- throttler.acquire
       maybeAccessToken   <- findAccessToken(latestLogEvent.projectId)
       maybePushEventInfo <- fetchLatestPushEvent(latestLogEvent.projectId, maybeAccessToken)
       updateResult       <- addEventsIfMissing(latestLogEvent, maybePushEventInfo, maybeAccessToken)
+      _                  <- throttler.release
     } yield updateResult
   } recoverWith loggingWarning(latestLogEvent)
 
@@ -111,8 +115,10 @@ private class IOMissedEventsLoader(
 
   private def loggingWarning(latestLogEvent: CommitEventId): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
-      logger.warn(exception)(s"Synchronizing Push Events for project ${latestLogEvent.projectId} failed")
-      IO.pure(Failed)
+      for {
+        _ <- logger.warn(exception)(s"Synchronizing Push Events for project ${latestLogEvent.projectId} failed")
+        _ <- throttler.release
+      } yield Failed
   }
 
   private lazy val loggingError: PartialFunction[Throwable, IO[Unit]] = {

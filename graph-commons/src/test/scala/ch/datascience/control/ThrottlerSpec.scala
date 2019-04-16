@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 import cats.MonadError
 import cats.effect._
 import cats.implicits._
+import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -39,7 +40,7 @@ class ThrottlerSpec extends WordSpec {
 
       val startTime = {
         for {
-          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(2, per = 1 second))
+          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(2L, per = 1 second))
           startTime <- timer.clock.monotonic(MILLISECONDS)
           _ <- List(
                 useThrottledResource("1", throttler),
@@ -73,7 +74,7 @@ class ThrottlerSpec extends WordSpec {
 
       val startTime = {
         for {
-          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(200, per = 1 second))
+          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(200L, per = 1 second))
           startTime <- timer.clock.monotonic(MILLISECONDS)
           _ <- List(
                 useThrottledResource("1", throttler, processingTime = 500 millis),

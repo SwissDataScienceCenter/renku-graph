@@ -34,7 +34,7 @@ private object DbConfigGenerator {
     url            <- relativePaths() map (RefType.applyRef[Url](_).getOrError)
     user           <- nonEmptyStrings() map (RefType.applyRef[User](_).getOrError)
     pass           <- nonEmptyStrings()
-    connectionPool <- positiveInts() map (RefType.applyRef[ConnectionPool](_).getOrError)
+    connectionPool <- positiveInts() map (_.value) map (RefType.applyRef[ConnectionPool](_).getOrError)
     maxLifetime    <- durations(max = 60 minutes)
   } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime)
 

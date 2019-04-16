@@ -16,33 +16,36 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.gitlab
+package ch.datascience.webhookservice.missedevents
 
 import cats.MonadError
 import cats.effect.{Concurrent, Timer}
 import cats.implicits._
 import ch.datascience.control.{RateLimit, Throttler}
+import ch.datascience.graph.gitlab.GitLabRateLimitProvider
+import eu.timepit.refined.auto._
 
 import scala.language.higherKinds
 
-sealed trait GitLab
+sealed trait EventsSynchronization
 
-object GitLabThrottler {
+object EventsSynchronizationThrottler {
 
   def apply[Interpretation[_]](
       gitLabRateLimitProvider: GitLabRateLimitProvider[Interpretation],
       throttler: (RateLimit,
                   Concurrent[Interpretation],
-                  Timer[Interpretation]) => Interpretation[Throttler[Interpretation, GitLab]] =
+                  Timer[Interpretation]) => Interpretation[Throttler[Interpretation, EventsSynchronization]] =
         (rateLimit: RateLimit, concurrent: Concurrent[Interpretation], timer: Timer[Interpretation]) =>
-          Throttler.apply[Interpretation, GitLab](rateLimit)(concurrent, timer)
+          Throttler.apply[Interpretation, EventsSynchronization](rateLimit)(concurrent, timer)
   )(
       implicit ME: MonadError[Interpretation, Throwable],
-      C:           Concurrent[Interpretation],
+      concurrent:  Concurrent[Interpretation],
       timer:       Timer[Interpretation]
-  ): Interpretation[Throttler[Interpretation, GitLab]] =
+  ): Interpretation[Throttler[Interpretation, EventsSynchronization]] =
     for {
-      rateLimit <- gitLabRateLimitProvider.get
-      throttler <- throttler(rateLimit, C, timer)
+      rateLimit        <- gitLabRateLimitProvider.get
+      reducedRateLimit <- ME.fromEither(rateLimit / 10)
+      throttler        <- throttler(reducedRateLimit, concurrent, timer)
     } yield throttler
 }

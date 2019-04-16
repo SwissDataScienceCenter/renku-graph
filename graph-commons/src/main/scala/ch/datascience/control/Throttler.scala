@@ -34,12 +34,12 @@ trait Throttler[Interpretation[_], ThrottlingTarget] {
 final class StandardThrottler[Interpretation[_], ThrottlingTarget](
     rateLimit:         RateLimit,
     semaphore:         Semaphore[Interpretation],
-    workersStartTimes: Ref[Interpretation, List[Long]]
+    workersStartTimes: Ref[Interpretation, List[BigDecimal]]
 )(implicit ME:         MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
     extends Throttler[Interpretation, ThrottlingTarget] {
 
   private val NextAttemptSleep: FiniteDuration = 100 millis
-  private val MinTimeGap = rateLimit.items.toDouble / rateLimit.per.toMillis
+  private val MinTimeGap = BigDecimal(rateLimit.items.value) / BigDecimal(rateLimit.per.toMillis)
 
   import timer.clock
 
@@ -47,13 +47,13 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget](
     for {
       _          <- semaphore.acquire
       startTimes <- workersStartTimes.get
-      now        <- clock.monotonic(MILLISECONDS)
+      now        <- clock.monotonic(MILLISECONDS) map (BigDecimal(_))
       _          <- verifyThroughput(startTimes, now)
     } yield ()
 
-  private def verifyThroughput(startTimes: List[Long], now: Long) = {
+  private def verifyThroughput(startTimes: List[BigDecimal], now: BigDecimal) = {
     val oldest = startTimes.head
-    if (startTimes.size.toDouble / (now - oldest) <= MinTimeGap)
+    if (BigDecimal(startTimes.size) / (now - oldest) <= MinTimeGap)
       workersStartTimes.modify(old => (startTimes :+ now) -> old) *> semaphore.release
     else semaphore.release *> timer.sleep(NextAttemptSleep) *> acquire
   }
@@ -74,7 +74,7 @@ object Throttler {
     timer:       Timer[Interpretation]): Interpretation[Throttler[Interpretation, ThrottlingTarget]] =
     for {
       semaphore         <- Semaphore[Interpretation](1)
-      workersStartTimes <- timer.clock.monotonic(MILLISECONDS) flatMap (now => Ref.of(List(now)))
+      workersStartTimes <- timer.clock.monotonic(MILLISECONDS) flatMap (now => Ref.of(List(BigDecimal(now))))
     } yield new StandardThrottler[Interpretation, ThrottlingTarget](rateLimit, semaphore, workersStartTimes)
 
   def noThrottling[Interpretation[_], ThrottlingTarget](

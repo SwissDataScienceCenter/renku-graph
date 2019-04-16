@@ -35,6 +35,9 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -326,11 +329,11 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         case Some(parentId) => CommitWithParent(commitId, parentId, project)
       }
 
-  private def commitsLists(size: Gen[Int] = positiveInts(max = 5)): Gen[NonEmptyList[Commit]] =
+  private def commitsLists(size: Gen[Int Refined Positive] = positiveInts(max = 5)): Gen[NonEmptyList[Commit]] =
     for {
       commitId <- commitIds
       project  <- projects
       size     <- size
-      commits  <- Gen.listOfN(size, commits(commitId, project))
+      commits  <- Gen.listOfN(size.value, commits(commitId, project))
     } yield NonEmptyList.fromListUnsafe(commits)
 }

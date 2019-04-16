@@ -20,6 +20,7 @@ package ch.datascience.webhookservice.missedevents
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -66,6 +67,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenPushAndLogEventsMatch(latestEventsList: _*)
 
+      givenThrottlerAccessed(latestEventsList.size)
+
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
       logger.logged(
@@ -99,6 +102,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
                   project         = Project(projectInfo2.id, projectInfo2.path))
       ).returning(IO.unit)
 
+      givenThrottlerAccessed(latestEventsList.size)
+
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
       logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 1 updates, 2 skipped, 0 failed"))
@@ -116,6 +121,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         .returning(IO.pure(None))
 
       givenPushAndLogEventsMatch(event2)
+
+      givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
@@ -137,6 +144,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       }
 
       givenPushAndLogEventsMatch(latestEventsList.tail: _*)
+
+      givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
@@ -164,6 +173,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenPushAndLogEventsMatch(event2)
 
+      givenThrottlerAccessed(latestEventsList.size)
+
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
@@ -189,6 +200,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         .returning(context.raiseError(exception))
 
       givenPushAndLogEventsMatch(event2)
+
+      givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
@@ -223,6 +236,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenPushAndLogEventsMatch(event2)
 
+      givenThrottlerAccessed(latestEventsList.size)
+
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
@@ -255,6 +270,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     val projectInfoFinder      = mock[ProjectInfoFinder[IO]]
     val pushEventSender        = mock[IOPushEventSender]
     val logger                 = TestLogger[IO]()
+    val throttler              = mock[Throttler[IO, EventsSynchronization]]
     val executionTimeRecorder  = TestExecutionTimeRecorder[IO](expected = ElapsedTime(10))
     val eventsLoader = new IOMissedEventsLoader(
       eventLogLatestEvents,
@@ -262,6 +278,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       latestPushEventFetcher,
       projectInfoFinder,
       pushEventSender,
+      throttler,
       logger,
       executionTimeRecorder
     )
@@ -300,5 +317,10 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       (pushEventSender
         .storeCommitsInEventLog(_: PushEvent))
         .expects(pushEvent)
+
+    def givenThrottlerAccessed(times: Int) = {
+      (throttler.acquire _).expects().returning(IO.unit).repeat(times to times)
+      (throttler.release _).expects().returning(IO.unit).repeat(times to times)
+    }
   }
 }

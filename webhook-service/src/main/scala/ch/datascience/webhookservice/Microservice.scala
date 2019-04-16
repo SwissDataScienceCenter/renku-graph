@@ -24,12 +24,12 @@ import cats.effect._
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
-import ch.datascience.graph.gitlab.GitLabThrottler
+import ch.datascience.graph.gitlab.{GitLabRateLimitProvider, GitLabThrottler}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.webhookservice.eventprocessing.IOHookEventEndpoint
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
-import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, IOEventsSynchronizationScheduler}
+import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, EventsSynchronizationThrottler, IOEventsSynchronizationScheduler}
 import pureconfig.loadConfigOrThrow
 
 import scala.concurrent.ExecutionContext
@@ -55,7 +55,9 @@ object Microservice extends IOApp {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
-        gitLabThrottler <- GitLabThrottler[IO]
+        gitLabRateLimitProvider        <- IO.pure(new GitLabRateLimitProvider[IO]())
+        gitLabThrottler                <- GitLabThrottler[IO](gitLabRateLimitProvider)
+        eventsSynchronizationThrottler <- EventsSynchronizationThrottler[IO](gitLabRateLimitProvider)
 
         httpServer = new HttpServer[IO](
           serverPort = 9001,
@@ -68,7 +70,7 @@ object Microservice extends IOApp {
 
         exitCode <- new MicroserviceRunner(
                      new IOEventLogDbInitializer(transactor),
-                     new IOEventsSynchronizationScheduler(transactor, gitLabThrottler),
+                     new IOEventsSynchronizationScheduler(transactor, gitLabThrottler, eventsSynchronizationThrottler),
                      httpServer
                    ) run args
       } yield exitCode

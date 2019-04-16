@@ -22,6 +22,7 @@ import java.time.temporal.ChronoUnit
 
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
+import eu.timepit.refined.api.Refined
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -34,25 +35,25 @@ class RateLimitSpec extends WordSpec with ScalaCheckPropertyChecks {
   "apply" should {
 
     "instantiate from '<number>/seq' value" in {
-      forAll(positiveInts(max = Integer.MAX_VALUE)) { int =>
+      forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
         RateLimit.from(s"$int/sec") shouldBe Right(RateLimit(int, 1 second))
       }
     }
 
     "instantiate from '<number>/min' value" in {
-      forAll(positiveInts(max = Integer.MAX_VALUE)) { int =>
+      forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
         RateLimit.from(s"$int/min") shouldBe Right(RateLimit(int, 1 minute))
       }
     }
 
     "instantiate from '<number>/hour' value" in {
-      forAll(positiveInts(max = Integer.MAX_VALUE)) { int =>
+      forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
         RateLimit.from(s"$int/hour") shouldBe Right(RateLimit(int, 1 hour))
       }
     }
 
     "instantiate from '<number>/day' value" in {
-      forAll(positiveInts(max = Integer.MAX_VALUE)) { int =>
+      forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
         RateLimit.from(s"$int/day") shouldBe Right(RateLimit(int, 1 day))
       }
     }
@@ -98,6 +99,20 @@ class RateLimitSpec extends WordSpec with ScalaCheckPropertyChecks {
           rateLimit.toString shouldBe s"$rate/hour"
         case rateLimit @ RateLimit(rate, unit) if unit._2.name() == ChronoUnit.DAYS.name() =>
           rateLimit.toString shouldBe s"$rate/day"
+      }
+    }
+  }
+
+  "/" should {
+
+    "make the rate limit x times slower than before" in {
+      forAll(rateLimits, positiveInts()) { (rateLimit, value) =>
+        rateLimit / value shouldBe Right(
+          RateLimit(
+            Refined.unsafeApply(rateLimit.items.value * (1 day).toMillis / (rateLimit.per.toMillis * value.value)),
+            1 day
+          )
+        )
       }
     }
   }

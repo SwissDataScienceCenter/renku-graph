@@ -23,14 +23,15 @@ import java.time.temporal.ChronoUnit.DAYS
 
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import eu.timepit.refined.api.{RefType, Refined}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
 import scala.concurrent.duration._
-import scala.concurrent.duration.FiniteDuration
 import scala.language.{implicitConversions, postfixOps}
 
 object Generators {
@@ -56,7 +57,11 @@ object Generators {
       list <- Gen.listOfN(size, generator)
     } yield list
 
-  def positiveInts(max: Int = 1000): Gen[Int] = choose(1, max)
+  def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
+    choose(1, max) map Refined.unsafeApply
+
+  def positiveLongs(max: Long = 1000): Gen[Long Refined Positive] =
+    choose(1L, max) map Refined.unsafeApply
 
   def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
     choose(1, max.toMillis)
@@ -79,12 +84,7 @@ object Generators {
     host <- nonEmptyStrings()
   } yield s"$protocol://$host:$port"
 
-  val validatedUrls: Gen[String Refined Url] = httpUrls
-    .map { value =>
-      RefType
-        .applyRef[String Refined Url](value)
-        .getOrElse(throw new IllegalArgumentException("Invalid url value"))
-    }
+  val validatedUrls: Gen[String Refined Url] = httpUrls map Refined.unsafeApply
 
   val shas: Gen[String] = for {
     length <- Gen.choose(40, 40)

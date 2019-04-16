@@ -25,7 +25,7 @@ import ch.datascience.db.DBConfigProvider.DBConfig._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
-import eu.timepit.refined.api.RefType
+import eu.timepit.refined.api.{RefType, Refined}
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -52,7 +52,7 @@ class DBConfigProviderSpec extends WordSpec {
             "db-host"                 -> host.value,
             "db-user"                 -> user,
             "db-pass"                 -> password,
-            "connection-pool"         -> connectionPool,
+            "connection-pool"         -> connectionPool.value,
             "max-connection-lifetime" -> maxLifetime.toString()
           ).asJava
         ).asJava
@@ -60,12 +60,12 @@ class DBConfigProviderSpec extends WordSpec {
 
       val Success(dbConfig) = new DBConfigProvider[Try, TestDB](namespace, driver, dbName, urlPrefix, config).get()
 
-      dbConfig.driver               shouldBe driver
-      dbConfig.url.value            shouldBe s"$urlPrefix://$host/$dbName"
-      dbConfig.user.value           shouldBe user
-      dbConfig.pass                 shouldBe password
-      dbConfig.connectionPool.value shouldBe connectionPool
-      dbConfig.maxLifetime          shouldBe maxLifetime
+      dbConfig.driver         shouldBe driver
+      dbConfig.url.value      shouldBe s"$urlPrefix://$host/$dbName"
+      dbConfig.user.value     shouldBe user
+      dbConfig.pass           shouldBe password
+      dbConfig.connectionPool shouldBe connectionPool
+      dbConfig.maxLifetime    shouldBe maxLifetime
     }
 
     "fail if there is no db config namespace in the config" in new TestCase {
@@ -82,7 +82,7 @@ class DBConfigProviderSpec extends WordSpec {
             "db-host"                 -> "",
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
-            "connection-pool"         -> positiveInts().generateOne,
+            "connection-pool"         -> positiveInts().generateOne.value,
             "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
           ).asJava
         ).asJava
@@ -100,7 +100,7 @@ class DBConfigProviderSpec extends WordSpec {
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> "",
             "db-pass"                 -> nonEmptyStrings().generateOne,
-            "connection-pool"         -> positiveInts().generateOne,
+            "connection-pool"         -> positiveInts().generateOne.value,
             "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
           ).asJava
         ).asJava
@@ -117,7 +117,7 @@ class DBConfigProviderSpec extends WordSpec {
           namespace -> Map(
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
-            "connection-pool"         -> positiveInts().generateOne,
+            "connection-pool"         -> positiveInts().generateOne.value,
             "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
           ).asJava
         ).asJava
@@ -152,7 +152,7 @@ class DBConfigProviderSpec extends WordSpec {
             "db-host"         -> hosts.generateOne.value,
             "db-user"         -> nonEmptyStrings().generateOne,
             "db-pass"         -> nonEmptyStrings().generateOne,
-            "connection-pool" -> positiveInts().generateOne
+            "connection-pool" -> positiveInts().generateOne.value
           ).asJava
         ).asJava
       )

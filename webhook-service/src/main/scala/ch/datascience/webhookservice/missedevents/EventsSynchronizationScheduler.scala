@@ -72,9 +72,10 @@ class EventsSynchronizationScheduler[Interpretation[_]](
 }
 
 class IOEventsSynchronizationScheduler(
-    transactor:      DbTransactor[IO, EventLogDB],
-    gitLabThrottler: Throttler[IO, GitLab]
-)(implicit timer:    Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
+    transactor:                     DbTransactor[IO, EventLogDB],
+    gitLabThrottler:                Throttler[IO, GitLab],
+    eventsSynchronizationThrottler: Throttler[IO, EventsSynchronization]
+)(implicit timer:                   Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
     extends EventsSynchronizationScheduler[IO](
       new SchedulerConfigProvider[IO](),
       new IOMissedEventsLoader(
@@ -83,6 +84,7 @@ class IOEventsSynchronizationScheduler(
         new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler),
         new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
         new IOPushEventSender(transactor, gitLabThrottler),
+        eventsSynchronizationThrottler,
         ApplicationLogger,
         new ExecutionTimeRecorder[IO]
       )

@@ -178,7 +178,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
     val gitLabUrl      = url(externalServiceBaseUrl)
     val projectId      = projectIds.generateOne
     val accessToken    = accessTokens.generateOne
-    val commitsIdsList = Gen.listOfN(positiveInts(max = 3).generateOne, commitIds).generateOne
+    val commitsIdsList = Gen.listOfN(positiveInts(max = 3).generateOne.value, commitIds).generateOne
 
     val configProvider = mock[IOGitLabConfigProvider]
 
