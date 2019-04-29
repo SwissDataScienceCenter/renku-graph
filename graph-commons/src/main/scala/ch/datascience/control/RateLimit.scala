@@ -88,7 +88,7 @@ object RateLimit extends TypeName {
         .applyRef[Long Refined Positive](
           rateLimit.items.value * (1 day).toMillis / (rateLimit.per.toMillis * divider.value)
         )
-        .leftMap(_ => new IllegalArgumentException("RateLimit cannot be initialized with values < 1"))
+        .leftMap(_ => new IllegalArgumentException("RateLimits below 1/day not supported"))
         .map(RateLimit(_, 1 day))
   }
 }

@@ -23,6 +23,7 @@ import java.time.temporal.ChronoUnit
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -105,15 +106,22 @@ class RateLimitSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "/" should {
 
-    "make the rate limit x times slower than before" in {
+    "make the rate limit x times slower than initially" in {
       forAll(rateLimits, positiveInts()) { (rateLimit, value) =>
-        rateLimit / value shouldBe Right(
-          RateLimit(
-            Refined.unsafeApply(rateLimit.items.value * (1 day).toMillis / (rateLimit.per.toMillis * value.value)),
-            1 day
+        whenever(rateLimit.items.value * (1 day).toMillis / (rateLimit.per.toMillis * value) > 0) {
+          rateLimit / value shouldBe Right(
+            RateLimit(
+              Refined.unsafeApply(rateLimit.items.value * (1 day).toMillis / (rateLimit.per.toMillis * value.value)),
+              1 day
+            )
           )
-        )
+        }
       }
+    }
+
+    "fail if resulting RateLimit below 1/day" in {
+      val Left(exception) = RateLimit(1L, per = 1 day) / 2
+      exception.getMessage shouldBe "RateLimits below 1/day not supported"
     }
   }
 }

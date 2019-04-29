@@ -31,7 +31,7 @@ trait Throttler[Interpretation[_], ThrottlingTarget] {
   def release: Interpretation[Unit]
 }
 
-final class StandardThrottler[Interpretation[_], ThrottlingTarget](
+final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[control] (
     rateLimit:         RateLimit,
     semaphore:         Semaphore[Interpretation],
     workersStartTimes: Ref[Interpretation, List[BigDecimal]]

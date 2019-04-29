@@ -130,13 +130,13 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      concurrentFindEventToProcess.unsafeRunSync()
+      parallelPopEventToProcess.unsafeRunSync() shouldBe List(event3Body)
 
-      findEvents(EventStatus.Processing) shouldBe List((event3Id, executionDate))
+      findEvents(EventStatus.Processing) shouldBe List(event3Id -> executionDate)
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(event1Body)
 
-      findEvents(EventStatus.Processing) shouldBe List((event1Id, executionDate), (event3Id, executionDate))
+      findEvents(EventStatus.Processing) shouldBe List(event1Id -> executionDate, event3Id -> executionDate)
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
@@ -161,11 +161,11 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody2)
 
-      findEvents(EventStatus.Processing) shouldBe List((event2Id, executionDate))
+      findEvents(EventStatus.Processing) shouldBe List(event2Id -> executionDate)
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody1)
 
-      findEvents(EventStatus.Processing) shouldBe List((event1Id, executionDate), (event2Id, executionDate))
+      findEvents(EventStatus.Processing) shouldBe List(event1Id -> executionDate, event2Id -> executionDate)
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
@@ -183,7 +183,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody)
 
-      findEvents(EventStatus.Processing) shouldBe List((eventId, executionDate))
+      findEvents(EventStatus.Processing) shouldBe List(eventId -> executionDate)
     }
 
     s"find no event when there there's one with $Processing status " +
@@ -223,10 +223,10 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     val executionDate = ExecutionDate(now)
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def concurrentFindEventToProcess =
-      for {
-        _ <- contextShift.shift *> eventLogFetch.popEventToProcess.start
-        _ <- contextShift.shift *> eventLogFetch.popEventToProcess
-      } yield ()
+    def parallelPopEventToProcess =
+      List(
+        eventLogFetch.popEventToProcess,
+        eventLogFetch.popEventToProcess
+      ).parSequence.map(_.flatten)
   }
 }

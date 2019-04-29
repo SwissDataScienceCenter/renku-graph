@@ -41,6 +41,7 @@ class ThrottlerSpec extends WordSpec {
       val startTime = {
         for {
           throttler <- Throttler[IO, ThrottlingTarget](RateLimit(2L, per = 1 second))
+          _         <- timer sleep (1 millis)
           startTime <- timer.clock.monotonic(MILLISECONDS)
           _ <- List(
                 useThrottledResource("1", throttler),
@@ -60,7 +61,8 @@ class ThrottlerSpec extends WordSpec {
           case (Nil, item)   => List(item)
           case (diffs, item) => diffs :+ item - diffs.sum
         }
-      startDelays foreach { delay =>
+        .sorted
+      startDelays.tail foreach { delay =>
         delay should be >= 500L
       }
 
@@ -75,6 +77,7 @@ class ThrottlerSpec extends WordSpec {
       val startTime = {
         for {
           throttler <- Throttler[IO, ThrottlingTarget](RateLimit(200L, per = 1 second))
+          _         <- timer sleep (1 millis)
           startTime <- timer.clock.monotonic(MILLISECONDS)
           _ <- List(
                 useThrottledResource("1", throttler, processingTime = 500 millis),
