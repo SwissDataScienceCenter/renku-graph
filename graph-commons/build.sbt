@@ -22,11 +22,11 @@ val pureConfigVersion = "0.10.2"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
-val refinedVersion = "0.9.4"
+val refinedVersion = "0.9.5"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
-libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "0.2.0"
+libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "0.3.0"
 
 val circeVersion = "0.11.1"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
@@ -40,17 +40,17 @@ libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.6.0"
 
-val http4sVersion = "0.20.0-M6"
+val http4sVersion = "0.20.0"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-circe"        % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-dsl"          % http4sVersion
 
 // Test dependencies
-libraryDependencies += "com.github.tomakehurst" % "wiremock"    % "2.21.0" % Test
-libraryDependencies += "org.scalamock"          %% "scalamock"  % "4.1.0"  % Test
+libraryDependencies += "com.github.tomakehurst" % "wiremock"    % "2.23.2" % Test
+libraryDependencies += "org.scalamock"          %% "scalamock"  % "4.2.0"  % Test
 libraryDependencies += "org.scalacheck"         %% "scalacheck" % "1.14.0" % Test
-libraryDependencies += "org.scalatest"          %% "scalatest"  % "3.0.6"  % Test
+libraryDependencies += "org.scalatest"          %% "scalatest"  % "3.0.7"  % Test
 
 libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
 libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test
