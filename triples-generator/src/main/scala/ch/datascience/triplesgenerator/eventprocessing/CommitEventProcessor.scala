@@ -181,9 +181,9 @@ class CommitEventProcessor[Interpretation[_]](
     val cause: Throwable
   }
   private object UploadingResult {
-    final case class Uploaded(commit:            Commit, numberOfTriples: Long)      extends UploadingResult
-    final case class RecoverableError(commit:    Commit, cause:           Throwable) extends UploadingError
-    final case class NonRecoverableError(commit: Commit, cause:           Throwable) extends UploadingError
+    case class Uploaded(commit:            Commit, numberOfTriples: Long)      extends UploadingResult
+    case class RecoverableError(commit:    Commit, cause:           Throwable) extends UploadingError
+    case class NonRecoverableError(commit: Commit, cause:           Throwable) extends UploadingError
   }
 }
 

@@ -33,7 +33,7 @@ class AssociationPersisterSpec extends WordSpec with InMemoryProjectsTokensDbSpe
 
       val encryptedToken = encryptedAccessTokens.generateOne
 
-      associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ()
+      associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ((): Unit)
 
       findToken(projectId) shouldBe Some(encryptedToken.value)
     }
@@ -42,12 +42,12 @@ class AssociationPersisterSpec extends WordSpec with InMemoryProjectsTokensDbSpe
 
       val encryptedToken = encryptedAccessTokens.generateOne
 
-      associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ()
+      associator.persistAssociation(projectId, encryptedToken).unsafeRunSync shouldBe ((): Unit)
 
       findToken(projectId) shouldBe Some(encryptedToken.value)
 
       val newEncryptedToken = encryptedAccessTokens.generateOne
-      associator.persistAssociation(projectId, newEncryptedToken).unsafeRunSync shouldBe ()
+      associator.persistAssociation(projectId, newEncryptedToken).unsafeRunSync shouldBe ((): Unit)
 
       findToken(projectId) shouldBe Some(newEncryptedToken.value)
     }

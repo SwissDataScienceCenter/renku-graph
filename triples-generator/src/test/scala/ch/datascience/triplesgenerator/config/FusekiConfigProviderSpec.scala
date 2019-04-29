@@ -25,12 +25,12 @@ import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class FusekiConfigProviderSpec extends WordSpec with PropertyChecks {
+class FusekiConfigProviderSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "get" should {
 

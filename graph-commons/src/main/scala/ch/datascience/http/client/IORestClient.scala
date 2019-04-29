@@ -68,12 +68,12 @@ abstract class IORestClient[ThrottlingTarget](throttler: Throttler[IO, Throttlin
     )
 
   private lazy val authHeader: AccessToken => Headers = {
-    case PersonalAccessToken(token) => Headers(Header("PRIVATE-TOKEN", token))
-    case OAuthAccessToken(token)    => Headers(Authorization(Token(Bearer, token)))
+    case PersonalAccessToken(token) => Headers.of(Header("PRIVATE-TOKEN", token))
+    case OAuthAccessToken(token)    => Headers.of(Authorization(Token(Bearer, token)))
   }
 
   private def basicAuthHeader(basicAuth: BasicAuth): Headers =
-    Headers(Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value)))
+    Headers.of(Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value)))
 
   protected def send[ResultType](request: Request[IO])(mapResponse: ResponseMapping[ResultType]): IO[ResultType] =
     BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>

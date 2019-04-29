@@ -53,7 +53,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       givenFetchLogLatestEvents
         .returning(context.pure(List.empty))
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
+      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 0 skipped, 0 failed"))
     }
@@ -69,7 +69,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenThrottlerAccessed(latestEventsList.size)
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
+      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(
         Info(s"Synchronized Push Events with GitLab in 10ms: 0 updates, ${latestEventsList.size} skipped, 0 failed")
@@ -104,7 +104,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenThrottlerAccessed(latestEventsList.size)
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
+      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 1 updates, 2 skipped, 0 failed"))
     }
@@ -124,7 +124,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenThrottlerAccessed(latestEventsList.size)
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
+      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 2 skipped, 0 failed"))
     }
@@ -147,7 +147,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenThrottlerAccessed(latestEventsList.size)
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
+      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       latestEventsList.headOption.foreach { event =>
         logger.logged(Warn(s"Synchronizing Push Events for project ${event.projectId} failed", exception))
@@ -175,7 +175,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenThrottlerAccessed(latestEventsList.size)
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
+      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Warn(s"Synchronizing Push Events for project ${event1.projectId} failed", exception),
@@ -203,7 +203,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenThrottlerAccessed(latestEventsList.size)
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
+      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Warn(s"Synchronizing Push Events for project ${event1.projectId} failed", exception),
@@ -238,7 +238,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenThrottlerAccessed(latestEventsList.size)
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ()
+      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Warn(s"Synchronizing Push Events for project ${event1.projectId} failed", exception),

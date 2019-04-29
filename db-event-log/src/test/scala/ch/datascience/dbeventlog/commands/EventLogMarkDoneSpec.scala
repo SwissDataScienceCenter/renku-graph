@@ -53,7 +53,7 @@ class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with Moc
                  committedDates.generateOne,
                  eventBodies.generateOne)
 
-      eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ()
+      eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now)))
     }

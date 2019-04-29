@@ -33,7 +33,7 @@ class TokenRemoverSpec extends WordSpec with InMemoryProjectsTokensDbSpec {
   "delete" should {
 
     "succeed if token does not exist" in new TestCase {
-      remover.delete(projectId).unsafeRunSync shouldBe ()
+      remover.delete(projectId).unsafeRunSync shouldBe ((): Unit)
     }
 
     "succeed if token exists" in new TestCase {
@@ -42,7 +42,7 @@ class TokenRemoverSpec extends WordSpec with InMemoryProjectsTokensDbSpec {
       insert(projectId, encryptedToken)
       findToken(projectId) shouldBe Some(encryptedToken.value)
 
-      remover.delete(projectId).unsafeRunSync shouldBe ()
+      remover.delete(projectId).unsafeRunSync shouldBe ((): Unit)
 
       findToken(projectId) shouldBe None
     }

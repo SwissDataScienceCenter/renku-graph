@@ -53,7 +53,7 @@ class IOAccessTokenRemoverSpec extends WordSpec with MockFactory with ExternalSe
           .willReturn(noContent())
       }
 
-      tokenRemover.removeAccessToken(projectId).unsafeRunSync() shouldBe (): Unit
+      tokenRemover.removeAccessToken(projectId).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "fail if fetching token-repository service url fails" in new TestCase {

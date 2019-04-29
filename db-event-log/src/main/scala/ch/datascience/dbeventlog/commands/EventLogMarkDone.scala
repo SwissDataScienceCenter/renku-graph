@@ -32,7 +32,7 @@ import scala.language.higherKinds
 
 class EventLogMarkDone[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
-    now:        () => Instant = Instant.now
+    now:        () => Instant = () => Instant.now
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   def markEventDone(commitEventId: CommitEventId): Interpretation[Unit] =

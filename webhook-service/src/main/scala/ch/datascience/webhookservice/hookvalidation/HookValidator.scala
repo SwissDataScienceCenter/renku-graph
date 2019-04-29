@@ -127,8 +127,8 @@ class HookValidator[Interpretation[_]](
 
   private sealed abstract class Token(val value: AccessToken)
   private object Token {
-    final case class GivenToken(override val value:  AccessToken) extends Token(value)
-    final case class StoredToken(override val value: AccessToken) extends Token(value)
+    case class GivenToken(override val value:  AccessToken) extends Token(value)
+    case class StoredToken(override val value: AccessToken) extends Token(value)
   }
 }
 

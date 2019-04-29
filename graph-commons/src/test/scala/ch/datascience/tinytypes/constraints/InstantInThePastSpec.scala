@@ -24,9 +24,9 @@ import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class InstantInThePastSpec extends WordSpec with PropertyChecks {
+class InstantInThePastSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "InstantInThePast" should {
 

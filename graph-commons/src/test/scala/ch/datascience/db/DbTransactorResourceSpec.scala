@@ -37,7 +37,7 @@ class DbTransactorResourceSpec extends WordSpec with MockFactory {
 
       transactedBlock.expects(*).returning(IO.unit)
 
-      transactorResource.use(transactedBlock).unsafeRunSync() shouldBe ()
+      transactorResource.use(transactedBlock).unsafeRunSync() shouldBe ((): Unit)
     }
   }
 

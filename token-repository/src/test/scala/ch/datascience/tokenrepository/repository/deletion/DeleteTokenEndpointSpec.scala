@@ -29,8 +29,8 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
 import io.circe.literal._
+import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.{MediaType, Method, Request, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -46,7 +46,7 @@ class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(context.pure(()))
 
-      val request = Request[IO](Method.DELETE, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request[IO](Method.DELETE, uri"projects" / projectId.toString / "tokens")
 
       val response = deleteToken(projectId).unsafeRunSync()
 
@@ -64,7 +64,7 @@ class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(context.raiseError(exception))
 
-      val request = Request[IO](Method.DELETE, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request[IO](Method.DELETE, uri"projects" / projectId.toString / "tokens")
 
       val response = deleteToken(projectId).unsafeRunSync()
 

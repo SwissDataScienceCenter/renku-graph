@@ -41,7 +41,7 @@ class AccessTokenExtractorSpec extends WordSpec {
       val accessToken = personalAccessTokens.generateOne
 
       finder.findAccessToken(
-        request.withHeaders(Headers(Header("PRIVATE-TOKEN", accessToken.value)))
+        request.withHeaders(Headers.of(Header("PRIVATE-TOKEN", accessToken.value)))
       ) shouldBe context.pure(accessToken)
     }
 
@@ -59,7 +59,7 @@ class AccessTokenExtractorSpec extends WordSpec {
       val accessToken = oauthAccessTokens.generateOne
 
       finder.findAccessToken(
-        request.withHeaders(Headers(Header("OAUTH-TOKEN", accessToken.value)))
+        request.withHeaders(Headers.of(Header("OAUTH-TOKEN", accessToken.value)))
       ) shouldBe context.pure(accessToken)
     }
 
@@ -71,7 +71,7 @@ class AccessTokenExtractorSpec extends WordSpec {
       finder.findAccessToken(
         request
           .withHeaders(
-            Headers(
+            Headers.of(
               Header("OAUTH-TOKEN", oauthAccessToken.value),
               Authorization(Token(Bearer, oauthAccessToken.value))
             )
@@ -85,7 +85,7 @@ class AccessTokenExtractorSpec extends WordSpec {
 
     "fail with UNAUTHORIZED when PRIVATE-TOKEN is invalid" in new TestCase {
       finder.findAccessToken(
-        request.withHeaders(Headers(Header("PRIVATE-TOKEN", "")))
+        request.withHeaders(Headers.of(Header("PRIVATE-TOKEN", "")))
       ) shouldBe context.raiseError(UnauthorizedException)
     }
 
@@ -100,7 +100,7 @@ class AccessTokenExtractorSpec extends WordSpec {
 
     "fail with UNAUTHORIZED when OAUTH-TOKEN is invalid" in new TestCase {
       finder.findAccessToken(
-        request.withHeaders(Headers(Header("OAUTH-TOKEN", "")))
+        request.withHeaders(Headers.of(Header("OAUTH-TOKEN", "")))
       ) shouldBe context.raiseError(UnauthorizedException)
     }
   }

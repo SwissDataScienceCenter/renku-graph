@@ -32,7 +32,7 @@ import scala.language.higherKinds
 
 class EventLogAdd[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
-    now:        () => Instant = Instant.now
+    now:        () => Instant = () => Instant.now
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   def storeNewEvent(commitEvent: CommitEvent, eventBody: EventBody): Interpretation[Unit] =
@@ -41,7 +41,7 @@ class EventLogAdd[Interpretation[_]](
   private def insertIfNotDuplicate(commitEvent: CommitEvent, eventBody: EventBody) =
     for {
       maybeEventId <- checkIfExists(commitEvent)
-      _            <- if (maybeEventId.isEmpty) insert(commitEvent, eventBody) else Free.pure[ConnectionOp, Unit]()
+      _            <- if (maybeEventId.isEmpty) insert(commitEvent, eventBody) else Free.pure[ConnectionOp, Unit](())
     } yield ()
 
   private def checkIfExists(commitEvent: CommitEvent) =

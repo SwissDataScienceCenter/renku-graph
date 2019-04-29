@@ -33,7 +33,7 @@ import org.scalatest.concurrent.Eventually
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.language.postfixOps
+import scala.language.{postfixOps, reflectiveCalls}
 import scala.util.Try
 
 class EventsSynchronizationSchedulerSpec extends WordSpec with MockFactory with Eventually {

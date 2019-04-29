@@ -117,7 +117,7 @@ private class CommitEventsFinder[Interpretation[_]](
         stream(leftToProcess) map (ME.raiseError[CommitEvent](exception) #:: _)
     }
 
-    private final case class EventLogException(cause: Throwable) extends Exception(cause)
+    private case class EventLogException(cause: Throwable) extends Exception(cause)
 
     private lazy val eventLogException: PartialFunction[Throwable, Interpretation[List[CommitId]]] = {
       case NonFatal(exception) => ME.raiseError(EventLogException(exception))

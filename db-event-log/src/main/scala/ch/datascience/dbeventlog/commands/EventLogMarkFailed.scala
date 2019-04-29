@@ -77,7 +77,7 @@ class EventLogMarkFailed[Interpretation[_]](
          |""".stripMargin.update.run
 }
 
-class ExecutionDateCalculator(now: () => Instant = Instant.now) {
+class ExecutionDateCalculator(now: () => Instant = () => Instant.now) {
 
   def newExecutionDate[T <: FailureStatus](
       createdDate:      CreatedDate,

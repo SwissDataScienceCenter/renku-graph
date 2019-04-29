@@ -62,7 +62,7 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
 
       eventLogMarkFailed
         .markEventFailed(eventId, TriplesStoreFailure, maybeMessage)
-        .unsafeRunSync() shouldBe ()
+        .unsafeRunSync() shouldBe ((): Unit)
 
       findEvent(eventId) shouldBe (newExecutionDate, TriplesStoreFailure, maybeMessage)
     }
@@ -92,7 +92,7 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
 
       eventLogMarkFailed
         .markEventFailed(eventId, NonRecoverableFailure, maybeMessage)
-        .unsafeRunSync() shouldBe ()
+        .unsafeRunSync() shouldBe ((): Unit)
 
       findEvent(eventId) shouldBe (newExecutionDate, NonRecoverableFailure, maybeMessage)
     }
@@ -111,7 +111,7 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
 
       eventLogMarkFailed
         .markEventFailed(eventId, TriplesStoreFailure, Some(message))
-        .unsafeRunSync() shouldBe ()
+        .unsafeRunSync() shouldBe ((): Unit)
 
       findEvent(eventId) shouldBe (executionDate, eventStatus, None)
     }
@@ -130,7 +130,7 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
 
       eventLogMarkFailed
         .markEventFailed(eventId, NonRecoverableFailure, Some(message))
-        .unsafeRunSync() shouldBe ()
+        .unsafeRunSync() shouldBe ((): Unit)
 
       findEvent(eventId) shouldBe (executionDate, eventStatus, None)
     }

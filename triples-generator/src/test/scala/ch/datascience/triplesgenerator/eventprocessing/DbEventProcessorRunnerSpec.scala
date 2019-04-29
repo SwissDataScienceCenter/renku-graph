@@ -38,7 +38,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.postfixOps
+import scala.language.{higherKinds, postfixOps, reflectiveCalls}
 
 class DbEventProcessorRunnerSpec extends WordSpec with Eventually with IntegrationPatience with MockFactory {
 

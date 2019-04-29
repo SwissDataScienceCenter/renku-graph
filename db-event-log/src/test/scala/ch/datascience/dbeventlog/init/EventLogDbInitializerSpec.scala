@@ -37,7 +37,7 @@ class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
 
       tableExists() shouldBe true
 
-      dbInitializer.run.unsafeRunSync() shouldBe ()
+      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists() shouldBe true
 
@@ -49,7 +49,7 @@ class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
 
       tableExists() shouldBe false
 
-      dbInitializer.run.unsafeRunSync() shouldBe ()
+      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists() shouldBe true
 
@@ -58,7 +58,7 @@ class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
 
     "assures there are indexes created for project_id, status and execution_date" in new TestCase {
 
-      dbInitializer.run.unsafeRunSync() shouldBe ()
+      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
       verifyTrue(sql"DROP INDEX idx_project_id;")
       verifyTrue(sql"DROP INDEX idx_status;")

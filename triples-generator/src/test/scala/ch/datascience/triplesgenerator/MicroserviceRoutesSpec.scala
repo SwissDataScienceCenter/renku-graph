@@ -21,9 +21,11 @@ package ch.datascience.triplesgenerator
 import cats.effect.IO
 import ch.datascience.http.server.EndpointTester._
 import org.http4s.Status._
-import org.http4s.{Method, Request, Uri}
+import org.http4s._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+
+import scala.language.reflectiveCalls
 
 class MicroserviceRoutesSpec extends WordSpec {
 
@@ -31,7 +33,7 @@ class MicroserviceRoutesSpec extends WordSpec {
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
       val response = routes.call(
-        Request(Method.GET, Uri.uri("ping"))
+        Request(Method.GET, uri"ping")
       )
 
       response.status       shouldBe Ok

@@ -30,8 +30,8 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
+import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.{MediaType, Method, Request, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -49,7 +49,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
-      val request = Request[IO](Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request[IO](Method.GET, uri"projects" / projectId.toString / "tokens")
 
       val response = fetchToken(projectId).unsafeRunSync()
 
@@ -69,7 +69,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
-      val request = Request[IO](Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request[IO](Method.GET, uri"projects" / projectId.toString / "tokens")
 
       val response = fetchToken(projectId).unsafeRunSync()
 
@@ -89,7 +89,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(OptionT.none[IO, AccessToken])
 
-      val request = Request[IO](Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request[IO](Method.GET, uri"projects" / projectId.toString / "tokens")
 
       val response = fetchToken(projectId).unsafeRunSync()
 
@@ -111,7 +111,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(OptionT(IO.raiseError[Option[AccessToken]](exception)))
 
-      val request = Request[IO](Method.GET, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request[IO](Method.GET, uri"projects" / projectId.toString / "tokens")
 
       val response = fetchToken(projectId).unsafeRunSync()
 
