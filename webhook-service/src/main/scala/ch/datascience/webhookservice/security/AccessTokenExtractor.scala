@@ -36,7 +36,6 @@ class AccessTokenExtractor[Interpretation[_]](implicit ME: MonadError[Interpreta
   def findAccessToken(request: Request[Interpretation]): Interpretation[AccessToken] =
     request.getTokenFromBearer
       .flatMap(toOAuthAccessToken)
-      .orElse(request.get("OAUTH-TOKEN") flatMap convert(OAuthAccessToken.from))
       .orElse(request.get("PRIVATE-TOKEN") flatMap convert(PersonalAccessToken.from))
       .getOrElseF(ME.raiseError(UnauthorizedException))
 

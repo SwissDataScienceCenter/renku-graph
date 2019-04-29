@@ -45,7 +45,7 @@ class AccessTokenExtractorSpec extends WordSpec {
       ) shouldBe context.pure(accessToken)
     }
 
-    "return oauth access token when 'Authorization: Bearer <token>' is present in the header" in new TestCase {
+    "return oauth access token when 'AUTHORIZATION: BEARER <token>' is present in the header" in new TestCase {
 
       val accessToken = oauthAccessTokens.generateOne
 
@@ -54,16 +54,7 @@ class AccessTokenExtractorSpec extends WordSpec {
       ) shouldBe context.pure(accessToken)
     }
 
-    "return oauth access token when OAUTH-TOKEN is present in the header" in new TestCase {
-
-      val accessToken = oauthAccessTokens.generateOne
-
-      finder.findAccessToken(
-        request.withHeaders(Headers.of(Header("OAUTH-TOKEN", accessToken.value)))
-      ) shouldBe context.pure(accessToken)
-    }
-
-    "return oauth access token when both PRIVATE-TOKEN and OAUTH-TOKEN are present" in new TestCase {
+    "return oauth access token when both PRIVATE-TOKEN and AUTHORIZATION: BEARER are present" in new TestCase {
 
       val oauthAccessToken    = oauthAccessTokens.generateOne
       val personalAccessToken = personalAccessTokens.generateOne
@@ -72,14 +63,14 @@ class AccessTokenExtractorSpec extends WordSpec {
         request
           .withHeaders(
             Headers.of(
-              Header("OAUTH-TOKEN", oauthAccessToken.value),
+              Header("PRIVATE-TOKEN", personalAccessToken.value),
               Authorization(Token(Bearer, oauthAccessToken.value))
             )
           )
       ) shouldBe context.pure(oauthAccessToken)
     }
 
-    "fail with UNAUTHORIZED when neither PRIVATE-TOKEN nor OAUTH-TOKEN is not present" in new TestCase {
+    "fail with UNAUTHORIZED when neither PRIVATE-TOKEN nor AUTHORIZATION: BEARER is not present" in new TestCase {
       finder.findAccessToken(request) shouldBe context.raiseError(UnauthorizedException)
     }
 
@@ -95,12 +86,6 @@ class AccessTokenExtractorSpec extends WordSpec {
 
       finder.findAccessToken(
         request.withHeaders(Authorization(Token(Basic, accessToken.value)))
-      ) shouldBe context.raiseError(UnauthorizedException)
-    }
-
-    "fail with UNAUTHORIZED when OAUTH-TOKEN is invalid" in new TestCase {
-      finder.findAccessToken(
-        request.withHeaders(Headers.of(Header("OAUTH-TOKEN", "")))
       ) shouldBe context.raiseError(UnauthorizedException)
     }
   }
