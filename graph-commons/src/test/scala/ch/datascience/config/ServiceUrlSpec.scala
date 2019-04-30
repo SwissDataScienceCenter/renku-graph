@@ -18,15 +18,13 @@
 
 package ch.datascience.config
 
-import java.net.MalformedURLException
-
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ServiceUrlSpec extends WordSpec with PropertyChecks {
+class ServiceUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "apply" should {
 

@@ -18,14 +18,13 @@
 
 package ch.datascience.dbeventlog.commands
 
-import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogVerifyExistenceSpec extends WordSpec with DbSpec with InMemoryEventLogDb {
+class EventLogVerifyExistenceSpec extends WordSpec with InMemoryEventLogDbSpec {
 
   "filterNotExistingInLog" should {
 
@@ -123,6 +122,6 @@ class EventLogVerifyExistenceSpec extends WordSpec with DbSpec with InMemoryEven
   private trait TestCase {
     val projectId = projectIds.generateOne
 
-    val existenceVerification = new EventLogVerifyExistence(transactorProvider)
+    val existenceVerification = new EventLogVerifyExistence(transactor)
   }
 }

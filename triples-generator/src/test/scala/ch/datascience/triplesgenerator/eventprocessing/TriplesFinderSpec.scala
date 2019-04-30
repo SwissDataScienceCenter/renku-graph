@@ -409,6 +409,6 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     val toRdfTriples        = mockFunction[InputStream, IO[RDFTriples]]
     randomLong.expects().returning(pathDifferentiator)
 
-    val triplesFinder = new IOTriplesFinder(gitLabRepoUrlFinder, file, git, renku, toRdfTriples, randomLong)
+    val triplesFinder = new IOTriplesFinder(gitLabRepoUrlFinder, renku, file, git, toRdfTriples, randomLong)
   }
 }

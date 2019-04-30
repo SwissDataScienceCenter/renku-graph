@@ -58,7 +58,7 @@ class IOAccessTokenAssociatorSpec extends WordSpec with MockFactory with Externa
             .willReturn(noContent())
         }
 
-        associator.associate(projectId, accessToken).unsafeRunSync() shouldBe (): Unit
+        associator.associate(projectId, accessToken).unsafeRunSync() shouldBe ((): Unit)
       }
     }
 

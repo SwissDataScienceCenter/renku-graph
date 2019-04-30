@@ -26,6 +26,7 @@ import ch.datascience.webhookservice.model._
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.project.SelfUrlConfigProvider.SelfUrl
 import ch.datascience.webhookservice.project._
+import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 
@@ -48,22 +49,23 @@ object WebhookServiceGenerators {
     projectId <- projectIds
   } yield HookToken(projectId)
 
-  implicit val projectOwner: Gen[ProjectOwner] = for {
-    id <- userIds
-  } yield ProjectOwner(id)
-
   implicit val projectVisibilities: Gen[ProjectVisibility] = Gen.oneOf(ProjectVisibility.all.toList)
 
   implicit val projectInfos: Gen[ProjectInfo] = for {
     id         <- projectIds
     visibility <- projectVisibilities
     path       <- projectPaths
-    owner      <- projectOwner
-  } yield ProjectInfo(id, visibility, path, owner)
+  } yield ProjectInfo(id, visibility, path)
 
   implicit val selfUrls: Gen[SelfUrl] =
     validatedUrls map (url => SelfUrl.apply(url.value))
 
   implicit val projectHookUrls: Gen[ProjectHookUrl] =
     validatedUrls map (url => ProjectHookUrl.apply(url.value))
+
+  implicit val pushEventInfos: Gen[PushEventInfo] = for {
+    projectId <- projectIds
+    pushUser  <- pushUsers
+    commitTo  <- commitIds
+  } yield PushEventInfo(projectId, pushUser, commitTo)
 }

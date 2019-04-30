@@ -47,7 +47,8 @@ lazy val webhookService = Project(
 ).dependsOn(
   graphCommons % "compile->compile",
   graphCommons % "test->test",
-  dbEventLog
+  dbEventLog   % "compile->compile",
+  dbEventLog   % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
@@ -61,8 +62,8 @@ lazy val triplesGenerator = Project(
 ).dependsOn(
   graphCommons % "compile->compile",
   graphCommons % "test->test",
-  dbEventLog % "compile->compile",
-  dbEventLog % "test->test"
+  dbEventLog   % "compile->compile",
+  dbEventLog   % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
@@ -89,6 +90,9 @@ lazy val commonSettings = Seq(
   publishArtifact in (Compile, packageSrc) := false,
 
   scalacOptions += "-Ypartial-unification",
+  scalacOptions += "-feature",
+  scalacOptions += "-unchecked",
+  scalacOptions += "-deprecation",
 
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),

@@ -21,7 +21,11 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.control.Throttler
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands._
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.{CommitEvent, CommitId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.config.GitLabConfigProvider
@@ -43,6 +47,7 @@ private class CommitEventsFinder[Interpretation[_]](
 
   import Stream._
   type EventsStream = Stream[Interpretation[CommitEvent]]
+  private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
   def findCommitEvents(pushEvent: PushEvent, maybeAccessToken: Option[AccessToken]): Interpretation[EventsStream] =
     for {
@@ -61,8 +66,9 @@ private class CommitEventsFinder[Interpretation[_]](
 
     private def stream(commitIds: List[CommitId]): Interpretation[EventsStream] =
       commitIds match {
-        case Nil                       => ME.pure(Stream.empty)
-        case commitId +: leftToProcess => nextElement(commitId, leftToProcess)
+        case Nil                               => ME.pure(Stream.empty)
+        case DontCareCommitId +: leftToProcess => stream(leftToProcess)
+        case commitId +: leftToProcess         => nextElement(commitId, leftToProcess)
       }
 
     private def nextElement(commitId: CommitId, leftToProcess: List[CommitId]) = {
@@ -85,7 +91,7 @@ private class CommitEventsFinder[Interpretation[_]](
         pushUser      = pushEvent.pushUser,
         author        = commitInfo.author,
         committer     = commitInfo.committer,
-        parents       = commitInfo.parents,
+        parents       = commitInfo.parents.filterNot(_ == DontCareCommitId),
         project       = pushEvent.project
       )
 
@@ -111,7 +117,7 @@ private class CommitEventsFinder[Interpretation[_]](
         stream(leftToProcess) map (ME.raiseError[CommitEvent](exception) #:: _)
     }
 
-    private final case class EventLogException(cause: Throwable) extends Exception(cause)
+    private case class EventLogException(cause: Throwable) extends Exception(cause)
 
     private lazy val eventLogException: PartialFunction[Throwable, Interpretation[List[CommitId]]] = {
       case NonFatal(exception) => ME.raiseError(EventLogException(exception))
@@ -119,9 +125,12 @@ private class CommitEventsFinder[Interpretation[_]](
   }
 }
 
-private class IOCommitEventsFinder(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+private class IOCommitEventsFinder(
+    transactor:              DbTransactor[IO, EventLogDB],
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends CommitEventsFinder[IO](
-      new IOCommitInfoFinder(new GitLabConfigProvider()),
-      new IOEventLogLatestEvent,
-      new IOEventLogVerifyExistence
+      new IOCommitInfoFinder(new GitLabConfigProvider(), gitLabThrottler),
+      new IOEventLogLatestEvent(transactor),
+      new IOEventLogVerifyExistence(transactor)
     )

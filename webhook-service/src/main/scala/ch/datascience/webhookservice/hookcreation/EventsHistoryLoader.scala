@@ -20,17 +20,21 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Clock, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.graph.model.events.{Project, PushUser}
+import ch.datascience.control.Throttler
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventLogDB
+import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.model.events.Project
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
-import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
-import ch.datascience.webhookservice.hookcreation.UserInfoFinder.UserInfo
 import ch.datascience.webhookservice.project.ProjectInfo
+import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
+import ch.datascience.webhookservice.pushevents._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -39,39 +43,30 @@ import scala.util.control.NonFatal
 
 private class EventsHistoryLoader[Interpretation[_]](
     latestPushEventFetcher: LatestPushEventFetcher[Interpretation],
-    userInfoFinder:         UserInfoFinder[Interpretation],
     pushEventSender:        PushEventSender[Interpretation],
     logger:                 Logger[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable]) {
 
   import latestPushEventFetcher._
   import pushEventSender._
-  import userInfoFinder._
 
   def loadAllEvents(projectInfo: ProjectInfo, accessToken: AccessToken): Interpretation[Unit] = {
     for {
-      latestPushEvent <- OptionT(fetchLatestPushEvent(projectInfo.id, accessToken))
-      userInfo        <- OptionT.liftF(findUserInfo(latestPushEvent.authorId, accessToken))
-      pushEvent       <- OptionT.liftF(pushEventFrom(latestPushEvent, projectInfo, userInfo))
+      latestPushEvent <- OptionT(fetchLatestPushEvent(projectInfo.id, Some(accessToken)))
+      pushEvent       <- OptionT.liftF(pushEventFrom(latestPushEvent, projectInfo))
       _               <- OptionT.liftF(storeCommitsInEventLog(pushEvent))
-      _               <- OptionT.liftF(logger.info(s"Project: ${projectInfo.id}: events history sent to the Event Log"))
     } yield ()
   }.value
-    .flatMap(logNoEventsSent(projectInfo))
+    .flatMap(_ => ME.unit)
     .recoverWith(loggingError(projectInfo))
 
-  private def pushEventFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo, userInfo: UserInfo) = ME.pure {
+  private def pushEventFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = ME.pure {
     PushEvent(
       maybeCommitFrom = None,
       commitTo        = pushEventInfo.commitTo,
-      pushUser        = PushUser(userInfo.userId, userInfo.username, maybeEmail = None),
+      pushUser        = pushEventInfo.pushUser,
       project         = Project(projectInfo.id, projectInfo.path)
     )
-  }
-
-  private def logNoEventsSent(projectInfo: ProjectInfo): Option[Unit] => Interpretation[Unit] = {
-    case None => logger.info(s"Project: ${projectInfo.id}: No events to be sent to the Event Log")
-    case _    => ME.pure(())
   }
 
   private def loggingError(projectInfo: ProjectInfo): PartialFunction[Throwable, Interpretation[Unit]] = {
@@ -81,10 +76,12 @@ private class EventsHistoryLoader[Interpretation[_]](
   }
 }
 
-private class IOEventsHistoryLoader(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+private class IOEventsHistoryLoader(
+    transactor:              DbTransactor[IO, EventLogDB],
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
     extends EventsHistoryLoader[IO](
-      new IOLatestPushEventFetcher(new GitLabConfigProvider[IO]),
-      new IOUserInfoFinder(new GitLabConfigProvider[IO]),
-      new IOPushEventSender,
+      new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler),
+      new IOPushEventSender(transactor, gitLabThrottler),
       ApplicationLogger
     )

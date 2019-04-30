@@ -18,17 +18,30 @@
 
 package ch.datascience.tokenrepository.repository
 
-import cats.MonadError
-import ch.datascience.db.DBConfigProvider
-import eu.timepit.refined.auto._
+import ch.datascience.db.DbSpec
+import ch.datascience.graph.model.events.ProjectId
+import doobie.implicits._
+import org.scalatest.TestSuite
 
-import scala.language.higherKinds
+trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb {
+  self: TestSuite =>
 
-private class ProjectsTokensConfig[Interpretation[_]](
-    implicit ME: MonadError[Interpretation, Throwable]
-) extends DBConfigProvider[Interpretation](
-      namespace = "projects-tokens",
-      driver    = "org.postgresql.Driver",
-      dbName    = "projects_tokens",
-      urlPrefix = "jdbc:postgresql"
-    )
+  protected def initDb(): Unit = execute {
+    sql"""|CREATE TABLE projects_tokens(
+          | project_id int4 PRIMARY KEY,
+          | token VARCHAR NOT NULL
+          |);""".stripMargin.update.run
+  }
+
+  protected def prepareDbForTest(): Unit = execute {
+    sql"TRUNCATE TABLE projects_tokens".update.run
+  }
+
+  protected def findToken(projectId: ProjectId): Option[String] = execute {
+    sql"""select token 
+          from projects_tokens  
+          where project_id = ${projectId.value}"""
+      .query[String]
+      .option
+  }
+}

@@ -34,10 +34,19 @@ object ExecutionDate extends TinyTypeFactory[Instant, ExecutionDate](new Executi
 
 final class EventMessage private (val value: String) extends AnyVal with TinyType[String]
 object EventMessage extends TinyTypeFactory[String, EventMessage](new EventMessage(_)) with NonBlank {
-  def apply(exception: Throwable): Option[EventMessage] = from(exception.getMessage).fold(
-    _ => None,
-    Option.apply
-  )
+
+  import java.io.{PrintWriter, StringWriter}
+
+  def apply(exception: Throwable): Option[EventMessage] = {
+    val exceptionAsString = new StringWriter
+    exception.printStackTrace(new PrintWriter(exceptionAsString))
+    exceptionAsString.flush()
+
+    from(exceptionAsString.toString).fold(
+      _ => None,
+      Option.apply
+    )
+  }
 }
 
 sealed trait EventStatus extends TinyType[String] with Product with Serializable

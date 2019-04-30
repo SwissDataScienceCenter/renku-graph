@@ -21,6 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 import java.time.{LocalDateTime, ZoneOffset}
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
@@ -192,7 +193,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
         .expects()
         .returning(returning)
 
-    val finder = new IOCommitInfoFinder(configProvider)
+    val finder = new IOCommitInfoFinder(configProvider, Throttler.noThrottling)
 
     private def url(value: String) =
       RefType

@@ -20,26 +20,24 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.db.TransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus.{Processing, TriplesStore}
-import ch.datascience.dbeventlog.{EventStatus, IOTransactorProvider}
+import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import ch.datascience.graph.model.events.CommitEventId
 import doobie.implicits._
 
 import scala.language.higherKinds
 
 class EventLogMarkDone[Interpretation[_]](
-    transactorProvider: TransactorProvider[Interpretation],
-    now:                () => Instant = Instant.now
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, EventLogDB],
+    now:        () => Instant = () => Instant.now
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   def markEventDone(commitEventId: CommitEventId): Interpretation[Unit] =
     for {
-      transactor     <- transactorProvider.transactor
-      updatedRecords <- update(commitEventId, newStatus = TriplesStore).transact(transactor)
+      updatedRecords <- update(commitEventId, newStatus = TriplesStore).transact(transactor.get)
       _              <- failIfNoRecordsUpdated(commitEventId)(updatedRecords)
     } yield ()
 
@@ -61,5 +59,6 @@ class EventLogMarkDone[Interpretation[_]](
 }
 
 class IOEventLogMarkDone(
-    implicit contextShift: ContextShift[IO]
-) extends EventLogMarkDone[IO](new IOTransactorProvider)
+    transactor:          DbTransactor[IO, EventLogDB]
+)(implicit contextShift: ContextShift[IO])
+    extends EventLogMarkDone[IO](transactor)

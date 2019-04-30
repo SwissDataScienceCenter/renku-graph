@@ -21,7 +21,6 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.effect.IO._
 import cats.effect._
 import cats.implicits._
-import ch.datascience.dbeventlog.EventBody
 import ch.datascience.dbeventlog.commands.EventLogFetch
 import ch.datascience.logging.ApplicationLogger
 import io.chrisdavenport.log4cats.Logger
@@ -35,32 +34,28 @@ class DbEventProcessorRunner(
     logger:         Logger[IO] = ApplicationLogger
 )(
     implicit contextShift: ContextShift[IO],
-    executionContext:      ExecutionContext
+    executionContext:      ExecutionContext,
+    timer:                 Timer[IO]
 ) extends EventProcessorRunner[IO](eventProcessor) {
 
   import DbEventProcessorRunner.interval
   import eventLogFetch._
 
-  private implicit val timer: Timer[IO] = IO.timer(executionContext)
-
   lazy val run: IO[Unit] =
     for {
       _ <- logger.info("Waiting for new events")
-      _ <- checkForNewLine
+      _ <- checkForNewEvent
     } yield ()
 
-  private def checkForNewLine: IO[Unit] =
-    for {
-      maybeEvent <- findEventToProcess
-      _          <- sleepOrProcessEvent(maybeEvent)
-      _          <- checkForNewLine
-    } yield ()
+  private def checkForNewEvent: IO[Unit] =
+    isEventToProcess flatMap {
+      case true  => List(popEvent, checkForNewEvent).parSequence *> IO.unit
+      case false => timer.sleep(interval) *> checkForNewEvent
+    }
 
-  private lazy val sleepOrProcessEvent: Option[EventBody] => IO[_] = {
-    case None => IO.sleep(interval)
-    case Some(eventBody) =>
-      contextShift.shift *>
-        (IO.unit flatMap (_ => eventProcessor(eventBody))).start
+  private def popEvent: IO[Unit] = popEventToProcess flatMap {
+    case Some(eventBody) => eventProcessor(eventBody)
+    case None            => IO.unit
   }
 }
 
@@ -68,5 +63,5 @@ private object DbEventProcessorRunner {
   import scala.concurrent.duration._
   import scala.language.postfixOps
 
-  val interval: FiniteDuration = 500 millis
+  val interval: FiniteDuration = 2 second
 }

@@ -22,9 +22,9 @@ import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class NonNegativeSpec extends WordSpec with PropertyChecks {
+class NonNegativeSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "NonNegative" should {
 

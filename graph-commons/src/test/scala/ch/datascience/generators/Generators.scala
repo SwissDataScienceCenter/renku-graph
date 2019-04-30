@@ -22,13 +22,17 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit.DAYS
 
 import ch.datascience.config.ServiceUrl
-import eu.timepit.refined.api.{RefType, Refined}
+import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
-import scala.language.implicitConversions
+import scala.concurrent.duration._
+import scala.language.{implicitConversions, postfixOps}
 
 object Generators {
 
@@ -47,7 +51,21 @@ object Generators {
       lines <- Gen.listOfN(size, nonEmptyStrings())
     } yield lines
 
-  def positiveInts(max: Int = 1000): Gen[Int] = choose(1, max)
+  def nonEmptyList[T](generator: Gen[T], minElements: Int = 1, maxElements: Int = 5): Gen[List[T]] =
+    for {
+      size <- choose(minElements, maxElements)
+      list <- Gen.listOfN(size, generator)
+    } yield list
+
+  def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
+    choose(1, max) map Refined.unsafeApply
+
+  def positiveLongs(max: Long = 1000): Gen[Long Refined Positive] =
+    choose(1L, max) map Refined.unsafeApply
+
+  def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
+    choose(1, max.toMillis)
+      .map(FiniteDuration(_, MILLISECONDS))
 
   def nonNegativeInts(max: Int = 1000): Gen[Int] = choose(0, max)
 
@@ -66,15 +84,10 @@ object Generators {
     host <- nonEmptyStrings()
   } yield s"$protocol://$host:$port"
 
-  val validatedUrls: Gen[String Refined Url] = httpUrls
-    .map { value =>
-      RefType
-        .applyRef[String Refined Url](value)
-        .getOrElse(throw new IllegalArgumentException("Invalid url value"))
-    }
+  val validatedUrls: Gen[String Refined Url] = httpUrls map Refined.unsafeApply
 
   val shas: Gen[String] = for {
-    length <- Gen.choose(5, 40)
+    length <- Gen.choose(40, 40)
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'f').map(_.toString)))
   } yield chars.mkString("")
 
@@ -88,11 +101,18 @@ object Generators {
       .choose(Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
-  implicit val exceptions: Gen[Exception] =
-    nonEmptyStrings(20).map(new Exception(_))
-
-  implicit val serviceUrls: Gen[ServiceUrl] =
-    httpUrls.map(ServiceUrl.apply)
+  implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls.map(ServiceUrl.apply)
+  implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
+  implicit val exceptions:   Gen[Exception]   = nonEmptyStrings(20).map(new Exception(_))
+  implicit val nestedExceptions: Gen[Exception] = for {
+    nestLevels <- positiveInts(5)
+    rootCause  <- exceptions
+  } yield {
+    import Implicits._
+    (1 to nestLevels).foldLeft(rootCause) { (nestedException, _) =>
+      new Exception(nonEmptyStrings().generateOne, nestedException)
+    }
+  }
 
   implicit val jsons: Gen[Json] = {
     import io.circe.syntax._

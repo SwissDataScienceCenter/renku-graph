@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice.tokenrepository
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
 import ch.datascience.http.client.IORestClient
@@ -34,7 +35,7 @@ trait AccessTokenRemover[Interpretation[_]] {
 class IOAccessTokenRemover(
     tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO]
 )(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient
+    extends IORestClient(Throttler.noThrottling)
     with AccessTokenRemover[IO] {
 
   import cats.effect._

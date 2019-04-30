@@ -22,9 +22,11 @@ COPY --from=builder /work/triples-generator/target/universal/stage .
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 # Installing Renku
-RUN apk add --no-cache git curl bash python3-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev && \
+RUN apk add --no-cache git git-lfs curl bash python3-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev && \
     python3 -m pip install --pre renku sentry-sdk && \
-    chown -R daemon:daemon .
+    chown -R daemon:daemon . && \
+    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"  && \
+    git config --global filter.lfs.process "git-lfs filter-process --skip"
 
 ENTRYPOINT ["bin/triples-generator"]
 CMD []

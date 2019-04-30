@@ -20,17 +20,16 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
-import cats.effect.IO
 import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog._
 import ch.datascience.graph.model.events._
 import doobie.implicits._
-import doobie.util.transactor.Transactor.Aux
+import org.scalatest.TestSuite
 
-trait InMemoryEventLogDb {
-  self: DbSpec =>
+trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
+  self: TestSuite =>
 
-  protected def initDb(transactor: Aux[IO, Unit]): Unit =
+  protected def initDb(): Unit = execute {
     sql"""
          |CREATE TABLE IF NOT EXISTS event_log(
          | event_id varchar NOT NULL,
@@ -44,29 +43,26 @@ trait InMemoryEventLogDb {
          | PRIMARY KEY (event_id, project_id)
          |);
       """.stripMargin.update.run
-      .transact(transactor)
-      .unsafeRunSync()
+  }
 
-  protected def prepareDbForTest(transactor: Aux[IO, Unit]): Unit =
+  protected def prepareDbForTest(): Unit = execute {
     sql"TRUNCATE TABLE event_log".update.run
-      .transact(transactor)
-      .unsafeRunSync()
+  }
 
   protected def storeEvent(commitEventId: CommitEventId,
                            eventStatus:   EventStatus,
                            executionDate: ExecutionDate,
                            eventDate:     CommittedDate,
                            eventBody:     EventBody,
-                           createdDate:   CreatedDate = CreatedDate(Instant.now)): Unit =
+                           createdDate:   CreatedDate = CreatedDate(Instant.now)): Unit = execute {
     sql"""insert into 
          |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
          |values (${commitEventId.id}, ${commitEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
       """.stripMargin.update.run
       .map(_ => ())
-      .transact(transactor)
-      .unsafeRunSync()
+  }
 
-  protected def findEvents(status: EventStatus): List[(CommitEventId, ExecutionDate)] =
+  protected def findEvents(status: EventStatus): List[(CommitEventId, ExecutionDate)] = execute {
     sql"""select event_id, project_id, execution_date
          |from event_log 
          |where status = $status
@@ -74,6 +70,5 @@ trait InMemoryEventLogDb {
          """.stripMargin
       .query[(CommitEventId, ExecutionDate)]
       .to[List]
-      .transact(transactor)
-      .unsafeRunSync()
+  }
 }

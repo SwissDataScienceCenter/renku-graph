@@ -16,10 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog
+package ch.datascience.webhookservice.missedevents
 
-import cats.effect.{ContextShift, IO}
-import ch.datascience.db.TransactorProvider
+import cats.MonadError
+import ch.datascience.config.ConfigLoader
+import com.typesafe.config.{Config, ConfigFactory}
 
-class IOTransactorProvider(implicit contextShift: ContextShift[IO])
-    extends TransactorProvider[IO](new EventLogDbConfig[IO])
+import scala.concurrent.duration.FiniteDuration
+import scala.language.higherKinds
+
+private class SchedulerConfigProvider[Interpretation[_]](
+    configuration: Config = ConfigFactory.load()
+)(implicit ME:     MonadError[Interpretation, Throwable])
+    extends ConfigLoader[Interpretation] {
+
+  def getInitialDelay: Interpretation[FiniteDuration] =
+    find[FiniteDuration]("events-synchronization.initial-delay", configuration)
+
+  def getInterval: Interpretation[FiniteDuration] =
+    find[FiniteDuration]("events-synchronization.interval", configuration)
+}

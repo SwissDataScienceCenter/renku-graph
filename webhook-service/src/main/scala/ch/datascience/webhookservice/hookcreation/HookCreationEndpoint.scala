@@ -18,14 +18,18 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.effect.{ContextShift, Effect, IO}
+import cats.effect._
 import cats.implicits._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventLogDB
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
+import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult
+import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.security.AccessTokenExtractor
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response, Status}
@@ -49,7 +53,7 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
     } yield response
   } recoverWith httpResponse
 
-  private lazy val toHttpResponse: HookCreationResult => Interpretation[Response[Interpretation]] = {
+  private lazy val toHttpResponse: CreationResult => Interpretation[Response[Interpretation]] = {
     case HookCreated => Created(InfoMessage("Hook created"))
     case HookExisted => Ok(InfoMessage("Hook already existed"))
   }
@@ -64,6 +68,10 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 }
 
 class IOHookCreationEndpoint(
-    implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO]
-) extends HookCreationEndpoint[IO](new IOHookCreator, new AccessTokenExtractor[IO])
+    transactor:              DbTransactor[IO, EventLogDB],
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
+    extends HookCreationEndpoint[IO](
+      new IOHookCreator(transactor, gitLabThrottler),
+      new AccessTokenExtractor[IO]
+    )

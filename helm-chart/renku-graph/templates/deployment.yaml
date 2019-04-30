@@ -40,10 +40,14 @@ spec:
                 secretKeyRef:
                   name: {{ template "graph.fullname" . }}
                   key: dbEventLog-postgresPassword
+            - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
+              value: "{{ .Values.webhookService.dbEventLog.connectionPool }}"
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "token-repository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
+            - name: GITLAB_RATE_LIMIT
+              value: {{ .Values.webhookService.gitlab.rateLimit }}
             - name: SELF_IP
               valueFrom:
                 fieldRef:
@@ -54,10 +58,24 @@ spec:
               {{- else }}
               value: {{ printf "http://$(SELF_IP):9001" | quote }}
               {{- end }}
+            - name: EVENTS_SYNCHRONIZATION_JOB_DELAY
+              {{- if .Values.webhookService.eventsSynchronization.initialDelay }}
+              value: {{ .Values.webhookService.eventsSynchronization.initialDelay }}
+              {{- else }}
+              value: 1 minute
+              {{- end }}
+            - name: EVENTS_SYNCHRONIZATION_JOB_INTERVAL
+              {{- if .Values.webhookService.eventsSynchronization.interval }}
+              value: {{ .Values.webhookService.eventsSynchronization.interval }}
+              {{- else }}
+              value: 1 hour
+              {{- end }}
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=webhook-service&environment={{ .Release.Namespace }}
+            - name: THREADS_NUMBER
+              value: "{{ .Values.webhookService.threadsNumber }}"
             - name: JAVA_OPTS
-              value: -Xmx100m -XX:+UseG1GC
+              value: -Xmx200m -XX:+UseG1GC
           ports:
             - name: http-webhook-sv
               containerPort: 9001
@@ -87,8 +105,12 @@ spec:
                 secretKeyRef:
                   name: {{ template "graph.fullname" . }}
                   key: dbEventLog-postgresPassword
+            - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
+              value: "{{ .Values.triplesGenerator.dbEventLog.connectionPool }}"
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
+            - name: GITLAB_RATE_LIMIT
+              value: {{ .Values.triplesGenerator.gitlab.rateLimit }}
             - name: JENA_DATASET_NAME
               {{- if .Values.global.graph.jena.dataset }}
               value: {{ .Values.global.graph.jena.dataset }}
@@ -102,12 +124,16 @@ spec:
                 secretKeyRef:
                   name: {{ template "jena.fullname" . }}
                   key: jena-admin-password
+            - name: RENKU_LOG_TIMEOUT
+              value: "{{ .Values.triplesGenerator.renkuLogTimeout }}"
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuPython }}
             - name: GRAPH_SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=triples-generator&environment={{ .Release.Namespace }}
+            - name: THREADS_NUMBER
+              value: "{{ .Values.triplesGenerator.threadsNumber }}"
             - name: JAVA_OPTS
-              value: -Xmx100m -XX:+UseG1GC
+              value: -Xmx300m -XX:+UseG1GC
           ports:
             - name: http-triples-gn
               containerPort: 9002
@@ -146,6 +172,8 @@ spec:
                 secretKeyRef:
                   name: {{ template "graph.fullname" . }}
                   key: tokenRepository-postgresPassword
+            - name: TOKEN_REPOSITORY_POSTGRES_CONNECTION_POOL
+              value: "{{ .Values.tokenRepository.connectionPool }}"
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=token-repository&environment={{ .Release.Namespace }}
             - name: JAVA_OPTS

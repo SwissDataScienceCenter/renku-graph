@@ -24,9 +24,11 @@ import eu.timepit.refined.auto._
 
 import scala.language.higherKinds
 
-private class EventLogDbConfig[Interpretation[_]](
+sealed trait EventLogDB
+
+class EventLogDbConfigProvider[Interpretation[_]](
     implicit ME: MonadError[Interpretation, Throwable]
-) extends DBConfigProvider[Interpretation](
+) extends DBConfigProvider[Interpretation, EventLogDB](
       namespace = "db-event-log",
       driver    = "org.postgresql.Driver",
       dbName    = "event_log",

@@ -22,9 +22,9 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectIdSpec extends WordSpec with PropertyChecks {
+class ProjectIdSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "instantiation" should {
 
@@ -42,7 +42,7 @@ class ProjectIdSpec extends WordSpec with PropertyChecks {
   }
 }
 
-class ProjectPathSpec extends WordSpec with PropertyChecks {
+class ProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "instantiation" should {
 

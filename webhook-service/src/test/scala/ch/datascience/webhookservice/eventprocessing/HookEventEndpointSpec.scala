@@ -25,19 +25,19 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
-import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
+import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.{Header, Headers, MediaType, Method, Request, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -55,8 +55,8 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
-      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
-        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+      val request = Request(Method.POST, uri"webhooks" / "events")
+        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
         .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -76,8 +76,8 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
-      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
-        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+      val request = Request(Method.POST, uri"webhooks" / "events")
+        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
         .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -89,8 +89,8 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
 
-      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
-        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+      val request = Request(Method.POST, uri"webhooks" / "events")
+        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
         .withEntity(Json.obj())
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -102,7 +102,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
-      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
+      val request = Request(Method.POST, uri"webhooks" / "events")
         .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -119,8 +119,8 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
         .expects(serializedHookToken)
         .returning(context.pure(HookToken(projectIds.generateOne)))
 
-      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
-        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+      val request = Request(Method.POST, uri"webhooks" / "events")
+        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
         .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -138,8 +138,8 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
         .expects(serializedHookToken)
         .returning(context.raiseError(exception))
 
-      val request = Request(Method.POST, Uri.uri("webhooks") / "events")
-        .withHeaders(Headers(Header("X-Gitlab-Token", serializedHookToken.toString)))
+      val request = Request(Method.POST, uri"webhooks" / "events")
+        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
         .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()

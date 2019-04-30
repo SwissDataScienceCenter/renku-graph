@@ -18,54 +18,48 @@
 
 package ch.datascience.tokenrepository.repository.init
 
-import cats.MonadError
-import cats.effect.{ContextShift, ExitCode, IO}
+import cats.effect._
 import cats.implicits._
-import ch.datascience.db.TransactorProvider
+import ch.datascience.db.DbTransactor
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.tokenrepository.repository.ProjectsTokensConfig
-import doobie.util.transactor.Transactor.Aux
+import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class DbInitializer[Interpretation[_]](
-    transactorProvider: TransactorProvider[Interpretation],
-    logger:             Logger[Interpretation]
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, ProjectsTokensDB],
+    logger:     Logger[Interpretation]
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
   def run: Interpretation[ExitCode] = {
-    for {
-      transactor <- transactorProvider.transactor
-      _          <- createTable(transactor)
-    } yield {
-      logger.info("Database initialization success")
-      ExitCode.Success
-    }
-  } recoverWith logging
-
-  private def createTable(transactor: Aux[Interpretation, Unit]): Interpretation[Unit] =
     sql"""
          |CREATE TABLE IF NOT EXISTS projects_tokens(
          | project_id int4 PRIMARY KEY,
          | token VARCHAR NOT NULL
          |);
        """.stripMargin.update.run
-      .transact(transactor)
-      .map(_ => ())
+      .transact(transactor.get)
+      .map { _ =>
+        logger.info("Projects Tokens database initialization success")
+        ExitCode.Success
+      }
+  } recoverWith logging
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[ExitCode]] = {
     case NonFatal(exception) =>
-      logger.error(exception)("Database initialization failure")
+      logger.error(exception)("Projects Tokens database initialization failure")
       ME.raiseError(exception)
   }
 }
 
-class IODbInitializer(implicit contextShift: ContextShift[IO])
+class IODbInitializer(
+    transactor:          DbTransactor[IO, ProjectsTokensDB]
+)(implicit contextShift: ContextShift[IO])
     extends DbInitializer[IO](
-      transactorProvider = new TransactorProvider[IO](new ProjectsTokensConfig[IO]),
-      logger             = ApplicationLogger
+      transactor,
+      ApplicationLogger
     )

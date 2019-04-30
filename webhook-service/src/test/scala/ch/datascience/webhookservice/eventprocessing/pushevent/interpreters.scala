@@ -18,21 +18,29 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
+import cats.effect.Bracket
 import cats.implicits._
-import ch.datascience.db.TransactorProvider
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogLatestEvent, EventLogVerifyExistence}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender
 import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
 class TryPushEventSender(
-    accessTokenFinder:  AccessTokenFinder[Try],
-    commitEventsFinder: CommitEventsFinder[Try],
-    commitEventSender:  CommitEventSender[Try],
-    logger:             Logger[Try]
-) extends PushEventSender[Try](accessTokenFinder, commitEventsFinder, commitEventSender, logger)
+    accessTokenFinder:     AccessTokenFinder[Try],
+    commitEventsFinder:    CommitEventsFinder[Try],
+    commitEventSender:     CommitEventSender[Try],
+    logger:                Logger[Try],
+    executionTimeRecorder: ExecutionTimeRecorder[Try]
+) extends PushEventSender[Try](accessTokenFinder,
+                                 commitEventsFinder,
+                                 commitEventSender,
+                                 logger,
+                                 executionTimeRecorder)
 
 private class TryCommitEventsFinder(
     commitInfoFinder:        CommitInfoFinder[Try],
@@ -40,8 +48,12 @@ private class TryCommitEventsFinder(
     eventLogVerifyExistence: EventLogVerifyExistence[Try]
 ) extends CommitEventsFinder[Try](commitInfoFinder, latestEventFinder, eventLogVerifyExistence)
 
-private class TryEventLogLatestEvent(transactorProvider: TransactorProvider[Try])
-    extends EventLogLatestEvent[Try](transactorProvider)
+private class TryEventLogLatestEvent(
+    transactor: DbTransactor[Try, EventLogDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends EventLogLatestEvent[Try](transactor)
 
-private class TryEventLogVerifyExistence(transactorProvider: TransactorProvider[Try])
-    extends EventLogVerifyExistence[Try](transactorProvider)
+private class TryEventLogVerifyExistence(
+    transactor: DbTransactor[Try, EventLogDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends EventLogVerifyExistence[Try](transactor)

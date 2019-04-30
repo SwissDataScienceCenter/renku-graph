@@ -20,7 +20,6 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
-import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
@@ -30,7 +29,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb with MockFactory {
+class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "markEventDone" should {
 
@@ -54,7 +53,7 @@ class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb 
                  committedDates.generateOne,
                  eventBodies.generateOne)
 
-      eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ()
+      eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now)))
     }
@@ -77,7 +76,7 @@ class EventLogMarkDoneSpec extends WordSpec with DbSpec with InMemoryEventLogDb 
   private trait TestCase {
 
     val currentTime      = mockFunction[Instant]
-    val eventLogMarkDone = new EventLogMarkDone(transactorProvider, currentTime)
+    val eventLogMarkDone = new EventLogMarkDone(transactor, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

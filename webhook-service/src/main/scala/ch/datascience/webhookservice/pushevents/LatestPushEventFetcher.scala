@@ -16,39 +16,41 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.hookcreation
+package ch.datascience.webhookservice.pushevents
 
+import LatestPushEventFetcher.PushEventInfo
 import cats.effect.{ContextShift, IO}
-import ch.datascience.graph.model.events.{CommitId, ProjectId, UserId}
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import ch.datascience.webhookservice.eventprocessing.pushevent.CommitInfo
-import ch.datascience.webhookservice.hookcreation.LatestPushEventFetcher.PushEventInfo
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait LatestPushEventFetcher[Interpretation[_]] {
+trait LatestPushEventFetcher[Interpretation[_]] {
   def fetchLatestPushEvent(
-      projectId:   ProjectId,
-      accessToken: AccessToken
+      projectId:        ProjectId,
+      maybeAccessToken: Option[AccessToken]
   ): Interpretation[Option[PushEventInfo]]
 }
 
-private object LatestPushEventFetcher {
+object LatestPushEventFetcher {
 
   final case class PushEventInfo(
       projectId: ProjectId,
-      authorId:  UserId,
+      pushUser:  PushUser,
       commitTo:  CommitId
   )
 }
 
-private class IOLatestPushEventFetcher(
-    gitLabConfig:            GitLabConfigProvider[IO]
+class IOLatestPushEventFetcher(
+    gitLabConfig:            GitLabConfigProvider[IO],
+    gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient
+    extends IORestClient(gitLabThrottler)
     with LatestPushEventFetcher[IO] {
 
   import cats.implicits._
@@ -60,13 +62,13 @@ private class IOLatestPushEventFetcher(
   import org.http4s.{EntityDecoder, Request, Response}
 
   override def fetchLatestPushEvent(
-      projectId:   ProjectId,
-      accessToken: AccessToken
+      projectId:        ProjectId,
+      maybeAccessToken: Option[AccessToken]
   ): IO[Option[PushEventInfo]] =
     for {
       gitLabHostUrl <- gitLabConfig.get
       uri           <- validateUri(s"$gitLabHostUrl/api/v4/projects/$projectId/events") map (_.withQueryParam("action", "pushed"))
-      projectInfo   <- send(request(GET, uri, accessToken))(mapResponse)
+      projectInfo   <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield projectInfo
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[PushEventInfo]]] = {
@@ -78,12 +80,14 @@ private class IOLatestPushEventFetcher(
   private implicit lazy val pushEventInfoDecoder: EntityDecoder[IO, Option[PushEventInfo]] = {
     implicit val hookNameDecoder: Decoder[Option[PushEventInfo]] = (cursor: HCursor) =>
       for {
-        maybeProjectId <- cursor.downArray.downField("project_id").as[Option[ProjectId]]
-        maybeAuthorId  <- cursor.downArray.downField("author_id").as[Option[UserId]]
-        maybeCommitTo  <- cursor.downArray.downField("push_data").downField("commit_to").as[Option[CommitId]]
+        maybeProjectId      <- cursor.downArray.downField("project_id").as[Option[ProjectId]]
+        maybeAuthorId       <- cursor.downArray.downField("author_id").as[Option[UserId]]
+        maybeAuthorUsername <- cursor.downArray.downField("author_username").as[Option[Username]]
+        maybeCommitTo       <- cursor.downArray.downField("push_data").downField("commit_to").as[Option[CommitId]]
       } yield
-        (maybeProjectId, maybeAuthorId, maybeCommitTo) mapN {
-          case (projectId, authorId, commitTo) => PushEventInfo(projectId, authorId, commitTo)
+        (maybeProjectId, maybeAuthorId, maybeAuthorUsername, maybeCommitTo) mapN {
+          case (projectId, authorId, authorUsername, commitTo) =>
+            PushEventInfo(projectId, PushUser(authorId, authorUsername, maybeEmail = None), commitTo)
       }
 
     jsonOf[IO, Option[PushEventInfo]]

@@ -20,12 +20,10 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
-import cats.implicits._
-import ch.datascience.db.TransactorProvider
-import ch.datascience.dbeventlog.{EventBody, EventStatus, IOTransactorProvider}
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventStatus}
 import ch.datascience.graph.model.events._
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
@@ -33,20 +31,17 @@ import doobie.implicits._
 import scala.language.higherKinds
 
 class EventLogAdd[Interpretation[_]](
-    transactorProvider: TransactorProvider[Interpretation],
-    now:                () => Instant = Instant.now
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, EventLogDB],
+    now:        () => Instant = () => Instant.now
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   def storeNewEvent(commitEvent: CommitEvent, eventBody: EventBody): Interpretation[Unit] =
-    for {
-      transactor <- transactorProvider.transactor
-      _          <- insertIfNotDuplicate(commitEvent, eventBody).transact(transactor)
-    } yield ()
+    insertIfNotDuplicate(commitEvent, eventBody).transact(transactor.get)
 
   private def insertIfNotDuplicate(commitEvent: CommitEvent, eventBody: EventBody) =
     for {
       maybeEventId <- checkIfExists(commitEvent)
-      _            <- if (maybeEventId.isEmpty) insert(commitEvent, eventBody) else Free.pure[ConnectionOp, Unit]()
+      _            <- if (maybeEventId.isEmpty) insert(commitEvent, eventBody) else Free.pure[ConnectionOp, Unit](())
     } yield ()
 
   private def checkIfExists(commitEvent: CommitEvent) =
@@ -67,4 +62,7 @@ class EventLogAdd[Interpretation[_]](
   }
 }
 
-class IOEventLogAdd(implicit contextShift: ContextShift[IO]) extends EventLogAdd[IO](new IOTransactorProvider)
+class IOEventLogAdd(
+    transactor:          DbTransactor[IO, EventLogDB]
+)(implicit contextShift: ContextShift[IO])
+    extends EventLogAdd[IO](transactor)

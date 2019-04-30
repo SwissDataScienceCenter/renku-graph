@@ -22,17 +22,20 @@ import java.io._
 import java.security.SecureRandom
 
 import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.config.ServiceUrl
+import ch.datascience.config.{ConfigLoader, ServiceUrl}
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.triplesgenerator.eventprocessing.Commands.GitLabRepoUrlFinder
 import ch.datascience.triplesgenerator.eventprocessing.Commit._
+import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.jena.rdf.model.ModelFactory
 
-import scala.language.higherKinds
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
+import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
 private abstract class TriplesFinder[Interpretation[_]] {
@@ -41,9 +44,9 @@ private abstract class TriplesFinder[Interpretation[_]] {
 
 private class IOTriplesFinder(
     gitRepoUrlFinder: GitLabRepoUrlFinder[IO],
+    renku:            Commands.Renku,
     file:             Commands.File = new Commands.File,
     git:              Commands.Git = new Commands.Git,
-    renku:            Commands.Renku = new Commands.Renku,
     toRdfTriples: InputStream => IO[RDFTriples] = inputStream =>
       IO(RDFTriples(ModelFactory.createDefaultModel.read(inputStream, ""))),
     randomLong:          () => Long = new SecureRandom().nextLong _
@@ -163,14 +166,45 @@ private object Commands {
     }
   }
 
-  class Renku {
+  class Renku(
+      timeout:             FiniteDuration
+  )(implicit contextShift: ContextShift[IO],
+    timer:                 Timer[IO],
+    ME:                    MonadError[IO, Throwable],
+    executionContext:      ExecutionContext) {
+
+    import scala.util.Try
 
     def log[T <: Commit](
         commit:                 T,
         destinationDirectory:   Path
-    )(implicit generateTriples: (T, Path) => CommandResult): IO[InputStream] = IO {
-      generateTriples(commit, destinationDirectory).out.toInputStream
+    )(implicit generateTriples: (T, Path) => CommandResult): IO[InputStream] =
+      IO.race(
+          call(generateTriples(commit, destinationDirectory)),
+          timer.sleep(timeout)
+        )
+        .flatMap {
+          case Left(triplesStream) => IO.pure(triplesStream)
+          case Right(_)            => timeoutExceededError(commit)
+        }
+
+    private def timeoutExceededError(commit: Commit): IO[InputStream] = ME.raiseError {
+      new Exception(
+        s"'renku log' execution for commit: ${commit.id}, project: ${commit.project.id} took longer than $timeout - terminating"
+      )
     }
+
+    private def call(generateTriples: => CommandResult) =
+      IO.cancelable[InputStream] { cb =>
+        executionContext.execute { () =>
+          Try {
+            cb(Right(generateTriples.out.toInputStream))
+          } recover {
+            case NonFatal(exception) => cb(Left(exception))
+          }
+        }
+        IO.unit
+      }
 
     implicit val commitWithoutParentTriplesFinder: (CommitWithoutParent, Path) => CommandResult = {
       case (_, destinationDirectory) =>
@@ -199,7 +233,15 @@ private object Commands {
 
     private implicit class StreamValueOps(streamValue: StreamValue) {
       lazy val toInputStream: InputStream =
-        new ByteArrayInputStream(streamValue.chunks.flatMap(_.array).toArray)
+        new ByteArrayInputStream(streamValue.string.trim.getBytes)
     }
   }
+}
+
+class RenkuLogTimeoutConfigProvider[Interpretation[_]](
+    configuration: Config = ConfigFactory.load()
+)(implicit ME:     MonadError[Interpretation, Throwable])
+    extends ConfigLoader[Interpretation] {
+
+  def get: Interpretation[FiniteDuration] = find[FiniteDuration]("renku-log-timeout", configuration)
 }

@@ -18,18 +18,17 @@
 
 package ch.datascience.tokenrepository.repository.fetching
 
-import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import ch.datascience.tokenrepository.repository.InMemoryProjectsTokens
+import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import doobie.implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class PersistedTokensFinderSpec extends WordSpec with DbSpec with InMemoryProjectsTokens {
+class PersistedTokensFinderSpec extends WordSpec with InMemoryProjectsTokensDbSpec {
 
   "findToken" should {
 
@@ -51,16 +50,15 @@ class PersistedTokensFinderSpec extends WordSpec with DbSpec with InMemoryProjec
 
     val projectId = projectIds.generateOne
 
-    val finder = new PersistedTokensFinder(transactorProvider)
+    val finder = new PersistedTokensFinder(transactor)
 
-    def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit =
+    def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit = execute {
       sql"""insert into 
             projects_tokens (project_id, token) 
             values (${projectId.value}, ${encryptedToken.value})
          """.update.run
         .map(assureInserted)
-        .transact(transactor)
-        .unsafeRunSync()
+    }
 
     private lazy val assureInserted: Int => Unit = {
       case 1 => ()

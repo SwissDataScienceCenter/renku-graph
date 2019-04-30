@@ -19,28 +19,40 @@
 package ch.datascience.tokenrepository
 
 import cats.effect._
+import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
 import ch.datascience.tokenrepository.repository.init.IODbInitializer
+import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 
 import scala.language.higherKinds
 
 object Microservice extends IOApp {
 
-  private val dbInitializer = new IODbInitializer
-  private val httpServer = new HttpServer[IO](
-    serverPort = 9003,
-    serviceRoutes = new MicroserviceRoutes[IO](
-      new IOFetchTokenEndpoint,
-      new IOAssociateTokenEndpoint,
-      new IODeleteTokenEndpoint
-    ).routes
-  )
-
   override def run(args: List[String]): IO[ExitCode] =
-    new MicroserviceRunner(dbInitializer, httpServer).run(args)
+    for {
+      transactorResource <- new ProjectsTokensDbConfigProvider[IO] map DbTransactorResource[IO, ProjectsTokensDB]
+      exitCode           <- runMicroservice(transactorResource, args)
+    } yield exitCode
+
+  private def runMicroservice(transactorResource: DbTransactorResource[IO, ProjectsTokensDB], args: List[String]) =
+    transactorResource.use { transactor =>
+      val httpServer = new HttpServer[IO](
+        serverPort = 9003,
+        serviceRoutes = new MicroserviceRoutes[IO](
+          new IOFetchTokenEndpoint(transactor),
+          new IOAssociateTokenEndpoint(transactor),
+          new IODeleteTokenEndpoint(transactor)
+        ).routes
+      )
+
+      new MicroserviceRunner(
+        new IODbInitializer(transactor),
+        httpServer
+      ) run args
+    }
 }
 
 class MicroserviceRunner(

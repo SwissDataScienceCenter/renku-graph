@@ -22,10 +22,10 @@ import cats.effect._
 import ch.datascience.http.server.EndpointTester._
 import io.circe.Json
 import io.circe.literal._
+import org.http4s._
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
-import org.http4s.{HttpRoutes, MediaType, Method, Request, Response, Status, Uri}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -65,7 +65,7 @@ class HttpServerSpec extends WordSpec with Http4sDsl[IO] {
   private implicit val timer:        Timer[IO]        = IO.timer(global)
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
-  private val baseUri = Uri.uri("http://localhost:9999")
+  private val baseUri = uri"http://localhost:9999"
   private val routes = HttpRoutes.of[IO] {
     case GET -> Root / "resource" => Ok("response")
   }

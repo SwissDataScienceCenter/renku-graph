@@ -28,11 +28,11 @@ import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
 import io.circe.literal._
+import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.{MediaType, Method, Request, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -49,7 +49,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(()))
 
-      val request = Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(json"""{"personalAccessToken": ${accessToken.value}}""")
 
       val response = associateToken(projectId, request).unsafeRunSync()
@@ -57,7 +57,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
       response.status                              shouldBe Status.NoContent
       response.body.compile.toVector.unsafeRunSync shouldBe empty
 
-      logger.loggedOnly(Info(s"Token associated with projectId: $projectId"))
+      logger.expectNoLogs()
     }
 
     "respond with NO_CONTENT if the OAuth Access Token association was successful" in new TestCase {
@@ -69,7 +69,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(()))
 
-      val request = Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(json"""{"oauthAccessToken": ${accessToken.value}}""")
 
       val response = associateToken(projectId, request).unsafeRunSync()
@@ -77,12 +77,12 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
       response.status                              shouldBe Status.NoContent
       response.body.compile.toVector.unsafeRunSync shouldBe empty
 
-      logger.loggedOnly(Info(s"Token associated with projectId: $projectId"))
+      logger.expectNoLogs()
     }
 
     "respond with BAD_REQUEST if the request body is invalid" in new TestCase {
 
-      val request = Request[IO](Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request[IO](Method.PUT, uri"projects" / projectId.toString / "tokens")
 
       val response = associateToken(projectId, request).unsafeRunSync()
 
@@ -103,7 +103,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.raiseError(exception))
 
-      val request = Request(Method.PUT, Uri.uri("projects") / projectId.toString / "tokens")
+      val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(json"""{"personalAccessToken": ${accessToken.value}}""")
 
       val response = associateToken(projectId, request).unsafeRunSync()

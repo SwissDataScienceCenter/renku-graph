@@ -16,10 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.orchestration
+package ch.datascience.graph.gitlab
+
+import cats.MonadError
+import ch.datascience.config.ConfigLoader
+import ch.datascience.control.RateLimit
+import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.language.higherKinds
 
-trait Provider[Interpretation[_], T] {
-  def get(): Interpretation[T]
+class GitLabRateLimitProvider[Interpretation[_]](
+    configuration: Config = ConfigFactory.load()
+)(implicit ME:     MonadError[Interpretation, Throwable])
+    extends ConfigLoader[Interpretation] {
+
+  def get: Interpretation[RateLimit] = find[RateLimit]("services.gitlab.rate-limit", configuration)
 }

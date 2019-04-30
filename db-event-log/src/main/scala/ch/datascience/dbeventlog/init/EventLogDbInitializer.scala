@@ -18,39 +18,36 @@
 
 package ch.datascience.dbeventlog.init
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.db.TransactorProvider
-import ch.datascience.dbeventlog.IOTransactorProvider
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.logging.ApplicationLogger
 import doobie.util.fragment.Fragment
-import doobie.util.transactor.Transactor.Aux
 import io.chrisdavenport.log4cats.Logger
 
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class EventLogDbInitializer[Interpretation[_]](
-    transactorProvider: TransactorProvider[Interpretation],
-    logger:             Logger[Interpretation]
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+    transactor: DbTransactor[Interpretation, EventLogDB],
+    logger:     Logger[Interpretation]
+)(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
   def run: Interpretation[Unit] = {
     for {
-      transactor <- transactorProvider.transactor
-      _          <- createTable(transactor)
-      _          <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)", transactor)
-      _          <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)", transactor)
-      _          <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)", transactor)
-      _          <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)", transactor)
-      _          <- logger.info("Event Log database initialization success")
+      _ <- createTable(transactor)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)", transactor)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)", transactor)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)", transactor)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)", transactor)
+      _ <- logger.info("Event Log database initialization success")
     } yield ()
   } recoverWith logging
 
-  private def createTable(transactor: Aux[Interpretation, Unit]): Interpretation[Unit] =
+  private def createTable(transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] =
     sql"""
          |CREATE TABLE IF NOT EXISTS event_log(
          | event_id varchar NOT NULL,
@@ -64,12 +61,12 @@ class EventLogDbInitializer[Interpretation[_]](
          | PRIMARY KEY (event_id, project_id)
          |);
        """.stripMargin.update.run
-      .transact(transactor)
+      .transact(transactor.get)
       .map(_ => ())
 
-  private def execute(sql: Fragment, transactor: Aux[Interpretation, Unit]): Interpretation[Unit] =
+  private def execute(sql: Fragment, transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] =
     sql.update.run
-      .transact(transactor)
+      .transact(transactor.get)
       .map(_ => ())
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
@@ -79,8 +76,10 @@ class EventLogDbInitializer[Interpretation[_]](
   }
 }
 
-class IOEventLogDbInitializer(implicit contextShift: ContextShift[IO])
+class IOEventLogDbInitializer(
+    transactor:          DbTransactor[IO, EventLogDB]
+)(implicit contextShift: ContextShift[IO])
     extends EventLogDbInitializer[IO](
-      transactorProvider = new IOTransactorProvider,
-      logger             = ApplicationLogger
+      transactor,
+      ApplicationLogger
     )

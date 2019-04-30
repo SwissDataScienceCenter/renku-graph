@@ -16,28 +16,34 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.dbeventlog
 
-import cats.effect.IO
-import ch.datascience.db.DbSpec
+import cats.effect.{ContextShift, IO}
+import ch.datascience.db.DbTransactor
+import ch.datascience.db.TestDbConfig._
+import doobie.free.connection.ConnectionIO
 import doobie.implicits._
-import doobie.util.transactor.Transactor.Aux
+import doobie.util.transactor.Transactor
 
-trait InMemoryProjectsTokens {
-  self: DbSpec =>
+import scala.concurrent.ExecutionContext.Implicits.global
 
-  protected def initDb(transactor: Aux[IO, Unit]): Unit =
-    sql"""
-         |CREATE TABLE projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | token VARCHAR NOT NULL
-         |);
-       """.stripMargin.update.run
-      .transact(transactor)
-      .unsafeRunSync()
+trait InMemoryEventLogDb {
 
-  protected def prepareDbForTest(transactor: Aux[IO, Unit]): Unit =
-    sql"TRUNCATE TABLE projects_tokens".update.run
-      .transact(transactor)
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+
+  private val dbConfig = newDbConfig[EventLogDB]
+
+  lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB](
+    Transactor.fromDriverManager[IO](
+      dbConfig.driver.value,
+      dbConfig.url.value,
+      dbConfig.user.value,
+      dbConfig.pass
+    )
+  )
+
+  def execute[O](query: ConnectionIO[O]): O =
+    query
+      .transact(transactor.get)
       .unsafeRunSync()
 }

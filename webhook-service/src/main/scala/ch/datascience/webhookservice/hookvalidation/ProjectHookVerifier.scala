@@ -20,6 +20,8 @@ package ch.datascience.webhookservice.hookvalidation
 
 import ProjectHookVerifier.HookIdentifier
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
@@ -45,9 +47,10 @@ private object ProjectHookVerifier {
 }
 
 private class IOProjectHookVerifier(
-    gitLabUrlProvider:       GitLabConfigProvider[IO]
+    gitLabUrlProvider:       GitLabConfigProvider[IO],
+    gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient
+    extends IORestClient(gitLabThrottler)
     with ProjectHookVerifier[IO] {
 
   import cats.effect._

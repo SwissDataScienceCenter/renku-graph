@@ -19,6 +19,7 @@
 package ch.datascience.graph.tokenrepository
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.{AccessToken, IORestClient}
 
@@ -32,7 +33,7 @@ trait AccessTokenFinder[Interpretation[_]] {
 class IOAccessTokenFinder(
     tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO]
 )(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient
+    extends IORestClient(Throttler.noThrottling)
     with AccessTokenFinder[IO] {
 
   import cats.effect._

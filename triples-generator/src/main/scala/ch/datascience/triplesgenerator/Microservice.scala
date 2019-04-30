@@ -18,35 +18,54 @@
 
 package ch.datascience.triplesgenerator
 
+import java.util.concurrent.Executors.newFixedThreadPool
+
 import cats.effect._
+import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
+import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
-import ch.datascience.triplesgenerator.init.{FusekiDatasetInitializer, IOFusekiDatasetInitializer, SentryInitializer}
+import ch.datascience.triplesgenerator.init._
+import pureconfig._
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.ExecutionContext
 
 object Microservice extends IOApp {
 
-  private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
+  private implicit val executionContext: ExecutionContext =
+    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
 
-  private val httpServer = new HttpServer[IO](
-    serverPort    = 9002,
-    serviceRoutes = new MicroserviceRoutes[IO].routes
-  )
-  private val eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch))
-    .withEventsProcessor(new IOCommitEventProcessor())
-  private val microserviceRunner = new MicroserviceRunner(
-    new SentryInitializer[IO],
-    new IOEventLogDbInitializer,
-    new IOFusekiDatasetInitializer,
-    eventProcessorRunner,
-    httpServer
-  )
+  protected implicit override def contextShift: ContextShift[IO] =
+    IO.contextShift(executionContext)
+
+  protected implicit override def timer: Timer[IO] =
+    IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] =
-    microserviceRunner.run(args)
+    for {
+      transactorResource <- new EventLogDbConfigProvider[IO] map DbTransactorResource[IO, EventLogDB]
+      exitCode           <- runMicroservice(transactorResource, args)
+    } yield exitCode
+
+  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
+    transactorResource.use { transactor =>
+      for {
+        renkuLogTimeout <- new RenkuLogTimeoutConfigProvider[IO].get
+
+        eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
+          .withEventsProcessor(new IOCommitEventProcessor(transactor, renkuLogTimeout))
+
+        exitCode <- new MicroserviceRunner(
+                     new SentryInitializer[IO],
+                     new IOEventLogDbInitializer(transactor),
+                     new IOFusekiDatasetInitializer,
+                     eventProcessorRunner,
+                     new HttpServer[IO](serverPort = 9002, new MicroserviceRoutes[IO].routes)
+                   ) run args
+      } yield exitCode
+    }
 }
 
 private class MicroserviceRunner(

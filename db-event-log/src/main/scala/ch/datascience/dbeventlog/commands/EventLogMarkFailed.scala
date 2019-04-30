@@ -20,10 +20,8 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
-import cats.implicits._
-import ch.datascience.db.TransactorProvider
+import cats.effect.{Bracket, ContextShift, IO}
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
 import ch.datascience.dbeventlog.commands.ExecutionDateCalculator.StatusBasedCalculator
@@ -33,19 +31,16 @@ import doobie.implicits._
 import scala.language.higherKinds
 
 class EventLogMarkFailed[Interpretation[_]](
-    transactorProvider:      TransactorProvider[Interpretation],
+    transactor:              DbTransactor[Interpretation, EventLogDB],
     executionDateCalculator: ExecutionDateCalculator = new ExecutionDateCalculator()
-)(implicit ME:               MonadError[Interpretation, Throwable]) {
+)(implicit ME:               Bracket[Interpretation, Throwable]) {
 
   import executionDateCalculator._
 
   def markEventFailed(commitEventId: CommitEventId,
                       status:        FailureStatus,
                       maybeMessage:  Option[EventMessage]): Interpretation[Unit] =
-    for {
-      transactor <- transactorProvider.transactor
-      _          <- findEventAndUpdate(commitEventId, status, maybeMessage).transact(transactor)
-    } yield ()
+    findEventAndUpdate(commitEventId, status, maybeMessage).transact(transactor.get)
 
   private def findEventAndUpdate(commitEventId: CommitEventId,
                                  status:        FailureStatus,
@@ -82,7 +77,7 @@ class EventLogMarkFailed[Interpretation[_]](
          |""".stripMargin.update.run
 }
 
-class ExecutionDateCalculator(now: () => Instant = Instant.now) {
+class ExecutionDateCalculator(now: () => Instant = () => Instant.now) {
 
   def newExecutionDate[T <: FailureStatus](
       createdDate:      CreatedDate,
@@ -113,5 +108,6 @@ object ExecutionDateCalculator {
 }
 
 class IOEventLogMarkFailed(
-    implicit contextShift: ContextShift[IO]
-) extends EventLogMarkFailed[IO](new IOTransactorProvider)
+    transactor:          DbTransactor[IO, EventLogDB]
+)(implicit contextShift: ContextShift[IO])
+    extends EventLogMarkFailed[IO](transactor)

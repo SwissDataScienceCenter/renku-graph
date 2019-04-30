@@ -27,16 +27,16 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.webhookservice.hookcreation.HookCreator.HookCreationResult.{HookCreated, HookExisted}
+import ch.datascience.http.server.EndpointTester._
+import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.security.IOAccessTokenExtractor
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
+import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.{MediaType, Method, Request, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -59,7 +59,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.pure(HookCreated))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
 
       val response = createHook(projectId, request).unsafeRunSync
 
@@ -81,7 +81,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.pure(HookExisted))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
 
       val response = createHook(projectId, request).unsafeRunSync()
 
@@ -97,7 +97,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(*)
         .returning(context.raiseError(UnauthorizedException))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
 
       val response = createHook(projectId, request).unsafeRunSync()
 
@@ -120,7 +120,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
 
       val response = createHook(projectId, request).unsafeRunSync()
 
@@ -143,7 +143,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
 
       val response = createHook(projectId, request).unsafeRunSync()
 

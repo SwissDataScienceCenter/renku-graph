@@ -27,16 +27,16 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators.projectIds
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
-import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.http.server.EndpointTester._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
 import ch.datascience.webhookservice.security.IOAccessTokenExtractor
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
+import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.{MediaType, Method, Request, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -59,7 +59,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(HookExists))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
 
       val response = validateHook(projectId, request).unsafeRunSync()
 
@@ -81,7 +81,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(context.pure(HookMissing))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
 
       val response = validateHook(projectId, request).unsafeRunSync()
 
@@ -97,7 +97,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .expects(*)
         .returning(context.raiseError(UnauthorizedException))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
 
       val response = validateHook(projectId, request).unsafeRunSync()
 
@@ -119,7 +119,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
 
       val response = validateHook(projectId, request).unsafeRunSync()
 
@@ -141,7 +141,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 
-      val request = Request[IO](Method.POST, Uri.uri("projects") / projectId.toString / "webhooks" / "validation")
+      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
 
       val response = validateHook(projectId, request).unsafeRunSync()
 

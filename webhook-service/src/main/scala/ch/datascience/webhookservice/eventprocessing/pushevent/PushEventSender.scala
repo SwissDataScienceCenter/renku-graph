@@ -18,13 +18,17 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Clock, ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
+import ch.datascience.control.Throttler
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventLogDB
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.CommitEvent
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
-import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.ApplicationLogger
+import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent._
 import io.chrisdavenport.log4cats.Logger
@@ -34,41 +38,47 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class PushEventSender[Interpretation[_]: Monad](
-    accessTokenFinder:  AccessTokenFinder[Interpretation],
-    commitEventsFinder: CommitEventsFinder[Interpretation],
-    commitEventSender:  CommitEventSender[Interpretation],
-    logger:             Logger[Interpretation]
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+    accessTokenFinder:     AccessTokenFinder[Interpretation],
+    commitEventsFinder:    CommitEventsFinder[Interpretation],
+    commitEventSender:     CommitEventSender[Interpretation],
+    logger:                Logger[Interpretation],
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
+)(implicit ME:             MonadError[Interpretation, Throwable]) {
 
+  import SendingResult._
   import accessTokenFinder._
   import commitEventSender._
   import commitEventsFinder._
+  import executionTimeRecorder._
 
-  def storeCommitsInEventLog(pushEvent: PushEvent): Interpretation[Unit] = {
-    for {
-      maybeAccessToken   <- findAccessToken(pushEvent.project.id) map loggingInfoIfNoToken(pushEvent)
-      commitEventsStream <- findCommitEvents(pushEvent, maybeAccessToken)
-      _                  <- (commitEventsStream map sendEvent(pushEvent)).sequence
-      _                  <- logger.info(logMessageFor(pushEvent, "stored in event log"))
-    } yield ()
-  } recoverWith loggingError(pushEvent)
-
-  private def loggingInfoIfNoToken(pushEvent: PushEvent)(maybeAccessToken: Option[AccessToken]): Option[AccessToken] =
-    maybeAccessToken match {
-      case None =>
-        logger.info(logMessageFor(pushEvent, "no access token found so assuming public project"))
-        maybeAccessToken
-      case _ =>
-        maybeAccessToken
-    }
+  def storeCommitsInEventLog(pushEvent: PushEvent): Interpretation[Unit] =
+    measureExecutionTime {
+      for {
+        maybeAccessToken   <- findAccessToken(pushEvent.project.id)
+        commitEventsStream <- findCommitEvents(pushEvent, maybeAccessToken)
+        sendingResults     <- (commitEventsStream map sendEvent(pushEvent)).sequence
+      } yield sendingResults
+    } flatMap logSummary(pushEvent) recoverWith loggingError(pushEvent)
 
   private def sendEvent(pushEvent: PushEvent)(maybeCommitEvent: Interpretation[CommitEvent]) = {
     for {
       commitEvent <- maybeCommitEvent recoverWith fetchErrorLogging
       _           <- send(commitEvent) recoverWith sendErrorLogging(commitEvent)
-      _           <- logger.info(logMessageFor(pushEvent, "stored in event log", Some(commitEvent)))
-    } yield ()
+    } yield Stored: SendingResult
   } recover withLogging(pushEvent)
+
+  private def logSummary(pushEvent: PushEvent): ((ElapsedTime, Stream[SendingResult])) => Interpretation[Unit] = {
+    case (elapsedTime, sendingResults) =>
+      val groupedByType = sendingResults groupBy identity
+      val stored        = groupedByType.get(Stored).map(_.size).getOrElse(0)
+      val failed        = groupedByType.get(Failed).map(_.size).getOrElse(0)
+      logger.info(
+        logMessageFor(
+          pushEvent,
+          s"${sendingResults.size} Commit Events generated, $stored stored in the Event Log, $failed failed in ${elapsedTime}ms"
+        )
+      )
+  }
 
   private def loggingError(pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -104,11 +114,13 @@ class PushEventSender[Interpretation[_]: Monad](
       )
   }
 
-  private def withLogging(pushEvent: PushEvent): PartialFunction[Throwable, Unit] = {
+  private def withLogging(pushEvent: PushEvent): PartialFunction[Throwable, SendingResult] = {
     case CommitEventProcessingException(maybeCommitEvent, message, cause) =>
       logger.error(cause)(logMessageFor(pushEvent, message, maybeCommitEvent))
+      SendingResult.Failed
     case NonFatal(exception) =>
       ME.raiseError(exception)
+      SendingResult.Failed
   }
 
   private def logMessageFor(
@@ -120,12 +132,22 @@ class PushEventSender[Interpretation[_]: Monad](
       s"project: ${pushEvent.project.id}" +
       s"${maybeCommitEvent.map(_.id).map(id => s", CommitEvent id: $id").getOrElse("")}" +
       s": $message"
+
+  private sealed trait SendingResult extends Product with Serializable
+  private object SendingResult {
+    final case object Stored extends SendingResult
+    final case object Failed extends SendingResult
+  }
 }
 
-class IOPushEventSender(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+class IOPushEventSender(
+    transactor:              DbTransactor[IO, EventLogDB],
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
     extends PushEventSender[IO](
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
-      new IOCommitEventsFinder(),
-      new IOCommitEventSender,
-      ApplicationLogger
+      new IOCommitEventsFinder(transactor, gitLabThrottler),
+      new IOCommitEventSender(transactor),
+      ApplicationLogger,
+      new ExecutionTimeRecorder[IO]
     )

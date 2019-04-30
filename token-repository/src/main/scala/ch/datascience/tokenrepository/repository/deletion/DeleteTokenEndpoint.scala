@@ -23,8 +23,10 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
@@ -41,13 +43,8 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
   def deleteToken(projectId: ProjectId): Interpretation[Response[Interpretation]] =
     tokenRemover
       .delete(projectId)
-      .flatMap(toHttpResult(projectId))
+      .flatMap(_ => NoContent())
       .recoverWith(httpResult(projectId))
-
-  private def toHttpResult(projectId: ProjectId): Unit => Interpretation[Response[Interpretation]] = _ => {
-    logger.info(s"Token deleted for projectId: $projectId")
-    NoContent()
-  }
 
   private def httpResult(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
@@ -57,5 +54,7 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
   }
 }
 
-class IODeleteTokenEndpoint(implicit contextShift: ContextShift[IO])
-    extends DeleteTokenEndpoint[IO](new IOTokenRemover, ApplicationLogger)
+class IODeleteTokenEndpoint(
+    transactor:          DbTransactor[IO, ProjectsTokensDB]
+)(implicit contextShift: ContextShift[IO])
+    extends DeleteTokenEndpoint[IO](new IOTokenRemover(transactor), ApplicationLogger)

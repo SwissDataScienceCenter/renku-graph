@@ -19,24 +19,28 @@
 package ch.datascience.webhookservice.project
 
 import cats.effect.{ContextShift, IO}
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.project.ProjectVisibility.Public
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait ProjectInfoFinder[Interpretation[_]] {
   def findProjectInfo(
-      projectId:   ProjectId,
-      accessToken: AccessToken
+      projectId:        ProjectId,
+      maybeAccessToken: Option[AccessToken]
   ): Interpretation[ProjectInfo]
 }
 
 class IOProjectInfoFinder(
-    gitLabConfigProvider:    GitLabConfigProvider[IO]
+    gitLabConfigProvider:    GitLabConfigProvider[IO],
+    gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient
+    extends IORestClient(gitLabThrottler)
     with ProjectInfoFinder[IO] {
 
   import cats.effect._
@@ -48,11 +52,11 @@ class IOProjectInfoFinder(
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: ProjectId, accessToken: AccessToken): IO[ProjectInfo] =
+  def findProjectInfo(projectId: ProjectId, maybeAccessToken: Option[AccessToken]): IO[ProjectInfo] =
     for {
       gitLabHostUrl <- gitLabConfigProvider.get
       uri           <- validateUri(s"$gitLabHostUrl/api/v4/projects/$projectId")
-      projectInfo   <- send(request(GET, uri, accessToken))(mapResponse)
+      projectInfo   <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield projectInfo
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ProjectInfo]] = {
@@ -64,11 +68,13 @@ class IOProjectInfoFinder(
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
       for {
         id         <- cursor.downField("id").as[ProjectId]
-        visibility <- cursor.downField("visibility").as[ProjectVisibility]
+        visibility <- cursor.downField("visibility").as[Option[ProjectVisibility]] map defaultToPublic
         path       <- cursor.downField("path_with_namespace").as[ProjectPath]
-        ownerId    <- cursor.downField("owner").downField("id").as[UserId]
-      } yield ProjectInfo(id, visibility, path, ProjectOwner(ownerId))
+      } yield ProjectInfo(id, visibility, path)
 
     jsonOf[IO, ProjectInfo]
   }
+
+  private def defaultToPublic(maybeVisibility: Option[ProjectVisibility]): ProjectVisibility =
+    maybeVisibility getOrElse Public
 }

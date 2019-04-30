@@ -21,8 +21,9 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import cats.{Monad, MonadError}
-import ch.datascience.dbeventlog.EventBody
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.commands.{EventLogAdd, IOEventLogAdd}
+import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.graph.model.events.CommitEvent
 
 import scala.language.higherKinds
@@ -43,5 +44,7 @@ class CommitEventSender[Interpretation[_]: Monad](
     } yield ()
 }
 
-class IOCommitEventSender(implicit contextShift: ContextShift[IO], ME: MonadError[IO, Throwable])
-    extends CommitEventSender[IO](new CommitEventSerializer[IO], new IOEventLogAdd)
+class IOCommitEventSender(
+    transactor:          DbTransactor[IO, EventLogDB]
+)(implicit contextShift: ContextShift[IO], ME: MonadError[IO, Throwable])
+    extends CommitEventSender[IO](new CommitEventSerializer[IO], new IOEventLogAdd(transactor))

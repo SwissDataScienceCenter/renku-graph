@@ -21,12 +21,14 @@ package ch.datascience.triplesgenerator.eventprocessing
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 
 import cats.effect._
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.EventBody
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
+import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
+import doobie.util.transactor.Transactor
 import org.scalacheck.Gen.listOfN
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -36,7 +38,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.postfixOps
+import scala.language.{higherKinds, postfixOps, reflectiveCalls}
 
 class DbEventProcessorRunnerSpec extends WordSpec with Eventually with IntegrationPatience with MockFactory {
 
@@ -99,16 +101,23 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
-    val eventLogFetch = new IOEventLogFetch {
+    class TestDbTransactor(transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, EventLogDB](transactor)
+    private val transactor = mock[TestDbTransactor]
+    val eventLogFetch = new IOEventLogFetch(transactor) {
       private val eventsQueue = new ConcurrentLinkedQueue[EventBody]()
 
       def addEventsToReturn(events: Seq[EventBody]): Unit =
         eventsQueue addAll events.asJava
 
-      override def findEventToProcess: IO[Option[EventBody]] = IO.pure {
+      override def popEventToProcess: IO[Option[EventBody]] = IO.pure {
         Option(eventsQueue.poll())
+      }
+
+      override def isEventToProcess: IO[Boolean] = IO.pure {
+        !eventsQueue.isEmpty
       }
     }
     val logger              = TestLogger[IO]()

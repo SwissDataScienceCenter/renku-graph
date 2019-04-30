@@ -18,13 +18,9 @@
 
 package ch.datascience.webhookservice.project
 
-import ch.datascience.graph.model.events.{ProjectId, ProjectPath, UserId}
+import ch.datascience.graph.model.events.{ProjectId, ProjectPath}
 import ch.datascience.tinytypes.TinyType
 import io.circe.Decoder
-
-final case class ProjectOwner(
-    id: UserId
-)
 
 sealed trait ProjectVisibility extends TinyType[String] with Product with Serializable
 
@@ -59,6 +55,5 @@ object ProjectVisibility {
 final case class ProjectInfo(
     id:         ProjectId,
     visibility: ProjectVisibility,
-    path:       ProjectPath,
-    owner:      ProjectOwner
+    path:       ProjectPath
 )

@@ -22,9 +22,9 @@ import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class GitShaSpec extends WordSpec with PropertyChecks {
+class GitShaSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "GitSha" should {
 

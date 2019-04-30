@@ -22,13 +22,17 @@ import cats.data.EitherT
 import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
+import ch.datascience.control.Throttler
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventLogDB
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
-import ch.datascience.webhookservice.hookcreation.HookCreator.{HookAlreadyCreated, HookCreationResult}
+import ch.datascience.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.HookMissing
@@ -43,7 +47,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private class HookCreator[Interpretation[_]: Monad](
+private class HookCreator[Interpretation[_]](
     projectHookUrlFinder:  ProjectHookUrlFinder[Interpretation],
     projectHookValidator:  HookValidator[Interpretation],
     projectInfoFinder:     ProjectInfoFinder[Interpretation],
@@ -52,28 +56,30 @@ private class HookCreator[Interpretation[_]: Monad](
     accessTokenAssociator: AccessTokenAssociator[Interpretation],
     eventsHistoryLoader:   EventsHistoryLoader[Interpretation],
     logger:                Logger[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable]) {
+)(implicit ME:             MonadError[Interpretation, Throwable],
+  contextShift:            ContextShift[Interpretation],
+  concurrent:              Concurrent[Interpretation]) {
 
-  import HookCreator.HookCreationResult._
+  import HookCreator.CreationResult._
+  import accessTokenAssociator._
   import hookTokenCrypto._
   import projectHookCreator.create
   import projectHookUrlFinder._
   import projectHookValidator._
-  import accessTokenAssociator._
   import projectInfoFinder._
 
-  def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookCreationResult] = {
+  def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[CreationResult] = {
     for {
       projectHookUrl      <- right(findProjectHookUrl)
       hookValidation      <- right(validateHook(projectId, accessToken))
       _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
-      projectInfo         <- right(findProjectInfo(projectId, accessToken))
+      projectInfo         <- right(findProjectInfo(projectId, Some(accessToken)))
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
       _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
       _                   <- right(associate(projectId, accessToken))
-      _                   <- right(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken))
+      _                   <- right(contextShift.shift *> concurrent.start(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken)))
     } yield ()
-  } fold (leftToHookExisted, rightToHookCreated(projectId)) recoverWith loggingError(projectId)
+  } fold [CreationResult] (_ => HookExisted, _ => HookCreated) recoverWith loggingError(projectId)
 
   private def leftIfProjectHookExists(
       hookValidation: HookValidationResult,
@@ -84,19 +90,7 @@ private class HookCreator[Interpretation[_]: Monad](
     right = ()
   )
 
-  private lazy val leftToHookExisted: HookAlreadyCreated => HookCreationResult = hookAlreadyCreated => {
-    logger.info(
-      s"Hook already created for projectId: ${hookAlreadyCreated.projectId}, url: ${hookAlreadyCreated.projectHookUrl}"
-    )
-    HookExisted
-  }
-
-  private def rightToHookCreated(projectId: ProjectId): Unit => HookCreationResult = _ => {
-    logger.info(s"Hook created for project with id $projectId")
-    HookCreated
-  }
-
-  private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[HookCreationResult]] = {
+  private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[CreationResult]] = {
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
       ME.raiseError(exception)
@@ -108,10 +102,10 @@ private class HookCreator[Interpretation[_]: Monad](
 
 private object HookCreator {
 
-  sealed trait HookCreationResult
-  object HookCreationResult {
-    final case object HookCreated extends HookCreationResult
-    final case object HookExisted extends HookCreationResult
+  sealed trait CreationResult extends Product with Serializable
+  object CreationResult {
+    final case object HookCreated extends CreationResult
+    final case object HookExisted extends CreationResult
   }
 
   private case class HookAlreadyCreated(
@@ -120,14 +114,17 @@ private object HookCreator {
   )
 }
 
-private class IOHookCreator(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+private class IOHookCreator(
+    transactor:              DbTransactor[IO, EventLogDB],
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
     extends HookCreator[IO](
       new IOProjectHookUrlFinder,
-      new IOHookValidator,
-      new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
+      new IOHookValidator(gitLabThrottler),
+      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
       HookTokenCrypto[IO],
-      new IOProjectHookCreator(new GitLabConfigProvider[IO]),
+      new IOProjectHookCreator(new GitLabConfigProvider[IO], gitLabThrottler),
       new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO]()),
-      new IOEventsHistoryLoader,
+      new IOEventsHistoryLoader(transactor, gitLabThrottler),
       ApplicationLogger
     )

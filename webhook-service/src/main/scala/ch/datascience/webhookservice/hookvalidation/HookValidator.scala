@@ -22,6 +22,8 @@ import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.control.Throttler
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
@@ -84,7 +86,7 @@ class HookValidator[Interpretation[_]](
 
   private def findVisibilityAndToken(projectId:   ProjectId,
                                      accessToken: AccessToken): Interpretation[(ProjectVisibility, Token)] =
-    findProjectInfo(projectId, accessToken)
+    findProjectInfo(projectId, Some(accessToken))
       .map(_.visibility -> (GivenToken(accessToken): Token))
       .recoverWith(visibilityAndStoredToken(projectId))
 
@@ -94,7 +96,7 @@ class HookValidator[Interpretation[_]](
     case UnauthorizedException => {
       for {
         storedAccessToken <- findAccessToken(projectId) flatMap getOrError(projectId)
-        projectInfo       <- findProjectInfo(projectId, storedAccessToken.value)
+        projectInfo       <- findProjectInfo(projectId, Some(storedAccessToken.value))
       } yield projectInfo.visibility -> storedAccessToken
     } recoverWith storedAccessTokenError(projectId)
   }
@@ -113,9 +115,9 @@ class HookValidator[Interpretation[_]](
   private def toValidationResult(projectHookPresent: Boolean,
                                  projectId:          ProjectId): Interpretation[HookValidationResult] =
     if (projectHookPresent)
-      logger.info(s"Hook exists for project with id $projectId").map(_ => HookExists)
+      ME.pure(HookExists)
     else
-      logger.info(s"Hook missing for project with id $projectId").map(_ => HookMissing)
+      ME.pure(HookMissing)
 
   private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[HookValidationResult]] = {
     case NonFatal(exception) =>
@@ -125,8 +127,8 @@ class HookValidator[Interpretation[_]](
 
   private sealed abstract class Token(val value: AccessToken)
   private object Token {
-    final case class GivenToken(override val value:  AccessToken) extends Token(value)
-    final case class StoredToken(override val value: AccessToken) extends Token(value)
+    case class GivenToken(override val value:  AccessToken) extends Token(value)
+    case class StoredToken(override val value: AccessToken) extends Token(value)
   }
 }
 
@@ -139,11 +141,13 @@ object HookValidator {
   }
 }
 
-class IOHookValidator(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+class IOHookValidator(
+    gitLabThrottler:         Throttler[IO, GitLab]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
     extends HookValidator[IO](
-      new IOProjectInfoFinder(new GitLabConfigProvider[IO]),
+      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
       new IOProjectHookUrlFinder,
-      new IOProjectHookVerifier(new GitLabConfigProvider[IO]),
+      new IOProjectHookVerifier(new GitLabConfigProvider[IO], gitLabThrottler),
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]),
       new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO]),
       new IOAccessTokenRemover(new TokenRepositoryUrlProvider[IO]),

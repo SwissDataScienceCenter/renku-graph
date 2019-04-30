@@ -18,39 +18,73 @@
 
 package ch.datascience.webhookservice
 
+import java.util.concurrent.Executors.newFixedThreadPool
+
 import cats.effect._
+import ch.datascience.db.DbTransactorResource
+import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
+import ch.datascience.graph.gitlab.{GitLabRateLimitProvider, GitLabThrottler}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.webhookservice.eventprocessing.IOHookEventEndpoint
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
+import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, EventsSynchronizationThrottler, IOEventsSynchronizationScheduler}
+import pureconfig.loadConfigOrThrow
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 object Microservice extends IOApp {
 
-  private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.global
+  private implicit val executionContext: ExecutionContext =
+    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
 
-  private val eventLogDbInitializer = new IOEventLogDbInitializer
-  private val httpServer = new HttpServer[IO](
-    serverPort = 9001,
-    serviceRoutes = new MicroserviceRoutes[IO](
-      new IOHookEventEndpoint,
-      new IOHookCreationEndpoint,
-      new IOHookValidationEndpoint
-    ).routes
-  )
+  protected implicit override def contextShift: ContextShift[IO] =
+    IO.contextShift(executionContext)
+
+  protected implicit override def timer: Timer[IO] =
+    IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] =
-    new MicroserviceRunner(eventLogDbInitializer, httpServer).run(args)
+    for {
+      transactorResource <- new EventLogDbConfigProvider[IO] map DbTransactorResource[IO, EventLogDB]
+      exitCode           <- runMicroservice(transactorResource, args)
+    } yield exitCode
+
+  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
+    transactorResource.use { transactor =>
+      for {
+        gitLabRateLimitProvider        <- IO.pure(new GitLabRateLimitProvider[IO]())
+        gitLabThrottler                <- GitLabThrottler[IO](gitLabRateLimitProvider)
+        eventsSynchronizationThrottler <- EventsSynchronizationThrottler[IO](gitLabRateLimitProvider)
+
+        httpServer = new HttpServer[IO](
+          serverPort = 9001,
+          serviceRoutes = new MicroserviceRoutes[IO](
+            new IOHookEventEndpoint(transactor, gitLabThrottler),
+            new IOHookCreationEndpoint(transactor, gitLabThrottler),
+            new IOHookValidationEndpoint(gitLabThrottler)
+          ).routes
+        )
+
+        exitCode <- new MicroserviceRunner(
+                     new IOEventLogDbInitializer(transactor),
+                     new IOEventsSynchronizationScheduler(transactor, gitLabThrottler, eventsSynchronizationThrottler),
+                     httpServer
+                   ) run args
+      } yield exitCode
+    }
 }
 
-class MicroserviceRunner(eventLogDbInitializer: IOEventLogDbInitializer, httpServer: HttpServer[IO]) {
+class MicroserviceRunner(eventLogDbInitializer:          IOEventLogDbInitializer,
+                         eventsSynchronizationScheduler: EventsSynchronizationScheduler[IO],
+                         httpServer:                     HttpServer[IO])(implicit contextShift: ContextShift[IO]) {
+  import cats.implicits._
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      _      <- eventLogDbInitializer.run
-      result <- httpServer.run
-    } yield result
+      _ <- eventLogDbInitializer.run
+      _ <- List(httpServer.run.start, eventsSynchronizationScheduler.run).sequence
+    } yield ExitCode.Success
 }
