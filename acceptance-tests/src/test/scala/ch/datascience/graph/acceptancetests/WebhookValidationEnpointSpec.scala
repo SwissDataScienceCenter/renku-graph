@@ -89,7 +89,7 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       Then("he should get OK response back")
       response.status shouldBe Ok
 
-      And("the access token used in the POST should get associated with the project")
+      And("the access token used in the POST should be added to the token repository")
       val expectedAccessTokenJson = accessToken match {
         case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}"""
         case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
@@ -97,6 +97,19 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       tokenRepositoryClient
         .GET(s"projects/$projectId/tokens", maybeAccessToken = None)
         .bodyAsJson shouldBe expectedAccessTokenJson
+
+      And("when the webhook get deleted")
+      `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(projectId)
+
+      And("user does POST webhook-service/projects/:id/webhooks/validation again")
+      val afterDeletionResponse =
+        webhookServiceClient.POST(s"projects/$projectId/webhooks/validation", Some(accessToken))
+
+      Then("he should get NOT_FOUND response back")
+      afterDeletionResponse.status shouldBe NotFound
+
+      And("the access token should get removed from the token repository")
+      tokenRepositoryClient.GET(s"projects/$projectId/tokens", maybeAccessToken = None).status shouldBe NotFound
     }
   }
 }

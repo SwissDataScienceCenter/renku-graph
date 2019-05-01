@@ -76,7 +76,7 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
       Then("he should get CREATED response back")
       response.status shouldBe Created
 
-      And("the access token used in the POST should get associated with the project")
+      And("the access token used in the POST should be added to the token repository")
       val expectedAccessTokenJson = accessToken match {
         case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}"""
         case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
