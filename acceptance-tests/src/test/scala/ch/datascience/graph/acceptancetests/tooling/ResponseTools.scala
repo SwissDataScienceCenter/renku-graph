@@ -16,19 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog
+package ch.datascience.graph.acceptancetests.tooling
 
-import cats.MonadError
-import ch.datascience.db.DBConfigProvider
-import eu.timepit.refined.auto._
+import cats.effect.IO
+import io.circe.Json
+import org.http4s.circe.jsonOf
+import org.http4s.{EntityDecoder, Response}
 
-import scala.language.higherKinds
+object ResponseTools {
 
-sealed trait EventLogDB
+  private implicit val jsonEntityDecoder: EntityDecoder[IO, Json] = jsonOf[IO, Json]
 
-class EventLogDbConfigProvider[Interpretation[_]](
-    implicit ME: MonadError[Interpretation, Throwable]
-) extends DBConfigProvider[Interpretation, EventLogDB](
-      namespace = "db-event-log",
-      dbName    = "event_log"
-    )
+  implicit class ResponseOps(response: Response[IO]) {
+    lazy val bodyAsJson: Json = response.as[Json].unsafeRunSync()
+  }
+}

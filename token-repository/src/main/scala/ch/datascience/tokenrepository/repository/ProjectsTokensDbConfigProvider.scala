@@ -30,7 +30,5 @@ class ProjectsTokensDbConfigProvider[Interpretation[_]](
     implicit ME: MonadError[Interpretation, Throwable]
 ) extends DBConfigProvider[Interpretation, ProjectsTokensDB](
       namespace = "projects-tokens",
-      driver    = "org.postgresql.Driver",
-      dbName    = "projects_tokens",
-      urlPrefix = "jdbc:postgresql"
+      dbName    = "projects_tokens"
     )
