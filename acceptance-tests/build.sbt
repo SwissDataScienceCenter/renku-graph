@@ -17,3 +17,5 @@
  */
 
 name := "acceptance-tests"
+
+parallelExecution in Test := false

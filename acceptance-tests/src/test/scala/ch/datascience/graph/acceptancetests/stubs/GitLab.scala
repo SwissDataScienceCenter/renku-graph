@@ -19,11 +19,11 @@
 package ch.datascience.graph.acceptancetests.stubs
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.relativePaths
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.webhookservice.project.ProjectVisibility
-import com.github.tomakehurst.wiremock.client.WireMock.{get, okJson, stubFor}
+import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 
 object GitLab {
@@ -34,8 +34,8 @@ object GitLab {
       get(s"/api/v4/projects/$projectId")
         .willReturn(okJson(json"""
             {
-              "id": ${projectId.value}, 
-              "visibility": ${projectVisibility.value}, 
+              "id":                  ${projectId.value}, 
+              "visibility":          ${projectVisibility.value}, 
               "path_with_namespace": ${relativePaths(minSegments = 2, maxSegments = 2).generateOne}
             }""".noSpaces))
     }
@@ -52,5 +52,26 @@ object GitLab {
     stubFor {
       get(s"/api/v4/projects/$projectId/hooks")
         .willReturn(okJson(json"""[]""".noSpaces))
+    }
+
+  def `POST <gitlab>/api/v4/projects/:id/hooks returning CREATED`(projectId: ProjectId): Unit =
+    stubFor {
+      post(s"/api/v4/projects/$projectId/hooks")
+        .willReturn(created())
+    }
+
+  def `GET <gitlab>/api/v4/projects/:id/events returning OK with some events`(projectId: ProjectId): Unit =
+    stubFor {
+      get(s"/api/v4/projects/$projectId/events?action=pushed")
+        .willReturn(okJson(json"""[
+            {
+              "project_id":      ${projectId.value},
+              "author_id":       ${positiveInts().generateOne.value},
+              "author_username": ${nonEmptyStrings().generateOne},
+              "push_data": {
+                "commit_to":     ${shas.generateOne}
+              }
+            }                         
+        ]""".noSpaces))
     }
 }
