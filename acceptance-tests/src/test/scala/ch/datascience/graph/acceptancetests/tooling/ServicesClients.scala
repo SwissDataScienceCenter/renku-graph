@@ -21,19 +21,40 @@ package ch.datascience.graph.acceptancetests.tooling
 import cats.effect.{ContextShift, IO}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.webhookservice.crypto.HookTokenCrypto
+import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
 import org.http4s.Status.Ok
+import org.http4s.{Header, Method, Response}
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 object WebhookServiceClient {
-  def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO]): ServiceClient =
-    new ServiceClient {
-      override val baseUrl: String Refined Url = "http://localhost:9001"
-    }
+
+  def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO]) = new WebhookServiceClient
+
+  class WebhookServiceClient(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+      extends ServiceClient {
+    import io.circe.Json
+    import org.http4s.EntityEncoder
+    import org.http4s.circe.jsonEncoderOf
+
+    override val baseUrl: String Refined Url = "http://localhost:9001"
+
+    private implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
+
+    def POST(url: String, hookToken: HookToken, payload: Json): Response[IO] = {
+      for {
+        encryptedHookToken <- HookTokenCrypto[IO].encrypt(hookToken)
+        tokenHeader        <- IO.pure(Header("X-Gitlab-Token", encryptedHookToken.value))
+        uri                <- validateUri(s"$baseUrl/$url")
+        response           <- send(request(Method.POST, uri) withHeaders tokenHeader withEntity payload)(mapResponse)
+      } yield response
+    }.unsafeRunSync()
+  }
 }
 
 object TokenRepositoryClient {
@@ -78,7 +99,7 @@ abstract class ServiceClient(implicit executionContext: ExecutionContext, contex
     case NonFatal(_) => ServiceDown
   }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Response[IO]]] = {
+  protected lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Response[IO]]] = {
     case (_, _, response) => IO.pure(response)
   }
 }

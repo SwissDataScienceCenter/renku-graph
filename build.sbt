@@ -93,7 +93,8 @@ lazy val acceptanceTests = Project(
   webhookService,
   triplesGenerator,
   tokenRepository,
-  graphCommons % "test->test"
+  graphCommons % "test->test",
+  dbEventLog   % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )

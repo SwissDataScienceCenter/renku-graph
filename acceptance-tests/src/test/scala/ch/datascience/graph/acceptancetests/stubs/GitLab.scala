@@ -21,7 +21,8 @@ package ch.datascience.graph.acceptancetests.stubs
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import ch.datascience.webhookservice.project.ProjectVisibility
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
@@ -73,5 +74,24 @@ object GitLab {
               }
             }                         
         ]""".noSpaces))
+    }
+
+  def `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(
+      projectId: ProjectId,
+      commitId:  CommitId): Unit =
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+        .willReturn(okJson(json"""
+            {
+              "id":              ${commitId.value},
+              "author_name":     ${nonEmptyStrings().generateOne},
+              "author_email":    ${emails.generateOne.value},
+              "committer_name":  ${nonEmptyStrings().generateOne},
+              "committer_email": ${emails.generateOne.value},
+              "message":         ${nonEmptyStrings().generateOne},
+              "committed_date":  ${committedDates.generateOne.value.toString},
+              "parent_ids":      []
+            }                         
+        """.noSpaces))
     }
 }

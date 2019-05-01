@@ -20,6 +20,7 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect.concurrent.Semaphore
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import ch.datascience.stubbing.ExternalServiceStubbing
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -39,8 +40,8 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
   protected implicit lazy val contextShift:     ContextShift[IO] = GraphServices.contextShift
   protected implicit lazy val timer:            Timer[IO]        = GraphServices.timer
 
-  protected val webhookServiceClient:  ServiceClient = GraphServices.webhookServiceClient
-  protected val tokenRepositoryClient: ServiceClient = GraphServices.tokenRepositoryClient
+  protected val webhookServiceClient:  WebhookServiceClient = GraphServices.webhookServiceClient
+  protected val tokenRepositoryClient: ServiceClient        = GraphServices.tokenRepositoryClient
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
