@@ -34,16 +34,15 @@ Creates a webhook for a project with the given `project id`.
 The endpoint requires an authorization token. It can be passed in the request header as:
 - `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
 - `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
-- `OAUTH-TOKEN: <token>` with OAuth Token obtained from GitLab (deprecated)
 
 **Response**
 
-| Status                     | Description                                                                           |
-|----------------------------|---------------------------------------------------------------------------------------|
-| OK (200)                   | When hook already exists for the project                                              |
-| CREATED (201)              | When a new hook was created                                                           |
-| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `OAUTH-TOKEN` in the header or it's invalid |
-| INTERNAL SERVER ERROR (500)| When there are problems with webhook creation                                         |
+| Status                     | Description                                                                                     |
+|----------------------------|-------------------------------------------------------------------------------------------------|
+| OK (200)                   | When hook already exists for the project                                                        |
+| CREATED (201)              | When a new hook was created                                                                     |
+| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `AUTHORIZATION: BEARER` in the header or it's invalid |
+| INTERNAL SERVER ERROR (500)| When there are problems with webhook creation                                                   |
 
 #### POST /projects/:id/webhooks/validation
 
@@ -57,7 +56,6 @@ Validates the webhook for the project with the given `project id`. It succeeds (
 The endpoint requires an authorization token. It can be passed in the request header as:
 - `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
 - `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
-- `OAUTH-TOKEN: <token>` with OAuth Token obtained from GitLab (deprecated)
 
 **Response**
 
@@ -65,7 +63,7 @@ The endpoint requires an authorization token. It can be passed in the request he
 |----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | OK (200)                   | When the hook exists for the project and the project is either public or there's a Personal Access Token available for it                                         |
 | NOT_FOUND (404)            | When the hook either does not exists or there's no Personal Access Token available for it. If the hook exists but there's no PAT for it, the hook will be removed |
-| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `OAUTH-TOKEN` in the header or it's invalid                                                                             |
+| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `AUTHORIZATION: BEARER` in the header or it's invalid                                                                   |
 | INTERNAL SERVER ERROR (500)| When there are problems with validating the hook presence                                                                                                         |
 
 #### POST /webhooks/events
