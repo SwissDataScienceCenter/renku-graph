@@ -55,7 +55,7 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
         IO.unit
       }
 
-      eventsSource.withEventsProcessor(processor).run.unsafeRunCancelable(_ => Unit)
+      eventsSource.withEventsProcessor(processor).run.unsafeRunAsyncAndForget()
 
       eventually {
         accumulator.keySet().asScala shouldBe events.toSet
@@ -66,10 +66,6 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
 
       eventually {
         accumulator.keySet().asScala shouldBe (events :+ subsequentEvent).toSet
-      }
-
-      withClue("Number of used threads has to be greater than 1, in fact ") {
-        accumulator.values().asScala.toSet.size should be > 1
       }
 
       logger.loggedOnly(Info("Waiting for new events"))
@@ -84,16 +80,24 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
 
       val accumulator = new ConcurrentHashMap[EventBody, Long]()
       def processor(event: EventBody): IO[Unit] =
-        if (event == eventBody2) IO.raiseError(new Exception("error during processing eventBody2"))
+        if (event == eventBody2)
+          IO.raiseError(new Exception("error during processing eventBody2"))
         else {
           accumulator.put(event, Thread.currentThread().getId)
           IO.unit
         }
 
-      eventsSource.withEventsProcessor(processor).run.unsafeRunCancelable(_ => Unit)
+      eventsSource.withEventsProcessor(processor).run.unsafeRunAsyncAndForget()
 
       eventually {
         accumulator.keySet().asScala shouldBe Set(eventBody1, eventBody3)
+      }
+
+      val eventBody4 = eventBodies.generateOne
+      eventLogFetch.addEventsToReturn(Seq(eventBody4))
+
+      eventually {
+        accumulator.keySet().asScala shouldBe Set(eventBody1, eventBody3, eventBody4)
       }
 
       logger.loggedOnly(Info("Waiting for new events"))

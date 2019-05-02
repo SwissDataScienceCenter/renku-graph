@@ -21,7 +21,6 @@ package ch.datascience.dbeventlog.commands
 import java.time.Instant
 import java.time.temporal.ChronoUnit._
 
-import cats.implicits._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
@@ -130,7 +129,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      parallelPopEventToProcess.unsafeRunSync() shouldBe List(event3Body)
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(event3Body)
 
       findEvents(EventStatus.Processing) shouldBe List(event3Id -> executionDate)
 
@@ -222,11 +221,5 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     val now           = Instant.now()
     val executionDate = ExecutionDate(now)
     currentTime.expects().returning(now).anyNumberOfTimes()
-
-    def parallelPopEventToProcess =
-      List(
-        eventLogFetch.popEventToProcess,
-        eventLogFetch.popEventToProcess
-      ).parSequence.map(_.flatten)
   }
 }

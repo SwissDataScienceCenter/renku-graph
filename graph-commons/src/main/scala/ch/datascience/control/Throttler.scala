@@ -39,7 +39,7 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[contr
     extends Throttler[Interpretation, ThrottlingTarget] {
 
   private val NextAttemptSleep: FiniteDuration = 100 millis
-  private val MinTimeGap = BigDecimal(rateLimit.items.value) / BigDecimal(rateLimit.per.toMillis)
+  private val MinTimeGap = BigDecimal(rateLimit.items.value) / BigDecimal(rateLimit.per.toNanos)
 
   import timer.clock
 
@@ -47,15 +47,16 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[contr
     for {
       _          <- semaphore.acquire
       startTimes <- workersStartTimes.get
-      now        <- clock.monotonic(MILLISECONDS) map (BigDecimal(_))
+      now        <- clock.monotonic(NANOSECONDS) map (BigDecimal(_))
       _          <- verifyThroughput(startTimes, now)
     } yield ()
 
   private def verifyThroughput(startTimes: List[BigDecimal], now: BigDecimal) = {
-    val oldest = startTimes.head
-    if (BigDecimal(startTimes.size) / (now - oldest) <= MinTimeGap)
+    val medianStartTime = startTimes(startTimes.size / 2)
+    if (BigDecimal(startTimes.size) / (now - medianStartTime) <= MinTimeGap)
       workersStartTimes.modify(old => (startTimes :+ now) -> old) *> semaphore.release
-    else semaphore.release *> timer.sleep(NextAttemptSleep) *> acquire
+    else
+      semaphore.release *> timer.sleep(NextAttemptSleep) *> acquire
   }
 
   override def release: Interpretation[Unit] =
@@ -74,7 +75,7 @@ object Throttler {
     timer:       Timer[Interpretation]): Interpretation[Throttler[Interpretation, ThrottlingTarget]] =
     for {
       semaphore         <- Semaphore[Interpretation](1)
-      workersStartTimes <- timer.clock.monotonic(MILLISECONDS) flatMap (now => Ref.of(List(BigDecimal(now))))
+      workersStartTimes <- timer.clock.monotonic(NANOSECONDS) flatMap (now => Ref.of(List(BigDecimal(now))))
     } yield new StandardThrottler[Interpretation, ThrottlingTarget](rateLimit, semaphore, workersStartTimes)
 
   def noThrottling[Interpretation[_], ThrottlingTarget](
