@@ -40,16 +40,9 @@ class ThrottlerSpec extends WordSpec {
 
       val startTime = {
         for {
-          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(2L, per = 1 second))
-          _         <- timer sleep (1 millis)
+          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(10L, per = 1 second))
           startTime <- timer.clock.monotonic(MILLISECONDS)
-          _ <- List(
-                useThrottledResource("1", throttler),
-                useThrottledResource("2", throttler),
-                useThrottledResource("3", throttler),
-                useThrottledResource("4", throttler),
-                useThrottledResource("5", throttler)
-              ).parSequence
+          _         <- (1 to 20).map(useThrottledResource(_, throttler)).toList.parSequence
         } yield startTime
       }.unsafeRunSync()
 
@@ -58,18 +51,16 @@ class ThrottlerSpec extends WordSpec {
         .toList
         .sorted
         .foldLeft(List.empty[Long]) {
-          case (Nil, item)   => List(item)
           case (diffs, item) => diffs :+ item - diffs.sum
         }
-        .sorted
       startDelays.tail foreach { delay =>
-        delay should be >= 500L
+        delay should be >= (100L - (100L * 0.10).toLong)
       }
 
       val totalTime = register.asScala.values
         .map(greenLight => greenLight - startTime)
         .sum
-      totalTime should be > (5 * 500L)
+      totalTime should be > (startDelays.size * 100L)
     }
 
     "not sequence work items but process them in parallel" in new TestCase {
@@ -77,15 +68,8 @@ class ThrottlerSpec extends WordSpec {
       val startTime = {
         for {
           throttler <- Throttler[IO, ThrottlingTarget](RateLimit(200L, per = 1 second))
-          _         <- timer sleep (1 millis)
           startTime <- timer.clock.monotonic(MILLISECONDS)
-          _ <- List(
-                useThrottledResource("1", throttler, processingTime = 500 millis),
-                useThrottledResource("2", throttler, processingTime = 500 millis),
-                useThrottledResource("3", throttler, processingTime = 500 millis),
-                useThrottledResource("4", throttler, processingTime = 500 millis),
-                useThrottledResource("5", throttler, processingTime = 500 millis),
-              ).parSequence
+          _         <- (1 to 20).map(useThrottledResource(_, throttler, processingTime = 500 millis)).toList.parSequence
         } yield startTime
       }.unsafeRunSync()
 
@@ -94,7 +78,6 @@ class ThrottlerSpec extends WordSpec {
         .toList
         .sorted
         .foldLeft(List.empty[Long]) {
-          case (Nil, item)   => List(item)
           case (diffs, item) => diffs :+ item - diffs.sum
         }
       startDelays foreach { delay =>
@@ -104,7 +87,7 @@ class ThrottlerSpec extends WordSpec {
       val totalTime = register.asScala.values
         .map(greenLight => greenLight - startTime)
         .sum
-      totalTime should be < (5 * 500L)
+      totalTime should be < (startDelays.size * 500L)
     }
   }
 
@@ -116,13 +99,7 @@ class ThrottlerSpec extends WordSpec {
       val startTime = {
         for {
           startTime <- timer.clock.monotonic(MILLISECONDS)
-          _ <- List(
-                useThrottledResource("1", throttler),
-                useThrottledResource("2", throttler),
-                useThrottledResource("3", throttler),
-                useThrottledResource("4", throttler),
-                useThrottledResource("5", throttler)
-              ).parSequence
+          _         <- (1 to 20).map(useThrottledResource(_, throttler)).toList.parSequence
         } yield startTime
       }.unsafeRunSync()
 
@@ -154,13 +131,13 @@ class ThrottlerSpec extends WordSpec {
     val context  = MonadError[IO, Throwable]
     val register = new ConcurrentHashMap[String, Long]()
 
-    def useThrottledResource[Target](name:           String,
+    def useThrottledResource[Target](name:           Int,
                                      throttler:      Throttler[IO, Target],
                                      processingTime: FiniteDuration = 0 seconds): IO[Unit] =
       for {
         _          <- throttler.acquire
         greenLight <- clock.monotonic(MILLISECONDS)
-        _          <- context.pure(register.put(name, greenLight))
+        _          <- context.pure(register.put(name.toString, greenLight))
         _          <- timer.sleep(processingTime)
         _          <- throttler.release
       } yield ()
