@@ -29,13 +29,17 @@ import scala.language.postfixOps
 
 object EventLog extends InMemoryEventLogDb {
 
-  def findEvents(projectId: ProjectId): List[CommitId] = execute {
+  def findEvents(projectId: ProjectId, status: EventStatus): List[CommitId] = execute {
     sql"""select event_id
          |from event_log
-         |where project_id = $projectId and status = ${EventStatus.New: EventStatus}
+         |where project_id = $projectId and status = $status
          """.stripMargin
       .query[CommitId]
       .to[List]
+  }
+
+  def deleteAllEvents(): Unit = execute {
+    sql"""delete from event_log""".update.run
   }
 
   protected override val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =

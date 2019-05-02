@@ -57,6 +57,13 @@ object WebhookServiceClient {
   }
 }
 
+object TriplesGeneratorClient {
+  def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO]): ServiceClient =
+    new ServiceClient {
+      override val baseUrl: String Refined Url = "http://localhost:9002"
+    }
+}
+
 object TokenRepositoryClient {
   def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO]): ServiceClient =
     new ServiceClient {

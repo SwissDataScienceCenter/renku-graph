@@ -15,8 +15,7 @@ lazy val root = Project(
   dbEventLog,
   tokenRepository,
   webhookService,
-  triplesGenerator,
-  acceptanceTests
+  triplesGenerator
 )
 
 lazy val graphCommons = Project(

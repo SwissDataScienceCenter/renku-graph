@@ -18,10 +18,12 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
+import cats.effect._
 import cats.effect.concurrent.Semaphore
-import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.triplesgenerator
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -45,9 +47,19 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
+
+    RdfStoreStub.start()
+    RdfStoreStub.givenRenkuDataSetExists()
+
     GraphServices.servicesRunner
-      .run(webhookservice.Microservice -> webhookServiceClient, tokenrepository.Microservice -> tokenRepositoryClient)
+      .run(
+        webhookservice.Microservice   -> webhookServiceClient,
+        triplesgenerator.Microservice -> GraphServices.triplesGeneratorClient,
+        tokenrepository.Microservice  -> tokenRepositoryClient
+      )
       .unsafeRunSync()
+
+    RdfStoreStub.shutdown()
   }
 }
 
@@ -57,8 +69,9 @@ object GraphServices {
   implicit lazy val contextShift:     ContextShift[IO] = IO.contextShift(executionContext)
   implicit lazy val timer:            Timer[IO]        = IO.timer(executionContext)
 
-  val webhookServiceClient  = WebhookServiceClient()
-  val tokenRepositoryClient = TokenRepositoryClient()
+  val webhookServiceClient   = WebhookServiceClient()
+  val triplesGeneratorClient = TriplesGeneratorClient()
+  val tokenRepositoryClient  = TokenRepositoryClient()
 
   private val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
 }

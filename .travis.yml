@@ -1,18 +1,18 @@
 dist: xenial
 branches:
   only:
-  - master
+    - master
 language: scala
 jdk: openjdk8
 scala:
-- 2.12.8
+  - 2.12.8
 cache:
   directories:
-  - "$HOME/.ivy2/cache"
-  - "$HOME/.sbt"
+    - "$HOME/.ivy2/cache"
+    - "$HOME/.sbt"
 before_cache:
-- find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
-- find $HOME/.sbt        -name "*.lock"               -print -delete
+  - find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
+  - find $HOME/.sbt        -name "*.lock"               -print -delete
 env:
   global:
     - DOCKER_LABEL=$TRAVIS_BRANCH
@@ -43,7 +43,7 @@ install:
   - PATH=`pwd`/linux-amd64/:$PATH
   - helm init --client-only
 script:
-- sbt ++$TRAVIS_SCALA_VERSION clean test && bash ./.travis/check-code-formatting.sh
+  - sbt ++$TRAVIS_SCALA_VERSION clean test && sbt ++$TRAVIS_SCALA_VERSION "project acceptance-tests" clean test && bash ./.travis/check-code-formatting.sh
 deploy:
   - &script
     provider: script

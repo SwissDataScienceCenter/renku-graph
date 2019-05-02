@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.db.EventLog
@@ -42,7 +43,7 @@ class PushEventsConsumptionSpec extends FeatureSpec with GivenWhenThen with Grap
       Given("project having commit with the commit id in GitLab")
       `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-      When("user does POST webhook-service/webhooks/events")
+      When("POST webhook-service/webhooks/events happens")
       val payload =
         json"""
               {
@@ -61,7 +62,7 @@ class PushEventsConsumptionSpec extends FeatureSpec with GivenWhenThen with Grap
       response.status shouldBe Accepted
 
       And("there should be a relevant event added to the Event Log")
-      EventLog.findEvents(projectId) shouldBe List(commitId)
+      EventLog.findEvents(projectId, status = New) shouldBe List(commitId)
     }
   }
 }
