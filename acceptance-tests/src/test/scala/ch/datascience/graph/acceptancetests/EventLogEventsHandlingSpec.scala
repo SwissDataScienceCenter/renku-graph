@@ -16,13 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.tooling
+package ch.datascience.graph.acceptancetests
 
 import ch.datascience.dbeventlog.EventStatus.{New, NonRecoverableFailure}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
+import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, emails, projectIds, projectPaths}
 import ch.datascience.graph.model.events.{CommitId, ProjectId, ProjectPath}
 import ch.datascience.webhookservice.model.HookToken
