@@ -20,14 +20,11 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.dbeventlog.EventStatus.{New, NonRecoverableFailure}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
-import ch.datascience.graph.model.events.EventsGenerators.{commitIds, emails, projectIds, projectPaths}
-import ch.datascience.graph.model.events.{CommitId, ProjectId, ProjectPath}
+import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projectIds, projectPaths}
 import ch.datascience.webhookservice.model.HookToken
-import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -48,14 +45,12 @@ class EventLogEventsHandlingSpec
       val projectPath = projectPaths.generateOne
       val commitId    = commitIds.generateOne
 
-      EventLog deleteAllEvents ()
-
       Given("project having commit with the commit id in GitLab")
       `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
       When("Push Event arrives")
       webhookServiceClient
-        .POST("webhooks/events", HookToken(projectId), payload(projectId, projectPath, commitId))
+        .POST("webhooks/events", HookToken(projectId), model.GitLab.pushEvent(projectId, projectPath, commitId))
         .status shouldBe Accepted
 
       Then("there should be an Commit Event added to the Event Log")
@@ -69,16 +64,4 @@ class EventLogEventsHandlingSpec
       }
     }
   }
-
-  private def payload(projectId: ProjectId, projectPath: ProjectPath, commitId: CommitId) = json"""
-      {
-        "after":         ${commitId.value},
-        "user_id":       ${positiveInts().generateOne.value}, 
-        "user_username": ${nonEmptyStrings().generateOne},
-        "user_email":    ${emails.generateOne.value},
-        "project": {
-          "id":                  ${projectId.value},
-          "path_with_namespace": ${projectPath.value}
-        }
-      }"""
 }

@@ -44,7 +44,7 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
 
       Given("project having Graph Services hook in GitLab")
-      `GET <gitlab>/api/v4/projects/:id/hooks returning OK`(projectId)
+      `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks", Some(accessToken))

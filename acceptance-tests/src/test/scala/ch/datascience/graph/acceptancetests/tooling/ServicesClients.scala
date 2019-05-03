@@ -20,12 +20,14 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.control.Throttler
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
+import io.circe.Json
 import org.http4s.Status.Ok
 import org.http4s.{Header, Method, Response}
 
@@ -39,12 +41,8 @@ object WebhookServiceClient {
   class WebhookServiceClient(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
       extends ServiceClient {
     import io.circe.Json
-    import org.http4s.EntityEncoder
-    import org.http4s.circe.jsonEncoderOf
 
     override val baseUrl: String Refined Url = "http://localhost:9001"
-
-    private implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
 
     def POST(url: String, hookToken: HookToken, payload: Json): Response[IO] = {
       for {
@@ -69,6 +67,15 @@ object TokenRepositoryClient {
     new ServiceClient {
       override val baseUrl: String Refined Url = "http://localhost:9003"
     }
+
+  implicit class AccessTokenOps(accessToken: AccessToken) {
+    import io.circe.literal._
+
+    lazy val toJson: Json = accessToken match {
+      case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}"""
+      case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
+    }
+  }
 }
 
 abstract class ServiceClient(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
@@ -77,7 +84,9 @@ abstract class ServiceClient(implicit executionContext: ExecutionContext, contex
   import ServiceClient.ServiceReadiness
   import ServiceClient.ServiceReadiness._
   import cats.implicits._
-  import org.http4s.{Method, Request, Response, Status}
+  import org.http4s.circe.jsonEncoderOf
+  import org.http4s.{EntityEncoder, Method, Request, Response, Status}
+  protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
 
   val baseUrl: String Refined Url
 
@@ -85,6 +94,13 @@ abstract class ServiceClient(implicit executionContext: ExecutionContext, contex
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.POST, uri, maybeAccessToken))(mapResponse)
+    } yield response
+  }.unsafeRunSync()
+
+  def PUT(url: String, payload: Json, maybeAccessToken: Option[AccessToken]): Response[IO] = {
+    for {
+      uri      <- validateUri(s"$baseUrl/$url")
+      response <- send(request(Method.PUT, uri, maybeAccessToken) withEntity payload)(mapResponse)
     } yield response
   }.unsafeRunSync()
 

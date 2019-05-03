@@ -55,7 +55,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
       ).generateOne
       storeEventsWithRecentTime(projectId, doneEvents ::: toBeProcessedEvents)
 
-      val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).unsafeRunSync()
+      val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
       val expectedTotal: Int = doneEvents.size + toBeProcessedEvents.size
       processingStatus.done.value           shouldBe doneEvents.size
@@ -66,28 +66,31 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
     "return a ProcessingStatus for the given project " +
       "including events only close to the latest created_date" in new TestCase {
 
-      val sameDateEvents = nonEmptyList(eventStatuses).generateOne
+      val sameDateEvents = nonEmptyList(eventStatuses, minElements = 10, maxElements = 20).generateOne
       storeEventsWithRecentTime(projectId, sameDateEvents)
 
       storeEventsWithOlderDate(projectId, nonEmptyList(eventStatuses).generateOne)
 
-      val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).unsafeRunSync()
+      val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
       processingStatus.total.value shouldBe sameDateEvents.size
     }
 
-    "return None if the last created event was more than 2 minutes ago" in new TestCase {
+    "return a ProcessingStatus for the given project " +
+      "even if the last created event was in the past" in new TestCase {
 
-      storeEventsWithOlderDate(projectId, nonEmptyList(eventStatuses).generateOne)
+      val newestSameDateEvents = nonEmptyList(eventStatuses, minElements = 10, maxElements = 20).generateOne
+      storeEventsWithOlderDate(projectId, newestSameDateEvents)
 
-      processingStatusFinder.fetchStatus(projectId).unsafeRunSync() shouldBe None
+      storeEventsWithEvenOlderDate(projectId, nonEmptyList(eventStatuses).generateOne)
+
+      val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
+
+      processingStatus.total.value shouldBe newestSameDateEvents.size
     }
 
-    "return None if there were no events in the last 2 minutes for the project id" in new TestCase {
-
-      storeEventsWithRecentTime(projectIds.generateOne, nonEmptyList(eventStatuses).generateOne)
-
-      processingStatusFinder.fetchStatus(projectId).unsafeRunSync() shouldBe None
+    "return None if there were no events for the project id" in new TestCase {
+      processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync() shouldBe None
     }
   }
 
@@ -114,6 +117,17 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
         committedDates.generateOne,
         eventBodies.generateOne,
         CreatedDate(Instant.now.minus(122, SECONDS))
+      )
+    }
+
+    def storeEventsWithEvenOlderDate(projectId: ProjectId, statuses: NonEmptyList[EventStatus]): Unit = statuses map {
+      storeEvent(
+        commitEventIds.generateOne.copy(projectId = projectId),
+        _,
+        executionDates.generateOne,
+        committedDates.generateOne,
+        eventBodies.generateOne,
+        CreatedDate(Instant.now.minus(2, DAYS))
       )
     }
   }

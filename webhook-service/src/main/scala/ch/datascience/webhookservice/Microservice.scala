@@ -65,7 +65,7 @@ object Microservice extends IOApp {
             new IOHookEventEndpoint(transactor, gitLabThrottler),
             new IOHookCreationEndpoint(transactor, gitLabThrottler),
             new IOHookValidationEndpoint(gitLabThrottler),
-            new IOProcessingStatusEndpoint(transactor)
+            new IOProcessingStatusEndpoint(transactor, gitLabThrottler)
           ).routes
         )
 

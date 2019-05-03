@@ -46,7 +46,7 @@ class HookValidationEndpoint[Interpretation[_]: Effect](
   def validateHook(projectId: ProjectId, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
       accessToken    <- findAccessToken(request)
-      creationResult <- hookValidator.validateHook(projectId, accessToken)
+      creationResult <- hookValidator.validateHook(projectId, Some(accessToken))
       response       <- toHttpResponse(creationResult)
     } yield response
   } recoverWith withHttpResult

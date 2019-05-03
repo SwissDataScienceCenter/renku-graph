@@ -23,10 +23,9 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
+import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.webhookservice.project.ProjectVisibility.{Private, Public}
-import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -45,7 +44,7 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
 
       Given("project having Graph Services hook in GitLab")
-      `GET <gitlab>/api/v4/projects/:id/hooks returning OK`(projectId)
+      `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks/validation", Some(accessToken))
@@ -81,7 +80,7 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Private)
 
       Given("project having Graph Services hook in GitLab")
-      `GET <gitlab>/api/v4/projects/:id/hooks returning OK`(projectId)
+      `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks/validation", Some(accessToken))
@@ -90,13 +89,9 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       response.status shouldBe Ok
 
       And("the access token used in the POST should be added to the token repository")
-      val expectedAccessTokenJson = accessToken match {
-        case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}"""
-        case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
-      }
       tokenRepositoryClient
         .GET(s"projects/$projectId/tokens", maybeAccessToken = None)
-        .bodyAsJson shouldBe expectedAccessTokenJson
+        .bodyAsJson shouldBe accessToken.toJson
 
       And("when the webhook get deleted")
       `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(projectId)

@@ -38,10 +38,6 @@ object EventLog extends InMemoryEventLogDb {
       .to[List]
   }
 
-  def deleteAllEvents(): Unit = execute {
-    sql"""delete from event_log""".update.run
-  }
-
   protected override val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 }

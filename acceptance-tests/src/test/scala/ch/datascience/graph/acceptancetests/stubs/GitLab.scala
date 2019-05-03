@@ -41,7 +41,7 @@ object GitLab {
             }""".noSpaces))
     }
 
-  def `GET <gitlab>/api/v4/projects/:id/hooks returning OK`(projectId: ProjectId): Unit = {
+  def `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId: ProjectId): Unit = {
     val webhookUrl = s"${webhookServiceClient.baseUrl}/webhooks/events"
     stubFor {
       get(s"/api/v4/projects/$projectId/hooks")

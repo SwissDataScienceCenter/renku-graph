@@ -19,14 +19,23 @@
 package ch.datascience.webhookservice.eventprocessing
 
 import cats.MonadError
+import cats.data.OptionT
 import cats.effect._
 import cats.implicits._
+import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogProcessingStatus, IOEventLogProcessingStatus, ProcessingStatus}
+import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
+<<<<<<< HEAD
+import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
+=======
+import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
+>>>>>>> 2af18b6... fix: status endpoint to return NOT_FOUND when no hook for a project
+import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
@@ -39,22 +48,43 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class ProcessingStatusEndpoint[Interpretation[_]: Effect](
+    hookValidator:          HookValidator[Interpretation],
     eventsProcessingStatus: EventLogProcessingStatus[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  import eventsProcessingStatus._
+  import HookValidationResult._
   import ProcessingStatusEndpoint._
+  import eventsProcessingStatus._
+  import hookValidator._
 
   def fetchProcessingStatus(projectId: ProjectId): Interpretation[Response[Interpretation]] = {
     for {
-      maybeProcessingStatus <- fetchStatus(projectId)
-      response <- maybeProcessingStatus match {
-                   case Some(processingStatus) => Ok(processingStatus.asJson)
-                   case None                   => NotFound(InfoMessage(s"Project: $projectId not found"))
-                 }
+<<<<<<< HEAD
+      _        <- OptionT(validateHook(projectId, maybeAccessToken = None) map hookDoesNotExistToNone)
+      response <- fetchStatus(projectId) semiflatMap (processingStatus => Ok(processingStatus.asJson))
     } yield response
-  } recoverWith httpResponse
+  } getOrElseF NotFound(InfoMessage(s"Project: $projectId not found")) recoverWith httpResponse
+
+  private lazy val hookDoesNotExistToNone: HookValidationResult => Option[Unit] = {
+    case HookExists => Some(())
+    case _          => None
+  }
+=======
+      _        <- OptionT(validateHook(projectId, maybeAccessToken = None) map hookMissingToNone recover noAccessTokenToNone)
+      response <- fetchStatus(projectId) semiflatMap (processingStatus => Ok(processingStatus.asJson))
+    } yield response
+  } getOrElseF NotFound(InfoMessage(s"Progress status for project '$projectId' not found")) recoverWith httpResponse
+
+  private lazy val hookMissingToNone: HookValidationResult => Option[Unit] = {
+    case HookExists => Some(())
+    case _          => None
+  }
+
+  private lazy val noAccessTokenToNone: PartialFunction[Throwable, Option[Unit]] = {
+    case NoAccessTokenException(_) => None
+  }
+>>>>>>> 2af18b6... fix: status endpoint to return NOT_FOUND when no hook for a project
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))
@@ -74,6 +104,8 @@ private object ProcessingStatusEndpoint {
 }
 
 class IOProcessingStatusEndpoint(
-    transactor:              DbTransactor[IO, EventLogDB]
+    transactor:              DbTransactor[IO, EventLogDB],
+    gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
-    extends ProcessingStatusEndpoint[IO](new IOEventLogProcessingStatus(transactor))
+    extends ProcessingStatusEndpoint[IO](new IOHookValidator(gitLabThrottler),
+                                         new IOEventLogProcessingStatus(transactor))

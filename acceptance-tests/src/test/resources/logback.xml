@@ -1,0 +1,29 @@
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%d %-5level %logger{5} - %message%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC_STDOUT" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="STDOUT"/>
+    </appender>
+
+    <logger name="application" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_STDOUT"/>
+    </logger>
+
+    <!-- Turning down the wiremock logging -->
+    <logger name="com.github.tomakehurst.wiremock" level="ERROR"/>
+    <logger name="wiremock.org" level="ERROR"/>
+    <logger name="WireMock" level="ERROR"/>
+    <!-- wiremock has per endpoint servlet logging -->
+    <logger name="/" level="ERROR"/>
+
+    <root level="WARN">
+        <appender-ref ref="ASYNC_STDOUT"/>
+    </root>
+
+</configuration>
