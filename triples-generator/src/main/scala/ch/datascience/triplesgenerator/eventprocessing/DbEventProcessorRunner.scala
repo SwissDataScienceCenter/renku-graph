@@ -41,11 +41,10 @@ class DbEventProcessorRunner(
   import DbEventProcessorRunner.interval
   import eventLogFetch._
 
-  lazy val run: IO[Unit] =
-    for {
-      _ <- logger.info("Waiting for new events")
-      _ <- checkForNewEvent
-    } yield ()
+  lazy val run: IO[Unit] = for {
+    _ <- logger.info("Waiting for new events")
+    _ <- checkForNewEvent
+  } yield ()
 
   private def checkForNewEvent: IO[Unit] =
     isEventToProcess flatMap {
@@ -54,7 +53,7 @@ class DbEventProcessorRunner(
     }
 
   private def popEvent: IO[Unit] = popEventToProcess flatMap {
-    case Some(eventBody) => eventProcessor(eventBody)
+    case Some(eventBody) => eventProcessor(eventBody) recoverWith { case _ => IO.unit }
     case None            => IO.unit
   }
 }
@@ -63,5 +62,5 @@ private object DbEventProcessorRunner {
   import scala.concurrent.duration._
   import scala.language.postfixOps
 
-  val interval: FiniteDuration = 2 second
+  val interval: FiniteDuration = 2 seconds
 }

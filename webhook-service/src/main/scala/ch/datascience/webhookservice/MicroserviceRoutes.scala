@@ -20,7 +20,7 @@ package ch.datascience.webhookservice
 
 import cats.effect.ConcurrentEffect
 import ch.datascience.graph.http.server.ProjectIdPathBinder
-import ch.datascience.webhookservice.eventprocessing.HookEventEndpoint
+import ch.datascience.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import ch.datascience.webhookservice.hookcreation.HookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint
 import org.http4s.dsl.Http4sDsl
@@ -28,9 +28,10 @@ import org.http4s.dsl.Http4sDsl
 import scala.language.higherKinds
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    hookEventEndpoint:      HookEventEndpoint[F],
-    hookCreationEndpoint:   HookCreationEndpoint[F],
-    hookValidationEndpoint: HookValidationEndpoint[F]
+    hookEventEndpoint:        HookEventEndpoint[F],
+    hookCreationEndpoint:     HookCreationEndpoint[F],
+    hookValidationEndpoint:   HookValidationEndpoint[F],
+    processingStatusEndpoint: ProcessingStatusEndpoint[F]
 ) extends Http4sDsl[F] {
 
   import org.http4s.HttpRoutes
@@ -44,5 +45,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
         hookCreationEndpoint.createHook(projectId, request)
       case request @ POST -> Root / "projects" / ProjectIdPathBinder(projectId) / "webhooks" / "validation" =>
         hookValidationEndpoint.validateHook(projectId, request)
+      case GET -> Root / "projects" / ProjectIdPathBinder(projectId) / "events" / "status" =>
+        processingStatusEndpoint.fetchProcessingStatus(projectId)
     }
 }
