@@ -43,18 +43,14 @@ class ProcessingStatusEndpoint[Interpretation[_]: Effect](
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  import eventsProcessingStatus._
   import ProcessingStatusEndpoint._
+  import eventsProcessingStatus._
 
-  def fetchProcessingStatus(projectId: ProjectId): Interpretation[Response[Interpretation]] = {
-    for {
-      maybeProcessingStatus <- fetchStatus(projectId)
-      response <- maybeProcessingStatus match {
-                   case Some(processingStatus) => Ok(processingStatus.asJson)
-                   case None                   => NotFound(InfoMessage(s"Project: $projectId not found"))
-                 }
-    } yield response
-  } recoverWith httpResponse
+  def fetchProcessingStatus(projectId: ProjectId): Interpretation[Response[Interpretation]] =
+    fetchStatus(projectId)
+      .semiflatMap(processingStatus => Ok(processingStatus.asJson))
+      .getOrElseF(NotFound(InfoMessage(s"Project: $projectId not found")))
+      .recoverWith(httpResponse)
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))

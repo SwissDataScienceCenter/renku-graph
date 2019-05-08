@@ -19,11 +19,12 @@
 package ch.datascience.webhookservice.eventprocessing
 
 import cats.MonadError
+import cats.data.OptionT
 import cats.effect.IO
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.dbeventlog.DbEventLogGenerators.processingStatuses
-import ch.datascience.dbeventlog.commands.IOEventLogProcessingStatus
+import ch.datascience.dbeventlog.commands.{IOEventLogProcessingStatus, ProcessingStatus}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.EventsGenerators.projectIds
@@ -50,7 +51,7 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
       (eventsProcessingStatus
         .fetchStatus(_: ProjectId))
         .expects(projectId)
-        .returning(context.pure(Some(processingStatus)))
+        .returning(OptionT.some(processingStatus))
 
       val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
@@ -69,7 +70,7 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
       (eventsProcessingStatus
         .fetchStatus(_: ProjectId))
         .expects(projectId)
-        .returning(context.pure(None))
+        .returning(OptionT.none[IO, ProcessingStatus])
 
       val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
@@ -84,7 +85,7 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
       (eventsProcessingStatus
         .fetchStatus(_: ProjectId))
         .expects(projectId)
-        .returning(context.raiseError(exception))
+        .returning(OptionT.liftF(context.raiseError(exception)))
 
       val response = fetchProcessingStatus(projectId).unsafeRunSync()
 

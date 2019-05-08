@@ -22,16 +22,14 @@ import java.time.temporal.ChronoUnit._
 import java.time.{Duration, Instant}
 
 import cats.MonadError
-import cats.data.NonEmptyList
+import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
-import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.dbeventlog.{CreatedDate, EventLogDB, EventStatus}
+import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import doobie.implicits._
-import doobie.util.fragment.Fragment
-import doobie.util.fragments.in
+import doobie.util.Read
 import eu.timepit.refined.api.RefType.applyRef
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -46,44 +44,62 @@ class EventLogProcessingStatus[Interpretation[_]](
 
   import EventLogProcessingStatus._
 
-  def fetchStatus(projectId: ProjectId): Interpretation[Option[ProcessingStatus]] =
-    findDoneAndTotal(projectId)
-      .query[(Int, Int)]
-      .option
-      .transact(transactor.get)
-      .flatMap(toProcessingStatus)
+  def fetchStatus(projectId: ProjectId): OptionT[Interpretation, ProcessingStatus] =
+    for {
+      latestEvent           <- findTheLatestEvent(projectId)
+      events                <- addPreviousFromTheSameBatch(projectId, latestEvent, List(latestEvent))
+      maybeProcessingStatus <- toProcessingStatus(events)
+    } yield maybeProcessingStatus
 
-  private def findDoneAndTotal(projectId: ProjectId): Fragment = fr"""
-    select done.number, total.number 
-    from (""" ++ findDone(projectId) ++ fr") done, (" ++ findTotal(projectId) ++ fr") total"
+  private def findTheLatestEvent(projectId: ProjectId): OptionT[Interpretation, Event] = OptionT(sql"""
+      select event_id, status, created_date 
+      from event_log
+      where project_id = $projectId
+      order by created_date desc
+      limit 1
+  """.query[Event].option.transact(transactor.get))
 
-  // format: off
-  private def findDone(projectId: ProjectId): Fragment =fr"""
-    select count(*) as number
-    from event_log
-    where project_id = $projectId""" ++
-      `and status IN`(TriplesStore, NonRecoverableFailure) ++ fr"""
-       and created_date > ${now() minus ToBeConsideredAsBeingProcessed}"""
+  private def addPreviousFromTheSameBatch(projectId:      ProjectId,
+                                          previousEvent:  Event,
+                                          previousEvents: List[Event]): OptionT[Interpretation, List[Event]] =
+    OptionT.liftF {
+      findPreviousFromTheSameBatch(projectId, previousEvent)
+        .flatMap(foundEvent => addPreviousFromTheSameBatch(projectId, foundEvent, previousEvents :+ foundEvent))
+        .getOrElse(previousEvents)
+    }
 
-  private def findTotal(projectId: ProjectId): Fragment = fr"""
-    select count(*) as number
-    from event_log
-    where project_id = $projectId 
-      and created_date > ${now() minus ToBeConsideredAsBeingProcessed}"""
-  // format: on
+  private def findPreviousFromTheSameBatch(projectId: ProjectId, previousEvent: Event) = OptionT {
+    sql"""
+        select event_id, status, created_date
+        from event_log
+        where project_id = $projectId
+          and event_id <> ${previousEvent.eventId}
+          and created_date <= ${previousEvent.createdDate}
+          and created_date >= ${previousEvent.createdDate.value minus MaxTimeDiffBetweenEventsInBatch}
+        order by created_date desc
+        limit 1
+      """.query[Event].option.transact(transactor.get)
+  }
 
-  private def `and status IN`(statuses: EventStatus*) =
-    fr" and " ++ in(fr"status", NonEmptyList.fromListUnsafe(statuses.toList))
-
-  private lazy val toProcessingStatus: Option[(Int, Int)] => Interpretation[Option[ProcessingStatus]] = {
-    case None                => ME.pure(None)
-    case Some((0, 0))        => ME.pure(None)
-    case Some((done, total)) => ProcessingStatus.from[Interpretation](done, total) map Option.apply
+  private def toProcessingStatus(events: List[Event]) = OptionT.liftF {
+    events.foldLeft(0 -> 0) {
+      case ((done, total), Event(_, status, _)) if status == TriplesStore || status == NonRecoverableFailure =>
+        (done + 1) -> (total + 1)
+      case ((done, total), _) => done -> (total + 1)
+    } match {
+      case (done, total) => ProcessingStatus.from(done, total)(ME)
+    }
   }
 }
 
 private object EventLogProcessingStatus {
-  val ToBeConsideredAsBeingProcessed = Duration.of(2, MINUTES)
+  val MaxTimeDiffBetweenEventsInBatch = Duration.of(15, SECONDS)
+
+  implicit val eventRead: Read[Event] = Read[(CommitId, EventStatus, CreatedDate)].map {
+    case (eventId, status, createdDate) => Event(eventId, status, createdDate)
+  }
+
+  final case class Event(eventId: CommitId, status: EventStatus, createdDate: CreatedDate)
 }
 
 class IOEventLogProcessingStatus(
