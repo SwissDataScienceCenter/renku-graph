@@ -64,27 +64,6 @@ class HookValidatorSpec extends WordSpec with MockFactory {
     }
 
     "fail if finding stored access token fails when no access token given" in new TestCase {
-<<<<<<< HEAD
-
-      val projectInfo = projectInfos.generateOne.copy(visibility = Internal)
-      val projectId   = projectInfo.id
-
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      val storedAccessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
-        .returning(error)
-
-      validator.validateHook(projectId, maybeAccessToken = None) shouldBe error
-
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
-    }
-
-    "fail if finding stored access token fails when an invalid access token given" in new TestCase {
-=======
->>>>>>> 2af18b6... fix: status endpoint to return NOT_FOUND when no hook for a project
 
       val projectId = projectInfos.generateOne.copy(visibility = Internal).id
 

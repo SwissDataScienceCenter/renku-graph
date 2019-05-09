@@ -32,10 +32,7 @@ import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
-<<<<<<< HEAD
-=======
 import ch.datascience.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
->>>>>>> 2af18b6... fix: status endpoint to return NOT_FOUND when no hook for a project
 import ch.datascience.webhookservice.hookvalidation.IOHookValidator
 import io.circe.Json
 import io.circe.literal._
@@ -121,35 +118,6 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
       response.status                 shouldBe NotFound
       response.contentType            shouldBe Some(`Content-Type`(application.json))
       response.as[Json].unsafeRunSync shouldBe InfoMessage(s"Progress status for project '$projectId' not found").asJson
-    }
-
-    "return INTERNAL_SERVER_ERROR when checking if the webhook exists fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, None)
-        .returning(context.raiseError(exception))
-
-      val response = fetchProcessingStatus(projectId).unsafeRunSync()
-
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception.getMessage).asJson
-    }
-
-    "return NOT_FOUND if the webhook does not exist" in new TestCase {
-
-      (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
-        .expects(projectId, None)
-        .returning(context.pure(HookMissing))
-
-      val response = fetchProcessingStatus(projectId).unsafeRunSync()
-
-      response.status                 shouldBe NotFound
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"Project: $projectId not found").asJson
     }
 
     "return INTERNAL_SERVER_ERROR when checking if the webhook exists fails" in new TestCase {

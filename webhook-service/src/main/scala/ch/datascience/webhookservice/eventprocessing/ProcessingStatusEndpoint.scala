@@ -30,11 +30,7 @@ import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogProcessingStatus, IOEventLogProcessingStatus, ProcessingStatus}
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
-<<<<<<< HEAD
-import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
-=======
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
->>>>>>> 2af18b6... fix: status endpoint to return NOT_FOUND when no hook for a project
 import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
 import io.circe.Encoder
 import io.circe.literal._
@@ -60,17 +56,6 @@ class ProcessingStatusEndpoint[Interpretation[_]: Effect](
 
   def fetchProcessingStatus(projectId: ProjectId): Interpretation[Response[Interpretation]] = {
     for {
-<<<<<<< HEAD
-      _        <- OptionT(validateHook(projectId, maybeAccessToken = None) map hookDoesNotExistToNone)
-      response <- fetchStatus(projectId) semiflatMap (processingStatus => Ok(processingStatus.asJson))
-    } yield response
-  } getOrElseF NotFound(InfoMessage(s"Project: $projectId not found")) recoverWith httpResponse
-
-  private lazy val hookDoesNotExistToNone: HookValidationResult => Option[Unit] = {
-    case HookExists => Some(())
-    case _          => None
-  }
-=======
       _        <- OptionT(validateHook(projectId, maybeAccessToken = None) map hookMissingToNone recover noAccessTokenToNone)
       response <- fetchStatus(projectId) semiflatMap (processingStatus => Ok(processingStatus.asJson))
     } yield response
@@ -84,7 +69,6 @@ class ProcessingStatusEndpoint[Interpretation[_]: Effect](
   private lazy val noAccessTokenToNone: PartialFunction[Throwable, Option[Unit]] = {
     case NoAccessTokenException(_) => None
   }
->>>>>>> 2af18b6... fix: status endpoint to return NOT_FOUND when no hook for a project
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))
