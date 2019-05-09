@@ -55,8 +55,8 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(accessToken))
 
       (hookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(HookExists))
 
       val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
@@ -77,8 +77,8 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(accessToken))
 
       (hookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
@@ -115,8 +115,8 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
 
       val errorMessage = ErrorMessage("some error")
       (hookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
       val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
@@ -137,8 +137,8 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(accessToken))
 
       (hookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(IO.raiseError(UnauthorizedException))
 
       val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
