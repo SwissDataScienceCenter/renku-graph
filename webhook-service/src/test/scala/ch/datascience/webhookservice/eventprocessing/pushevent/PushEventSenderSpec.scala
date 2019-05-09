@@ -32,6 +32,7 @@ import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent._
+import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender.SendingResult
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -45,20 +46,26 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
   "storeCommitsInEventLog" should {
 
     "convert the given push event into commit events and store them in the event log" in new TestCase {
-      val commitEventsStream = commitEventsFrom(pushEvent).generateOne
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
         .findAccessToken(_: ProjectId))
         .expects(projectId)
-        .returning(context.pure(maybeAccessToken))
+        .returning(context pure maybeAccessToken)
 
-      (commitEventsFinder
-        .findCommitEvents(_: PushEvent, _: Option[AccessToken]))
+      (commitEventsSource
+        .buildEventsSource(_: PushEvent, _: Option[AccessToken]))
         .expects(pushEvent, maybeAccessToken)
-        .returning(context.pure(commitEventsStream))
+        .returning(context pure eventsFlowBuilder)
 
-      val commitEvents = toList(commitEventsStream)
+      val commitEvents = commitEventsFrom(pushEvent).generateOne
+      (eventsFlowBuilder
+        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .expects(*)
+        .onCall { transform: Function1[CommitEvent, Try[SendingResult]] =>
+          commitEvents.map(transform).sequence
+        }
+
       commitEvents foreach { commitEvent =>
         (commitEventSender
           .send(_: CommitEvent))
@@ -81,33 +88,33 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
       (accessTokenFinder
         .findAccessToken(_: ProjectId))
         .expects(projectId)
-        .returning(context.raiseError(exception))
+        .returning(context raiseError exception)
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Failure(exception)
 
-      logger.loggedOnly(Error(failedStoring(pushEvent), exception))
+      logger.loggedOnly(Error(generalFailure(pushEvent), exception))
     }
 
-    "fail if finding commit events stream fails" in new TestCase {
+    "fail if finding commit events source fails" in new TestCase {
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
         .findAccessToken(_: ProjectId))
         .expects(projectId)
-        .returning(context.pure(maybeAccessToken))
+        .returning(context pure maybeAccessToken)
 
       val exception = exceptions.generateOne
-      (commitEventsFinder
-        .findCommitEvents(_: PushEvent, _: Option[AccessToken]))
+      (commitEventsSource
+        .buildEventsSource(_: PushEvent, _: Option[AccessToken]))
         .expects(pushEvent, maybeAccessToken)
-        .returning(context.raiseError(exception))
+        .returning(context raiseError exception)
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Failure(exception)
 
-      logger.loggedOnly(Error(failedStoring(pushEvent), exception))
+      logger.loggedOnly(Error(generalFailure(pushEvent), exception))
     }
 
-    "store all non failing events and log errors for these for which fetching fail" in new TestCase {
+    "fail if finding commit events fails" in new TestCase {
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
@@ -115,61 +122,85 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
         .expects(projectId)
         .returning(context.pure(maybeAccessToken))
 
-      val exception          = exceptions.generateOne
-      val commitEventsStream = Failure(exception) #:: commitEventsFrom(pushEvent).generateOne
-      (commitEventsFinder
-        .findCommitEvents(_: PushEvent, _: Option[AccessToken]))
+      (commitEventsSource
+        .buildEventsSource(_: PushEvent, _: Option[AccessToken]))
         .expects(pushEvent, maybeAccessToken)
-        .returning(context.pure(commitEventsStream))
+        .returning(context pure eventsFlowBuilder)
 
-      val commitEvents = toList(commitEventsStream)
-      commitEvents foreach { commitEvent =>
-        (commitEventSender
-          .send(_: CommitEvent))
-          .expects(commitEvent)
-          .returning(context.pure(()))
-      }
+      val exception = exceptions.generateOne
+      (eventsFlowBuilder
+        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .expects(*)
+        .returning(context raiseError exception)
 
-      pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Success(())
+      pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Failure(exception)
 
-      logger.loggedOnly(
-        Error(failedFetching(pushEvent), exception),
-        Info(successfulStoring(pushEvent, commitEventsStream.size, stored = commitEventsStream.size - 1, failed = 1))
-      )
+      logger.loggedOnly(Error(failedFinding(pushEvent), exception))
     }
 
-    "store all non failing events and log errors for these for which storing fail" in new TestCase {
+    "fail if transforming to commit events fails" in new TestCase {
+
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
         .findAccessToken(_: ProjectId))
         .expects(projectId)
         .returning(context.pure(maybeAccessToken))
 
-      val commitEventsStream = commitEventsFrom(pushEvent).generateOne
-      (commitEventsFinder
-        .findCommitEvents(_: PushEvent, _: Option[AccessToken]))
+      (commitEventsSource
+        .buildEventsSource(_: PushEvent, _: Option[AccessToken]))
         .expects(pushEvent, maybeAccessToken)
-        .returning(context.pure(commitEventsStream))
+        .returning(context pure eventsFlowBuilder)
 
-      val failingEvent +: passingEvents = toList(commitEventsStream)
+      val exception = exceptions.generateOne
+      (eventsFlowBuilder
+        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .expects(*)
+        .onCall { _: Function1[CommitEvent, Try[SendingResult]] =>
+          context raiseError exception
+        }
+
+      pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Failure(exception)
+
+      logger.loggedOnly(Error(failedFinding(pushEvent), exception))
+    }
+
+    "store all non failing events and log errors for these for which storing fails" in new TestCase {
+      val maybeAccessToken = Gen.option(accessTokens).generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(projectId)
+        .returning(context.pure(maybeAccessToken))
+
+      (commitEventsSource
+        .buildEventsSource(_: PushEvent, _: Option[AccessToken]))
+        .expects(pushEvent, maybeAccessToken)
+        .returning(context pure eventsFlowBuilder)
+
+      val commitEvents @ failingEvent +: passingEvents = commitEventsFrom(pushEvent).generateOne
+      (eventsFlowBuilder
+        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .expects(*)
+        .onCall { transform: Function1[CommitEvent, Try[SendingResult]] =>
+          commitEvents.map(transform).sequence
+        }
 
       val exception = exceptions.generateOne
       (commitEventSender
         .send(_: CommitEvent))
         .expects(failingEvent)
-        .returning(context.raiseError(exception))
+        .returning(context raiseError exception)
       passingEvents foreach { event =>
         (commitEventSender
           .send(_: CommitEvent))
           .expects(event)
-          .returning(context.pure(()))
+          .returning(context pure ((): Unit))
       }
 
       pushEventSender.storeCommitsInEventLog(pushEvent) shouldBe Success(())
 
       logger.loggedOnly(
         Error(failedStoring(pushEvent, failingEvent), exception),
-        Info(successfulStoring(pushEvent, commitEventsStream.size, stored = commitEventsStream.size - 1, failed = 1))
+        Info(successfulStoring(pushEvent, commitEvents.size, stored = passingEvents.size, failed = 1))
       )
     }
   }
@@ -183,12 +214,13 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val commitEventSender     = mock[TryCommitEventSender]
-    val commitEventsFinder    = mock[TryCommitEventsFinder]
+    val commitEventsSource    = mock[TryCommitEventsSourceBuilder]
+    val eventsFlowBuilder     = mock[CommitEventsSourceBuilder.EventsFlowBuilder[Try]]
     val logger                = TestLogger[Try]()
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](expected = elapsedTime)
     val pushEventSender = new PushEventSender[Try](
       accessTokenFinder,
-      commitEventsFinder,
+      commitEventsSource,
       commitEventSender,
       logger,
       executionTimeRecorder
@@ -198,59 +230,49 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
       s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: " +
         s"$commitEvents Commit Events generated, $stored stored in the Event Log, $failed failed in ${elapsedTime}ms"
 
-    def failedFetching(pushEvent: PushEvent): String =
+    def failedFinding(pushEvent: PushEvent): String =
       s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: " +
-        "fetching one of the commit events failed"
+        "finding commit events failed"
 
-    def failedStoring(pushEvent: PushEvent): String =
+    def generalFailure(pushEvent: PushEvent): String =
       s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}: " +
-        "storing in event log failed"
+        "converting to commit events failed"
 
     def failedStoring(pushEvent: PushEvent, commitEvent: CommitEvent): String =
       s"PushEvent commitTo: ${pushEvent.commitTo}, project: ${pushEvent.project.id}, CommitEvent id: ${commitEvent.id}: " +
-        "storing in event log failed"
-  }
+        "storing in the event log failed"
 
-  private def commitEventsFrom(pushEvent: PushEvent): Gen[Stream[Try[CommitEvent]]] =
-    for {
-      commitEvent <- commitEventFrom(pushEvent)
-    } yield {
-      val firstCommitEvent = commitEventFrom(pushEvent).generateOne
+    def commitEventsFrom(pushEvent: PushEvent): Gen[List[CommitEvent]] =
+      for {
+        commitEvent <- commitEventFrom(pushEvent)
+      } yield
+        commitEvent +: commitEvent.parents
+          .map(commitEventFrom(_, pushEvent.pushUser, pushEvent.project).generateOne)
 
-      commitEvent.parents.foldLeft(Stream(Try(firstCommitEvent))) { (commitEvents, parentId) =>
-        Try(commitEventFrom(parentId, pushEvent.pushUser, pushEvent.project).generateOne) #:: commitEvents
-      }
-    }
-
-  private def commitEventFrom(pushEvent: PushEvent): Gen[CommitEvent] =
-    commitEventFrom(
-      pushEvent.commitTo,
-      pushEvent.pushUser,
-      pushEvent.project
-    )
-
-  private def commitEventFrom(commitId: CommitId, pushUser: PushUser, project: Project): Gen[CommitEvent] =
-    for {
-      message       <- commitMessages
-      committedDate <- committedDates
-      author        <- users
-      committer     <- users
-      parentsIds    <- parentsIdsLists()
-    } yield
-      CommitEvent(
-        id            = commitId,
-        message       = message,
-        committedDate = committedDate,
-        pushUser      = pushUser,
-        author        = author,
-        committer     = committer,
-        parents       = parentsIds,
-        project       = project
+    def commitEventFrom(pushEvent: PushEvent): Gen[CommitEvent] =
+      commitEventFrom(
+        pushEvent.commitTo,
+        pushEvent.pushUser,
+        pushEvent.project
       )
 
-  private def toList(eventsStream: Stream[Try[CommitEvent]]): List[CommitEvent] =
-    eventsStream.toList.foldLeft(List.empty[CommitEvent]) {
-      case (allEvents, Success(event)) => allEvents :+ event
-      case (allEvents, Failure(_))     => allEvents
-    }
+    def commitEventFrom(commitId: CommitId, pushUser: PushUser, project: Project): Gen[CommitEvent] =
+      for {
+        message       <- commitMessages
+        committedDate <- committedDates
+        author        <- users
+        committer     <- users
+        parentsIds    <- parentsIdsLists()
+      } yield
+        CommitEvent(
+          id            = commitId,
+          message       = message,
+          committedDate = committedDate,
+          pushUser      = pushUser,
+          author        = author,
+          committer     = committer,
+          parents       = parentsIds,
+          project       = project
+        )
+  }
 }
