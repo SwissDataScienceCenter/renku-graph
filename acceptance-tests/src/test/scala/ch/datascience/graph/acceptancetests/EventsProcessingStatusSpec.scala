@@ -58,24 +58,29 @@ class EventsProcessingStatusSpec
       When("there is a webhook but no events in the Event Log")
       givenHookValidationToHookExists(projectId)
 
-      Then("the status endpoint should return NOT_FOUND")
-      webhookServiceClient.GET(s"projects/$projectId/events/status", maybeAccessToken = None).status shouldBe NotFound
+      Then("the status endpoint should return OK with done = total = 0")
+      val noEventsResponse = webhookServiceClient.GET(s"projects/$projectId/events/status", maybeAccessToken = None)
+      noEventsResponse.status shouldBe Ok
+      val noEventsResponseJson = noEventsResponse.bodyAsJson.hcursor
+      noEventsResponseJson.downField("done").as[Int]        shouldBe Right(0)
+      noEventsResponseJson.downField("total").as[Int]       shouldBe Right(0)
+      noEventsResponseJson.downField("progress").as[Double] shouldBe a[Left[_, _]]
 
       When("there are events being processed")
       sendEventsForProcessing(projectId)
 
       Then("the status endpoint should return OK with some progress info")
       eventually {
-        val statusResult = webhookServiceClient.GET(s"projects/$projectId/events/status", maybeAccessToken = None)
+        val response = webhookServiceClient.GET(s"projects/$projectId/events/status", maybeAccessToken = None)
 
-        statusResult.status shouldBe Ok
+        response.status shouldBe Ok
 
-        val response    = statusResult.bodyAsJson.hcursor
-        val Right(done) = response.downField("done").as[Int]
+        val responseJson = response.bodyAsJson.hcursor
+        val Right(done)  = responseJson.downField("done").as[Int]
         done should be <= numberOfEvents
-        val Right(total) = response.downField("total").as[Int]
+        val Right(total) = responseJson.downField("total").as[Int]
         total shouldBe numberOfEvents
-        val Right(progress) = response.downField("progress").as[Double]
+        val Right(progress) = responseJson.downField("progress").as[Double]
         progress should be <= 100D
       }
     }
