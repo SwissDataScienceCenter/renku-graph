@@ -32,7 +32,7 @@ import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
 import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Response
@@ -52,14 +52,23 @@ class ProcessingStatusEndpoint[Interpretation[_]: Effect](
   import HookValidationResult._
   import ProcessingStatusEndpoint._
   import eventsProcessingStatus._
-  import hookValidator._
 
   def fetchProcessingStatus(projectId: ProjectId): Interpretation[Response[Interpretation]] = {
     for {
-      _        <- OptionT(validateHook(projectId, maybeAccessToken = None) map hookMissingToNone recover noAccessTokenToNone)
-      response <- fetchStatus(projectId) semiflatMap (processingStatus => Ok(processingStatus.asJson))
+      _        <- validateHook(projectId)
+      response <- findStatus(projectId)
     } yield response
   } getOrElseF NotFound(InfoMessage(s"Progress status for project '$projectId' not found")) recoverWith httpResponse
+
+  private def validateHook(projectId: ProjectId): OptionT[Interpretation, Unit] = OptionT {
+    hookValidator.validateHook(projectId, maybeAccessToken = None) map hookMissingToNone recover noAccessTokenToNone
+  }
+
+  private def findStatus(projectId: ProjectId): OptionT[Interpretation, Response[Interpretation]] = OptionT.liftF {
+    fetchStatus(projectId)
+      .semiflatMap(processingStatus => Ok(processingStatus.asJson))
+      .getOrElseF(Ok(zeroProcessingStatusJson))
+  }
 
   private lazy val hookMissingToNone: HookValidationResult => Option[Unit] = {
     case HookExists => Some(())
@@ -85,6 +94,12 @@ private object ProcessingStatusEndpoint {
        "progress": ${progress.value}
       }"""
   }
+
+  val zeroProcessingStatusJson: Json = json"""
+      {
+       "done": ${0},
+       "total": ${0}
+      }"""
 }
 
 class IOProcessingStatusEndpoint(

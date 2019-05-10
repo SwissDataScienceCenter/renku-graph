@@ -32,11 +32,11 @@ Fetches information about processing progress of project events.
 
 **Response**
 
-| Status                     | Description                                                                                          |
-|----------------------------|------------------------------------------------------------------------------------------------------|
-| OK (200)                   | When there are events in the Event Log for that project                                              |
-| NOT_FOUND (404)            | When there are no events in the Event Log for that project or the project has no Graph Services hook |
-| INTERNAL SERVER ERROR (500)| When there are problems with finding the status                                                      |
+| Status                     | Description                                          |
+|----------------------------|------------------------------------------------------|
+| OK (200)                   | When there is Graph Services hook for the project    |
+| NOT_FOUND (404)            | When there is no Graph Services hook for the project |
+| INTERNAL SERVER ERROR (500)| When there are problems with finding the status      |
 
 Examples of valid responses:
 - all events from the latest batch are processed
@@ -53,6 +53,13 @@ Examples of valid responses:
   "done": 10,
   "total": 20,
   "progress": 50.00
+}
+```
+- no events in the Event Log
+```
+{
+  "done": 0,
+  "total": 0
 }
 ```
 

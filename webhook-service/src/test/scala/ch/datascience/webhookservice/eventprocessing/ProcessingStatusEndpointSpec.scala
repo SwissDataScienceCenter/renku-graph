@@ -72,8 +72,8 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
       }"""
     }
 
-    "return NOT_FOUND if no progress status can be found for the projectId " +
-      "even if the webhook exists" in new TestCase {
+    "return OK the progress status with done = total = 0 if the webhook exists " +
+      "but there are no events in the Event Log yet" in new TestCase {
 
       (hookValidator
         .validateHook(_: ProjectId, _: Option[AccessToken]))
@@ -87,9 +87,12 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
 
       val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                 shouldBe NotFound
+      response.status                 shouldBe Ok
       response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"Progress status for project '$projectId' not found").asJson
+      response.as[Json].unsafeRunSync shouldBe json"""{
+        "done": ${0},
+        "total": ${0}
+      }"""
     }
 
     "return NOT_FOUND if the webhook does not exist" in new TestCase {
