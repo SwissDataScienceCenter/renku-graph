@@ -7,12 +7,13 @@ This microservice:
 
 ## API
 
-| Method | Path                                      | Description                                    |
-|--------|-------------------------------------------|------------------------------------------------|
-|  GET   | ```/ping```                               | To check if service is healthy                 |
-|  POST  | ```/projects/:id/webhooks```              | Creates a webhook for a project in GitLab      |
-|  POST  | ```/projects/:id/webhooks/validation```   | Validates the project's webhook                |
-|  POST  | ```/webhooks/events```                    | Consumes push events sent from GitLab          |
+| Method | Path                                      | Description                                           |
+|--------|-------------------------------------------|-------------------------------------------------------|
+|  GET   | ```/ping```                               | To check if service is healthy                        |
+|  GET   | ```/projects/:id/events/status```         | Gives info about processing progress of recent events |
+|  POST  | ```/projects/:id/webhooks```              | Creates a webhook for a project in GitLab             |
+|  POST  | ```/projects/:id/webhooks/validation```   | Validates the project's webhook                       |
+|  POST  | ```/webhooks/events```                    | Consumes push events sent from GitLab                 |
      
 #### GET /ping
 
@@ -24,6 +25,43 @@ Verifies service health.
 |----------------------------|-------------------------|
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
+
+#### GET /projects/:id/events/status
+
+Fetches information about processing progress of project events.
+
+**Response**
+
+| Status                     | Description                                          |
+|----------------------------|------------------------------------------------------|
+| OK (200)                   | When there is Graph Services hook for the project    |
+| NOT_FOUND (404)            | When there is no Graph Services hook for the project |
+| INTERNAL SERVER ERROR (500)| When there are problems with finding the status      |
+
+Examples of valid responses:
+- all events from the latest batch are processed
+```
+{
+  "done": 20,
+  "total": 20,
+  "progress": 100.00
+}
+```
+- some events from the latest batch are being processed
+```
+{
+  "done": 10,
+  "total": 20,
+  "progress": 50.00
+}
+```
+- no events in the Event Log
+```
+{
+  "done": 0,
+  "total": 0
+}
+```
 
 #### POST /projects/:id/webhooks
 

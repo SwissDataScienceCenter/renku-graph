@@ -61,7 +61,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     "do nothing if the latest eventIds in the Event Log " +
       "matches the latest commits in GitLab for relevant projects" in new TestCase {
 
-      val latestEventsList = nonEmptyList(commitEventIds).generateOne
+      val latestEventsList = nonEmptyList(commitEventIds).generateOne.toList
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -80,7 +80,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       "for projects with the latest eventIds different than the latest commits in GitLab" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: event3 +: Nil =
-        nonEmptyList(commitEventIds, minElements = 3, maxElements = 3).generateOne
+        nonEmptyList(commitEventIds, minElements = 3, maxElements = 3).generateOne.toList
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -111,7 +111,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
     "do nothing if the latest PushEvent does not exists" in new TestCase {
       val latestEventsList @ event1 +: event2 +: Nil =
-        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne
+        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne.toList
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -131,7 +131,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
     "not break processing if finding Access Token for one of the event(s) fails" in new TestCase {
 
-      val latestEventsList = nonEmptyList(commitEventIds, minElements = 2).generateOne
+      val latestEventsList = nonEmptyList(commitEventIds, minElements = 2).generateOne.toList
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -161,7 +161,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     "not break processing if finding the latest Push Event for one of the events fails" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: Nil =
-        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne
+        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne.toList
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -186,7 +186,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     "not break processing if finding Project Info for one of the events fails" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: Nil =
-        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne
+        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne.toList
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
@@ -214,7 +214,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     "not break processing if storing Push Event for one of the events fails" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: Nil =
-        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne
+        nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne.toList
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 

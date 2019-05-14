@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.eventprocessing
 
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.controllers.ErrorMessage
+import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -63,7 +63,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe Accepted
       response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Event accepted"}"""
+      response.as[Json].unsafeRunSync shouldBe InfoMessage("Event accepted").asJson
     }
 
     "return INTERNAL_SERVER_ERROR when storing push event in the event log fails" in new TestCase {
