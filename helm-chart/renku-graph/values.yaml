@@ -30,7 +30,7 @@ triplesGenerator:
   resources:
     limits:
       memory: 900Mi
-  renkuLogTimeout: 3 minutes
+  renkuLogTimeout: 60 minutes
   gitlab:
     rateLimit: 50/sec
   threadsNumber: 4
@@ -99,7 +99,7 @@ resources: {}
   #  cpu: 100m
   #  memory: 128Mi
   # requests:
-  #  cpu: 100m
+#  cpu: 100m
 #  memory: 128Mi
 
 nodeSelector: {}
