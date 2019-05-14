@@ -18,8 +18,8 @@
 
 package ch.datascience.http.client
 
-import cats.implicits._
 import cats.effect.{ContextShift, IO}
+import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.RestClientError.{MappingError, UnexpectedResponseError}
@@ -31,6 +31,8 @@ import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.headers.Authorization
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 abstract class IORestClient[ThrottlingTarget](throttler: Throttler[IO, ThrottlingTarget])(
@@ -76,7 +78,7 @@ abstract class IORestClient[ThrottlingTarget](throttler: Throttler[IO, Throttlin
     Headers.of(Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value)))
 
   protected def send[ResultType](request: Request[IO])(mapResponse: ResponseMapping[ResultType]): IO[ResultType] =
-    BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>
+    BlazeClientBuilder[IO](executionContext).withRequestTimeout(10 minutes).resource.use { httpClient =>
       for {
         _          <- throttler.acquire
         callResult <- callRemote(httpClient, request, mapResponse)
