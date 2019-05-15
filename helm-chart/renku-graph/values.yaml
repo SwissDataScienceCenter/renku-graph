@@ -12,8 +12,8 @@ tokenRepository:
     port: 9003
   resources:
     limits:
-      memory: 400Mi
-  connectionPool: 5
+      memory: 100Mi
+  connectionPool: 3
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
     ## Generated using: `openssl rand -hex 8|base64`
@@ -29,13 +29,13 @@ triplesGenerator:
     port: 9002
   resources:
     limits:
-      memory: 900Mi
+      memory: 1500Mi
   renkuLogTimeout: 60 minutes
   gitlab:
     rateLimit: 50/sec
-  threadsNumber: 4
+  threadsNumber: 2
   dbEventLog:
-    connectionPool: 5
+    connectionPool: 2
 
 webhookService:
   image:
@@ -47,12 +47,12 @@ webhookService:
     port: 80
   resources:
     limits:
-      memory: 600Mi
+      memory: 300Mi
   gitlab:
     rateLimit: 50/sec
   threadsNumber: 4
   dbEventLog:
-    connectionPool: 5
+    connectionPool: 4
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
