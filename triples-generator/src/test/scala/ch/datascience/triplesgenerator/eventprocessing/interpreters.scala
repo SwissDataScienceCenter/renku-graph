@@ -22,7 +22,7 @@ import cats.effect.{Bracket, IO}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed}
+import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed, EventLogMarkNew}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.triplesgenerator.eventprocessing.Commands.GitLabRepoUrlFinder
 
@@ -37,6 +37,10 @@ private abstract class TryEventLogMarkDone(
     transactor: DbTransactor[Try, EventLogDB]
 )(implicit ME:  Bracket[Try, Throwable])
     extends EventLogMarkDone[Try](transactor)
+private abstract class TryEventLogMarkNew(
+    transactor: DbTransactor[Try, EventLogDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends EventLogMarkNew[Try](transactor)
 private abstract class TryEventLogMarkFailed(
     transactor: DbTransactor[Try, EventLogDB]
 )(implicit ME:  Bracket[Try, Throwable])

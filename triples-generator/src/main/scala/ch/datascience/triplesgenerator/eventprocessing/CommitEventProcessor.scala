@@ -24,7 +24,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed, IOEventLogMarkDone, IOEventLogMarkFailed}
+import ch.datascience.dbeventlog.commands._
 import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
@@ -46,6 +46,7 @@ class CommitEventProcessor[Interpretation[_]](
     triplesFinder:            TriplesFinder[Interpretation],
     fusekiConnector:          FusekiConnector[Interpretation],
     eventLogMarkDone:         EventLogMarkDone[Interpretation],
+    eventLogMarkNew:          EventLogMarkNew[Interpretation],
     eventLogMarkFailed:       EventLogMarkFailed[Interpretation],
     logger:                   Logger[Interpretation],
     executionTimeRecorder:    ExecutionTimeRecorder[Interpretation]
@@ -57,6 +58,7 @@ class CommitEventProcessor[Interpretation[_]](
   import commitEventsDeserialiser._
   import eventLogMarkDone._
   import eventLogMarkFailed._
+  import eventLogMarkNew._
   import executionTimeRecorder._
   import fusekiConnector._
   import triplesFinder._
@@ -65,7 +67,7 @@ class CommitEventProcessor[Interpretation[_]](
     measureExecutionTime {
       for {
         commits          <- deserialiseToCommitEvents(eventBody)
-        maybeAccessToken <- findAccessToken(commits.head.project.id)
+        maybeAccessToken <- findAccessToken(commits.head.project.id) recoverWith rollback(commits.head)
         uploadingResults <- allToTriplesAndUpload(commits, maybeAccessToken)
       } yield uploadingResults
     } flatMap logSummary recoverWith logEventProcessingError(eventBody)
@@ -169,6 +171,12 @@ class CommitEventProcessor[Interpretation[_]](
     case NonFatal(exception) => logger.error(exception)(s"Commit Event processing failure: $eventBody")
   }
 
+  private def rollback(commit: Commit): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
+    case NonFatal(exception) =>
+      markEventNew(commit.commitEventId)
+        .flatMap(_ => ME.raiseError(new Exception("processing failure -> Event rolled back", exception)))
+  }
+
   private sealed trait UploadingResult extends Product with Serializable {
     val commit: Commit
   }
@@ -193,6 +201,7 @@ class IOCommitEventProcessor(
                           new Commands.Renku(renkuLogTimeout)),
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),
       new IOEventLogMarkDone(transactor),
+      new IOEventLogMarkNew(transactor),
       new IOEventLogMarkFailed(transactor),
       ApplicationLogger,
       new ExecutionTimeRecorder[IO]
