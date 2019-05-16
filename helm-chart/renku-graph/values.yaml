@@ -32,12 +32,12 @@ triplesGenerator:
       memory: 2000Mi
   renkuLogTimeout: 60 minutes
   gitlab:
-    rateLimit: 50/sec
+    rateLimit: 30/sec
   ## a demanded number of concurrent triples generation processes
-  generationProcessesNumber: 2
-  threadsNumber: 4
+  generationProcessesNumber: 4
+  threadsNumber: 6
   dbEventLog:
-    connectionPool: 3
+    connectionPool: 4
 
 webhookService:
   image:
@@ -54,8 +54,8 @@ webhookService:
     initialDelay: 2 minutes
     interval: 30 minutes
   gitlab:
-    rateLimit: 50/sec
-  threadsNumber: 4
+    rateLimit: 100/sec
+  threadsNumber: 5
   dbEventLog:
     connectionPool: 4
   hookToken:
