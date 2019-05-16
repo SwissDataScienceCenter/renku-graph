@@ -18,12 +18,13 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
+import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
@@ -39,9 +40,10 @@ private trait CommitInfoFinder[Interpretation[_]] {
 
 private class IOCommitInfoFinder(
     gitLabConfigProvider:    GitLabConfigProvider[IO],
-    gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient(gitLabThrottler)
+    gitLabThrottler:         Throttler[IO, GitLab],
+    logger:                  Logger[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORestClient(gitLabThrottler, logger)
     with CommitInfoFinder[IO] {
 
   import CommitInfo._

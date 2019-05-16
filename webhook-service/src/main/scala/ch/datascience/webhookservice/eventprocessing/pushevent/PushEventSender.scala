@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import cats.effect.{Clock, ContextShift, IO}
+import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.control.Throttler
@@ -124,9 +124,9 @@ private object PushEventSender {
 class IOPushEventSender(
     transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends PushEventSender[IO](
-      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
+      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
       new IOCommitEventsSourceBuilder(transactor, gitLabThrottler),
       new IOCommitEventSender(transactor),
       ApplicationLogger,

@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
@@ -28,6 +28,7 @@ import ch.datascience.dbeventlog.commands._
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.{CommitEvent, CommitId}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.PushEvent
 import ch.datascience.webhookservice.eventprocessing.pushevent.CommitEventsSourceBuilder.EventsFlowBuilder
@@ -111,8 +112,8 @@ private object CommitEventsSourceBuilder {
 private class IOCommitEventsSourceBuilder(
     transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends CommitEventsSourceBuilder[IO](
-      new IOCommitInfoFinder(new GitLabConfigProvider(), gitLabThrottler),
+      new IOCommitInfoFinder(new GitLabConfigProvider(), gitLabThrottler, ApplicationLogger),
       new IOEventLogVerifyExistence(transactor)
     )

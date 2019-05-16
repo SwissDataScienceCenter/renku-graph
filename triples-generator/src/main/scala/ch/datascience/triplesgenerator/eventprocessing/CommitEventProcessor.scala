@@ -158,11 +158,6 @@ class CommitEventProcessor[Interpretation[_]](
       )
   }
 
-  private def logError(commit: Commit): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"${logMessageCommon(commit)} failed to mark as $TriplesStore in the Event Log")
-  }
-
   private lazy val logMessageCommon: Commit => String = {
     case CommitWithoutParent(id, project) =>
       s"Commit Event id: $id, project: ${project.id} ${project.path}"
@@ -193,7 +188,7 @@ class IOCommitEventProcessor(
 )(implicit contextShift: ContextShift[IO], executionContext: ExecutionContext, timer: Timer[IO])
     extends CommitEventProcessor[IO](
       new CommitEventsDeserialiser[IO](),
-      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
+      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
       new IOTriplesFinder(new GitLabRepoUrlFinder[IO](new GitLabUrlProvider[IO]()),
                           new Commands.Renku(renkuLogTimeout)),
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),

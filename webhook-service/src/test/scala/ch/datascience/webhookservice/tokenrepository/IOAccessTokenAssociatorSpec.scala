@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.tokenrepository
 
 import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
@@ -30,6 +30,7 @@ import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.tokenrepository.IOTokenRepositoryUrlProvider
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
@@ -96,7 +97,8 @@ class IOAccessTokenAssociatorSpec extends WordSpec with MockFactory with Externa
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
 
@@ -106,7 +108,7 @@ class IOAccessTokenAssociatorSpec extends WordSpec with MockFactory with Externa
     val projectId          = projectIds.generateOne
 
     val tokenRepositoryUrlProvider = mock[IOTokenRepositoryUrlProvider]
-    val associator                 = new IOAccessTokenAssociator(tokenRepositoryUrlProvider)
+    val associator                 = new IOAccessTokenAssociator(tokenRepositoryUrlProvider, TestLogger())
   }
 
   private lazy val toJson: AccessToken => String = {

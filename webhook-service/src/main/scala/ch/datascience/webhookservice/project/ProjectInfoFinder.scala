@@ -18,13 +18,14 @@
 
 package ch.datascience.webhookservice.project
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.project.ProjectVisibility.Public
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -38,9 +39,10 @@ trait ProjectInfoFinder[Interpretation[_]] {
 
 class IOProjectInfoFinder(
     gitLabConfigProvider:    GitLabConfigProvider[IO],
-    gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient(gitLabThrottler)
+    gitLabThrottler:         Throttler[IO, GitLab],
+    logger:                  Logger[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORestClient(gitLabThrottler, logger)
     with ProjectInfoFinder[IO] {
 
   import cats.effect._

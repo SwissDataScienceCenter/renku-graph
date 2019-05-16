@@ -18,11 +18,17 @@
 
 package ch.datascience.http.client
 
-import cats.effect.{ContextShift, IO}
+import java.net.ConnectException
+
+import IORestClient._
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.RestClientError.{MappingError, UnexpectedResponseError}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.NonNegative
+import io.chrisdavenport.log4cats.Logger
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s._
@@ -31,14 +37,15 @@ import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.headers.Authorization
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
-import scala.language.postfixOps
+import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-abstract class IORestClient[ThrottlingTarget](throttler: Throttler[IO, ThrottlingTarget])(
-    implicit executionContext:                           ExecutionContext,
-    contextShift:                                        ContextShift[IO]
-) {
+abstract class IORestClient[ThrottlingTarget](
+    throttler:               Throttler[IO, ThrottlingTarget],
+    logger:                  Logger[IO],
+    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
 
   protected def validateUri(uri: String): IO[Uri] =
     IO.fromEither(Uri.fromString(uri))
@@ -78,20 +85,21 @@ abstract class IORestClient[ThrottlingTarget](throttler: Throttler[IO, Throttlin
     Headers.of(Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value)))
 
   protected def send[ResultType](request: Request[IO])(mapResponse: ResponseMapping[ResultType]): IO[ResultType] =
-    BlazeClientBuilder[IO](executionContext).withRequestTimeout(10 minutes).resource.use { httpClient =>
+    BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>
       for {
         _          <- throttler.acquire
-        callResult <- callRemote(httpClient, request, mapResponse)
+        callResult <- callRemote(httpClient, request, mapResponse, attempt = 1)
         _          <- throttler.release
       } yield callResult
     }
 
   private def callRemote[ResultType](httpClient:  Client[IO],
                                      request:     Request[IO],
-                                     mapResponse: ResponseMapping[ResultType]) =
+                                     mapResponse: ResponseMapping[ResultType],
+                                     attempt:     Int) =
     httpClient
       .fetch[ResultType](request)(processResponse(request, mapResponse))
-      .recoverWith(connectionError(request))
+      .recoverWith(connectionError(httpClient, request, mapResponse, attempt))
 
   private def processResponse[ResultType](request: Request[IO], mapResponse: ResponseMapping[ResultType])(
       response:                                    Response[IO]) =
@@ -112,16 +120,28 @@ abstract class IORestClient[ThrottlingTarget](throttler: Throttler[IO, Throttlin
     case NonFatal(cause) => IO.raiseError(MappingError(ExceptionMessage(request, response, cause), cause))
   }
 
-  private def connectionError[T](request: Request[IO]): PartialFunction[Throwable, IO[T]] = {
+  private def connectionError[T](httpClient:  Client[IO],
+                                 request:     Request[IO],
+                                 mapResponse: ResponseMapping[T],
+                                 attempt:     Int): PartialFunction[Throwable, IO[T]] = {
     case error: RestClientError =>
       throttler.release *> IO.raiseError(error)
     case NonFatal(cause) =>
-      throttler.release *> IO.raiseError(new RuntimeException(ExceptionMessage(request, cause), cause))
+      cause match {
+        case exception: ConnectException if attempt <= maxRetries.value =>
+          logger.warn(ExceptionMessage(request, s"timed out -> retrying attempt $attempt", exception))
+          timer.sleep(retryInterval) *> callRemote(httpClient, request, mapResponse, attempt + 1)
+        case other =>
+          throttler.release *> IO.raiseError(new Exception(ExceptionMessage(request, other), other))
+      }
   }
 
   private type ResponseMapping[ResultType] = PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
 
   private object ExceptionMessage {
+
+    def apply(request: Request[IO], message: String, cause: Throwable): String =
+      s"${request.method} ${request.uri} $message error: ${toSingleLine(cause.getMessage)}"
 
     def apply(request: Request[IO], cause: Throwable): String =
       s"${request.method} ${request.uri} error: ${toSingleLine(cause.getMessage)}"
@@ -134,4 +154,14 @@ abstract class IORestClient[ThrottlingTarget](throttler: Throttler[IO, Throttlin
 
     private def toSingleLine(string: String): String = string.split('\n').map(_.trim.filter(_ >= ' ')).mkString
   }
+}
+
+private object IORestClient {
+  import eu.timepit.refined.auto._
+
+  import scala.concurrent.duration._
+  import scala.language.postfixOps
+
+  private val SleepAfterConnectionIssue:        FiniteDuration          = 10 seconds
+  private val MaxRetriesAfterConnectionTimeout: Int Refined NonNegative = 10
 }

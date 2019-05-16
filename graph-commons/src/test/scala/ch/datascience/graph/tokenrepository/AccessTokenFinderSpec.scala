@@ -18,11 +18,12 @@
 
 package ch.datascience.graph.tokenrepository
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.http4s.Status
@@ -105,7 +106,8 @@ class AccessTokenFinderSpec extends WordSpec with ExternalServiceStubbing with M
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
     val tokenRepositoryUrl = ServiceUrl(externalServiceBaseUrl)
@@ -118,6 +120,6 @@ class AccessTokenFinderSpec extends WordSpec with ExternalServiceStubbing with M
         .expects()
         .returning(returning)
 
-    val accessTokenFinder = new IOAccessTokenFinder(configProvider)
+    val accessTokenFinder = new IOAccessTokenFinder(configProvider, TestLogger())
   }
 }
