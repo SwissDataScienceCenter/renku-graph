@@ -71,7 +71,7 @@ private class HookCreator[Interpretation[_]](
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[CreationResult] = {
     for {
       projectHookUrl      <- right(findProjectHookUrl)
-      hookValidation      <- right(validateHook(projectId, accessToken))
+      hookValidation      <- right(validateHook(projectId, Some(accessToken)))
       _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
       projectInfo         <- right(findProjectInfo(projectId, Some(accessToken)))
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))

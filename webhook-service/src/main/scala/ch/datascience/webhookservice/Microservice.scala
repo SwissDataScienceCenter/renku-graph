@@ -26,7 +26,7 @@ import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.graph.gitlab.{GitLabRateLimitProvider, GitLabThrottler}
 import ch.datascience.http.server.HttpServer
-import ch.datascience.webhookservice.eventprocessing.IOHookEventEndpoint
+import ch.datascience.webhookservice.eventprocessing.{IOHookEventEndpoint, IOProcessingStatusEndpoint}
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
 import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, EventsSynchronizationThrottler, IOEventsSynchronizationScheduler}
@@ -64,7 +64,8 @@ object Microservice extends IOApp {
           serviceRoutes = new MicroserviceRoutes[IO](
             new IOHookEventEndpoint(transactor, gitLabThrottler),
             new IOHookCreationEndpoint(transactor, gitLabThrottler),
-            new IOHookValidationEndpoint(gitLabThrottler)
+            new IOHookValidationEndpoint(gitLabThrottler),
+            new IOProcessingStatusEndpoint(transactor, gitLabThrottler)
           ).routes
         )
 

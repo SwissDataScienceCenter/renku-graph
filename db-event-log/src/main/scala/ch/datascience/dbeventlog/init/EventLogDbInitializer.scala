@@ -43,6 +43,7 @@ class EventLogDbInitializer[Interpretation[_]](
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)", transactor)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)", transactor)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)", transactor)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)", transactor)
       _ <- logger.info("Event Log database initialization success")
     } yield ()
   } recoverWith logging

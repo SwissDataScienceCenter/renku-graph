@@ -30,7 +30,6 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository._
 import io.chrisdavenport.log4cats.Logger
@@ -50,6 +49,7 @@ class HookValidator[Interpretation[_]](
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
 
   import HookValidator.HookValidationResult._
+  import HookValidator._
   import ProjectVisibility._
   import Token._
   import accessTokenAssociator._
@@ -59,8 +59,8 @@ class HookValidator[Interpretation[_]](
   import projectHookVerifier._
   import projectInfoFinder._
 
-  def validateHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[HookValidationResult] =
-    findVisibilityAndToken(projectId, accessToken) flatMap {
+  def validateHook(projectId: ProjectId, maybeAccessToken: Option[AccessToken]): Interpretation[HookValidationResult] =
+    findVisibilityAndToken(projectId, maybeAccessToken) flatMap {
       case (Public, token) =>
         for {
           hookUrl          <- findProjectHookUrl
@@ -84,26 +84,34 @@ class HookValidator[Interpretation[_]](
         } yield validationResult
     } recoverWith loggingError(projectId)
 
-  private def findVisibilityAndToken(projectId:   ProjectId,
-                                     accessToken: AccessToken): Interpretation[(ProjectVisibility, Token)] =
-    findProjectInfo(projectId, Some(accessToken))
-      .map(_.visibility -> (GivenToken(accessToken): Token))
-      .recoverWith(visibilityAndStoredToken(projectId))
+  private def findVisibilityAndToken(
+      projectId:        ProjectId,
+      maybeAccessToken: Option[AccessToken]): Interpretation[(ProjectVisibility, Token)] =
+    maybeAccessToken match {
+      case None =>
+        findVisibilityAndStoredToken(projectId)
+      case Some(accessToken) =>
+        findProjectInfo(projectId, maybeAccessToken)
+          .map(_.visibility -> (GivenToken(accessToken): Token))
+          .recoverWith(visibilityAndStoredToken(projectId))
+    }
 
   private def visibilityAndStoredToken(
       projectId: ProjectId
   ): PartialFunction[Throwable, Interpretation[(ProjectVisibility, Token)]] = {
-    case UnauthorizedException => {
-      for {
-        storedAccessToken <- findAccessToken(projectId) flatMap getOrError(projectId)
-        projectInfo       <- findProjectInfo(projectId, Some(storedAccessToken.value))
-      } yield projectInfo.visibility -> storedAccessToken
-    } recoverWith storedAccessTokenError(projectId)
+    case UnauthorizedException => findVisibilityAndStoredToken(projectId)
   }
+
+  private def findVisibilityAndStoredToken(projectId: ProjectId) = {
+    for {
+      storedAccessToken <- findAccessToken(projectId) flatMap getOrError(projectId)
+      projectInfo       <- findProjectInfo(projectId, Some(storedAccessToken.value))
+    } yield projectInfo.visibility -> storedAccessToken
+  } recoverWith storedAccessTokenError(projectId)
 
   private def getOrError(projectId: ProjectId): Option[AccessToken] => Interpretation[Token] = {
     case Some(token) => ME.pure(StoredToken(token))
-    case None        => ME.raiseError[Token](new Exception(s"No access token found for projectId $projectId"))
+    case None        => ME.raiseError[Token](NoAccessTokenException(s"No access token found for projectId $projectId"))
   }
 
   private def storedAccessTokenError(
@@ -139,6 +147,8 @@ object HookValidator {
     final case object HookExists  extends HookValidationResult
     final case object HookMissing extends HookValidationResult
   }
+
+  final case class NoAccessTokenException(message: String) extends RuntimeException(message)
 }
 
 class IOHookValidator(

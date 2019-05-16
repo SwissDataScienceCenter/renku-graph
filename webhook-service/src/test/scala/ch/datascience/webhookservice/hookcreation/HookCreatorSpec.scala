@@ -54,8 +54,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
@@ -92,8 +92,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(HookExists))
 
       hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookExisted
@@ -123,8 +123,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (projectHookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.raiseError(exception))
 
       intercept[Exception] {
@@ -141,8 +141,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       val exception = exceptions.generateOne
@@ -165,8 +165,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
@@ -194,8 +194,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
@@ -228,8 +228,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
@@ -267,8 +267,8 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
