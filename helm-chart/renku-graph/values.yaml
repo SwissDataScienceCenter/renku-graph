@@ -12,7 +12,7 @@ tokenRepository:
     port: 9003
   resources:
     limits:
-      memory: 100Mi
+      memory: 250Mi
   connectionPool: 3
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
@@ -29,13 +29,15 @@ triplesGenerator:
     port: 9002
   resources:
     limits:
-      memory: 1500Mi
+      memory: 2000Mi
   renkuLogTimeout: 60 minutes
   gitlab:
     rateLimit: 50/sec
-  threadsNumber: 2
+  ## a demanded number of concurrent triples generation processes
+  generationProcessesNumber: 2
+  threadsNumber: 4
   dbEventLog:
-    connectionPool: 2
+    connectionPool: 3
 
 webhookService:
   image:
@@ -47,7 +49,10 @@ webhookService:
     port: 80
   resources:
     limits:
-      memory: 300Mi
+      memory: 350Mi
+  eventsSynchronization:
+    initialDelay: 2 minutes
+    interval: 30 minutes
   gitlab:
     rateLimit: 50/sec
   threadsNumber: 4

@@ -54,8 +54,8 @@ object Microservice extends IOApp {
       for {
         renkuLogTimeout <- new RenkuLogTimeoutConfigProvider[IO].get
 
-        eventProcessorRunner = new EventsSource[IO](new DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
-          .withEventsProcessor(new IOCommitEventProcessor(transactor, renkuLogTimeout))
+        eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
+                                 .withEventsProcessor(new IOCommitEventProcessor(transactor, renkuLogTimeout))
 
         exitCode <- new MicroserviceRunner(
                      new SentryInitializer[IO],

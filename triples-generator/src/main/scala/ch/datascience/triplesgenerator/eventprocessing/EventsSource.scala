@@ -23,11 +23,12 @@ import ch.datascience.dbeventlog.EventBody
 import scala.language.higherKinds
 
 class EventsSource[Interpretation[_]](
-    newRunner: EventProcessor[Interpretation] => EventProcessorRunner[Interpretation]
+    newRunner: EventProcessor[Interpretation] => Interpretation[EventProcessorRunner[Interpretation]]
 ) {
 
-  def withEventsProcessor(eventProcessor: EventProcessor[Interpretation]): EventProcessorRunner[Interpretation] =
-    newRunner(eventProcessor)
+  def withEventsProcessor(
+      eventProcessor: EventProcessor[Interpretation]
+  ): Interpretation[EventProcessorRunner[Interpretation]] = newRunner(eventProcessor)
 }
 
 abstract class EventProcessor[Interpretation[_]] extends (EventBody => Interpretation[Unit])
