@@ -49,7 +49,7 @@ webhookService:
     port: 80
   resources:
     limits:
-      memory: 350Mi
+      memory: 500Mi
   eventsSynchronization:
     initialDelay: 2 minutes
     interval: 30 minutes
