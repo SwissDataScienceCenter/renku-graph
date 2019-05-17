@@ -34,6 +34,7 @@ import doobie.implicits._
 import doobie.util.fragments._
 
 import scala.language.higherKinds
+import scala.util.Random
 
 private object EventLogFetch {
   val MaxProcessingTime: Duration = Duration.of(10, MINUTES)
@@ -54,7 +55,7 @@ class EventLogFetch[Interpretation[_]](
 
   private def findEventAndUpdateForProcessing =
     for {
-      maybeIdAndProjectAndBody <- findOldestEvent
+      maybeIdAndProjectAndBody <- findProjectsOldestEvents map selectRandom
       maybeBody                <- markAsProcessing(maybeIdAndProjectAndBody)
     } yield maybeBody
 
@@ -69,8 +70,27 @@ class EventLogFetch[Interpretation[_]](
   }.query[EventIdAndBody].option
   // format: on
 
+  // format: off
+  private def findProjectsOldestEvents = {
+    fr"""select event_log.event_id, event_log.project_id, event_log.event_body
+         from event_log, (select  project_id, min(execution_date) as oldest_execution_date
+                          from event_log
+                          where (""" ++ `status IN`(New, TriplesStoreFailure) ++ fr""" and execution_date < ${now()})
+                            or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
+                          group by project_id) oldest_events
+         where event_log.project_id = oldest_events.project_id 
+           and event_log.execution_date = oldest_events.oldest_execution_date"""
+  }.query[EventIdAndBody].to[List]
+  // format: on
+
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
+
+  private lazy val selectRandom: List[EventIdAndBody] => Option[EventIdAndBody] = {
+    case Nil           => None
+    case single +: Nil => Some(single)
+    case many          => many.get(Random.nextInt(many.size))
+  }
 
   private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventBody]] = {
     case None => Free.pure[ConnectionOp, Option[EventBody]](None)

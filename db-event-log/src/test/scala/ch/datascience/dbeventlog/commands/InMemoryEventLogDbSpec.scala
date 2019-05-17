@@ -24,6 +24,7 @@ import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog._
 import ch.datascience.graph.model.events._
 import doobie.implicits._
+import doobie.util.fragment.Fragment
 import org.scalatest.TestSuite
 
 trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
@@ -62,13 +63,16 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
       .map(_ => ())
   }
 
-  protected def findEvents(status: EventStatus): List[(CommitEventId, ExecutionDate)] = execute {
-    sql"""select event_id, project_id, execution_date
-         |from event_log 
-         |where status = $status
-         |order by created_date asc
-         """.stripMargin
-      .query[(CommitEventId, ExecutionDate)]
-      .to[List]
-  }
+  // format: off
+  protected def findEvents(status:  EventStatus,
+                           orderBy: Fragment = fr"created_date asc"): List[(CommitEventId, ExecutionDate)] =
+    execute {
+      (fr"""select event_id, project_id, execution_date
+            from event_log 
+            where status = $status
+            order by """ ++ orderBy)
+        .query[(CommitEventId, ExecutionDate)]
+        .to[List]
+    }
+  // format: on
 }
