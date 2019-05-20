@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.eventprocessing.pushevent
 
 import java.time.{LocalDateTime, ZoneOffset}
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -31,6 +31,7 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfigProvider._
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.interpreters.TestLogger
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
@@ -159,7 +160,8 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
     val gitLabUrl     = url(externalServiceBaseUrl)
@@ -193,7 +195,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
         .expects()
         .returning(returning)
 
-    val finder = new IOCommitInfoFinder(configProvider, Throttler.noThrottling)
+    val finder = new IOCommitInfoFinder(configProvider, Throttler.noThrottling, TestLogger())
 
     private def url(value: String) =
       RefType

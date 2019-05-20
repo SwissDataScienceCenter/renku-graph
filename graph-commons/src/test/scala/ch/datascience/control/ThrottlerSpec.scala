@@ -38,87 +38,63 @@ class ThrottlerSpec extends WordSpec {
 
     "enforce processing with throughput not greater than demanded" in new TestCase {
 
+      val tasksNumber = 20
+
       val startTime = {
         for {
           throttler <- Throttler[IO, ThrottlingTarget](RateLimit(10L, per = 1 second))
-          startTime <- timer.clock.monotonic(MILLISECONDS)
-          _         <- (1 to 20).map(useThrottledResource(_, throttler)).toList.parSequence
+          startTime <- clock.monotonic(MILLISECONDS)
+          _         <- processConcurrently(tasksNumber, use = throttler)
         } yield startTime
       }.unsafeRunSync()
 
-      val startDelays = register.asScala.values
-        .map(greenLight => greenLight - startTime)
-        .toList
-        .sorted
-        .foldLeft(List.empty[Long]) {
-          case (diffs, item) => diffs :+ item - diffs.sum
-        }
+      val startDelays = tasksStartDelays(startTime)
       startDelays.tail foreach { delay =>
-        delay should be >= (100L - (100L * 0.30).toLong)
+        delay should be >= (100 - (100 * 0.30).toLong)
       }
 
-      val totalTime = register.asScala.values
-        .map(greenLight => greenLight - startTime)
-        .sum
-      totalTime should be > (startDelays.size * 100L)
+      totalTasksProcessingTime(startTime) should be > (tasksNumber * 100L)
     }
 
     "not sequence work items but process them in parallel" in new TestCase {
 
+      val tasksNumber = 20
+
       val startTime = {
         for {
           throttler <- Throttler[IO, ThrottlingTarget](RateLimit(200L, per = 1 second))
-          startTime <- timer.clock.monotonic(MILLISECONDS)
-          _         <- (1 to 20).map(useThrottledResource(_, throttler, processingTime = 500 millis)).toList.parSequence
+          startTime <- clock.monotonic(MILLISECONDS)
+          _         <- processConcurrently(tasksNumber, use = throttler, taskProcessingTime = Some(500 millis))
         } yield startTime
       }.unsafeRunSync()
 
-      val startDelays = register.asScala.values
-        .map(greenLight => greenLight - startTime)
-        .toList
-        .sorted
-        .foldLeft(List.empty[Long]) {
-          case (diffs, item) => diffs :+ item - diffs.sum
-        }
+      val startDelays = tasksStartDelays(startTime)
       startDelays foreach { delay =>
-        delay should be < 1000L
+        delay should be < (1000 + (1000 * 0.30).toLong)
       }
 
-      val totalTime = register.asScala.values
-        .map(greenLight => greenLight - startTime)
-        .sum
-      totalTime should be < (startDelays.size * 500L)
+      totalTasksProcessingTime(startTime) should be < (tasksNumber * 500L)
     }
   }
 
   "noThrottling" should {
 
     "return Throttler which does not do anything to the throughput" in new TestCase {
-      val throttler = Throttler.noThrottling[IO, Any]
+
+      val tasksNumber = 20
 
       val startTime = {
         for {
-          startTime <- timer.clock.monotonic(MILLISECONDS)
-          _         <- (1 to 20).map(useThrottledResource(_, throttler)).toList.parSequence
+          startTime <- clock.monotonic(MILLISECONDS)
+          _         <- processConcurrently(tasksNumber, use = Throttler.noThrottling[IO, Any])
         } yield startTime
       }.unsafeRunSync()
 
-      val startDelays = register.asScala.values
-        .map(greenLight => greenLight - startTime)
-        .toList
-        .sorted
-        .foldLeft(List.empty[Long]) {
-          case (Nil, item)   => List(item)
-          case (diffs, item) => diffs :+ item - diffs.sum
-        }
-      startDelays foreach { delay =>
+      tasksStartDelays(startTime) foreach { delay =>
         delay should be < 1000L
       }
 
-      val totalTime = register.asScala.values
-        .map(greenLight => greenLight - startTime)
-        .sum
-      totalTime should be < (5 * 500L)
+      totalTasksProcessingTime(startTime) should be < (5 * 500L)
     }
   }
 
@@ -131,16 +107,35 @@ class ThrottlerSpec extends WordSpec {
     val context  = MonadError[IO, Throwable]
     val register = new ConcurrentHashMap[String, Long]()
 
-    def useThrottledResource[Target](name:           Int,
-                                     throttler:      Throttler[IO, Target],
-                                     processingTime: FiniteDuration = 0 seconds): IO[Unit] =
+    def processConcurrently[ThrottlingTarget](tasks:              Int,
+                                              use:                Throttler[IO, ThrottlingTarget],
+                                              taskProcessingTime: Option[FiniteDuration] = None) =
+      ((1 to tasks) map (useThrottledResource(_, use, taskProcessingTime))).toList.parSequence
+
+    private def useThrottledResource[Target](name:               Int,
+                                             throttler:          Throttler[IO, Target],
+                                             taskProcessingTime: Option[FiniteDuration]): IO[Unit] =
       for {
         _          <- throttler.acquire
         greenLight <- clock.monotonic(MILLISECONDS)
         _          <- context.pure(register.put(name.toString, greenLight))
-        _          <- timer.sleep(processingTime)
+        _          <- taskProcessingTime.map(timer.sleep) getOrElse IO.unit
         _          <- throttler.release
       } yield ()
+
+    def tasksStartDelays(startTime: Long) =
+      register.asScala.values
+        .map(greenLight => greenLight - startTime)
+        .toList
+        .sorted
+        .foldLeft(List.empty[Long]) {
+          case (diffs, item) => diffs :+ item - diffs.sum
+        }
+
+    def totalTasksProcessingTime(startTime: Long) =
+      register.asScala.values
+        .map(greenLight => greenLight - startTime)
+        .sum
   }
 
   private trait ThrottlingTarget

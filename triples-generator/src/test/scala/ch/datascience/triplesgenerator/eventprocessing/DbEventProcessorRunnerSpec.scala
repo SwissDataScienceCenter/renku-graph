@@ -28,6 +28,7 @@ import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
+import com.typesafe.config.ConfigFactory
 import doobie.util.transactor.Transactor
 import org.scalacheck.Gen.listOfN
 import org.scalamock.scalatest.MockFactory
@@ -55,7 +56,7 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
         IO.unit
       }
 
-      eventsSource.withEventsProcessor(processor).run.unsafeRunAsyncAndForget()
+      eventSourceWith(processor).run.unsafeRunAsyncAndForget()
 
       eventually {
         accumulator.keySet().asScala shouldBe events.toSet
@@ -87,7 +88,7 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
           IO.unit
         }
 
-      eventsSource.withEventsProcessor(processor).run.unsafeRunAsyncAndForget()
+      eventSourceWith(processor).run.unsafeRunAsyncAndForget()
 
       eventually {
         accumulator.keySet().asScala shouldBe Set(eventBody1, eventBody3)
@@ -124,8 +125,13 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
         !eventsQueue.isEmpty
       }
     }
-    val logger              = TestLogger[IO]()
-    private val eventRunner = new DbEventProcessorRunner(_, eventLogFetch, logger)
-    val eventsSource        = new EventsSource[IO](eventRunner)
+
+    val logger               = TestLogger[IO]()
+    private val config       = ConfigFactory.parseMap(Map("generation-processes-number" -> 5).asJava)
+    private val eventRunner  = DbEventProcessorRunner(_, eventLogFetch, config, logger)
+    private val eventsSource = new EventsSource[IO](eventRunner)
+
+    def eventSourceWith(processor: EventProcessor[IO]): EventProcessorRunner[IO] =
+      eventsSource.withEventsProcessor(processor).unsafeRunSync()
   }
 }

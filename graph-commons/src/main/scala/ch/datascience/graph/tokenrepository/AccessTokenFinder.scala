@@ -18,10 +18,11 @@
 
 package ch.datascience.graph.tokenrepository
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.{AccessToken, IORestClient}
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -31,9 +32,10 @@ trait AccessTokenFinder[Interpretation[_]] {
 }
 
 class IOAccessTokenFinder(
-    tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO]
-)(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient(Throttler.noThrottling)
+    tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO],
+    logger:                     Logger[IO]
+)(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORestClient(Throttler.noThrottling, logger)
     with AccessTokenFinder[IO] {
 
   import cats.effect._

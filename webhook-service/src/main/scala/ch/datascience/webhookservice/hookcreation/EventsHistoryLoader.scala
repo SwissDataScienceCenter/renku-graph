@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{Clock, ContextShift, IO}
+import cats.effect._
 import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
@@ -79,9 +79,9 @@ private class EventsHistoryLoader[Interpretation[_]](
 private class IOEventsHistoryLoader(
     transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends EventsHistoryLoader[IO](
-      new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler),
+      new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
       new IOPushEventSender(transactor, gitLabThrottler),
       ApplicationLogger
     )

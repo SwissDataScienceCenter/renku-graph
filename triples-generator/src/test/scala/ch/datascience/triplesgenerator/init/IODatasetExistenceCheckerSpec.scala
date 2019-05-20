@@ -18,9 +18,10 @@
 
 package ch.datascience.triplesgenerator.init
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -71,12 +72,13 @@ class IODatasetExistenceCheckerSpec extends WordSpec with ExternalServiceStubbin
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
     val fusekiBaseUrl = ServiceUrl(externalServiceBaseUrl)
     val fusekiConfig  = fusekiConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
 
-    val datasetExistenceChecker = new IODatasetExistenceChecker
+    val datasetExistenceChecker = new IODatasetExistenceChecker(TestLogger())
   }
 }
