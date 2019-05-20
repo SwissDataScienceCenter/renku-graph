@@ -22,7 +22,7 @@ import cats.effect.Bracket
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogLatestEvent, EventLogVerifyExistence}
+import ch.datascience.dbeventlog.commands.EventLogVerifyExistence
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender
@@ -32,26 +32,20 @@ import scala.util.Try
 
 class TryPushEventSender(
     accessTokenFinder:     AccessTokenFinder[Try],
-    commitEventsFinder:    CommitEventsFinder[Try],
+    commitEventsSource:    CommitEventsSourceBuilder[Try],
     commitEventSender:     CommitEventSender[Try],
     logger:                Logger[Try],
     executionTimeRecorder: ExecutionTimeRecorder[Try]
 ) extends PushEventSender[Try](accessTokenFinder,
-                                 commitEventsFinder,
+                                 commitEventsSource,
                                  commitEventSender,
                                  logger,
                                  executionTimeRecorder)
 
-private class TryCommitEventsFinder(
+private class TryCommitEventsSourceBuilder(
     commitInfoFinder:        CommitInfoFinder[Try],
-    latestEventFinder:       EventLogLatestEvent[Try],
     eventLogVerifyExistence: EventLogVerifyExistence[Try]
-) extends CommitEventsFinder[Try](commitInfoFinder, latestEventFinder, eventLogVerifyExistence)
-
-private class TryEventLogLatestEvent(
-    transactor: DbTransactor[Try, EventLogDB]
-)(implicit ME:  Bracket[Try, Throwable])
-    extends EventLogLatestEvent[Try](transactor)
+) extends CommitEventsSourceBuilder[Try](commitInfoFinder, eventLogVerifyExistence)
 
 private class TryEventLogVerifyExistence(
     transactor: DbTransactor[Try, EventLogDB]

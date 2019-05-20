@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.pushevents
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{accessTokens, oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
@@ -26,6 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfigProvider.HostUrl
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
@@ -172,7 +173,8 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
     val gitLabUrl      = url(externalServiceBaseUrl)
@@ -187,7 +189,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
         .expects()
         .returning(returning)
 
-    val pushEventFetcher = new IOLatestPushEventFetcher(configProvider, Throttler.noThrottling)
+    val pushEventFetcher = new IOLatestPushEventFetcher(configProvider, Throttler.noThrottling, TestLogger())
   }
 
   private def pushEvents(projectId: ProjectId, commitIds: Seq[CommitId]) =

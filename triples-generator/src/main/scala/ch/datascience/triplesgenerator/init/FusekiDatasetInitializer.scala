@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.init
 
 import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.triplesgenerator.config.{FusekiConfig, FusekiConfigProvider}
@@ -69,10 +69,11 @@ class FusekiDatasetInitializer[Interpretation[_]](
 
 class IOFusekiDatasetInitializer(
     implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO]
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]
 ) extends FusekiDatasetInitializer[IO](
       new FusekiConfigProvider[IO](),
-      new IODatasetExistenceChecker,
-      new IODatasetExistenceCreator,
+      new IODatasetExistenceChecker(ApplicationLogger),
+      new IODatasetExistenceCreator(ApplicationLogger),
       ApplicationLogger
     )

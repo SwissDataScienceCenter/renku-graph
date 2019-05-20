@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookvalidation
 
 import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.gitlab.GitLab
@@ -153,13 +153,13 @@ object HookValidator {
 
 class IOHookValidator(
     gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends HookValidator[IO](
-      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
+      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
       new IOProjectHookUrlFinder,
-      new IOProjectHookVerifier(new GitLabConfigProvider[IO], gitLabThrottler),
-      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]),
-      new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO]),
-      new IOAccessTokenRemover(new TokenRepositoryUrlProvider[IO]),
+      new IOProjectHookVerifier(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
+      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO], ApplicationLogger),
+      new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO], ApplicationLogger),
+      new IOAccessTokenRemover(new TokenRepositoryUrlProvider[IO], ApplicationLogger),
       ApplicationLogger
     )

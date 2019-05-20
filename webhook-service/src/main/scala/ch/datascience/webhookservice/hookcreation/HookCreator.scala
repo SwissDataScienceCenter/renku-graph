@@ -18,10 +18,10 @@
 
 package ch.datascience.webhookservice.hookcreation
 
+import cats.MonadError
 import cats.data.EitherT
 import cats.effect._
 import cats.implicits._
-import cats.{Monad, MonadError}
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
@@ -117,14 +117,14 @@ private object HookCreator {
 private class IOHookCreator(
     transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookCreator[IO](
       new IOProjectHookUrlFinder,
       new IOHookValidator(gitLabThrottler),
-      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
+      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
       HookTokenCrypto[IO],
-      new IOProjectHookCreator(new GitLabConfigProvider[IO], gitLabThrottler),
-      new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO]()),
+      new IOProjectHookCreator(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
+      new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
       new IOEventsHistoryLoader(transactor, gitLabThrottler),
       ApplicationLogger
     )

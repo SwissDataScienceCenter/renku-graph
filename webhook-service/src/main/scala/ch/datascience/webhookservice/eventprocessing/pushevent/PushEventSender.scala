@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.eventprocessing.pushevent
 
-import cats.effect.{Clock, ContextShift, IO}
+import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.control.Throttler
@@ -39,35 +39,48 @@ import scala.util.control.NonFatal
 
 class PushEventSender[Interpretation[_]: Monad](
     accessTokenFinder:     AccessTokenFinder[Interpretation],
-    commitEventsFinder:    CommitEventsFinder[Interpretation],
+    commitEventsSource:    CommitEventsSourceBuilder[Interpretation],
     commitEventSender:     CommitEventSender[Interpretation],
     logger:                Logger[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
 
-  import SendingResult._
+  import PushEventSender.SendingResult
+  import PushEventSender.SendingResult._
   import accessTokenFinder._
   import commitEventSender._
-  import commitEventsFinder._
+  import commitEventsSource._
   import executionTimeRecorder._
 
   def storeCommitsInEventLog(pushEvent: PushEvent): Interpretation[Unit] =
     measureExecutionTime {
       for {
         maybeAccessToken   <- findAccessToken(pushEvent.project.id)
-        commitEventsStream <- findCommitEvents(pushEvent, maybeAccessToken)
-        sendingResults     <- (commitEventsStream map sendEvent(pushEvent)).sequence
+        commitEventsSource <- buildEventsSource(pushEvent, maybeAccessToken)
+        sendingResults     <- commitEventsSource transformEventsWith sendEvent(pushEvent) recoverWith findingEventException
       } yield sendingResults
     } flatMap logSummary(pushEvent) recoverWith loggingError(pushEvent)
 
-  private def sendEvent(pushEvent: PushEvent)(maybeCommitEvent: Interpretation[CommitEvent]) = {
-    for {
-      commitEvent <- maybeCommitEvent recoverWith fetchErrorLogging
-      _           <- send(commitEvent) recoverWith sendErrorLogging(commitEvent)
-    } yield Stored: SendingResult
-  } recover withLogging(pushEvent)
+  private def sendEvent(pushEvent: PushEvent)(commitEvent: CommitEvent): Interpretation[SendingResult] =
+    send(commitEvent)
+      .map(_ => Stored: SendingResult)
+      .recover(sendErrorLogging(pushEvent, commitEvent))
 
-  private def logSummary(pushEvent: PushEvent): ((ElapsedTime, Stream[SendingResult])) => Interpretation[Unit] = {
+  private def sendErrorLogging(pushEvent:   PushEvent,
+                               commitEvent: CommitEvent): PartialFunction[Throwable, SendingResult] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(logMessageFor(pushEvent, "storing in the event log failed", Some(commitEvent)))
+      SendingResult.Failed
+  }
+
+  private lazy val findingEventException: PartialFunction[Throwable, Interpretation[List[SendingResult]]] = {
+    case NonFatal(exception) => ME.raiseError(EventFindingException(exception))
+  }
+
+  private case class EventFindingException(cause: Throwable)
+      extends RuntimeException("finding commit events failed", cause)
+
+  private def logSummary(pushEvent: PushEvent): ((ElapsedTime, List[SendingResult])) => Interpretation[Unit] = {
     case (elapsedTime, sendingResults) =>
       val groupedByType = sendingResults groupBy identity
       val stored        = groupedByType.get(Stored).map(_.size).getOrElse(0)
@@ -81,46 +94,12 @@ class PushEventSender[Interpretation[_]: Monad](
   }
 
   private def loggingError(pushEvent: PushEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case exception @ EventFindingException(cause) =>
+      logger.error(cause)(logMessageFor(pushEvent, exception.getMessage))
+      ME.raiseError(cause)
     case NonFatal(exception) =>
-      logger.error(exception)(logMessageFor(pushEvent, "storing in event log failed"))
+      logger.error(exception)(logMessageFor(pushEvent, "converting to commit events failed"))
       ME.raiseError(exception)
-  }
-
-  private case class CommitEventProcessingException(
-      maybeCommitEvent: Option[CommitEvent],
-      message:          String,
-      cause:            Throwable
-  ) extends Exception
-
-  private lazy val fetchErrorLogging: PartialFunction[Throwable, Interpretation[CommitEvent]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(
-        CommitEventProcessingException(
-          maybeCommitEvent = None,
-          message          = "fetching one of the commit events failed",
-          cause            = exception
-        )
-      )
-  }
-
-  private def sendErrorLogging(commitEvent: CommitEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(
-        CommitEventProcessingException(
-          maybeCommitEvent = Some(commitEvent),
-          message          = "storing in event log failed",
-          cause            = exception
-        )
-      )
-  }
-
-  private def withLogging(pushEvent: PushEvent): PartialFunction[Throwable, SendingResult] = {
-    case CommitEventProcessingException(maybeCommitEvent, message, cause) =>
-      logger.error(cause)(logMessageFor(pushEvent, message, maybeCommitEvent))
-      SendingResult.Failed
-    case NonFatal(exception) =>
-      ME.raiseError(exception)
-      SendingResult.Failed
   }
 
   private def logMessageFor(
@@ -132,9 +111,11 @@ class PushEventSender[Interpretation[_]: Monad](
       s"project: ${pushEvent.project.id}" +
       s"${maybeCommitEvent.map(_.id).map(id => s", CommitEvent id: $id").getOrElse("")}" +
       s": $message"
+}
 
-  private sealed trait SendingResult extends Product with Serializable
-  private object SendingResult {
+private object PushEventSender {
+  sealed trait SendingResult extends Product with Serializable
+  object SendingResult {
     final case object Stored extends SendingResult
     final case object Failed extends SendingResult
   }
@@ -143,10 +124,10 @@ class PushEventSender[Interpretation[_]: Monad](
 class IOPushEventSender(
     transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends PushEventSender[IO](
-      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
-      new IOCommitEventsFinder(transactor, gitLabThrottler),
+      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
+      new IOCommitEventsSourceBuilder(transactor, gitLabThrottler),
       new IOCommitEventSender(transactor),
       ApplicationLogger,
       new ExecutionTimeRecorder[IO]

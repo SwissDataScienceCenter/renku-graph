@@ -19,12 +19,13 @@
 package ch.datascience.webhookservice.pushevents
 
 import LatestPushEventFetcher.PushEventInfo
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
+import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
@@ -48,9 +49,10 @@ object LatestPushEventFetcher {
 
 class IOLatestPushEventFetcher(
     gitLabConfig:            GitLabConfigProvider[IO],
-    gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient(gitLabThrottler)
+    gitLabThrottler:         Throttler[IO, GitLab],
+    logger:                  Logger[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORestClient(gitLabThrottler, logger)
     with LatestPushEventFetcher[IO] {
 
   import cats.implicits._

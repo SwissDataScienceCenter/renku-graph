@@ -80,9 +80,9 @@ class IOEventsSynchronizationScheduler(
       new SchedulerConfigProvider[IO](),
       new IOMissedEventsLoader(
         new IOEventLogLatestEvents(transactor),
-        new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO]()),
-        new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler),
-        new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler),
+        new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
+        new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
+        new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
         new IOPushEventSender(transactor, gitLabThrottler),
         eventsSynchronizationThrottler,
         ApplicationLogger,
