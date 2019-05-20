@@ -27,8 +27,8 @@ import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
+import ch.datascience.webhookservice.eventprocessing.StartCommit
+import ch.datascience.webhookservice.eventprocessing.startcommit.CommitToEventLog
 import ch.datascience.webhookservice.project.{ProjectInfo, ProjectInfoFinder}
 import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher
 import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
@@ -46,7 +46,7 @@ private class IOMissedEventsLoader(
     accessTokenFinder:      AccessTokenFinder[IO],
     latestPushEventFetcher: LatestPushEventFetcher[IO],
     projectInfoFinder:      ProjectInfoFinder[IO],
-    pushEventSender:        PushEventSender[IO],
+    commitToEventLog:       CommitToEventLog[IO],
     throttler:              Throttler[IO, EventsSynchronization],
     logger:                 Logger[IO],
     executionTimeRecorder:  ExecutionTimeRecorder[IO]
@@ -59,7 +59,7 @@ private class IOMissedEventsLoader(
   import executionTimeRecorder._
   import latestPushEventFetcher._
   import projectInfoFinder._
-  import pushEventSender._
+  import commitToEventLog._
 
   def loadMissedEvents: IO[Unit] =
     measureExecutionTime {
@@ -99,16 +99,15 @@ private class IOMissedEventsLoader(
       case Some(pushEventInfo) =>
         for {
           projectInfo <- findProjectInfo(latestLogEvent.projectId, maybeAccessToken)
-          pushEvent   <- constructPushEvent(pushEventInfo, projectInfo)
-          _           <- storeCommitsInEventLog(pushEvent)
+          startCommit <- startCommitFrom(pushEventInfo, projectInfo)
+          _           <- storeCommitsInEventLog(startCommit)
         } yield Updated
     }
 
-  private def constructPushEvent(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = IO.pure {
-    PushEvent(
-      maybeCommitFrom = None,
-      commitTo        = pushEventInfo.commitTo,
-      project         = Project(projectInfo.id, projectInfo.path)
+  private def startCommitFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = IO.pure {
+    StartCommit(
+      id      = pushEventInfo.commitTo,
+      project = Project(projectInfo.id, projectInfo.path)
     )
   }
 

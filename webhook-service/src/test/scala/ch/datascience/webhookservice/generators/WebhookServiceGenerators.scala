@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.generators
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import ch.datascience.webhookservice.eventprocessing.PushEvent
+import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.model._
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.project.SelfUrlConfigProvider.SelfUrl
@@ -32,11 +32,10 @@ import org.scalacheck.Gen
 
 object WebhookServiceGenerators {
 
-  implicit val pushEvents: Gen[PushEvent] = for {
-    maybeBefore <- Gen.option(commitIds)
-    after       <- commitIds
-    project     <- projects
-  } yield PushEvent(maybeBefore, after, project)
+  implicit val startCommits: Gen[StartCommit] = for {
+    id      <- commitIds
+    project <- projects
+  } yield StartCommit(id, project)
 
   implicit val serializedHookTokens: Gen[SerializedHookToken] = nonEmptyStrings().map { value =>
     RefType

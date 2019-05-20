@@ -20,8 +20,7 @@ package ch.datascience.webhookservice.eventprocessing
 
 import ch.datascience.graph.model.events.{CommitId, Project}
 
-final case class PushEvent(
-    maybeCommitFrom: Option[CommitId],
-    commitTo:        CommitId,
-    project:         Project
+final case class StartCommit(
+    id:      CommitId,
+    project: Project
 )

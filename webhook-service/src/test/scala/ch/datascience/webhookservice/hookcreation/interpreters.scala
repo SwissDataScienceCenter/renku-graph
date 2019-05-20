@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
-import ch.datascience.webhookservice.eventprocessing.pushevent.PushEventSender
+import ch.datascience.webhookservice.eventprocessing.startcommit.CommitToEventLog
 import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher
 import io.chrisdavenport.log4cats.Logger
 
@@ -27,7 +27,7 @@ import scala.util.Try
 
 private class TryEventsHistoryLoader(
     latestPushEventFetcher: LatestPushEventFetcher[Try],
-    pushEventSender:        PushEventSender[Try],
+    commitToEventLog:       CommitToEventLog[Try],
     logger:                 Logger[Try]
 )(implicit ME:              MonadError[Try, Throwable])
-    extends EventsHistoryLoader[Try](latestPushEventFetcher, pushEventSender, logger)
+    extends EventsHistoryLoader[Try](latestPushEventFetcher, commitToEventLog, logger)

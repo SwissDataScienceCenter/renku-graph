@@ -30,8 +30,8 @@ import ch.datascience.graph.model.events.Project
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
+import ch.datascience.webhookservice.eventprocessing.StartCommit
+import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import ch.datascience.webhookservice.project.ProjectInfo
 import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
 import ch.datascience.webhookservice.pushevents._
@@ -43,28 +43,27 @@ import scala.util.control.NonFatal
 
 private class EventsHistoryLoader[Interpretation[_]](
     latestPushEventFetcher: LatestPushEventFetcher[Interpretation],
-    pushEventSender:        PushEventSender[Interpretation],
+    commitToEventLog:       CommitToEventLog[Interpretation],
     logger:                 Logger[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable]) {
 
   import latestPushEventFetcher._
-  import pushEventSender._
+  import commitToEventLog._
 
   def loadAllEvents(projectInfo: ProjectInfo, accessToken: AccessToken): Interpretation[Unit] = {
     for {
       latestPushEvent <- OptionT(fetchLatestPushEvent(projectInfo.id, Some(accessToken)))
-      pushEvent       <- OptionT.liftF(pushEventFrom(latestPushEvent, projectInfo))
-      _               <- OptionT.liftF(storeCommitsInEventLog(pushEvent))
+      startCommit     <- OptionT.liftF(startCommitFrom(latestPushEvent, projectInfo))
+      _               <- OptionT.liftF(storeCommitsInEventLog(startCommit))
     } yield ()
   }.value
     .flatMap(_ => ME.unit)
     .recoverWith(loggingError(projectInfo))
 
-  private def pushEventFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = ME.pure {
-    PushEvent(
-      maybeCommitFrom = None,
-      commitTo        = pushEventInfo.commitTo,
-      project         = Project(projectInfo.id, projectInfo.path)
+  private def startCommitFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = ME.pure {
+    StartCommit(
+      id      = pushEventInfo.commitTo,
+      project = Project(projectInfo.id, projectInfo.path)
     )
   }
 
@@ -81,6 +80,6 @@ private class IOEventsHistoryLoader(
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends EventsHistoryLoader[IO](
       new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
-      new IOPushEventSender(transactor, gitLabThrottler),
+      new IOCommitToEventLog(transactor, gitLabThrottler),
       ApplicationLogger
     )

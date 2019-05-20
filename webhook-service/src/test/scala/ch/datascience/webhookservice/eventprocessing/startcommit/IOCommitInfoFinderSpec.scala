@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.pushevent
+package ch.datascience.webhookservice.eventprocessing.startcommit
 
 import java.time.{LocalDateTime, ZoneOffset}
 

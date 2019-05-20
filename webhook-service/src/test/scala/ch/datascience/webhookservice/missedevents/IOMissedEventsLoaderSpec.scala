@@ -33,8 +33,8 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info, Warn}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
+import ch.datascience.webhookservice.eventprocessing.StartCommit
+import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.project.ProjectInfoFinder
 import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher
@@ -96,9 +96,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         .returning(context.pure(projectInfo2))
 
       givenStoring(
-        PushEvent(maybeCommitFrom = None,
-                  commitTo        = pushEventInfo2.commitTo,
-                  project         = Project(projectInfo2.id, projectInfo2.path))
+        StartCommit(id = pushEventInfo2.commitTo, project = Project(projectInfo2.id, projectInfo2.path))
       ).returning(IO.unit)
 
       givenThrottlerAccessed(latestEventsList.size)
@@ -227,9 +225,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         .returning(context.pure(projectInfo1))
       val exception = exceptions.generateOne
       givenStoring(
-        PushEvent(maybeCommitFrom = None,
-                  commitTo        = pushEventInfo1.commitTo,
-                  project         = Project(projectInfo1.id, projectInfo1.path))
+        StartCommit(id = pushEventInfo1.commitTo, project = Project(projectInfo1.id, projectInfo1.path))
       ).returning(IO.raiseError(exception))
 
       givenPushAndLogEventsMatch(event2)
@@ -266,7 +262,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     val accessTokenFinder      = mock[AccessTokenFinder[IO]]
     val latestPushEventFetcher = mock[LatestPushEventFetcher[IO]]
     val projectInfoFinder      = mock[ProjectInfoFinder[IO]]
-    val pushEventSender        = mock[IOPushEventSender]
+    val commitToEventLog       = mock[IOCommitToEventLog]
     val logger                 = TestLogger[IO]()
     val throttler              = mock[Throttler[IO, EventsSynchronization]]
     val executionTimeRecorder  = TestExecutionTimeRecorder[IO](expected = ElapsedTime(10))
@@ -275,7 +271,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       accessTokenFinder,
       latestPushEventFetcher,
       projectInfoFinder,
-      pushEventSender,
+      commitToEventLog,
       throttler,
       logger,
       executionTimeRecorder
@@ -311,9 +307,9 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
         .expects(latestEvent.projectId, maybeAccessToken)
 
-    def givenStoring(pushEvent: PushEvent) =
-      (pushEventSender
-        .storeCommitsInEventLog(_: PushEvent))
+    def givenStoring(pushEvent: StartCommit) =
+      (commitToEventLog
+        .storeCommitsInEventLog(_: StartCommit))
         .expects(pushEvent)
 
     def givenThrottlerAccessed(times: Int) = {

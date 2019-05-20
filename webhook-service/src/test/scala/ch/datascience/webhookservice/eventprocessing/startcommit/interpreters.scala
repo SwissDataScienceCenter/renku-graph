@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.pushevent
+package ch.datascience.webhookservice.eventprocessing.startcommit
 
 import cats.effect.Bracket
 import cats.implicits._
@@ -30,17 +30,17 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
-class TryPushEventSender(
+class TryCommitToEventLog(
     accessTokenFinder:     AccessTokenFinder[Try],
     commitEventsSource:    CommitEventsSourceBuilder[Try],
     commitEventSender:     CommitEventSender[Try],
     logger:                Logger[Try],
     executionTimeRecorder: ExecutionTimeRecorder[Try]
-) extends PushEventSender[Try](accessTokenFinder,
-                                 commitEventsSource,
-                                 commitEventSender,
-                                 logger,
-                                 executionTimeRecorder)
+) extends CommitToEventLog[Try](accessTokenFinder,
+                                  commitEventsSource,
+                                  commitEventSender,
+                                  logger,
+                                  executionTimeRecorder)
 
 private class TryCommitEventsSourceBuilder(
     commitInfoFinder:        CommitInfoFinder[Try],

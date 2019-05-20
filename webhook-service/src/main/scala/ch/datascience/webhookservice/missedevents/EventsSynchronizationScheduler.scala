@@ -29,7 +29,7 @@ import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.tokenrepository.{IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
+import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
 import ch.datascience.webhookservice.project.IOProjectInfoFinder
 import ch.datascience.webhookservice.pushevents.IOLatestPushEventFetcher
 
@@ -83,7 +83,7 @@ class IOEventsSynchronizationScheduler(
         new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
         new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
         new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
-        new IOPushEventSender(transactor, gitLabThrottler),
+        new IOCommitToEventLog(transactor, gitLabThrottler),
         eventsSynchronizationThrottler,
         ApplicationLogger,
         new ExecutionTimeRecorder[IO]

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.pushevent
+package ch.datascience.webhookservice.eventprocessing.startcommit
 
 import cats.MonadError
 import cats.implicits._
@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators.pushEvents
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators.startCommits
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -42,18 +42,18 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
       "if found commit info has no parents " +
       "and there are no events in the Event Log" in new TestCase {
 
-      givenNonExistingInLog(in = pushEvent.commitTo, out = pushEvent.commitTo)
+      givenNonExistingInLog(in = startCommit.id, out = startCommit.id)
 
-      val commitInfo = commitInfos(pushEvent.commitTo, noParents).generateOne
+      val commitInfo = commitInfos(startCommit.id, noParents).generateOne
       givenFindingCommitInfoReturns(commitInfo)
 
       source.transformEventsWith(send) shouldBe context.pure(List(commitInfo.id))
     }
 
     "do not map any commit events with the transform function " +
-      "if Push Event's 'commitTo' matches the latest event from the Event Log" in new TestCase {
+      "if Start Commit's 'commitTo' matches the latest event from the Event Log" in new TestCase {
 
-      givenNonExistingInLog(in = List(pushEvent.commitTo), out = Nil)
+      givenNonExistingInLog(in = List(startCommit.id), out = Nil)
 
       source.transformEventsWith(send) shouldBe context.pure(Nil)
     }
@@ -61,7 +61,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
     "map commit events with the transform function " +
       "starting from the 'commitTo' to the ancestor matching the latest event in the Event Log" in new TestCase {
 
-      val level1Info = commitInfos(pushEvent.commitTo, singleParent).generateOne
+      val level1Info = commitInfos(startCommit.id, singleParent).generateOne
 
       val level2Infos = level1Info.parents map { parentId =>
         commitInfos(parentId, singleParent).generateOne
@@ -84,7 +84,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
       "starting from the 'commitTo' to the oldest ancestor " +
       "if there are no events in the Event Log" in new TestCase {
 
-      val level1Info = commitInfos(pushEvent.commitTo, singleParent).generateOne
+      val level1Info = commitInfos(startCommit.id, singleParent).generateOne
 
       val level2Infos = level1Info.parents map { parentId =>
         commitInfos(parentId, singleParent).generateOne
@@ -109,7 +109,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
       val level1Parent1 = commitIds.generateOne
       val level1Parent2 = commitIds.generateOne
-      val level1Info    = commitInfos(pushEvent.commitTo, level1Parent1, level1Parent2).generateOne
+      val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
 
       val level2Commit2Parent = commitIds.generateOne
       val level2Infos @ _ +: level2Info2 +: Nil = List(
@@ -132,7 +132,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
       val level1Parent1 = CommitId("0000000000000000000000000000000000000000")
       val level1Parent2 = commitIds.generateOne
-      val level1Info    = commitInfos(pushEvent.commitTo, level1Parent1, level1Parent2).generateOne
+      val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
       val level2Info    = commitInfos(level1Parent2, noParents).generateOne
 
       givenFindingCommitInfoReturns(level1Info, level2Info)
@@ -146,12 +146,12 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
     "fail mapping the Commit Events " +
       "if verifying existence of parent ids in the Event Log fails" in new TestCase {
 
-      val commitInfo = commitInfos(pushEvent.commitTo, parentsIdsLists(minNumber = 2)).generateOne
+      val commitInfo = commitInfos(startCommit.id, parentsIdsLists(minNumber = 2)).generateOne
 
       val exception = exceptions.generateOne
       (eventLogVerifyExistence
         .filterNotExistingInLog(_: List[CommitId], _: ProjectId))
-        .expects(List(commitInfo.id), pushEvent.project.id)
+        .expects(List(commitInfo.id), startCommit.project.id)
         .returning(context.raiseError(exception))
 
       source.transformEventsWith(send) shouldBe context.raiseError(exception)
@@ -160,7 +160,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
     "fail mapping the Commit Events " +
       "if finding commit info fails" in new TestCase {
 
-      val level1Info = commitInfos(pushEvent.commitTo, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
+      val level1Info = commitInfos(startCommit.id, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
       val level2Infos @ level2Info1 +: level2Info2 +: Nil = level1Info.parents map { parentId =>
         commitInfos(parentId, noParents).generateOne
       }
@@ -170,7 +170,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
       (commitInfoFinder
         .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
-        .expects(pushEvent.project.id, level2Info1.id, maybeAccessToken)
+        .expects(startCommit.project.id, level2Info1.id, maybeAccessToken)
         .returning(context.raiseError(exception))
 
       givenNonExistingInLog(in = level1Info.id, out          = level1Info.id)
@@ -184,7 +184,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
       val level1Parent1 = commitIds.generateOne
       val level1Parent2 = commitIds.generateOne
-      val level1Info    = commitInfos(pushEvent.commitTo, level1Parent1, level1Parent2).generateOne
+      val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
 
       val level2Infos @ level2Info1 +: _ = List(
         commitInfos(level1Parent1, noParents).generateOne,
@@ -206,14 +206,14 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
-    val pushEvent        = pushEvents.generateOne
+    val startCommit      = startCommits.generateOne
     val maybeAccessToken = Gen.option(accessTokens).generateOne
 
     val send: CommitEvent => Try[CommitId] = event => Try(event.id)
     val commitInfoFinder        = mock[CommitInfoFinder[Try]]
     val eventLogVerifyExistence = mock[TryEventLogVerifyExistence]
     private val sourceBuilder   = new CommitEventsSourceBuilder[Try](commitInfoFinder, eventLogVerifyExistence)
-    val Success(source)         = sourceBuilder.buildEventsSource(pushEvent, maybeAccessToken)
+    val Success(source)         = sourceBuilder.buildEventsSource(startCommit, maybeAccessToken)
 
     def givenFindingCommitInfoReturns(commitInfo: CommitInfo, otherInfos: Seq[CommitInfo]*): Unit =
       givenFindingCommitInfoReturns(commitInfo +: otherInfos.flatten: _*)
@@ -222,7 +222,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
       commitInfos foreach { commitInfo =>
         (commitInfoFinder
           .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
-          .expects(pushEvent.project.id, commitInfo.id, maybeAccessToken)
+          .expects(startCommit.project.id, commitInfo.id, maybeAccessToken)
           .returning(context pure commitInfo)
       }
 
@@ -232,7 +232,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
     def givenNonExistingInLog(in: List[CommitId], out: List[CommitId]): Unit =
       (eventLogVerifyExistence
         .filterNotExistingInLog(_: List[CommitId], _: ProjectId))
-        .expects(in, pushEvent.project.id)
+        .expects(in, startCommit.project.id)
         .returning(context pure out)
   }
 
