@@ -42,7 +42,6 @@ object LatestPushEventFetcher {
 
   final case class PushEventInfo(
       projectId: ProjectId,
-      pushUser:  PushUser,
       commitTo:  CommitId
   )
 }
@@ -82,15 +81,9 @@ class IOLatestPushEventFetcher(
   private implicit lazy val pushEventInfoDecoder: EntityDecoder[IO, Option[PushEventInfo]] = {
     implicit val hookNameDecoder: Decoder[Option[PushEventInfo]] = (cursor: HCursor) =>
       for {
-        maybeProjectId      <- cursor.downArray.downField("project_id").as[Option[ProjectId]]
-        maybeAuthorId       <- cursor.downArray.downField("author_id").as[Option[UserId]]
-        maybeAuthorUsername <- cursor.downArray.downField("author_username").as[Option[Username]]
-        maybeCommitTo       <- cursor.downArray.downField("push_data").downField("commit_to").as[Option[CommitId]]
-      } yield
-        (maybeProjectId, maybeAuthorId, maybeAuthorUsername, maybeCommitTo) mapN {
-          case (projectId, authorId, authorUsername, commitTo) =>
-            PushEventInfo(projectId, PushUser(authorId, authorUsername, maybeEmail = None), commitTo)
-      }
+        maybeProjectId <- cursor.downArray.downField("project_id").as[Option[ProjectId]]
+        maybeCommitTo  <- cursor.downArray.downField("push_data").downField("commit_to").as[Option[CommitId]]
+      } yield (maybeProjectId, maybeCommitTo) mapN PushEventInfo.apply
 
     jsonOf[IO, Option[PushEventInfo]]
   }

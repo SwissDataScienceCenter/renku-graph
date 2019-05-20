@@ -35,9 +35,8 @@ object WebhookServiceGenerators {
   implicit val pushEvents: Gen[PushEvent] = for {
     maybeBefore <- Gen.option(commitIds)
     after       <- commitIds
-    pushUser    <- pushUsers
     project     <- projects
-  } yield PushEvent(maybeBefore, after, pushUser, project)
+  } yield PushEvent(maybeBefore, after, project)
 
   implicit val serializedHookTokens: Gen[SerializedHookToken] = nonEmptyStrings().map { value =>
     RefType
@@ -65,7 +64,6 @@ object WebhookServiceGenerators {
 
   implicit val pushEventInfos: Gen[PushEventInfo] = for {
     projectId <- projectIds
-    pushUser  <- pushUsers
     commitTo  <- commitIds
-  } yield PushEventInfo(projectId, pushUser, commitTo)
+  } yield PushEventInfo(projectId, commitTo)
 }

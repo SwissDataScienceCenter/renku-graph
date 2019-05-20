@@ -247,16 +247,15 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
         commitEvent <- commitEventFrom(pushEvent)
       } yield
         commitEvent +: commitEvent.parents
-          .map(commitEventFrom(_, pushEvent.pushUser, pushEvent.project).generateOne)
+          .map(commitEventFrom(_, pushEvent.project).generateOne)
 
     def commitEventFrom(pushEvent: PushEvent): Gen[CommitEvent] =
       commitEventFrom(
         pushEvent.commitTo,
-        pushEvent.pushUser,
         pushEvent.project
       )
 
-    def commitEventFrom(commitId: CommitId, pushUser: PushUser, project: Project): Gen[CommitEvent] =
+    def commitEventFrom(commitId: CommitId, project: Project): Gen[CommitEvent] =
       for {
         message       <- commitMessages
         committedDate <- committedDates
@@ -268,7 +267,6 @@ class PushEventSenderSpec extends WordSpec with MockFactory {
           id            = commitId,
           message       = message,
           committedDate = committedDate,
-          pushUser      = pushUser,
           author        = author,
           committer     = committer,
           parents       = parentsIds,

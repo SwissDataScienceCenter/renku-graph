@@ -117,17 +117,8 @@ private object HookEventEndpoint {
     for {
       maybeCommitFrom <- cursor.downField("before").as[Option[CommitId]]
       commitTo        <- cursor.downField("after").as[CommitId]
-      userId          <- cursor.downField("user_id").as[UserId]
-      username        <- cursor.downField("user_username").as[Username]
-      maybeEmail      <- cursor.downField("user_email").as[Option[String]].flatMap(emptyToNone)
       project         <- cursor.downField("project").as[Project]
-    } yield
-      PushEvent(
-        maybeCommitFrom,
-        commitTo,
-        PushUser(userId, username, maybeEmail),
-        project
-      )
+    } yield PushEvent(maybeCommitFrom, commitTo, project)
   }
 
   private lazy val emptyToNone: Option[String] => Either[DecodingFailure, Option[Email]] = {

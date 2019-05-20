@@ -94,8 +94,8 @@ private class IOMissedEventsLoader(
                                  maybePushEventInfo: Option[PushEventInfo],
                                  maybeAccessToken:   Option[AccessToken]) =
     maybePushEventInfo match {
-      case None                                         => IO.pure(Skipped)
-      case Some(PushEventInfo(_, _, latestLogEvent.id)) => IO.pure(Skipped)
+      case None                                      => IO.pure(Skipped)
+      case Some(PushEventInfo(_, latestLogEvent.id)) => IO.pure(Skipped)
       case Some(pushEventInfo) =>
         for {
           projectInfo <- findProjectInfo(latestLogEvent.projectId, maybeAccessToken)
@@ -108,7 +108,6 @@ private class IOMissedEventsLoader(
     PushEvent(
       maybeCommitFrom = None,
       commitTo        = pushEventInfo.commitTo,
-      pushUser        = pushEventInfo.pushUser,
       project         = Project(projectInfo.id, projectInfo.path)
     )
   }

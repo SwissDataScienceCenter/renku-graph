@@ -98,7 +98,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       givenStoring(
         PushEvent(maybeCommitFrom = None,
                   commitTo        = pushEventInfo2.commitTo,
-                  pushUser        = pushEventInfo2.pushUser,
                   project         = Project(projectInfo2.id, projectInfo2.path))
       ).returning(IO.unit)
 
@@ -230,7 +229,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       givenStoring(
         PushEvent(maybeCommitFrom = None,
                   commitTo        = pushEventInfo1.commitTo,
-                  pushUser        = pushEventInfo1.pushUser,
                   project         = Project(projectInfo1.id, projectInfo1.path))
       ).returning(IO.raiseError(exception))
 

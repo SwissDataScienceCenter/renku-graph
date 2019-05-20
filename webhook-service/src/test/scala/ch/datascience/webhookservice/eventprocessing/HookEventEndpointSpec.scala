@@ -152,20 +152,21 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
   "PushEvent deserialization" should {
 
-    "work if 'user_email' is present" in new TestCase {
+    "work if 'before' is present" in new TestCase {
       import HookEventEndpoint.pushEventDecoder
 
-      val pushEventWithEmail = pushEvent.copy(pushUser = pushEvent.pushUser.copy(maybeEmail = Some(emails.generateOne)))
+      val commitFrom              = commitIds.generateOne
+      val pushEventWithCommitFrom = pushEvent.copy(maybeCommitFrom = Some(commitFrom))
 
-      pushEventPayloadFrom(pushEventWithEmail).as[PushEvent] shouldBe Right(pushEventWithEmail)
+      pushEventPayloadFrom(pushEventWithCommitFrom).as[PushEvent] shouldBe Right(pushEventWithCommitFrom)
     }
 
-    "work if 'user_email' is empty" in new TestCase {
+    "work if 'before' is null" in new TestCase {
       import HookEventEndpoint.pushEventDecoder
 
-      val pushEventWithEmail = pushEvent.copy(pushUser = pushEvent.pushUser.copy(maybeEmail = None))
+      val pushEventWithoutCommitFrom = pushEvent.copy(maybeCommitFrom = None)
 
-      pushEventPayloadFrom(pushEventWithEmail).as[PushEvent] shouldBe Right(pushEventWithEmail)
+      pushEventPayloadFrom(pushEventWithoutCommitFrom).as[PushEvent] shouldBe Right(pushEventWithoutCommitFrom)
     }
   }
 
@@ -189,22 +190,20 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
       pushEventSender
     ).processPushEvent _
 
-    def pushEventPayloadFrom(pushEvent: PushEvent) =
-      Json.obj(
-        Seq(
-          pushEvent.maybeCommitFrom.map(before => "before" -> Json.fromString(before.value)),
-          Some("after"         -> Json.fromString(pushEvent.commitTo.value)),
-          Some("user_id"       -> Json.fromInt(pushEvent.pushUser.userId.value)),
-          Some("user_username" -> Json.fromString(pushEvent.pushUser.username.value)),
-          Some("user_email"    -> Json.fromString(pushEvent.pushUser.maybeEmail.map(_.value).getOrElse(""))),
-          Some(
-            "project" -> Json.obj(
-              "id"                  -> Json.fromInt(pushEvent.project.id.value),
-              "path_with_namespace" -> Json.fromString(pushEvent.project.path.value)
-            )
-          )
-        ).flatten: _*
-      )
+    def pushEventPayloadFrom(pushEvent: PushEvent) = json"""
+      {                                                      
+        "after": ${pushEvent.commitTo.value},
+        "project": {
+          "id":                  ${pushEvent.project.id.value},
+          "path_with_namespace": ${pushEvent.project.path.value}
+        }
+      }
+    """ deepMerge Json.obj(
+      pushEvent.maybeCommitFrom match {
+        case Some(commitFrom) => "before" -> Json.fromString(commitFrom.value)
+        case None             => "before" -> Json.Null
+      }
+    )
 
     def expectDecryptionOf(hookAuthToken: SerializedHookToken, returning: HookToken) =
       (hookTokenCrypto

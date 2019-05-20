@@ -60,7 +60,6 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
       pushEventFetcher.fetchLatestPushEvent(projectId, Some(personalAccessToken)).unsafeRunSync() shouldBe Some(
         PushEventInfo(
           projectId = projectId,
-          pushUser  = PushUser(UserId(5), Username("user.name"), maybeEmail = None),
           commitTo  = commitsIdsList.head
         )
       )
@@ -79,7 +78,6 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
       pushEventFetcher.fetchLatestPushEvent(projectId, Some(oauthAccessToken)).unsafeRunSync() shouldBe Some(
         PushEventInfo(
           projectId = projectId,
-          pushUser  = PushUser(UserId(5), Username("user.name"), maybeEmail = None),
           commitTo  = commitsIdsList.head
         )
       )
@@ -96,7 +94,6 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
       pushEventFetcher.fetchLatestPushEvent(projectId, maybeAccessToken = None).unsafeRunSync() shouldBe Some(
         PushEventInfo(
           projectId = projectId,
-          pushUser  = PushUser(UserId(5), Username("user.name"), maybeEmail = None),
           commitTo  = commitsIdsList.head
         )
       )

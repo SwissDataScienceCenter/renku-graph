@@ -88,17 +88,15 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
       findCommitInfo(pushEvent.project.id, commitId, maybeAccessToken)
         .map(commitInfo => merge(commitInfo, pushEvent))
 
-    private def merge(commitInfo: CommitInfo, pushEvent: PushEvent): CommitEvent =
-      CommitEvent(
-        id            = commitInfo.id,
-        message       = commitInfo.message,
-        committedDate = commitInfo.committedDate,
-        pushUser      = pushEvent.pushUser,
-        author        = commitInfo.author,
-        committer     = commitInfo.committer,
-        parents       = commitInfo.parents.filterNot(_ == DontCareCommitId),
-        project       = pushEvent.project
-      )
+    private def merge(commitInfo: CommitInfo, pushEvent: PushEvent) = CommitEvent(
+      id            = commitInfo.id,
+      message       = commitInfo.message,
+      committedDate = commitInfo.committedDate,
+      author        = commitInfo.author,
+      committer     = commitInfo.committer,
+      parents       = commitInfo.parents.filterNot(_ == DontCareCommitId),
+      project       = pushEvent.project
+    )
   }
 }
 
