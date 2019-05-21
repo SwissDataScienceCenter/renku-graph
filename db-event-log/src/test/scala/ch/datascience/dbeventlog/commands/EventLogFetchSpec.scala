@@ -30,6 +30,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitEventId, ProjectId}
 import doobie.implicits._
+import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

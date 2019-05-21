@@ -29,6 +29,7 @@ import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.{CommitEvent, CommitId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder, IOCommitInfoFinder}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.startcommit.CommitEventsSourceBuilder.EventsFlowBuilder

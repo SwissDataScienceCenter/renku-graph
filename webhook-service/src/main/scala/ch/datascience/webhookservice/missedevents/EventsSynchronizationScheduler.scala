@@ -31,7 +31,7 @@ import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
 import ch.datascience.webhookservice.project.IOProjectInfoFinder
-import ch.datascience.webhookservice.pushevents.IOLatestPushEventFetcher
+import ch.datascience.webhookservice.commits.IOLatestCommitFinder
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -81,7 +81,7 @@ class IOEventsSynchronizationScheduler(
       new IOMissedEventsLoader(
         new IOEventLogLatestEvents(transactor),
         new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
-        new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
+        new IOLatestCommitFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
         new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
         new IOCommitToEventLog(transactor, gitLabThrottler),
         eventsSynchronizationThrottler,

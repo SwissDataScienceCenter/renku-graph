@@ -26,6 +26,8 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.AccessToken
+import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder}
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators.startCommits
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -241,20 +243,9 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
   private def commitInfos(commitId: CommitId, parentsGenerator: Gen[List[CommitId]]): Gen[CommitInfo] =
     for {
-      message       <- commitMessages
-      committedDate <- committedDates
-      author        <- users
-      committer     <- users
-      parentsIds    <- parentsGenerator
-    } yield
-      CommitInfo(
-        id            = commitId,
-        message       = message,
-        committedDate = committedDate,
-        author        = author,
-        committer     = committer,
-        parents       = parentsIds
-      )
+      info       <- WebhookServiceGenerators.commitInfos
+      parentsIds <- parentsGenerator
+    } yield info.copy(id = commitId, parents = parentsIds)
 
   private val noParents: Gen[List[CommitId]] = Gen.const(List.empty)
 

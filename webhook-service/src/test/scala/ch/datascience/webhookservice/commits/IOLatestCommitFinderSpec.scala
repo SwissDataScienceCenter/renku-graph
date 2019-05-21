@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.pushevents
+package ch.datascience.webhookservice.commits
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
@@ -24,101 +24,91 @@ import ch.datascience.generators.CommonGraphGenerators.{accessTokens, oauthAcces
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfigProvider.HostUrl
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
 import io.circe.Json
+import io.circe.literal._
 import org.http4s.Status
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
 
-  "findLatestPushEvent" should {
+  "findLatestCommit" should {
 
-    "return latest fetched PushEvent if remote responds with OK and valid body - personal access token case" in new TestCase {
+    "return latest Commit info if remote responds with OK and valid body - personal access token case" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/events?action=pushed")
+        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
           .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(okJson(pushEvents(projectId, commitsIdsList)))
+          .willReturn(okJson(commitsJson(from = commitInfo)))
       }
 
-      pushEventFetcher.fetchLatestPushEvent(projectId, Some(personalAccessToken)).unsafeRunSync() shouldBe Some(
-        PushEventInfo(
-          projectId = projectId,
-          commitTo  = commitsIdsList.head
-        )
+      latestCommitFinder.findLatestCommit(projectId, Some(personalAccessToken)).value.unsafeRunSync() shouldBe Some(
+        commitInfo
       )
     }
 
-    "return latest fetched PushEvent if remote responds with OK and valid body - oauth token case" in new TestCase {
+    "return latest Commit info if remote responds with OK and valid body - oauth token case" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
       val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/events?action=pushed")
+        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
           .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(okJson(pushEvents(projectId, commitsIdsList)))
+          .willReturn(okJson(commitsJson(from = commitInfo)))
       }
 
-      pushEventFetcher.fetchLatestPushEvent(projectId, Some(oauthAccessToken)).unsafeRunSync() shouldBe Some(
-        PushEventInfo(
-          projectId = projectId,
-          commitTo  = commitsIdsList.head
-        )
+      latestCommitFinder.findLatestCommit(projectId, Some(oauthAccessToken)).value.unsafeRunSync() shouldBe Some(
+        commitInfo
       )
     }
 
-    "return latest fetched PushEvent if remote responds with OK and valid body - no token case" in new TestCase {
+    "return latest Commit info if remote responds with OK and valid body - no token case" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/events?action=pushed")
-          .willReturn(okJson(pushEvents(projectId, commitsIdsList)))
+        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
+          .willReturn(okJson(commitsJson(from = commitInfo)))
       }
 
-      pushEventFetcher.fetchLatestPushEvent(projectId, maybeAccessToken = None).unsafeRunSync() shouldBe Some(
-        PushEventInfo(
-          projectId = projectId,
-          commitTo  = commitsIdsList.head
-        )
+      latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync() shouldBe Some(
+        commitInfo
       )
     }
 
-    "return None if remote responds with OK and no events" in new TestCase {
+    "return None if remote responds with OK and no commits" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/events?action=pushed")
+        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
           .willReturn(okJson("[]"))
       }
 
-      pushEventFetcher.fetchLatestPushEvent(projectId, maybeAccessToken = None).unsafeRunSync() shouldBe None
+      latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync() shouldBe None
     }
 
     "return None if remote responds with NOT_FOUND" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/events?action=pushed")
+        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
           .willReturn(notFound())
       }
 
-      pushEventFetcher.fetchLatestPushEvent(projectId, maybeAccessToken = None).unsafeRunSync() shouldBe None
+      latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync() shouldBe None
     }
 
     "fail if fetching the the config fails" in new TestCase {
@@ -126,7 +116,7 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
       expectGitLabConfigProvider(returning = IO.raiseError(exception))
 
       intercept[Exception] {
-        pushEventFetcher.fetchLatestPushEvent(projectId, maybeAccessToken = None).unsafeRunSync()
+        latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -134,12 +124,12 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/events?action=pushed")
+        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
           .willReturn(unauthorized())
       }
 
       intercept[Exception] {
-        pushEventFetcher.fetchLatestPushEvent(projectId, maybeAccessToken = None).unsafeRunSync()
+        latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -147,26 +137,26 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/events?action=pushed")
+        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
           .willReturn(badRequest().withBody("some error"))
       }
 
       intercept[Exception] {
-        pushEventFetcher.fetchLatestPushEvent(projectId, maybeAccessToken = None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/events?action=pushed returned ${Status.BadRequest}; body: some error"
+        latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync()
+      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits?per_page=1 returned ${Status.BadRequest}; body: some error"
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
       expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/events?action=pushed")
+        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
           .willReturn(okJson("{}"))
       }
 
       intercept[Exception] {
-        pushEventFetcher.fetchLatestPushEvent(projectId, maybeAccessToken = None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/events?action=pushed returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+        latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync()
+      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits?per_page=1 returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
   }
 
@@ -174,10 +164,10 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val gitLabUrl      = url(externalServiceBaseUrl)
-    val projectId      = projectIds.generateOne
-    val accessToken    = accessTokens.generateOne
-    val commitsIdsList = Gen.listOfN(positiveInts(max = 3).generateOne.value, commitIds).generateOne
+    val gitLabUrl   = url(externalServiceBaseUrl)
+    val projectId   = projectIds.generateOne
+    val accessToken = accessTokens.generateOne
+    val commitInfo  = commitInfos.generateOne
 
     val configProvider = mock[IOGitLabConfigProvider]
 
@@ -186,20 +176,23 @@ class IOLatestPushEventFetcherSpec extends WordSpec with MockFactory with Extern
         .expects()
         .returning(returning)
 
-    val pushEventFetcher = new IOLatestPushEventFetcher(configProvider, Throttler.noThrottling, TestLogger())
+    val latestCommitFinder = new IOLatestCommitFinder(configProvider, Throttler.noThrottling, TestLogger())
   }
 
-  private def pushEvents(projectId: ProjectId, commitIds: Seq[CommitId]) =
-    Json.arr(commitIds map pushEvent(projectId): _*).noSpaces
+  private def commitsJson(from: CommitInfo) =
+    Json.arr(commitJson(from)).noSpaces
 
-  private def pushEvent(projectId: ProjectId)(commitId: CommitId) = Json.obj(
-    "project_id"      -> Json.fromInt(projectId.value),
-    "author_id"       -> Json.fromInt(5),
-    "author_username" -> Json.fromString("user.name"),
-    "push_data" -> Json.obj(
-      "commit_to" -> Json.fromString(commitId.value)
-    )
-  )
+  private def commitJson(commitInfo: CommitInfo) = json"""
+    {
+      "id":              ${commitInfo.id.value},
+      "author_name":     ${commitInfo.author.username.value},
+      "author_email":    ${commitInfo.author.email.value},
+      "committer_name":  ${commitInfo.committer.username.value},
+      "committer_email": ${commitInfo.committer.email.value},
+      "message":         ${commitInfo.message.value},
+      "committed_date":  ${commitInfo.committedDate.value},
+      "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
+    }"""
 
   private def url(value: String) =
     RefType

@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice.missedevents
 
 import cats.MonadError
+import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
 import ch.datascience.control.Throttler
 import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
@@ -33,11 +34,12 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info, Warn}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.webhookservice.commits.{CommitInfo, LatestCommitFinder}
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.project.ProjectInfoFinder
-import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher
+import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -55,7 +57,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 0 skipped, 0 failed"))
+      logger.logged(Info("Synchronized Commits with GitLab in 10ms: 0 updates, 0 skipped, 0 failed"))
     }
 
     "do nothing if the latest eventIds in the Event Log " +
@@ -65,14 +67,14 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
-      givenPushAndLogEventsMatch(latestEventsList: _*)
+      givenLatestCommitsAndLogEventsMatch(latestEventsList: _*)
 
       givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(
-        Info(s"Synchronized Push Events with GitLab in 10ms: 0 updates, ${latestEventsList.size} skipped, 0 failed")
+        Info(s"Synchronized Commits with GitLab in 10ms: 0 updates, ${latestEventsList.size} skipped, 0 failed")
       )
     }
 
@@ -84,26 +86,26 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       givenFetchLogLatestEvents
         .returning(context.pure(latestEventsList))
 
-      givenPushAndLogEventsMatch(event1, event3)
+      givenLatestCommitsAndLogEventsMatch(event1, event3)
 
       val maybeAccessToken2 = Gen.option(accessTokens).generateOne
       givenAccessToken(event2.projectId, maybeAccessToken2)
-      val pushEventInfo2 = pushEventInfos.generateOne.copy(event2.projectId)
-      givenFetchLatestPushEvent(event2, maybeAccessToken2)
-        .returning(IO.pure(Some(pushEventInfo2)))
+      val commitInfo2 = commitInfos.generateOne
+      givenFetchLatestCommit(event2, maybeAccessToken2)
+        .returning(OptionT.some[IO](commitInfo2))
       val projectInfo2 = projectInfos.generateOne.copy(id = event2.projectId)
       givenFindingProjectInfo(event2, maybeAccessToken2)
         .returning(context.pure(projectInfo2))
 
       givenStoring(
-        StartCommit(id = pushEventInfo2.commitTo, project = Project(projectInfo2.id, projectInfo2.path))
+        StartCommit(id = commitInfo2.id, project = Project(projectInfo2.id, projectInfo2.path))
       ).returning(IO.unit)
 
       givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 1 updates, 2 skipped, 0 failed"))
+      logger.logged(Info("Synchronized Commits with GitLab in 10ms: 1 updates, 2 skipped, 0 failed"))
     }
 
     "do nothing if the latest PushEvent does not exists" in new TestCase {
@@ -114,16 +116,16 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       val maybeAccessToken1 = Gen.option(accessTokens).generateOne
       givenAccessToken(event1.projectId, maybeAccessToken1)
-      givenFetchLatestPushEvent(event1, maybeAccessToken1)
-        .returning(IO.pure(None))
+      givenFetchLatestCommit(event1, maybeAccessToken1)
+        .returning(OptionT.none[IO, CommitInfo])
 
-      givenPushAndLogEventsMatch(event2)
+      givenLatestCommitsAndLogEventsMatch(event2)
 
       givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 2 skipped, 0 failed"))
+      logger.logged(Info("Synchronized Commits with GitLab in 10ms: 0 updates, 2 skipped, 0 failed"))
     }
 
     "not break processing if finding Access Token for one of the event(s) fails" in new TestCase {
@@ -140,22 +142,21 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
           .returning(context.raiseError(exception))
       }
 
-      givenPushAndLogEventsMatch(latestEventsList.tail: _*)
+      givenLatestCommitsAndLogEventsMatch(latestEventsList.tail: _*)
 
       givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       latestEventsList.headOption.foreach { event =>
-        logger.logged(Warn(s"Synchronizing Push Events for project ${event.projectId} failed", exception))
+        logger.logged(Warn(s"Synchronizing Commits for project ${event.projectId} failed", exception))
       }
       logger.logged(
-        Info(
-          s"Synchronized Push Events with GitLab in 10ms: 0 updates, ${latestEventsList.tail.size} skipped, 1 failed")
+        Info(s"Synchronized Commits with GitLab in 10ms: 0 updates, ${latestEventsList.tail.size} skipped, 1 failed")
       )
     }
 
-    "not break processing if finding the latest Push Event for one of the events fails" in new TestCase {
+    "not break processing if finding the latest Commit for one of the events fails" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: Nil =
         nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne.toList
@@ -165,18 +166,18 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       val maybeAccessToken1 = Gen.option(accessTokens).generateOne
       givenAccessToken(event1.projectId, maybeAccessToken1)
       val exception = exceptions.generateOne
-      givenFetchLatestPushEvent(event1, maybeAccessToken1)
-        .returning(context.raiseError(exception))
+      givenFetchLatestCommit(event1, maybeAccessToken1)
+        .returning(OptionT.liftF(context.raiseError(exception)))
 
-      givenPushAndLogEventsMatch(event2)
+      givenLatestCommitsAndLogEventsMatch(event2)
 
       givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Warn(s"Synchronizing Push Events for project ${event1.projectId} failed", exception),
-        Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
+        Warn(s"Synchronizing Commits for project ${event1.projectId} failed", exception),
+        Info("Synchronized Commits with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -189,26 +190,26 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       val maybeAccessToken1 = Gen.option(accessTokens).generateOne
       givenAccessToken(event1.projectId, maybeAccessToken1)
-      val pushEventInfo1 = pushEventInfos.generateOne.copy(event2.projectId)
-      givenFetchLatestPushEvent(event1, maybeAccessToken1)
-        .returning(IO.pure(Some(pushEventInfo1)))
+      val commitInfo1 = commitInfos.generateOne
+      givenFetchLatestCommit(event1, maybeAccessToken1)
+        .returning(OptionT.some[IO](commitInfo1))
       val exception = exceptions.generateOne
       givenFindingProjectInfo(event1, maybeAccessToken1)
         .returning(context.raiseError(exception))
 
-      givenPushAndLogEventsMatch(event2)
+      givenLatestCommitsAndLogEventsMatch(event2)
 
       givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Warn(s"Synchronizing Push Events for project ${event1.projectId} failed", exception),
-        Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
+        Warn(s"Synchronizing Commits for project ${event1.projectId} failed", exception),
+        Info("Synchronized Commits with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
       )
     }
 
-    "not break processing if storing Push Event for one of the events fails" in new TestCase {
+    "not break processing if storing start Commit for one of the events fails" in new TestCase {
 
       val latestEventsList @ event1 +: event2 +: Nil =
         nonEmptyList(commitEventIds, minElements = 2, maxElements = 2).generateOne.toList
@@ -217,26 +218,26 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       val maybeAccessToken1 = Gen.option(accessTokens).generateOne
       givenAccessToken(event1.projectId, maybeAccessToken1)
-      val pushEventInfo1 = pushEventInfos.generateOne.copy(event2.projectId)
-      givenFetchLatestPushEvent(event1, maybeAccessToken1)
-        .returning(IO.pure(Some(pushEventInfo1)))
+      val commitInfo1 = commitInfos.generateOne
+      givenFetchLatestCommit(event1, maybeAccessToken1)
+        .returning(OptionT.some[IO](commitInfo1))
       val projectInfo1 = projectInfos.generateOne.copy(id = event1.projectId)
       givenFindingProjectInfo(event1, maybeAccessToken1)
         .returning(context.pure(projectInfo1))
       val exception = exceptions.generateOne
       givenStoring(
-        StartCommit(id = pushEventInfo1.commitTo, project = Project(projectInfo1.id, projectInfo1.path))
+        StartCommit(id = commitInfo1.id, project = Project(projectInfo1.id, projectInfo1.path))
       ).returning(IO.raiseError(exception))
 
-      givenPushAndLogEventsMatch(event2)
+      givenLatestCommitsAndLogEventsMatch(event2)
 
       givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Warn(s"Synchronizing Push Events for project ${event1.projectId} failed", exception),
-        Info("Synchronized Push Events with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
+        Warn(s"Synchronizing Commits for project ${event1.projectId} failed", exception),
+        Info("Synchronized Commits with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -249,7 +250,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         eventsLoader.loadMissedEvents.unsafeRunSync()
       } shouldBe exception
 
-      logger.loggedOnly(Error("Synchronizing Push Events with GitLab failed", exception))
+      logger.loggedOnly(Error("Synchronizing Commits with GitLab failed", exception))
     }
   }
 
@@ -258,18 +259,18 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val eventLogLatestEvents   = mock[IOEventLogLatestEvents]
-    val accessTokenFinder      = mock[AccessTokenFinder[IO]]
-    val latestPushEventFetcher = mock[LatestPushEventFetcher[IO]]
-    val projectInfoFinder      = mock[ProjectInfoFinder[IO]]
-    val commitToEventLog       = mock[IOCommitToEventLog]
-    val logger                 = TestLogger[IO]()
-    val throttler              = mock[Throttler[IO, EventsSynchronization]]
-    val executionTimeRecorder  = TestExecutionTimeRecorder[IO](expected = ElapsedTime(10))
+    val eventLogLatestEvents  = mock[IOEventLogLatestEvents]
+    val accessTokenFinder     = mock[AccessTokenFinder[IO]]
+    val latestCommitFinder    = mock[LatestCommitFinder[IO]]
+    val projectInfoFinder     = mock[ProjectInfoFinder[IO]]
+    val commitToEventLog      = mock[IOCommitToEventLog]
+    val logger                = TestLogger[IO]()
+    val throttler             = mock[Throttler[IO, EventsSynchronization]]
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](expected = ElapsedTime(10))
     val eventsLoader = new IOMissedEventsLoader(
       eventLogLatestEvents,
       accessTokenFinder,
-      latestPushEventFetcher,
+      latestCommitFinder,
       projectInfoFinder,
       commitToEventLog,
       throttler,
@@ -281,19 +282,19 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       (eventLogLatestEvents.findAllLatestEvents _)
         .expects()
 
-    def givenPushAndLogEventsMatch(latestEvents: CommitEventId*): Unit =
+    def givenLatestCommitsAndLogEventsMatch(latestEvents: CommitEventId*): Unit =
       latestEvents foreach { latestEvent =>
         val maybeAccessToken = Gen.option(accessTokens).generateOne
         givenAccessToken(latestEvent.projectId, maybeAccessToken)
 
-        val pushEventInfo = pushEventInfos.generateOne.copy(latestEvent.projectId, commitTo = latestEvent.id)
-        givenFetchLatestPushEvent(latestEvent, maybeAccessToken)
-          .returning(context.pure(Some(pushEventInfo)))
+        val commitInfo = commitInfos.generateOne.copy(id = latestEvent.id)
+        givenFetchLatestCommit(latestEvent, maybeAccessToken)
+          .returning(OptionT.some[IO](commitInfo))
       }
 
-    def givenFetchLatestPushEvent(latestEvent: CommitEventId, maybeAccessToken: Option[AccessToken]) =
-      (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
+    def givenFetchLatestCommit(latestEvent: CommitEventId, maybeAccessToken: Option[AccessToken]) =
+      (latestCommitFinder
+        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
         .expects(latestEvent.projectId, maybeAccessToken)
 
     def givenAccessToken(projectId: ProjectId, maybeAccessToken: Option[AccessToken]) =

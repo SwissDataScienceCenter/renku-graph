@@ -19,6 +19,7 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
+import cats.data.OptionT
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -27,12 +28,11 @@ import ch.datascience.graph.model.events._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.webhookservice.commits.{CommitInfo, LatestCommitFinder}
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.startcommit.TryCommitToEventLog
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.project.ProjectInfo
-import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher
-import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -43,41 +43,40 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
 
   "loadAllEvents" should {
 
-    "fetch latest push event and other missing bits of info, build start Commit and pass it to the Commit to Event Log" in new TestCase {
+    "fetch latest Commit and other missing bits of info, build start Commit and pass it to the CommitToEventLog" in new TestCase {
 
-      val pushEventInfo = pushEventInfoFrom(projectInfo)
-      (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
+      val commitInfo = commitInfos.generateOne
+      (latestCommitFinder
+        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(Some(pushEventInfo)))
+        .returning(OptionT.some[Try](commitInfo))
 
       (commitToEventLog
         .storeCommitsInEventLog(_: StartCommit))
-        .expects(startCommitFrom(pushEventInfo, projectInfo))
+        .expects(startCommitFrom(commitInfo, projectInfo))
         .returning(context.pure(()))
 
       eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe Success(())
     }
 
-    "do nothing if there's no latest push event" in new TestCase {
+    "do nothing if there's no latest Commit" in new TestCase {
 
-      val pushEventInfo = pushEventInfoFrom(projectInfo)
-      (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
+      (latestCommitFinder
+        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(None))
+        .returning(OptionT.none[Try, CommitInfo])
 
       eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe Success(())
     }
 
-    "fail if fetching latest push event fails" in new TestCase {
+    "fail if fetching latest Commit fails" in new TestCase {
 
       val exception = exceptions.generateOne
       val error     = context.raiseError(exception)
-      (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
+      (latestCommitFinder
+        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(error)
+        .returning(OptionT.liftF(error))
 
       eventsHistoryLoader.loadAllEvents(projectInfo, accessToken) shouldBe error
 
@@ -86,11 +85,11 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
 
     "fail if sending start Commit to the Event Log fails" in new TestCase {
 
-      val pushEventInfo = pushEventInfoFrom(projectInfo)
-      (latestPushEventFetcher
-        .fetchLatestPushEvent(_: ProjectId, _: Option[AccessToken]))
+      val commitInfo = commitInfos.generateOne
+      (latestCommitFinder
+        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(Some(pushEventInfo)))
+        .returning(OptionT.some[Try](commitInfo))
 
       val exception = exceptions.generateOne
       val error     = context.raiseError(exception)
@@ -112,22 +111,18 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
 
     val context = MonadError[Try, Throwable]
 
-    val latestPushEventFetcher = mock[LatestPushEventFetcher[Try]]
-    val commitToEventLog       = mock[TryCommitToEventLog]
-    val logger                 = TestLogger[Try]()
+    val latestCommitFinder = mock[LatestCommitFinder[Try]]
+    val commitToEventLog   = mock[TryCommitToEventLog]
+    val logger             = TestLogger[Try]()
     val eventsHistoryLoader = new EventsHistoryLoader[Try](
-      latestPushEventFetcher,
+      latestCommitFinder,
       commitToEventLog,
       logger
     )
   }
 
-  private def pushEventInfoFrom(projectInfo: ProjectInfo) =
-    pushEventInfos.generateOne
-      .copy(projectId = projectInfo.id)
-
-  private def startCommitFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = StartCommit(
-    id      = pushEventInfo.commitTo,
+  private def startCommitFrom(commitInfo: CommitInfo, projectInfo: ProjectInfo) = StartCommit(
+    id      = commitInfo.id,
     project = Project(projectInfo.id, projectInfo.path)
   )
 }

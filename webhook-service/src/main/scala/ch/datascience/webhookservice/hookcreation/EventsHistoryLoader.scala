@@ -29,12 +29,11 @@ import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.Project
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.webhookservice.commits._
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import ch.datascience.webhookservice.project.ProjectInfo
-import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
-import ch.datascience.webhookservice.pushevents._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -42,30 +41,28 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private class EventsHistoryLoader[Interpretation[_]](
-    latestPushEventFetcher: LatestPushEventFetcher[Interpretation],
-    commitToEventLog:       CommitToEventLog[Interpretation],
-    logger:                 Logger[Interpretation]
-)(implicit ME:              MonadError[Interpretation, Throwable]) {
+    latestCommitFinder: LatestCommitFinder[Interpretation],
+    commitToEventLog:   CommitToEventLog[Interpretation],
+    logger:             Logger[Interpretation]
+)(implicit ME:          MonadError[Interpretation, Throwable]) {
 
-  import latestPushEventFetcher._
   import commitToEventLog._
+  import latestCommitFinder._
 
   def loadAllEvents(projectInfo: ProjectInfo, accessToken: AccessToken): Interpretation[Unit] = {
     for {
-      latestPushEvent <- OptionT(fetchLatestPushEvent(projectInfo.id, Some(accessToken)))
-      startCommit     <- OptionT.liftF(startCommitFrom(latestPushEvent, projectInfo))
-      _               <- OptionT.liftF(storeCommitsInEventLog(startCommit))
+      latestCommit <- findLatestCommit(projectInfo.id, Some(accessToken))
+      startCommit  <- OptionT.some[Interpretation](startCommitFrom(latestCommit, projectInfo))
+      _            <- OptionT.liftF(storeCommitsInEventLog(startCommit))
     } yield ()
   }.value
     .flatMap(_ => ME.unit)
     .recoverWith(loggingError(projectInfo))
 
-  private def startCommitFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = ME.pure {
-    StartCommit(
-      id      = pushEventInfo.commitTo,
-      project = Project(projectInfo.id, projectInfo.path)
-    )
-  }
+  private def startCommitFrom(latestCommit: CommitInfo, projectInfo: ProjectInfo) = StartCommit(
+    id      = latestCommit.id,
+    project = Project(projectInfo.id, projectInfo.path)
+  )
 
   private def loggingError(projectInfo: ProjectInfo): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -79,7 +76,7 @@ private class IOEventsHistoryLoader(
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends EventsHistoryLoader[IO](
-      new IOLatestPushEventFetcher(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
+      new IOLatestCommitFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
       new IOCommitToEventLog(transactor, gitLabThrottler),
       ApplicationLogger
     )

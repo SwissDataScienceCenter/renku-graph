@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.pushevents
+package ch.datascience.webhookservice.commits
 
-import LatestPushEventFetcher.PushEventInfo
+import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.gitlab.GitLab
@@ -26,65 +26,55 @@ import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import io.chrisdavenport.log4cats.Logger
-import org.http4s.Status
+import io.circe.Decoder
+import io.circe.Decoder.decodeList
+import org.http4s.circe.jsonOf
+import org.http4s.{EntityDecoder, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-trait LatestPushEventFetcher[Interpretation[_]] {
-  def fetchLatestPushEvent(
+trait LatestCommitFinder[Interpretation[_]] {
+  def findLatestCommit(
       projectId:        ProjectId,
       maybeAccessToken: Option[AccessToken]
-  ): Interpretation[Option[PushEventInfo]]
+  ): OptionT[Interpretation, CommitInfo]
 }
 
-object LatestPushEventFetcher {
-
-  final case class PushEventInfo(
-      projectId: ProjectId,
-      commitTo:  CommitId
-  )
-}
-
-class IOLatestPushEventFetcher(
-    gitLabConfig:            GitLabConfigProvider[IO],
+class IOLatestCommitFinder(
+    gitLabConfigProvider:    GitLabConfigProvider[IO],
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient(gitLabThrottler, logger)
-    with LatestPushEventFetcher[IO] {
+    with LatestCommitFinder[IO] {
 
-  import cats.implicits._
+  import CommitInfo._
   import ch.datascience.http.client.RestClientError.UnauthorizedException
-  import io.circe.{Decoder, HCursor}
   import org.http4s.Method.GET
   import org.http4s.Status._
-  import org.http4s.circe.jsonOf
-  import org.http4s.{EntityDecoder, Request, Response}
+  import org.http4s.{Request, Response}
 
-  override def fetchLatestPushEvent(
+  override def findLatestCommit(
       projectId:        ProjectId,
       maybeAccessToken: Option[AccessToken]
-  ): IO[Option[PushEventInfo]] =
+  ): OptionT[IO, CommitInfo] = OptionT {
     for {
-      gitLabHostUrl <- gitLabConfig.get
-      uri           <- validateUri(s"$gitLabHostUrl/api/v4/projects/$projectId/events") map (_.withQueryParam("action", "pushed"))
-      projectInfo   <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-    } yield projectInfo
+      gitLabHost      <- gitLabConfigProvider.get
+      stringUri       <- IO.pure(s"$gitLabHost/api/v4/projects/$projectId/repository/commits")
+      uri             <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
+      maybeCommitInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+    } yield maybeCommitInfo
+  }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[PushEventInfo]]] = {
-    case (Ok, _, response)    => response.as[Option[PushEventInfo]]
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[CommitInfo]]] = {
+    case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption)
     case (NotFound, _, _)     => IO.pure(None)
     case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
   }
 
-  private implicit lazy val pushEventInfoDecoder: EntityDecoder[IO, Option[PushEventInfo]] = {
-    implicit val hookNameDecoder: Decoder[Option[PushEventInfo]] = (cursor: HCursor) =>
-      for {
-        maybeProjectId <- cursor.downArray.downField("project_id").as[Option[ProjectId]]
-        maybeCommitTo  <- cursor.downArray.downField("push_data").downField("commit_to").as[Option[CommitId]]
-      } yield (maybeProjectId, maybeCommitTo) mapN PushEventInfo.apply
-
-    jsonOf[IO, Option[PushEventInfo]]
+  private implicit val commitInfosEntityDecoder: EntityDecoder[IO, List[CommitInfo]] = {
+    implicit val infosDecoder: Decoder[List[CommitInfo]] = decodeList[CommitInfo]
+    jsonOf[IO, List[CommitInfo]]
   }
 }

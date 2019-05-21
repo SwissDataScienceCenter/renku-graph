@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.startcommit
+package ch.datascience.webhookservice.commits
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
@@ -25,12 +25,13 @@ import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import io.chrisdavenport.log4cats.Logger
-import org.http4s.Status
+import org.http4s.circe.jsonOf
+import org.http4s.{EntityDecoder, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait CommitInfoFinder[Interpretation[_]] {
+trait CommitInfoFinder[Interpretation[_]] {
   def findCommitInfo(
       projectId:        ProjectId,
       commitId:         CommitId,
@@ -38,7 +39,7 @@ private trait CommitInfoFinder[Interpretation[_]] {
   ): Interpretation[CommitInfo]
 }
 
-private class IOCommitInfoFinder(
+class IOCommitInfoFinder(
     gitLabConfigProvider:    GitLabConfigProvider[IO],
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
@@ -64,39 +65,6 @@ private class IOCommitInfoFinder(
     case (Ok, _, response)    => response.as[CommitInfo]
     case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
   }
-}
 
-private case class CommitInfo(
-    id:            CommitId,
-    message:       CommitMessage,
-    committedDate: CommittedDate,
-    author:        User,
-    committer:     User,
-    parents:       List[CommitId]
-)
-
-private object CommitInfo {
-  import io.circe._
-  import org.http4s._
-  import org.http4s.circe._
-
-  private implicit val commitInfoDecoder: Decoder[CommitInfo] = (cursor: HCursor) =>
-    for {
-      id             <- cursor.downField("id").as[CommitId]
-      authorName     <- cursor.downField("author_name").as[Username]
-      authorEmail    <- cursor.downField("author_email").as[Email]
-      committerName  <- cursor.downField("committer_name").as[Username]
-      committerEmail <- cursor.downField("committer_email").as[Email]
-      message        <- cursor.downField("message").as[CommitMessage]
-      committedDate  <- cursor.downField("committed_date").as[CommittedDate]
-      parents        <- cursor.downField("parent_ids").as[List[CommitId]]
-    } yield
-      CommitInfo(id,
-                 message,
-                 committedDate,
-                 author    = User(authorName, authorEmail),
-                 committer = User(committerName, committerEmail),
-                 parents)
-
-  implicit val commitInfoEntityDecoder: EntityDecoder[IO, CommitInfo] = jsonOf[IO, CommitInfo]
+  private implicit val commitInfoEntityDecoder: EntityDecoder[IO, CommitInfo] = jsonOf[IO, CommitInfo]
 }

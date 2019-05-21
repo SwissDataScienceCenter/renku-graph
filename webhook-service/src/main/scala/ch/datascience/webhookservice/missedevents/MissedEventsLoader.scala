@@ -27,11 +27,10 @@ import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import ch.datascience.webhookservice.commits.{CommitInfo, LatestCommitFinder}
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.startcommit.CommitToEventLog
 import ch.datascience.webhookservice.project.{ProjectInfo, ProjectInfoFinder}
-import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher
-import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
 import io.chrisdavenport.log4cats.Logger
 
 import scala.language.higherKinds
@@ -42,24 +41,24 @@ private abstract class MissedEventsLoader[Interpretation[_]] {
 }
 
 private class IOMissedEventsLoader(
-    eventLogLatestEvents:   EventLogLatestEvents[IO],
-    accessTokenFinder:      AccessTokenFinder[IO],
-    latestPushEventFetcher: LatestPushEventFetcher[IO],
-    projectInfoFinder:      ProjectInfoFinder[IO],
-    commitToEventLog:       CommitToEventLog[IO],
-    throttler:              Throttler[IO, EventsSynchronization],
-    logger:                 Logger[IO],
-    executionTimeRecorder:  ExecutionTimeRecorder[IO]
-)(implicit contextShift:    ContextShift[IO])
+    eventLogLatestEvents:  EventLogLatestEvents[IO],
+    accessTokenFinder:     AccessTokenFinder[IO],
+    latestCommitFinder:    LatestCommitFinder[IO],
+    projectInfoFinder:     ProjectInfoFinder[IO],
+    commitToEventLog:      CommitToEventLog[IO],
+    throttler:             Throttler[IO, EventsSynchronization],
+    logger:                Logger[IO],
+    executionTimeRecorder: ExecutionTimeRecorder[IO]
+)(implicit contextShift:   ContextShift[IO])
     extends MissedEventsLoader[IO] {
 
   import UpdateResult._
   import accessTokenFinder._
+  import commitToEventLog._
   import eventLogLatestEvents._
   import executionTimeRecorder._
-  import latestPushEventFetcher._
+  import latestCommitFinder._
   import projectInfoFinder._
-  import commitToEventLog._
 
   def loadMissedEvents: IO[Unit] =
     measureExecutionTime {
@@ -73,7 +72,7 @@ private class IOMissedEventsLoader(
   private lazy val logSummary: ((ElapsedTime, UpdateSummary)) => IO[Unit] = {
     case (elapsedTime, updateSummary) =>
       logger.info(
-        s"Synchronized Push Events with GitLab in ${elapsedTime}ms: " +
+        s"Synchronized Commits with GitLab in ${elapsedTime}ms: " +
           s"${updateSummary(Updated)} updates, " +
           s"${updateSummary(Skipped)} skipped, " +
           s"${updateSummary(Failed)} failed"
@@ -82,31 +81,31 @@ private class IOMissedEventsLoader(
 
   private def loadEvents(latestLogEvent: CommitEventId): IO[UpdateResult] = {
     for {
-      _                  <- throttler.acquire
-      maybeAccessToken   <- findAccessToken(latestLogEvent.projectId)
-      maybePushEventInfo <- fetchLatestPushEvent(latestLogEvent.projectId, maybeAccessToken)
-      updateResult       <- addEventsIfMissing(latestLogEvent, maybePushEventInfo, maybeAccessToken)
-      _                  <- throttler.release
+      _                 <- throttler.acquire
+      maybeAccessToken  <- findAccessToken(latestLogEvent.projectId)
+      maybeLatestCommit <- findLatestCommit(latestLogEvent.projectId, maybeAccessToken).value
+      updateResult      <- addEventsIfMissing(latestLogEvent, maybeLatestCommit, maybeAccessToken)
+      _                 <- throttler.release
     } yield updateResult
   } recoverWith loggingWarning(latestLogEvent)
 
-  private def addEventsIfMissing(latestLogEvent:     CommitEventId,
-                                 maybePushEventInfo: Option[PushEventInfo],
-                                 maybeAccessToken:   Option[AccessToken]) =
-    maybePushEventInfo match {
-      case None                                      => IO.pure(Skipped)
-      case Some(PushEventInfo(_, latestLogEvent.id)) => IO.pure(Skipped)
-      case Some(pushEventInfo) =>
+  private def addEventsIfMissing(latestLogEvent:    CommitEventId,
+                                 maybeLatestCommit: Option[CommitInfo],
+                                 maybeAccessToken:  Option[AccessToken]) =
+    maybeLatestCommit match {
+      case None                                                   => IO.pure(Skipped)
+      case Some(commitInfo) if commitInfo.id == latestLogEvent.id => IO.pure(Skipped)
+      case Some(commitInfo) =>
         for {
           projectInfo <- findProjectInfo(latestLogEvent.projectId, maybeAccessToken)
-          startCommit <- startCommitFrom(pushEventInfo, projectInfo)
+          startCommit <- startCommitFrom(commitInfo, projectInfo)
           _           <- storeCommitsInEventLog(startCommit)
         } yield Updated
     }
 
-  private def startCommitFrom(pushEventInfo: PushEventInfo, projectInfo: ProjectInfo) = IO.pure {
+  private def startCommitFrom(commitInfo: CommitInfo, projectInfo: ProjectInfo) = IO.pure {
     StartCommit(
-      id      = pushEventInfo.commitTo,
+      id      = commitInfo.id,
       project = Project(projectInfo.id, projectInfo.path)
     )
   }
@@ -114,14 +113,14 @@ private class IOMissedEventsLoader(
   private def loggingWarning(latestLogEvent: CommitEventId): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
       for {
-        _ <- logger.warn(exception)(s"Synchronizing Push Events for project ${latestLogEvent.projectId} failed")
+        _ <- logger.warn(exception)(s"Synchronizing Commits for project ${latestLogEvent.projectId} failed")
         _ <- throttler.release
       } yield Failed
   }
 
   private lazy val loggingError: PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
-      logger.error(exception)("Synchronizing Push Events with GitLab failed")
+      logger.error(exception)("Synchronizing Commits with GitLab failed")
       IO.raiseError(exception)
   }
 

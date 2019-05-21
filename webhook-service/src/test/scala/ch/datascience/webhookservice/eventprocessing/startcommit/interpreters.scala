@@ -25,6 +25,7 @@ import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.EventLogVerifyExistence
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.logging.ExecutionTimeRecorder
+import ch.datascience.webhookservice.commits.CommitInfoFinder
 import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender
 import io.chrisdavenport.log4cats.Logger
 
