@@ -21,45 +21,34 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 import cats.MonadError
 import ch.datascience.graph.model.events._
 import io.circe.Json
+import io.circe.literal._
 
 import scala.language.higherKinds
 import scala.util.Try
 
 private class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
-  def serialiseToJsonString(commitEvent: CommitEvent): Interpretation[String] =
-    ME.fromTry {
-      Try {
-        Json
-          .obj(
-            "id"            -> Json.fromString(commitEvent.id.value),
-            "message"       -> Json.fromString(commitEvent.message.value),
-            "committedDate" -> Json.fromString(commitEvent.committedDate.toString),
-            "pushUser"      -> toJson(commitEvent.pushUser),
-            "author" -> Json.obj(
-              "username" -> Json.fromString(commitEvent.author.username.value),
-              "email"    -> Json.fromString(commitEvent.author.email.value)
-            ),
-            "committer" -> Json.obj(
-              "username" -> Json.fromString(commitEvent.committer.username.value),
-              "email"    -> Json.fromString(commitEvent.committer.email.value)
-            ),
-            "parents" -> Json.arr(commitEvent.parents.map(parentId => Json.fromString(parentId.value)): _*),
-            "project" -> Json.obj(
-              "id"   -> Json.fromInt(commitEvent.project.id.value),
-              "path" -> Json.fromString(commitEvent.project.path.value)
-            )
-          )
-          .noSpaces
-      }
-    }
+  def serialiseToJsonString(commitEvent: CommitEvent): Interpretation[String] = ME.fromTry {
+    Try(toJson(commitEvent).noSpaces)
+  }
 
-  private def toJson(pushUser: PushUser): Json =
-    Json.obj(
-      Seq(
-        Some("userId"   -> Json.fromInt(pushUser.userId.value)),
-        Some("username" -> Json.fromString(pushUser.username.value)),
-        pushUser.maybeEmail.map(email => "email" -> Json.fromString(email.value))
-      ).flatten: _*
-    )
+  private def toJson(commitEvent: CommitEvent): Json = json"""
+    {
+      "id":            ${commitEvent.id.value},
+      "message":       ${commitEvent.message.value},
+      "committedDate": ${commitEvent.committedDate.toString},
+      "author": {
+        "username":    ${commitEvent.author.username.value},
+        "email"   :    ${commitEvent.author.email.value}
+      },
+      "committer": {
+        "username":    ${commitEvent.committer.username.value},
+        "email":       ${commitEvent.committer.email.value}
+      }, 
+      "parents":       ${commitEvent.parents.map(_.value).toArray},
+      "project": {
+        "id":          ${commitEvent.project.id.value},
+        "path":        ${commitEvent.project.path.value}
+      }
+    }"""
 }

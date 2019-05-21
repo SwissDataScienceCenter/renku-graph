@@ -70,7 +70,7 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 class IOHookCreationEndpoint(
     transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookCreationEndpoint[IO](
       new IOHookCreator(transactor, gitLabThrottler),
       new AccessTokenExtractor[IO]

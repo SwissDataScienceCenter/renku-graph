@@ -32,6 +32,7 @@ import ch.datascience.graph.model.events._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
@@ -173,7 +174,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       logSummary(commits, triples = List.empty, uploaded = 0, failed = 2)
     }
 
-    s"succeed and log error if marking event in as $TriplesStore fails" in new TestCase {
+    s"succeed and log an error if marking event in as $TriplesStore fails" in new TestCase {
 
       val commits       = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commits.toList
@@ -209,7 +210,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       logSummary(commits, triples = List(triples), uploaded = 1, failed = 0)
     }
 
-    "succeed but log an error if CommitEvent processing fails" in new TestCase {
+    "succeed and log an error if CommitEvent deserialization fails" in new TestCase {
 
       val exception = exceptions.generateOne
       (eventsDeserialiser
@@ -222,7 +223,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(s"Commit Event processing failure: $eventBody", exception))
     }
 
-    "succeed but log an error if finding an access token fails" in new TestCase {
+    s"mark event as $New and log an error if finding an access token fails" in new TestCase {
 
       val commits = commitsLists(size = Gen.const(1)).generateOne
       (eventsDeserialiser
@@ -234,9 +235,19 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       givenFetchingAccessToken(forProjectId = commits.head.project.id)
         .returning(context.raiseError(exception))
 
+      (eventLogMarkNew
+        .markEventNew(_: CommitEventId))
+        .expects(commits.head.commitEventId)
+        .returning(context.unit)
+
       eventProcessor(eventBody) shouldBe context.unit
 
-      logger.loggedOnly(Error(s"Commit Event processing failure: $eventBody", exception))
+      logger.loggedOnly(
+        Error(
+          message          = s"Commit Event processing failure: $eventBody",
+          throwableMatcher = NotRefEqual(new Exception("processing failure -> Event rolled back", exception))
+        )
+      )
     }
   }
 
@@ -252,6 +263,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     val triplesFinder         = mock[TryTriplesFinder]
     val fusekiConnector       = mock[TryFusekiConnector]
     val eventLogMarkDone      = mock[TryEventLogMarkDone]
+    val eventLogMarkNew       = mock[TryEventLogMarkNew]
     val eventLogMarkFailed    = mock[TryEventLogMarkFailed]
     val logger                = TestLogger[Try]()
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](expected = elapsedTime)
@@ -261,6 +273,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       triplesFinder,
       fusekiConnector,
       eventLogMarkDone,
+      eventLogMarkNew,
       eventLogMarkFailed,
       logger,
       executionTimeRecorder

@@ -18,11 +18,15 @@
 
 package ch.datascience.http.client
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.control.Throttler
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.auto._
+import io.chrisdavenport.log4cats.Logger
 import org.http4s.Method.GET
 import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
@@ -30,6 +34,8 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFactory {
 
@@ -94,16 +100,25 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.NoContent}; body: "
     }
 
-    "fail if there are connectivity problems" in {
+    "fail after retrying if there is a persistent connectivity problem" in {
+      val logger = TestLogger[IO]()
+
       intercept[Exception] {
-        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling).callRemote.unsafeRunSync()
+        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, logger).callRemote
+          .unsafeRunSync()
       }.getMessage shouldBe s"GET http://localhost:1024/resource error: Connection refused"
+
+      logger.loggedOnly(
+        Warn("GET http://localhost:1024/resource timed out -> retrying attempt 1 error: Connection refused"),
+        Warn("GET http://localhost:1024/resource timed out -> retrying attempt 2 error: Connection refused")
+      )
     }
   }
 
   private trait TestCase {
     val throttler = mock[Throttler[IO, Any]]
-    val client    = new TestRestClient(hostUrl, throttler)
+    val logger    = TestLogger[IO]()
+    val client    = new TestRestClient(hostUrl, throttler, logger)
 
     def verifyThrottling(): Unit =
       inSequence {
@@ -112,10 +127,12 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
       }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
   private val hostUrl = ServiceUrl(externalServiceBaseUrl)
 
-  private class TestRestClient(hostUrl: ServiceUrl, throttler: Throttler[IO, Any]) extends IORestClient(throttler) {
+  private class TestRestClient(hostUrl: ServiceUrl, throttler: Throttler[IO, Any], logger: Logger[IO])
+      extends IORestClient(throttler, logger, retryInterval = 1 millisecond, maxRetries = 2) {
 
     def callRemote: IO[Int] =
       for {

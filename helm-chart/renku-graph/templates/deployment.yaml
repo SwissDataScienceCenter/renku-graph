@@ -130,6 +130,8 @@ spec:
               value: {{ .Values.sentry.sentryDsnRenkuPython }}
             - name: GRAPH_SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=triples-generator&environment={{ .Release.Namespace }}
+            - name: GENERATION_PROCESSES_NUMBER
+              value: "{{ .Values.triplesGenerator.generationProcessesNumber }}"
             - name: THREADS_NUMBER
               value: "{{ .Values.triplesGenerator.threadsNumber }}"
             - name: JAVA_OPTS

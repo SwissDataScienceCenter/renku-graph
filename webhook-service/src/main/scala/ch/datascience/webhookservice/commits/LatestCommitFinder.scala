@@ -16,67 +16,65 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.project
+package ch.datascience.webhookservice.commits
 
+import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import ch.datascience.webhookservice.project.ProjectVisibility.Public
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Decoder
+import io.circe.Decoder.decodeList
+import org.http4s.circe.jsonOf
+import org.http4s.{EntityDecoder, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-trait ProjectInfoFinder[Interpretation[_]] {
-  def findProjectInfo(
+trait LatestCommitFinder[Interpretation[_]] {
+  def findLatestCommit(
       projectId:        ProjectId,
       maybeAccessToken: Option[AccessToken]
-  ): Interpretation[ProjectInfo]
+  ): OptionT[Interpretation, CommitInfo]
 }
 
-class IOProjectInfoFinder(
+class IOLatestCommitFinder(
     gitLabConfigProvider:    GitLabConfigProvider[IO],
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient(gitLabThrottler, logger)
-    with ProjectInfoFinder[IO] {
+    with LatestCommitFinder[IO] {
 
-  import cats.effect._
+  import CommitInfo._
   import ch.datascience.http.client.RestClientError.UnauthorizedException
-  import io.circe._
   import org.http4s.Method.GET
-  import org.http4s.Status.Unauthorized
-  import org.http4s._
-  import org.http4s.circe._
-  import org.http4s.dsl.io._
+  import org.http4s.Status._
+  import org.http4s.{Request, Response}
 
-  def findProjectInfo(projectId: ProjectId, maybeAccessToken: Option[AccessToken]): IO[ProjectInfo] =
+  override def findLatestCommit(
+      projectId:        ProjectId,
+      maybeAccessToken: Option[AccessToken]
+  ): OptionT[IO, CommitInfo] = OptionT {
     for {
-      gitLabHostUrl <- gitLabConfigProvider.get
-      uri           <- validateUri(s"$gitLabHostUrl/api/v4/projects/$projectId")
-      projectInfo   <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-    } yield projectInfo
+      gitLabHost      <- gitLabConfigProvider.get
+      stringUri       <- IO.pure(s"$gitLabHost/api/v4/projects/$projectId/repository/commits")
+      uri             <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
+      maybeCommitInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+    } yield maybeCommitInfo
+  }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ProjectInfo]] = {
-    case (Ok, _, response)    => response.as[ProjectInfo]
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[CommitInfo]]] = {
+    case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption)
+    case (NotFound, _, _)     => IO.pure(None)
     case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
   }
 
-  private implicit lazy val projectInfoDecoder: EntityDecoder[IO, ProjectInfo] = {
-    implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
-      for {
-        id         <- cursor.downField("id").as[ProjectId]
-        visibility <- cursor.downField("visibility").as[Option[ProjectVisibility]] map defaultToPublic
-        path       <- cursor.downField("path_with_namespace").as[ProjectPath]
-      } yield ProjectInfo(id, visibility, path)
-
-    jsonOf[IO, ProjectInfo]
+  private implicit val commitInfosEntityDecoder: EntityDecoder[IO, List[CommitInfo]] = {
+    implicit val infosDecoder: Decoder[List[CommitInfo]] = decodeList[CommitInfo]
+    jsonOf[IO, List[CommitInfo]]
   }
-
-  private def defaultToPublic(maybeVisibility: Option[ProjectVisibility]): ProjectVisibility =
-    maybeVisibility getOrElse Public
 }

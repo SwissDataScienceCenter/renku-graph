@@ -24,8 +24,13 @@ import java.time.temporal.ChronoUnit._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
+import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.{CommitEventId, ProjectId}
+import doobie.implicits._
+import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -37,11 +42,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
   "isEventToProcess" should {
 
     s"return true if there are events with with status $New and execution date in the past" in new TestCase {
-      storeEvent(commitEventIds.generateOne,
-                 EventStatus.New,
-                 ExecutionDate(now minus (5, SECONDS)),
-                 committedDates.generateOne,
-                 eventBodies.generateOne)
+      storeNewEvent(commitEventIds.generateOne, ExecutionDate(now minus (5, SECONDS)), eventBodies.generateOne)
 
       eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
     }
@@ -107,19 +108,17 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
       s"and status $New or $TriplesStoreFailure " +
       s"and mark it as $Processing" in new TestCase {
 
-      val event1Id   = commitEventIds.generateOne
+      val projectId = projectIds.generateOne
+
+      val event1Id   = commitEventIds.generateOne.copy(projectId = projectId)
       val event1Body = eventBodies.generateOne
-      storeEvent(event1Id,
-                 EventStatus.New,
-                 ExecutionDate(now minus (5, SECONDS)),
-                 committedDates.generateOne,
-                 event1Body)
+      storeNewEvent(event1Id, ExecutionDate(now minus (5, SECONDS)), event1Body)
 
-      val event2Id   = commitEventIds.generateOne
+      val event2Id   = commitEventIds.generateOne.copy(projectId = projectId)
       val event2Body = eventBodies.generateOne
-      storeEvent(event2Id, EventStatus.New, ExecutionDate(now plus (5, HOURS)), committedDates.generateOne, event2Body)
+      storeNewEvent(event2Id, ExecutionDate(now plus (5, HOURS)), event2Body)
 
-      val event3Id   = commitEventIds.generateOne
+      val event3Id   = commitEventIds.generateOne.copy(projectId = projectId)
       val event3Body = eventBodies.generateOne
       storeEvent(event3Id,
                  EventStatus.TriplesStoreFailure,
@@ -136,35 +135,6 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(event1Body)
 
       findEvents(EventStatus.Processing) shouldBe List(event1Id -> executionDate, event3Id -> executionDate)
-
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
-    }
-
-    "find event with execution date farthest in the past " +
-      "event if there are more events with the same id" in new TestCase {
-
-      val sameEventId = commitIds.generateOne
-      val event1Id    = commitEventIds.generateOne.copy(id = sameEventId)
-      val eventBody1  = eventBodies.generateOne
-      storeEvent(event1Id,
-                 EventStatus.New,
-                 ExecutionDate(now minus (5, SECONDS)),
-                 committedDates.generateOne,
-                 eventBody1)
-
-      val eventBody2 = eventBodies.generateOne
-      val event2Id   = commitEventIds.generateOne.copy(id = sameEventId)
-      storeEvent(event2Id, EventStatus.New, ExecutionDate(now minus (5, HOURS)), committedDates.generateOne, eventBody2)
-
-      findEvents(EventStatus.Processing) shouldBe List.empty
-
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody2)
-
-      findEvents(EventStatus.Processing) shouldBe List(event2Id -> executionDate)
-
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody1)
-
-      findEvents(EventStatus.Processing) shouldBe List(event1Id -> executionDate, event2Id -> executionDate)
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
@@ -201,15 +171,43 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
     "find no events when there are no events matching the criteria" in new TestCase {
 
-      storeEvent(
+      storeNewEvent(
         commitEventIds.generateOne,
-        EventStatus.New,
         ExecutionDate(now plus (5, HOURS)),
-        committedDates.generateOne,
         eventBodies.generateOne
       )
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
+    }
+
+    "find events not always from the same project " +
+      "even if some projects events' farthest execution dates are later" in new TestCase {
+
+      val allProjectIds = nonEmptyList(projectIds, minElements = 2).generateOne
+      val eventIdsBodiesDates = for {
+        projectId     <- allProjectIds
+        eventId       <- nonEmptyList(commitIds, minElements = 5).generateOne map (CommitEventId(_, projectId))
+        eventBody     <- nonEmptyList(eventBodies, maxElements = 1).generateOne
+        executionDate <- NonEmptyList.of(executionDateDifferentiated(by = projectId, allProjectIds))
+      } yield (eventId, executionDate, eventBody)
+
+      eventIdsBodiesDates.toList foreach {
+        case (eventId, eventExecutionDate, eventBody) => storeNewEvent(eventId, eventExecutionDate, eventBody)
+      }
+
+      findEvents(EventStatus.Processing) shouldBe List.empty
+
+      val eventsFetcher = new EventLogFetch(transactor)
+      eventIdsBodiesDates.toList foreach { _ =>
+        eventsFetcher.popEventToProcess.unsafeRunSync() shouldBe a[Some[_]]
+      }
+
+      val commitEventsByExecutionOrder = findEvents(
+        status  = Processing,
+        orderBy = fr"execution_date asc"
+      ).map(_._1)
+      val commitEventsByExecutionDate = eventIdsBodiesDates.map(_._1)
+      commitEventsByExecutionOrder.map(_.projectId) should not be commitEventsByExecutionDate.map(_.projectId).toList
     }
   }
 
@@ -221,5 +219,11 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     val now           = Instant.now()
     val executionDate = ExecutionDate(now)
     currentTime.expects().returning(now).anyNumberOfTimes()
+
+    def executionDateDifferentiated(by: ProjectId, allProjects: NonEmptyList[ProjectId]) =
+      ExecutionDate(now minus (1000 - (allProjects.toList.indexOf(by) * 10), SECONDS))
   }
+
+  private def storeNewEvent(commitEventId: CommitEventId, executionDate: ExecutionDate, eventBody: EventBody): Unit =
+    storeEvent(commitEventId, New, executionDate, committedDates.generateOne, eventBody)
 }

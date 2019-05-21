@@ -46,17 +46,26 @@ object Generators {
     } yield chars.mkString("")
   }
 
-  def nonEmptyStringsList(minElements: Int = 1, maxElements: Int = 5): Gen[List[String]] =
+  def nonEmptyStringsList(minElements: Int Refined Positive = 1,
+                          maxElements: Int Refined Positive = 5): Gen[List[String]] =
     for {
-      size  <- choose(minElements, maxElements)
+      size  <- choose(minElements.value, maxElements.value)
       lines <- Gen.listOfN(size, nonEmptyStrings())
     } yield lines
 
-  def nonEmptyList[T](generator: Gen[T], minElements: Int = 1, maxElements: Int = 5): Gen[NonEmptyList[T]] =
+  def nonEmptyList[T](generator:   Gen[T],
+                      minElements: Int Refined Positive = 1,
+                      maxElements: Int Refined Positive = 5): Gen[NonEmptyList[T]] =
     for {
-      size <- choose(minElements, maxElements)
+      size <- choose(minElements.value, maxElements.value)
       list <- Gen.listOfN(size, generator)
     } yield NonEmptyList.fromListUnsafe(list)
+
+  def listOf[T](generator: Gen[T], maxElements: Int Refined Positive = 5): Gen[List[T]] =
+    for {
+      size <- choose(0, maxElements.value)
+      list <- Gen.listOfN(size, generator)
+    } yield list
 
   def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
     choose(1, max) map Refined.unsafeApply

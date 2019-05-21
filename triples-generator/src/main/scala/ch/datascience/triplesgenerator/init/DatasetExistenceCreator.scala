@@ -18,10 +18,11 @@
 
 package ch.datascience.triplesgenerator.init
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.{BasicAuth, IORestClient}
 import ch.datascience.triplesgenerator.config.FusekiConfig
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -30,10 +31,11 @@ private trait DatasetExistenceCreator[Interpretation[_]] {
   def createDataset(fusekiConfig: FusekiConfig): Interpretation[Unit]
 }
 
-private class IODatasetExistenceCreator(
-    implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO]
-) extends IORestClient(Throttler.noThrottling)
+private class IODatasetExistenceCreator(logger: Logger[IO])(
+    implicit executionContext:                  ExecutionContext,
+    contextShift:                               ContextShift[IO],
+    timer:                                      Timer[IO]
+) extends IORestClient(Throttler.noThrottling, logger)
     with DatasetExistenceCreator[IO] {
 
   import cats.effect._

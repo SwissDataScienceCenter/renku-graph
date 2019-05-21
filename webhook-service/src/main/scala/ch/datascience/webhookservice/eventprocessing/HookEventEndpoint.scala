@@ -31,7 +31,7 @@ import ch.datascience.graph.model.events._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import ch.datascience.webhookservice.eventprocessing.pushevent.{IOPushEventSender, PushEventSender}
+import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.{Decoder, HCursor}
 import org.http4s.circe._
@@ -44,30 +44,30 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class HookEventEndpoint[Interpretation[_]: Effect](
-    hookTokenCrypto: HookTokenCrypto[Interpretation],
-    pushEventSender: PushEventSender[Interpretation]
-)(implicit ME:       MonadError[Interpretation, Throwable])
+    hookTokenCrypto:  HookTokenCrypto[Interpretation],
+    commitToEventLog: CommitToEventLog[Interpretation]
+)(implicit ME:        MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
   import HookEventEndpoint._
   import hookTokenCrypto._
-  import pushEventSender._
+  import commitToEventLog._
 
   def processPushEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
-      pushEvent <- request.as[PushEvent] recoverWith badRequest
-      authToken <- findHookToken(request)
-      hookToken <- decrypt(authToken) recoverWith unauthorizedException
-      _         <- validate(hookToken, pushEvent)
-      _         <- storeCommitsInEventLog(pushEvent)
-      response  <- Accepted(InfoMessage("Event accepted"))
+      startCommit <- request.as[StartCommit] recoverWith badRequest
+      authToken   <- findHookToken(request)
+      hookToken   <- decrypt(authToken) recoverWith unauthorizedException
+      _           <- validate(hookToken, startCommit)
+      _           <- storeCommitsInEventLog(startCommit)
+      response    <- Accepted(InfoMessage("Event accepted"))
     } yield response
   } recoverWith httpResponse
 
-  private implicit lazy val pushEventEntityDecoder: EntityDecoder[Interpretation, PushEvent] =
-    jsonOf[Interpretation, PushEvent]
+  private implicit lazy val pushEventEntityDecoder: EntityDecoder[Interpretation, StartCommit] =
+    jsonOf[Interpretation, StartCommit]
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[PushEvent]] = {
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[StartCommit]] = {
     case NonFatal(exception) =>
       ME.raiseError(BadRequestError(exception))
   }
@@ -86,8 +86,8 @@ class HookEventEndpoint[Interpretation[_]: Effect](
       ME.raiseError(UnauthorizedException)
   }
 
-  private def validate(hookToken: HookToken, pushEvent: PushEvent): Interpretation[Unit] = ME.fromEither {
-    if (hookToken.projectId == pushEvent.project.id) Right(())
+  private def validate(hookToken: HookToken, startCommit: StartCommit): Interpretation[Unit] = ME.fromEither {
+    if (hookToken.projectId == startCommit.project.id) Right(())
     else Left(UnauthorizedException)
   }
 
@@ -113,22 +113,11 @@ private object HookEventEndpoint {
     } yield Project(id, path)
   }
 
-  implicit val pushEventDecoder: Decoder[PushEvent] = (cursor: HCursor) => {
+  implicit val pushEventDecoder: Decoder[StartCommit] = (cursor: HCursor) =>
     for {
-      maybeCommitFrom <- cursor.downField("before").as[Option[CommitId]]
-      commitTo        <- cursor.downField("after").as[CommitId]
-      userId          <- cursor.downField("user_id").as[UserId]
-      username        <- cursor.downField("user_username").as[Username]
-      maybeEmail      <- cursor.downField("user_email").as[Option[String]].flatMap(emptyToNone)
-      project         <- cursor.downField("project").as[Project]
-    } yield
-      PushEvent(
-        maybeCommitFrom,
-        commitTo,
-        PushUser(userId, username, maybeEmail),
-        project
-      )
-  }
+      commitTo <- cursor.downField("after").as[CommitId]
+      project  <- cursor.downField("project").as[Project]
+    } yield StartCommit(commitTo, project)
 
   private lazy val emptyToNone: Option[String] => Either[DecodingFailure, Option[Email]] = {
     case Some("") => Right(None)
@@ -144,5 +133,5 @@ private object HookEventEndpoint {
 class IOHookEventEndpoint(
     transactor:              DbTransactor[IO, EventLogDB],
     gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO])
-    extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOPushEventSender(transactor, gitLabThrottler))
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
+    extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOCommitToEventLog(transactor, gitLabThrottler))

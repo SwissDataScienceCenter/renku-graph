@@ -20,24 +20,22 @@ package ch.datascience.webhookservice.generators
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.webhookservice.commits.CommitInfo
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import ch.datascience.webhookservice.eventprocessing.PushEvent
+import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.model._
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.project.SelfUrlConfigProvider.SelfUrl
 import ch.datascience.webhookservice.project._
-import ch.datascience.webhookservice.pushevents.LatestPushEventFetcher.PushEventInfo
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
 
 object WebhookServiceGenerators {
 
-  implicit val pushEvents: Gen[PushEvent] = for {
-    maybeBefore <- Gen.option(commitIds)
-    after       <- commitIds
-    pushUser    <- pushUsers
-    project     <- projects
-  } yield PushEvent(maybeBefore, after, pushUser, project)
+  implicit val startCommits: Gen[StartCommit] = for {
+    id      <- commitIds
+    project <- projects
+  } yield StartCommit(id, project)
 
   implicit val serializedHookTokens: Gen[SerializedHookToken] = nonEmptyStrings().map { value =>
     RefType
@@ -63,9 +61,12 @@ object WebhookServiceGenerators {
   implicit val projectHookUrls: Gen[ProjectHookUrl] =
     validatedUrls map (url => ProjectHookUrl.apply(url.value))
 
-  implicit val pushEventInfos: Gen[PushEventInfo] = for {
-    projectId <- projectIds
-    pushUser  <- pushUsers
-    commitTo  <- commitIds
-  } yield PushEventInfo(projectId, pushUser, commitTo)
+  implicit val commitInfos: Gen[CommitInfo] = for {
+    id            <- commitIds
+    message       <- commitMessages
+    committedDate <- committedDates
+    author        <- users
+    committer     <- users
+    parents       <- listOf(commitIds)
+  } yield CommitInfo(id, message, committedDate, author, committer, parents)
 }

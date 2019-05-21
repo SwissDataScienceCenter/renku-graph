@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -28,6 +28,7 @@ import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.{GitLabConfigProvider, IOGitLabConfigProvider}
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
@@ -144,7 +145,8 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
     val gitLabUrl     = url(externalServiceBaseUrl)
@@ -159,7 +161,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
         .expects()
         .returning(returning)
 
-    val verifier = new IOProjectHookVerifier(gitLabUrlProvider, Throttler.noThrottling)
+    val verifier = new IOProjectHookVerifier(gitLabUrlProvider, Throttler.noThrottling, TestLogger())
   }
 
   private def withHooks(projectId: ProjectId, oneHookUrl: ProjectHookUrl): String =

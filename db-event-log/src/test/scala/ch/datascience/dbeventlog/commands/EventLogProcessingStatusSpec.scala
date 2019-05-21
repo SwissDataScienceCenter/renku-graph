@@ -29,6 +29,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators.{commitEventIds, committedDates, projectIds}
 import ch.datascience.graph.model.events.ProjectId
+import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.tokenrepository
 
 import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
@@ -28,6 +28,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.tokenrepository.IOTokenRepositoryUrlProvider
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.syntax._
@@ -89,7 +90,8 @@ class IOAccessTokenRemoverSpec extends WordSpec with MockFactory with ExternalSe
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
 
@@ -99,6 +101,6 @@ class IOAccessTokenRemoverSpec extends WordSpec with MockFactory with ExternalSe
     val projectId          = projectIds.generateOne
 
     val tokenRepositoryUrlProvider = mock[IOTokenRepositoryUrlProvider]
-    val tokenRemover               = new IOAccessTokenRemover(tokenRepositoryUrlProvider)
+    val tokenRemover               = new IOAccessTokenRemover(tokenRepositoryUrlProvider, TestLogger())
   }
 }

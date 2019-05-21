@@ -27,18 +27,11 @@ object EventsGenerators {
   implicit val commitIds:      Gen[CommitId]      = shas map CommitId.apply
   implicit val commitMessages: Gen[CommitMessage] = nonEmptyStrings() map CommitMessage.apply
   implicit val committedDates: Gen[CommittedDate] = timestampsNotInTheFuture map CommittedDate.apply
-  implicit val userIds:        Gen[UserId]        = nonNegativeInts() map UserId.apply
   implicit val usernames:      Gen[Username]      = nonEmptyStrings() map Username.apply
   implicit val emails: Gen[Email] = for {
     beforeAt <- nonEmptyStrings()
     afterAt  <- nonEmptyStrings()
   } yield Email(s"$beforeAt@$afterAt")
-
-  implicit val pushUsers: Gen[PushUser] = for {
-    userId     <- userIds
-    username   <- usernames
-    maybeEmail <- Gen.option(emails)
-  } yield PushUser(userId, username, maybeEmail)
 
   implicit val users: Gen[User] = for {
     username <- usernames
@@ -70,12 +63,11 @@ object EventsGenerators {
 
   implicit val commitEvents: Gen[CommitEvent] = for {
     commitId      <- commitIds
+    project       <- projects
     message       <- commitMessages
     committedDate <- committedDates
-    pushUser      <- pushUsers
     author        <- users
     committer     <- users
     parentsIds    <- parentsIdsLists()
-    project       <- projects
-  } yield CommitEvent(commitId, message, committedDate, pushUser, author, committer, parentsIds, project)
+  } yield CommitEvent(commitId, project, message, committedDate, author, committer, parentsIds)
 }

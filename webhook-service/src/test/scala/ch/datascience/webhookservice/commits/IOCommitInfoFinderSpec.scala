@@ -16,25 +16,26 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.pushevent
+package ch.datascience.webhookservice.commits
 
 import java.time.{LocalDateTime, ZoneOffset}
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.config.GitLabConfigProvider._
 import ch.datascience.webhookservice.config.IOGitLabConfigProvider
-import ch.datascience.http.client.RestClientError.UnauthorizedException
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.string.Url
-import io.circe.parser._
+import io.circe.literal._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -159,7 +160,8 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
     val gitLabUrl     = url(externalServiceBaseUrl)
@@ -171,20 +173,17 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     val committer     = users.generateOne
     val parents       = parentsIdsLists().generateOne
 
-    lazy val Right(responseJson) = parse {
-      s"""
-         |{
-         |  "id": "$commitId",
-         |  "author_name": "${author.username}",
-         |  "author_email": "${author.email}",
-         |  "committer_name": "${committer.username}",
-         |  "committer_email": "${committer.email}",
-         |  "message": "$commitMessage",
-         |  "committed_date": "2012-09-20T09:06:12+03:00",
-         |  "parent_ids": ${parents.map(parent => s""""$parent"""").mkString("[", ",", "]")}
-         |}
-      """.stripMargin
-    }
+    lazy val responseJson = json"""
+    {
+      "id":              ${commitId.value},
+      "author_name":     ${author.username.value},
+      "author_email":    ${author.email.value},
+      "committer_name":  ${committer.username.value},
+      "committer_email": ${committer.email.value},
+      "message":         ${commitMessage.value},
+      "committed_date":  "2012-09-20T09:06:12+03:00",
+      "parent_ids":      ${parents.map(_.value).toArray}
+    }"""
 
     val configProvider = mock[IOGitLabConfigProvider]
 
@@ -193,7 +192,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
         .expects()
         .returning(returning)
 
-    val finder = new IOCommitInfoFinder(configProvider, Throttler.noThrottling)
+    val finder = new IOCommitInfoFinder(configProvider, Throttler.noThrottling, TestLogger())
 
     private def url(value: String) =
       RefType

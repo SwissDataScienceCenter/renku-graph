@@ -19,13 +19,14 @@
 package ch.datascience.webhookservice.hookvalidation
 
 import ProjectHookVerifier.HookIdentifier
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
+import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
 
 import scala.concurrent.ExecutionContext
@@ -48,9 +49,10 @@ private object ProjectHookVerifier {
 
 private class IOProjectHookVerifier(
     gitLabUrlProvider:       GitLabConfigProvider[IO],
-    gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient(gitLabThrottler)
+    gitLabThrottler:         Throttler[IO, GitLab],
+    logger:                  Logger[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORestClient(gitLabThrottler, logger)
     with ProjectHookVerifier[IO] {
 
   import cats.effect._
