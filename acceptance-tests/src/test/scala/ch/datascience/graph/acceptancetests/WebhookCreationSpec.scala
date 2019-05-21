@@ -67,10 +67,10 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
       Given("project creation in GitLab returning CREATED")
       `POST <gitlab>/api/v4/projects/:id/hooks returning CREATED`(projectId)
 
-      Given("push events in GitLab existed")
-      `GET <gitlab>/api/v4/projects/:id/events returning OK with some events`(projectId)
+      Given("latest Commit in GitLab exists")
+      `GET <gitlab>/api/v4/projects/:id/repository/commits returning OK with a commit`(projectId)
 
-      When("user does POST webhook-service/projects/:id/webhooks")
+      When("user issues POST webhook-service/projects/:id/webhooks")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks", Some(accessToken))
 
       Then("he should get CREATED response back")

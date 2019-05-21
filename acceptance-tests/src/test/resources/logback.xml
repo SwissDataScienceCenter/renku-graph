@@ -11,18 +11,13 @@
         <appender-ref ref="STDOUT"/>
     </appender>
 
-    <logger name="application" level="INFO" additivity="false">
+    <logger name="application" level="OFF" additivity="false">
         <appender-ref ref="ASYNC_STDOUT"/>
     </logger>
 
-    <!-- Turning down the wiremock logging -->
-    <logger name="com.github.tomakehurst.wiremock" level="ERROR"/>
-    <logger name="wiremock.org" level="ERROR"/>
-    <logger name="WireMock" level="ERROR"/>
-    <!-- wiremock has per endpoint servlet logging -->
-    <logger name="/" level="ERROR"/>
+    <logger name="com.github.tomakehurst.wiremock" level="OFF"/>
 
-    <root level="WARN">
+    <root level="OFF">
         <appender-ref ref="ASYNC_STDOUT"/>
     </root>
 

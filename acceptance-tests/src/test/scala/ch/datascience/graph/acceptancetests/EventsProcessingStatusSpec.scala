@@ -29,6 +29,9 @@ import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project.ProjectVisibility.Public
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -43,7 +46,7 @@ class EventsProcessingStatusSpec
     with Eventually
     with IntegrationPatience {
 
-  private val numberOfEvents = 10
+  private val numberOfEvents: Int Refined Positive = 10
 
   feature("Status of events processing for a given project") {
 
@@ -77,9 +80,9 @@ class EventsProcessingStatusSpec
 
         val responseJson = response.bodyAsJson.hcursor
         val Right(done)  = responseJson.downField("done").as[Int]
-        done should be <= numberOfEvents
+        done should be <= numberOfEvents.value
         val Right(total) = responseJson.downField("total").as[Int]
-        total shouldBe numberOfEvents
+        total shouldBe numberOfEvents.value
         val Right(progress) = responseJson.downField("progress").as[Double]
         progress should be <= 100D
       }

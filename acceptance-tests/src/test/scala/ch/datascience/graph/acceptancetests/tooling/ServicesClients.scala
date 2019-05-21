@@ -18,10 +18,11 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
@@ -32,13 +33,18 @@ import org.http4s.Status.Ok
 import org.http4s.{Header, Method, Response}
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 object WebhookServiceClient {
 
-  def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO]) = new WebhookServiceClient
+  def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) =
+    new WebhookServiceClient
 
-  class WebhookServiceClient(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
+  class WebhookServiceClient(implicit executionContext: ExecutionContext,
+                             contextShift:              ContextShift[IO],
+                             timer:                     Timer[IO])
       extends ServiceClient {
     import io.circe.Json
 
@@ -56,14 +62,18 @@ object WebhookServiceClient {
 }
 
 object TriplesGeneratorClient {
-  def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO]): ServiceClient =
+  def apply()(implicit executionContext: ExecutionContext,
+              contextShift:              ContextShift[IO],
+              timer:                     Timer[IO]): ServiceClient =
     new ServiceClient {
       override val baseUrl: String Refined Url = "http://localhost:9002"
     }
 }
 
 object TokenRepositoryClient {
-  def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO]): ServiceClient =
+  def apply()(implicit executionContext: ExecutionContext,
+              contextShift:              ContextShift[IO],
+              timer:                     Timer[IO]): ServiceClient =
     new ServiceClient {
       override val baseUrl: String Refined Url = "http://localhost:9003"
     }
@@ -78,8 +88,10 @@ object TokenRepositoryClient {
   }
 }
 
-abstract class ServiceClient(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO])
-    extends IORestClient(Throttler.noThrottling) {
+abstract class ServiceClient(implicit executionContext: ExecutionContext,
+                             contextShift:              ContextShift[IO],
+                             timer:                     Timer[IO])
+    extends IORestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
 
   import ServiceClient.ServiceReadiness
   import ServiceClient.ServiceReadiness._

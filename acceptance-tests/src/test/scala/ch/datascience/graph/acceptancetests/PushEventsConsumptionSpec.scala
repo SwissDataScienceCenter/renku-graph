@@ -44,18 +44,17 @@ class PushEventsConsumptionSpec extends FeatureSpec with GivenWhenThen with Grap
       `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
       When("POST webhook-service/webhooks/events happens")
-      val payload =
-        json"""
-              {
-                "after":         ${commitId.value},
-                "user_id":       ${positiveInts().generateOne.value}, 
-                "user_username": ${nonEmptyStrings().generateOne},
-                "user_email":    ${emails.generateOne.value},
-                "project": {
-                  "id":                  ${projectId.value},
-                  "path_with_namespace": ${projectPaths.generateOne.value}
-                }
-              }"""
+      val payload  = json"""
+        {
+          "after":         ${commitId.value},
+          "user_id":       ${positiveInts().generateOne.value},
+          "user_username": ${nonEmptyStrings().generateOne},
+          "user_email":    ${emails.generateOne.value},
+          "project": {
+            "id":                  ${projectId.value},
+            "path_with_namespace": ${projectPaths.generateOne.value}
+          }
+        }"""
       val response = webhookServiceClient.POST("webhooks/events", HookToken(projectId), payload)
 
       Then("he should get ACCEPTED response back")

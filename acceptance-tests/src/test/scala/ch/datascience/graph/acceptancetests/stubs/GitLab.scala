@@ -34,11 +34,11 @@ object GitLab {
     stubFor {
       get(s"/api/v4/projects/$projectId")
         .willReturn(okJson(json"""
-            {
-              "id":                  ${projectId.value}, 
-              "visibility":          ${projectVisibility.value}, 
-              "path_with_namespace": ${relativePaths(minSegments = 2, maxSegments = 2).generateOne}
-            }""".noSpaces))
+          {
+            "id":                  ${projectId.value}, 
+            "visibility":          ${projectVisibility.value}, 
+            "path_with_namespace": ${relativePaths(minSegments = 2, maxSegments = 2).generateOne}
+          }""".noSpaces))
     }
 
   def `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId: ProjectId): Unit = {
@@ -61,18 +61,20 @@ object GitLab {
         .willReturn(created())
     }
 
-  def `GET <gitlab>/api/v4/projects/:id/events returning OK with some events`(projectId: ProjectId): Unit =
+  def `GET <gitlab>/api/v4/projects/:id/repository/commits returning OK with a commit`(projectId: ProjectId): Unit =
     stubFor {
-      get(s"/api/v4/projects/$projectId/events?action=pushed")
+      get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
         .willReturn(okJson(json"""[
-            {
-              "project_id":      ${projectId.value},
-              "author_id":       ${positiveInts().generateOne.value},
-              "author_username": ${nonEmptyStrings().generateOne},
-              "push_data": {
-                "commit_to":     ${shas.generateOne}
-              }
-            }                         
+          {
+            "id":              ${commitIds.generateOne.value},
+            "author_name":     ${nonEmptyStrings().generateOne},
+            "author_email":    ${emails.generateOne.value},
+            "committer_name":  ${nonEmptyStrings().generateOne},
+            "committer_email": ${emails.generateOne.value},
+            "message":         ${nonEmptyStrings().generateOne},
+            "committed_date":  ${committedDates.generateOne.value.toString},
+            "parent_ids":      []
+          }                         
         ]""".noSpaces))
     }
 
@@ -82,16 +84,16 @@ object GitLab {
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
         .willReturn(okJson(json"""
-            {
-              "id":              ${commitId.value},
-              "author_name":     ${nonEmptyStrings().generateOne},
-              "author_email":    ${emails.generateOne.value},
-              "committer_name":  ${nonEmptyStrings().generateOne},
-              "committer_email": ${emails.generateOne.value},
-              "message":         ${nonEmptyStrings().generateOne},
-              "committed_date":  ${committedDates.generateOne.value.toString},
-              "parent_ids":      []
-            }                         
+          {
+            "id":              ${commitId.value},
+            "author_name":     ${nonEmptyStrings().generateOne},
+            "author_email":    ${emails.generateOne.value},
+            "committer_name":  ${nonEmptyStrings().generateOne},
+            "committer_email": ${emails.generateOne.value},
+            "message":         ${nonEmptyStrings().generateOne},
+            "committed_date":  ${committedDates.generateOne.value.toString},
+            "parent_ids":      []
+          }                         
         """.noSpaces))
     }
 }
