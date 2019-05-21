@@ -29,7 +29,7 @@ import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
-import ch.datascience.webhookservice.eventprocessing.pushevent.IOPushEventSender
+import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.Json
@@ -48,16 +48,16 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
-      (pushEventSender
-        .storeCommitsInEventLog(_: PushEvent))
-        .expects(pushEvent)
+      (commitToEventLog
+        .storeCommitsInEventLog(_: StartCommit))
+        .expects(startCommit)
         .returning(context.pure(()))
 
-      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
+      expectDecryptionOf(serializedHookToken, returning = HookToken(startCommit.project.id))
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(pushEvent))
+        .withEntity(pushEventPayloadFrom(startCommit))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -69,16 +69,16 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
     "return INTERNAL_SERVER_ERROR when storing push event in the event log fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (pushEventSender
-        .storeCommitsInEventLog(_: PushEvent))
-        .expects(pushEvent)
+      (commitToEventLog
+        .storeCommitsInEventLog(_: StartCommit))
+        .expects(startCommit)
         .returning(context.raiseError(exception))
 
-      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
+      expectDecryptionOf(serializedHookToken, returning = HookToken(startCommit.project.id))
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(pushEvent))
+        .withEntity(pushEventPayloadFrom(startCommit))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -103,7 +103,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
       val request = Request(Method.POST, uri"webhooks" / "events")
-        .withEntity(pushEventPayloadFrom(pushEvent))
+        .withEntity(pushEventPayloadFrom(startCommit))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -121,7 +121,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(pushEvent))
+        .withEntity(pushEventPayloadFrom(startCommit))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -140,7 +140,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(pushEvent))
+        .withEntity(pushEventPayloadFrom(startCommit))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -152,27 +152,17 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
   "PushEvent deserialization" should {
 
-    "work if 'user_email' is present" in new TestCase {
+    "work if 'before' is null" in new TestCase {
       import HookEventEndpoint.pushEventDecoder
 
-      val pushEventWithEmail = pushEvent.copy(pushUser = pushEvent.pushUser.copy(maybeEmail = Some(emails.generateOne)))
-
-      pushEventPayloadFrom(pushEventWithEmail).as[PushEvent] shouldBe Right(pushEventWithEmail)
-    }
-
-    "work if 'user_email' is empty" in new TestCase {
-      import HookEventEndpoint.pushEventDecoder
-
-      val pushEventWithEmail = pushEvent.copy(pushUser = pushEvent.pushUser.copy(maybeEmail = None))
-
-      pushEventPayloadFrom(pushEventWithEmail).as[PushEvent] shouldBe Right(pushEventWithEmail)
+      pushEventPayloadFrom(startCommit).as[StartCommit] shouldBe Right(startCommit)
     }
   }
 
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val pushEvent = pushEvents.generateOne
+    val startCommit = startCommits.generateOne
     val serializedHookToken = nonEmptyStrings().map {
       SerializedHookToken
         .from(_)
@@ -182,29 +172,22 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
         )
     }.generateOne
 
-    val pushEventSender = mock[IOPushEventSender]
-    val hookTokenCrypto = mock[IOHookTokenCrypto]
+    val commitToEventLog = mock[IOCommitToEventLog]
+    val hookTokenCrypto  = mock[IOHookTokenCrypto]
     val processPushEvent = new HookEventEndpoint[IO](
       hookTokenCrypto,
-      pushEventSender
+      commitToEventLog
     ).processPushEvent _
 
-    def pushEventPayloadFrom(pushEvent: PushEvent) =
-      Json.obj(
-        Seq(
-          pushEvent.maybeCommitFrom.map(before => "before" -> Json.fromString(before.value)),
-          Some("after"         -> Json.fromString(pushEvent.commitTo.value)),
-          Some("user_id"       -> Json.fromInt(pushEvent.pushUser.userId.value)),
-          Some("user_username" -> Json.fromString(pushEvent.pushUser.username.value)),
-          Some("user_email"    -> Json.fromString(pushEvent.pushUser.maybeEmail.map(_.value).getOrElse(""))),
-          Some(
-            "project" -> Json.obj(
-              "id"                  -> Json.fromInt(pushEvent.project.id.value),
-              "path_with_namespace" -> Json.fromString(pushEvent.project.path.value)
-            )
-          )
-        ).flatten: _*
-      )
+    def pushEventPayloadFrom(commit: StartCommit) = json"""
+      {                                                      
+        "after": ${commit.id.value},
+        "project": {
+          "id":                  ${commit.project.id.value},
+          "path_with_namespace": ${commit.project.path.value}
+        }
+      }
+    """
 
     def expectDecryptionOf(hookAuthToken: SerializedHookToken, returning: HookToken) =
       (hookTokenCrypto

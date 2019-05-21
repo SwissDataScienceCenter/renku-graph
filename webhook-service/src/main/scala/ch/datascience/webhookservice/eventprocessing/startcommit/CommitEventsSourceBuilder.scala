@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.pushevent
+package ch.datascience.webhookservice.eventprocessing.startcommit
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
@@ -29,9 +29,10 @@ import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events.{CommitEvent, CommitId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder, IOCommitInfoFinder}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
-import ch.datascience.webhookservice.eventprocessing.PushEvent
-import ch.datascience.webhookservice.eventprocessing.pushevent.CommitEventsSourceBuilder.EventsFlowBuilder
+import ch.datascience.webhookservice.eventprocessing.StartCommit
+import ch.datascience.webhookservice.eventprocessing.startcommit.CommitEventsSourceBuilder.EventsFlowBuilder
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -45,20 +46,20 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
   import eventLogVerifyExistence._
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
-  def buildEventsSource(pushEvent:        PushEvent,
+  def buildEventsSource(startCommit:      StartCommit,
                         maybeAccessToken: Option[AccessToken]): Interpretation[EventsFlowBuilder[Interpretation]] =
     ME.pure {
       new EventsFlowBuilder[Interpretation] {
         override def transformEventsWith[O](transform: CommitEvent => Interpretation[O]): Interpretation[List[O]] =
-          new EventsFlow(pushEvent, maybeAccessToken, transform).run()
+          new EventsFlow(startCommit, maybeAccessToken, transform).run()
       }
     }
 
-  private class EventsFlow[O](pushEvent:        PushEvent,
+  private class EventsFlow[O](startCommit:      StartCommit,
                               maybeAccessToken: Option[AccessToken],
                               transform:        CommitEvent => Interpretation[O]) {
 
-    def run(): Interpretation[List[O]] = findEventAndTransform(List(pushEvent.commitTo), List.empty)
+    def run(): Interpretation[List[O]] = findEventAndTransform(List(startCommit.id), List.empty)
 
     private def findEventAndTransform(commitIds: List[CommitId], transformResults: List[O]): Interpretation[List[O]] =
       commitIds match {
@@ -81,24 +82,21 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
       } yield commitEvents
 
     private def filterNotInLog(commitIds: List[CommitId]) =
-      if (commitIds.nonEmpty) filterNotExistingInLog(commitIds, pushEvent.project.id)
+      if (commitIds.nonEmpty) filterNotExistingInLog(commitIds, startCommit.project.id)
       else ME.pure(List.empty[CommitId])
 
     private def findCommitEvent(commitId: CommitId): Interpretation[CommitEvent] =
-      findCommitInfo(pushEvent.project.id, commitId, maybeAccessToken)
-        .map(commitInfo => merge(commitInfo, pushEvent))
+      findCommitInfo(startCommit.project.id, commitId, maybeAccessToken) map toCommitEvent
 
-    private def merge(commitInfo: CommitInfo, pushEvent: PushEvent): CommitEvent =
-      CommitEvent(
-        id            = commitInfo.id,
-        message       = commitInfo.message,
-        committedDate = commitInfo.committedDate,
-        pushUser      = pushEvent.pushUser,
-        author        = commitInfo.author,
-        committer     = commitInfo.committer,
-        parents       = commitInfo.parents.filterNot(_ == DontCareCommitId),
-        project       = pushEvent.project
-      )
+    private def toCommitEvent(commitInfo: CommitInfo) = CommitEvent(
+      id            = commitInfo.id,
+      message       = commitInfo.message,
+      committedDate = commitInfo.committedDate,
+      author        = commitInfo.author,
+      committer     = commitInfo.committer,
+      parents       = commitInfo.parents.filterNot(_ == DontCareCommitId),
+      project       = startCommit.project
+    )
   }
 }
 

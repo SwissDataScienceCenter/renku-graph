@@ -26,16 +26,16 @@ import io.circe.Decoder
 
 final case class CommitEvent(
     id:            CommitId,
+    project:       Project,
     message:       CommitMessage,
     committedDate: CommittedDate,
-    pushUser:      PushUser,
     author:        User,
     committer:     User,
-    parents:       List[CommitId],
-    project:       Project
+    parents:       List[CommitId]
 )
 
 object CommitEvent {
+
   implicit class CommitEventOps(commitEvent: CommitEvent) {
     lazy val commitEventId: CommitEventId = CommitEventId(commitEvent.id, commitEvent.project.id)
   }
