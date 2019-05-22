@@ -10,6 +10,9 @@ packagedArtifacts := Map.empty
 lazy val root = Project(
   id   = "renku-graph",
   base = file(".")
+).settings(
+  skip in publish := true, 
+  publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
   graphCommons,
   dbEventLog,
@@ -102,7 +105,9 @@ lazy val commonSettings = Seq(
   organization := "ch.datascience",
   scalaVersion := "2.12.8",
 
-  publishArtifact := false,
+  skip in publish := true,
+  publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
+  
   publishArtifact in (Compile, packageDoc) := false,
   publishArtifact in (Compile, packageSrc) := false,
 
