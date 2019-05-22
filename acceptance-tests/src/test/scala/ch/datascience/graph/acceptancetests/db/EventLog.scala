@@ -16,19 +16,28 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog
+package ch.datascience.graph.acceptancetests.db
 
-import cats.MonadError
+import cats.effect.IO
 import ch.datascience.db.DBConfigProvider
-import eu.timepit.refined.auto._
+import ch.datascience.dbeventlog._
+import ch.datascience.dbeventlog.commands._
+import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import doobie.implicits._
 
-import scala.language.higherKinds
+import scala.language.postfixOps
 
-sealed trait EventLogDB
+object EventLog extends InMemoryEventLogDb {
 
-class EventLogDbConfigProvider[Interpretation[_]](
-    implicit ME: MonadError[Interpretation, Throwable]
-) extends DBConfigProvider[Interpretation, EventLogDB](
-      namespace = "db-event-log",
-      dbName    = "event_log"
-    )
+  def findEvents(projectId: ProjectId, status: EventStatus): List[CommitId] = execute {
+    sql"""select event_id
+         |from event_log
+         |where project_id = $projectId and status = $status
+         """.stripMargin
+      .query[CommitId]
+      .to[List]
+  }
+
+  protected override val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
+    new EventLogDbConfigProvider[IO].get().unsafeRunSync()
+}

@@ -34,9 +34,7 @@ import scala.language.higherKinds
 
 class DBConfigProvider[Interpretation[_], TargetDB](
     namespace: String,
-    driver:    DBConfig.Driver,
     dbName:    DBConfig.DbName,
-    urlPrefix: DBConfig.UrlPrefix,
     config:    Config = ConfigFactory.load()
 )(implicit ME: MonadError[Interpretation, Throwable])
     extends ConfigLoader[Interpretation] {
@@ -48,19 +46,22 @@ class DBConfigProvider[Interpretation[_], TargetDB](
 
   def get(): Interpretation[DBConfig[TargetDB]] =
     for {
+      driver         <- find[DBConfig.Driver](s"$namespace.db-driver", config)
       host           <- find[DBConfig.Host](s"$namespace.db-host", config)
       user           <- find[DBConfig.User](s"$namespace.db-user", config)
       pass           <- find[DBConfig.Pass](s"$namespace.db-pass", config)
       connectionPool <- find[DBConfig.ConnectionPool](s"$namespace.connection-pool", config)
       maxLifetime    <- find[DBConfig.MaxLifetime](s"$namespace.max-connection-lifetime", config)
-      url            <- findUrl(host)
+      urlTemplate    <- find[DBConfig.UrlTemplate](s"$namespace.db-url-template", config)
+      url            <- findUrl(urlTemplate, host)
     } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime)
 
-  private def findUrl(host: DBConfig.Host): Interpretation[DBConfig.Url] = ME.fromEither {
-    RefType
-      .applyRef[DBConfig.Url](s"$urlPrefix://$host/$dbName")
-      .leftMap(_ => new IllegalArgumentException("Invalid db url value"))
-  }
+  private def findUrl(urlTeplate: DBConfig.UrlTemplate, host: DBConfig.Host): Interpretation[DBConfig.Url] =
+    ME.fromEither {
+      RefType
+        .applyRef[DBConfig.Url](urlTeplate.value.replace("$host", host.value).replace("$dbName", dbName.value))
+        .leftMap(_ => new IllegalArgumentException("Invalid db url value"))
+    }
 }
 
 object DBConfigProvider {
@@ -76,7 +77,7 @@ object DBConfigProvider {
     type Driver         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Url            = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Host           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type UrlPrefix      = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type UrlTemplate    = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type DbName         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type User           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Pass           = String

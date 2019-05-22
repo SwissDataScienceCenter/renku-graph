@@ -82,6 +82,22 @@ lazy val tokenRepository = Project(
   AutomateHeaderPlugin
 )
 
+
+lazy val acceptanceTests = Project(
+  id   = "acceptance-tests",
+  base = file("acceptance-tests")
+).settings(
+  commonSettings
+).dependsOn(
+  webhookService,
+  triplesGenerator,
+  tokenRepository,
+  graphCommons % "test->test",
+  dbEventLog   % "test->test"
+).enablePlugins(
+  AutomateHeaderPlugin
+)
+
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
   scalaVersion := "2.12.8",

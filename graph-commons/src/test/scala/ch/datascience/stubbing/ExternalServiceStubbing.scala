@@ -21,12 +21,20 @@ package ch.datascience.stubbing
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 
 trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll {
   this: Suite =>
 
-  private val wireMockConfig = WireMockConfiguration.wireMockConfig().dynamicPort()
+  protected val maybeFixedPort: Option[Int Refined Positive] = None
+
+  private lazy val wireMockConfig =
+    maybeFixedPort
+      .map(fixedPort => WireMockConfiguration.wireMockConfig().port(fixedPort.value))
+      .getOrElse(WireMockConfiguration.wireMockConfig().dynamicPort())
+
   private lazy val server = {
     val newServer = new WireMockServer(wireMockConfig)
     newServer.start()
@@ -34,7 +42,7 @@ trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll 
     newServer
   }
 
-  val externalServiceBaseUrl: String = s"http://localhost:${server.port()}"
+  lazy val externalServiceBaseUrl: String = s"http://localhost:${server.port()}"
 
   override def beforeEach {
     server.resetAll()

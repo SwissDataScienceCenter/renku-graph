@@ -19,8 +19,8 @@
 package ch.datascience.dbeventlog
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.db.DbTransactor
 import ch.datascience.db.TestDbConfig._
+import ch.datascience.db.{DBConfigProvider, DbTransactor}
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import doobie.util.transactor.Transactor
@@ -31,7 +31,7 @@ trait InMemoryEventLogDb {
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
-  private val dbConfig = newDbConfig[EventLogDB]
+  protected val dbConfig: DBConfigProvider.DBConfig[EventLogDB] = newDbConfig[EventLogDB]
 
   lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB](
     Transactor.fromDriverManager[IO](

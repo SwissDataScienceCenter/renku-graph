@@ -16,19 +16,27 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog
+package ch.datascience.graph.acceptancetests.stubs
 
-import cats.MonadError
-import ch.datascience.db.DBConfigProvider
-import eu.timepit.refined.auto._
+import com.github.tomakehurst.wiremock.client.WireMock
+import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
 
-import scala.language.higherKinds
+object RdfStoreStub {
+  import com.github.tomakehurst.wiremock.WireMockServer
+  import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 
-sealed trait EventLogDB
+  private lazy val fusekiStub = new WireMockServer(WireMockConfiguration.wireMockConfig().port(3030))
 
-class EventLogDbConfigProvider[Interpretation[_]](
-    implicit ME: MonadError[Interpretation, Throwable]
-) extends DBConfigProvider[Interpretation, EventLogDB](
-      namespace = "db-event-log",
-      dbName    = "event_log"
-    )
+  def start(): Unit = {
+    fusekiStub.start()
+    WireMock.configureFor(fusekiStub.port())
+  }
+
+  def shutdown(): Unit = fusekiStub.shutdown()
+
+  def givenRenkuDataSetExists(): Unit =
+    stubFor {
+      get("/$/datasets/renku")
+        .willReturn(ok())
+    }
+}

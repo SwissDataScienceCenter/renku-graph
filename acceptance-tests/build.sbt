@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2018 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,19 +16,6 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog
+name := "acceptance-tests"
 
-import cats.MonadError
-import ch.datascience.db.DBConfigProvider
-import eu.timepit.refined.auto._
-
-import scala.language.higherKinds
-
-sealed trait EventLogDB
-
-class EventLogDbConfigProvider[Interpretation[_]](
-    implicit ME: MonadError[Interpretation, Throwable]
-) extends DBConfigProvider[Interpretation, EventLogDB](
-      namespace = "db-event-log",
-      dbName    = "event_log"
-    )
+parallelExecution in Test := false
