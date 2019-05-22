@@ -69,7 +69,7 @@ class EventsProcessingStatusSpec
       noEventsResponseJson.downField("total").as[Int]       shouldBe Right(0)
       noEventsResponseJson.downField("progress").as[Double] shouldBe a[Left[_, _]]
 
-      When("there are events being processed")
+      When("there are events under processing")
       sendEventsForProcessing(projectId)
 
       Then("the status endpoint should return OK with some progress info")

@@ -37,7 +37,7 @@ class EventLogEventsHandlingSpec
     with Eventually
     with IntegrationPatience {
 
-  feature("Commit Events from the Event Log to be translated to triples in a RDF Store") {
+  feature("Commit Events from the Event Log get translated to triples in a RDF Store") {
 
     scenario("Not processed Commit Events in the Event Log should be picked-up for processing") {
 
@@ -45,10 +45,10 @@ class EventLogEventsHandlingSpec
       val projectPath = projectPaths.generateOne
       val commitId    = commitIds.generateOne
 
-      Given("project having commit with the commit id in GitLab")
+      Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-      When("Push Event arrives")
+      When("a Push Event arrives")
       webhookServiceClient
         .POST("webhooks/events", HookToken(projectId), model.GitLab.pushEvent(projectId, projectPath, commitId))
         .status shouldBe Accepted

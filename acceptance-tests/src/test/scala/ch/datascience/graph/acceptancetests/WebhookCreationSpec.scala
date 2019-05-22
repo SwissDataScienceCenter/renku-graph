@@ -33,17 +33,17 @@ import org.scalatest.{FeatureSpec, GivenWhenThen}
 
 class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServices {
 
-  feature("The user can add a webhook to a project with POST webhook-service/projects/:id/webhooks") {
+  feature("A Graph Services hook can be created for a project") {
 
-    scenario("There's already Graph Services webhook on the project in GitLab") {
+    scenario("Graph Services hook is present on the project in GitLab") {
 
       val projectId   = projectIds.generateOne
       val accessToken = accessTokens.generateOne
 
-      Given("project having info in GitLab")
+      Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
 
-      Given("project having Graph Services hook in GitLab")
+      Given("project has Graph Services hook in GitLab")
       `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks")
@@ -53,30 +53,30 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
       response.status shouldBe Ok
     }
 
-    scenario("There's no Graph Services webhook on the project in GitLab") {
+    scenario("No Graph Services webhook on the project in GitLab") {
 
       val projectId   = projectIds.generateOne
       val accessToken = accessTokens.generateOne
 
-      Given("project having info in GitLab")
+      Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
 
-      Given("project not having Graph Services hook in GitLab")
+      Given("project does not have Graph Services hook in GitLab")
       `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(projectId)
 
       Given("project creation in GitLab returning CREATED")
       `POST <gitlab>/api/v4/projects/:id/hooks returning CREATED`(projectId)
 
-      Given("latest Commit in GitLab exists")
+      Given("some Commit for the project exists in GitLab")
       `GET <gitlab>/api/v4/projects/:id/repository/commits returning OK with a commit`(projectId)
 
-      When("user issues POST webhook-service/projects/:id/webhooks")
+      When("user does POST webhook-service/projects/:id/webhooks")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks", Some(accessToken))
 
       Then("he should get CREATED response back")
       response.status shouldBe Created
 
-      And("the access token used in the POST should be added to the token repository")
+      And("the Access Token used in the POST should be added to the token repository")
       val expectedAccessTokenJson = accessToken match {
         case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}"""
         case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""

@@ -20,7 +20,6 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
@@ -33,23 +32,20 @@ import org.scalatest.{FeatureSpec, GivenWhenThen}
 
 class PushEventsConsumptionSpec extends FeatureSpec with GivenWhenThen with GraphServices {
 
-  feature("POST webhook-service/webhooks/events endpoint consuming Push Events") {
+  feature("A Push Event sent to the services generates Commit Events in the Event Log") {
 
     scenario("Push Event not being processed yet gets translated into Commit Events in the Event Log") {
 
       val projectId = projectIds.generateOne
       val commitId  = commitIds.generateOne
 
-      Given("project having commit with the commit id in GitLab")
+      Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-      When("POST webhook-service/webhooks/events happens")
+      When("user does POST webhook-service/webhooks/events happens")
       val payload  = json"""
         {
           "after":         ${commitId.value},
-          "user_id":       ${positiveInts().generateOne.value},
-          "user_username": ${nonEmptyStrings().generateOne},
-          "user_email":    ${emails.generateOne.value},
           "project": {
             "id":                  ${projectId.value},
             "path_with_namespace": ${projectPaths.generateOne.value}

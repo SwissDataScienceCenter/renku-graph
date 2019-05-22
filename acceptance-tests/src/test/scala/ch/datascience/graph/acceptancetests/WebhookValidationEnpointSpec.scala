@@ -32,18 +32,17 @@ import org.scalatest.{FeatureSpec, GivenWhenThen}
 
 class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with GraphServices {
 
-  feature(
-    "The user can verify if there's a webhook for a project by doing POST webhook-service/projects/:id/webhooks/validation") {
+  feature("Existence of a Graph Services hook can be validated") {
 
-    scenario("There's a Graph Services webhook on a Public project in GitLab") {
+    scenario("There's a Graph Services hook on a Public project in GitLab") {
 
       val projectId   = projectIds.generateOne
       val accessToken = accessTokens.generateOne
 
-      Given("project having info in GitLab")
+      Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
 
-      Given("project having Graph Services hook in GitLab")
+      Given("project has Graph Services hook in GitLab")
       `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
@@ -53,15 +52,15 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       response.status shouldBe Ok
     }
 
-    scenario("There's no Graph Services webhook on a Public project in GitLab") {
+    scenario("There's no Graph Services hook on a Public project in GitLab") {
 
       val projectId   = projectIds.generateOne
       val accessToken = accessTokens.generateOne
 
-      Given("project having info in GitLab")
+      Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
 
-      Given("project not having Graph Services hook in GitLab")
+      Given("project does not have Graph Services hook in GitLab")
       `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
@@ -71,15 +70,15 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       response.status shouldBe NotFound
     }
 
-    scenario("There's a Graph Services webhook on a non-public project in GitLab") {
+    scenario("There's a Graph Services hook on a non-public project in GitLab") {
 
       val projectId   = projectIds.generateOne
       val accessToken = accessTokens.generateOne
 
-      Given("project having info in GitLab")
+      Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Private)
 
-      Given("project having Graph Services hook in GitLab")
+      Given("project has Graph Services hook in GitLab")
       `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
@@ -88,12 +87,12 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       Then("he should get OK response back")
       response.status shouldBe Ok
 
-      And("the access token used in the POST should be added to the token repository")
+      And("the Access Token used in the POST should be added to the token repository")
       tokenRepositoryClient
         .GET(s"projects/$projectId/tokens", maybeAccessToken = None)
         .bodyAsJson shouldBe accessToken.toJson
 
-      And("when the webhook get deleted")
+      And("when the hook get deleted from GitLab")
       `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(projectId)
 
       And("user does POST webhook-service/projects/:id/webhooks/validation again")
@@ -103,7 +102,7 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       Then("he should get NOT_FOUND response back")
       afterDeletionResponse.status shouldBe NotFound
 
-      And("the access token should get removed from the token repository")
+      And("the Access Token should be removed from the token repository")
       tokenRepositoryClient.GET(s"projects/$projectId/tokens", maybeAccessToken = None).status shouldBe NotFound
     }
   }
