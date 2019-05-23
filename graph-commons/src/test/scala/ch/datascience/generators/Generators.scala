@@ -19,7 +19,7 @@
 package ch.datascience.generators
 
 import java.time.Instant
-import java.time.temporal.ChronoUnit.DAYS
+import java.time.temporal.ChronoUnit.{DAYS, MINUTES => MINS}
 
 import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
@@ -111,6 +111,11 @@ object Generators {
   val timestampsNotInTheFuture: Gen[Instant] =
     Gen
       .choose(Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli)
+      .map(Instant.ofEpochMilli)
+
+  val timestampsInTheFuture: Gen[Instant] =
+    Gen
+      .choose(Instant.now().plus(10, MINS).toEpochMilli, Instant.now().plus(2000, DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls.map(ServiceUrl.apply)

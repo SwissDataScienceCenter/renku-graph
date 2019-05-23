@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.init
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.{BasicAuth, IORestClient}
+import ch.datascience.http.client.IORestClient
 import ch.datascience.triplesgenerator.config.FusekiConfig
 import io.chrisdavenport.log4cats.Logger
 
@@ -45,12 +45,12 @@ private class IODatasetExistenceCreator(logger: Logger[IO])(
 
   override def createDataset(fusekiConfig: FusekiConfig): IO[Unit] =
     for {
-      uri         <- validateUri(s"${fusekiConfig.fusekiBaseUrl}/$$/datasets")
-      projectInfo <- send(postRequest(uri, fusekiConfig))(mapResponse)
-    } yield projectInfo
+      uri    <- validateUri(s"${fusekiConfig.fusekiBaseUrl}/$$/datasets")
+      result <- send(postRequest(uri, fusekiConfig))(mapResponse)
+    } yield result
 
   private def postRequest(uri: Uri, fusekiConfig: FusekiConfig): Request[IO] =
-    request(POST, uri, BasicAuth(fusekiConfig.username, fusekiConfig.password))
+    request(POST, uri, fusekiConfig.authCredentials)
       .withEntity(
         UrlForm(
           "dbName" -> fusekiConfig.datasetName.toString,

@@ -16,23 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.triplesgenerator.reprovisioning
 
-import cats.effect.ConcurrentEffect
-import ch.datascience.triplesgenerator.reprovisioning.CompleteReProvisioningEndpoint
-import org.http4s.dsl.Http4sDsl
+import cats.MonadError
+import cats.implicits._
+import ch.datascience.dbeventlog.commands.EventLogMarkAllNew
 
 import scala.language.higherKinds
 
-private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
-    completeReProvisionEndpoint: CompleteReProvisioningEndpoint[Interpretation]
-) extends Http4sDsl[Interpretation] {
+private class ReProvisioner[Interpretation[_]](
+    datasetTruncator:   DatasetTruncator[Interpretation],
+    eventLogMarkAllNew: EventLogMarkAllNew[Interpretation]
+)(implicit ME:          MonadError[Interpretation, Throwable]) {
 
-  import org.http4s.HttpRoutes
+  import datasetTruncator._
+  import eventLogMarkAllNew._
 
-  lazy val routes: HttpRoutes[Interpretation] = HttpRoutes
-    .of[Interpretation] {
-      case GET -> Root / "ping" => Ok("pong")
-      case request @ DELETE -> Root / "triples" / "projects" => completeReProvisionEndpoint.reProvisionAll(request)
-    }
+  def startReProvisioning: Interpretation[Unit] =
+    for {
+      _ <- truncateDataset
+      _ <- markAllEventsAsNew
+    } yield ()
 }

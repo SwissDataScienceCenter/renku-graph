@@ -19,10 +19,9 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.triplesgenerator.config.IOFusekiConfigProvider
+import ch.datascience.triplesgenerator.config.{FusekiBaseUrl, IOFusekiConfigProvider}
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.apache.jena.rdf.model.Model
 import org.apache.jena.rdfconnection.RDFConnection
@@ -149,7 +148,7 @@ class FusekiConnectorSpec extends WordSpec with MockFactory {
     val rdfTriples   = rdfTriplesSets.generateOne
     val fusekiConfig = fusekiConfigs.generateOne
 
-    val createConnection     = mockFunction[ServiceUrl, RDFConnection]
+    val createConnection     = mockFunction[FusekiBaseUrl, RDFConnection]
     val fusekiConnection     = mock[RDFConnection]
     val fusekiConfigProvider = mock[IOFusekiConfigProvider]
 

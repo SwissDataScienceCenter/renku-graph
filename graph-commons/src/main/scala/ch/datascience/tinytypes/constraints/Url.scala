@@ -20,7 +20,7 @@ package ch.datascience.tinytypes.constraints
 
 import java.net.URL
 
-import ch.datascience.tinytypes.Constraints
+import ch.datascience.tinytypes.{Constraints, TinyType, TinyTypeFactory}
 
 import scala.util.Try
 
@@ -29,4 +29,12 @@ trait Url extends Constraints[String] {
     check   = url => Try(new URL(url)).isSuccess,
     message = (url: String) => s"Cannot instantiate $typeName with '$url'"
   )
+}
+
+trait UrlOps[T <: TinyType[String]] {
+  self: TinyTypeFactory[String, T] with Url =>
+
+  implicit class UrlOps(url: T) {
+    def /(value: Any): T = apply(s"$url/$value")
+  }
 }

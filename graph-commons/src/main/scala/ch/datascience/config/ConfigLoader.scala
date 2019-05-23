@@ -29,7 +29,7 @@ import scala.language.higherKinds
 
 abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
-  protected def find[T](key: String, config: Config)(implicit reader: Derivation[ConfigReader[T]]): Interpretation[T] =
+  protected def find[T](key: String, config: Config)(implicit reader: ConfigReader[T]): Interpretation[T] =
     fromEither {
       loadConfig[T](config, key)
     }

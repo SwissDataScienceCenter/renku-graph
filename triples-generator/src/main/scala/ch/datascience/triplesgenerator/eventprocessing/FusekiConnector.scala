@@ -20,8 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import ch.datascience.config.ServiceUrl
-import ch.datascience.triplesgenerator.config.FusekiConfigProvider
+import ch.datascience.triplesgenerator.config.{FusekiBaseUrl, FusekiConfigProvider}
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 
 import scala.language.higherKinds
@@ -33,7 +32,7 @@ private abstract class FusekiConnector[Interpretation[_]] {
 
 private class IOFusekiConnector(
     fusekiConfigProvider:    FusekiConfigProvider[IO],
-    fusekiConnectionBuilder: ServiceUrl => RDFConnection = IOFusekiConnector.fusekiConnectionBuilder
+    fusekiConnectionBuilder: FusekiBaseUrl => RDFConnection = IOFusekiConnector.fusekiConnectionBuilder
 )(implicit contextShift:     ContextShift[IO])
     extends FusekiConnector[IO] {
 
@@ -60,7 +59,7 @@ private class IOFusekiConnector(
 }
 
 private object IOFusekiConnector {
-  private val fusekiConnectionBuilder: ServiceUrl => RDFConnection = fusekiUrl =>
+  private val fusekiConnectionBuilder: FusekiBaseUrl => RDFConnection = fusekiUrl =>
     RDFConnectionFuseki
       .create()
       .destination(fusekiUrl.toString)

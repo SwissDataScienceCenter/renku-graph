@@ -21,7 +21,7 @@ package ch.datascience.graph.acceptancetests.tooling
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, BasicAuthCredentials, IORestClient}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.model.HookToken
@@ -113,6 +113,13 @@ abstract class ServiceClient(implicit executionContext: ExecutionContext,
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.PUT, uri, maybeAccessToken) withEntity payload)(mapResponse)
+    } yield response
+  }.unsafeRunSync()
+
+  def DELETE(url: String, basicAuth: BasicAuthCredentials): Response[IO] = {
+    for {
+      uri      <- validateUri(s"$baseUrl/$url")
+      response <- send(request(Method.DELETE, uri, basicAuth))(mapResponse)
     } yield response
   }.unsafeRunSync()
 

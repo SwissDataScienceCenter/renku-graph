@@ -18,9 +18,7 @@
 
 package ch.datascience.config
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.constraints.Url
+import ch.datascience.tinytypes.constraints.{Url, UrlOps}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -32,13 +30,9 @@ class ServiceUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
     "have the Url constraint" in {
       ServiceUrl shouldBe an[Url]
     }
-  }
 
-  "/" should {
-
-    "allow to add next path part" in {
-      val url = serviceUrls.generateOne
-      (url / "path").toString shouldBe s"$url/path"
+    "be the UrlOps" in {
+      ServiceUrl shouldBe an[UrlOps[_]]
     }
   }
 

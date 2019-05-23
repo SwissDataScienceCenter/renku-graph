@@ -16,49 +16,61 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.init
+package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.config.FusekiBaseUrl
-import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
+import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators.fusekiConfigs
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.http4s.Status
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IODatasetExistenceCreatorSpec extends WordSpec with ExternalServiceStubbing with MockFactory {
+class IODatasetTruncatorSpec extends WordSpec with ExternalServiceStubbing {
 
-  "createDataset" should {
+  "truncateDataset" should {
 
-    "succeed if POST /$/datasets returns OK" in new TestCase {
+    "succeed when SPARQL truncate command sent to the Store's update endpoint got OK" in new TestCase {
 
       stubFor {
-        post("/$/datasets")
-          .withHeader("content-type", containing("application/x-www-form-urlencoded"))
+        post(s"/${fusekiConfig.datasetName}/update")
           .withBasicAuth(fusekiConfig.authCredentials.username.value, fusekiConfig.authCredentials.password.value)
-          .withRequestBody(equalTo(s"dbName=${fusekiConfig.datasetName}&dbType=${fusekiConfig.datasetType}"))
+          .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
+          .withRequestBody(equalTo("update=DELETE { ?s ?p ?o} WHERE { ?s ?p ?o}"))
           .willReturn(ok())
       }
 
-      datasetExistenceCreator.createDataset(fusekiConfig).unsafeRunSync() shouldBe ((): Unit)
+      datasetTruncator.truncateDataset.unsafeRunSync() shouldBe ((): Unit)
     }
 
-    "fail if POST /$/datasets returns status different than OK" in new TestCase {
+    s"fails with $UnauthorizedException when SPARQL truncate command sent to the Store's update endpoint got status other than 401" in new TestCase {
 
       stubFor {
-        post("/$/datasets")
+        post(s"/${fusekiConfig.datasetName}/update")
           .willReturn(unauthorized().withBody("some message"))
       }
 
+      intercept[UnauthorizedException] {
+        datasetTruncator.truncateDataset.unsafeRunSync()
+      }
+    }
+
+    "fails when SPARQL truncate command sent to the Store's update endpoint got status other than OK" in new TestCase {
+
+      stubFor {
+        post(s"/${fusekiConfig.datasetName}/update")
+          .willReturn(badRequest().withBody("some message"))
+      }
+
       intercept[Exception] {
-        datasetExistenceCreator.createDataset(fusekiConfig).unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiBaseUrl/$$/datasets returned ${Status.Unauthorized}; body: some message"
+        datasetTruncator.truncateDataset.unsafeRunSync()
+      }.getMessage shouldBe s"POST $fusekiBaseUrl/${fusekiConfig.datasetName}/update returned ${Status.BadRequest}; body: some message"
     }
   }
 
@@ -68,7 +80,8 @@ class IODatasetExistenceCreatorSpec extends WordSpec with ExternalServiceStubbin
   private trait TestCase {
     val fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     val fusekiConfig  = fusekiConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
+    val logger        = TestLogger[IO]()
 
-    val datasetExistenceCreator = new IODatasetExistenceCreator(TestLogger())
+    val datasetTruncator = IODatasetTruncator(fusekiConfig, logger).unsafeRunSync()
   }
 }

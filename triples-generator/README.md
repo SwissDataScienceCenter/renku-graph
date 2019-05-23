@@ -5,6 +5,37 @@ This is a microservice which:
 - clones the Git project, checks out the commit `id` in order to create RDF triples by invoking `renku log --format rdf`,
 - uploads the generated triples to Jena Fuseki
 
+## API
+
+| Method | Path                            | Description                                                                           |
+|--------|---------------------------------|---------------------------------------------------------------------------------------|
+| GET    | ```/ping```                     | To check if service is healthy                                                        |
+| DELETE | ```/triples/projects```         | Truncates the RDF storage and re-provisions it with all the events from the Event Log |
+
+#### GET /ping
+
+Verifies service health.
+
+**Response**
+
+| Status                     | Description             |
+|----------------------------|-------------------------|
+| OK (200)                   | If service is healthy   |
+| INTERNAL SERVER ERROR (500)| Otherwise               |
+
+#### DELETE /triples/projects
+
+Truncates the RDF storage and re-provisions it with all the events from the Event Log.
+The endpoint is protected with Basic Auth authorization. 
+
+**Response**
+
+| Status                     | Description                                     |
+|----------------------------|-------------------------------------------------|
+| ACCEPTED (202)             | When re-provisioning got triggered successfully |
+| UNAUTHORIZED (401)         | If no or invalid credentials were given         |
+| INTERNAL SERVER ERROR (500)| Otherwise                                       |
+
 ### Trying out
 
 The triples-generator is a part of multi-module sbt project thus it has to be built from the root level.

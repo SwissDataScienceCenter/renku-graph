@@ -18,13 +18,33 @@
 
 package ch.datascience.http.client
 
+import cats.implicits._
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import pureconfig.ConfigReader
+import pureconfig.error.CannotConvert
 
-case class BasicAuth(username: BasicAuthUsername, password: BasicAuthPassword)
+case class BasicAuthCredentials(username: BasicAuthUsername, password: BasicAuthPassword)
 
 class BasicAuthUsername private (val value: String) extends AnyVal with TinyType[String]
 object BasicAuthUsername extends TinyTypeFactory[String, BasicAuthUsername](new BasicAuthUsername(_)) with NonBlank
 
 class BasicAuthPassword private (val value: String) extends AnyVal with TinyType[String]
 object BasicAuthPassword extends TinyTypeFactory[String, BasicAuthPassword](new BasicAuthPassword(_)) with NonBlank
+
+object BasicAuthConfigReaders {
+
+  implicit val usernameReader: ConfigReader[BasicAuthUsername] =
+    ConfigReader.fromString[BasicAuthUsername] { value =>
+      BasicAuthUsername
+        .from(value)
+        .leftMap(exception => CannotConvert(value, BasicAuthUsername.getClass.toString, exception.getMessage))
+    }
+
+  implicit val passwordReader: ConfigReader[BasicAuthPassword] =
+    ConfigReader.fromString[BasicAuthPassword] { value =>
+      BasicAuthPassword
+        .from(value)
+        .leftMap(exception => CannotConvert(value, BasicAuthPassword.getClass.toString, exception.getMessage))
+    }
+}

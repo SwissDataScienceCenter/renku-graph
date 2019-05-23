@@ -20,9 +20,9 @@ package ch.datascience.triplesgenerator.config
 
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.http.client.{BasicAuthPassword, BasicAuthUsername}
-import ch.datascience.config.{ConfigLoader, ServiceUrl}
-import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.config.ConfigLoader
+import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
+import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
@@ -64,38 +64,38 @@ object DatasetType {
 }
 
 final case class FusekiConfig(
-    fusekiBaseUrl: ServiceUrl,
-    datasetName:   DatasetName,
-    datasetType:   DatasetType,
-    username:      BasicAuthUsername,
-    password:      BasicAuthPassword
+    fusekiBaseUrl:   FusekiBaseUrl,
+    datasetName:     DatasetName,
+    datasetType:     DatasetType,
+    authCredentials: BasicAuthCredentials
 )
+
+class FusekiBaseUrl private (val value: String) extends AnyVal with TinyType[String]
+object FusekiBaseUrl
+    extends TinyTypeFactory[String, FusekiBaseUrl](new FusekiBaseUrl(_))
+    with Url
+    with UrlOps[FusekiBaseUrl] {
+  private[config] implicit val fusekiBaseUrlReader: ConfigReader[FusekiBaseUrl] =
+    ConfigReader.fromString[FusekiBaseUrl] { value =>
+      FusekiBaseUrl
+        .from(value)
+        .leftMap(exception => CannotConvert(value, FusekiBaseUrl.getClass.toString, exception.getMessage))
+    }
+}
 
 class FusekiConfigProvider[Interpretation[_]](
     config:    Config = ConfigFactory.load()
 )(implicit ME: MonadError[Interpretation, Throwable])
     extends ConfigLoader[Interpretation] {
 
-  private implicit val usernameReader: ConfigReader[BasicAuthUsername] =
-    ConfigReader.fromString[BasicAuthUsername] { value =>
-      BasicAuthUsername
-        .from(value)
-        .leftMap(exception => CannotConvert(value, BasicAuthUsername.getClass.toString, exception.getMessage))
-    }
-
-  private implicit val passwordReader: ConfigReader[BasicAuthPassword] =
-    ConfigReader.fromString[BasicAuthPassword] { value =>
-      BasicAuthPassword
-        .from(value)
-        .leftMap(exception => CannotConvert(value, BasicAuthPassword.getClass.toString, exception.getMessage))
-    }
+  import ch.datascience.http.client.BasicAuthConfigReaders._
 
   def get: Interpretation[FusekiConfig] =
     for {
-      url         <- find[ServiceUrl]("services.fuseki.url", config)
+      url         <- find[FusekiBaseUrl]("services.fuseki.url", config)
       datasetName <- find[DatasetName]("services.fuseki.dataset-name", config)
       datasetType <- find[DatasetType]("services.fuseki.dataset-type", config)
       username    <- find[BasicAuthUsername]("services.fuseki.username", config)
       password    <- find[BasicAuthPassword]("services.fuseki.password", config)
-    } yield FusekiConfig(url, datasetName, datasetType, username, password)
+    } yield FusekiConfig(url, datasetName, datasetType, BasicAuthCredentials(username, password))
 }

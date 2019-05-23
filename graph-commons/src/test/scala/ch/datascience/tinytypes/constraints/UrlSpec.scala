@@ -18,6 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
@@ -38,8 +39,16 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       intercept[IllegalArgumentException](UrlType("invalid url")).getMessage shouldBe "Cannot instantiate ch.datascience.tinytypes.constraints.UrlType with 'invalid url'"
     }
   }
+
+  "/" should {
+
+    "allow to add next path part" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+      (url / "path").toString shouldBe s"$url/path"
+    }
+  }
 }
 
 private class UrlType private (val value: String) extends AnyVal with TinyType[String]
 
-private object UrlType extends TinyTypeFactory[String, UrlType](new UrlType(_)) with Url
+private object UrlType extends TinyTypeFactory[String, UrlType](new UrlType(_)) with Url with UrlOps[UrlType]

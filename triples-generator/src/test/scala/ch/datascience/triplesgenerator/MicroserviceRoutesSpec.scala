@@ -20,14 +20,16 @@ package ch.datascience.triplesgenerator
 
 import cats.effect.IO
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.triplesgenerator.reprovisioning.IOCompleteReProvisioningEndpoint
 import org.http4s.Status._
 import org.http4s._
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends WordSpec {
+class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
   "routes" should {
 
@@ -42,6 +44,7 @@ class MicroserviceRoutesSpec extends WordSpec {
   }
 
   private trait TestCase {
-    val routes = new MicroserviceRoutes[IO].routes.or(notAvailableResponse)
+    val completeReProvisionEndpoint = mock[IOCompleteReProvisioningEndpoint]
+    val routes                      = new MicroserviceRoutes[IO](completeReProvisionEndpoint).routes.or(notAvailableResponse)
   }
 }
