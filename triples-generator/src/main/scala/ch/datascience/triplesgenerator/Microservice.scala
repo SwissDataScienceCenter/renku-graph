@@ -27,7 +27,7 @@ import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGeneratorProvider
 import ch.datascience.triplesgenerator.init._
 import pureconfig._
 
@@ -53,7 +53,7 @@ object Microservice extends IOApp {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
-        triplesGenerator <- TriplesGenerator()
+        triplesGenerator <- new TriplesGeneratorProvider().get
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
                                  .withEventsProcessor(new IOCommitEventProcessor(transactor, triplesGenerator))
 

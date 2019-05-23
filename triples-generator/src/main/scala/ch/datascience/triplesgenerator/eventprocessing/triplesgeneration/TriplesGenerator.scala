@@ -18,21 +18,31 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration
 
+import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.config.ConfigLoader
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
+import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-abstract class TriplesGenerator[Interpretation[_]] {
+trait TriplesGenerator[Interpretation[_]] {
   def generateTriples(commit: Commit, maybeAccessToken: Option[AccessToken]): Interpretation[RDFTriples]
 }
 
-object TriplesGenerator {
+class TriplesGeneratorProvider(
+    configuration: Config = ConfigFactory.load()
+)(implicit ME:     MonadError[IO, Throwable])
+    extends ConfigLoader[IO] {
 
-  def apply()(implicit contextShift: ContextShift[IO],
-              executionContext:      ExecutionContext,
-              timer:                 Timer[IO]): IO[TriplesGenerator[IO]] = RenkuLogTriplesGenerator()
+  def get(implicit contextShift: ContextShift[IO],
+          executionContext:      ExecutionContext,
+          timer:                 Timer[IO]): IO[TriplesGenerator[IO]] =
+    find[String]("triples-generator", configuration) flatMap {
+      case "renku-log"        => RenkuLogTriplesGenerator()
+      case "remote-generator" => RemoteTriplesGenerator(configuration)
+    }
 }

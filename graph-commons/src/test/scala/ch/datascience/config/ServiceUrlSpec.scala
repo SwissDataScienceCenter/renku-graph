@@ -20,24 +20,17 @@ package ch.datascience.config
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.tinytypes.constraints.Url
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class ServiceUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  "apply" should {
+  "ServiceUrl" should {
 
-    "be successful for valid urls" in {
-      forAll(httpUrls) { url =>
-        ServiceUrl(url).toString shouldBe url
-      }
-    }
-
-    "fail for invalid urls" in {
-      an[IllegalArgumentException] should be thrownBy {
-        ServiceUrl("invalid url")
-      }
+    "have the Url constraint" in {
+      ServiceUrl shouldBe an[Url]
     }
   }
 
@@ -46,19 +39,6 @@ class ServiceUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
     "allow to add next path part" in {
       val url = serviceUrls.generateOne
       (url / "path").toString shouldBe s"$url/path"
-    }
-  }
-
-  "from" should {
-
-    "instantiate for valid urls" in {
-      val serviceUrl = serviceUrls.generateOne
-      ServiceUrl.from(serviceUrl.toString) shouldBe Right(serviceUrl)
-    }
-
-    "fail with IllegalArgumentException for invalid urls" in {
-      val Left(failure) = ServiceUrl.from("dfh://asdf")
-      failure.getMessage shouldBe s"Cannot instantiate ${ServiceUrl.getClass.getName}".replace("$", "")
     }
   }
 
