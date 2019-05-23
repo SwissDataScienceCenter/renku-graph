@@ -28,9 +28,15 @@ import ch.datascience.webhookservice.model.HookToken
 import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.Matchers._
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.{FeatureSpec, GivenWhenThen}
 
-class PushEventsConsumptionSpec extends FeatureSpec with GivenWhenThen with GraphServices {
+class PushEventsConsumptionSpec
+    extends FeatureSpec
+    with GivenWhenThen
+    with GraphServices
+    with Eventually
+    with IntegrationPatience {
 
   feature("A Push Event sent to the services generates Commit Events in the Event Log") {
 
@@ -57,7 +63,9 @@ class PushEventsConsumptionSpec extends FeatureSpec with GivenWhenThen with Grap
       response.status shouldBe Accepted
 
       And("there should be a relevant event added to the Event Log")
-      EventLog.findEvents(projectId, status = New) shouldBe List(commitId)
+      eventually {
+        EventLog.findEvents(projectId, status = New) shouldBe List(commitId)
+      }
     }
   }
 }

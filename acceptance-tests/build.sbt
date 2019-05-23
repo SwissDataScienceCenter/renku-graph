@@ -19,3 +19,5 @@
 name := "acceptance-tests"
 
 parallelExecution in Test := false
+
+libraryDependencies += "org.apache.jena" % "jena-fuseki-main" % "3.11.0" % Test

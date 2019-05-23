@@ -21,24 +21,24 @@ package ch.datascience.graph.acceptancetests.model
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, ProjectId, ProjectPath}
+import ch.datascience.graph.model.events.{CommitId, Project, ProjectId}
 import io.circe.Json
 import io.circe.literal._
 
 object GitLab {
 
   def pushEvent(projectId: ProjectId, commitId: CommitId): Json =
-    pushEvent(projectId, projectPaths.generateOne, commitId)
+    pushEvent(projects.generateOne.copy(id = projectId), commitId)
 
-  def pushEvent(projectId: ProjectId, projectPath: ProjectPath, commitId: CommitId): Json = json"""
+  def pushEvent(project: Project, commitId: CommitId): Json = json"""
       {
         "after":         ${commitId.value},
         "user_id":       ${positiveInts().generateOne.value}, 
         "user_username": ${nonEmptyStrings().generateOne},
         "user_email":    ${emails.generateOne.value},
         "project": {
-          "id":                  ${projectId.value},
-          "path_with_namespace": ${projectPath.value}
+          "id":                  ${project.id.value},
+          "path_with_namespace": ${project.path.value}
         }
       }"""
 }
