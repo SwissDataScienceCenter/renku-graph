@@ -20,12 +20,12 @@ package ch.datascience.graph.acceptancetests.stubs
 
 import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 
 object RdfStoreStub {
   import com.github.tomakehurst.wiremock.WireMockServer
-  import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 
-  private lazy val fusekiStub = new WireMockServer(WireMockConfiguration.wireMockConfig().port(3030))
+  private lazy val fusekiStub = new WireMockServer(wireMockConfig().port(3030))
 
   def start(): Unit = {
     fusekiStub.start()
@@ -37,6 +37,6 @@ object RdfStoreStub {
   def givenRenkuDataSetExists(): Unit =
     stubFor {
       get("/$/datasets/renku")
-        .willReturn(ok())
+        .willReturn(ok("{}"))
     }
 }

@@ -19,10 +19,10 @@
 package ch.datascience.triplesgenerator.init
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.triplesgenerator.config.FusekiBaseUrl
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.http4s.Status
@@ -40,7 +40,7 @@ class IODatasetExistenceCheckerSpec extends WordSpec with ExternalServiceStubbin
 
       stubFor {
         get(s"/$$/datasets/${fusekiConfig.datasetName}")
-          .withBasicAuth(fusekiConfig.username.value, fusekiConfig.password.value)
+          .withBasicAuth(fusekiConfig.authCredentials.username.value, fusekiConfig.authCredentials.password.value)
           .willReturn(ok())
       }
 
@@ -51,7 +51,7 @@ class IODatasetExistenceCheckerSpec extends WordSpec with ExternalServiceStubbin
 
       stubFor {
         get(s"/$$/datasets/${fusekiConfig.datasetName}")
-          .withBasicAuth(fusekiConfig.username.value, fusekiConfig.password.value)
+          .withBasicAuth(fusekiConfig.authCredentials.username.value, fusekiConfig.authCredentials.password.value)
           .willReturn(notFound())
       }
 
@@ -62,7 +62,7 @@ class IODatasetExistenceCheckerSpec extends WordSpec with ExternalServiceStubbin
 
       stubFor {
         get(s"/$$/datasets/${fusekiConfig.datasetName}")
-          .withBasicAuth(fusekiConfig.username.value, fusekiConfig.password.value)
+          .withBasicAuth(fusekiConfig.authCredentials.username.value, fusekiConfig.authCredentials.password.value)
           .willReturn(unauthorized().withBody("some message"))
       }
 
@@ -76,7 +76,7 @@ class IODatasetExistenceCheckerSpec extends WordSpec with ExternalServiceStubbin
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val fusekiBaseUrl = ServiceUrl(externalServiceBaseUrl)
+    val fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     val fusekiConfig  = fusekiConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
 
     val datasetExistenceChecker = new IODatasetExistenceChecker(TestLogger())

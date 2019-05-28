@@ -42,24 +42,31 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
   protected implicit lazy val contextShift:     ContextShift[IO] = GraphServices.contextShift
   protected implicit lazy val timer:            Timer[IO]        = GraphServices.timer
 
-  protected val webhookServiceClient:  WebhookServiceClient = GraphServices.webhookServiceClient
-  protected val tokenRepositoryClient: ServiceClient        = GraphServices.tokenRepositoryClient
+  protected val webhookServiceClient:   WebhookServiceClient = GraphServices.webhookServiceClient
+  protected val tokenRepositoryClient:  ServiceClient        = GraphServices.tokenRepositoryClient
+  protected val triplesGeneratorClient: ServiceClient        = GraphServices.triplesGeneratorClient
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    RdfStoreStub.start()
-    RdfStoreStub.givenRenkuDataSetExists()
-
     GraphServices.servicesRunner
       .run(
-        webhookservice.Microservice   -> webhookServiceClient,
-        triplesgenerator.Microservice -> GraphServices.triplesGeneratorClient,
-        tokenrepository.Microservice  -> tokenRepositoryClient
+        ServiceRun(webhookservice.Microservice, webhookServiceClient),
+        ServiceRun(tokenrepository.Microservice, tokenRepositoryClient),
+        ServiceRun(
+          service       = triplesgenerator.Microservice,
+          serviceClient = GraphServices.triplesGeneratorClient,
+          preServiceStart = List(
+            IO(RdfStoreStub.start()),
+            IO(RdfStoreStub.givenRenkuDataSetExists())
+          ),
+          postServiceStart = List(
+            IO(RdfStoreStub.shutdown()),
+            IO(RDFStore.start())
+          )
+        )
       )
       .unsafeRunSync()
-
-    RdfStoreStub.shutdown()
   }
 }
 

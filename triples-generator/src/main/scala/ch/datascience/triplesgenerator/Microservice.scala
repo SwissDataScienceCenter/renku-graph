@@ -27,7 +27,9 @@ import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.triplesgenerator.eventprocessing._
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGeneratorProvider
 import ch.datascience.triplesgenerator.init._
+import ch.datascience.triplesgenerator.reprovisioning.IOCompleteReProvisionEndpoint
 import pureconfig._
 
 import scala.concurrent.ExecutionContext
@@ -52,17 +54,17 @@ object Microservice extends IOApp {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
-        renkuLogTimeout <- new RenkuLogTimeoutConfigProvider[IO].get
-
+        triplesGenerator <- new TriplesGeneratorProvider().get
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
-                                 .withEventsProcessor(new IOCommitEventProcessor(transactor, renkuLogTimeout))
-
+                                 .withEventsProcessor(new IOCommitEventProcessor(transactor, triplesGenerator))
+        completeReProvisionEndpoint <- IOCompleteReProvisionEndpoint(transactor)
         exitCode <- new MicroserviceRunner(
                      new SentryInitializer[IO],
                      new IOEventLogDbInitializer(transactor),
                      new IOFusekiDatasetInitializer,
                      eventProcessorRunner,
-                     new HttpServer[IO](serverPort = 9002, new MicroserviceRoutes[IO].routes)
+                     new HttpServer[IO](serverPort    = 9002,
+                                        serviceRoutes = new MicroserviceRoutes[IO](completeReProvisionEndpoint).routes)
                    ) run args
       } yield exitCode
     }

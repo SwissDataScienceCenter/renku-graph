@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.init
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.{BasicAuth, IORestClient}
+import ch.datascience.http.client.IORestClient
 import ch.datascience.triplesgenerator.config.FusekiConfig
 import io.chrisdavenport.log4cats.Logger
 
@@ -45,9 +45,9 @@ private class IODatasetExistenceChecker(logger: Logger[IO])(
 
   override def doesDatasetExists(fusekiConfig: FusekiConfig): IO[Boolean] =
     for {
-      uri         <- validateUri(s"${fusekiConfig.fusekiBaseUrl}/$$/datasets/${fusekiConfig.datasetName}")
-      projectInfo <- send(request(GET, uri, BasicAuth(fusekiConfig.username, fusekiConfig.password)))(mapResponse)
-    } yield projectInfo
+      uri    <- validateUri(s"${fusekiConfig.fusekiBaseUrl}/$$/datasets/${fusekiConfig.datasetName}")
+      result <- send(request(GET, uri, fusekiConfig.authCredentials))(mapResponse)
+    } yield result
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Boolean]] = {
     case (Ok, _, _)       => IO.pure(true)

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
 import java.io.InputStream
 
@@ -30,6 +30,7 @@ import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, Project, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.{GitLabUrlProvider, RDFTriples}
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -39,7 +40,7 @@ import os.Path
 
 import scala.concurrent.ExecutionContext
 
-class TriplesFinderSpec extends WordSpec with MockFactory {
+class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
 
   "generateTriples" should {
 
@@ -85,7 +86,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync() shouldBe rdfTriples
+      triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync() shouldBe rdfTriples
     }
 
     "create a temp directory, " +
@@ -131,7 +132,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesFinder.generateTriples(commitWithParent, maybeAccessToken).unsafeRunSync() shouldBe rdfTriples
+      triplesGenerator.generateTriples(commitWithParent, maybeAccessToken).unsafeRunSync() shouldBe rdfTriples
     }
 
     "fail if temp directory creation fails" in new TestCase {
@@ -143,7 +144,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .returning(IO.raiseError(exception))
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -169,7 +170,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -200,7 +201,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -236,7 +237,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -277,7 +278,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -322,7 +323,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -367,7 +368,7 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesFinder.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -409,6 +410,6 @@ class TriplesFinderSpec extends WordSpec with MockFactory {
     val toRdfTriples        = mockFunction[InputStream, IO[RDFTriples]]
     randomLong.expects().returning(pathDifferentiator)
 
-    val triplesFinder = new IOTriplesFinder(gitLabRepoUrlFinder, renku, file, git, toRdfTriples, randomLong)
+    val triplesGenerator = new RenkuLogTriplesGenerator(gitLabRepoUrlFinder, renku, file, git, toRdfTriples, randomLong)
   }
 }

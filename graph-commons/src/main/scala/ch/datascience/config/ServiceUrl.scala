@@ -18,9 +18,8 @@
 
 package ch.datascience.config
 
-import java.net.URL
-
 import cats.implicits._
+import ch.datascience.tinytypes.constraints.{Url, UrlOps}
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
@@ -30,18 +29,7 @@ import scala.util.Try
 
 class ServiceUrl private (val value: String) extends AnyVal with TinyType[String]
 
-object ServiceUrl extends TinyTypeFactory[String, ServiceUrl](new ServiceUrl(_)) {
-
-  addConstraint(
-    check   = url => Try(new URL(url)).isSuccess,
-    message = (_: String) => s"Cannot instantiate $typeName"
-  )
-
-  implicit class ServiceUrlOps(serviceUrl: ServiceUrl) {
-    def /(value: Any): ServiceUrl = ServiceUrl(
-      s"$serviceUrl/$value"
-    )
-  }
+object ServiceUrl extends TinyTypeFactory[String, ServiceUrl](new ServiceUrl(_)) with Url with UrlOps[ServiceUrl] {
 
   implicit val serviceUrlReader: ConfigReader[ServiceUrl] =
     ConfigReader.fromString[ServiceUrl] { value =>

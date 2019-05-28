@@ -16,23 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.tinytypes.constraints
 
-import cats.effect.ConcurrentEffect
-import ch.datascience.triplesgenerator.reprovisioning.CompleteReProvisioningEndpoint
-import org.http4s.dsl.Http4sDsl
+import java.net.URL
 
-import scala.language.higherKinds
+import ch.datascience.tinytypes.{Constraints, TinyType, TinyTypeFactory}
 
-private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
-    completeReProvisionEndpoint: CompleteReProvisioningEndpoint[Interpretation]
-) extends Http4sDsl[Interpretation] {
+import scala.util.Try
 
-  import org.http4s.HttpRoutes
+trait Url extends Constraints[String] {
+  addConstraint(
+    check   = url => Try(new URL(url)).isSuccess,
+    message = (url: String) => s"Cannot instantiate $typeName with '$url'"
+  )
+}
 
-  lazy val routes: HttpRoutes[Interpretation] = HttpRoutes
-    .of[Interpretation] {
-      case GET -> Root / "ping" => Ok("pong")
-      case request @ DELETE -> Root / "triples" / "projects" => completeReProvisionEndpoint.reProvisionAll(request)
-    }
+trait UrlOps[T <: TinyType[String]] {
+  self: TinyTypeFactory[String, T] with Url =>
+
+  implicit class UrlOps(url: T) {
+    def /(value: Any): T = apply(s"$url/$value")
+  }
 }

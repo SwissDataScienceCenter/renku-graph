@@ -260,7 +260,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
     val eventsDeserialiser    = mock[TryCommitEventsDeserialiser]
     val accessTokenFinder     = mock[TryAccessTokenFinder]
-    val triplesFinder         = mock[TryTriplesFinder]
+    val triplesFinder         = mock[TryTriplesGenerator]
     val fusekiConnector       = mock[TryFusekiConnector]
     val eventLogMarkDone      = mock[TryEventLogMarkDone]
     val eventLogMarkNew       = mock[TryEventLogMarkNew]

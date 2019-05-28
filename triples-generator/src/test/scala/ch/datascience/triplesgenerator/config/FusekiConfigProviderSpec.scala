@@ -43,8 +43,8 @@ class FusekiConfigProviderSpec extends WordSpec with ScalaCheckPropertyChecks {
                 "url"          -> fusekiConfig.fusekiBaseUrl.toString,
                 "dataset-name" -> fusekiConfig.datasetName.value,
                 "dataset-type" -> fusekiConfig.datasetType.value,
-                "username"     -> fusekiConfig.username.value,
-                "password"     -> fusekiConfig.password.value
+                "username"     -> fusekiConfig.authCredentials.username.value,
+                "password"     -> fusekiConfig.authCredentials.password.value
               ).asJava
             ).asJava
           ).asJava
@@ -52,11 +52,11 @@ class FusekiConfigProviderSpec extends WordSpec with ScalaCheckPropertyChecks {
 
         val Success(actual) = new FusekiConfigProvider[Try](config).get
 
-        actual.fusekiBaseUrl shouldBe fusekiConfig.fusekiBaseUrl
-        actual.datasetName   shouldBe fusekiConfig.datasetName
-        actual.datasetType   shouldBe fusekiConfig.datasetType
-        actual.username      shouldBe fusekiConfig.username
-        actual.password      shouldBe fusekiConfig.password
+        actual.fusekiBaseUrl            shouldBe fusekiConfig.fusekiBaseUrl
+        actual.datasetName              shouldBe fusekiConfig.datasetName
+        actual.datasetType              shouldBe fusekiConfig.datasetType
+        actual.authCredentials.username shouldBe fusekiConfig.authCredentials.username
+        actual.authCredentials.password shouldBe fusekiConfig.authCredentials.password
       }
     }
 
@@ -69,7 +69,7 @@ class FusekiConfigProviderSpec extends WordSpec with ScalaCheckPropertyChecks {
               "dataset-name" -> fusekiConfigs.generateOne.datasetName.value,
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
               "username"     -> fusekiConfigs.generateOne.datasetName.value,
-              "password"     -> fusekiConfigs.generateOne.password.value
+              "password"     -> fusekiConfigs.generateOne.authCredentials.password.value
             ).asJava
           ).asJava
         ).asJava
@@ -88,8 +88,8 @@ class FusekiConfigProviderSpec extends WordSpec with ScalaCheckPropertyChecks {
               "url"          -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> "  ",
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
-              "username"     -> fusekiConfigs.generateOne.username.value,
-              "password"     -> fusekiConfigs.generateOne.password.value
+              "username"     -> fusekiConfigs.generateOne.authCredentials.username.value,
+              "password"     -> fusekiConfigs.generateOne.authCredentials.password.value
             ).asJava
           ).asJava
         ).asJava
@@ -108,8 +108,8 @@ class FusekiConfigProviderSpec extends WordSpec with ScalaCheckPropertyChecks {
               "url"          -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> fusekiConfigs.generateOne.datasetName.value,
               "dataset-type" -> "unknown",
-              "username"     -> fusekiConfigs.generateOne.username.value,
-              "password"     -> fusekiConfigs.generateOne.password.value
+              "username"     -> fusekiConfigs.generateOne.authCredentials.username.value,
+              "password"     -> fusekiConfigs.generateOne.authCredentials.password.value
             ).asJava
           ).asJava
         ).asJava
@@ -129,7 +129,7 @@ class FusekiConfigProviderSpec extends WordSpec with ScalaCheckPropertyChecks {
               "dataset-name" -> fusekiConfigs.generateOne.datasetName.value,
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
               "username"     -> "  ",
-              "password"     -> fusekiConfigs.generateOne.password.value
+              "password"     -> fusekiConfigs.generateOne.authCredentials.password.value
             ).asJava
           ).asJava
         ).asJava
@@ -148,7 +148,7 @@ class FusekiConfigProviderSpec extends WordSpec with ScalaCheckPropertyChecks {
               "url"          -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> fusekiConfigs.generateOne.datasetName.value,
               "dataset-type" -> fusekiConfigs.generateOne.datasetType.value,
-              "username"     -> fusekiConfigs.generateOne.username.value,
+              "username"     -> fusekiConfigs.generateOne.authCredentials.username.value,
               "password"     -> ""
             ).asJava
           ).asJava

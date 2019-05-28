@@ -23,6 +23,11 @@ import cats.effect.concurrent.Semaphore
 
 import scala.concurrent.ExecutionContext
 
+final case class ServiceRun(service:          IOApp,
+                            serviceClient:    ServiceClient,
+                            preServiceStart:  List[IO[Unit]] = List.empty,
+                            postServiceStart: List[IO[Unit]] = List.empty)
+
 class ServicesRunner(
     semaphore:               Semaphore[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
@@ -33,27 +38,31 @@ class ServicesRunner(
   import scala.concurrent.duration._
   import scala.language.postfixOps
 
-  def run(servicesAndClients: (IOApp, ServiceClient)*): IO[Unit] =
+  def run(services: ServiceRun*): IO[Unit] =
     for {
       _ <- semaphore.acquire
-      _ <- servicesAndClients.toList.map { case (service, client) => start(service, client) }.parSequence
+      _ <- services.toList.map(start).parSequence
       _ <- semaphore.release
     } yield ()
 
   private def start(
-      service:                 IOApp,
-      serviceClient:           ServiceClient
-  )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]): IO[Unit] =
+      serviceRun:              ServiceRun
+  )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]): IO[Unit] = {
+    import serviceRun._
     serviceClient.ping.flatMap {
       case ServiceUp => IO.unit
       case _ =>
-        IO(service.main(Array.empty)).start.unsafeRunAsyncAndForget()
-        verifyServiceReady(serviceClient)
+        for {
+          _ <- preServiceStart.sequence
+          _ = IO(service.main(Array.empty)).start.unsafeRunAsyncAndForget()
+          _ <- verifyServiceReady(serviceRun)
+        } yield ()
     }
+  }
 
-  private def verifyServiceReady(serviceClient: ServiceClient)(implicit timer: Timer[IO]): IO[Unit] =
-    serviceClient.ping flatMap {
-      case ServiceUp => IO.unit
-      case _         => timer.sleep(500 millis) *> verifyServiceReady(serviceClient)
+  private def verifyServiceReady(serviceRun: ServiceRun)(implicit timer: Timer[IO]): IO[Unit] =
+    serviceRun.serviceClient.ping flatMap {
+      case ServiceUp => serviceRun.postServiceStart.sequence map (_ => ())
+      case _         => timer.sleep(500 millis) *> verifyServiceReady(serviceRun)
     }
 }

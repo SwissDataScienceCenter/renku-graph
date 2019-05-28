@@ -47,8 +47,7 @@ abstract class IORestClient[ThrottlingTarget](
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
 
-  protected def validateUri(uri: String): IO[Uri] =
-    IO.fromEither(Uri.fromString(uri))
+  protected lazy val validateUri: String => IO[Uri] = IORestClient.validateUri
 
   protected def request(method: Method, uri: Uri): Request[IO] =
     Request[IO](
@@ -69,7 +68,7 @@ abstract class IORestClient[ThrottlingTarget](
       case _                 => request(method, uri)
     }
 
-  protected def request(method: Method, uri: Uri, basicAuth: BasicAuth): Request[IO] =
+  protected def request(method: Method, uri: Uri, basicAuth: BasicAuthCredentials): Request[IO] =
     Request[IO](
       method  = method,
       uri     = uri,
@@ -81,7 +80,7 @@ abstract class IORestClient[ThrottlingTarget](
     case OAuthAccessToken(token)    => Headers.of(Authorization(Token(Bearer, token)))
   }
 
-  private def basicAuthHeader(basicAuth: BasicAuth): Headers =
+  private def basicAuthHeader(basicAuth: BasicAuthCredentials): Headers =
     Headers.of(Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value)))
 
   protected def send[ResultType](request: Request[IO])(mapResponse: ResponseMapping[ResultType]): IO[ResultType] =
@@ -156,7 +155,7 @@ abstract class IORestClient[ThrottlingTarget](
   }
 }
 
-private object IORestClient {
+object IORestClient {
   import eu.timepit.refined.auto._
 
   import scala.concurrent.duration._
@@ -164,4 +163,7 @@ private object IORestClient {
 
   private val SleepAfterConnectionIssue:        FiniteDuration          = 10 seconds
   private val MaxRetriesAfterConnectionTimeout: Int Refined NonNegative = 10
+
+  def validateUri(uri: String): IO[Uri] =
+    IO.fromEither(Uri.fromString(uri))
 }

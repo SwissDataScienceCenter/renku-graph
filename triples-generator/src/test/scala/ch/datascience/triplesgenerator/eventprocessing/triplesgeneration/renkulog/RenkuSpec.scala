@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
 import java.nio.file.Paths
 
@@ -25,8 +25,9 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.triplesgenerator.eventprocessing.Commands.Renku
+import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Renku
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

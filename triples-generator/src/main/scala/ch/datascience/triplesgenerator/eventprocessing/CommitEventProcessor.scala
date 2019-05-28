@@ -31,19 +31,18 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.triplesgenerator.config.FusekiConfigProvider
-import ch.datascience.triplesgenerator.eventprocessing.Commands.GitLabRepoUrlFinder
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class CommitEventProcessor[Interpretation[_]](
     commitEventsDeserialiser: CommitEventsDeserialiser[Interpretation],
     accessTokenFinder:        AccessTokenFinder[Interpretation],
-    triplesFinder:            TriplesFinder[Interpretation],
+    triplesGenerator:         TriplesGenerator[Interpretation],
     fusekiConnector:          FusekiConnector[Interpretation],
     eventLogMarkDone:         EventLogMarkDone[Interpretation],
     eventLogMarkNew:          EventLogMarkNew[Interpretation],
@@ -61,7 +60,7 @@ class CommitEventProcessor[Interpretation[_]](
   import eventLogMarkNew._
   import executionTimeRecorder._
   import fusekiConnector._
-  import triplesFinder._
+  import triplesGenerator._
 
   def apply(eventBody: EventBody): Interpretation[Unit] =
     measureExecutionTime {
@@ -192,13 +191,12 @@ class CommitEventProcessor[Interpretation[_]](
 
 class IOCommitEventProcessor(
     transactor:          DbTransactor[IO, EventLogDB],
-    renkuLogTimeout:     FiniteDuration
+    triplesGenerator:    TriplesGenerator[IO],
 )(implicit contextShift: ContextShift[IO], executionContext: ExecutionContext, timer: Timer[IO])
     extends CommitEventProcessor[IO](
       new CommitEventsDeserialiser[IO](),
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
-      new IOTriplesFinder(new GitLabRepoUrlFinder[IO](new GitLabUrlProvider[IO]()),
-                          new Commands.Renku(renkuLogTimeout)),
+      triplesGenerator,
       new IOFusekiConnector(new FusekiConfigProvider[IO]()),
       new IOEventLogMarkDone(transactor),
       new IOEventLogMarkNew(transactor),
