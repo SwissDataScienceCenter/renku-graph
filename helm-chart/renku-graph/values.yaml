@@ -2,10 +2,18 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+## Global chart section shared between all renku services.
+## The values here are most likely set through the parent chart.
+# global:
+#   gitlab:
+#     ## The URL of the gitlab server. This should include the path 
+#     ## if applicable (eg https://gitlab.com or https://renku.some.domain/gitlab)
+#     # url: 
+
 tokenRepository:
   image:
-    repository: renku/token-repository
-    tag: 'latest'
+    repository: ableuler/token-repository
+    tag: '841230a'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
