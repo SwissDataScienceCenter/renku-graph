@@ -30,11 +30,11 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     sql"""|CREATE TABLE projects_tokens(
           | project_id int4 PRIMARY KEY,
           | token VARCHAR NOT NULL
-          |);""".stripMargin.update.run
+          |);""".stripMargin.update.run.map(_ => ())
   }
 
   protected def prepareDbForTest(): Unit = execute {
-    sql"TRUNCATE TABLE projects_tokens".update.run
+    sql"TRUNCATE TABLE projects_tokens".update.run.map(_ => ())
   }
 
   protected def findToken(projectId: ProjectId): Option[String] = execute {

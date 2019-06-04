@@ -120,11 +120,10 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
     val logger    = TestLogger[IO]()
     val client    = new TestRestClient(hostUrl, throttler, logger)
 
-    def verifyThrottling(): Unit =
-      inSequence {
-        (throttler.acquire _).expects().returning(IO.unit)
-        (throttler.release _).expects().returning(IO.unit)
-      }
+    def verifyThrottling() = inSequence {
+      (throttler.acquire _).expects().returning(IO.unit)
+      (throttler.release _).expects().returning(IO.unit)
+    }
   }
 
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)

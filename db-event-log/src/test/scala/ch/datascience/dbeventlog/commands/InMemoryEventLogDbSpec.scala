@@ -43,11 +43,11 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
          | message varchar,
          | PRIMARY KEY (event_id, project_id)
          |);
-      """.stripMargin.update.run
+      """.stripMargin.update.run.map(_ => ())
   }
 
   protected def prepareDbForTest(): Unit = execute {
-    sql"TRUNCATE TABLE event_log".update.run
+    sql"TRUNCATE TABLE event_log".update.run.map(_ => ())
   }
 
   protected def storeEvent(commitEventId: CommitEventId,
@@ -59,8 +59,7 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
     sql"""insert into 
          |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
          |values (${commitEventId.id}, ${commitEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
-      """.stripMargin.update.run
-      .map(_ => ())
+      """.stripMargin.update.run.map(_ => ())
   }
 
   // format: off

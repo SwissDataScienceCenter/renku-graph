@@ -42,7 +42,7 @@ import eu.timepit.refined.numeric.Positive
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.{Assertion, WordSpec}
 
 import scala.util.Try
 
@@ -287,7 +287,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     def generateTriples(forCommits: NonEmptyList[Commit]): NonEmptyList[(Commit, RDFTriples)] =
       forCommits map (_ -> rdfTriplesSets.generateOne)
 
-    def successfulTriplesGenerationAndUpload(commitAndTriples: (Commit, RDFTriples)): Unit = {
+    def successfulTriplesGenerationAndUpload(commitAndTriples: (Commit, RDFTriples)) = {
       val (commit, triples) = commitAndTriples
       (triplesFinder
         .generateTriples(_: Commit, _: Option[AccessToken]))
@@ -312,7 +312,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(commitEventId, status, EventMessage(exception))
         .returning(context.unit)
 
-    def logSummary(commits: NonEmptyList[Commit], triples: List[RDFTriples], uploaded: Int, failed: Int): Unit = {
+    def logSummary(commits: NonEmptyList[Commit], triples: List[RDFTriples], uploaded: Int, failed: Int): Assertion = {
       val totalTriplesNumber = triples.map(_.value.size()).sum
       logger.logged(
         Info(
@@ -322,7 +322,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       )
     }
 
-    def logError(commit: Commit, exception: Exception, message: String = "failed"): Unit =
+    def logError(commit: Commit, exception: Exception, message: String = "failed"): Assertion =
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
 
     def commonLogMessage: Commit => String = {

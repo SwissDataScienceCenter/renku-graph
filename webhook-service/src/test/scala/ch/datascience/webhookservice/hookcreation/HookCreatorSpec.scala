@@ -331,7 +331,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger
     )
 
-    def expectEventsHistoryLoader(returning: IO[Unit]): Unit =
+    def expectEventsHistoryLoader(returning: IO[Unit]) =
       (eventsHistoryLoader
         .loadAllEvents(_: ProjectInfo, _: AccessToken))
         .expects(projectInfo, accessToken)
