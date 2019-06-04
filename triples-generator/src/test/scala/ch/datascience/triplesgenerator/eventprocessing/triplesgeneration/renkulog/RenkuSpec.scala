@@ -79,7 +79,7 @@ class RenkuSpec extends WordSpec {
 
     def triplesGeneration(returning: CommandResult): (Commit, Path) => CommandResult =
       (_, _) => {
-        Thread.sleep((renkuLogTimeout - (200 millis)).toMillis)
+        Thread.sleep((renkuLogTimeout - (700 millis)).toMillis)
         returning
       }
 
