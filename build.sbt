@@ -18,7 +18,8 @@ lazy val root = Project(
   dbEventLog,
   tokenRepository,
   webhookService,
-  triplesGenerator
+  triplesGenerator,
+  graphService
 )
 
 lazy val graphCommons = Project(
@@ -85,6 +86,18 @@ lazy val tokenRepository = Project(
   AutomateHeaderPlugin
 )
 
+lazy val graphService = Project(
+  id   = "graph-service",
+  base = file("graph-service")
+).settings(
+  commonSettings
+).dependsOn(
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
+  JavaAppPackaging,
+  AutomateHeaderPlugin
+)
 
 lazy val acceptanceTests = Project(
   id   = "acceptance-tests",
@@ -95,6 +108,7 @@ lazy val acceptanceTests = Project(
   webhookService,
   triplesGenerator,
   tokenRepository,
+  graphService,
   graphCommons % "test->test",
   dbEventLog   % "test->test"
 ).enablePlugins(
