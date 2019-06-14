@@ -93,14 +93,14 @@ class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
          | message varchar,
          | PRIMARY KEY (event_id, project_id)
          |);
-       """.stripMargin.update.run
+       """.stripMargin.update.run.map(_ => ())
   }
 
   protected def dropTable(): Unit = execute {
-    sql"DROP TABLE IF EXISTS event_log".update.run
+    sql"DROP TABLE IF EXISTS event_log".update.run.map(_ => ())
   }
 
   protected def verifyTrue(sql: Fragment): Unit = execute {
-    sql.update.run
+    sql.update.run.map(_ => ())
   }
 }

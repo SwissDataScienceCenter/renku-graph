@@ -34,9 +34,11 @@ object RdfStoreStub {
 
   def shutdown(): Unit = fusekiStub.shutdown()
 
-  def givenRenkuDataSetExists(): Unit =
+  def givenRenkuDataSetExists(): Unit = {
     stubFor {
       get("/$/datasets/renku")
         .willReturn(ok("{}"))
     }
+    ()
+  }
 }

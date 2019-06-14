@@ -74,10 +74,10 @@ class DbInitializerSpec extends WordSpec with InMemoryProjectsTokensDb {
          | project_id int4 PRIMARY KEY,
          | token VARCHAR NOT NULL
          |);
-       """.stripMargin.update.run
+       """.stripMargin.update.run.map(_ => ())
   }
 
   protected def dropTable(): Unit = execute {
-    sql"DROP TABLE IF EXISTS projects_tokens".update.run
+    sql"DROP TABLE IF EXISTS projects_tokens".update.run.map(_ => ())
   }
 }

@@ -115,7 +115,9 @@ lazy val commonSettings = Seq(
   scalacOptions += "-feature",
   scalacOptions += "-unchecked",
   scalacOptions += "-deprecation",
-
+  scalacOptions += "-Ywarn-value-discard",
+  scalacOptions += "-Xfatal-warnings",
+  
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),

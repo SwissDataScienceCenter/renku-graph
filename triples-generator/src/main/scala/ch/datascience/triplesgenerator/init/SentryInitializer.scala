@@ -25,7 +25,7 @@ import scala.language.higherKinds
 import scala.util.{Properties, Try}
 
 class SentryInitializer[Interpretation[_]](
-    initSentry:     String => Unit = dns => Sentry.init(dns),
+    initSentry:     String => Unit = dns => { Sentry.init(dns); () },
     getEnvVariable: String => Option[String] = Properties.envOrNone _
 )(implicit ME:      MonadError[Interpretation, Throwable]) {
 

@@ -231,11 +231,13 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
     def givenNonExistingInLog(in: CommitId, out: CommitId): Unit =
       givenNonExistingInLog(List(in), List(out))
 
-    def givenNonExistingInLog(in: List[CommitId], out: List[CommitId]): Unit =
+    def givenNonExistingInLog(in: List[CommitId], out: List[CommitId]): Unit = {
       (eventLogVerifyExistence
         .filterNotExistingInLog(_: List[CommitId], _: ProjectId))
         .expects(in, startCommit.project.id)
         .returning(context pure out)
+      ()
+    }
   }
 
   private def commitInfos(commitId: CommitId, parents: CommitId*): Gen[CommitInfo] =
