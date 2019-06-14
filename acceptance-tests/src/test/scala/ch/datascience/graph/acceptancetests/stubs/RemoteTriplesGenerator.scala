@@ -24,7 +24,7 @@ import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
 object RemoteTriplesGenerator {
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project:  Project,
-                                                                                        commitId: CommitId): Unit =
+                                                                                        commitId: CommitId): Unit = {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
@@ -63,4 +63,6 @@ object RemoteTriplesGenerator {
           """.stripMargin)
         )
     }
+    ()
+  }
 }

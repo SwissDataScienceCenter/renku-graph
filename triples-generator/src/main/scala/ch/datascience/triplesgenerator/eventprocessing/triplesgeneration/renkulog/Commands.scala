@@ -125,13 +125,15 @@ private object Commands {
     }
 
     private def call(generateTriples: => CommandResult) =
-      IO.cancelable[InputStream] { cb =>
+      IO.cancelable[InputStream] { callback =>
         executionContext.execute { () =>
-          Try {
-            cb(Right(generateTriples.out.toInputStream))
-          } recover {
-            case NonFatal(exception) => cb(Left(exception))
-          }
+          {
+            Try {
+              callback(Right(generateTriples.out.toInputStream))
+            } recover {
+              case NonFatal(exception) => callback(Left(exception))
+            }
+          } fold (throw _, identity)
         }
         IO.unit
       }

@@ -28,12 +28,13 @@ import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
+import org.scalatest.Assertion
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 object RdfStoreProvisioning extends Eventually with IntegrationPatience {
 
-  def `data in the RDF store`(project: Project, commitId: CommitId): Unit = {
+  def `data in the RDF store`(project: Project, commitId: CommitId): Assertion = {
     val projectId = project.id
 
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)

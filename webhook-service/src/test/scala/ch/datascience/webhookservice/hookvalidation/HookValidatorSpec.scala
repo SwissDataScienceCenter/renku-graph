@@ -672,7 +672,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       logger
     )
 
-    def assumeGivenAccessTokenInvalid(projectId: ProjectId): Unit =
+    def assumeGivenAccessTokenInvalid(projectId: ProjectId) =
       (projectInfoFinder
         .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))

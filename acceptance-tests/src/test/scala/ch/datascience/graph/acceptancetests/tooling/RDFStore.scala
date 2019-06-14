@@ -36,9 +36,9 @@ object RDFStore {
 
   private lazy val connnection = RDFConnectionFactory.connect(renkuDataSet)
 
-  def start(): Unit = rdfStoreServer.start()
+  def start(): Unit = { rdfStoreServer.start(); () }
 
-  def stop(): Unit = rdfStoreServer.stop()
+  def stop(): Unit = { rdfStoreServer.stop(); () }
 
   def findAllTriplesNumber(): Int =
     connnection

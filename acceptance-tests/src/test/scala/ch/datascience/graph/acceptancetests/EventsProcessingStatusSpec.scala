@@ -97,7 +97,7 @@ class EventsProcessingStatusSpec
     `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
   }
 
-  private def sendEventsForProcessing(projectId: ProjectId): Unit =
+  private def sendEventsForProcessing(projectId: ProjectId) =
     nonEmptyList(commitIds, minElements = numberOfEvents, maxElements = numberOfEvents).generateOne
       .map { commitId =>
         `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)

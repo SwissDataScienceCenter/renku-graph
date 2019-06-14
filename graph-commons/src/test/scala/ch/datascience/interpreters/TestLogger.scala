@@ -21,6 +21,7 @@ package ch.datascience.interpreters
 import cats.Monad
 import ch.datascience.interpreters.TestLogger.LogMessage._
 import io.chrisdavenport.log4cats.Logger
+import org.scalatest.Assertion
 import org.scalatest.Matchers._
 
 import scala.collection.mutable.ArrayBuffer
@@ -34,16 +35,16 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
 
   private[this] val invocations = ArrayBuffer.empty[LogEntry]
 
-  def logged(expected: LogEntry*): Unit =
+  def logged(expected: LogEntry*): Assertion =
     invocations should contain allElementsOf expected
 
-  def notLogged(expected: LogEntry): Unit =
+  def notLogged(expected: LogEntry): Assertion =
     invocations should not contain expected
 
-  def loggedOnly(expected: LogEntry*): Unit =
+  def loggedOnly(expected: LogEntry*): Assertion =
     loggedOnly(expected.toList)
 
-  def loggedOnly(expected: List[LogEntry]): Unit =
+  def loggedOnly(expected: List[LogEntry]): Assertion =
     invocations should contain only (expected: _*)
 
   def expectNoLogs(): Unit =
