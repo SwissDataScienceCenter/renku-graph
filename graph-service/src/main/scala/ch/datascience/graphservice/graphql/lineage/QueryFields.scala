@@ -20,12 +20,12 @@ package ch.datascience.graphservice.graphql.lineage
 
 import cats.effect.IO
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graphservice.graphql.Arguments._
 import ch.datascience.graphservice.graphql.QueryContext
 import ch.datascience.tinytypes.constraints.RelativePath
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import sangria.ast
+import eu.timepit.refined.auto._
 import sangria.schema._
-import sangria.validation.ValueCoercionViolation
 
 import scala.language.higherKinds
 
@@ -39,76 +39,33 @@ private[graphql] object QueryFields {
         name        = "lineage",
         fieldType   = OptionType(lineageType),
         description = Some("Returns a lineage for a project with the given path"),
-        arguments   = List(ProjectPathArgument, MaybeCommitIdArgument, MaybeFilePathArgument),
+        arguments   = List(projectPathArgument, maybeCommitIdArgument, maybeFilePathArgument),
         resolve = context =>
-          context.ctx.lineageRepository
-            .findLineage(context.args arg ProjectPathArgument,
-                         context.args arg MaybeCommitIdArgument,
-                         context.args arg MaybeFilePathArgument)
+          context.ctx.lineageFinder
+            .findLineage(context.args arg projectPathArgument,
+                         context.args arg maybeCommitIdArgument,
+                         context.args arg maybeFilePathArgument)
             .unsafeToFuture()
       )
     )
 
-  private implicit val ProjectPathType: ScalarType[ProjectPath] = {
-    import cats.implicits._
-    case object ProjectPathCoercionViolation
-        extends ValueCoercionViolation("ProjectPath value expected in format <namespace>/<project>")
-
-    ScalarType[ProjectPath](
-      name         = "ProjectPath",
-      description  = Some("Project's path in the GitLab."),
-      coerceOutput = valueOutput,
-      coerceUserInput = {
-        case s: String => ProjectPath.from(s) leftMap (_ => ProjectPathCoercionViolation)
-        case _ => Left(ProjectPathCoercionViolation)
-      },
-      coerceInput = {
-        case ast.StringValue(s, _, _, _, _) => ProjectPath.from(s) leftMap (_ => ProjectPathCoercionViolation)
-        case _                              => Left(ProjectPathCoercionViolation)
-      }
+  val projectPathArgument = Argument(
+    name = "projectPath",
+    argumentType = ProjectPath.toScalarType(
+      description      = "Project's path in the GitLab.",
+      exceptionMessage = "ProjectPath value expected in format <namespace>/<project>"
     )
-  }
-  val ProjectPathArgument = Argument("projectPath", ProjectPathType)
+  )
 
-  private implicit val CommitIdType: ScalarType[CommitId] = {
-    import cats.implicits._
-    case object CommitIdCoercionViolation extends ValueCoercionViolation("CommitId not valid")
-
-    ScalarType[CommitId](
-      name         = "CommitId",
-      description  = Some("Commit id"),
-      coerceOutput = valueOutput,
-      coerceUserInput = {
-        case s: String => CommitId.from(s) leftMap (_ => CommitIdCoercionViolation)
-        case _ => Left(CommitIdCoercionViolation)
-      },
-      coerceInput = {
-        case ast.StringValue(s, _, _, _, _) => CommitId.from(s) leftMap (_ => CommitIdCoercionViolation)
-        case _                              => Left(CommitIdCoercionViolation)
-      }
-    )
-  }
-  val MaybeCommitIdArgument = Argument("commitId", OptionInputType(CommitIdType))
+  val maybeCommitIdArgument = Argument(
+    name         = "commitId",
+    argumentType = OptionInputType(CommitId.toScalarType(description = "Commit Id"))
+  )
 
   final class FilePath private (val value: String) extends AnyVal with TinyType[String]
   object FilePath extends TinyTypeFactory[String, FilePath](new FilePath(_)) with RelativePath
-  private implicit val FilePathType: ScalarType[FilePath] = {
-    import cats.implicits._
-    case object FilePathCoercionViolation extends ValueCoercionViolation("FilePath not valid")
-
-    ScalarType[FilePath](
-      name         = "FilePath",
-      description  = Some("File path"),
-      coerceOutput = valueOutput,
-      coerceUserInput = {
-        case s: String => FilePath.from(s) leftMap (_ => FilePathCoercionViolation)
-        case _ => Left(FilePathCoercionViolation)
-      },
-      coerceInput = {
-        case ast.StringValue(s, _, _, _, _) => FilePath.from(s) leftMap (_ => FilePathCoercionViolation)
-        case _                              => Left(FilePathCoercionViolation)
-      }
-    )
-  }
-  val MaybeFilePathArgument = Argument("filePath", OptionInputType(FilePathType))
+  val maybeFilePathArgument = Argument(
+    name         = "filePath",
+    argumentType = OptionInputType(FilePath.toScalarType(description = "File path"))
+  )
 }

@@ -18,18 +18,21 @@
 
 package ch.datascience.graphservice.graphql
 
-import sangria.schema._
+import cats.effect.IO
+import ch.datascience.graphservice.config.GitLabBaseUrl
+import ch.datascience.graphservice.graphql.lineage.LineageFinder
+import ch.datascience.graphservice.rdfstore.RDFConnectionResource
+import sangria.schema.Schema
 
-import scala.language.higherKinds
+import scala.concurrent.ExecutionContext
 
-object QuerySchema {
+private class IOLineageFinder(
+    rdfConnectionResource: RDFConnectionResource[IO],
+    gitLabBaseUrl:         GitLabBaseUrl
+) extends LineageFinder[IO](rdfConnectionResource, gitLabBaseUrl)
 
-  def apply[Interpretation[_]](
-      fields: List[Field[QueryContext[Interpretation], Unit]]
-  ): Schema[QueryContext[Interpretation], Unit] = Schema {
-    ObjectType(
-      name   = "Query",
-      fields = fields
-    )
-  }
-}
+private class IOQueryRunner(
+    schema:                  Schema[QueryContext[IO], Unit],
+    repository:              QueryContext[IO]
+)(implicit executionContext: ExecutionContext)
+    extends QueryRunner[IO, QueryContext[IO]](schema, repository)

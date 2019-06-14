@@ -33,7 +33,7 @@ import scala.collection.JavaConverters._
 import scala.language.higherKinds
 import scala.util.Try
 
-class LineageRepository[Interpretation[_]](
+class LineageFinder[Interpretation[_]](
     rdfConnectionResource: RDFConnectionResource[Interpretation],
     gitLabBaseUrl:         GitLabBaseUrl
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
@@ -165,10 +165,10 @@ class LineageRepository[Interpretation[_]](
       .getOrElse("")
 }
 
-object IOLineageRepository {
-  def apply(): IO[LineageRepository[IO]] =
+object IOLineageFinder {
+  def apply(): IO[LineageFinder[IO]] =
     for {
       connectionResource <- IORDFConnectionResource()
       gitLabBaseUrl      <- GitLabBaseUrl[IO]()
-    } yield new LineageRepository[IO](connectionResource, gitLabBaseUrl)
+    } yield new LineageFinder[IO](connectionResource, gitLabBaseUrl)
 }

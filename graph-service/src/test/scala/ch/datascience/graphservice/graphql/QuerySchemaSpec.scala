@@ -20,11 +20,10 @@ package ch.datascience.graphservice.graphql
 
 import cats.effect.IO
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.graphservice.graphql.lineage.LineageRepository
 import ch.datascience.graphservice.graphql.lineage.QueryFields.FilePath
 import ch.datascience.graphservice.graphql.lineage.model.Edge.SourceEdge
-import ch.datascience.graphservice.graphql.lineage.model.Lineage
 import ch.datascience.graphservice.graphql.lineage.model.Node.SourceNode
+import ch.datascience.graphservice.graphql.lineage.model.{Edge, Lineage, Node}
 import io.circe.Json
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
@@ -43,7 +42,7 @@ class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
 
   "query" should {
 
-    "allow to search for lineage of a given projectId" in new TestCase {
+    "allow to search for lineage of a given projectId" in new LineageTestCase {
       val query = graphql"""
         {
           lineage(projectPath: "namespace/project") {
@@ -58,38 +57,12 @@ class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
         }"""
 
       givenFindLineage(ProjectPath("namespace/project"), None, None)
-        .returning(
-          IO.pure(
-            Some(
-              Lineage(
-                nodes = List(SourceNode("node-id", "node-label")),
-                edges = List(SourceEdge("edge-id"))
-              )
-            )
-          )
-        )
+        .returning(IO.pure(Some(lineage)))
 
-      execute(query) shouldBe json"""
-        {
-          "data" : {
-            "lineage" : {
-              "nodes" : [
-                {
-                  "id" : "node-id",
-                  "label" : "node-label"
-                }
-              ],
-              "edges" : [
-                {
-                  "id" : "edge-id"
-                }
-              ]
-            }
-          }
-        }"""
+      execute(query) shouldBe json(lineage)
     }
 
-    "allow to search for lineage of a given projectId and commitId" in new TestCase {
+    "allow to search for lineage of a given projectId and commitId" in new LineageTestCase {
       val query = graphql"""
         {
           lineage(projectPath: "namespace/project", commitId: "1234567") {
@@ -104,38 +77,12 @@ class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
         }"""
 
       givenFindLineage(ProjectPath("namespace/project"), Some(CommitId("1234567")), None)
-        .returning(
-          IO.pure(
-            Some(
-              Lineage(
-                nodes = List(SourceNode("node-id", "node-label")),
-                edges = List(SourceEdge("edge-id"))
-              )
-            )
-          )
-        )
+        .returning(IO.pure(Some(lineage)))
 
-      execute(query) shouldBe json"""
-        {
-          "data" : {
-            "lineage" : {
-              "nodes" : [
-                {
-                  "id" : "node-id",
-                  "label" : "node-label"
-                }
-              ],
-              "edges" : [
-                {
-                  "id" : "edge-id"
-                }
-              ]
-            }
-          }
-        }"""
+      execute(query) shouldBe json(lineage)
     }
 
-    "allow to search for lineage of a given projectId, commitId and file" in new TestCase {
+    "allow to search for lineage of a given projectId, commitId and file" in new LineageTestCase {
       val query = graphql"""
         {
           lineage(projectPath: "namespace/project", commitId: "1234567", filePath: "directory/file") {
@@ -150,48 +97,26 @@ class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
         }"""
 
       givenFindLineage(ProjectPath("namespace/project"), Some(CommitId("1234567")), Some(FilePath("directory/file")))
-        .returning(
-          IO.pure(
-            Some(
-              Lineage(
-                nodes = List(SourceNode("node-id", "node-label")),
-                edges = List(SourceEdge("edge-id"))
-              )
-            )
-          ))
+        .returning(IO.pure(Some(lineage)))
 
-      execute(query) shouldBe json"""
-        {
-          "data" : {
-            "lineage" : {
-              "nodes" : [
-                {
-                  "id" : "node-id",
-                  "label" : "node-label"
-                }
-              ],
-              "edges" : [
-                {
-                  "id" : "edge-id"
-                }
-              ]
-            }
-          }
-        }"""
+      execute(query) shouldBe json(lineage)
     }
   }
 
   private trait TestCase {
-    private val lineageRepository = mock[IOLineageRepository]
+    val lineageFinder = mock[IOLineageFinder]
 
     def execute(query: Document): Json =
       Executor
         .execute(
           QuerySchema[IO](lineage.QueryFields()),
           query,
-          new QueryContext[IO](lineageRepository)
+          new QueryContext[IO](lineageFinder)
         )
         .futureValue
+  }
+
+  private trait LineageTestCase extends TestCase {
 
     def givenFindLineage(
         projectPath:   ProjectPath,
@@ -199,10 +124,36 @@ class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
         maybeFilePath: Option[FilePath]
     ) = new {
       def returning(result: IO[Option[Lineage]]) =
-        (lineageRepository
+        (lineageFinder
           .findLineage(_: ProjectPath, _: Option[CommitId], _: Option[FilePath]))
           .expects(projectPath, maybeCommitId, maybeFilePath)
           .returning(result)
     }
+
+    lazy val lineage = Lineage(
+      nodes = List(SourceNode("node-id", "node-label")),
+      edges = List(SourceEdge("edge-id"))
+    )
+
+    def json(lineage: Lineage) = json"""
+        {
+          "data" : {
+            "lineage" : {
+              "nodes" : ${Json.arr(lineage.nodes.map(toJson): _*)},
+              "edges" : ${Json.arr(lineage.edges.map(toJson): _*)}
+            }
+          }
+        }"""
+
+    private def toJson(node: Node) = json"""
+        {
+          "id" : ${node.id},
+          "label" : ${node.label}
+        }"""
+
+    private def toJson(edge: Edge) = json"""
+        {
+          "id" : ${edge.id}
+        }"""
   }
 }

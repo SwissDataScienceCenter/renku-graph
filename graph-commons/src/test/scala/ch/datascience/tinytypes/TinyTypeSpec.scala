@@ -92,6 +92,33 @@ class TinyTypeFactorySpec extends WordSpec {
   }
 }
 
+class TypeNameSpec extends WordSpec {
+
+  "typeName" should {
+
+    "return type name without $ signs in case of nested types" in {
+      TestTypeName.typeName shouldBe "ch.datascience.tinytypes.TypeNameSpec.TestTypeName"
+    }
+
+    "return type name for non-nested types" in {
+      TinyTypeTest.typeName shouldBe "ch.datascience.tinytypes.TinyTypeTest"
+    }
+  }
+
+  "shortTypeName" should {
+
+    "return the type name without the package info and $ signs in case of nested types" in {
+      TestTypeName.shortTypeName shouldBe "TestTypeName"
+    }
+
+    "return type name without the package info for non-nested types" in {
+      TinyTypeTest.shortTypeName shouldBe "TinyTypeTest"
+    }
+  }
+
+  private object TestTypeName extends TypeName
+}
+
 private class TinyTypeTest private (val value: String) extends AnyVal with TinyType[String]
 
 private object TinyTypeTest extends TinyTypeFactory[String, TinyTypeTest](new TinyTypeTest(_)) {
