@@ -1,4 +1,8 @@
 dist: xenial
+branches:
+  only:
+    - master
+    - /^\d+\.\d+\.\d+(-\S*)?$/
 language: scala
 jdk: openjdk8
 scala:
