@@ -16,8 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.graphservice.graphql
+package ch.datascience.tinytypes.constraints
 
-import sangria.ast.Document
+import ch.datascience.tinytypes.Constraints
 
-final case class UserQuery(query: Document, operation: Option[String])
+trait RelativePath extends Constraints[String] with NonBlank {
+  addConstraint(
+    check   = value => !value.startsWith("/") && !value.endsWith("/"),
+    message = value => s"'$value' is not a valid $typeName"
+  )
+}
