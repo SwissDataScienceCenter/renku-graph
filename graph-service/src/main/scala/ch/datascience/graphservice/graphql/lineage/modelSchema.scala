@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.graphservice.lineage
+package ch.datascience.graphservice.graphql.lineage
 
-import ch.datascience.graphservice.lineage.model._
+import ch.datascience.graphservice.graphql.lineage.model._
 import sangria.macros.derive._
 import sangria.schema._
 
-private object schema {
+private object modelSchema {
 
-  private implicit val NodeType: ObjectType[Unit, Node] = ObjectType(
+  private implicit val nodeType: ObjectType[Unit, Node] = ObjectType(
     name        = "node",
     description = "Lineage node",
     fields[Unit, Node](
@@ -33,7 +33,7 @@ private object schema {
     )
   )
 
-  private implicit val EdgeType: ObjectType[Unit, Edge] = ObjectType(
+  private implicit val edgeType: ObjectType[Unit, Edge] = ObjectType(
     name        = "edge",
     description = "Lineage edge",
     fields = fields[Unit, Edge](
@@ -41,7 +41,7 @@ private object schema {
     )
   )
 
-  val LineageType: ObjectType[Unit, Lineage] = deriveObjectType[Unit, Lineage](
+  val lineageType: ObjectType[Unit, Lineage] = deriveObjectType[Unit, Lineage](
     ObjectTypeDescription("Lineage"),
     DocumentField("nodes", "Lineage nodes"),
     DocumentField("edges", "Lineage edges")

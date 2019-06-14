@@ -16,14 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.graphservice.lineage
+package ch.datascience.graphservice.graphql
 
 import cats.effect.IO
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.graphservice.lineage.model.Edge.SourceEdge
-import ch.datascience.graphservice.lineage.model.Lineage
-import ch.datascience.graphservice.lineage.model.Node.SourceNode
-import ch.datascience.graphservice.lineage.queries.{FilePath, lineageQuerySchema}
+import ch.datascience.graphservice.graphql.lineage.LineageRepository
+import ch.datascience.graphservice.graphql.lineage.QueryFields.FilePath
+import ch.datascience.graphservice.graphql.lineage.model.Edge.SourceEdge
+import ch.datascience.graphservice.graphql.lineage.model.Lineage
+import ch.datascience.graphservice.graphql.lineage.model.Node.SourceNode
 import io.circe.Json
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
@@ -36,8 +37,9 @@ import sangria.macros._
 import sangria.marshalling.circe._
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.language.reflectiveCalls
 
-class queriesSpec extends WordSpec with ScalaFutures with MockFactory {
+class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
 
   "query" should {
 
@@ -55,9 +57,7 @@ class queriesSpec extends WordSpec with ScalaFutures with MockFactory {
           }
         }"""
 
-      (lineageRepository
-        .findLineage(_: ProjectPath, _: Option[CommitId], _: Option[FilePath]))
-        .expects(ProjectPath("namespace/project"), None, None)
+      givenFindLineage(ProjectPath("namespace/project"), None, None)
         .returning(
           IO.pure(
             Some(
@@ -103,9 +103,7 @@ class queriesSpec extends WordSpec with ScalaFutures with MockFactory {
           }
         }"""
 
-      (lineageRepository
-        .findLineage(_: ProjectPath, _: Option[CommitId], _: Option[FilePath]))
-        .expects(ProjectPath("namespace/project"), Some(CommitId("1234567")), None)
+      givenFindLineage(ProjectPath("namespace/project"), Some(CommitId("1234567")), None)
         .returning(
           IO.pure(
             Some(
@@ -151,9 +149,7 @@ class queriesSpec extends WordSpec with ScalaFutures with MockFactory {
           }
         }"""
 
-      (lineageRepository
-        .findLineage(_: ProjectPath, _: Option[CommitId], _: Option[FilePath]))
-        .expects(ProjectPath("namespace/project"), Some(CommitId("1234567")), Some(FilePath("directory/file")))
+      givenFindLineage(ProjectPath("namespace/project"), Some(CommitId("1234567")), Some(FilePath("directory/file")))
         .returning(
           IO.pure(
             Some(
@@ -162,8 +158,7 @@ class queriesSpec extends WordSpec with ScalaFutures with MockFactory {
                 edges = List(SourceEdge("edge-id"))
               )
             )
-          )
-        )
+          ))
 
       execute(query) shouldBe json"""
         {
@@ -187,16 +182,27 @@ class queriesSpec extends WordSpec with ScalaFutures with MockFactory {
   }
 
   private trait TestCase {
-    val lineageRepository = mock[IOLineageRepository]
+    private val lineageRepository = mock[IOLineageRepository]
 
     def execute(query: Document): Json =
       Executor
         .execute(
-          lineageQuerySchema,
+          QuerySchema[IO](lineage.QueryFields()),
           query,
-          lineageRepository
+          new QueryContext[IO](lineageRepository)
         )
         .futureValue
 
+    def givenFindLineage(
+        projectPath:   ProjectPath,
+        maybeCommitId: Option[CommitId],
+        maybeFilePath: Option[FilePath]
+    ) = new {
+      def returning(result: IO[Option[Lineage]]) =
+        (lineageRepository
+          .findLineage(_: ProjectPath, _: Option[CommitId], _: Option[FilePath]))
+          .expects(projectPath, maybeCommitId, maybeFilePath)
+          .returning(result)
+    }
   }
 }

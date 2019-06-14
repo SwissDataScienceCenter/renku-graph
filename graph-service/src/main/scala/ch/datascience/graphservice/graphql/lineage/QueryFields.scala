@@ -16,18 +16,38 @@
  * limitations under the License.
  */
 
-package ch.datascience.graphservice.lineage
+package ch.datascience.graphservice.graphql.lineage
 
+import cats.effect.IO
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graphservice.graphql.QueryContext
 import ch.datascience.tinytypes.constraints.RelativePath
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import sangria.ast
 import sangria.schema._
 import sangria.validation.ValueCoercionViolation
 
-private object queries {
+import scala.language.higherKinds
 
-  import schema._
+private[graphql] object QueryFields {
+
+  import modelSchema._
+
+  def apply(): List[Field[QueryContext[IO], Unit]] =
+    fields[QueryContext[IO], Unit](
+      Field(
+        name        = "lineage",
+        fieldType   = OptionType(lineageType),
+        description = Some("Returns a lineage for a project with the given path"),
+        arguments   = List(ProjectPathArgument, MaybeCommitIdArgument, MaybeFilePathArgument),
+        resolve = context =>
+          context.ctx.lineageRepository
+            .findLineage(context.args arg ProjectPathArgument,
+                         context.args arg MaybeCommitIdArgument,
+                         context.args arg MaybeFilePathArgument)
+            .unsafeToFuture()
+      )
+    )
 
   private implicit val ProjectPathType: ScalarType[ProjectPath] = {
     import cats.implicits._
@@ -91,24 +111,4 @@ private object queries {
     )
   }
   val MaybeFilePathArgument = Argument("filePath", OptionInputType(FilePathType))
-
-  val QueryType = ObjectType(
-    name = "Query",
-    fields = fields[IOLineageRepository, Unit](
-      Field(
-        name        = "lineage",
-        fieldType   = OptionType(LineageType),
-        description = Some("Returns a lineage for a project with the given path"),
-        arguments   = List(ProjectPathArgument, MaybeCommitIdArgument, MaybeFilePathArgument),
-        resolve = context =>
-          context.ctx
-            .findLineage(context.args arg ProjectPathArgument,
-                         context.args arg MaybeCommitIdArgument,
-                         context.args arg MaybeFilePathArgument)
-            .unsafeToFuture()
-      )
-    )
-  )
-
-  val lineageQuerySchema: Schema[IOLineageRepository, Unit] = Schema(QueryType)
 }

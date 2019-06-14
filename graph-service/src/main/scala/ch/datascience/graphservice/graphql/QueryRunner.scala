@@ -28,9 +28,9 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
-class QueryRunner[Interpretation[_]: Async, +QuerySchema](
-    schema:                  Schema[QuerySchema, Unit],
-    repository:              QuerySchema
+class QueryRunner[Interpretation[_]: Async, +QueryContext](
+    schema:                  Schema[QueryContext, Unit],
+    repository:              QueryContext
 )(implicit executionContext: ExecutionContext) {
 
   def run(userQuery: UserQuery): Interpretation[Json] = Async[Interpretation].async { callback =>

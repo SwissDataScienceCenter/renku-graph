@@ -16,24 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.graphservice.lineage
+package ch.datascience.graphservice.graphql.lineage
 
 import cats.MonadError
-import cats.implicits._
 import cats.effect.IO
+import cats.implicits._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.graphservice.config.GitLabBaseUrl
-import ch.datascience.graphservice.lineage.model.Edge.{SourceEdge, TargetEdge}
-import ch.datascience.graphservice.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.graphservice.lineage.model.{Edge, Lineage, Node}
-import ch.datascience.graphservice.lineage.queries.FilePath
+import ch.datascience.graphservice.graphql.lineage.QueryFields.FilePath
+import ch.datascience.graphservice.graphql.lineage.model.Edge.{SourceEdge, TargetEdge}
+import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
+import ch.datascience.graphservice.graphql.lineage.model.{Edge, Lineage, Node}
 import ch.datascience.graphservice.rdfstore.{IORDFConnectionResource, RDFConnectionResource}
 
 import scala.collection.JavaConverters._
 import scala.language.higherKinds
 import scala.util.Try
 
-private class LineageRepository[Interpretation[_]](
+class LineageRepository[Interpretation[_]](
     rdfConnectionResource: RDFConnectionResource[Interpretation],
     gitLabBaseUrl:         GitLabBaseUrl
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
@@ -165,15 +165,10 @@ private class LineageRepository[Interpretation[_]](
       .getOrElse("")
 }
 
-private class IOLineageRepository(
-    rdfConnectionResource: RDFConnectionResource[IO],
-    gitLabBaseUrl:         GitLabBaseUrl
-) extends LineageRepository[IO](rdfConnectionResource, gitLabBaseUrl)
-
-private object IOLineageRepository {
-  def apply(): IO[IOLineageRepository] =
+object IOLineageRepository {
+  def apply(): IO[LineageRepository[IO]] =
     for {
       connectionResource <- IORDFConnectionResource()
       gitLabBaseUrl      <- GitLabBaseUrl[IO]()
-    } yield new IOLineageRepository(connectionResource, gitLabBaseUrl)
+    } yield new LineageRepository[IO](connectionResource, gitLabBaseUrl)
 }

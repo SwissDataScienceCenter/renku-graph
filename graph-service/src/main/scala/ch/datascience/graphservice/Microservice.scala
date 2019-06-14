@@ -21,7 +21,7 @@ package ch.datascience.graphservice
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
-import ch.datascience.graphservice.lineage.IOLineageEndpoint
+import ch.datascience.graphservice.graphql.IOQueryEndpoint
 import ch.datascience.http.server.HttpServer
 import pureconfig.loadConfigOrThrow
 
@@ -44,10 +44,10 @@ object Microservice extends IOApp {
   private def runMicroservice(args: List[String]) = httpServer flatMap (_.run)
 
   private lazy val httpServer = for {
-    lineageEndpoint <- IOLineageEndpoint()
+    queryEndpoint <- IOQueryEndpoint()
   } yield
     new HttpServer[IO](
       serverPort    = 9004,
-      serviceRoutes = new MicroserviceRoutes[IO](lineageEndpoint).routes
+      serviceRoutes = new MicroserviceRoutes[IO](queryEndpoint).routes
     )
 }

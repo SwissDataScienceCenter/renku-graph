@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.graphservice.lineage
+package ch.datascience.graphservice.graphql.lineage
 
 import java.io.Serializable
 
-private object model {
+object model {
 
   final case class Lineage(nodes: List[Node], edges: List[Edge])
 

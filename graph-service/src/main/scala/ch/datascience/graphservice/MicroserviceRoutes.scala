@@ -19,22 +19,22 @@
 package ch.datascience.graphservice
 
 import cats.effect.ConcurrentEffect
-import ch.datascience.graphservice.lineage.LineageEndpoint
+import ch.datascience.graphservice.graphql.QueryEndpoint
 import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    lineageEndpoint: LineageEndpoint[F]
+    queryEndpoint: QueryEndpoint[F]
 ) extends Http4sDsl[F] {
 
-  import lineageEndpoint._
+  import queryEndpoint._
   import org.http4s.HttpRoutes
 
   lazy val routes: HttpRoutes[F] = HttpRoutes
     .of[F] {
       case GET -> Root / "ping"               => Ok("pong")
-      case GET -> Root / "lineage" / "schema" => schema
-      case request @ POST -> Root / "lineage" => findLineage(request)
+      case GET -> Root / "graphql" / "schema" => schema
+      case request @ POST -> Root / "graphql" => handleQuery(request)
     }
 }
