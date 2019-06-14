@@ -99,7 +99,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
     val projectId              = projectIds.generateOne
     val processingStatusFinder = new IOEventLogProcessingStatus(transactor)
 
-    def storeEventsWithRecentTime(projectId: ProjectId, statuses: NonEmptyList[EventStatus]): Unit = statuses map {
+    def storeEventsWithRecentTime(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
       storeEvent(
         commitEventIds.generateOne.copy(projectId = projectId),
         _,
@@ -110,7 +110,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
       )
     }
 
-    def storeEventsWithOlderDate(projectId: ProjectId, statuses: NonEmptyList[EventStatus]): Unit = statuses map {
+    def storeEventsWithOlderDate(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
       storeEvent(
         commitEventIds.generateOne.copy(projectId = projectId),
         _,
@@ -121,7 +121,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
       )
     }
 
-    def storeEventsWithEvenOlderDate(projectId: ProjectId, statuses: NonEmptyList[EventStatus]): Unit = statuses map {
+    def storeEventsWithEvenOlderDate(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
       storeEvent(
         commitEventIds.generateOne.copy(projectId = projectId),
         _,

@@ -114,7 +114,7 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
     val eventLogFetch = new IOEventLogFetch(transactor) {
       private val eventsQueue = new ConcurrentLinkedQueue[EventBody]()
 
-      def addEventsToReturn(events: Seq[EventBody]): Unit =
+      def addEventsToReturn(events: Seq[EventBody]) =
         eventsQueue addAll events.asJava
 
       override def popEventToProcess: IO[Option[EventBody]] = IO.pure {
