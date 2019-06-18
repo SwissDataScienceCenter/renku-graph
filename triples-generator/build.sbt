@@ -19,6 +19,6 @@
 name := "triples-generator"
 
 libraryDependencies += "ch.qos.logback"  % "logback-classic"    % "1.2.3"
-libraryDependencies += "com.lihaoyi"     %% "ammonite-ops"      % "1.6.6"
+libraryDependencies += "com.lihaoyi"     %% "ammonite-ops"      % "1.6.7"
 libraryDependencies += "io.sentry"       % "sentry-logback"     % "1.7.22"
-libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % "3.10.0"
+libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % "3.12.0"

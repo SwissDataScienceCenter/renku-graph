@@ -129,7 +129,7 @@ class IOCompleteReProvisioningEndpointSpec extends WordSpec with MockFactory {
               "url"          -> fusekiConfig.fusekiBaseUrl.value,
               "dataset-name" -> fusekiConfig.datasetName.value,
               "dataset-type" -> fusekiConfig.datasetType.value
-            ).drop(Random.nextInt(5)).asJava
+            ).removeRandomEntry.asJava
           ).asJava
         ).asJava
       )
@@ -139,5 +139,16 @@ class IOCompleteReProvisioningEndpointSpec extends WordSpec with MockFactory {
         IOCompleteReProvisionEndpoint(transactor, config).unsafeRunSync()
       }
     }
+  }
+
+  private implicit class ConfigMapOps(config: Map[String, String]) {
+    private val configToMiss = Random.nextInt(config.size)
+
+    lazy val removeRandomEntry: Map[String, String] =
+      config.zipWithIndex
+        .foldLeft(Map.empty[String, String]) {
+          case (newConfig, (_, `configToMiss`)) => newConfig
+          case (newConfig, ((k, v), _))         => newConfig + (k -> v)
+        }
   }
 }
