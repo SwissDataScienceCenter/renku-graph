@@ -19,7 +19,7 @@
 package ch.datascience.graphservice.graphql.lineage
 
 import cats.MonadError
-import cats.effect.IO
+import cats.effect.{Clock, IO}
 import cats.implicits._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.graphservice.config.GitLabBaseUrl
@@ -28,6 +28,9 @@ import ch.datascience.graphservice.graphql.lineage.model.Edge.{SourceEdge, Targe
 import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.graphservice.graphql.lineage.model.{Edge, Lineage, Node}
 import ch.datascience.graphservice.rdfstore.{IORDFConnectionResource, RDFConnectionResource}
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import io.chrisdavenport.log4cats.Logger
 
 import scala.collection.JavaConverters._
 import scala.language.higherKinds
@@ -35,13 +38,19 @@ import scala.util.Try
 
 class LineageFinder[Interpretation[_]](
     rdfConnectionResource: RDFConnectionResource[Interpretation],
-    gitLabBaseUrl:         GitLabBaseUrl
+    gitLabBaseUrl:         GitLabBaseUrl,
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+    logger:                Logger[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
+
+  import executionTimeRecorder._
 
   def findLineage(projectPath:   ProjectPath,
                   maybeCommitId: Option[CommitId],
                   maybeFilePath: Option[FilePath]): Interpretation[Option[Lineage]] =
-    runQuery(createQuery(queryFilter(projectPath, maybeCommitId, maybeFilePath)))
+    measureExecutionTime {
+      runQuery(createQuery(queryFilter(projectPath, maybeCommitId, maybeFilePath)))
+    } flatMap logExecutionTime(projectPath, maybeCommitId, maybeFilePath)
 
   private def runQuery(query: String): Interpretation[Option[Lineage]] = rdfConnectionResource.use { connection =>
     ME.fromTry {
@@ -163,12 +172,27 @@ class LineageFinder[Interpretation[_]](
        """.stripMargin
       }
       .getOrElse("")
+
+  private def logExecutionTime(
+      projectPath:   ProjectPath,
+      maybeCommitId: Option[CommitId],
+      maybeFilePath: Option[FilePath]
+  ): ((ElapsedTime, Option[Lineage])) => Interpretation[Option[Lineage]] = {
+    case (elapsedTime, maybeLineage) =>
+      logger.info(
+        s"Found lineage for $projectPath " +
+          s"${maybeCommitId.map(commit => s"$commit: commitId ").getOrElse("")}" +
+          s"${maybeFilePath.map(filePath => s"$filePath: file ").getOrElse("")}" +
+          s"in ${elapsedTime}ms"
+      )
+      ME pure maybeLineage
+  }
 }
 
 object IOLineageFinder {
-  def apply(): IO[LineageFinder[IO]] =
+  def apply()(implicit clock: Clock[IO]): IO[LineageFinder[IO]] =
     for {
       connectionResource <- IORDFConnectionResource()
       gitLabBaseUrl      <- GitLabBaseUrl[IO]()
-    } yield new LineageFinder[IO](connectionResource, gitLabBaseUrl)
+    } yield new LineageFinder[IO](connectionResource, gitLabBaseUrl, new ExecutionTimeRecorder[IO], ApplicationLogger)
 }

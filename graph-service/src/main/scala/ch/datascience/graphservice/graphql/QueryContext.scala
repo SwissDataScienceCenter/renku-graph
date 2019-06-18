@@ -18,7 +18,7 @@
 
 package ch.datascience.graphservice.graphql
 
-import cats.effect.IO
+import cats.effect.{Clock, IO}
 import ch.datascience.graphservice.graphql.lineage.{IOLineageFinder, LineageFinder}
 
 import scala.language.higherKinds
@@ -28,7 +28,7 @@ class QueryContext[Interpretation[_]](
 )
 
 object IOQueryContext {
-  def apply(): IO[QueryContext[IO]] =
+  def apply()(implicit clock: Clock[IO]): IO[QueryContext[IO]] =
     for {
       lineageFinder <- IOLineageFinder()
     } yield new QueryContext[IO](lineageFinder)
