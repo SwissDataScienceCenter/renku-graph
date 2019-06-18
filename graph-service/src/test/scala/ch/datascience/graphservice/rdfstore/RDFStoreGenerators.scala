@@ -25,8 +25,10 @@ object RDFStoreGenerators {
 
   import RDFStoreConfig._
 
-  implicit val fusekiConfigs: Gen[RDFStoreConfig] = for {
+  implicit val datasetNames: Gen[DatasetName] = nonEmptyStrings() map DatasetName.apply
+
+  implicit val rdfStoreConfigs: Gen[RDFStoreConfig] = for {
     fusekiUrl   <- httpUrls map FusekiBaseUrl.apply
-    datasetName <- nonEmptyStrings() map DatasetName.apply
+    datasetName <- datasetNames
   } yield RDFStoreConfig(fusekiUrl, datasetName)
 }

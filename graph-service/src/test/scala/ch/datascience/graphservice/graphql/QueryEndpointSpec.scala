@@ -120,7 +120,6 @@ class QueryEndpointSpec extends WordSpec with MockFactory {
 
     val queryMatchingRequest: MatcherBase = argAssert { userQuery: UserQuery =>
       userQuery.query.source shouldBe Some(queryStatement)
-      userQuery.operation    shouldBe None
       ()
     }
   }

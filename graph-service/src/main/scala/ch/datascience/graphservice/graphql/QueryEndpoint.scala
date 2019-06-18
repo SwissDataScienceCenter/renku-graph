@@ -89,8 +89,7 @@ private object QueryEndpoint {
                 .as[String]
                 .flatMap(rawQuery => Either.fromTry(QueryParser.parse(rawQuery)))
                 .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
-      operation <- cursor.downField("operationName").as[Option[String]]
-    } yield UserQuery(query, operation)
+    } yield UserQuery(query)
   }
 }
 

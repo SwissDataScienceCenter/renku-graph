@@ -16,8 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.graphservice.graphql
+package ch.datascience.graphservice.graphql.lineage
 
-import sangria.ast.Document
+import ch.datascience.generators.Generators._
+import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
+import ch.datascience.graphservice.graphql.lineage.model.{NodeId, NodeLabel}
+import org.scalacheck.Gen
 
-final case class UserQuery(query: Document)
+object LineageGenerators {
+
+  implicit val nodeIds:    Gen[NodeId]    = nonEmptyStrings() map NodeId.apply
+  implicit val nodeLabels: Gen[NodeLabel] = nonEmptyStrings() map NodeLabel.apply
+
+  implicit val sourceNodes: Gen[SourceNode] = for {
+    id    <- nodeIds
+    label <- nodeLabels
+  } yield SourceNode(id, label)
+
+  implicit val targetNodes: Gen[TargetNode] = for {
+    id    <- nodeIds
+    label <- nodeLabels
+  } yield TargetNode(id, label)
+}

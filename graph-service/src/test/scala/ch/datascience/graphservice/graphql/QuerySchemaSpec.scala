@@ -20,16 +20,16 @@ package ch.datascience.graphservice.graphql
 
 import cats.effect.IO
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graphservice.graphql.lineage.IOLineageFinder
 import ch.datascience.graphservice.graphql.lineage.QueryFields.FilePath
-import ch.datascience.graphservice.graphql.lineage.model.Edge.SourceEdge
-import ch.datascience.graphservice.graphql.lineage.model.Node.SourceNode
-import ch.datascience.graphservice.graphql.lineage.model.{Edge, Lineage, Node}
+import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
+import ch.datascience.graphservice.graphql.lineage.model.{Edge, Lineage, Node, NodeId, NodeLabel}
 import io.circe.Json
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import sangria.ast.Document
 import sangria.execution.Executor
 import sangria.macros._
@@ -38,7 +38,7 @@ import sangria.marshalling.circe._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.reflectiveCalls
 
-class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
+class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with IntegrationPatience {
 
   "query" should {
 
@@ -51,7 +51,8 @@ class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
               label
             }
             edges {
-              id
+              source
+              target
             }
           }
         }"""
@@ -71,7 +72,8 @@ class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
               label
             }
             edges {
-              id
+              source
+              target
             }
           }
         }"""
@@ -91,7 +93,8 @@ class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
               label
             }
             edges {
-              id
+              source
+              target
             }
           }
         }"""
@@ -130,30 +133,33 @@ class QuerySchemaSpec extends WordSpec with ScalaFutures with MockFactory {
           .returning(result)
     }
 
+    private val sourceNode = SourceNode(NodeId("node-1"), NodeLabel("node-1-label"))
+    private val targetNode = TargetNode(NodeId("node-2"), NodeLabel("node-2-label"))
     lazy val lineage = Lineage(
-      nodes = List(SourceNode("node-id", "node-label")),
-      edges = List(SourceEdge("edge-id"))
+      nodes = Set(sourceNode, targetNode),
+      edges = Set(Edge(sourceNode, targetNode))
     )
 
     def json(lineage: Lineage) = json"""
         {
           "data" : {
             "lineage" : {
-              "nodes" : ${Json.arr(lineage.nodes.map(toJson): _*)},
-              "edges" : ${Json.arr(lineage.edges.map(toJson): _*)}
+              "nodes" : ${Json.arr(lineage.nodes.map(toJson).to[List]: _*)},
+              "edges" : ${Json.arr(lineage.edges.map(toJson).to[List]: _*)}
             }
           }
         }"""
 
     private def toJson(node: Node) = json"""
         {
-          "id" : ${node.id},
-          "label" : ${node.label}
+          "id" : ${node.id.value},
+          "label" : ${node.label.value}
         }"""
 
     private def toJson(edge: Edge) = json"""
         {
-          "id" : ${edge.id}
+          "source" : ${edge.source.id.value},
+          "target" : ${edge.target.id.value}
         }"""
   }
 }

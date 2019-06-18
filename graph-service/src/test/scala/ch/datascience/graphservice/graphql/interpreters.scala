@@ -19,20 +19,9 @@
 package ch.datascience.graphservice.graphql
 
 import cats.effect.IO
-import ch.datascience.graphservice.config.GitLabBaseUrl
-import ch.datascience.graphservice.graphql.lineage.LineageFinder
-import ch.datascience.graphservice.rdfstore.RDFConnectionResource
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.logging.ExecutionTimeRecorder
 import sangria.schema.Schema
 
 import scala.concurrent.ExecutionContext
-
-private class IOLineageFinder(
-    rdfConnectionResource: RDFConnectionResource[IO],
-    gitLabBaseUrl:         GitLabBaseUrl,
-    executionTimeRecorder: ExecutionTimeRecorder[IO]
-) extends LineageFinder[IO](rdfConnectionResource, gitLabBaseUrl, executionTimeRecorder, TestLogger())
 
 private class IOQueryRunner(
     schema:                  Schema[QueryContext[IO], Unit],

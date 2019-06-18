@@ -29,30 +29,30 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class GitLabBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
+class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "apply" should {
 
-    "return GitLab url if there's a valid value in the config for 'services.gitlab.url'" in {
+    "return GitLab url if there's a valid value in the config for 'services.renku.url'" in {
       forAll(httpUrls) { url =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
-              "gitlab" -> Map(
+              "renku" -> Map(
                 "url" -> url
               ).asJava
             ).asJava
           ).asJava
         )
 
-        val Success(actual) = GitLabBaseUrl[Try](config)
+        val Success(actual) = RenkuBaseUrl[Try](config)
 
-        actual shouldBe GitLabBaseUrl(url)
+        actual shouldBe RenkuBaseUrl(url)
       }
     }
 
     "fail if there's no relevant config entry" in {
-      val Failure(exception) = GitLabBaseUrl[Try](ConfigFactory.empty())
+      val Failure(exception) = RenkuBaseUrl[Try](ConfigFactory.empty())
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -61,14 +61,14 @@ class GitLabBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "gitlab" -> Map(
+            "renku" -> Map(
               "url" -> "abcd"
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = GitLabBaseUrl[Try](config)
+      val Failure(exception) = RenkuBaseUrl[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }

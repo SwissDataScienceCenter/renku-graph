@@ -18,85 +18,84 @@
 
 package ch.datascience.graphservice.graphql.lineage
 
-import cats.MonadError
-import cats.effect.{Clock, IO}
-import cats.implicits._
+import cats.effect._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.graphservice.config.GitLabBaseUrl
+import ch.datascience.graphservice.config.RenkuBaseUrl
 import ch.datascience.graphservice.graphql.lineage.QueryFields.FilePath
-import ch.datascience.graphservice.graphql.lineage.model.Edge.{SourceEdge, TargetEdge}
 import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.graphservice.graphql.lineage.model.{Edge, Lineage, Node}
-import ch.datascience.graphservice.rdfstore.{IORDFConnectionResource, RDFConnectionResource}
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import ch.datascience.graphservice.graphql.lineage.model._
+import ch.datascience.graphservice.rdfstore.{IORDFConnectionResourceBuilder, RDFConnectionResourceBuilder}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.collection.JavaConverters._
 import scala.language.higherKinds
-import scala.util.Try
 
-class LineageFinder[Interpretation[_]](
-    rdfConnectionResource: RDFConnectionResource[Interpretation],
-    gitLabBaseUrl:         GitLabBaseUrl,
-    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    logger:                Logger[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable]) {
-
-  import executionTimeRecorder._
-
+trait LineageFinder[Interpretation[_]] {
   def findLineage(projectPath:   ProjectPath,
                   maybeCommitId: Option[CommitId],
-                  maybeFilePath: Option[FilePath]): Interpretation[Option[Lineage]] =
+                  maybeFilePath: Option[FilePath]): Interpretation[Option[Lineage]]
+}
+
+class IOLineageFinder(
+    connectionResourceBuilder: RDFConnectionResourceBuilder[IO],
+    renkuBaseUrl:              RenkuBaseUrl,
+    executionTimeRecorder:     ExecutionTimeRecorder[IO],
+    logger:                    Logger[IO]
+) extends LineageFinder[IO] {
+
+  import cats.implicits._
+  import executionTimeRecorder._
+
+  override def findLineage(projectPath:   ProjectPath,
+                           maybeCommitId: Option[CommitId],
+                           maybeFilePath: Option[FilePath]): IO[Option[Lineage]] =
     measureExecutionTime {
       runQuery(createQuery(queryFilter(projectPath, maybeCommitId, maybeFilePath)))
     } flatMap logExecutionTime(projectPath, maybeCommitId, maybeFilePath)
 
-  private def runQuery(query: String): Interpretation[Option[Lineage]] = rdfConnectionResource.use { connection =>
-    ME.fromTry {
-      Try {
-        val querySolutions = connection
-          .query(query)
-          .execSelect()
-          .asScala
+  private def runQuery(query: String): IO[Option[Lineage]] = connectionResourceBuilder.resource.use { connection =>
+    IO {
+      val querySolutions = connection
+        .query(query)
+        .execSelect()
+        .asScala
 
-        if (querySolutions.isEmpty) None
-        else {
-          val (allNodes, allEdges) = querySolutions.foldLeft((List.empty[Node], List.empty[Edge])) {
-            case ((nodes, edges), querySolution) =>
-              val target      = querySolution.get("target").asResource().getURI
-              val targetLabel = querySolution.get("target_label").asLiteral().toString
-              val source      = querySolution.get("source").asResource().getURI
-              val sourceLabel = querySolution.get("source_label").asLiteral().toString
+      if (querySolutions.isEmpty) None
+      else {
+        val (allNodes, allEdges) = querySolutions.foldLeft((Set.empty[Node], Set.empty[Edge])) {
+          case ((nodes, edges), querySolution) =>
+            val sourceNode = SourceNode(
+              NodeId(querySolution.get("source").asResource().getURI),
+              NodeLabel(querySolution.get("source_label").asLiteral().toString)
+            )
+            val targetNode = TargetNode(
+              NodeId(querySolution.get("target").asResource().getURI),
+              NodeLabel(querySolution.get("target_label").asLiteral().toString)
+            )
 
-              val newNodes = nodes :+ TargetNode(target, targetLabel) :+ SourceNode(source, sourceLabel)
-              val newEdges = edges :+ TargetEdge(target) :+ SourceEdge(source)
+            val newNodes = nodes + targetNode + sourceNode
+            val newEdges = edges + Edge(sourceNode, targetNode)
 
-              newNodes -> newEdges
+            newNodes -> newEdges
+        }
+
+        val (nodesToRemove, edgesToRemove) =
+          allNodes.filter(_.label.value.startsWith("renku")).foldLeft((Set.empty[Node], Set.empty[Edge])) {
+            case ((nodesForRemoval, edgesForRemoval), node) =>
+              val nodeMatchingTargetEdges = allEdges filter (_.target == node)
+              val nodeMatchingSourceEdges = allEdges filter (_.source == node)
+
+              if (nodeMatchingTargetEdges.size == 1 && nodeMatchingSourceEdges.isEmpty)
+                (nodesForRemoval + node) -> (edgesForRemoval + nodeMatchingTargetEdges.head)
+              else if (nodeMatchingSourceEdges.size == 1 && nodeMatchingTargetEdges.isEmpty)
+                (nodesForRemoval + node) -> (edgesForRemoval + nodeMatchingSourceEdges.head)
+              else
+                nodesForRemoval -> edgesForRemoval
           }
 
-          val (nodesToRemove, edgesToRemove) =
-            allNodes.filter(_.label.startsWith("renku")).foldLeft((List.empty[Node], List.empty[Edge])) {
-              case ((nodesForRemoval, edgesForRemoval), node) =>
-                val nodeMatchingTargetEdges = allEdges.filter {
-                  case TargetEdge(node.id) => true
-                  case _                   => false
-                }
-                val nodeMatchingSourceEdges = allEdges.filter {
-                  case SourceEdge(node.id) => true
-                  case _                   => false
-                }
-
-                if (nodeMatchingTargetEdges.size == 1 && nodeMatchingSourceEdges.isEmpty)
-                  (nodesForRemoval :+ node) -> (edgesForRemoval :+ nodeMatchingTargetEdges.head)
-                else if (nodeMatchingSourceEdges.size == 1 && nodeMatchingTargetEdges.isEmpty)
-                  (nodesForRemoval :+ node) -> (edgesForRemoval :+ nodeMatchingSourceEdges.head)
-                else
-                  nodesForRemoval -> edgesForRemoval
-            }
-
-          Some(Lineage(allNodes diff nodesToRemove, allEdges diff edgesToRemove))
-        }
+        Some(Lineage(allNodes diff nodesToRemove, allEdges diff edgesToRemove))
       }
     }
   }
@@ -118,8 +117,7 @@ class LineageFinder[Interpretation[_]](
        |    WHERE {
        |      $filter
        |      ?qentity (
-       |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* |
-       |        (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
+       |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
        |      ) ?entity .
        |    }
        |    GROUP BY ?entity
@@ -148,7 +146,7 @@ class LineageFinder[Interpretation[_]](
                           maybeFilePath: Option[FilePath]): String =
     s"""
        |      ?qentity dcterms:isPartOf ?project .
-       |      FILTER (?project = <${gitLabBaseUrl / projectPath}>)
+       |      FILTER (?project = <${renkuBaseUrl / projectPath}>)
        |      ${filterOn(maybeCommitId)}
        |      ${filterOn(maybeCommitId, maybeFilePath)}
        |""".stripMargin
@@ -157,8 +155,7 @@ class LineageFinder[Interpretation[_]](
     maybeCommitId
       .map { commitId =>
         s"""
-           |    ?qentity (prov:qualifiedGeneration/prov:activity | 
-           |    ^prov:entity/^prov:qualifiedUsage) ?qactivity .
+           |    ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?qactivity .
            |    FILTER (?qactivity = <file:///commit/$commitId>)
        """.stripMargin
       }
@@ -177,7 +174,7 @@ class LineageFinder[Interpretation[_]](
       projectPath:   ProjectPath,
       maybeCommitId: Option[CommitId],
       maybeFilePath: Option[FilePath]
-  ): ((ElapsedTime, Option[Lineage])) => Interpretation[Option[Lineage]] = {
+  ): ((ElapsedTime, Option[Lineage])) => IO[Option[Lineage]] = {
     case (elapsedTime, maybeLineage) =>
       logger.info(
         s"Found lineage for $projectPath " +
@@ -185,14 +182,21 @@ class LineageFinder[Interpretation[_]](
           s"${maybeFilePath.map(filePath => s"$filePath: file ").getOrElse("")}" +
           s"in ${elapsedTime}ms"
       )
-      ME pure maybeLineage
+      IO.pure(maybeLineage)
   }
 }
 
 object IOLineageFinder {
+
   def apply()(implicit clock: Clock[IO]): IO[LineageFinder[IO]] =
     for {
-      connectionResource <- IORDFConnectionResource()
-      gitLabBaseUrl      <- GitLabBaseUrl[IO]()
-    } yield new LineageFinder[IO](connectionResource, gitLabBaseUrl, new ExecutionTimeRecorder[IO], ApplicationLogger)
+      connectionResourceBuilder <- IORDFConnectionResourceBuilder()
+      renkuBaseUrl              <- RenkuBaseUrl[IO]()
+    } yield
+      new IOLineageFinder(
+        connectionResourceBuilder,
+        renkuBaseUrl,
+        new ExecutionTimeRecorder[IO],
+        ApplicationLogger
+      )
 }

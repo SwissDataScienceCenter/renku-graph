@@ -30,20 +30,20 @@ import pureconfig.error.CannotConvert
 
 import scala.language.higherKinds
 
-class GitLabBaseUrl private (val value: String) extends AnyVal with TinyType[String]
-object GitLabBaseUrl
-    extends TinyTypeFactory[String, GitLabBaseUrl](new GitLabBaseUrl(_))
+class RenkuBaseUrl private (val value: String) extends AnyVal with TinyType[String]
+object RenkuBaseUrl
+    extends TinyTypeFactory[String, RenkuBaseUrl](new RenkuBaseUrl(_))
     with Url
-    with UrlOps[GitLabBaseUrl] {
+    with UrlOps[RenkuBaseUrl] {
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[GitLabBaseUrl] =
-    find[Interpretation, GitLabBaseUrl]("services.gitlab.url", config)
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RenkuBaseUrl] =
+    find[Interpretation, RenkuBaseUrl]("services.renku.url", config)
 
-  private implicit val gitLabBaseUrlReader: ConfigReader[GitLabBaseUrl] =
-    ConfigReader.fromString[GitLabBaseUrl] { value =>
-      GitLabBaseUrl
+  private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] =
+    ConfigReader.fromString[RenkuBaseUrl] { value =>
+      RenkuBaseUrl
         .from(value)
         .leftMap(exception => CannotConvert(value, FusekiBaseUrl.getClass.toString, exception.getMessage))
     }

@@ -47,13 +47,13 @@ object RDFStoreConfig {
       datasetName <- find[Interpretation, DatasetName]("services.fuseki.dataset-name", config)
     } yield RDFStoreConfig(url, datasetName)
 
-  class FusekiBaseUrl private (val value: String) extends AnyVal with TinyType[String]
+  final class FusekiBaseUrl private (val value: String) extends AnyVal with TinyType[String]
   object FusekiBaseUrl
       extends TinyTypeFactory[String, FusekiBaseUrl](new FusekiBaseUrl(_))
       with Url
       with UrlOps[FusekiBaseUrl]
 
-  class DatasetName private (val value: String) extends AnyVal with TinyType[String]
+  final class DatasetName private (val value: String) extends AnyVal with TinyType[String]
   object DatasetName extends TinyTypeFactory[String, DatasetName](new DatasetName(_)) with NonBlank
 
   private implicit val fusekiBaseUrlReader: ConfigReader[FusekiBaseUrl] =

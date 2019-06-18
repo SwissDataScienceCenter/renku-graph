@@ -28,8 +28,8 @@ private object modelSchema {
     name        = "node",
     description = "Lineage node",
     fields[Unit, Node](
-      Field("id", StringType, Some("Node identifier"), resolve = _.value.id),
-      Field("label", StringType, Some("Node label"), resolve   = _.value.label)
+      Field("id", StringType, Some("Node identifier"), resolve = _.value.id.toString),
+      Field("label", StringType, Some("Node label"), resolve   = _.value.label.toString)
     )
   )
 
@@ -37,13 +37,17 @@ private object modelSchema {
     name        = "edge",
     description = "Lineage edge",
     fields = fields[Unit, Edge](
-      Field("id", StringType, Some("Edge identifier"), resolve = _.value.id)
+      Field("source", StringType, Some("Source node"), resolve = _.value.source.id.toString),
+      Field("target", StringType, Some("Target node"), resolve = _.value.target.id.toString)
     )
   )
 
-  val lineageType: ObjectType[Unit, Lineage] = deriveObjectType[Unit, Lineage](
-    ObjectTypeDescription("Lineage"),
-    DocumentField("nodes", "Lineage nodes"),
-    DocumentField("edges", "Lineage edges")
+  val lineageType: ObjectType[Unit, Lineage] = ObjectType[Unit, Lineage](
+    name        = "lineage",
+    description = "Lineage",
+    fields = fields[Unit, Lineage](
+      Field("nodes", ListType(nodeType), Some("Lineage nodes"), resolve = _.value.nodes.toList),
+      Field("edges", ListType(edgeType), Some("Lineage edges"), resolve = _.value.edges.toList)
+    )
   )
 }

@@ -35,7 +35,7 @@ class RDFStoreConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
   "get" should {
 
     "read 'services.fuseki.url', 'services.fuseki.dataset-name' to instantiate the RDFStoreConfig" in {
-      forAll(fusekiConfigs) { fusekiConfig =>
+      forAll(rdfStoreConfigs) { fusekiConfig =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
@@ -60,7 +60,7 @@ class RDFStoreConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
           "services" -> Map(
             "fuseki" -> Map(
               "url"          -> "invalid-url",
-              "dataset-name" -> fusekiConfigs.generateOne.datasetName.value
+              "dataset-name" -> rdfStoreConfigs.generateOne.datasetName.value
             ).asJava
           ).asJava
         ).asJava
@@ -76,7 +76,7 @@ class RDFStoreConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url"          -> fusekiConfigs.generateOne.fusekiBaseUrl.toString,
+              "url"          -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> "  "
             ).asJava
           ).asJava

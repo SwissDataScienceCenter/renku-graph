@@ -19,51 +19,52 @@
 package ch.datascience.graphservice.rdfstore
 
 import cats.MonadError
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import ch.datascience.graphservice.rdfstore.RDFStoreConfig.FusekiBaseUrl
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 
 import scala.language.higherKinds
+import scala.util.Try
 import scala.util.control.NonFatal
 
-abstract class RDFConnectionResource[Interpretation[_]] {
-  def use[Out](function: RDFConnection => Interpretation[Out]): Interpretation[Out]
-}
-
-class IORDFConnectionResource private (
+class RDFConnectionResourceBuilder[Interpretation[_]](
     rdfStoreConfig:          RDFStoreConfig,
-    fusekiConnectionBuilder: FusekiBaseUrl => RDFConnection = IORDFConnectionResource.fusekiConnectionBuilder
-)(implicit ME:               MonadError[IO, Throwable])
-    extends RDFConnectionResource[IO] {
+    fusekiConnectionBuilder: FusekiBaseUrl => RDFConnection
+)(implicit ME:               MonadError[Interpretation, Throwable]) {
 
   import cats.implicits._
   import rdfStoreConfig._
 
-  def use[Out](function: RDFConnection => IO[Out]): IO[Out] =
-    newConnection
-      .bracket(function)(closeConnection)
-      .recoverWith(meaningfulError)
+  def resource: Resource[IO, RDFConnection] =
+    Resource
+      .make(openConnection)(closeConnection)
 
-  private def newConnection: IO[RDFConnection] = IO {
-    fusekiConnectionBuilder(fusekiBaseUrl / datasetName)
+  private def openConnection: IO[RDFConnection] =
+    IO {
+      fusekiConnectionBuilder(fusekiBaseUrl / datasetName)
+    } recoverWith meaningfulError
+
+  private lazy val meaningfulError: PartialFunction[Throwable, IO[RDFConnection]] = {
+    case NonFatal(exception) => IO.raiseError(new RuntimeException("RDF Store cannot be accessed", exception))
   }
 
   private def closeConnection(connection: RDFConnection): IO[Unit] = IO {
     connection.close()
-  }
-
-  private def meaningfulError[Out]: PartialFunction[Throwable, IO[Out]] = {
-    case NonFatal(exception) => ME.raiseError(new RuntimeException("RDF Store cannot be accessed", exception))
+    ()
   }
 }
 
-object IORDFConnectionResource {
+object IORDFConnectionResourceBuilder {
 
-  private val fusekiConnectionBuilder: FusekiBaseUrl => RDFConnection = fusekiUrl =>
-    RDFConnectionFuseki
-      .create()
-      .destination(fusekiUrl.toString)
-      .build()
+  private[rdfstore] val fusekiConnectionBuilder: FusekiBaseUrl => RDFConnection =
+    fusekiUrl =>
+      RDFConnectionFuseki
+        .create()
+        .destination(fusekiUrl.toString)
+        .build()
 
-  def apply(): IO[IORDFConnectionResource] = RDFStoreConfig[IO]() map (new IORDFConnectionResource(_))
+  def apply(): IO[RDFConnectionResourceBuilder[IO]] =
+    for {
+      config <- RDFStoreConfig[IO]()
+    } yield new RDFConnectionResourceBuilder[IO](config, fusekiConnectionBuilder)
 }
