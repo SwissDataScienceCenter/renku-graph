@@ -16,22 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.stubs
+package ch.datascience.graph.acceptancetests.data
 
-import ch.datascience.graph.model.events.{CommitId, Project}
-import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
+import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.graphservice.config.RenkuBaseUrl
+import ch.datascience.graphservice.graphql
+import ch.datascience.graphservice.graphql.lineage.model.Node
+import io.circe.{Encoder, Json}
 
-object RemoteTriplesGenerator {
+object KnowledgeGraph {
 
-  def `GET <triples-generator>/projects/:id/commits/:id returning OK`(project:  Project,
-                                                                      commitId: CommitId,
-                                                                      triples:  String): Unit = {
-    stubFor {
-      get(s"/projects/${project.id}/commits/$commitId")
-        .willReturn(
-          ok(triples)
-        )
-    }
-    ()
+  private val renkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
+  private val testData     = new graphql.lineage.TestData(renkuBaseUrl)
+
+  def triples(projectPath: ProjectPath): String = testData.triples(projectPath)
+
+  implicit val nodeEncoder: Encoder[Node] = Encoder.instance {
+    case Node(id, _) => Json.fromString(id.value)
   }
 }

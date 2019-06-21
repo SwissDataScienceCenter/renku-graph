@@ -16,22 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.stubs
+package ch.datascience.tinytypes.json
 
-import ch.datascience.graph.model.events.{CommitId, Project}
-import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
+import ch.datascience.tinytypes.TinyType
+import io.circe.{Encoder, Json}
 
-object RemoteTriplesGenerator {
+object TinyTypeEncoders {
 
-  def `GET <triples-generator>/projects/:id/commits/:id returning OK`(project:  Project,
-                                                                      commitId: CommitId,
-                                                                      triples:  String): Unit = {
-    stubFor {
-      get(s"/projects/${project.id}/commits/$commitId")
-        .willReturn(
-          ok(triples)
-        )
-    }
-    ()
-  }
+  implicit def encoder[TT <: TinyType[String]](implicit encode: String => Json): Encoder[TT] =
+    Encoder.instance[TT](ttValue => encode(ttValue.value))
+
+  implicit val stringEncoder: String => Json = Json.fromString
 }

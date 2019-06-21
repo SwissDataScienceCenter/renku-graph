@@ -19,8 +19,8 @@
 package ch.datascience.graph.acceptancetests.flows
 
 import ch.datascience.dbeventlog.EventStatus.New
+import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.db.EventLog
-import ch.datascience.graph.acceptancetests.model
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
@@ -34,15 +34,15 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 object RdfStoreProvisioning extends Eventually with IntegrationPatience {
 
-  def `data in the RDF store`(project: Project, commitId: CommitId): Assertion = {
+  def `data in the RDF store`(project: Project, commitId: CommitId, triples: String): Assertion = {
     val projectId = project.id
 
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-    `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 
     webhookServiceClient
-      .POST("webhooks/events", HookToken(projectId), model.GitLab.pushEvent(project, commitId))
+      .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))
       .status shouldBe Accepted
 
     eventually {

@@ -29,6 +29,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
 import io.circe.Json
+import io.circe.literal._
 import org.http4s.Status.Ok
 import org.http4s.{Header, Method, Response}
 
@@ -79,12 +80,34 @@ object TokenRepositoryClient {
     }
 
   implicit class AccessTokenOps(accessToken: AccessToken) {
-    import io.circe.literal._
 
     lazy val toJson: Json = accessToken match {
       case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}"""
       case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
     }
+  }
+}
+
+object GraphServiceClient {
+  import sangria.ast.Document
+
+  def apply()(implicit executionContext: ExecutionContext,
+              contextShift:              ContextShift[IO],
+              timer:                     Timer[IO]): GraphServiceClient = new GraphServiceClient
+
+  class GraphServiceClient(implicit executionContext: ExecutionContext,
+                           contextShift:              ContextShift[IO],
+                           timer:                     Timer[IO])
+      extends ServiceClient {
+    override val baseUrl: String Refined Url = "http://localhost:9004"
+
+    def POST(query: Document): Response[IO] = {
+      for {
+        uri      <- validateUri(s"$baseUrl/knowledge-graph/graphql")
+        payload  <- IO(json"""{"query": ${query.source.getOrElse("")}}""")
+        response <- send(request(Method.POST, uri) withEntity payload)(mapResponse)
+      } yield response
+    }.unsafeRunSync()
   }
 }
 

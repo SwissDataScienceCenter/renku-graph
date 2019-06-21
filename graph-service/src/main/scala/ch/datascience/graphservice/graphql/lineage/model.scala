@@ -18,8 +18,6 @@
 
 package ch.datascience.graphservice.graphql.lineage
 
-import java.io.Serializable
-
 import cats.MonadError
 import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.tinytypes.constraints.NonBlank
@@ -49,13 +47,20 @@ object model {
 
   final case class Edge(source: SourceNode, target: TargetNode)
 
-  sealed trait Node extends Product with Serializable {
-    val id:    NodeId
-    val label: NodeLabel
+  sealed case class Node(id: NodeId, label: NodeLabel)
 
-    override def equals(other: Any): Boolean =
-      if (!other.isInstanceOf[Node]) false
-      else this.id == other.asInstanceOf[Node].id && this.label == other.asInstanceOf[Node].label
+  object Node {
+    sealed trait SourceNode extends Node
+
+    object SourceNode {
+      def apply(id: NodeId, label: NodeLabel): SourceNode = new Node(id, label) with SourceNode
+    }
+
+    sealed trait TargetNode extends Node
+
+    object TargetNode {
+      def apply(id: NodeId, label: NodeLabel): TargetNode = new Node(id, label) with TargetNode
+    }
   }
 
   final class NodeId private (val value: String) extends AnyVal with TinyType[String]
@@ -63,9 +68,4 @@ object model {
 
   final class NodeLabel private (val value: String) extends AnyVal with TinyType[String]
   object NodeLabel extends TinyTypeFactory[String, NodeLabel](new NodeLabel(_)) with NonBlank
-
-  object Node {
-    final case class SourceNode(id: NodeId, label: NodeLabel) extends Node
-    final case class TargetNode(id: NodeId, label: NodeLabel) extends Node
-  }
 }

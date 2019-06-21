@@ -19,6 +19,7 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data.KnowledgeGraph.triples
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
 import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
@@ -37,7 +38,7 @@ class JenaReProvisioningSpec extends FeatureSpec with GivenWhenThen with GraphSe
       val commitId = commitIds.generateOne
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, commitId)
+      `data in the RDF store`(project, commitId, triples(project.path))
       val initialTriplesNumber = RDFStore.findAllTriplesNumber()
 
       When("user does DELETE triples-generator/triples/projects")

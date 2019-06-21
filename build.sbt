@@ -108,7 +108,7 @@ lazy val acceptanceTests = Project(
   webhookService,
   triplesGenerator,
   tokenRepository,
-  graphService,
+  graphService % "test->test",
   graphCommons % "test->test",
   dbEventLog   % "test->test"
 ).enablePlugins(
