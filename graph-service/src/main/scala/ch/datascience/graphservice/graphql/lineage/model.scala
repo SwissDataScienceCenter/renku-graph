@@ -20,13 +20,32 @@ package ch.datascience.graphservice.graphql.lineage
 
 import java.io.Serializable
 
+import cats.MonadError
 import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 
+import scala.language.higherKinds
+
 object model {
 
-  final case class Lineage(edges: Set[Edge], nodes: Set[Node])
+  final case class Lineage private (edges: Set[Edge], nodes: Set[Node])
+
+  object Lineage {
+
+    def from[Interpretation[_]](edges: Set[Edge], nodes: Set[Node])(
+        implicit ME:                   MonadError[Interpretation, Throwable]): Interpretation[Lineage] = {
+      val edgesNodes = collectNodes(edges)
+      if (edgesNodes == nodes) ME.pure(Lineage(edges, nodes))
+      else if ((nodes diff edgesNodes).nonEmpty) ME.raiseError(new IllegalArgumentException("There are orphan nodes"))
+      else ME.raiseError(new IllegalArgumentException("There are edges with no nodes definitions"))
+    }
+
+    private def collectNodes(edges: Set[Edge]): Set[Node] =
+      edges.foldLeft(Set.empty[Node]) { (nodes, edge) =>
+        nodes + edge.source + edge.target
+      }
+  }
 
   final case class Edge(source: SourceNode, target: TargetNode)
 

@@ -20,8 +20,8 @@ package ch.datascience.graphservice.graphql.lineage
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.graphservice.graphql.lineage.model.{NodeId, NodeLabel}
-import org.scalacheck.Gen
+import ch.datascience.graphservice.graphql.lineage.model.{Edge, Node, NodeId, NodeLabel}
+import org.scalacheck.{Arbitrary, Gen}
 
 object LineageGenerators {
 
@@ -37,4 +37,14 @@ object LineageGenerators {
     id    <- nodeIds
     label <- nodeLabels
   } yield TargetNode(id, label)
+
+  implicit val nodes: Gen[Node] = for {
+    source <- Arbitrary.arbBool.arbitrary
+    node   <- if (source) sourceNodes else targetNodes
+  } yield node
+
+  implicit val edges: Gen[Edge] = for {
+    sourceNode <- sourceNodes
+    targetNode <- targetNodes
+  } yield Edge(sourceNode, targetNode)
 }
