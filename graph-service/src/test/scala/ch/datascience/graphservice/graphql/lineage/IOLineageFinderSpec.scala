@@ -18,18 +18,21 @@
 
 package ch.datascience.graphservice.graphql.lineage
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.graphservice.config.RenkuBaseUrl
-import ch.datascience.graphservice.graphql.lineage.model.{Edge, Lineage, NodeId, NodeLabel}
+import ch.datascience.graphservice.graphql.lineage.QueryFields.FilePath
 import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
+import ch.datascience.graphservice.graphql.lineage.model._
 import ch.datascience.graphservice.rdfstore.InMemoryRdfStore
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore {
 
@@ -39,75 +42,128 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore {
       loadToStore(inputTriples)
 
       lineageFinder
-        .findLineage(projectPath, None, None)
-//          .findLineage(projectPath,
-//                       Some(CommitId("0000003")),
-//                       Some(FilePath("preprocessed-data")))
+        .findLineage(projectPath, maybeCommitId = None, maybeFilePath = None)
         .unsafeRunSync() shouldBe Some(
         Lineage(
-          nodes = Set(
-            TargetNode(NodeId("file:///blob/0000004/result-file-2"), NodeLabel("result-file-2@0000004")),
-            TargetNode(NodeId("file:///blob/0000004/result-file-1"), NodeLabel("result-file-1@0000004")),
-            TargetNode(NodeId("file:///blob/0000001/input-data"), NodeLabel("input-data@0000001")),
-            TargetNode(NodeId("file:///blob/0000002/source-file-2"), NodeLabel("source-file-2@0000002")),
-            TargetNode(NodeId("file:///blob/0000003/preprocessed-data"), NodeLabel("preprocessed-data@0000003")),
-            TargetNode(NodeId("file:///commit/0000004"), NodeLabel("renku run python source-file-2 preprocessed-data")),
-            TargetNode(NodeId("file:///commit/0000003"),
-                       NodeLabel("renku run python source-file-1 input-data preprocessed-data")),
-            TargetNode(NodeId("file:///blob/0000002/source-file-1"), NodeLabel("source-file-1@0000002"))
-          ),
           edges = Set(
-            Edge(
-              SourceNode(NodeId("file:///blob/0000003/preprocessed-data"), NodeLabel("preprocessed-data@0000003")),
-              TargetNode(NodeId("file:///commit/0000004"),
-                         NodeLabel("renku run python source-file-2 preprocessed-data"))
-            ),
-            Edge(
-              SourceNode(NodeId("file:///blob/0000002/source-file-1"), NodeLabel("source-file-1@0000002")),
-              TargetNode(NodeId("file:///commit/0000003"),
-                         NodeLabel("renku run python source-file-1 input-data preprocessed-data"))
-            ),
-            Edge(
-              SourceNode(NodeId("file:///blob/0000002/source-file-2"), NodeLabel("source-file-2@0000002")),
-              TargetNode(NodeId("file:///commit/0000004"),
-                         NodeLabel("renku run python source-file-2 preprocessed-data"))
-            ),
-            Edge(
-              SourceNode(NodeId("file:///commit/0000004"),
-                         NodeLabel("renku run python source-file-2 preprocessed-data")),
-              TargetNode(NodeId("file:///blob/0000004/result-file-1"), NodeLabel("result-file-1@0000004"))
-            ),
-            Edge(
-              SourceNode(NodeId("file:///commit/0000003"),
-                         NodeLabel("renku run python source-file-1 input-data preprocessed-data")),
-              TargetNode(NodeId("file:///blob/0000003/preprocessed-data"), NodeLabel("preprocessed-data@0000003"))
-            ),
-            Edge(
-              SourceNode(NodeId("file:///commit/0000004"),
-                         NodeLabel("renku run python source-file-2 preprocessed-data")),
-              TargetNode(NodeId("file:///blob/0000004/result-file-2"), NodeLabel("result-file-2@0000004"))
-            ),
-            Edge(
-              SourceNode(NodeId("file:///blob/0000001/input-data"), NodeLabel("input-data@0000001")),
-              TargetNode(NodeId("file:///commit/0000003"),
-                         NodeLabel("renku run python source-file-1 input-data preprocessed-data"))
-            )
+            Edge(sourceNode(`commit1-input-data`), targetNode(`commit3-renku-run`)),
+            Edge(sourceNode(`commit2-source-file1`), targetNode(`commit3-renku-run`)),
+            Edge(sourceNode(`commit3-renku-run`), targetNode(`commit3-preprocessed-data`)),
+            Edge(sourceNode(`commit3-preprocessed-data`), targetNode(`commit4-renku-run`)),
+            Edge(sourceNode(`commit2-source-file2`), targetNode(`commit4-renku-run`)),
+            Edge(sourceNode(`commit4-renku-run`), targetNode(`commit4-result-file1`)),
+            Edge(sourceNode(`commit4-renku-run`), targetNode(`commit4-result-file2`))
+          ),
+          nodes = Set(
+            node(`commit1-input-data`),
+            node(`commit2-source-file1`),
+            node(`commit2-source-file2`),
+            node(`commit3-renku-run`),
+            node(`commit3-preprocessed-data`),
+            node(`commit4-renku-run`),
+            node(`commit4-result-file1`),
+            node(`commit4-result-file2`)
           )
         )
       )
     }
+
+    "return the lineage of the given project for a given commit id" in new TestCase {
+      loadToStore(inputTriples)
+
+      lineageFinder
+        .findLineage(projectPath, maybeCommitId = Some(CommitId("0000003")), maybeFilePath = None)
+        .unsafeRunSync() shouldBe Some(
+        Lineage(
+          edges = Set(
+            Edge(sourceNode(`commit1-input-data`), targetNode(`commit3-renku-run`)),
+            Edge(sourceNode(`commit2-source-file1`), targetNode(`commit3-renku-run`)),
+            Edge(sourceNode(`commit3-renku-run`), targetNode(`commit3-preprocessed-data`)),
+            Edge(sourceNode(`commit3-preprocessed-data`), targetNode(`commit4-renku-run`)),
+            Edge(sourceNode(`commit4-renku-run`), targetNode(`commit4-result-file1`)),
+            Edge(sourceNode(`commit4-renku-run`), targetNode(`commit4-result-file2`))
+          ),
+          nodes = Set(
+            node(`commit1-input-data`),
+            node(`commit2-source-file1`),
+            node(`commit3-renku-run`),
+            node(`commit3-preprocessed-data`),
+            node(`commit4-renku-run`),
+            node(`commit4-result-file1`),
+            node(`commit4-result-file2`)
+          )
+        )
+      )
+    }
+
+    "return the lineage of the given project for a given commit id and file path" in new TestCase {
+      loadToStore(inputTriples)
+
+      lineageFinder
+        .findLineage(projectPath, Some(CommitId("0000004")), Some(FilePath("result-file-1")))
+        .unsafeRunSync() shouldBe Some(
+        Lineage(
+          edges = Set(
+            Edge(sourceNode(`commit1-input-data`), targetNode(`commit3-renku-run`)),
+            Edge(sourceNode(`commit2-source-file1`), targetNode(`commit3-renku-run`)),
+            Edge(sourceNode(`commit3-renku-run`), targetNode(`commit3-preprocessed-data`)),
+            Edge(sourceNode(`commit3-preprocessed-data`), targetNode(`commit4-renku-run`)),
+            Edge(sourceNode(`commit2-source-file2`), targetNode(`commit4-renku-run`)),
+            Edge(sourceNode(`commit4-renku-run`), targetNode(`commit4-result-file1`))
+          ),
+          nodes = Set(
+            node(`commit1-input-data`),
+            node(`commit2-source-file1`),
+            node(`commit2-source-file2`),
+            node(`commit3-renku-run`),
+            node(`commit3-preprocessed-data`),
+            node(`commit4-renku-run`),
+            node(`commit4-result-file1`)
+          )
+        )
+      )
+    }
+
+    "return None if there's no lineage for the project" in new TestCase {
+      lineageFinder
+        .findLineage(projectPath, maybeCommitId = None, maybeFilePath = None)
+        .unsafeRunSync() shouldBe None
+    }
   }
 
-  private trait TestCase {
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
-    val lineageFinder = new IOLineageFinder(rdfConnectionResourceBuilder,
+  private trait TestCase {
+    val lineageFinder = new IOLineageFinder(sparqlEndpoint,
                                             renkuBaseUrl,
                                             TestExecutionTimeRecorder[IO](elapsedTimes.generateOne),
                                             TestLogger())
   }
 
+  private def sourceNode(idAndLabel: (NodeId, NodeLabel)): SourceNode = (SourceNode.apply _).tupled(idAndLabel)
+  private def targetNode(idAndLabel: (NodeId, NodeLabel)): TargetNode = (TargetNode.apply _).tupled(idAndLabel)
+  private def node(idAndLabel:       (NodeId, NodeLabel)): TargetNode = (TargetNode.apply _).tupled(idAndLabel)
+
   private val renkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
   private val projectPath  = ProjectPath("kuba/zurich-bikes")
+
+  private val `commit1-input-data` = NodeId("file:///blob/0000001/input-data") ->
+    NodeLabel("input-data@0000001")
+  private val `commit2-source-file1` = NodeId("file:///blob/0000002/source-file-1") ->
+    NodeLabel("source-file-1@0000002")
+  private val `commit2-source-file2` = NodeId("file:///blob/0000002/source-file-2") ->
+    NodeLabel("source-file-2@0000002")
+  private val `commit3-renku-run` = NodeId("file:///commit/0000003") ->
+    NodeLabel("renku run python source-file-1 input-data preprocessed-data")
+  private val `commit3-preprocessed-data` = NodeId("file:///blob/0000003/preprocessed-data") ->
+    NodeLabel("preprocessed-data@0000003")
+  private val `commit4-renku-run` = NodeId("file:///commit/0000004") ->
+    NodeLabel("renku run python source-file-2 preprocessed-data")
+  private val `commit4-result-file1` = NodeId("file:///blob/0000004/result-file-1") ->
+    NodeLabel("result-file-1@0000004")
+  private val `commit4-result-file2` = NodeId("file:///blob/0000004/result-file-2") ->
+    NodeLabel("result-file-2@0000004")
 
   private val inputTriples = s"""
                                 |<rdf:RDF

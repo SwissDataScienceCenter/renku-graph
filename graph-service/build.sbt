@@ -18,12 +18,12 @@
 
 name := "graph-service"
 
-val jenaVersion = "3.12.0"
-libraryDependencies += "ch.qos.logback"  % "logback-classic"    % "1.2.3"
-libraryDependencies += "io.sentry"       % "sentry-logback"     % "1.7.22"
-libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
+libraryDependencies += "io.sentry"      % "sentry-logback"  % "1.7.22"
 
 libraryDependencies += "org.sangria-graphql" %% "sangria"       % "1.4.2"
 libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.2.1"
 
-libraryDependencies += "org.apache.jena" % "jena-fuseki-main" % jenaVersion % Test
+val jenaVersion = "3.12.0"
+libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
+libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % Test

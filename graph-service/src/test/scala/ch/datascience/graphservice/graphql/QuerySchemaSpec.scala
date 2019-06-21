@@ -20,10 +20,10 @@ package ch.datascience.graphservice.graphql
 
 import cats.effect.IO
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.graphservice.graphql.lineage.IOLineageFinder
+import ch.datascience.graphservice.graphql.lineage.LineageFinder
 import ch.datascience.graphservice.graphql.lineage.QueryFields.FilePath
 import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.graphservice.graphql.lineage.model.{Edge, Lineage, Node, NodeId, NodeLabel}
+import ch.datascience.graphservice.graphql.lineage.model._
 import io.circe.Json
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
@@ -107,7 +107,7 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
   }
 
   private trait TestCase {
-    val lineageFinder = mock[IOLineageFinder]
+    val lineageFinder = mock[LineageFinder[IO]]
 
     def execute(query: Document): Json =
       Executor
@@ -135,10 +135,7 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
 
     private val sourceNode = SourceNode(NodeId("node-1"), NodeLabel("node-1-label"))
     private val targetNode = TargetNode(NodeId("node-2"), NodeLabel("node-2-label"))
-    lazy val lineage = Lineage(
-      nodes = Set(sourceNode, targetNode),
-      edges = Set(Edge(sourceNode, targetNode))
-    )
+    lazy val lineage       = Lineage(edges = Set(Edge(sourceNode, targetNode)), nodes = Set(sourceNode, targetNode))
 
     def json(lineage: Lineage) = json"""
         {

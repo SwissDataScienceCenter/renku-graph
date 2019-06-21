@@ -26,7 +26,9 @@ import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 
 object model {
 
-  final case class Lineage(nodes: Set[Node], edges: Set[Edge])
+  final case class Lineage(edges: Set[Edge], nodes: Set[Node])
+
+  final case class Edge(source: SourceNode, target: TargetNode)
 
   sealed trait Node extends Product with Serializable {
     val id:    NodeId
@@ -47,6 +49,4 @@ object model {
     final case class SourceNode(id: NodeId, label: NodeLabel) extends Node
     final case class TargetNode(id: NodeId, label: NodeLabel) extends Node
   }
-
-  final case class Edge(source: SourceNode, target: TargetNode)
 }

@@ -19,7 +19,7 @@
 package ch.datascience.graphservice.graphql
 
 import cats.MonadError
-import cats.effect.{Clock, Effect, IO}
+import cats.effect._
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import io.circe.Json
@@ -95,7 +95,9 @@ private object QueryEndpoint {
 
 object IOQueryEndpoint {
 
-  def apply()(implicit executionContext: ExecutionContext, clock: Clock[IO]): IO[QueryEndpoint[IO]] =
+  def apply()(implicit executionContext: ExecutionContext,
+              contextShift:              ContextShift[IO],
+              timer:                     Timer[IO]): IO[QueryEndpoint[IO]] =
     for {
       queryContext <- IOQueryContext()
       querySchema = QuerySchema[IO](lineage.QueryFields())
