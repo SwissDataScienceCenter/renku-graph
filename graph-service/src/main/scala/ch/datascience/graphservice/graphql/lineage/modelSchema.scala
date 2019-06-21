@@ -19,7 +19,6 @@
 package ch.datascience.graphservice.graphql.lineage
 
 import ch.datascience.graphservice.graphql.lineage.model._
-import sangria.macros.derive._
 import sangria.schema._
 
 private object modelSchema {

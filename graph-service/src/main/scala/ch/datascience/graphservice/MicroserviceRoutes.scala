@@ -31,10 +31,12 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import queryEndpoint._
   import org.http4s.HttpRoutes
 
+  // format: off
   lazy val routes: HttpRoutes[F] = HttpRoutes
     .of[F] {
-      case GET -> Root / "ping"               => Ok("pong")
-      case GET -> Root / "graphql" / "schema" => schema
-      case request @ POST -> Root / "graphql" => handleQuery(request)
+      case           GET  -> Root / "ping"    => Ok("pong")
+      case           GET  -> Root / "knowledge-graph" / "graphql" => schema
+      case request @ POST -> Root / "knowledge-graph" / "graphql" => handleQuery(request)
     }
+  // format: on
 }
