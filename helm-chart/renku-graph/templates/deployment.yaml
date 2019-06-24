@@ -200,6 +200,40 @@ spec:
             failureThreshold: 3
           resources:
 {{ toYaml .Values.tokenRepository.resources | indent 12 }}
+        - name: {{ .Chart.Name }}-graph-service
+          image: "{{ .Values.graphService.image.repository }}:{{ .Values.graphService.image.tag }}"
+          imagePullPolicy: {{ .Values.graphService.image.pullPolicy }}
+          env:
+            - name: JENA_DATASET_NAME
+              {{- if .Values.global.graph.jena.dataset }}
+              value: {{ .Values.global.graph.jena.dataset }}
+              {{- else }}
+              value: {{ .Release.Namespace }}
+             {{- end }}
+            - name: JENA_BASE_URL
+              value: "http://{{ template "jena.fullname" . }}:{{ .Values.jena.service.port }}"
+            - name: RENKU_BASE_URL
+              value: {{ .Values.graphService.services.renku.url }}
+            - name: SENTRY_DSN
+              value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=graph-service&environment={{ .Release.Namespace }}
+            - name: THREADS_NUMBER
+              value: "{{ .Values.graphService.threadsNumber }}"
+            - name: JAVA_OPTS
+              value: -Xmx200m -XX:+UseG1GC
+          ports:
+            - name: http-graph-sv
+              containerPort: 9004
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http-graph-sv
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http-graph-sv
+          resources:
+{{ toYaml .Values.graphService.resources | indent 12 }}
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
