@@ -25,12 +25,6 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            - name: ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ template "jena.fullname" . }}
-                  key: jena-admin-password
           ports:
             - name: http
               containerPort: 3030
@@ -44,8 +38,12 @@ spec:
               path: /
               port: http
           volumeMounts:
-          - name: jena-persistence
-            mountPath: /fuseki
+            - name: shiro-config
+              mountPath: /fuseki/shiro.ini
+              subPath: shiro.ini
+              readOnly: true
+            - name: jena-persistence
+              mountPath: /fuseki
           resources:
 {{ toYaml .Values.resources | indent 12 }}
       volumes:
@@ -56,6 +54,9 @@ spec:
         {{- else }}
           emptyDir: {}
         {{- end }}
+        - name: shiro-config
+          configMap:
+            name: jena-shiro-ini
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}

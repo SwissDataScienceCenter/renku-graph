@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ template "jena.fullname" . }}
+  name: jena-shiro-ini
   labels:
     app: {{ template "jena.name" . }}
     chart: {{ template "jena.chart" . }}
@@ -10,27 +10,24 @@ metadata:
     heritage: {{ .Release.Service }}
 data:
   shiro.ini: |-
-    cluster.name: {{ .Values.cluster.name }}
+    [main]
+    # Development
+    ssl.enabled = false
 
-    node.data: ${NODE_DATA:true}
-    node.master: ${NODE_MASTER:true}
-    node.ingest: ${NODE_INGEST:true}
-    node.name: ${HOSTNAME}
+    plainMatcher=org.apache.shiro.authc.credential.SimpleCredentialsMatcher
+    iniRealm.credentialsMatcher = $plainMatcher
 
-    network.host: 0.0.0.0
+    [users]
+    admin={{ .Values.admin.password }}
+    renkuuser={{ .Values.renkuuser.password }}
 
-    # cloud:
-    #   kubernetes:
-    #     service: ${SERVICE}
-    #     namespace: ${KUBERNETES_NAMESPACE}
+    [roles]
 
-    bootstrap.memory_lock: ${BOOTSTRAP_MEMORY_LOCK:false}
+    [urls]
+    ## Control functions open to anyone
+    /$/status = anon
+    /$/ping   = anon
 
-    discovery:
-      zen:
-        # hosts_provider: kubernetes
-        ping.unicast.hosts:
-        - ${SERVICE}
-        minimum_master_nodes: ${MINIMUM_MASTER_NODES:2}
-
-    processors: ${PROCESSORS:}
+    ## and the rest are restricted
+    /$/** = authcBasic,user[admin]
+    /{{ .Values.global.graph.jena.dataset }}/** = authcBasic,user[renkuuser]

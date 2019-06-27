@@ -55,4 +55,12 @@ tolerations: []
 affinity: {}
 
 # Jena configuration
-jena: {}
+jena:
+  admin:
+    ## Admin user password
+    ## Generate one using: `openssl rand -hex 16`
+    password:
+  renkuuser:
+    ## Dataset user password
+    ## Generate one using: `openssl rand -hex 16`
+    password:
