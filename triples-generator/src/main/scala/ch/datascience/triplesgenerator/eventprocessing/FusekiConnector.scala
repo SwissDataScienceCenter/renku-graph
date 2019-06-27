@@ -20,8 +20,9 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import ch.datascience.triplesgenerator.config.{FusekiBaseUrl, FusekiConfigProvider}
-import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
+import ch.datascience.http.client.BasicAuthCredentials
+import ch.datascience.triplesgenerator.config.{FusekiBaseUrl, FusekiUserConfig}
+import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFactory}
 
 import scala.language.higherKinds
 import scala.util.control.NonFatal
@@ -31,20 +32,21 @@ private abstract class FusekiConnector[Interpretation[_]] {
 }
 
 private class IOFusekiConnector(
-    fusekiConfigProvider:    FusekiConfigProvider[IO],
-    fusekiConnectionBuilder: FusekiBaseUrl => RDFConnection = IOFusekiConnector.fusekiConnectionBuilder
+    fusekiUserConfig:        FusekiUserConfig,
+    fusekiConnectionBuilder: (FusekiBaseUrl, BasicAuthCredentials) => RDFConnection
 )(implicit contextShift:     ContextShift[IO])
     extends FusekiConnector[IO] {
+
+  private lazy val fusekiBaseUrl = fusekiUserConfig.fusekiBaseUrl / fusekiUserConfig.datasetName
 
   def upload(rdfTriples: RDFTriples): IO[Unit] =
     newConnection
       .bracket(send(rdfTriples))(closeConnection)
       .recoverWith(meaningfulError)
 
-  private def newConnection: IO[RDFConnection] =
-    contextShift.shift *> fusekiConfigProvider.get.flatMap { fusekiConfig =>
-      IO(fusekiConnectionBuilder(fusekiConfig.fusekiBaseUrl / fusekiConfig.datasetName))
-    }
+  private def newConnection: IO[RDFConnection] = IO {
+    fusekiConnectionBuilder(fusekiBaseUrl, fusekiUserConfig.authCredentials)
+  }
 
   private def send(rdfTriples: RDFTriples)(connection: RDFConnection): IO[Unit] =
     IO(connection.load(rdfTriples.value))
@@ -59,9 +61,12 @@ private class IOFusekiConnector(
 }
 
 private object IOFusekiConnector {
-  private val fusekiConnectionBuilder: FusekiBaseUrl => RDFConnection = fusekiUrl =>
-    RDFConnectionFuseki
-      .create()
-      .destination(fusekiUrl.toString)
-      .build()
+
+  private val fusekiConnectionBuilder: (FusekiBaseUrl, BasicAuthCredentials) => RDFConnection =
+    (fusekiUrl, authCredentials) =>
+      RDFConnectionFactory
+        .connectPW(fusekiUrl.value, authCredentials.username.value, authCredentials.password.value)
+
+  def apply()(implicit contextShift: ContextShift[IO]): IO[IOFusekiConnector] =
+    FusekiUserConfig[IO]() map (new IOFusekiConnector(_, fusekiConnectionBuilder))
 }

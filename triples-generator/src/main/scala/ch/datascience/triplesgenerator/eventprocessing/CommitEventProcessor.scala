@@ -30,7 +30,6 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.triplesgenerator.config.FusekiConfigProvider
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import io.chrisdavenport.log4cats.Logger
@@ -189,18 +188,26 @@ class CommitEventProcessor[Interpretation[_]](
   }
 }
 
-class IOCommitEventProcessor(
-    transactor:          DbTransactor[IO, EventLogDB],
-    triplesGenerator:    TriplesGenerator[IO],
-)(implicit contextShift: ContextShift[IO], executionContext: ExecutionContext, timer: Timer[IO])
-    extends CommitEventProcessor[IO](
-      new CommitEventsDeserialiser[IO](),
-      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
-      triplesGenerator,
-      new IOFusekiConnector(new FusekiConfigProvider[IO]()),
-      new IOEventLogMarkDone(transactor),
-      new IOEventLogMarkNew(transactor),
-      new IOEventLogMarkFailed(transactor),
-      ApplicationLogger,
-      new ExecutionTimeRecorder[IO]
-    )
+object IOCommitEventProcessor {
+
+  def apply(
+      transactor:          DbTransactor[IO, EventLogDB],
+      triplesGenerator:    TriplesGenerator[IO],
+  )(implicit contextShift: ContextShift[IO],
+    executionContext:      ExecutionContext,
+    timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
+    for {
+      fusekiConnector <- IOFusekiConnector()
+    } yield
+      new CommitEventProcessor[IO](
+        new CommitEventsDeserialiser[IO](),
+        new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
+        triplesGenerator,
+        fusekiConnector,
+        new IOEventLogMarkDone(transactor),
+        new IOEventLogMarkNew(transactor),
+        new IOEventLogMarkFailed(transactor),
+        ApplicationLogger,
+        new ExecutionTimeRecorder[IO]
+      )
+}

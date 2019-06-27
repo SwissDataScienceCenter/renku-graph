@@ -38,10 +38,16 @@ object ServiceTypesGenerators {
     RDFTriples(model)
   }
 
-  implicit val fusekiConfigs: Gen[FusekiConfig] = for {
+  implicit val fusekiAdminConfigs: Gen[FusekiAdminConfig] = for {
     fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
     datasetName     <- nonEmptyStrings() map DatasetName.apply
     datasetType     <- Gen.oneOf(Mem, TDB)
     authCredentials <- basicAuthCredentials
-  } yield FusekiConfig(fusekiUrl, datasetName, datasetType, authCredentials)
+  } yield FusekiAdminConfig(fusekiUrl, datasetName, datasetType, authCredentials)
+
+  implicit val fusekiUserConfigs: Gen[FusekiUserConfig] = for {
+    fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
+    datasetName     <- nonEmptyStrings() map DatasetName.apply
+    authCredentials <- basicAuthCredentials
+  } yield FusekiUserConfig(fusekiUrl, datasetName, authCredentials)
 }
