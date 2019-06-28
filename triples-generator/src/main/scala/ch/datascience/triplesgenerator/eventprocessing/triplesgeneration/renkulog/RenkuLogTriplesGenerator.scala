@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
-import java.io._
 import java.security.SecureRandom
 
 import Commands.GitLabRepoUrlFinder
@@ -32,7 +31,6 @@ import ch.datascience.triplesgenerator.eventprocessing.Commit._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.{Commit, GitLabUrlProvider, RDFTriples}
 import com.typesafe.config.{Config, ConfigFactory}
-import org.apache.jena.rdf.model.ModelFactory
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -44,7 +42,6 @@ class RenkuLogTriplesGenerator private[renkulog] (
     renku:               Commands.Renku,
     file:                Commands.File,
     git:                 Commands.Git,
-    toRdfTriples:        InputStream => IO[RDFTriples],
     randomLong:          () => Long
 )(implicit contextShift: ContextShift[IO])
     extends TriplesGenerator[IO] {
@@ -63,8 +60,7 @@ class RenkuLogTriplesGenerator private[renkulog] (
           gitRepositoryUrl <- findRepositoryUrl(commit.project.path, maybeAccessToken)
           _                <- git cloneRepo (gitRepositoryUrl, repositoryDirectory, workDirectory)
           _                <- git checkout (commit.id, repositoryDirectory)
-          triplesStream    <- findTriplesStream(commit, repositoryDirectory)
-          rdfTriples       <- toRdfTriples(triplesStream)
+          rdfTriples       <- findTriples(commit, repositoryDirectory)
         } yield rdfTriples
       }(repositoryDirectory => delete(repositoryDirectory))
       .recoverWith(meaningfulError)
@@ -79,7 +75,7 @@ class RenkuLogTriplesGenerator private[renkulog] (
     case repositoryDirectoryFinder(folderName) => folderName
   }
 
-  private def findTriplesStream(commit: Commit, repositoryDirectory: Path): IO[InputStream] = {
+  private def findTriples(commit: Commit, repositoryDirectory: Path): IO[RDFTriples] = {
     import renku._
 
     commit match {
@@ -108,8 +104,7 @@ object RenkuLogTriplesGenerator {
         new Commands.Renku(renkuLogTimeout),
         new Commands.File,
         new Commands.Git,
-        toRdfTriples = inputStream => IO(RDFTriples(ModelFactory.createDefaultModel.read(inputStream, ""))),
-        randomLong   = new SecureRandom().nextLong _
+        randomLong = new SecureRandom().nextLong _
       )
 }
 

@@ -42,7 +42,7 @@ class CommitEventProcessor[Interpretation[_]](
     commitEventsDeserialiser: CommitEventsDeserialiser[Interpretation],
     accessTokenFinder:        AccessTokenFinder[Interpretation],
     triplesGenerator:         TriplesGenerator[Interpretation],
-    fusekiConnector:          FusekiConnector[Interpretation],
+    triplesUploader:          TriplesUploader[Interpretation],
     eventLogMarkDone:         EventLogMarkDone[Interpretation],
     eventLogMarkNew:          EventLogMarkNew[Interpretation],
     eventLogMarkFailed:       EventLogMarkFailed[Interpretation],
@@ -58,8 +58,8 @@ class CommitEventProcessor[Interpretation[_]](
   import eventLogMarkFailed._
   import eventLogMarkNew._
   import executionTimeRecorder._
-  import fusekiConnector._
   import triplesGenerator._
+  import triplesUploader._
 
   def apply(eventBody: EventBody): Interpretation[Unit] =
     measureExecutionTime {
@@ -83,7 +83,7 @@ class CommitEventProcessor[Interpretation[_]](
     for {
       triples <- generateTriples(commit, maybeAccessToken)
       result <- upload(triples)
-                 .map(_ => Uploaded(commit, triples.value.size()): UploadingResult)
+                 .map(_ => Uploaded(commit): UploadingResult)
                  .recoverWith(recoverableFailure(commit))
     } yield result
   } recoverWith nonRecoverableFailure(commit)
@@ -146,13 +146,12 @@ class CommitEventProcessor[Interpretation[_]](
   private def logSummary: ((ElapsedTime, NonEmptyList[UploadingResult])) => Interpretation[Unit] = {
     case (elapsedTime, uploadingResults) =>
       val (uploaded, failed) = uploadingResults.foldLeft(List.empty[Uploaded] -> List.empty[UploadingError]) {
-        case ((allUploaded, allFailed), uploaded @ Uploaded(_, _)) => (allUploaded :+ uploaded) -> allFailed
+        case ((allUploaded, allFailed), uploaded @ Uploaded(_)) => (allUploaded :+ uploaded) -> allFailed
         case ((allUploaded, allFailed), failed: UploadingError) => allUploaded -> (allFailed :+ failed)
       }
       logger.info(
         s"${logMessageCommon(uploadingResults.head.commit)} processed in ${elapsedTime}ms: " +
           s"${uploadingResults.size} commits, " +
-          s"${uploaded.map(_.numberOfTriples).sum} triples in total, " +
           s"${uploaded.size} commits uploaded, " +
           s"${failed.size} commits failed"
       )
@@ -182,9 +181,9 @@ class CommitEventProcessor[Interpretation[_]](
     val cause: Throwable
   }
   private object UploadingResult {
-    case class Uploaded(commit:            Commit, numberOfTriples: Long)      extends UploadingResult
-    case class RecoverableError(commit:    Commit, cause:           Throwable) extends UploadingError
-    case class NonRecoverableError(commit: Commit, cause:           Throwable) extends UploadingError
+    case class Uploaded(commit:            Commit) extends UploadingResult
+    case class RecoverableError(commit:    Commit, cause: Throwable) extends UploadingError
+    case class NonRecoverableError(commit: Commit, cause: Throwable) extends UploadingError
   }
 }
 
@@ -197,13 +196,13 @@ object IOCommitEventProcessor {
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      fusekiConnector <- IOFusekiConnector()
+      triplesUploader <- IOTriplesUploader()
     } yield
       new CommitEventProcessor[IO](
         new CommitEventsDeserialiser[IO](),
         new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
         triplesGenerator,
-        fusekiConnector,
+        triplesUploader,
         new IOEventLogMarkDone(transactor),
         new IOEventLogMarkNew(transactor),
         new IOEventLogMarkFailed(transactor),

@@ -74,10 +74,6 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(IO.pure(rdfTriplesStream))
-
-      toRdfTriples
-        .expects(rdfTriplesStream)
         .returning(IO.pure(rdfTriples))
 
       (file
@@ -120,10 +116,6 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitWithParent, _: Path)(_: (CommitWithParent, Path) => CommandResult))
         .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
-        .returning(IO.pure(rdfTriplesStream))
-
-      toRdfTriples
-        .expects(rdfTriplesStream)
         .returning(IO.pure(rdfTriples))
 
       (file
@@ -284,51 +276,6 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       actual.getCause   shouldBe exception
     }
 
-    "fail if converting the rdf triples stream to rdf triples fails" in new TestCase {
-
-      (file
-        .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
-
-      (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
-        .returning(IO.pure(gitRepositoryUrl))
-
-      (git
-        .cloneRepo(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(IO.pure(successfulCommandResult))
-
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.pure(successfulCommandResult))
-
-      (renku
-        .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
-        .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(IO.pure(rdfTriplesStream))
-
-      val exception = exceptions.generateOne
-      toRdfTriples
-        .expects(rdfTriplesStream)
-        .returning(IO.raiseError(exception))
-
-      (file
-        .delete(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.unit)
-        .atLeastOnce()
-
-      val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
-      }
-      actual.getMessage shouldBe "Triples generation failed"
-      actual.getCause   shouldBe exception
-    }
-
     "fail if removing the temp folder fails" in new TestCase {
 
       (file
@@ -354,10 +301,6 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(IO.pure(rdfTriplesStream))
-
-      toRdfTriples
-        .expects(rdfTriplesStream)
         .returning(IO.pure(rdfTriples))
 
       val exception = exceptions.generateOne
@@ -407,9 +350,8 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
     val git                 = mock[Commands.Git]
     val renku               = mock[Commands.Renku]
     val randomLong          = mockFunction[Long]
-    val toRdfTriples        = mockFunction[InputStream, IO[RDFTriples]]
     randomLong.expects().returning(pathDifferentiator)
 
-    val triplesGenerator = new RenkuLogTriplesGenerator(gitLabRepoUrlFinder, renku, file, git, toRdfTriples, randomLong)
+    val triplesGenerator = new RenkuLogTriplesGenerator(gitLabRepoUrlFinder, renku, file, git, randomLong)
   }
 }

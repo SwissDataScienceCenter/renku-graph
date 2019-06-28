@@ -35,7 +35,6 @@ import org.scalatest.WordSpec
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.io.Source
 import scala.language.postfixOps
 
 class RenkuSpec extends WordSpec {
@@ -46,9 +45,9 @@ class RenkuSpec extends WordSpec {
       val commandBody   = nonEmptyStrings().generateOne
       val commandResult = CommandResult(exitCode = 0, chunks = Seq(Left(new Bytes(commandBody.getBytes()))))
 
-      val result = renku.log(commit, path)(triplesGeneration(returning = commandResult)).unsafeRunSync()
+      val triples = renku.log(commit, path)(triplesGeneration(returning = commandResult)).unsafeRunSync()
 
-      Source.fromInputStream(result).mkString shouldBe commandBody
+      triples.value shouldBe commandBody
     }
 
     "fail if calling 'renku log' results in a failure" in new TestCase {
