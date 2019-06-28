@@ -41,6 +41,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Random
 
 class CompleteReProvisioningEndpointSpec extends WordSpec with MockFactory {
 
@@ -124,5 +125,16 @@ class IOCompleteReProvisioningEndpointSpec extends WordSpec with MockFactory {
           .unsafeRunSync()
       }
     }
+  }
+
+  private implicit class ConfigMapOps(config: Map[String, String]) {
+    private val configToMiss = Random.nextInt(config.size)
+
+    lazy val removeRandomEntry: Map[String, String] =
+      config.zipWithIndex
+        .foldLeft(Map.empty[String, String]) {
+          case (newConfig, (_, `configToMiss`)) => newConfig
+          case (newConfig, ((k, v), _))         => newConfig + (k -> v)
+        }
   }
 }

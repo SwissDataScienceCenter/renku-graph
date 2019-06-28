@@ -18,11 +18,11 @@
 
 name := "graph-commons"
 
-val pureConfigVersion = "0.10.2"
+val pureConfigVersion = "0.11.0"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
-val refinedVersion = "0.9.5"
+val refinedVersion = "0.9.7"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
@@ -33,14 +33,14 @@ libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
-val doobieVersion = "0.6.0"
+val doobieVersion = "0.7.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.6.0"
 
-val http4sVersion = "0.20.0"
+val http4sVersion = "0.20.1"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-circe"        % http4sVersion
