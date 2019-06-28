@@ -4,8 +4,8 @@
 
 tokenRepository:
   image:
-    repository: jachro/token-repository
-    tag: '3b05cd4'
+    repository: renku/token-repository
+    tag: 'latest'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -21,8 +21,8 @@ tokenRepository:
 
 triplesGenerator:
   image:
-    repository: jachro/triples-generator
-    tag: '3b05cd4'
+    repository: renku/triples-generator
+    tag: 'latest'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -41,8 +41,8 @@ triplesGenerator:
 
 webhookService:
   image:
-    repository: jachro/webhook-service
-    tag: '3b05cd4'
+    repository: renku/webhook-service
+    tag: 'latest'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
