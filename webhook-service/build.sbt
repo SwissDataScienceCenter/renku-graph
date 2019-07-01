@@ -19,4 +19,4 @@
 name := "webhook-service"
 
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
-libraryDependencies += "io.sentry"      % "sentry-logback"  % "1.7.22"
+libraryDependencies += "io.sentry"      % "sentry-logback"  % "1.7.23"
