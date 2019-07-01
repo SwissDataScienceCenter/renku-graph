@@ -55,8 +55,8 @@ spec:
           emptyDir: {}
         {{- end }}
         - name: shiro-config
-          configMap:
-            name: jena-shiro-ini
+          secret:
+            secretName: jena-shiro-ini
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
