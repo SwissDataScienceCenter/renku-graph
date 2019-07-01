@@ -18,12 +18,8 @@
 
 package ch.datascience.triplesgenerator.init
 
-import cats.effect.IO
-
 import scala.util.Try
 
 private abstract class TryDatasetExistenceChecker extends DatasetExistenceChecker[Try]
 
 private abstract class TryDatasetExistenceCreator extends DatasetExistenceCreator[Try]
-
-abstract class IOSentryInitializer extends SentryInitializer[IO]

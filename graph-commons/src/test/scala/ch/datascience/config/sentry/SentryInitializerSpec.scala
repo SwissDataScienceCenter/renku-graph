@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.init
+package ch.datascience.config.sentry
 
 import cats.MonadError
 import cats.implicits._

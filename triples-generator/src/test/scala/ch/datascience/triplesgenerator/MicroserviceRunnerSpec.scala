@@ -23,8 +23,9 @@ import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
+import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessorRunner
-import ch.datascience.triplesgenerator.init.{IOFusekiDatasetInitializer, IOSentryInitializer}
+import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

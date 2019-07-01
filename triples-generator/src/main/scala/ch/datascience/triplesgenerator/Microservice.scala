@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
+import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
