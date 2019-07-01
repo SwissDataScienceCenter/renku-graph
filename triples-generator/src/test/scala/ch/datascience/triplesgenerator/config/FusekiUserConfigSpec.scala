@@ -34,7 +34,7 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "apply" should {
 
-    "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.renkuuser.username' and 'services.fuseki.renkuuser.password' to instantiate the FusekiUserConfig" in {
+    "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the FusekiUserConfig" in {
       forAll(fusekiUserConfigs) { userConfig =>
         val config = ConfigFactory.parseMap(
           Map(
@@ -42,7 +42,7 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
               "fuseki" -> Map(
                 "url"          -> userConfig.fusekiBaseUrl.toString,
                 "dataset-name" -> userConfig.datasetName.value,
-                "renkuuser" -> Map(
+                "renku" -> Map(
                   "username" -> userConfig.authCredentials.username.value,
                   "password" -> userConfig.authCredentials.password.value
                 ).asJava
@@ -67,7 +67,7 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
             "fuseki" -> Map(
               "url"          -> "invalid-url",
               "dataset-name" -> fusekiUserConfigs.generateOne.datasetName.value,
-              "renkuuser" -> Map(
+              "renku" -> Map(
                 "username" -> fusekiUserConfigs.generateOne.authCredentials.username.value,
                 "password" -> fusekiUserConfigs.generateOne.authCredentials.password.value
               ).asJava
@@ -88,7 +88,7 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
             "fuseki" -> Map(
               "url"          -> fusekiUserConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> "  ",
-              "renkuuser" -> Map(
+              "renku" -> Map(
                 "username" -> fusekiUserConfigs.generateOne.authCredentials.username.value,
                 "password" -> fusekiUserConfigs.generateOne.authCredentials.password.value
               ).asJava
@@ -109,7 +109,7 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
             "fuseki" -> Map(
               "url"          -> fusekiUserConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> fusekiUserConfigs.generateOne.datasetName.value,
-              "renkuuser" -> Map(
+              "renku" -> Map(
                 "username" -> "  ",
                 "password" -> fusekiUserConfigs.generateOne.authCredentials.password.value
               ).asJava
@@ -130,7 +130,7 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
             "fuseki" -> Map(
               "url"          -> fusekiUserConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> fusekiUserConfigs.generateOne.datasetName.value,
-              "admin" -> Map(
+              "renku" -> Map(
                 "username" -> fusekiUserConfigs.generateOne.authCredentials.username.value,
                 "password" -> ""
               ).asJava

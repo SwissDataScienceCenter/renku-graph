@@ -71,8 +71,8 @@ object FusekiUserConfig {
     for {
       url         <- find[Interpretation, FusekiBaseUrl]("services.fuseki.url", config)
       datasetName <- find[Interpretation, DatasetName]("services.fuseki.dataset-name", config)
-      username    <- find[Interpretation, BasicAuthUsername]("services.fuseki.renkuuser.username", config)
-      password    <- find[Interpretation, BasicAuthPassword]("services.fuseki.renkuuser.password", config)
+      username    <- find[Interpretation, BasicAuthUsername]("services.fuseki.renku.username", config)
+      password    <- find[Interpretation, BasicAuthPassword]("services.fuseki.renku.password", config)
     } yield FusekiUserConfig(url, datasetName, BasicAuthCredentials(username, password))
 }
 

@@ -60,7 +60,7 @@ jena:
     ## Admin user password
     ## Generate one using: `openssl rand -hex 16`
     password:
-  renkuuser:
+  renku:
     ## Dataset user password
     ## Generate one using: `openssl rand -hex 16`
     password:

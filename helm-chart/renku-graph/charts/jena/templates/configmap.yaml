@@ -19,7 +19,7 @@ data:
 
     [users]
     admin={{ .Values.admin.password }}
-    renkuuser={{ .Values.renkuuser.password }}
+    renku={{ .Values.renku.password }}
 
     [roles]
 
@@ -30,4 +30,4 @@ data:
 
     ## and the rest are restricted
     /$/** = authcBasic,user[admin]
-    /{{ .Values.global.graph.jena.dataset }}/** = authcBasic,user[renkuuser]
+    /{{ .Values.global.graph.jena.dataset }}/** = authcBasic,user[renku]
