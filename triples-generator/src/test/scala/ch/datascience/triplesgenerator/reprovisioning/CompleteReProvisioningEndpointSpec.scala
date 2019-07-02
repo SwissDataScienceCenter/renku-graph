@@ -20,7 +20,6 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.MonadError
 import cats.effect.{IO, Timer}
-import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
@@ -31,7 +30,6 @@ import ch.datascience.http.client.BasicAuthCredentials
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
-import com.typesafe.config.ConfigFactory
 import io.circe.Json
 import io.circe.syntax._
 import org.http4s.MediaType.application
@@ -90,53 +88,41 @@ class CompleteReProvisioningEndpointSpec extends WordSpec with MockFactory {
 
 class IOCompleteReProvisioningEndpointSpec extends WordSpec with MockFactory {
 
-  import scala.collection.JavaConverters._
   private implicit val timer: Timer[IO] = IO.timer(global)
 
   "apply" should {
 
-    "instantiate CompleteReProvisionEndpoint with basic auth credentials read from config" in {
-      val fusekiConfig = fusekiConfigs.generateOne
-      val config = ConfigFactory.parseMap(
-        Map(
-          "services" -> Map(
-            "fuseki" -> Map(
-              "username"     -> fusekiConfig.authCredentials.username.value,
-              "password"     -> fusekiConfig.authCredentials.password.value,
-              "url"          -> fusekiConfig.fusekiBaseUrl.value,
-              "dataset-name" -> fusekiConfig.datasetName.value,
-              "dataset-type" -> fusekiConfig.datasetType.value
-            ).asJava
-          ).asJava
-        ).asJava
-      )
+    "instantiate CompleteReProvisionEndpoint with admin auth credentials taken from the config" in {
+      val adminConfig = fusekiAdminConfigs.generateOne
+      val userConfig  = fusekiUserConfigs.generateOne
 
       val transactor = DbTransactor[IO, EventLogDB](null)
-      val endpoint   = IOCompleteReProvisionEndpoint(transactor, config).unsafeRunSync()
+      val endpoint = IOCompleteReProvisionEndpoint(
+        transactor,
+        IO.pure(adminConfig),
+        IO.pure(userConfig)
+      ).unsafeRunSync()
 
-      endpoint.credentials shouldBe BasicAuthCredentials(fusekiConfig.authCredentials.username,
-                                                         fusekiConfig.authCredentials.password)
+      endpoint.credentials shouldBe BasicAuthCredentials(adminConfig.authCredentials.username,
+                                                         adminConfig.authCredentials.password)
     }
 
-    "fail if fuseki config cannot be read from the config" in {
-      val fusekiConfig = fusekiConfigs.generateOne
-      val config = ConfigFactory.parseMap(
-        Map(
-          "services" -> Map(
-            "fuseki" -> Map(
-              "username"     -> fusekiConfig.authCredentials.username.value,
-              "password"     -> fusekiConfig.authCredentials.password.value,
-              "url"          -> fusekiConfig.fusekiBaseUrl.value,
-              "dataset-name" -> fusekiConfig.datasetName.value,
-              "dataset-type" -> fusekiConfig.datasetType.value
-            ).removeRandomEntry.asJava
-          ).asJava
-        ).asJava
-      )
+    "fail if fuseki config fails on reading the admin config" in {
+      val userConfig = fusekiUserConfigs.generateOne
 
       val transactor = DbTransactor[IO, EventLogDB](null)
-      intercept[ConfigLoadingException] {
-        IOCompleteReProvisionEndpoint(transactor, config).unsafeRunSync()
+      intercept[Exception] {
+        IOCompleteReProvisionEndpoint(transactor, IO.raiseError(new Exception("")), IO.pure(userConfig)).unsafeRunSync()
+      }
+    }
+
+    "fail if fuseki config fails on reading the user config" in {
+      val adminConfig = fusekiAdminConfigs.generateOne
+
+      val transactor = DbTransactor[IO, EventLogDB](null)
+      intercept[Exception] {
+        IOCompleteReProvisionEndpoint(transactor, IO.pure(adminConfig), IO.raiseError(new Exception("")))
+          .unsafeRunSync()
       }
     }
   }

@@ -21,35 +21,36 @@ package ch.datascience.triplesgenerator.init
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
-import ch.datascience.triplesgenerator.config.FusekiConfig
+import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait DatasetExistenceCreator[Interpretation[_]] {
-  def createDataset(fusekiConfig: FusekiConfig): Interpretation[Unit]
+  def createDataset(): Interpretation[Unit]
 }
 
-private class IODatasetExistenceCreator(logger: Logger[IO])(
-    implicit executionContext:                  ExecutionContext,
-    contextShift:                               ContextShift[IO],
-    timer:                                      Timer[IO]
+private class IODatasetExistenceCreator(fusekiAdminConfig: FusekiAdminConfig, logger: Logger[IO])(
+    implicit executionContext:                             ExecutionContext,
+    contextShift:                                          ContextShift[IO],
+    timer:                                                 Timer[IO]
 ) extends IORestClient(Throttler.noThrottling, logger)
     with DatasetExistenceCreator[IO] {
 
   import cats.effect._
+  import fusekiAdminConfig._
   import org.http4s.Method.POST
   import org.http4s._
   import org.http4s.dsl.io._
 
-  override def createDataset(fusekiConfig: FusekiConfig): IO[Unit] =
+  override def createDataset(): IO[Unit] =
     for {
-      uri    <- validateUri(s"${fusekiConfig.fusekiBaseUrl}/$$/datasets")
-      result <- send(postRequest(uri, fusekiConfig))(mapResponse)
+      uri    <- validateUri(s"$fusekiBaseUrl/$$/datasets")
+      result <- send(postRequest(uri, fusekiAdminConfig))(mapResponse)
     } yield result
 
-  private def postRequest(uri: Uri, fusekiConfig: FusekiConfig): Request[IO] =
+  private def postRequest(uri: Uri, fusekiConfig: FusekiAdminConfig): Request[IO] =
     request(POST, uri, fusekiConfig.authCredentials)
       .withEntity(
         UrlForm(

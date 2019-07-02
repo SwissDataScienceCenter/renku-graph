@@ -155,7 +155,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .returning(context.pure(triples1))
 
       val exception1 = exceptions.generateOne
-      (fusekiConnector
+      (triplesUploader
         .upload(_: RDFTriples))
         .expects(triples1)
         .returning(context.raiseError(exception1))
@@ -193,7 +193,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(commit, maybeAccessToken)
         .returning(context.pure(triples))
 
-      (fusekiConnector
+      (triplesUploader
         .upload(_: RDFTriples))
         .expects(triples)
         .returning(context.unit)
@@ -261,7 +261,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     val eventsDeserialiser    = mock[TryCommitEventsDeserialiser]
     val accessTokenFinder     = mock[TryAccessTokenFinder]
     val triplesFinder         = mock[TryTriplesGenerator]
-    val fusekiConnector       = mock[TryFusekiConnector]
+    val triplesUploader       = mock[TryTriplesUploader]
     val eventLogMarkDone      = mock[TryEventLogMarkDone]
     val eventLogMarkNew       = mock[TryEventLogMarkNew]
     val eventLogMarkFailed    = mock[TryEventLogMarkFailed]
@@ -271,7 +271,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       eventsDeserialiser,
       accessTokenFinder,
       triplesFinder,
-      fusekiConnector,
+      triplesUploader,
       eventLogMarkDone,
       eventLogMarkNew,
       eventLogMarkFailed,
@@ -294,7 +294,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(commit, maybeAccessToken)
         .returning(context.pure(triples))
 
-      (fusekiConnector
+      (triplesUploader
         .upload(_: RDFTriples))
         .expects(triples)
         .returning(context.unit)
@@ -312,15 +312,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(commitEventId, status, EventMessage(exception))
         .returning(context.unit)
 
-    def logSummary(commits: NonEmptyList[Commit], triples: List[RDFTriples], uploaded: Int, failed: Int): Assertion = {
-      val totalTriplesNumber = triples.map(_.value.size()).sum
+    def logSummary(commits: NonEmptyList[Commit], triples: List[RDFTriples], uploaded: Int, failed: Int): Assertion =
       logger.logged(
         Info(
           s"${commonLogMessage(commits.head)} processed in ${elapsedTime}ms: " +
-            s"${commits.size} commits, $totalTriplesNumber triples in total, $uploaded commits uploaded, $failed commits failed"
+            s"${commits.size} commits, $uploaded commits uploaded, $failed commits failed"
         )
       )
-    }
 
     def logError(commit: Commit, exception: Exception, message: String = "failed"): Assertion =
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))

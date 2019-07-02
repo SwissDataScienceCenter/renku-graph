@@ -23,7 +23,6 @@ import cats.implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.triplesgenerator.config.{FusekiConfig, TryFusekiConfigProvider}
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators
 import ServiceTypesGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -40,13 +39,8 @@ class FusekiDatasetInitializerSpec extends WordSpec with MockFactory {
 
     "succeed if the relevant dataset exists" in new TestCase {
 
-      (fusekiConfigProvider.get _)
+      (datasetExistenceChecker.doesDatasetExists _)
         .expects()
-        .returning(context.pure(fusekiConfig))
-
-      (datasetExistenceChecker
-        .doesDatasetExists(_: FusekiConfig))
-        .expects(fusekiConfig)
         .returning(context.pure(true))
 
       datasetVerifier.run shouldBe context.unit
@@ -56,18 +50,12 @@ class FusekiDatasetInitializerSpec extends WordSpec with MockFactory {
 
     "succeed if the relevant dataset does not exist but was successfully created" in new TestCase {
 
-      (fusekiConfigProvider.get _)
+      (datasetExistenceChecker.doesDatasetExists _)
         .expects()
-        .returning(context.pure(fusekiConfig))
-
-      (datasetExistenceChecker
-        .doesDatasetExists(_: FusekiConfig))
-        .expects(fusekiConfig)
         .returning(context.pure(false))
 
-      (datasetExistenceCreator
-        .createDataset(_: FusekiConfig))
-        .expects(fusekiConfig)
+      (datasetExistenceCreator.createDataset _)
+        .expects()
         .returning(context.unit)
 
       datasetVerifier.run shouldBe context.unit
@@ -75,28 +63,11 @@ class FusekiDatasetInitializerSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Info(s"'${fusekiConfig.datasetName}' dataset created in Jena"))
     }
 
-    "fail if getting the config fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      (fusekiConfigProvider.get _)
-        .expects()
-        .returning(context.raiseError(exception))
-
-      datasetVerifier.run shouldBe context.raiseError(exception)
-
-      logger.loggedOnly(Error("Dataset initialization in Jena failed. Cannot load the config", exception))
-    }
-
     "fail if check of dataset existence fails" in new TestCase {
 
-      (fusekiConfigProvider.get _)
-        .expects()
-        .returning(context.pure(fusekiConfig))
-
       val exception = exceptions.generateOne
-      (datasetExistenceChecker
-        .doesDatasetExists(_: FusekiConfig))
-        .expects(fusekiConfig)
+      (datasetExistenceChecker.doesDatasetExists _)
+        .expects()
         .returning(context.raiseError(exception))
 
       datasetVerifier.run shouldBe context.raiseError(exception)
@@ -106,19 +77,13 @@ class FusekiDatasetInitializerSpec extends WordSpec with MockFactory {
 
     "fail if dataset creation fails" in new TestCase {
 
-      (fusekiConfigProvider.get _)
+      (datasetExistenceChecker.doesDatasetExists _)
         .expects()
-        .returning(context.pure(fusekiConfig))
-
-      (datasetExistenceChecker
-        .doesDatasetExists(_: FusekiConfig))
-        .expects(fusekiConfig)
         .returning(context.pure(false))
 
       val exception = exceptions.generateOne
-      (datasetExistenceCreator
-        .createDataset(_: FusekiConfig))
-        .expects(fusekiConfig)
+      (datasetExistenceCreator.createDataset _)
+        .expects()
         .returning(context.raiseError(exception))
 
       datasetVerifier.run shouldBe context.raiseError(exception)
@@ -130,14 +95,13 @@ class FusekiDatasetInitializerSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
-    val fusekiConfig = fusekiConfigs.generateOne
+    val fusekiConfig = fusekiAdminConfigs.generateOne
 
-    val fusekiConfigProvider    = mock[TryFusekiConfigProvider]
     val datasetExistenceChecker = mock[TryDatasetExistenceChecker]
     val datasetExistenceCreator = mock[TryDatasetExistenceCreator]
     val logger                  = TestLogger[Try]()
     val datasetVerifier = new FusekiDatasetInitializer[Try](
-      fusekiConfigProvider,
+      fusekiConfig,
       datasetExistenceChecker,
       datasetExistenceCreator,
       logger

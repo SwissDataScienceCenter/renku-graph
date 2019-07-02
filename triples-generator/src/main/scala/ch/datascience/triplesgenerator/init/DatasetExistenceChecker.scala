@@ -21,32 +21,33 @@ package ch.datascience.triplesgenerator.init
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
-import ch.datascience.triplesgenerator.config.FusekiConfig
+import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait DatasetExistenceChecker[Interpretation[_]] {
-  def doesDatasetExists(fusekiConfig: FusekiConfig): Interpretation[Boolean]
+  def doesDatasetExists(): Interpretation[Boolean]
 }
 
-private class IODatasetExistenceChecker(logger: Logger[IO])(
-    implicit executionContext:                  ExecutionContext,
-    contextShift:                               ContextShift[IO],
-    timer:                                      Timer[IO]
+private class IODatasetExistenceChecker(fusekiAdminConfig: FusekiAdminConfig, logger: Logger[IO])(
+    implicit executionContext:                             ExecutionContext,
+    contextShift:                                          ContextShift[IO],
+    timer:                                                 Timer[IO]
 ) extends IORestClient(Throttler.noThrottling, logger)
     with DatasetExistenceChecker[IO] {
 
   import cats.effect._
+  import fusekiAdminConfig._
   import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.dsl.io._
 
-  override def doesDatasetExists(fusekiConfig: FusekiConfig): IO[Boolean] =
+  override def doesDatasetExists(): IO[Boolean] =
     for {
-      uri    <- validateUri(s"${fusekiConfig.fusekiBaseUrl}/$$/datasets/${fusekiConfig.datasetName}")
-      result <- send(request(GET, uri, fusekiConfig.authCredentials))(mapResponse)
+      uri    <- validateUri(s"$fusekiBaseUrl/$$/datasets/$datasetName")
+      result <- send(request(GET, uri, fusekiAdminConfig.authCredentials))(mapResponse)
     } yield result
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Boolean]] = {
