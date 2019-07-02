@@ -36,9 +36,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   this: Suite =>
 
   private val fusekiServerPort = 3030
-  private val rdfStoreConfig = RDFStoreConfig(
-    FusekiBaseUrl(s"http://localhost:$fusekiServerPort"),
-    datasetNames.generateOne
+  private val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
+    fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
   )
   import rdfStoreConfig._
   private lazy val renkuDataSet = DatasetFactory.createTxnMem()

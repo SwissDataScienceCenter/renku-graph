@@ -22,6 +22,7 @@ import RDFStoreConfig._
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ConfigLoader
+import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -31,13 +32,15 @@ import pureconfig.error.CannotConvert
 import scala.language.higherKinds
 
 final case class RDFStoreConfig(
-    fusekiBaseUrl: FusekiBaseUrl,
-    datasetName:   DatasetName
+    fusekiBaseUrl:   FusekiBaseUrl,
+    datasetName:     DatasetName,
+    authCredentials: BasicAuthCredentials
 )
 
 object RDFStoreConfig {
 
   import ConfigLoader._
+  import ch.datascience.http.client.BasicAuthConfigReaders._
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load()
@@ -45,7 +48,9 @@ object RDFStoreConfig {
     for {
       url         <- find[Interpretation, FusekiBaseUrl]("services.fuseki.url", config)
       datasetName <- find[Interpretation, DatasetName]("services.fuseki.dataset-name", config)
-    } yield RDFStoreConfig(url, datasetName)
+      username    <- find[Interpretation, BasicAuthUsername]("services.fuseki.renku.username", config)
+      password    <- find[Interpretation, BasicAuthPassword]("services.fuseki.renku.password", config)
+    } yield RDFStoreConfig(url, datasetName, BasicAuthCredentials(username, password))
 
   final class FusekiBaseUrl private (val value: String) extends AnyVal with TinyType[String]
   object FusekiBaseUrl

@@ -27,7 +27,7 @@ import ch.datascience.graphservice.graphql.lineage.QueryFields.FilePath
 import ch.datascience.graphservice.graphql.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.graphservice.graphql.lineage.model._
 import ch.datascience.graphservice.rdfstore.RDFStoreConfig
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.{BasicAuthCredentials, IORestClient}
 import ch.datascience.http.client.IORestClient.validateUri
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -46,6 +46,7 @@ trait LineageFinder[Interpretation[_]] {
 
 class IOLineageFinder(
     sparqlEndpoint:          Uri,
+    userCredentials:         BasicAuthCredentials,
     renkuBaseUrl:            RenkuBaseUrl,
     executionTimeRecorder:   ExecutionTimeRecorder[IO],
     logger:                  Logger[IO]
@@ -58,7 +59,7 @@ class IOLineageFinder(
   import org.http4s.MediaType.application
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
-  import org.http4s.dsl.io.Ok
+  import org.http4s.Status.Ok
   import org.http4s.headers._
   import org.http4s.{Request, Response, Status}
 
@@ -73,7 +74,7 @@ class IOLineageFinder(
     } flatMap logExecutionTime(projectPath, maybeCommitId, maybeFilePath)
 
   private def queryRequest(projectPath: ProjectPath, maybeCommitId: Option[CommitId], maybeFilePath: Option[FilePath]) =
-    request(POST, sparqlEndpoint)
+    request(POST, sparqlEndpoint, userCredentials)
       .withEntity(s"query=${Query.create(projectPath, maybeCommitId, maybeFilePath)}")
       .putHeaders(`Content-Type`(`x-www-form-urlencoded`), Accept(application.json))
 
@@ -202,19 +203,24 @@ class IOLineageFinder(
 
 object IOLineageFinder {
 
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[LineageFinder[IO]] =
+  def apply(
+      rdfStoreConfig:          IO[RDFStoreConfig] = RDFStoreConfig[IO](),
+      renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+      logger:                  Logger[IO] = ApplicationLogger
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[LineageFinder[IO]] =
     for {
-      config         <- RDFStoreConfig[IO]()
+      config         <- rdfStoreConfig
       sparqlEndpoint <- validateUri(s"${config.fusekiBaseUrl}/${config.datasetName}/sparql")
-      renkuBaseUrl   <- RenkuBaseUrl[IO]()
+      renkuBaseUrl   <- renkuBaseUrl
     } yield
       new IOLineageFinder(
         sparqlEndpoint,
+        config.authCredentials,
         renkuBaseUrl,
         new ExecutionTimeRecorder[IO],
-        ApplicationLogger
+        logger
       )
 
   import io.circe.{Decoder, DecodingFailure, HCursor}

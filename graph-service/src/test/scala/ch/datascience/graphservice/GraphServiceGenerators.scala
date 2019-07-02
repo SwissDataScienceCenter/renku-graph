@@ -16,22 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.graphservice.rdfstore
+package ch.datascience.graphservice
 
-import ch.datascience.generators.CommonGraphGenerators.basicAuthCredentials
-import ch.datascience.generators.Generators.{httpUrls, nonEmptyStrings}
+import ch.datascience.generators.Generators._
+import ch.datascience.graphservice.config.RenkuBaseUrl
 import org.scalacheck.Gen
 
-object RDFStoreGenerators {
-
-  import RDFStoreConfig._
-
-  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls map FusekiBaseUrl.apply
-  implicit val datasetNames:   Gen[DatasetName]   = nonEmptyStrings() map DatasetName.apply
-
-  implicit val rdfStoreConfigs: Gen[RDFStoreConfig] = for {
-    fusekiUrl       <- fusekiBaseUrls
-    datasetName     <- datasetNames
-    authCredentials <- basicAuthCredentials
-  } yield RDFStoreConfig(fusekiUrl, datasetName, authCredentials)
+object GraphServiceGenerators {
+  val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls map RenkuBaseUrl.apply
 }

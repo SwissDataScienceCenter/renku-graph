@@ -27,22 +27,22 @@ import ch.datascience.graphservice.config.RenkuBaseUrl
 import ch.datascience.graphservice.graphql.lineage.QueryFields.FilePath
 import ch.datascience.graphservice.graphql.lineage.model._
 import ch.datascience.graphservice.rdfstore.InMemoryRdfStore
+import ch.datascience.graphservice.rdfstore.RDFStoreConfig.FusekiBaseUrl
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.stubbing.ExternalServiceStubbing
+import com.github.tomakehurst.wiremock.client.WireMock._
+import org.http4s.Status
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore {
-
-  private val renkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
-  private val projectPath  = ProjectPath("kuba/zurich-bikes")
-  private val testData     = new TestData(renkuBaseUrl)
+class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalServiceStubbing {
 
   "findLineage" should {
 
-    "return the whole lineage of the given project" in new TestCase {
+    "return the whole lineage of the given project" in new InMemoryStoreTestCase {
       loadToStore(testData.triples(projectPath))
 
       lineageFinder
@@ -72,7 +72,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore {
       )
     }
 
-    "return the lineage of the given project for a given commit id" in new TestCase {
+    "return the lineage of the given project for a given commit id" in new InMemoryStoreTestCase {
       loadToStore(testData.triples(projectPath))
 
       lineageFinder
@@ -100,7 +100,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore {
       )
     }
 
-    "return the lineage of the given project for a given commit id and file path" in new TestCase {
+    "return the lineage of the given project for a given commit id and file path" in new InMemoryStoreTestCase {
       loadToStore(testData.triples(projectPath))
 
       lineageFinder
@@ -128,20 +128,88 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore {
       )
     }
 
-    "return None if there's no lineage for the project" in new TestCase {
+    "return None if there's no lineage for the project" in new InMemoryStoreTestCase {
       lineageFinder
         .findLineage(projectPath, maybeCommitId = None, maybeFilePath = None)
         .unsafeRunSync() shouldBe None
+    }
+
+    "use Basic Authorization when calling the RDF store" in new MockedTestCase {
+      import io.circe.literal._
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/sparql")
+          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+          .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
+          .withHeader("accept", equalTo("application/json"))
+          .withRequestBody(containing("query="))
+          .willReturn(okJson(json"""{"results": {"bindings": []}}""".noSpaces))
+      }
+
+      lineageFinder
+        .findLineage(projectPath, None, None)
+        .unsafeRunSync() shouldBe None
+    }
+
+    "fail if remote responds with status different than OK" in new MockedTestCase {
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/sparql")
+          .willReturn(unauthorized().withBody("some error"))
+      }
+
+      intercept[Exception] {
+        lineageFinder
+          .findLineage(projectPath, None, None)
+          .unsafeRunSync()
+      }.getMessage shouldBe s"POST ${rdfStoreConfig.fusekiBaseUrl}/${rdfStoreConfig.datasetName}/sparql returned ${Status.Unauthorized}; body: some error"
+    }
+
+    "fail if remote responds with unrecognized body" in new MockedTestCase {
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/sparql")
+          .willReturn(okJson("{}"))
+      }
+
+      intercept[Exception] {
+        lineageFinder
+          .findLineage(projectPath, None, None)
+          .unsafeRunSync()
+      }.getMessage shouldBe s"POST ${rdfStoreConfig.fusekiBaseUrl}/${rdfStoreConfig.datasetName}/sparql returned ${Status.Ok}; " +
+        "error: Invalid message body: Could not decode JSON: {}"
     }
   }
 
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
-  private trait TestCase {
+  private trait InMemoryStoreTestCase {
+    import ch.datascience.generators.CommonGraphGenerators.basicAuthCredentials
+
+    val renkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
+    val projectPath  = ProjectPath("kuba/zurich-bikes")
+    val testData     = new TestData(renkuBaseUrl)
+
     val lineageFinder = new IOLineageFinder(sparqlEndpoint,
+                                            basicAuthCredentials.generateOne,
                                             renkuBaseUrl,
                                             TestExecutionTimeRecorder[IO](elapsedTimes.generateOne),
                                             TestLogger())
+  }
+
+  private trait MockedTestCase {
+    import ch.datascience.graph.model.events.EventsGenerators._
+    import ch.datascience.graphservice.GraphServiceGenerators._
+    import ch.datascience.graphservice.rdfstore.RDFStoreGenerators._
+
+    val renkuBaseUrl = renkuBaseUrls.generateOne
+    val projectPath  = projectPaths.generateOne
+
+    val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
+      fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
+    )
+    val lineageFinder = IOLineageFinder(
+      IO.pure(rdfStoreConfig),
+      IO.pure(renkuBaseUrl),
+      TestLogger()
+    ).unsafeRunSync()
   }
 }

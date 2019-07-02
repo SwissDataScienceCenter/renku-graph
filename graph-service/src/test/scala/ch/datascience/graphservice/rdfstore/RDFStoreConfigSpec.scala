@@ -21,7 +21,9 @@ package ch.datascience.graphservice.rdfstore
 import RDFStoreGenerators._
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
+import ch.datascience.generators.CommonGraphGenerators.basicAuthCredentials
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -34,14 +36,19 @@ class RDFStoreConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "get" should {
 
-    "read 'services.fuseki.url', 'services.fuseki.dataset-name' to instantiate the RDFStoreConfig" in {
+    "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' " +
+      "to instantiate the RDFStoreConfig" in {
       forAll(rdfStoreConfigs) { fusekiConfig =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
               "fuseki" -> Map(
                 "url"          -> fusekiConfig.fusekiBaseUrl.toString,
-                "dataset-name" -> fusekiConfig.datasetName.value
+                "dataset-name" -> fusekiConfig.datasetName.value,
+                "renku" -> Map(
+                  "username" -> fusekiConfig.authCredentials.username.value,
+                  "password" -> fusekiConfig.authCredentials.password.value
+                ).asJava
               ).asJava
             ).asJava
           ).asJava
@@ -49,8 +56,9 @@ class RDFStoreConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
 
         val Success(actual) = RDFStoreConfig[Try](config)
 
-        actual.fusekiBaseUrl shouldBe fusekiConfig.fusekiBaseUrl
-        actual.datasetName   shouldBe fusekiConfig.datasetName
+        actual.fusekiBaseUrl   shouldBe fusekiConfig.fusekiBaseUrl
+        actual.datasetName     shouldBe fusekiConfig.datasetName
+        actual.authCredentials shouldBe fusekiConfig.authCredentials
       }
     }
 
@@ -60,7 +68,11 @@ class RDFStoreConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
           "services" -> Map(
             "fuseki" -> Map(
               "url"          -> "invalid-url",
-              "dataset-name" -> rdfStoreConfigs.generateOne.datasetName.value
+              "dataset-name" -> datasetNames.generateOne.value,
+              "renku" -> Map(
+                "username" -> basicAuthCredentials.generateOne.username.value,
+                "password" -> basicAuthCredentials.generateOne.password.value
+              ).asJava
             ).asJava
           ).asJava
         ).asJava
@@ -76,8 +88,54 @@ class RDFStoreConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url"          -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
-              "dataset-name" -> "  "
+              "url"          -> fusekiBaseUrls.generateOne.value,
+              "dataset-name" -> blankStrings().generateOne,
+              "renku" -> Map(
+                "username" -> basicAuthCredentials.generateOne.username.value,
+                "password" -> basicAuthCredentials.generateOne.password.value
+              ).asJava
+            ).asJava
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = RDFStoreConfig[Try](config)
+
+      exception shouldBe an[ConfigLoadingException]
+    }
+
+    "fail if renku.username is blank" in {
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "fuseki" -> Map(
+              "url"          -> fusekiBaseUrls.generateOne.value,
+              "dataset-name" -> datasetNames.generateOne.value,
+              "renku" -> Map(
+                "username" -> blankStrings().generateOne,
+                "password" -> basicAuthCredentials.generateOne.password.value
+              ).asJava
+            ).asJava
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = RDFStoreConfig[Try](config)
+
+      exception shouldBe an[ConfigLoadingException]
+    }
+
+    "fail if renku.password is blank" in {
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "fuseki" -> Map(
+              "url"          -> fusekiBaseUrls.generateOne.value,
+              "dataset-name" -> datasetNames.generateOne.value,
+              "renku" -> Map(
+                "username" -> basicAuthCredentials.generateOne.username.value,
+                "password" -> blankStrings().generateOne
+              ).asJava
             ).asJava
           ).asJava
         ).asJava

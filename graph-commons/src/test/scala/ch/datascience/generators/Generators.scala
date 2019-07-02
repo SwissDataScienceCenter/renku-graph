@@ -26,7 +26,7 @@ import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.numeric.{NonNegative, Positive}
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
@@ -45,6 +45,12 @@ object Generators {
       chars  <- listOfN(length, alphaChar)
     } yield chars.mkString("")
   }
+
+  def blankStrings(maxLength: Int Refined NonNegative = 10): Gen[String] =
+    for {
+      length <- choose(0, maxLength.value)
+      chars  <- listOfN(length, const(" "))
+    } yield chars.mkString("")
 
   def nonEmptyStringsList(minElements: Int Refined Positive = 1,
                           maxElements: Int Refined Positive = 5): Gen[List[String]] =
