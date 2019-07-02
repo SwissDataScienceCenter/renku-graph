@@ -43,7 +43,7 @@ class JenaReProvisioningSpec extends FeatureSpec with GivenWhenThen with GraphSe
 
       When("user does DELETE triples-generator/triples/projects")
       triplesGeneratorClient
-        .DELETE("triples/projects", BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("jenaadmin")))
+        .DELETE("triples/projects", BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("adminpass")))
         .status shouldBe Accepted
 
       Then("all the triples should be deleted")

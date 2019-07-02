@@ -3,7 +3,9 @@
 # Edit at https://www.gitignore.io/?templates=sbt,scala,intellij+all
 
 # Metals
+.bloop
 .metals
+project/.bloop
 
 ### Intellij+all ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and WebStorm
