@@ -81,4 +81,8 @@ object GraphServices {
   val tokenRepositoryClient  = TokenRepositoryClient()
 
   private val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
+
+  sys.addShutdownHook {
+    servicesRunner.stopAllServices()
+  }
 }

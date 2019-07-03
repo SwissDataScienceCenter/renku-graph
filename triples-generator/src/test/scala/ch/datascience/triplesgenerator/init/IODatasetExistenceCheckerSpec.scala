@@ -44,7 +44,7 @@ class IODatasetExistenceCheckerSpec extends WordSpec with ExternalServiceStubbin
           .willReturn(ok())
       }
 
-      datasetExistenceChecker.doesDatasetExists(fusekiConfig).unsafeRunSync() shouldBe true
+      datasetExistenceChecker.doesDatasetExists().unsafeRunSync() shouldBe true
     }
 
     "return false if client responds with NOT_FOUND" in new TestCase {
@@ -55,7 +55,7 @@ class IODatasetExistenceCheckerSpec extends WordSpec with ExternalServiceStubbin
           .willReturn(notFound())
       }
 
-      datasetExistenceChecker.doesDatasetExists(fusekiConfig).unsafeRunSync() shouldBe false
+      datasetExistenceChecker.doesDatasetExists().unsafeRunSync() shouldBe false
     }
 
     "fail if client responds with neither OK nor NOT_FOUND" in new TestCase {
@@ -67,7 +67,7 @@ class IODatasetExistenceCheckerSpec extends WordSpec with ExternalServiceStubbin
       }
 
       intercept[Exception] {
-        datasetExistenceChecker.doesDatasetExists(fusekiConfig).unsafeRunSync()
+        datasetExistenceChecker.doesDatasetExists().unsafeRunSync()
       }.getMessage shouldBe s"GET $fusekiBaseUrl/$$/datasets/${fusekiConfig.datasetName} returned ${Status.Unauthorized}; body: some message"
     }
   }
@@ -77,8 +77,8 @@ class IODatasetExistenceCheckerSpec extends WordSpec with ExternalServiceStubbin
 
   private trait TestCase {
     val fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
-    val fusekiConfig  = fusekiConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
+    val fusekiConfig  = fusekiAdminConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
 
-    val datasetExistenceChecker = new IODatasetExistenceChecker(TestLogger())
+    val datasetExistenceChecker = new IODatasetExistenceChecker(fusekiConfig, TestLogger())
   }
 }

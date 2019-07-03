@@ -31,8 +31,7 @@ import ch.datascience.dbeventlog.commands.IOEventLogMarkAllNew
 import ch.datascience.http.client.BasicAuthCredentials
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.triplesgenerator.config.FusekiConfigProvider
-import com.typesafe.config.{Config, ConfigFactory}
+import ch.datascience.triplesgenerator.config.{FusekiAdminConfig, FusekiUserConfig}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
 import org.http4s.{BasicCredentials, Request, Response}
@@ -76,17 +75,20 @@ class CompleteReProvisioningEndpoint[Interpretation[_]](
 
 object IOCompleteReProvisionEndpoint extends ConfigLoader[IO] {
 
-  def apply(transactor:          DbTransactor[IO, EventLogDB], config: Config = ConfigFactory.load())(
+  def apply(transactor:          DbTransactor[IO, EventLogDB],
+            fusekiAdminConfig:   IO[FusekiAdminConfig] = FusekiAdminConfig[IO](),
+            fusekiUserConfig:    IO[FusekiUserConfig] = FusekiUserConfig[IO]())(
       implicit executionContext: ExecutionContext,
       contextShift:              ContextShift[IO],
       timer:                     Timer[IO]
   ): IO[CompleteReProvisioningEndpoint[IO]] =
     for {
-      fusekiConfig     <- new FusekiConfigProvider[IO](config).get
-      datasetTruncator <- IODatasetTruncator(fusekiConfig, ApplicationLogger)
+      adminConfig      <- fusekiAdminConfig
+      userConfig       <- fusekiUserConfig
+      datasetTruncator <- IODatasetTruncator(userConfig, ApplicationLogger)
     } yield
       new CompleteReProvisioningEndpoint(
-        credentials   = fusekiConfig.authCredentials,
+        credentials   = adminConfig.authCredentials,
         reProvisioner = new ReProvisioner[IO](datasetTruncator, new IOEventLogMarkAllNew(transactor))
       )
 }

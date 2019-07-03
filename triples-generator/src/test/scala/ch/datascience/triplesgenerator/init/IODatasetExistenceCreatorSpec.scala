@@ -46,7 +46,7 @@ class IODatasetExistenceCreatorSpec extends WordSpec with ExternalServiceStubbin
           .willReturn(ok())
       }
 
-      datasetExistenceCreator.createDataset(fusekiConfig).unsafeRunSync() shouldBe ((): Unit)
+      datasetExistenceCreator.createDataset().unsafeRunSync() shouldBe ((): Unit)
     }
 
     "fail if POST /$/datasets returns status different than OK" in new TestCase {
@@ -57,7 +57,7 @@ class IODatasetExistenceCreatorSpec extends WordSpec with ExternalServiceStubbin
       }
 
       intercept[Exception] {
-        datasetExistenceCreator.createDataset(fusekiConfig).unsafeRunSync()
+        datasetExistenceCreator.createDataset().unsafeRunSync()
       }.getMessage shouldBe s"POST $fusekiBaseUrl/$$/datasets returned ${Status.Unauthorized}; body: some message"
     }
   }
@@ -67,8 +67,8 @@ class IODatasetExistenceCreatorSpec extends WordSpec with ExternalServiceStubbin
 
   private trait TestCase {
     val fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
-    val fusekiConfig  = fusekiConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
+    val fusekiConfig  = fusekiAdminConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
 
-    val datasetExistenceCreator = new IODatasetExistenceCreator(TestLogger())
+    val datasetExistenceCreator = new IODatasetExistenceCreator(fusekiConfig, TestLogger())
   }
 }

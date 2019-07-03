@@ -18,8 +18,24 @@
 
 package ch.datascience.triplesgenerator.init
 
+import cats.effect.IO
+import ch.datascience.triplesgenerator.config.FusekiAdminConfig
+import io.chrisdavenport.log4cats.Logger
+
 import scala.util.Try
 
 private abstract class TryDatasetExistenceChecker extends DatasetExistenceChecker[Try]
 
 private abstract class TryDatasetExistenceCreator extends DatasetExistenceCreator[Try]
+
+class IOFusekiDatasetInitializer(
+    fusekiAdminConfig:       FusekiAdminConfig,
+    datasetExistenceChecker: DatasetExistenceChecker[IO],
+    datasetExistenceCreator: DatasetExistenceCreator[IO],
+    logger:                  Logger[IO]
+) extends FusekiDatasetInitializer[IO](
+      fusekiAdminConfig,
+      datasetExistenceChecker,
+      datasetExistenceCreator,
+      logger
+    )

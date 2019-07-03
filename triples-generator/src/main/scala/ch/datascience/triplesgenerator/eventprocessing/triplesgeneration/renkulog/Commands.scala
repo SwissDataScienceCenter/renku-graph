@@ -18,15 +18,13 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
-import java.io.{ByteArrayInputStream, InputStream}
-
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 
 import scala.concurrent.ExecutionContext
@@ -108,32 +106,32 @@ private object Commands {
     def log[T <: Commit](
         commit:                 T,
         destinationDirectory:   Path
-    )(implicit generateTriples: (T, Path) => CommandResult): IO[InputStream] =
+    )(implicit generateTriples: (T, Path) => CommandResult): IO[RDFTriples] =
       IO.race(
           call(generateTriples(commit, destinationDirectory)),
           timer.sleep(timeout)
         )
         .flatMap {
-          case Left(triplesStream) => IO.pure(triplesStream)
-          case Right(_)            => timeoutExceededError(commit)
+          case Left(rdfTriples) => IO.pure(rdfTriples)
+          case Right(_)         => timeoutExceededError(commit)
         }
 
-    private def timeoutExceededError(commit: Commit): IO[InputStream] = ME.raiseError {
+    private def timeoutExceededError(commit: Commit): IO[RDFTriples] = ME.raiseError {
       new Exception(
         s"'renku log' execution for commit: ${commit.id}, project: ${commit.project.id} took longer than $timeout - terminating"
       )
     }
 
     private def call(generateTriples: => CommandResult) =
-      IO.cancelable[InputStream] { callback =>
+      IO.cancelable[RDFTriples] { callback =>
         executionContext.execute { () =>
           {
-            Try {
-              callback(Right(generateTriples.out.toInputStream))
-            } recover {
-              case NonFatal(exception) => callback(Left(exception))
-            }
-          } fold (throw _, identity)
+            for {
+              triplesAsString <- Try(generateTriples.out.string.trim)
+              wrappedTriples  <- RDFTriples.from(triplesAsString).toTry
+            } yield callback(Right(wrappedTriples))
+          }.recover { case NonFatal(exception) => callback(Left(exception)) }
+            .fold(throw _, identity)
         }
         IO.unit
       }
@@ -161,11 +159,6 @@ private object Commands {
           s"${commit.parentId}..${commit.id}",
           changedFiles
         )(destinationDirectory)
-    }
-
-    private implicit class StreamValueOps(streamValue: StreamValue) {
-      lazy val toInputStream: InputStream =
-        new ByteArrayInputStream(streamValue.string.trim.getBytes)
     }
   }
 }

@@ -23,25 +23,30 @@ import ch.datascience.generators.Generators._
 import ch.datascience.triplesgenerator.config.DatasetType.{Mem, TDB}
 import ch.datascience.triplesgenerator.config._
 import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
-import org.apache.jena.rdf.model.ModelFactory
 import org.scalacheck.Gen
 
 object ServiceTypesGenerators {
 
   implicit val rdfTriplesSets: Gen[RDFTriples] = for {
-    model     <- Gen.uuid.map(_ => ModelFactory.createDefaultModel())
-    subject   <- nonEmptyStrings() map model.createResource
-    predicate <- nonEmptyStrings() map model.createProperty
-  } yield {
-    val `object` = model.createResource
-    model.add(subject, predicate, `object`)
-    RDFTriples(model)
-  }
+    subject <- nonEmptyStrings()
+    obj     <- nonEmptyStrings()
+  } yield
+    RDFTriples {
+      <rdf:Description rdf:about={subject}>
+        <rdfs:label>{obj}</rdfs:label>
+      </rdf:Description>.toString()
+    }
 
-  implicit val fusekiConfigs: Gen[FusekiConfig] = for {
+  implicit val fusekiAdminConfigs: Gen[FusekiAdminConfig] = for {
     fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
     datasetName     <- nonEmptyStrings() map DatasetName.apply
     datasetType     <- Gen.oneOf(Mem, TDB)
     authCredentials <- basicAuthCredentials
-  } yield FusekiConfig(fusekiUrl, datasetName, datasetType, authCredentials)
+  } yield FusekiAdminConfig(fusekiUrl, datasetName, datasetType, authCredentials)
+
+  implicit val fusekiUserConfigs: Gen[FusekiUserConfig] = for {
+    fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
+    datasetName     <- nonEmptyStrings() map DatasetName.apply
+    authCredentials <- basicAuthCredentials
+  } yield FusekiUserConfig(fusekiUrl, datasetName, authCredentials)
 }

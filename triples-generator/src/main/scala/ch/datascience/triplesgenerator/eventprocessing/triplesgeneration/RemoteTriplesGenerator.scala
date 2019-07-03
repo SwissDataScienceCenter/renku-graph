@@ -18,8 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration
 
-import java.io.{ByteArrayInputStream, InputStream}
-
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ConfigLoader
 import ch.datascience.control.Throttler
@@ -30,7 +28,6 @@ import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
 import com.typesafe.config.Config
 import io.chrisdavenport.log4cats.Logger
-import org.apache.jena.rdf.model.ModelFactory
 
 import scala.concurrent.ExecutionContext
 
@@ -52,7 +49,6 @@ object RemoteTriplesGenerator extends ConfigLoader[IO] {
 class RemoteTriplesGenerator(
     serviceUrl:              TriplesGenerationServiceUrl,
     logger:                  Logger[IO],
-    toRdfTriples:            InputStream => RDFTriples = stream => RDFTriples(ModelFactory.createDefaultModel.read(stream, ""))
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient[RemoteTriplesGenerator](Throttler.noThrottling, logger)
     with TriplesGenerator[IO] {
@@ -68,7 +64,7 @@ class RemoteTriplesGenerator(
     for {
       uri             <- validateUri(s"$serviceUrl/projects/${commit.project.id}/commits/${commit.id}")
       triplesAsString <- send(request(GET, uri))(mapResponse)
-      triples         <- IO(toRdfTriples(new ByteArrayInputStream(triplesAsString.getBytes)))
+      triples         <- IO.fromEither(RDFTriples.from(triplesAsString))
     } yield triples
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[String]] = {

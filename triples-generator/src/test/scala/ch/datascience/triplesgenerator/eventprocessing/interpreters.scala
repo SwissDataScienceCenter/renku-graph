@@ -31,7 +31,7 @@ import scala.util.Try
 private class TryCommitEventsDeserialiser   extends CommitEventsDeserialiser[Try]
 private abstract class TryAccessTokenFinder extends AccessTokenFinder[Try]
 private abstract class TryTriplesGenerator  extends TriplesGenerator[Try]
-private abstract class TryFusekiConnector   extends FusekiConnector[Try]
+private abstract class TryTriplesUploader   extends TriplesUploader[Try]
 private abstract class TryEventLogMarkDone(
     transactor: DbTransactor[Try, EventLogDB]
 )(implicit ME:  Bracket[Try, Throwable])

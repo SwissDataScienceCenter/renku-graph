@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.client.{BasicAuthCredentials, IORestClient}
-import ch.datascience.triplesgenerator.config.FusekiConfig
+import ch.datascience.triplesgenerator.config.FusekiUserConfig
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Uri
 
@@ -67,14 +67,12 @@ private object IODatasetTruncator {
   import IORestClient._
 
   def apply(
-      fusekiConfig:            FusekiConfig,
+      fusekiUserConfig:        FusekiUserConfig,
       logger:                  Logger[IO]
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[DatasetTruncator[IO]] = {
-    import fusekiConfig._
+    timer:                     Timer[IO]): IO[DatasetTruncator[IO]] =
     for {
-      uri <- validateUri(s"$fusekiBaseUrl/$datasetName/update")
-    } yield new IODatasetTruncator(uri, authCredentials, logger)
-  }
+      uri <- validateUri(s"${fusekiUserConfig.fusekiBaseUrl}/${fusekiUserConfig.datasetName}/update")
+    } yield new IODatasetTruncator(uri, fusekiUserConfig.authCredentials, logger)
 }

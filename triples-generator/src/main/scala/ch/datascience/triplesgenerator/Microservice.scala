@@ -55,14 +55,16 @@ object Microservice extends IOApp {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
-        triplesGenerator <- new TriplesGeneratorProvider().get
+        fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
+        triplesGenerator         <- new TriplesGeneratorProvider().get
+        commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator)
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
-                                 .withEventsProcessor(new IOCommitEventProcessor(transactor, triplesGenerator))
+                                 .withEventsProcessor(commitEventProcessor)
         completeReProvisionEndpoint <- IOCompleteReProvisionEndpoint(transactor)
         exitCode <- new MicroserviceRunner(
                      new SentryInitializer[IO],
                      new IOEventLogDbInitializer(transactor),
-                     new IOFusekiDatasetInitializer,
+                     fusekiDatasetInitializer,
                      eventProcessorRunner,
                      new HttpServer[IO](serverPort    = 9002,
                                         serviceRoutes = new MicroserviceRoutes[IO](completeReProvisionEndpoint).routes)

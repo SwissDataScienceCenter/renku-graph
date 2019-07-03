@@ -18,9 +18,12 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
+import java.util.concurrent.ConcurrentHashMap
+
 import cats.effect._
 import cats.effect.concurrent.Semaphore
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
 final case class ServiceRun(service:          IOApp,
@@ -45,6 +48,8 @@ class ServicesRunner(
       _ <- semaphore.release
     } yield ()
 
+  private val cancelTokens = new ConcurrentHashMap[CancelToken[IO], Unit]()
+
   private def start(
       serviceRun:              ServiceRun
   )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]): IO[Unit] = {
@@ -54,7 +59,7 @@ class ServicesRunner(
       case _ =>
         for {
           _ <- preServiceStart.sequence
-          _ = IO(service.main(Array.empty)).start.unsafeRunAsyncAndForget()
+          _ = service.run(Nil).start.map(fiber => cancelTokens.put(fiber.cancel, ())).unsafeRunAsyncAndForget()
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }
@@ -65,4 +70,6 @@ class ServicesRunner(
       case ServiceUp => serviceRun.postServiceStart.sequence map (_ => ())
       case _         => timer.sleep(500 millis) *> verifyServiceReady(serviceRun)
     }
+
+  def stopAllServices(): Unit = cancelTokens.keys.asScala.foreach(_.unsafeRunSync())
 }
