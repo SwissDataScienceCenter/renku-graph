@@ -65,8 +65,8 @@ webhookService:
 
 graphService:
   image:
-    repository: jachro/graph-service
-    tag: '3b05cd4'
+    repository: renku/graph-service
+    tag: 'latest'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
