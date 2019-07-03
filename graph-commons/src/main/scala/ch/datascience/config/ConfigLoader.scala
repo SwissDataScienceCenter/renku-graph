@@ -19,8 +19,6 @@
 package ch.datascience.config
 
 import cats.MonadError
-import cats.implicits._
-import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import com.typesafe.config.Config
 import pureconfig._
 import pureconfig.error.ConfigReaderFailures
@@ -30,17 +28,28 @@ import scala.language.higherKinds
 abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
   protected def find[T](key: String, config: Config)(implicit reader: ConfigReader[T]): Interpretation[T] =
+    ConfigLoader.find(key, config)
+}
+
+object ConfigLoader {
+
+  final class ConfigLoadingException(failures: ConfigReaderFailures) extends Exception {
+    override def getMessage: String = failures.toList.map(_.description).mkString("; ")
+  }
+
+  def find[Interpretation[_], T](
+      key:           String,
+      config:        Config
+  )(implicit reader: ConfigReader[T], ME: MonadError[Interpretation, Throwable]): Interpretation[T] =
     fromEither {
       loadConfig[T](config, key)
     }
 
-  private def fromEither[T](loadedConfig: ConfigReaderFailures Either T): Interpretation[T] = ME.fromEither[T] {
-    loadedConfig leftMap (new ConfigLoadingException(_))
-  }
-}
-
-object ConfigLoader {
-  final class ConfigLoadingException(failures: ConfigReaderFailures) extends Exception {
-    override def getMessage: String = failures.toList.map(_.description).mkString("; ")
-  }
+  private def fromEither[Interpretation[_], T](
+      loadedConfig: ConfigReaderFailures Either T
+  )(implicit ME:    MonadError[Interpretation, Throwable]): Interpretation[T] =
+    ME.fromEither[T] {
+      import cats.implicits._
+      loadedConfig leftMap (new ConfigLoadingException(_))
+    }
 }

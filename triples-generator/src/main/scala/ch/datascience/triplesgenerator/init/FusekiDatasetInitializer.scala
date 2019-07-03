@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.triplesgenerator.config.{FusekiConfig, FusekiConfigProvider}
+import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -30,7 +30,7 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class FusekiDatasetInitializer[Interpretation[_]](
-    fusekiConfigProvider:    FusekiConfigProvider[Interpretation],
+    fusekiAdminConfig:       FusekiAdminConfig,
     datasetExistenceChecker: DatasetExistenceChecker[Interpretation],
     datasetExistenceCreator: DatasetExistenceCreator[Interpretation],
     logger:                  Logger[Interpretation]
@@ -38,42 +38,42 @@ class FusekiDatasetInitializer[Interpretation[_]](
 
   import datasetExistenceChecker._
   import datasetExistenceCreator._
+  import fusekiAdminConfig._
 
   def run: Interpretation[Unit] =
     for {
-      fusekiConfig  <- fusekiConfigProvider.get recoverWith loggingError
-      datasetExists <- doesDatasetExists(fusekiConfig) recoverWith loggingError(fusekiConfig)
-      result        <- createDatasetIfNeeded(datasetExists, fusekiConfig) recoverWith loggingError(fusekiConfig)
+      datasetExists <- doesDatasetExists() recoverWith loggingError
+      result        <- createDatasetIfNeeded(datasetExists) recoverWith loggingError
     } yield result
 
-  private def createDatasetIfNeeded(datasetExists: Boolean, fusekiConfig: FusekiConfig): Interpretation[Unit] =
+  private def createDatasetIfNeeded(datasetExists: Boolean): Interpretation[Unit] =
     if (datasetExists)
-      logger.info(s"'${fusekiConfig.datasetName}' dataset exists in Jena; No action needed.")
+      logger.info(s"'$datasetName' dataset exists in Jena; No action needed.")
     else
-      createDataset(fusekiConfig).flatMap { _ =>
-        logger.info(s"'${fusekiConfig.datasetName}' dataset created in Jena")
+      createDataset() flatMap { _ =>
+        logger.info(s"'$datasetName' dataset created in Jena")
       }
 
-  private def loggingError: PartialFunction[Throwable, Interpretation[FusekiConfig]] = {
+  private def loggingError[T]: PartialFunction[Throwable, Interpretation[T]] = {
     case NonFatal(exception) =>
-      logger.error(exception)("Dataset initialization in Jena failed. Cannot load the config")
-      ME.raiseError(exception)
-  }
-
-  private def loggingError[T](fusekiConfig: FusekiConfig): PartialFunction[Throwable, Interpretation[T]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"'${fusekiConfig.datasetName}' dataset initialization in Jena failed")
+      logger.error(exception)(s"'$datasetName' dataset initialization in Jena failed")
       ME.raiseError(exception)
   }
 }
 
-class IOFusekiDatasetInitializer(
-    implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]
-) extends FusekiDatasetInitializer[IO](
-      new FusekiConfigProvider[IO](),
-      new IODatasetExistenceChecker(ApplicationLogger),
-      new IODatasetExistenceCreator(ApplicationLogger),
-      ApplicationLogger
-    )
+object IOFusekiDatasetInitializer {
+  def apply()(
+      implicit executionContext: ExecutionContext,
+      contextShift:              ContextShift[IO],
+      timer:                     Timer[IO]
+  ): IO[FusekiDatasetInitializer[IO]] =
+    for {
+      fusekiAdminConfig <- FusekiAdminConfig[IO]()
+    } yield
+      new FusekiDatasetInitializer[IO](
+        fusekiAdminConfig,
+        new IODatasetExistenceChecker(fusekiAdminConfig, ApplicationLogger),
+        new IODatasetExistenceCreator(fusekiAdminConfig, ApplicationLogger),
+        ApplicationLogger
+      )
+}

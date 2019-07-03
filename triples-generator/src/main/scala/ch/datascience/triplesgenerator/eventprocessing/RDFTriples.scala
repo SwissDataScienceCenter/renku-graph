@@ -18,9 +18,9 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
+import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import org.apache.jena.rdf.model.Model
 
-class RDFTriples private (val value: Model) extends TinyType[Model]
+class RDFTriples private (val value: String) extends AnyVal with TinyType[String]
 
-object RDFTriples extends TinyTypeFactory[Model, RDFTriples](instantiate = new RDFTriples(_))
+object RDFTriples extends TinyTypeFactory[String, RDFTriples](new RDFTriples(_)) with NonBlank

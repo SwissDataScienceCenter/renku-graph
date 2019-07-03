@@ -24,7 +24,7 @@ import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.config.FusekiBaseUrl
-import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators.fusekiConfigs
+import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators.fusekiUserConfigs
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.http4s.Status
 import org.scalatest.Matchers._
@@ -79,7 +79,7 @@ class IODatasetTruncatorSpec extends WordSpec with ExternalServiceStubbing {
 
   private trait TestCase {
     val fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
-    val fusekiConfig  = fusekiConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
+    val fusekiConfig  = fusekiUserConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
     val logger        = TestLogger[IO]()
 
     val datasetTruncator = IODatasetTruncator(fusekiConfig, logger).unsafeRunSync()

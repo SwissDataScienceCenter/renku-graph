@@ -28,7 +28,7 @@ import ch.datascience.generators.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -36,7 +36,7 @@ import scala.concurrent.duration._
 import scala.language.{postfixOps, reflectiveCalls}
 import scala.util.Try
 
-class EventsSynchronizationSchedulerSpec extends WordSpec with MockFactory with Eventually {
+class EventsSynchronizationSchedulerSpec extends WordSpec with MockFactory with Eventually with IntegrationPatience {
 
   "run" should {
 
