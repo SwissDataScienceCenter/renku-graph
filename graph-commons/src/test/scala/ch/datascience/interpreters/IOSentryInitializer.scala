@@ -19,6 +19,9 @@
 package ch.datascience.interpreters
 
 import cats.effect.IO
-import ch.datascience.config.sentry.SentryInitializer
+import ch.datascience.config.sentry.{SentryConfig, SentryInitializer}
 
-abstract class IOSentryInitializer extends SentryInitializer[IO]
+abstract class IOSentryInitializer(
+    maybeSentryConfig: Option[SentryConfig],
+    initSentry:        String => Unit
+) extends SentryInitializer[IO](maybeSentryConfig, initSentry)

@@ -18,8 +18,11 @@
 
 package ch.datascience.config.sentry
 
+import java.net.URLEncoder
+
 import cats.MonadError
 import cats.implicits._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalamock.scalatest.MockFactory
@@ -32,35 +35,31 @@ class SentryInitializerSpec extends WordSpec with MockFactory {
 
   "run" should {
 
-    "initialise Sentry and succeed if 'GRAPH_SENTRY_DSN' is non-blank and does not start with ?" in new TestCase {
-      val sentryDns = httpUrls.generateOne
-      getEnvVariable.expects("GRAPH_SENTRY_DSN").returning(Some(sentryDns))
+    "initialise Sentry with the url built from the given config if config given" in new TestCase {
+      val sentryConfig = sentryConfigs.generateOne
 
-      initSentry.expects(sentryDns)
+      initSentry.expects {
+        s"${sentryConfig.baseUrl}?" +
+          s"stacktrace.app.packages=&" +
+          s"servername=${urlEncode(sentryConfig.serviceName.toString)}&" +
+          s"environment=${urlEncode(sentryConfig.environmentName.toString)}"
+      }
 
-      sentryInitializer.run shouldBe context.unit
+      sentryInitializer(Some(sentryConfig)).run shouldBe context.unit
     }
 
-    "do nothing if 'GRAPH_SENTRY_DSN' is blank" in new TestCase {
-      getEnvVariable.expects("GRAPH_SENTRY_DSN").returning(Some("  "))
-
-      sentryInitializer.run shouldBe context.unit
-    }
-
-    "do nothing if 'GRAPH_SENTRY_DSN' starts with '?'" in new TestCase {
-      getEnvVariable.expects("GRAPH_SENTRY_DSN").returning(Some("  ?key=value"))
-
-      sentryInitializer.run shouldBe context.unit
+    "do nothing if no config given" in new TestCase {
+      val maybeConfig = None
+      sentryInitializer(maybeConfig).run shouldBe context.unit
     }
 
     "fail if Sentry initialisation fails" in new TestCase {
-      val sentryDns = httpUrls.generateOne
-      getEnvVariable.expects("GRAPH_SENTRY_DSN").returning(Some(sentryDns))
+      val sentryConfig = sentryConfigs.generateOne
 
       val exception = exceptions.generateOne
-      initSentry.expects(sentryDns).throwing(exception)
+      initSentry.expects(*).throwing(exception)
 
-      sentryInitializer.run shouldBe context.raiseError(exception)
+      sentryInitializer(Some(sentryConfig)).run shouldBe context.raiseError(exception)
     }
   }
 
@@ -68,7 +67,7 @@ class SentryInitializerSpec extends WordSpec with MockFactory {
     val context = MonadError[Try, Throwable]
 
     val initSentry        = mockFunction[String, Unit]
-    val getEnvVariable    = mockFunction[String, Option[String]]
-    val sentryInitializer = new SentryInitializer[Try](initSentry, getEnvVariable)
+    val sentryInitializer = new SentryInitializer[Try](_, initSentry)
+    val urlEncode         = URLEncoder.encode(_: String, "UTF-8")
   }
 }

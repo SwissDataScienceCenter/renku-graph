@@ -47,6 +47,27 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       (url / "path").toString shouldBe s"$url/path"
     }
   }
+
+  "?" should {
+
+    "allow to add a query parameter if there's no such a parameter already" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+      (url ? ("param" -> "value a")).toString shouldBe s"$url?param=value+a"
+    }
+  }
+
+  "&" should {
+
+    "allow to add a query parameter if there's already one" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+      ((url ? ("param1" -> "value 1")) & ("param2" -> "value 2")).toString shouldBe s"$url?param1=value+1&param2=value+2"
+    }
+
+    "allow to add a query parameter if there's more than one" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+      (url ? ("param1" -> "value 1") & ("param2" -> "value 2") & ("param3" -> "value 3")).toString shouldBe s"$url?param1=value+1&param2=value+2&param3=value+3"
+    }
+  }
 }
 
 private class UrlType private (val value: String) extends AnyVal with TinyType[String]

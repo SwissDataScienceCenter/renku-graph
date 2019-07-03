@@ -19,20 +19,40 @@
 package ch.datascience.config.sentry
 
 import cats.MonadError
-import io.sentry.Sentry
+import ch.datascience.config.sentry.SentryConfig.SentryBaseUrl
 
 import scala.language.higherKinds
-import scala.util.{Properties, Try}
+import scala.util.Try
 
 class SentryInitializer[Interpretation[_]](
-    initSentry:     String => Unit = dns => { Sentry.init(dns); () },
-    getEnvVariable: String => Option[String] = Properties.envOrNone _
-)(implicit ME:      MonadError[Interpretation, Throwable]) {
+    maybeSentryConfig: Option[SentryConfig],
+    initSentry:        String => Unit
+)(implicit ME:         MonadError[Interpretation, Throwable]) {
 
   def run: Interpretation[Unit] =
-    getEnvVariable("GRAPH_SENTRY_DSN").map(_.trim) match {
-      case Some("")                           => ME.unit
-      case Some(dsn) if !(dsn startsWith "?") => ME.fromTry(Try(initSentry(dsn)))
-      case _                                  => ME.unit
+    maybeSentryConfig.map(toDsn) match {
+      case Some(dsn) => ME.fromTry(Try(initSentry(dsn.toString)))
+      case _         => ME.unit
     }
+
+  private lazy val toDsn: SentryConfig => SentryBaseUrl = {
+    case SentryConfig(baseUrl, environmentName, serviceName) =>
+      baseUrl ? ("stacktrace.app.packages" -> "") & ("servername" -> serviceName.value) & ("environment" -> environmentName.value)
+  }
+}
+
+object SentryInitializer {
+  import cats.MonadError
+  import cats.implicits._
+  import io.sentry.Sentry
+
+  def apply[Interpretation[_]]()(
+      implicit ME: MonadError[Interpretation, Throwable]): Interpretation[SentryInitializer[Interpretation]] =
+    for {
+      maybeSentryConfig <- SentryConfig[Interpretation]()
+    } yield
+      new SentryInitializer(
+        maybeSentryConfig,
+        dns => { Sentry.init(dns); () }
+      )
 }

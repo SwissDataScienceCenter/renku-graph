@@ -18,10 +18,12 @@
 
 package ch.datascience.generators
 
+import ch.datascience.config.sentry.SentryConfig
+import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.RateLimit
-import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.generators.Generators._
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.http.client.{AccessToken, BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
+import ch.datascience.http.client._
 import org.scalacheck.Gen
 
 object CommonGraphGenerators {
@@ -55,4 +57,17 @@ object CommonGraphGenerators {
     RateLimit.from(s"$items/$unit").getOrElse {
       throw new IllegalArgumentException("Problems with rateLimits generator")
     }
+
+  private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
+    url         <- httpUrls
+    projectName <- nonEmptyList(nonEmptyStrings()).map(_.toList.mkString("."))
+    projectId   <- positiveInts(max = 100)
+  } yield SentryBaseUrl(s"$url@$projectName/$projectId")
+  private implicit val serviceNames:     Gen[ServiceName]     = nonEmptyStrings() map ServiceName.apply
+  private implicit val environmentNames: Gen[EnvironmentName] = nonEmptyStrings() map EnvironmentName.apply
+  implicit val sentryConfigs: Gen[SentryConfig] = for {
+    url             <- sentryBaseUrls
+    serviceName     <- serviceNames
+    environmentName <- environmentNames
+  } yield SentryConfig(url, environmentName, serviceName)
 }
