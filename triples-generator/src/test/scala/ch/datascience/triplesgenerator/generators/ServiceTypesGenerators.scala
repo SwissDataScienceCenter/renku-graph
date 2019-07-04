@@ -49,4 +49,9 @@ object ServiceTypesGenerators {
     datasetName     <- nonEmptyStrings() map DatasetName.apply
     authCredentials <- basicAuthCredentials
   } yield FusekiUserConfig(fusekiUrl, datasetName, authCredentials)
+
+  implicit val schemaVersions: Gen[SchemaVersion] = Gen
+    .listOfN(3, positiveInts(max = 50))
+    .map(_.mkString("."))
+    .map(SchemaVersion.apply)
 }
