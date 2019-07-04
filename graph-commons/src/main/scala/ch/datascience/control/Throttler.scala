@@ -18,6 +18,8 @@
 
 package ch.datascience.control
 
+import java.util.concurrent.TimeUnit
+
 import cats.MonadError
 import cats.effect.concurrent.{Ref, Semaphore}
 import cats.effect.{Concurrent, Timer}
@@ -34,12 +36,12 @@ trait Throttler[Interpretation[_], ThrottlingTarget] {
 final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[control] (
     rateLimit:         RateLimit,
     semaphore:         Semaphore[Interpretation],
-    workersStartTimes: Ref[Interpretation, List[BigDecimal]]
+    workersStartTimes: Ref[Interpretation, List[Long]]
 )(implicit ME:         MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
     extends Throttler[Interpretation, ThrottlingTarget] {
 
-  private val NextAttemptSleep: FiniteDuration = 100 millis
-  private val MinTimeGap = BigDecimal(rateLimit.items.value) / BigDecimal(rateLimit.per.toNanos)
+  private val MinTimeGap       = (rateLimit.per.multiplierFor(NANOSECONDS) / rateLimit.items.value).toLong
+  private val NextAttemptSleep = FiniteDuration(MinTimeGap / 10, TimeUnit.NANOSECONDS)
 
   import timer.clock
 
@@ -47,16 +49,23 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[contr
     for {
       _          <- semaphore.acquire
       startTimes <- workersStartTimes.get
-      now        <- clock.monotonic(NANOSECONDS) map (BigDecimal(_))
+      now        <- clock.monotonic(NANOSECONDS)
       _          <- verifyThroughput(startTimes, now)
     } yield ()
 
-  private def verifyThroughput(startTimes: List[BigDecimal], now: BigDecimal) = {
-    val medianStartTime = startTimes(startTimes.size / 2)
-    if (BigDecimal(startTimes.size) / (now - medianStartTime) <= MinTimeGap)
+  private def verifyThroughput(startTimes: List[Long], now: Long) =
+    if (notTooEarly(startTimes, now))
       workersStartTimes.modify(old => (startTimes :+ now) -> old) *> semaphore.release
     else
       semaphore.release *> timer.sleep(NextAttemptSleep) *> acquire
+
+  private def notTooEarly(startTimes: List[Long], now: Long): Boolean = {
+    val (_, durations) = (startTimes.tail :+ now).foldLeft(startTimes.head -> List.empty[Long]) {
+      case ((previous, durationsSoFar), current) =>
+        current -> (durationsSoFar :+ (current - previous))
+    }
+
+    durations.forall(_ >= MinTimeGap)
   }
 
   override def release: Interpretation[Unit] =
@@ -75,7 +84,7 @@ object Throttler {
     timer:       Timer[Interpretation]): Interpretation[Throttler[Interpretation, ThrottlingTarget]] =
     for {
       semaphore         <- Semaphore[Interpretation](1)
-      workersStartTimes <- timer.clock.monotonic(NANOSECONDS) flatMap (now => Ref.of(List(BigDecimal(now))))
+      workersStartTimes <- timer.clock.monotonic(NANOSECONDS) flatMap (now => Ref.of(List(now)))
     } yield new StandardThrottler[Interpretation, ThrottlingTarget](rateLimit, semaphore, workersStartTimes)
 
   def noThrottling[Interpretation[_], ThrottlingTarget](

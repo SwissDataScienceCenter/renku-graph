@@ -18,8 +18,8 @@
 
 package ch.datascience.generators
 
-import ch.datascience.control.RateLimit
-import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.control.{RateLimit, RateLimitUnit}
+import ch.datascience.generators.Generators._
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.{AccessToken, BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import org.scalacheck.Gen
@@ -49,10 +49,7 @@ object CommonGraphGenerators {
   } yield BasicAuthCredentials(username, password)
 
   implicit val rateLimits: Gen[RateLimit] = for {
-    items <- Gen.choose(1L, 50000L)
-    unit  <- Gen.oneOf("sec", "min", "hour", "day")
-  } yield
-    RateLimit.from(s"$items/$unit").getOrElse {
-      throw new IllegalArgumentException("Problems with rateLimits generator")
-    }
+    items <- positiveLongs()
+    unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
+  } yield RateLimit(items, per = unit)
 }
