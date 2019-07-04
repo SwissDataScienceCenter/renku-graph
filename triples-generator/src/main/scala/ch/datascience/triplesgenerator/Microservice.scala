@@ -26,8 +26,9 @@ import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
+import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGeneratorProvider
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.IOCompleteReProvisionEndpoint
 import pureconfig._
@@ -55,7 +56,8 @@ object Microservice extends IOApp {
     transactorResource.use { transactor =>
       for {
         fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
-        triplesGenerator         <- new TriplesGeneratorProvider().get
+        triplesGeneration        <- TriplesGeneration[IO]()
+        triplesGenerator         <- TriplesGenerator(triplesGeneration)
         commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator)
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
                                  .withEventsProcessor(commitEventProcessor)

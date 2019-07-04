@@ -19,32 +19,34 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.triplesgenerator.config.TriplesGeneration
+import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-class TriplesGeneratorProviderSpec extends WordSpec {
+class TriplesGeneratorSpec extends WordSpec {
 
-  "get" should {
+  "apply" should {
 
-    "return an instance of RenkuLogTriplesGenerator with the defaults from application.conf" in {
-      new TriplesGeneratorProvider().get.unsafeRunSync() shouldBe a[RenkuLogTriplesGenerator]
+    s"return an instance of RenkuLogTriplesGenerator if TriplesGeneration is $RenkuLog" in {
+      TriplesGenerator(TriplesGeneration.RenkuLog).unsafeRunSync() shouldBe a[RenkuLogTriplesGenerator]
     }
 
-    "return an instance of RemoteTriplesGenerator if 'triples-generator' config value set to 'remote-generator'" in {
-      import scala.collection.JavaConverters._
+    s"return an instance of RemoteTriplesGenerator if TriplesGeneration is $RemoteTriplesGeneration" in {
 
       val config = ConfigFactory.parseMap(
         Map(
-          "triples-generator" -> "remote-generator",
-          "services"          -> Map("triples-generator" -> Map("url" -> "http://host").asJava).asJava
+          "services" -> Map("triples-generator" -> Map("url" -> "http://host").asJava).asJava
         ).asJava
       )
 
-      new TriplesGeneratorProvider(config).get.unsafeRunSync() shouldBe a[RemoteTriplesGenerator]
+      TriplesGenerator(TriplesGeneration.RemoteTriplesGeneration, config)
+        .unsafeRunSync() shouldBe a[RemoteTriplesGenerator]
     }
   }
 

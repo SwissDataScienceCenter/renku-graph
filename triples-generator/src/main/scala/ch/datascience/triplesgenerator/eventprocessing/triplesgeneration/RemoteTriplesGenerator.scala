@@ -29,6 +29,7 @@ import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
 import com.typesafe.config.Config
 import io.chrisdavenport.log4cats.Logger
 
+import languageFeature.higherKinds
 import scala.concurrent.ExecutionContext
 
 // This TriplesGenerator supposed to be used by the acceptance-tests only
