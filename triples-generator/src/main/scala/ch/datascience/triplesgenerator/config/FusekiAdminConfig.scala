@@ -22,8 +22,8 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
-import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl}
+import ch.datascience.tinytypes.TinyType
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
@@ -54,53 +54,6 @@ object FusekiAdminConfig {
     } yield FusekiAdminConfig(url, datasetName, datasetType, BasicAuthCredentials(username, password))
 }
 
-final case class FusekiUserConfig(
-    fusekiBaseUrl:   FusekiBaseUrl,
-    datasetName:     DatasetName,
-    authCredentials: BasicAuthCredentials
-)
-
-object FusekiUserConfig {
-
-  import ConfigLoader._
-  import ch.datascience.http.client.BasicAuthConfigReaders._
-
-  def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[FusekiUserConfig] =
-    for {
-      url         <- find[Interpretation, FusekiBaseUrl]("services.fuseki.url", config)
-      datasetName <- find[Interpretation, DatasetName]("services.fuseki.dataset-name", config)
-      username    <- find[Interpretation, BasicAuthUsername]("services.fuseki.renku.username", config)
-      password    <- find[Interpretation, BasicAuthPassword]("services.fuseki.renku.password", config)
-    } yield FusekiUserConfig(url, datasetName, BasicAuthCredentials(username, password))
-}
-
-class FusekiBaseUrl private (val value: String) extends AnyVal with TinyType[String]
-object FusekiBaseUrl
-    extends TinyTypeFactory[String, FusekiBaseUrl](new FusekiBaseUrl(_))
-    with Url
-    with UrlOps[FusekiBaseUrl] {
-  private[config] implicit val fusekiBaseUrlReader: ConfigReader[FusekiBaseUrl] =
-    ConfigReader.fromString[FusekiBaseUrl] { value =>
-      FusekiBaseUrl
-        .from(value)
-        .leftMap(exception => CannotConvert(value, FusekiBaseUrl.getClass.toString, exception.getMessage))
-    }
-}
-
-class DatasetName private (val value: String) extends AnyVal with TinyType[String]
-
-object DatasetName extends TinyTypeFactory[String, DatasetName](new DatasetName(_)) with NonBlank {
-
-  private[config] implicit val datasetNameReader: ConfigReader[DatasetName] =
-    ConfigReader.fromString[DatasetName] { value =>
-      DatasetName
-        .from(value)
-        .leftMap(exception => CannotConvert(value, DatasetName.getClass.toString, exception.getMessage))
-    }
-}
-
 sealed trait DatasetType extends TinyType[String] with Product with Serializable
 
 object DatasetType {
@@ -117,7 +70,6 @@ object DatasetType {
     ConfigReader.fromString[DatasetType] {
       case Mem.value => Right(Mem)
       case TDB.value => Right(TDB)
-      case other =>
-        Left(CannotConvert(other, DatasetType.getClass.toString, s"$other is neither $Mem nor $TDB"))
+      case other     => Left(CannotConvert(other, DatasetType.getClass.toString, s"$other is neither $Mem nor $TDB"))
     }
 }

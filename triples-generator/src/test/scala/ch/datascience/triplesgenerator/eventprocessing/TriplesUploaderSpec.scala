@@ -19,10 +19,11 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator.config.FusekiBaseUrl
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.http4s.Status
@@ -75,7 +76,7 @@ class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalService
 
     val rdfTriples = rdfTriplesSets.generateOne
 
-    val fusekiUserConfig = fusekiUserConfigs.generateOne.copy(
+    val fusekiUserConfig = rdfStoreConfigs.generateOne.copy(
       fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     )
     val triplesUploader = new IOTriplesUploader(fusekiUserConfig, TestLogger())

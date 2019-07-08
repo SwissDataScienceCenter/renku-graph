@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.config
+package ch.datascience.rdfstore
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -30,12 +30,12 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
+class RdfStoreConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "apply" should {
 
     "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the FusekiUserConfig" in {
-      forAll(fusekiUserConfigs) { userConfig =>
+      forAll(rdfStoreConfigs) { userConfig =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
@@ -51,7 +51,7 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
           ).asJava
         )
 
-        val Success(actual) = FusekiUserConfig[Try](config)
+        val Success(actual) = RdfStoreConfig[Try](config)
 
         actual.fusekiBaseUrl            shouldBe userConfig.fusekiBaseUrl
         actual.datasetName              shouldBe userConfig.datasetName
@@ -66,17 +66,17 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
           "services" -> Map(
             "fuseki" -> Map(
               "url"          -> "invalid-url",
-              "dataset-name" -> fusekiUserConfigs.generateOne.datasetName.value,
+              "dataset-name" -> rdfStoreConfigs.generateOne.datasetName.value,
               "renku" -> Map(
-                "username" -> fusekiUserConfigs.generateOne.authCredentials.username.value,
-                "password" -> fusekiUserConfigs.generateOne.authCredentials.password.value
+                "username" -> rdfStoreConfigs.generateOne.authCredentials.username.value,
+                "password" -> rdfStoreConfigs.generateOne.authCredentials.password.value
               ).asJava
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = FusekiUserConfig[Try](config)
+      val Failure(exception) = RdfStoreConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -86,18 +86,18 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url"          -> fusekiUserConfigs.generateOne.fusekiBaseUrl.toString,
+              "url"          -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
               "dataset-name" -> "  ",
               "renku" -> Map(
-                "username" -> fusekiUserConfigs.generateOne.authCredentials.username.value,
-                "password" -> fusekiUserConfigs.generateOne.authCredentials.password.value
+                "username" -> rdfStoreConfigs.generateOne.authCredentials.username.value,
+                "password" -> rdfStoreConfigs.generateOne.authCredentials.password.value
               ).asJava
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = FusekiUserConfig[Try](config)
+      val Failure(exception) = RdfStoreConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -107,18 +107,18 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url"          -> fusekiUserConfigs.generateOne.fusekiBaseUrl.toString,
-              "dataset-name" -> fusekiUserConfigs.generateOne.datasetName.value,
+              "url"          -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
+              "dataset-name" -> rdfStoreConfigs.generateOne.datasetName.value,
               "renku" -> Map(
                 "username" -> "  ",
-                "password" -> fusekiUserConfigs.generateOne.authCredentials.password.value
+                "password" -> rdfStoreConfigs.generateOne.authCredentials.password.value
               ).asJava
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = FusekiUserConfig[Try](config)
+      val Failure(exception) = RdfStoreConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -128,10 +128,10 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url"          -> fusekiUserConfigs.generateOne.fusekiBaseUrl.toString,
-              "dataset-name" -> fusekiUserConfigs.generateOne.datasetName.value,
+              "url"          -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
+              "dataset-name" -> rdfStoreConfigs.generateOne.datasetName.value,
               "renku" -> Map(
-                "username" -> fusekiUserConfigs.generateOne.authCredentials.username.value,
+                "username" -> rdfStoreConfigs.generateOne.authCredentials.username.value,
                 "password" -> ""
               ).asJava
             ).asJava
@@ -139,7 +139,7 @@ class FusekiUserConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
         ).asJava
       )
 
-      val Failure(exception) = FusekiUserConfig[Try](config)
+      val Failure(exception) = RdfStoreConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }

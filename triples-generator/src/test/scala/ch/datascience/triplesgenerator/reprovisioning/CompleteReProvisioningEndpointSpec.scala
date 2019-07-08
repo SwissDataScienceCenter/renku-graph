@@ -94,7 +94,7 @@ class IOCompleteReProvisioningEndpointSpec extends WordSpec with MockFactory {
 
     "instantiate CompleteReProvisionEndpoint with admin auth credentials taken from the config" in {
       val adminConfig = fusekiAdminConfigs.generateOne
-      val userConfig  = fusekiUserConfigs.generateOne
+      val userConfig  = rdfStoreConfigs.generateOne
 
       val transactor = DbTransactor[IO, EventLogDB](null)
       val endpoint = IOCompleteReProvisionEndpoint(
@@ -108,7 +108,7 @@ class IOCompleteReProvisioningEndpointSpec extends WordSpec with MockFactory {
     }
 
     "fail if fuseki config fails on reading the admin config" in {
-      val userConfig = fusekiUserConfigs.generateOne
+      val userConfig = rdfStoreConfigs.generateOne
 
       val transactor = DbTransactor[IO, EventLogDB](null)
       intercept[Exception] {

@@ -19,12 +19,9 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.control.Throttler
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.http.client.{BasicAuthCredentials, IORestClient}
-import ch.datascience.triplesgenerator.config.FusekiUserConfig
+import ch.datascience.rdfstore.IORdfStoreClient.{Query, RdfDelete}
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
-import org.http4s.Uri
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -33,46 +30,17 @@ private trait DatasetTruncator[Interpretation[_]] {
   def truncateDataset: Interpretation[Unit]
 }
 
-private class IODatasetTruncator private (
-    updateUri:               Uri,
-    authCredentials:         BasicAuthCredentials,
+private class IODatasetTruncator(
+    rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    extends IORdfStoreClient[RdfDelete](rdfStoreConfig, logger)
     with DatasetTruncator[IO] {
 
-  import cats.effect._
-  import org.http4s.MediaType.application._
-  import org.http4s.Method.POST
-  import org.http4s._
-  import org.http4s.dsl.io._
-  import org.http4s.headers.`Content-Type`
-
-  override def truncateDataset: IO[Unit] = send(updateRequest(updateUri))(mapResponse)
-
-  private def updateRequest(uri: Uri) =
-    request(POST, uri, authCredentials)
-      .withEntity("update=DELETE { ?s ?p ?o} WHERE { ?s ?p ?o}")
-      .putHeaders(`Content-Type`(`x-www-form-urlencoded`): Header)
-
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (Ok, _, _)           => IO.unit
-    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
-    case (Forbidden, _, _)    => IO.raiseError(UnauthorizedException)
-  }
-}
-
-private object IODatasetTruncator {
-
-  import IORestClient._
-
-  def apply(
-      fusekiUserConfig:        FusekiUserConfig,
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[DatasetTruncator[IO]] =
-    for {
-      uri <- validateUri(s"${fusekiUserConfig.fusekiBaseUrl}/${fusekiUserConfig.datasetName}/update")
-    } yield new IODatasetTruncator(uri, fusekiUserConfig.authCredentials, logger)
+  override def truncateDataset: IO[Unit] =
+    send {
+      Query {
+        "DELETE { ?s ?p ?o} WHERE { ?s ?p ?o}"
+      }
+    }(unitResponseMapper)
 }

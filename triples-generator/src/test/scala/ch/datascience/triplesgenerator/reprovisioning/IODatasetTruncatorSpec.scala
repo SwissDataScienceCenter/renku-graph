@@ -19,12 +19,11 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator.config.FusekiBaseUrl
-import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators.fusekiUserConfigs
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.http4s.Status
 import org.scalatest.Matchers._
@@ -49,18 +48,6 @@ class IODatasetTruncatorSpec extends WordSpec with ExternalServiceStubbing {
       datasetTruncator.truncateDataset.unsafeRunSync() shouldBe ((): Unit)
     }
 
-    s"fails with $UnauthorizedException when SPARQL truncate command sent to the Store's update endpoint got status other than 401" in new TestCase {
-
-      stubFor {
-        post(s"/${fusekiConfig.datasetName}/update")
-          .willReturn(unauthorized().withBody("some message"))
-      }
-
-      intercept[UnauthorizedException] {
-        datasetTruncator.truncateDataset.unsafeRunSync()
-      }
-    }
-
     "fails when SPARQL truncate command sent to the Store's update endpoint got status other than OK" in new TestCase {
 
       stubFor {
@@ -79,9 +66,9 @@ class IODatasetTruncatorSpec extends WordSpec with ExternalServiceStubbing {
 
   private trait TestCase {
     val fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
-    val fusekiConfig  = fusekiUserConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
+    val fusekiConfig  = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
     val logger        = TestLogger[IO]()
 
-    val datasetTruncator = IODatasetTruncator(fusekiConfig, logger).unsafeRunSync()
+    val datasetTruncator = new IODatasetTruncator(fusekiConfig, logger)
   }
 }

@@ -18,14 +18,25 @@
 
 package ch.datascience.config
 
+import cats.MonadError
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import pureconfig.ConfigReader
 
-import scala.language.implicitConversions
+import scala.language.{higherKinds, implicitConversions}
 
-class ServiceUrl private (val value: String) extends AnyVal with TinyType[String]
+class RenkuBaseUrl private (val value: String) extends AnyVal with TinyType[String]
+object RenkuBaseUrl
+    extends TinyTypeFactory[String, RenkuBaseUrl](new RenkuBaseUrl(_))
+    with Url
+    with UrlOps[RenkuBaseUrl] {
+  import ConfigLoader._
+  import com.typesafe.config.{Config, ConfigFactory}
+  import pureconfig.ConfigReader
 
-object ServiceUrl extends TinyTypeFactory[String, ServiceUrl](new ServiceUrl(_)) with Url with UrlOps[ServiceUrl] {
-  implicit val serviceUrlReader: ConfigReader[ServiceUrl] = ConfigLoader.stringTinyTypeReader(this)
+  private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] = stringTinyTypeReader(this)
+
+  def apply[Interpretation[_]](
+      config:    Config = ConfigFactory.load()
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RenkuBaseUrl] =
+    find[Interpretation, RenkuBaseUrl]("services.renku.url", config)
 }

@@ -31,7 +31,8 @@ import ch.datascience.dbeventlog.commands.IOEventLogMarkAllNew
 import ch.datascience.http.client.BasicAuthCredentials
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.triplesgenerator.config.{FusekiAdminConfig, FusekiUserConfig}
+import ch.datascience.rdfstore.RdfStoreConfig
+import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
 import org.http4s.{BasicCredentials, Request, Response}
@@ -77,15 +78,14 @@ object IOCompleteReProvisionEndpoint extends ConfigLoader[IO] {
 
   def apply(transactor:          DbTransactor[IO, EventLogDB],
             fusekiAdminConfig:   IO[FusekiAdminConfig] = FusekiAdminConfig[IO](),
-            fusekiUserConfig:    IO[FusekiUserConfig] = FusekiUserConfig[IO]())(
+            rdfStoreConfig:      IO[RdfStoreConfig] = RdfStoreConfig[IO]())(
       implicit executionContext: ExecutionContext,
       contextShift:              ContextShift[IO],
       timer:                     Timer[IO]
   ): IO[CompleteReProvisioningEndpoint[IO]] =
     for {
       adminConfig      <- fusekiAdminConfig
-      userConfig       <- fusekiUserConfig
-      datasetTruncator <- IODatasetTruncator(userConfig, ApplicationLogger)
+      datasetTruncator <- rdfStoreConfig map (new IODatasetTruncator(_, ApplicationLogger))
     } yield
       new CompleteReProvisioningEndpoint(
         credentials   = adminConfig.authCredentials,
