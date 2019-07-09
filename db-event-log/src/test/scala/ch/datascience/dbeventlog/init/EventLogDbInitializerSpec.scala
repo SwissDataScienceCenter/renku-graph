@@ -19,16 +19,19 @@
 package ch.datascience.dbeventlog.init
 
 import cats.effect._
-import cats.implicits._
-import ch.datascience.dbeventlog.InMemoryEventLogDb
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventLogDB
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
-import doobie.util.fragment.Fragment
+import io.chrisdavenport.log4cats.Logger
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
+class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactory {
 
   "run" should {
 
@@ -36,6 +39,10 @@ class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
       if (!tableExists()) createTable()
 
       tableExists() shouldBe true
+
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
 
       dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
@@ -49,6 +56,10 @@ class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
 
       tableExists() shouldBe false
 
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
+
       dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists() shouldBe true
@@ -58,6 +69,14 @@ class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
 
     "assures there are indexes created for project_id, status and execution_date" in new TestCase {
 
+      if (!tableExists()) createTable()
+
+      tableExists() shouldBe true
+
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
+
       dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
       verifyTrue(sql"DROP INDEX idx_project_id;")
@@ -66,41 +85,30 @@ class EventLogDbInitializerSpec extends WordSpec with InMemoryEventLogDb {
       verifyTrue(sql"DROP INDEX idx_event_date;")
       verifyTrue(sql"DROP INDEX idx_created_date;")
     }
+
+    "fails if adding the project_path column fails" in new TestCase {
+
+      if (!tableExists()) createTable()
+
+      tableExists() shouldBe true
+
+      val exception = exceptions.generateOne
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      intercept[Exception] {
+        dbInitializer.run.unsafeRunSync()
+      } shouldBe exception
+    }
   }
 
   private trait TestCase {
-    val logger        = TestLogger[IO]()
-    val dbInitializer = new EventLogDbInitializer[IO](transactor, logger)
+    val projectPathAdder = mock[IOProjectPathAdder]
+    val logger           = TestLogger[IO]()
+    val dbInitializer    = new EventLogDbInitializer[IO](projectPathAdder, transactor, logger)
   }
 
-  private def tableExists(): Boolean =
-    sql"""select exists (select * from event_log);""".query.option
-      .transact(transactor.get)
-      .recover { case _ => None }
-      .unsafeRunSync()
-      .isDefined
-
-  private def createTable(): Unit = execute {
-    sql"""
-         |CREATE TABLE event_log(
-         | event_id varchar NOT NULL,
-         | project_id int4 NOT NULL,
-         | status varchar NOT NULL,
-         | created_date timestamp NOT NULL,
-         | execution_date timestamp NOT NULL,
-         | event_date timestamp NOT NULL,
-         | event_body text NOT NULL,
-         | message varchar,
-         | PRIMARY KEY (event_id, project_id)
-         |);
-       """.stripMargin.update.run.map(_ => ())
-  }
-
-  protected def dropTable(): Unit = execute {
-    sql"DROP TABLE IF EXISTS event_log".update.run.map(_ => ())
-  }
-
-  protected def verifyTrue(sql: Fragment): Unit = execute {
-    sql.update.run.map(_ => ())
-  }
+  private class IOProjectPathAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])
+      extends ProjectPathAdder[IO](transactor, logger)
 }
