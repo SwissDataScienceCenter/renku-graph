@@ -19,7 +19,8 @@
 package ch.datascience.generators
 
 import ch.datascience.control.RateLimit
-import ch.datascience.generators.Generators.{httpUrls, nonEmptyStrings}
+import ch.datascience.generators.Generators.{httpUrls, nonEmptyStrings, positiveInts}
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.{AccessToken, BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl, RdfStoreConfig}
@@ -62,4 +63,9 @@ object CommonGraphGenerators {
     datasetName     <- nonEmptyStrings() map DatasetName.apply
     authCredentials <- basicAuthCredentials
   } yield RdfStoreConfig(fusekiUrl, datasetName, authCredentials)
+
+  implicit val schemaVersions: Gen[SchemaVersion] = Gen
+    .listOfN(3, positiveInts(max = 50))
+    .map(_.mkString("."))
+    .map(SchemaVersion.apply)
 }

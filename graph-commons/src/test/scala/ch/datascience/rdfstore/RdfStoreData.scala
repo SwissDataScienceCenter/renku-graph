@@ -16,19 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.rdfstore
+package ch.datascience.rdfstore
 
 import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.triplesgenerator.config.SchemaVersion
 
 import scala.xml.Null
 
-object TestData extends TestData(RenkuBaseUrl("https://dev.renku.ch"))
+object RdfStoreData extends RdfStoreData(RenkuBaseUrl("https://dev.renku.ch"))
 
-class TestData(val renkuBaseUrl: RenkuBaseUrl) {
+class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
 
-  def minimalTriples(projectPath: ProjectPath, commitId: CommitId, maybeSchemaVersion: Option[SchemaVersion]): String =
+  def singleCommitTriples(projectPath:        ProjectPath,
+                          commitId:           CommitId,
+                          maybeSchemaVersion: Option[SchemaVersion]): String =
     <rdf:RDF 
     xmlns:prov="http://www.w3.org/ns/prov#" 
     xmlns:dcterms="http://purl.org/dc/terms/" 

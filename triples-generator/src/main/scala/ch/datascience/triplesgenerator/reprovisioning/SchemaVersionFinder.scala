@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.config
+package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.MonadError
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
@@ -28,10 +28,7 @@ import pureconfig.ConfigReader
 import scala.language.higherKinds
 import scala.util.Try
 
-class SchemaVersion private (val value: String) extends AnyVal with TinyType[String]
-object SchemaVersion extends TinyTypeFactory[String, SchemaVersion](new SchemaVersion(_)) with NonBlank
-
-object SchemaVersionFinder {
+private object SchemaVersionFinder {
 
   import ch.datascience.config.ConfigLoader._
 
@@ -42,7 +39,7 @@ object SchemaVersionFinder {
   )(implicit ME:         MonadError[Interpretation, Throwable]): Interpretation[SchemaVersion] =
     apply(triplesGeneration, findRenkuVersion, ConfigFactory.load())
 
-  private[config] def apply[Interpretation[_]](
+  private[reprovisioning] def apply[Interpretation[_]](
       triplesGeneration:  TriplesGeneration,
       renkuVersionFinder: Interpretation[SchemaVersion],
       config:             Config

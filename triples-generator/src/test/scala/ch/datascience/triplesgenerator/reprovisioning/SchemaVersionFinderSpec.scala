@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.config
+package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.MonadError
 import cats.implicits._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
-import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

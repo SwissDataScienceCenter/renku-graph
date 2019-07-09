@@ -16,22 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.stubs
+package ch.datascience.graph.model
 
-import ch.datascience.graph.model.events.{CommitId, Project}
-import ch.datascience.rdfstore.RdfStoreData
-import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
 
-object RemoteTriplesGenerator {
-
-  def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project:  Project,
-                                                                                        commitId: CommitId): Unit = {
-    stubFor {
-      get(s"/projects/${project.id}/commits/$commitId")
-        .willReturn(
-          ok(RdfStoreData.singleCommitTriples(project.path, commitId, None))
-        )
-    }
-    ()
-  }
-}
+class SchemaVersion private (val value: String) extends AnyVal with TinyType[String]
+object SchemaVersion extends TinyTypeFactory[String, SchemaVersion](new SchemaVersion(_)) with NonBlank

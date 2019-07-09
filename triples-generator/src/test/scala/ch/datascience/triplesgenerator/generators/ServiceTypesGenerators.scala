@@ -44,9 +44,4 @@ object ServiceTypesGenerators {
     datasetType     <- Gen.oneOf(Mem, TDB)
     authCredentials <- basicAuthCredentials
   } yield FusekiAdminConfig(fusekiUrl, datasetName, datasetType, authCredentials)
-
-  implicit val schemaVersions: Gen[SchemaVersion] = Gen
-    .listOfN(3, positiveInts(max = 50))
-    .map(_.mkString("."))
-    .map(SchemaVersion.apply)
 }
