@@ -41,7 +41,7 @@ class SchemaVersionFinderSpec extends WordSpec with MockFactory {
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "triples-generation" -> Map(
+            "triples-generator" -> Map(
               "schema-version" -> schemaVersion.toString
             ).asJava
           ).asJava

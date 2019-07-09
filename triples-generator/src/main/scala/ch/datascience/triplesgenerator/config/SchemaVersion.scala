@@ -49,7 +49,7 @@ object SchemaVersionFinder {
   )(implicit ME:          MonadError[Interpretation, Throwable]): Interpretation[SchemaVersion] = triplesGeneration match {
     case RenkuLog => renkuVersionFinder
     case RemoteTriplesGeneration =>
-      find[Interpretation, SchemaVersion]("services.triples-generation.schema-version", config)
+      find[Interpretation, SchemaVersion]("services.triples-generator.schema-version", config)
   }
 
   private def findRenkuVersion[Interpretation[_]](
