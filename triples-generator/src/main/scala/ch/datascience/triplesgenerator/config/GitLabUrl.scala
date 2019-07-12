@@ -16,18 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.triplesgenerator.config
 
 import cats.MonadError
-import ch.datascience.config.{ConfigLoader, ServiceUrl}
+import ch.datascience.config.ConfigLoader.{find, stringTinyTypeReader}
+import ch.datascience.tinytypes.constraints.{Url, UrlOps}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
+import pureconfig.ConfigReader
 
 import scala.language.higherKinds
 
-private class GitLabUrlProvider[Interpretation[_]](
-    config:    Config = ConfigFactory.load()
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
+class GitLabUrl private (val value: String) extends AnyVal with StringTinyType
+object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url with UrlOps[GitLabUrl] {
 
-  def get: Interpretation[ServiceUrl] = find[ServiceUrl]("services.gitlab.url", config)
+  private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = stringTinyTypeReader(GitLabUrl)
+
+  def apply[Interpretation[_]](
+      config:    Config = ConfigFactory.load
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[GitLabUrl] =
+    find[Interpretation, GitLabUrl]("services.gitlab.url", config)
 }

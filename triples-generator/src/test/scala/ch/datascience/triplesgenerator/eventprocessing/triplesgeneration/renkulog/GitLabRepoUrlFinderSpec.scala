@@ -26,6 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.http.client.AccessToken
+import ch.datascience.triplesgenerator.config.GitLabUrl
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -46,7 +47,7 @@ class GitLabRepoUrlFinderSpec extends WordSpec with MockFactory {
 
         val maybeAccessToken = Option.empty[AccessToken]
 
-        val repoUrlFinder = newRepoUrlFinder(ServiceUrl(s"$protocol://$host:$port"))
+        val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
         repoUrlFinder.findRepositoryUrl(path, maybeAccessToken) shouldBe context.pure(
           ServiceUrl(s"$protocol://$host:$port/$path.git")
@@ -57,7 +58,7 @@ class GitLabRepoUrlFinderSpec extends WordSpec with MockFactory {
 
         val accessToken = personalAccessTokens.generateOne
 
-        val repoUrlFinder = newRepoUrlFinder(ServiceUrl(s"$protocol://$host:$port"))
+        val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
         repoUrlFinder.findRepositoryUrl(path, Some(accessToken)) shouldBe context.pure(
           ServiceUrl(s"$protocol://gitlab-ci-token:${accessToken.value}@$host:$port/$path.git")
@@ -68,7 +69,7 @@ class GitLabRepoUrlFinderSpec extends WordSpec with MockFactory {
 
         val accessToken = oauthAccessTokens.generateOne
 
-        val repoUrlFinder = newRepoUrlFinder(ServiceUrl(s"$protocol://$host:$port"))
+        val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
         repoUrlFinder.findRepositoryUrl(path, Some(accessToken)) shouldBe context.pure(
           ServiceUrl(s"$protocol://oauth2:${accessToken.value}@$host:$port/$path.git")
@@ -80,7 +81,7 @@ class GitLabRepoUrlFinderSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
-    val newRepoUrlFinder: ServiceUrl => GitLabRepoUrlFinder[Try] = new GitLabRepoUrlFinder[Try](_)
+    val newRepoUrlFinder: GitLabUrl => GitLabRepoUrlFinder[Try] = new GitLabRepoUrlFinder[Try](_)
   }
 
   private lazy val protocols = Set("http", "https")

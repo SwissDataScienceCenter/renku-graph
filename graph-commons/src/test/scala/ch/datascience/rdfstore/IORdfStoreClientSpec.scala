@@ -24,11 +24,11 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.client.IORestClient
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.rdfstore.IORdfStoreClient.{Query, RdfDelete, RdfQuery, RdfQueryType, RdfUpdate}
+import ch.datascience.rdfstore.IORdfStoreClient.{RdfDelete, RdfQuery, RdfQueryType, RdfUpdate}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
-import org.http4s.{EntityDecoder, Response, Status}
+import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -165,21 +165,21 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
 
   private trait QueryClientTestCase extends TestCase {
     val client = new TestRdfQueryClient(
-      Query("""SELECT ?s ?p ?o WHERE { ?s ?p ?o}"""),
+      query = """SELECT ?s ?p ?o WHERE { ?s ?p ?o}""",
       rdfStoreConfig
     )
   }
 
   private trait UpdateClientTestCase extends TestCase {
     val client = new TestRdfClient[RdfUpdate](
-      Query("""INSERT { "o" "p" "s"} {}"""),
+      query = """INSERT { "o" "p" "s"} {}""",
       rdfStoreConfig
     )
   }
 
   private trait DeleteClientTestCase extends TestCase {
     val client = new TestRdfClient[RdfDelete](
-      Query("""INSERT { "o" "p" "s"} {}"""),
+      query = """INSERT { "o" "p" "s"} {}""",
       rdfStoreConfig
     )
   }
@@ -188,21 +188,16 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private class TestRdfClient[QT <: RdfQueryType](
-      val query:        Query,
+      val query:        String,
       rdfStoreConfig:   RdfStoreConfig
   )(implicit queryType: QT)
       extends IORdfStoreClient[QT](rdfStoreConfig, TestLogger[IO]()) {
-    def callRemote: IO[Unit] = send(query)(unitResponseMapper)
+    def callRemote: IO[Unit] = queryWitNoResult(query)
   }
 
-  private class TestRdfQueryClient(val query: Query, rdfStoreConfig: RdfStoreConfig)
+  private class TestRdfQueryClient(val query: String, rdfStoreConfig: RdfStoreConfig)
       extends IORdfStoreClient[RdfQuery](rdfStoreConfig, TestLogger[IO]()) {
 
-    import org.http4s.circe.jsonOf
-
-    private implicit val jsonEntityDecoder: EntityDecoder[IO, Json]  = jsonOf[IO, Json]
-    private val responseMapper:             Response[IO] => IO[Json] = _.as[Json]
-
-    def callRemote: IO[Json] = send(query)(responseMapper)
+    def callRemote: IO[Json] = queryExpecting[Json](query)
   }
 }

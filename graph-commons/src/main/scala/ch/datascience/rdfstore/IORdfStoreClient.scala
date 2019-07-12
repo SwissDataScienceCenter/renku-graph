@@ -18,6 +18,7 @@
 
 package ch.datascience.rdfstore
 
+import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
@@ -25,6 +26,7 @@ import ch.datascience.rdfstore.IORdfStoreClient.RdfQueryType
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Decoder
 import org.http4s.Uri
 
 import scala.concurrent.ExecutionContext
@@ -32,7 +34,11 @@ import scala.concurrent.ExecutionContext
 abstract class IORdfStoreClient[QT <: RdfQueryType](
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO], queryType: QT)
+)(implicit executionContext: ExecutionContext,
+  contextShift:              ContextShift[IO],
+  timer:                     Timer[IO],
+  ME:                        MonadError[IO, Throwable],
+  queryType:                 QT)
     extends IORestClient(Throttler.noThrottling, logger) {
 
   import ch.datascience.rdfstore.IORdfStoreClient.{Query, RdfQuery}
@@ -40,13 +46,21 @@ abstract class IORdfStoreClient[QT <: RdfQueryType](
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
   import org.http4s.Status._
+  import org.http4s.circe.jsonOf
   import org.http4s.headers._
   import org.http4s.{Request, Response, Status}
   import rdfStoreConfig._
 
-  protected def send[ResultType](query: Query)(mapResponse: Response[IO] => IO[ResultType]): IO[ResultType] =
+  protected def queryWitNoResult(using: String): IO[Unit] =
+    runQuery(using, (_: Response[IO]) => IO.unit)
+
+  protected def queryExpecting[ResultType](using: String)(implicit decoder: Decoder[ResultType]): IO[ResultType] =
+    runQuery(using, responseMapperFor[ResultType])
+
+  protected def runQuery[ResultType](using: String, mapResponse: Response[IO] => IO[ResultType]): IO[ResultType] =
     for {
       uri    <- validateUri((fusekiBaseUrl / datasetName / path).toString)
+      query  <- ME.fromEither(Query.from(using))
       result <- send(uploadRequest(uri, query))(toFullResponseMapper(mapResponse))
     } yield result
 
@@ -61,7 +75,8 @@ abstract class IORdfStoreClient[QT <: RdfQueryType](
     case (Ok, _, response) => mapResponse(response)
   }
 
-  protected val unitResponseMapper: Response[IO] => IO[Unit] = _ => IO.unit
+  private def responseMapperFor[ResultType](implicit decoder: Decoder[ResultType]): Response[IO] => IO[ResultType] =
+    _.as[ResultType](implicitly[MonadError[IO, Throwable]], jsonOf[IO, ResultType])
 
   private def toEntity(query: Query): String = queryType match {
     case _: RdfQuery => s"query=$query"

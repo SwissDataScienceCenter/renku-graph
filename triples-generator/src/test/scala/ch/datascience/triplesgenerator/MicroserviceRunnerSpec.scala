@@ -25,6 +25,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessorRunner
 import ch.datascience.triplesgenerator.init.{IOFusekiDatasetInitializer, IOSentryInitializer}
+import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioner, ReProvisioner}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -39,6 +40,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       "sentry initialization, " +
       "Event Log db verification, " +
       "dataset verification, " +
+      "re-provisioning, " +
       "starting Event Processor and " +
       "http server succeeds" in new TestCase {
       (sentryInitializer.run _)
@@ -50,6 +52,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
 
       (datasetInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (reProvisioner.run _)
         .expects()
         .returning(IO.unit)
 
@@ -127,6 +133,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.raiseError(exception))
 
+      (reProvisioner.run _)
+        .expects()
+        .returning(IO.unit)
+
       (httpServer.run _)
         .expects()
         .returning(IO.pure(ExitCode.Success))
@@ -153,8 +163,41 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
+      (reProvisioner.run _)
+        .expects()
+        .returning(IO.unit)
+
       val exception = exceptions.generateOne
       (httpServer.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+    }
+
+    "return Success ExitCode regardless of re-provisioning start-up" in new TestCase {
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventLogDbInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (datasetInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventProcessorRunner.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (httpServer.run _)
+        .expects()
+        .returning(IO.pure(ExitCode.Success))
+
+      val exception = exceptions.generateOne
+      (reProvisioner.run _)
         .expects()
         .returning(IO.raiseError(exception))
 
@@ -166,12 +209,14 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
     val sentryInitializer     = mock[IOSentryInitializer]
     val eventLogDbInitializer = mock[IOEventLogDbInitializer]
     val datasetInitializer    = mock[IOFusekiDatasetInitializer]
+    val reProvisioner         = mock[IOReProvisioner]
     val eventProcessorRunner  = mock[IOEventProcessorRunner]
     val httpServer            = mock[IOHttpServer]
     val microserviceRunner = new MicroserviceRunner(
       sentryInitializer,
       eventLogDbInitializer,
       datasetInitializer,
+      reProvisioner,
       eventProcessorRunner,
       httpServer
     )

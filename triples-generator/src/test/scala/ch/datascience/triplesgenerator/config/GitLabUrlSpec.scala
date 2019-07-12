@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.triplesgenerator.config
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
 import com.typesafe.config.ConfigFactory
@@ -30,29 +29,27 @@ import org.scalatest.WordSpec
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class GitLabUrlProviderSpec extends WordSpec {
+class GitLabUrlSpec extends WordSpec {
 
-  "get" should {
+  "apply" should {
 
     "read 'services.gitlab.url' from the config" in {
-      val gitLabUrl = httpUrls.generateOne
+      val url = httpUrls.generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "gitlab" -> Map(
-              "url" -> gitLabUrl
+              "url" -> url
             ).asJava
           ).asJava
         ).asJava
       )
 
-      new GitLabUrlProvider[Try](config).get shouldBe Success(ServiceUrl(gitLabUrl))
+      GitLabUrl[Try](config) shouldBe Success(GitLabUrl(url))
     }
 
     "fail if there's no 'services.gitlab.url' entry" in {
-      val config = ConfigFactory.empty()
-
-      val Failure(exception) = new GitLabUrlProvider[Try](config).get
+      val Failure(exception) = GitLabUrl[Try](ConfigFactory.empty())
 
       exception shouldBe an[ConfigLoadingException]
     }

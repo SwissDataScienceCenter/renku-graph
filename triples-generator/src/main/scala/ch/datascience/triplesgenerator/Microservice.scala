@@ -30,7 +30,7 @@ import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.init._
-import ch.datascience.triplesgenerator.reprovisioning.IOCompleteReProvisionEndpoint
+import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioner, ReProvisioner}
 import pureconfig._
 
 import scala.concurrent.ExecutionContext
@@ -57,18 +57,18 @@ object Microservice extends IOApp {
       for {
         fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
         triplesGeneration        <- TriplesGeneration[IO]()
+        reProvisioner            <- IOReProvisioner(triplesGeneration, transactor)
         triplesGenerator         <- TriplesGenerator(triplesGeneration)
         commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator)
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
                                  .withEventsProcessor(commitEventProcessor)
-        completeReProvisionEndpoint <- IOCompleteReProvisionEndpoint(transactor)
         exitCode <- new MicroserviceRunner(
                      new SentryInitializer[IO],
                      new IOEventLogDbInitializer(transactor),
                      fusekiDatasetInitializer,
+                     reProvisioner,
                      eventProcessorRunner,
-                     new HttpServer[IO](serverPort    = 9002,
-                                        serviceRoutes = new MicroserviceRoutes[IO](completeReProvisionEndpoint).routes)
+                     new HttpServer[IO](serverPort = 9002, serviceRoutes = new MicroserviceRoutes[IO]().routes)
                    ) run args
       } yield exitCode
     }
@@ -78,6 +78,7 @@ private class MicroserviceRunner(
     sentryInitializer:     SentryInitializer[IO],
     eventLogDbInitializer: IOEventLogDbInitializer,
     datasetInitializer:    FusekiDatasetInitializer[IO],
+    reProvisioner:         ReProvisioner[IO],
     eventProcessorRunner:  EventProcessorRunner[IO],
     httpServer:            HttpServer[IO]
 )(implicit contextShift:   ContextShift[IO]) {
@@ -89,6 +90,6 @@ private class MicroserviceRunner(
       _ <- sentryInitializer.run
       _ <- eventLogDbInitializer.run
       _ <- datasetInitializer.run
-      _ <- List(httpServer.run.start, eventProcessorRunner.run).sequence
+      _ <- List(reProvisioner.run.start, httpServer.run.start, eventProcessorRunner.run).sequence
     } yield ExitCode.Success
 }

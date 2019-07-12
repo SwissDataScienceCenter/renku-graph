@@ -68,12 +68,19 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT) extends 
     case exception => new IllegalArgumentException(exception)
   }
 
-  implicit class CommitIdResourceConverters(tinyType: TT) {
+  implicit class TinyTypeConverters(tinyType: TT) {
+
     def to[Interpretation[_], Out](implicit
                                    convert: TT => Either[Exception, Out],
                                    ME:      MonadError[Interpretation, Throwable]): Interpretation[Out] =
       ME.fromEither(convert(tinyType))
+
+    def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
   }
+}
+
+trait Renderer[View, T] {
+  def render(value: T): String
 }
 
 trait Constraints[V] extends TypeName {

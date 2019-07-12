@@ -18,8 +18,9 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, Project}
-import ch.datascience.rdfstore.RdfStoreData
+import ch.datascience.rdfstore.RdfStoreData._
 import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
 
 object RemoteTriplesGenerator {
@@ -29,7 +30,7 @@ object RemoteTriplesGenerator {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
-          ok(RdfStoreData.singleCommitTriples(project.path, commitId, None))
+          ok(RDF(singleFileAndCommitTriples(project.path, commitId, Some(SchemaVersion("0.5.0")))).toString())
         )
     }
     ()
