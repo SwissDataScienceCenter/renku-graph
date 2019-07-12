@@ -20,15 +20,12 @@ package ch.datascience.config
 
 import cats.MonadError
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 import scala.language.{higherKinds, implicitConversions}
 
-class RenkuBaseUrl private (val value: String) extends AnyVal with TinyType[String]
-object RenkuBaseUrl
-    extends TinyTypeFactory[String, RenkuBaseUrl](new RenkuBaseUrl(_))
-    with Url
-    with UrlOps[RenkuBaseUrl] {
+class RenkuBaseUrl private (val value: String) extends AnyVal with StringTinyType
+object RenkuBaseUrl extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_)) with Url with UrlOps[RenkuBaseUrl] {
   import ConfigLoader._
   import com.typesafe.config.{Config, ConfigFactory}
   import pureconfig.ConfigReader

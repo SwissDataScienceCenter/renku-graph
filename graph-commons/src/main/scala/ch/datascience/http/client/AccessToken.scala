@@ -20,20 +20,18 @@ package ch.datascience.http.client
 
 import cats.implicits._
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{Sensitive, TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{Sensitive, StringTinyType, TinyTypeFactory}
 import io.circe._
 
-sealed trait AccessToken extends Any with TinyType[String] with Sensitive
+sealed trait AccessToken extends Any with StringTinyType with Sensitive
 
 object AccessToken {
 
   final class PersonalAccessToken private (val value: String) extends AnyVal with AccessToken
-  object PersonalAccessToken
-      extends TinyTypeFactory[String, PersonalAccessToken](new PersonalAccessToken(_))
-      with NonBlank
+  object PersonalAccessToken extends TinyTypeFactory[PersonalAccessToken](new PersonalAccessToken(_)) with NonBlank
 
   final class OAuthAccessToken private (val value: String) extends AnyVal with AccessToken
-  object OAuthAccessToken extends TinyTypeFactory[String, OAuthAccessToken](new OAuthAccessToken(_)) with NonBlank
+  object OAuthAccessToken extends TinyTypeFactory[OAuthAccessToken](new OAuthAccessToken(_)) with NonBlank
 
   implicit val accessTokenEncoder: Encoder[AccessToken] = {
     case OAuthAccessToken(token)    => Json.obj("oauthAccessToken"    -> Json.fromString(token))

@@ -19,7 +19,7 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -48,6 +48,6 @@ class GitShaSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-private class SomeGitSha private (val value: String) extends AnyVal with TinyType[String]
+private class SomeGitSha private (val value: String) extends AnyVal with StringTinyType
 
-private object SomeGitSha extends TinyTypeFactory[String, SomeGitSha](new SomeGitSha(_)) with GitSha
+private object SomeGitSha extends TinyTypeFactory[SomeGitSha](new SomeGitSha(_)) with GitSha

@@ -23,7 +23,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQueryType
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Uri
 
@@ -76,8 +76,8 @@ abstract class IORdfStoreClient[QT <: RdfQueryType](
 
 object IORdfStoreClient {
 
-  class Query private (val value: String) extends AnyVal with TinyType[String]
-  object Query extends TinyTypeFactory[String, Query](new Query(_)) with NonBlank
+  class Query private (val value: String) extends AnyVal with StringTinyType
+  object Query extends TinyTypeFactory[Query](new Query(_)) with NonBlank
 
   trait RdfQueryType
   final implicit case object RdfQuery extends RdfQueryType

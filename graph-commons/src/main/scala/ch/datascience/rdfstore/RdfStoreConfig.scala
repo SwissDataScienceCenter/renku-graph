@@ -22,7 +22,7 @@ import cats.MonadError
 import ch.datascience.config.ConfigLoader.stringTinyTypeReader
 import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
@@ -51,16 +51,13 @@ object RdfStoreConfig {
     } yield RdfStoreConfig(url, datasetName, BasicAuthCredentials(username, password))
 }
 
-class FusekiBaseUrl private (val value: String) extends AnyVal with TinyType[String]
-object FusekiBaseUrl
-    extends TinyTypeFactory[String, FusekiBaseUrl](new FusekiBaseUrl(_))
-    with Url
-    with UrlOps[FusekiBaseUrl] {
+class FusekiBaseUrl private (val value: String) extends AnyVal with StringTinyType
+object FusekiBaseUrl extends TinyTypeFactory[FusekiBaseUrl](new FusekiBaseUrl(_)) with Url with UrlOps[FusekiBaseUrl] {
   implicit val fusekiBaseUrlReader: ConfigReader[FusekiBaseUrl] = stringTinyTypeReader(FusekiBaseUrl)
 }
 
-class DatasetName private (val value: String) extends AnyVal with TinyType[String]
+class DatasetName private (val value: String) extends AnyVal with StringTinyType
 
-object DatasetName extends TinyTypeFactory[String, DatasetName](new DatasetName(_)) with NonBlank {
+object DatasetName extends TinyTypeFactory[DatasetName](new DatasetName(_)) with NonBlank {
   implicit val datasetNameReader: ConfigReader[DatasetName] = stringTinyTypeReader(DatasetName)
 }

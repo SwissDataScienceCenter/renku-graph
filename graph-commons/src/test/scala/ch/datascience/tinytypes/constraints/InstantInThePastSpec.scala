@@ -21,7 +21,7 @@ package ch.datascience.tinytypes.constraints
 import java.time.{Clock, Instant, ZoneId}
 
 import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -57,10 +57,10 @@ class InstantInThePastSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-private class InstantInThePastType private (val value: Instant) extends AnyVal with TinyType[Instant]
+private class InstantInThePastType private (val value: Instant) extends AnyVal with InstantTinyType
 
 private object InstantInThePastType
-    extends TinyTypeFactory[Instant, InstantInThePastType](new InstantInThePastType(_))
+    extends TinyTypeFactory[InstantInThePastType](new InstantInThePastType(_))
     with InstantInThePast {
 
   var clock:                  Clock   = Clock.systemDefaultZone()

@@ -67,6 +67,9 @@ object Generators {
       list <- Gen.listOfN(size, generator)
     } yield list
 
+  def setOf[T](generator: Gen[T], size: Int Refined Positive = 5): Gen[Set[T]] =
+    Gen.containerOfN[Set, T](size.value, generator)
+
   def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
     choose(1, max) map Refined.unsafeApply
 

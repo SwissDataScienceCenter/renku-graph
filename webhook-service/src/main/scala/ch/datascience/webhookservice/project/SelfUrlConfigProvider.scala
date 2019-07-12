@@ -22,7 +22,7 @@ import SelfUrlConfigProvider.SelfUrl
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ConfigLoader
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.{RefType, Refined}
 import pureconfig._
@@ -49,8 +49,8 @@ object SelfUrlConfigProvider {
 
   import eu.timepit.refined.string.Url
 
-  class SelfUrl private (val value: String) extends AnyVal with TinyType[String]
-  object SelfUrl extends TinyTypeFactory[String, SelfUrl](new SelfUrl(_)) {
+  class SelfUrl private (val value: String) extends AnyVal with StringTinyType
+  object SelfUrl extends TinyTypeFactory[SelfUrl](new SelfUrl(_)) {
     private type SelfUrlValue = String Refined Url
 
     addConstraint(

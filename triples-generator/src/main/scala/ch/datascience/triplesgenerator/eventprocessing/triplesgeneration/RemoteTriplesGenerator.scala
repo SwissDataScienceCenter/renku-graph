@@ -24,7 +24,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tinytypes.constraints.Url
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
 import com.typesafe.config.Config
 import io.chrisdavenport.log4cats.Logger
@@ -74,7 +74,7 @@ class RemoteTriplesGenerator(
   }
 }
 
-class TriplesGenerationServiceUrl private (val value: String) extends AnyVal with TinyType[String]
+class TriplesGenerationServiceUrl private (val value: String) extends AnyVal with StringTinyType
 object TriplesGenerationServiceUrl
-    extends TinyTypeFactory[String, TriplesGenerationServiceUrl](new TriplesGenerationServiceUrl(_))
+    extends TinyTypeFactory[TriplesGenerationServiceUrl](new TriplesGenerationServiceUrl(_))
     with Url

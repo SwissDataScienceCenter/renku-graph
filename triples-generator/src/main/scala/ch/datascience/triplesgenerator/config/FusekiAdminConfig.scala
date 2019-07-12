@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl}
-import ch.datascience.tinytypes.TinyType
+import ch.datascience.tinytypes.StringTinyType
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
@@ -54,7 +54,7 @@ object FusekiAdminConfig {
     } yield FusekiAdminConfig(url, datasetName, datasetType, BasicAuthCredentials(username, password))
 }
 
-sealed trait DatasetType extends TinyType[String] with Product with Serializable
+sealed trait DatasetType extends StringTinyType with Product with Serializable
 
 object DatasetType {
 

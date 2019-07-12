@@ -19,10 +19,10 @@
 package ch.datascience.webhookservice.project
 
 import ch.datascience.graph.model.events.{ProjectId, ProjectPath}
-import ch.datascience.tinytypes.TinyType
+import ch.datascience.tinytypes.StringTinyType
 import io.circe.Decoder
 
-sealed trait ProjectVisibility extends TinyType[String] with Product with Serializable
+sealed trait ProjectVisibility extends StringTinyType with Product with Serializable
 
 object ProjectVisibility {
 

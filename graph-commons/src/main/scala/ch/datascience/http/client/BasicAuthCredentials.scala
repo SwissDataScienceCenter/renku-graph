@@ -19,15 +19,15 @@
 package ch.datascience.http.client
 
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 case class BasicAuthCredentials(username: BasicAuthUsername, password: BasicAuthPassword)
 
-class BasicAuthUsername private (val value: String) extends AnyVal with TinyType[String]
-object BasicAuthUsername extends TinyTypeFactory[String, BasicAuthUsername](new BasicAuthUsername(_)) with NonBlank
+class BasicAuthUsername private (val value: String) extends AnyVal with StringTinyType
+object BasicAuthUsername extends TinyTypeFactory[BasicAuthUsername](new BasicAuthUsername(_)) with NonBlank
 
-class BasicAuthPassword private (val value: String) extends AnyVal with TinyType[String]
-object BasicAuthPassword extends TinyTypeFactory[String, BasicAuthPassword](new BasicAuthPassword(_)) with NonBlank
+class BasicAuthPassword private (val value: String) extends AnyVal with StringTinyType
+object BasicAuthPassword extends TinyTypeFactory[BasicAuthPassword](new BasicAuthPassword(_)) with NonBlank
 
 object BasicAuthConfigReaders {
 

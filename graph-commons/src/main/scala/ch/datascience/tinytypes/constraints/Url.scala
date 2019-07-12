@@ -20,7 +20,7 @@ package ch.datascience.tinytypes.constraints
 
 import java.net.URL
 
-import ch.datascience.tinytypes.{Constraints, TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{Constraints, StringTinyType, TinyTypeFactory}
 
 import scala.util.Try
 
@@ -31,8 +31,8 @@ trait Url extends Constraints[String] {
   )
 }
 
-trait UrlOps[T <: TinyType[String]] {
-  self: TinyTypeFactory[String, T] with Url =>
+trait UrlOps[T <: StringTinyType] {
+  self: TinyTypeFactory[T] with Url =>
 
   implicit class UrlOps(url: T) {
     def /(value: Any): T = apply(s"$url/$value")
