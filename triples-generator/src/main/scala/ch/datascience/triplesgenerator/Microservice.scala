@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
+import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
@@ -54,6 +55,7 @@ object Microservice extends IOApp {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
+        sentryInitializer        <- SentryInitializer[IO]
         fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
         triplesGenerator         <- new TriplesGeneratorProvider().get
         commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator)
@@ -61,7 +63,7 @@ object Microservice extends IOApp {
                                  .withEventsProcessor(commitEventProcessor)
         completeReProvisionEndpoint <- IOCompleteReProvisionEndpoint(transactor)
         exitCode <- new MicroserviceRunner(
-                     new SentryInitializer[IO],
+                     sentryInitializer,
                      new IOEventLogDbInitializer(transactor),
                      fusekiDatasetInitializer,
                      eventProcessorRunner,
