@@ -16,23 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.init
+package ch.datascience.interpreters
 
-import cats.MonadError
-import io.sentry.Sentry
+import cats.effect.IO
+import ch.datascience.config.sentry.{SentryConfig, SentryInitializer}
 
-import scala.language.higherKinds
-import scala.util.{Properties, Try}
-
-class SentryInitializer[Interpretation[_]](
-    initSentry:     String => Unit = dns => { Sentry.init(dns); () },
-    getEnvVariable: String => Option[String] = Properties.envOrNone _
-)(implicit ME:      MonadError[Interpretation, Throwable]) {
-
-  def run: Interpretation[Unit] =
-    getEnvVariable("GRAPH_SENTRY_DSN").map(_.trim) match {
-      case Some("")                           => ME.unit
-      case Some(dsn) if !(dsn startsWith "?") => ME.fromTry(Try(initSentry(dsn)))
-      case _                                  => ME.unit
-    }
-}
+abstract class IOSentryInitializer(
+    maybeSentryConfig: Option[SentryConfig],
+    initSentry:        String => Unit
+) extends SentryInitializer[IO](maybeSentryConfig, initSentry)

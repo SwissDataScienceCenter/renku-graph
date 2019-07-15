@@ -33,6 +33,8 @@ libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
+libraryDependencies += "io.sentry" % "sentry-logback" % "1.7.23"
+
 val doobieVersion = "0.7.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion

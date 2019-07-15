@@ -45,7 +45,7 @@ abstract class TinyTypeFactory[V, TT <: TinyType[V]](instantiate: V => TT)
     identity
   )
 
-  final def unapply(sha: TT): Option[V] = Some(sha.value)
+  final def unapply(tinyType: TT): Option[V] = Some(tinyType.value)
 
   final def from(value: V): Either[IllegalArgumentException, TT] = {
     val maybeErrors = validateConstraints(value)
