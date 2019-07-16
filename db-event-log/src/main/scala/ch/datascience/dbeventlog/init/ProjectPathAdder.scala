@@ -53,7 +53,7 @@ private class ProjectPathAdder[Interpretation[_]](
 
   private def addColumn = {
     for {
-      _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN project_path VARCHAR", transactor)
+      _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS project_path VARCHAR", transactor)
       projectIdsAndPaths <- findDistinctProjects
       _                  <- updatePaths(projectIdsAndPaths)
       _                  <- execute(sql"ALTER TABLE event_log ALTER COLUMN project_path SET NOT NULL", transactor)
@@ -63,7 +63,7 @@ private class ProjectPathAdder[Interpretation[_]](
   } recoverWith logging
 
   private def findDistinctProjects: Interpretation[List[(ProjectId, ProjectPath)]] =
-    sql"select event_body from event_log group by project_id"
+    sql"select min(event_body) from event_log group by project_id;"
       .query[String]
       .to[List]
       .transact(transactor.get)
@@ -79,7 +79,7 @@ private class ProjectPathAdder[Interpretation[_]](
     } yield tuple
   }
 
-  private implicit lazy val projectInfoDecoder: Decoder[(ProjectId, ProjectPath)] = (cursor: HCursor) =>
+  private implicit lazy val projectIdAndPathDecoder: Decoder[(ProjectId, ProjectPath)] = (cursor: HCursor) =>
     for {
       id   <- cursor.downField("project").downField("id").as[ProjectId]
       path <- cursor.downField("project").downField("path").as[ProjectPath]

@@ -62,9 +62,15 @@ class CommitIdResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "toCommitId" should {
 
-    "return a valid CommitId" in {
+    "return a valid CommitId - a case with no path after the commitId" in {
       forAll(commitIds) { commitId =>
         CommitIdResource(s"file:///commit/$commitId").to[Try, CommitId] shouldBe Success(commitId)
+      }
+    }
+
+    "return a valid CommitId - case with some path after the commitId" in {
+      forAll(commitIds, relativePaths()) { (commitId, path) =>
+        CommitIdResource(s"file:///commit/$commitId/$path").to[Try, CommitId] shouldBe Success(commitId)
       }
     }
   }

@@ -37,7 +37,7 @@ object FullProjectPath extends TinyTypeFactory[FullProjectPath](new FullProjectP
   implicit lazy val projectPathDecoder: Decoder[FullProjectPath] = Decoder.decodeString.map(FullProjectPath.apply)
 
   implicit lazy val projectPathConverter: FullProjectPath => Either[Exception, ProjectPath] = {
-    val projectPathExtractor = "^.*\\/([\\w-]+\\/[\\w-]+)$".r
+    val projectPathExtractor = "^.*\\/(.*\\/.*)$".r
 
     {
       case FullProjectPath(projectPathExtractor(path)) => ProjectPath.from(path)
@@ -53,7 +53,7 @@ final class CommitIdResource private (val value: String) extends AnyVal with Str
 object CommitIdResource extends TinyTypeFactory[CommitIdResource](new CommitIdResource(_)) {
   factory =>
 
-  private val validationRegex = "^file:\\/\\/\\/commit\\/([0-9a-f]{5,40})$".r
+  private val validationRegex = "^file:\\/\\/\\/commit\\/([0-9a-f]{5,40})\\/?.*$".r
 
   addConstraint(
     check   = validationRegex.findFirstMatchIn(_).isDefined,
