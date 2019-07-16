@@ -1,0 +1,4 @@
+
+*           @SwissDataScienceCenter/renku-graph-maintainers
+*.rst       @SwissDataScienceCenter/documentation-reviewers
+/helm-chart/ @SwissDataScienceCenter/kartografen
