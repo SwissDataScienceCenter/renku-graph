@@ -16,26 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.stubs
+package ch.datascience.graph.acceptancetests
 
-import ch.datascience.graph.acceptancetests.model._
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CommitId, Project}
-import ch.datascience.rdfstore.RdfStoreData._
-import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
 
-object RemoteTriplesGenerator {
-
-  def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
-      project:       Project,
-      commitId:      CommitId,
-      schemaVersion: SchemaVersion = currentSchemaVersion): Unit = {
-    stubFor {
-      get(s"/projects/${project.id}/commits/$commitId")
-        .willReturn(
-          ok(RDF(singleFileAndCommitTriples(project.path, commitId, Some(schemaVersion))).toString())
-        )
-    }
-    ()
-  }
+package object model {
+  val currentSchemaVersion: SchemaVersion = SchemaVersion("0.5.0")
 }

@@ -18,6 +18,9 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
+import cats.effect.IO
+import cats.effect.concurrent.Ref
+import ch.datascience.graph.model.SchemaVersion
 import org.apache.jena.rdfconnection.RDFConnectionFactory
 
 object RDFStore {
@@ -25,29 +28,66 @@ object RDFStore {
   import org.apache.jena.fuseki.main.FusekiServer
   import org.apache.jena.query.DatasetFactory
 
-  private lazy val renkuDataSet = DatasetFactory.createTxnMem()
+  // There's a problem with restarting Jena so this whole complication comes due to that fact
+  private class JenaInstance {
+    val renkuDataSet = DatasetFactory.createTxnMem()
+    val connection   = RDFConnectionFactory.connect(renkuDataSet)
+    val rdfStoreServer = FusekiServer
+      .create()
+      .loopback(true)
+      .port(3030)
+      .add("/renku", renkuDataSet)
+      .build
+  }
 
-  private lazy val rdfStoreServer: FusekiServer = FusekiServer
-    .create()
-    .loopback(true)
-    .port(3030)
-    .add("/renku", renkuDataSet)
-    .build
+  private val jenaInstance = Ref.of[IO, JenaInstance](new JenaInstance()).unsafeRunSync()
 
-  private lazy val connnection = RDFConnectionFactory.connect(renkuDataSet)
+  def start(): Unit = {
+    for {
+      newJena <- IO(new JenaInstance())
+      _       <- jenaInstance.modify(old => newJena -> old)
+      _       <- IO(newJena.rdfStoreServer.start())
+    } yield ()
+  }.unsafeRunSync()
 
-  def start(): Unit = { rdfStoreServer.start(); () }
-
-  def stop(): Unit = { rdfStoreServer.stop(); () }
+  def stop(): Unit = {
+    for {
+      jena <- jenaInstance.get
+      _ = jena.renkuDataSet.close()
+      _ = jena.rdfStoreServer.stop()
+    } yield ()
+  }.unsafeRunSync()
 
   def findAllTriplesNumber(): Int =
-    connnection
-      .query(
-        "SELECT (COUNT(*) as ?Triples) WHERE { ?s ?p ?o}"
-      )
-      .execSelect()
-      .next()
-      .get("Triples")
-      .asLiteral()
-      .getInt
+    jenaInstance.get
+      .map { jena =>
+        jena.connection
+          .query("SELECT (COUNT(*) as ?Triples) WHERE { ?s ?p ?o}")
+          .execSelect()
+          .next()
+          .get("Triples")
+          .asLiteral()
+          .getInt
+      }
+      .unsafeRunSync()
+
+  def doesVersionTripleExist(schemaVersion: SchemaVersion): Boolean =
+    jenaInstance.get
+      .map { jena =>
+        jena.connection
+          .query(s"""
+                    |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    |
+                    |SELECT (COUNT(*) as ?Triples) WHERE { 
+                    |  ?agentS rdf:type <http://purl.org/dc/terms/SoftwareAgent> .
+                    |  ?agentS rdfs:label "renku $schemaVersion".
+                    |}""".stripMargin)
+          .execSelect()
+          .next()
+          .get("Triples")
+          .asLiteral()
+          .getInt != 0
+      }
+      .unsafeRunSync()
 }

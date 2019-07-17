@@ -20,7 +20,6 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect._
 import cats.effect.concurrent.Semaphore
-import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator
@@ -33,7 +32,6 @@ import scala.concurrent.ExecutionContext
 trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
   this: Suite =>
 
-  import ch.datascience.{tokenrepository, webhookservice}
   import eu.timepit.refined.auto._
 
   protected override val maybeFixedPort: Option[Int Refined Positive] = Some(2048)
@@ -45,32 +43,27 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
   protected val webhookServiceClient:   WebhookServiceClient = GraphServices.webhookServiceClient
   protected val tokenRepositoryClient:  ServiceClient        = GraphServices.tokenRepositoryClient
   protected val triplesGeneratorClient: ServiceClient        = GraphServices.triplesGeneratorClient
+  protected val webhookService:         ServiceRun           = GraphServices.webhookService
+  protected val tokenRepository:        ServiceRun           = GraphServices.tokenRepository
+  protected val triplesGenerator:       ServiceRun           = GraphServices.triplesGenerator
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
     GraphServices.servicesRunner
       .run(
-        ServiceRun(webhookservice.Microservice, webhookServiceClient),
-        ServiceRun(tokenrepository.Microservice, tokenRepositoryClient),
-        ServiceRun(
-          service       = triplesgenerator.Microservice,
-          serviceClient = GraphServices.triplesGeneratorClient,
-          preServiceStart = List(
-            IO(RdfStoreStub.start()),
-            IO(RdfStoreStub.givenRenkuDataSetExists())
-          ),
-          postServiceStart = List(
-            IO(RdfStoreStub.shutdown()),
-            IO(RDFStore.start())
-          )
-        )
+        webhookService,
+        tokenRepository,
+        triplesGenerator
       )
       .unsafeRunSync()
   }
 }
 
 object GraphServices {
+
+  import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
+  import ch.datascience.{tokenrepository, webhookservice}
 
   implicit lazy val executionContext: ExecutionContext = ExecutionContext.global
   implicit lazy val contextShift:     ContextShift[IO] = IO.contextShift(executionContext)
@@ -80,7 +73,19 @@ object GraphServices {
   val triplesGeneratorClient = TriplesGeneratorClient()
   val tokenRepositoryClient  = TokenRepositoryClient()
 
+  val webhookService  = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
+  val tokenRepository = ServiceRun("token-repository", tokenrepository.Microservice, tokenRepositoryClient)
+  val triplesGenerator = ServiceRun(
+    "triples-generator",
+    service          = triplesgenerator.Microservice,
+    serviceClient    = triplesGeneratorClient,
+    preServiceStart  = List(IO(RDFStore.stop()), IO(RdfStoreStub.start()), IO(RdfStoreStub.givenRenkuDataSetExists())),
+    postServiceStart = List(IO(RdfStoreStub.shutdown()), IO(RDFStore.start()))
+  )
+
   private val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
+
+  def restart(service: ServiceRun): Unit = servicesRunner.restart(service)
 
   sys.addShutdownHook {
     servicesRunner.stopAllServices()

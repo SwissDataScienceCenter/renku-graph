@@ -18,7 +18,9 @@
 
 package ch.datascience.triplesgenerator
 
-import cats.effect.{ContextShift, ExitCode, IO}
+import java.util.concurrent.ConcurrentHashMap
+
+import cats.effect.{CancelToken, ContextShift, ExitCode, IO}
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -115,7 +117,38 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if starting Event Processor fails" in new TestCase {
+    "fail if Http Server fails" in new TestCase {
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventLogDbInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (datasetInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventProcessorRunner.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (reProvisioner.run _)
+        .expects()
+        .returning(IO.unit)
+
+      val exception = exceptions.generateOne
+      (httpServer.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      intercept[Exception] {
+        microserviceRunner.run(Nil).unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "return Success ExitCode even if Event Processor fails" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -141,41 +174,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.pure(ExitCode.Success))
 
-      intercept[Exception] {
-        microserviceRunner.run(Nil).unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "return Success ExitCode regardless of Http Server start-up" in new TestCase {
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventLogDbInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (datasetInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventProcessorRunner.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (reProvisioner.run _)
-        .expects()
-        .returning(IO.unit)
-
-      val exception = exceptions.generateOne
-      (httpServer.run _)
-        .expects()
-        .returning(IO.raiseError(exception))
-
       microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
     }
 
-    "return Success ExitCode regardless of re-provisioning start-up" in new TestCase {
+    "return Success ExitCode even if re-provisioning fails" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -218,7 +220,8 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       datasetInitializer,
       reProvisioner,
       eventProcessorRunner,
-      httpServer
+      httpServer,
+      new ConcurrentHashMap[CancelToken[IO], Unit]()
     )
   }
 

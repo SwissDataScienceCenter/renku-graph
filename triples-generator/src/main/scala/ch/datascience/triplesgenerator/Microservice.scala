@@ -18,6 +18,7 @@
 
 package ch.datascience.triplesgenerator
 
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
@@ -26,6 +27,7 @@ import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
+import ch.datascience.microservices.IOMicroservice
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
@@ -35,7 +37,7 @@ import pureconfig._
 
 import scala.concurrent.ExecutionContext
 
-object Microservice extends IOApp {
+object Microservice extends IOMicroservice {
 
   private implicit val executionContext: ExecutionContext =
     ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
@@ -68,28 +70,35 @@ object Microservice extends IOApp {
                      fusekiDatasetInitializer,
                      reProvisioner,
                      eventProcessorRunner,
-                     new HttpServer[IO](serverPort = 9002, serviceRoutes = new MicroserviceRoutes[IO]().routes)
+                     new HttpServer[IO](serverPort = 9002, serviceRoutes = new MicroserviceRoutes[IO]().routes),
+                     subProcessesCancelTokens
                    ) run args
       } yield exitCode
     }
 }
 
 private class MicroserviceRunner(
-    sentryInitializer:     SentryInitializer[IO],
-    eventLogDbInitializer: IOEventLogDbInitializer,
-    datasetInitializer:    FusekiDatasetInitializer[IO],
-    reProvisioner:         ReProvisioner[IO],
-    eventProcessorRunner:  EventProcessorRunner[IO],
-    httpServer:            HttpServer[IO]
-)(implicit contextShift:   ContextShift[IO]) {
-
-  import cats.implicits._
+    sentryInitializer:        SentryInitializer[IO],
+    eventLogDbInitializer:    IOEventLogDbInitializer,
+    datasetInitializer:       FusekiDatasetInitializer[IO],
+    reProvisioner:            ReProvisioner[IO],
+    eventProcessorRunner:     EventProcessorRunner[IO],
+    httpServer:               HttpServer[IO],
+    subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
+)(implicit contextShift:      ContextShift[IO]) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      _ <- sentryInitializer.run
-      _ <- eventLogDbInitializer.run
-      _ <- datasetInitializer.run
-      _ <- List(reProvisioner.run.start, httpServer.run.start, eventProcessorRunner.run).sequence
-    } yield ExitCode.Success
+      _        <- sentryInitializer.run
+      _        <- eventLogDbInitializer.run
+      _        <- datasetInitializer.run
+      _        <- reProvisioner.run.start.map(gatherCancelToken)
+      _        <- eventProcessorRunner.run.start.map(gatherCancelToken)
+      exitCode <- httpServer.run
+    } yield exitCode
+
+  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
+    subProcessesCancelTokens.put(fiber.cancel, ())
+    fiber
+  }
 }
