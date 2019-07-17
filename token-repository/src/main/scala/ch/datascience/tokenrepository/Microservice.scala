@@ -19,6 +19,7 @@
 package ch.datascience.tokenrepository
 
 import cats.effect._
+import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
 import ch.datascience.microservices.IOMicroservice
@@ -40,29 +41,36 @@ object Microservice extends IOMicroservice {
 
   private def runMicroservice(transactorResource: DbTransactorResource[IO, ProjectsTokensDB], args: List[String]) =
     transactorResource.use { transactor =>
-      val httpServer = new HttpServer[IO](
-        serverPort = 9003,
-        serviceRoutes = new MicroserviceRoutes[IO](
-          new IOFetchTokenEndpoint(transactor),
-          new IOAssociateTokenEndpoint(transactor),
-          new IODeleteTokenEndpoint(transactor)
-        ).routes
-      )
+      for {
+        sentryInitializer <- SentryInitializer[IO]
 
-      new MicroserviceRunner(
-        new IODbInitializer(transactor),
-        httpServer
-      ) run args
+        httpServer = new HttpServer[IO](
+          serverPort = 9003,
+          serviceRoutes = new MicroserviceRoutes[IO](
+            new IOFetchTokenEndpoint(transactor),
+            new IOAssociateTokenEndpoint(transactor),
+            new IODeleteTokenEndpoint(transactor)
+          ).routes
+        )
+
+        exitCode <- new MicroserviceRunner(
+                     sentryInitializer,
+                     new IODbInitializer(transactor),
+                     httpServer
+                   ) run args
+      } yield exitCode
     }
 }
 
 class MicroserviceRunner(
-    dbInitializer: IODbInitializer,
-    httpServer:    HttpServer[IO]
+    sentryInitializer: SentryInitializer[IO],
+    dbInitializer:     IODbInitializer,
+    httpServer:        HttpServer[IO]
 ) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
+      _      <- sentryInitializer.run
       _      <- dbInitializer.run
       result <- httpServer.run
     } yield result

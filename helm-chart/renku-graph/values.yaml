@@ -65,7 +65,9 @@ webhookService:
     secret:
 
 sentry:
-  sentryDsnRenkuGraph: ''
+  enabled: false
+  url: '' # Sentry url
+  environmentName: '' # Environment name e.g. renkulabio
   sentryDsnRenkuPython: ''
 
 nameOverride: ''

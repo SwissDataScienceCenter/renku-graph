@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
+import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
@@ -57,6 +58,7 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
+        sentryInitializer        <- SentryInitializer[IO]
         fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
         triplesGeneration        <- TriplesGeneration[IO]()
         reProvisioner            <- IOReProvisioner(triplesGeneration, transactor)
@@ -65,7 +67,7 @@ object Microservice extends IOMicroservice {
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
                                  .withEventsProcessor(commitEventProcessor)
         exitCode <- new MicroserviceRunner(
-                     new SentryInitializer[IO],
+                     sentryInitializer,
                      new IOEventLogDbInitializer(transactor),
                      fusekiDatasetInitializer,
                      reProvisioner,

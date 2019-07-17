@@ -28,8 +28,6 @@ private abstract class TryDatasetExistenceChecker extends DatasetExistenceChecke
 
 private abstract class TryDatasetExistenceCreator extends DatasetExistenceCreator[Try]
 
-abstract class IOSentryInitializer extends SentryInitializer[IO]
-
 class IOFusekiDatasetInitializer(
     fusekiAdminConfig:       FusekiAdminConfig,
     datasetExistenceChecker: DatasetExistenceChecker[IO],

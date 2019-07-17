@@ -70,8 +70,14 @@ spec:
               {{- else }}
               value: 1 hour
               {{- end }}
-            - name: SENTRY_DSN
-              value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=webhook-service&environment={{ .Release.Namespace }}
+            - name: SENTRY_ENABLED
+              value: "{{ .Values.sentry.enabled }}"
+              {{- if .Values.sentry.enabled }}
+            - name: SENTRY_BASE_URL
+              value: {{ .Values.sentry.url }}
+            - name: SENTRY_ENVIRONMENT_NAME
+              value: {{ .Values.sentry.environmentName }}
+              {{- end }}
             - name: THREADS_NUMBER
               value: "{{ .Values.webhookService.threadsNumber }}"
             - name: JAVA_OPTS
@@ -135,8 +141,14 @@ spec:
               value: "{{ .Values.triplesGenerator.reProvisioningInitialDelay }}"
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuPython }}
-            - name: GRAPH_SENTRY_DSN
-              value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=triples-generator&environment={{ .Release.Namespace }}
+            - name: SENTRY_ENABLED
+              value: "{{ .Values.sentry.enabled }}"
+              {{- if .Values.sentry.enabled }}
+            - name: SENTRY_BASE_URL
+              value: {{ .Values.sentry.url }}
+            - name: SENTRY_ENVIRONMENT_NAME
+              value: {{ .Values.sentry.environmentName }}
+              {{- end }}
             - name: GENERATION_PROCESSES_NUMBER
               value: "{{ .Values.triplesGenerator.generationProcessesNumber }}"
             - name: THREADS_NUMBER
@@ -183,8 +195,14 @@ spec:
                   key: tokenRepository-postgresPassword
             - name: TOKEN_REPOSITORY_POSTGRES_CONNECTION_POOL
               value: "{{ .Values.tokenRepository.connectionPool }}"
-            - name: SENTRY_DSN
-              value: {{ .Values.sentry.sentryDsnRenkuGraph }}?stacktrace.app.packages=&servername=token-repository&environment={{ .Release.Namespace }}
+            - name: SENTRY_ENABLED
+              value: "{{ .Values.sentry.enabled }}"
+              {{- if .Values.sentry.enabled }}
+            - name: SENTRY_BASE_URL
+              value: {{ .Values.sentry.url }}
+            - name: SENTRY_ENVIRONMENT_NAME
+              value: {{ .Values.sentry.environmentName }}
+              {{- end }}
             - name: JAVA_OPTS
               value: -Xmx100m -XX:+UseG1GC
           ports:
