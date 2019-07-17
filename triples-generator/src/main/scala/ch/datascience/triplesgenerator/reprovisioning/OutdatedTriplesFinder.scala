@@ -49,6 +49,7 @@ private class IOOutdatedTriplesFinder(
                          |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
                          |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
                          |PREFIX prov: <http://www.w3.org/ns/prov#>
+                         |PREFIX schema: <http://schema.org/>
                          |PREFIX dcterms: <http://purl.org/dc/terms/>
                          |
                          |SELECT ?project ?commit
@@ -58,7 +59,7 @@ private class IOOutdatedTriplesFinder(
                          |  SELECT ?project
                          |  WHERE {
                          |    {
-                         |        ?commit dcterms:isPartOf ?project .
+                         |        ?commit dcterms:isPartOf|schema:isPartOf ?project .
                          |        ?commit rdf:type prov:Activity .
                          |        ?commit prov:agent ?agent .
                          |        ?agent  rdfs:label ?version
@@ -66,7 +67,7 @@ private class IOOutdatedTriplesFinder(
                          |    }
                          |    UNION
                          |    {
-                         |        ?commit dcterms:isPartOf ?project .
+                         |        ?commit dcterms:isPartOf|schema:isPartOf ?project .
                          |        ?commit rdf:type prov:Activity .
                          |        FILTER NOT EXISTS {
                          |          ?commit prov:agent ?agent .
@@ -78,7 +79,7 @@ private class IOOutdatedTriplesFinder(
                          |  }
                          |  # finding all the commits for the found project with either no agent or agent with a different version
                          |  {
-                         |	  ?commit dcterms:isPartOf ?project .
+                         |	  ?commit dcterms:isPartOf|schema:isPartOf ?project .
                          |    ?commit rdf:type prov:Activity .
                          |    ?commit prov:agent ?agent .
                          |    ?agent  rdfs:label ?version
@@ -86,7 +87,7 @@ private class IOOutdatedTriplesFinder(
                          |  }
                          |  UNION
                          |  {
-                         |	  ?commit dcterms:isPartOf ?project .
+                         |	  ?commit dcterms:isPartOf|schema:isPartOf ?project .
                          |    ?commit rdf:type prov:Activity .
                          |    FILTER NOT EXISTS {
                          |      ?commit prov:agent ?agent .

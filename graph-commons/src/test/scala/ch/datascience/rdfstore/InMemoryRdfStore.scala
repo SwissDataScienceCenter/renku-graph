@@ -144,6 +144,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
            |PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>
            |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
            |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+           |PREFIX schema: <http://schema.org/>
            |PREFIX dcterms: <http://purl.org/dc/terms/>
            |
            |$query""".stripMargin

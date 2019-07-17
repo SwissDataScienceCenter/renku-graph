@@ -48,6 +48,7 @@ private class IOOutdatedTriplesRemover(
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX prov: <http://www.w3.org/ns/prov#>
+       |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
        |DELETE { ?s ?p ?o } 
@@ -56,7 +57,7 @@ private class IOOutdatedTriplesRemover(
        |    SELECT ?subject
        |    WHERE {
        |      {
-       |        ?commit dcterms:isPartOf ${triplesToRemove.projectPath.showAs[RdfResource]} .
+       |        ?commit dcterms:isPartOf|schema:isPartOf ${triplesToRemove.projectPath.showAs[RdfResource]} .
        |        FILTER (?commit IN (${triplesToRemove.commits.map(_.showAs[RdfResource]).mkString(",")}))
        |        ?commit ?predicate ?object
        |      }
@@ -88,9 +89,7 @@ private class IOOutdatedTriplesRemover(
   private def removeOrphanAgentTriples: IO[Unit] = queryWitNoResult {
     s"""
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX prov: <http://www.w3.org/ns/prov#>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
        |DELETE { ?s ?p ?o } 
        |WHERE {
