@@ -6,8 +6,8 @@ Expand the name of the chart.
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "graphService.name" -}}
-{{- "graph-service" -}}
+{{- define "knowledgeGraph.name" -}}
+{{- "knowledge-graph" -}}
 {{- end -}}
 
 {{/*
@@ -28,11 +28,11 @@ If release name contains chart name it will be used as a full name.
 {{- end -}}
 {{- end -}}
 
-{{- define "graphService.fullname" -}}
+{{- define "knowledgeGraph.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
-{{- printf "%s-graph-service" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-knowledge-graph" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 {{- end -}}
 
@@ -43,8 +43,8 @@ Create chart name and version as used by the chart label.
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "graphService.chart" -}}
-{{- printf "%s-%s-graph-service" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{- define "knowledgeGraph.chart" -}}
+{{- printf "%s-knowledge-graph" .Chart.Name | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*

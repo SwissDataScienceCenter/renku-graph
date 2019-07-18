@@ -63,9 +63,9 @@ webhookService:
     ## Generated using: `openssl rand -hex 8|base64`
     secret:
 
-graphService:
+knowledgeGraph:
   image:
-    repository: renku/graph-service
+    repository: renku/knowledge-graph
     tag: 'latest'
     pullPolicy: IfNotPresent
   service:

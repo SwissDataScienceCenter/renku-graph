@@ -19,7 +19,7 @@ lazy val root = Project(
   tokenRepository,
   webhookService,
   triplesGenerator,
-  graphService
+  knowledgeGraph
 )
 
 lazy val graphCommons = Project(
@@ -86,9 +86,9 @@ lazy val tokenRepository = Project(
   AutomateHeaderPlugin
 )
 
-lazy val graphService = Project(
-  id   = "graph-service",
-  base = file("graph-service")
+lazy val knowledgeGraph = Project(
+  id   = "knowledge-graph",
+  base = file("knowledge-graph")
 ).settings(
   commonSettings
 ).dependsOn(
@@ -108,7 +108,7 @@ lazy val acceptanceTests = Project(
   webhookService,
   triplesGenerator,
   tokenRepository,
-  graphService % "test->test",
+  knowledgeGraph % "test->test",
   graphCommons % "test->test",
   dbEventLog   % "test->test"
 ).enablePlugins(

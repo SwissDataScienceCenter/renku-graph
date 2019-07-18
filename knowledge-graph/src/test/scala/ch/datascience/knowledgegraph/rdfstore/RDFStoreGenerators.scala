@@ -16,22 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.data
+package ch.datascience.knowledgegraph.rdfstore
 
-import ch.datascience.graph.model.events.ProjectPath
-import ch.datascience.knowledgegraph.config.RenkuBaseUrl
-import ch.datascience.knowledgegraph.graphql
-import ch.datascience.knowledgegraph.graphql.lineage.model.Node
-import io.circe.{Encoder, Json}
+import ch.datascience.generators.CommonGraphGenerators.basicAuthCredentials
+import ch.datascience.generators.Generators.{httpUrls, nonEmptyStrings}
+import org.scalacheck.Gen
 
-object KnowledgeGraph {
+object RDFStoreGenerators {
 
-  private val renkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
-  private val testData     = new graphql.lineage.TestData(renkuBaseUrl)
+  import RDFStoreConfig._
 
-  def triples(projectPath: ProjectPath): String = testData.triples(projectPath)
+  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls map FusekiBaseUrl.apply
+  implicit val datasetNames:   Gen[DatasetName]   = nonEmptyStrings() map DatasetName.apply
 
-  implicit val nodeEncoder: Encoder[Node] = Encoder.instance {
-    case Node(id, _) => Json.fromString(id.value)
-  }
+  implicit val rdfStoreConfigs: Gen[RDFStoreConfig] = for {
+    fusekiUrl       <- fusekiBaseUrls
+    datasetName     <- datasetNames
+    authCredentials <- basicAuthCredentials
+  } yield RDFStoreConfig(fusekiUrl, datasetName, authCredentials)
 }

@@ -16,22 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.data
+package ch.datascience.knowledgegraph.graphql
 
-import ch.datascience.graph.model.events.ProjectPath
-import ch.datascience.knowledgegraph.config.RenkuBaseUrl
-import ch.datascience.knowledgegraph.graphql
-import ch.datascience.knowledgegraph.graphql.lineage.model.Node
-import io.circe.{Encoder, Json}
+import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.knowledgegraph.graphql.lineage.{IOLineageFinder, LineageFinder}
 
-object KnowledgeGraph {
+import scala.concurrent.ExecutionContext
+import scala.language.higherKinds
 
-  private val renkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
-  private val testData     = new graphql.lineage.TestData(renkuBaseUrl)
+class QueryContext[Interpretation[_]](
+    val lineageFinder: LineageFinder[Interpretation]
+)
 
-  def triples(projectPath: ProjectPath): String = testData.triples(projectPath)
-
-  implicit val nodeEncoder: Encoder[Node] = Encoder.instance {
-    case Node(id, _) => Json.fromString(id.value)
-  }
+object IOQueryContext {
+  def apply()(implicit executionContext: ExecutionContext,
+              contextShift:              ContextShift[IO],
+              timer:                     Timer[IO]): IO[QueryContext[IO]] =
+    for {
+      lineageFinder <- IOLineageFinder()
+    } yield new QueryContext[IO](lineageFinder)
 }

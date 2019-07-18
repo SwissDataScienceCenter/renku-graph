@@ -16,22 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.data
+package ch.datascience.knowledgegraph.graphql
 
-import ch.datascience.graph.model.events.ProjectPath
-import ch.datascience.knowledgegraph.config.RenkuBaseUrl
-import ch.datascience.knowledgegraph.graphql
-import ch.datascience.knowledgegraph.graphql.lineage.model.Node
-import io.circe.{Encoder, Json}
+import sangria.ast.Document
 
-object KnowledgeGraph {
-
-  private val renkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
-  private val testData     = new graphql.lineage.TestData(renkuBaseUrl)
-
-  def triples(projectPath: ProjectPath): String = testData.triples(projectPath)
-
-  implicit val nodeEncoder: Encoder[Node] = Encoder.instance {
-    case Node(id, _) => Json.fromString(id.value)
-  }
-}
+final case class UserQuery(query: Document)

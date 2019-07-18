@@ -24,7 +24,7 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
 import ch.datascience.graph.model.events.ProjectPath
-import ch.datascience.graphservice.graphql
+import ch.datascience.knowledgegraph.graphql
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import flows.RdfStoreProvisioning._
 import graphql.lineage.TestData._

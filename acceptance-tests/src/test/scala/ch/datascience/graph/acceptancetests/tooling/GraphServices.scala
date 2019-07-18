@@ -34,7 +34,7 @@ import scala.concurrent.ExecutionContext
 trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
   this: Suite =>
 
-  import ch.datascience.{graphservice, tokenrepository, webhookservice}
+  import ch.datascience.{knowledgegraph, tokenrepository, webhookservice}
   import eu.timepit.refined.auto._
 
   protected override val maybeFixedPort: Option[Int Refined Positive] = Some(2048)
@@ -67,7 +67,7 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
             IO(RDFStore.start())
           )
         ),
-        ServiceRun(graphservice.Microservice, graphServiceClient)
+        ServiceRun(knowledgegraph.Microservice, graphServiceClient)
       )
       .unsafeRunSync()
   }

@@ -16,22 +16,27 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.data
+package ch.datascience.knowledgegraph
 
-import ch.datascience.graph.model.events.ProjectPath
-import ch.datascience.knowledgegraph.config.RenkuBaseUrl
-import ch.datascience.knowledgegraph.graphql
-import ch.datascience.knowledgegraph.graphql.lineage.model.Node
-import io.circe.{Encoder, Json}
+import cats.effect.ConcurrentEffect
+import ch.datascience.knowledgegraph.graphql.QueryEndpoint
+import org.http4s.dsl.Http4sDsl
 
-object KnowledgeGraph {
+import scala.language.higherKinds
 
-  private val renkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
-  private val testData     = new graphql.lineage.TestData(renkuBaseUrl)
+private class MicroserviceRoutes[F[_]: ConcurrentEffect](
+    queryEndpoint: QueryEndpoint[F]
+) extends Http4sDsl[F] {
 
-  def triples(projectPath: ProjectPath): String = testData.triples(projectPath)
+  import queryEndpoint._
+  import org.http4s.HttpRoutes
 
-  implicit val nodeEncoder: Encoder[Node] = Encoder.instance {
-    case Node(id, _) => Json.fromString(id.value)
-  }
+  // format: off
+  lazy val routes: HttpRoutes[F] = HttpRoutes
+    .of[F] {
+      case           GET  -> Root / "ping"    => Ok("pong")
+      case           GET  -> Root / "knowledge-graph" / "graphql" => schema
+      case request @ POST -> Root / "knowledge-graph" / "graphql" => handleQuery(request)
+    }
+  // format: on
 }
