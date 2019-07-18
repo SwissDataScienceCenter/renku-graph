@@ -19,11 +19,12 @@
 package ch.datascience.config
 
 import cats.MonadError
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import com.typesafe.config.Config
 import pureconfig._
-import pureconfig.error.ConfigReaderFailures
+import pureconfig.error.{CannotConvert, ConfigReaderFailures}
 
-import scala.language.higherKinds
+import scala.language.{higherKinds, implicitConversions}
 
 abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
@@ -52,4 +53,15 @@ object ConfigLoader {
       import cats.implicits._
       loadedConfig leftMap (new ConfigLoadingException(_))
     }
+
+  implicit def stringTinyTypeReader[TT <: TinyType[String]](
+      implicit ttApply: TinyTypeFactory[String, TT]): ConfigReader[TT] = {
+    import cats.implicits._
+    ConfigReader
+      .fromString[TT] { value =>
+        ttApply
+          .from(value)
+          .leftMap(exception => CannotConvert(value, ttApply.getClass.toString, exception.getMessage))
+      }
+  }
 }
