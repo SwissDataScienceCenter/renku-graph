@@ -71,7 +71,7 @@ class ReProvisioner[Interpretation[_]](
       _               <- liftF(logger.info(s"ReProvisioning '${outdatedTriples.projectPath}' project"))
       _               <- liftF(startReProvisioning)
     } yield ()
-  }.value.flatMap(_ => logger.info("All projects' triples up to date"))
+  }.value.flatMap(loggingAllProcessed)
 
   private lazy val tryAgain: PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -80,6 +80,11 @@ class ReProvisioner[Interpretation[_]](
         _ <- timer sleep sleepWhenBusy
         _ <- startReProvisioning
       } yield ()
+  }
+
+  private lazy val loggingAllProcessed: Option[Unit] => Interpretation[Unit] = {
+    case None => logger.info("All projects' triples up to date")
+    case _    => ME.unit
   }
 }
 

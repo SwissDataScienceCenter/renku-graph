@@ -18,48 +18,73 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
-import cats.effect.IO
-import cats.effect.concurrent.Ref
+import cats.effect.concurrent.MVar
+import cats.effect.{ContextShift, Fiber, IO}
 import ch.datascience.graph.model.SchemaVersion
+import org.apache.jena.fuseki.main.FusekiServer
+import org.apache.jena.query.DatasetFactory
 import org.apache.jena.rdfconnection.RDFConnectionFactory
+
+import scala.concurrent.ExecutionContext
 
 object RDFStore {
 
-  import org.apache.jena.fuseki.main.FusekiServer
-  import org.apache.jena.query.DatasetFactory
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
-  // There's a problem with restarting Jena so this whole complication comes due to that fact
+  // There's a problem with restarting Jena so this whole weirdness comes due to that fact
   private class JenaInstance {
-    val renkuDataSet = DatasetFactory.createTxnMem()
-    val connection   = RDFConnectionFactory.connect(renkuDataSet)
-    val rdfStoreServer = FusekiServer
-      .create()
-      .loopback(true)
-      .port(3030)
-      .add("/renku", renkuDataSet)
-      .build
+    lazy val renkuDataSet = DatasetFactory.createTxnMem()
+    lazy val connection   = RDFConnectionFactory.connect(renkuDataSet)
+
+    private val jenaFiber = MVar.empty[IO, Fiber[IO, FusekiServer]].unsafeRunSync()
+
+    def start(): IO[Unit] =
+      for {
+        _ <- contextShift.shift
+        fiber <- IO {
+                  FusekiServer
+                    .create()
+                    .loopback(true)
+                    .port(3030)
+                    .add("/renku", renkuDataSet)
+                    .build
+                    .start()
+                }.start
+        _ <- jenaFiber.put(fiber)
+      } yield ()
+
+    def stop(): IO[Unit] = {
+      connection.close()
+      renkuDataSet.close()
+      jenaFiber.tryTake.flatMap {
+        case None => IO.unit
+        case Some(fiber) =>
+          for {
+            _           <- fiber.join.map(_.stop())
+            cancelToken <- fiber.cancel
+          } yield cancelToken
+      }
+    }
   }
 
-  private val jenaInstance = Ref.of[IO, JenaInstance](new JenaInstance()).unsafeRunSync()
+  private val jenaReference = MVar.empty[IO, JenaInstance].unsafeRunSync()
 
-  def start(): Unit = {
+  def start(): IO[Unit] =
     for {
-      newJena <- IO(new JenaInstance())
-      _       <- jenaInstance.modify(old => newJena -> old)
-      _       <- IO(newJena.rdfStoreServer.start())
+      _ <- stop()
+      newJena = new JenaInstance()
+      _ <- jenaReference.put(newJena)
+      _ <- newJena.start()
     } yield ()
-  }.unsafeRunSync()
 
-  def stop(): Unit = {
+  def stop(): IO[Unit] =
     for {
-      jena <- jenaInstance.get
-      _ = jena.renkuDataSet.close()
-      _ = jena.rdfStoreServer.stop()
+      maybeJena <- jenaReference.tryTake
+      _         <- maybeJena.map(_.stop()).getOrElse(IO.unit)
     } yield ()
-  }.unsafeRunSync()
 
   def findAllTriplesNumber(): Int =
-    jenaInstance.get
+    jenaReference.read
       .map { jena =>
         jena.connection
           .query("SELECT (COUNT(*) as ?Triples) WHERE { ?s ?p ?o}")
@@ -72,7 +97,7 @@ object RDFStore {
       .unsafeRunSync()
 
   def doesVersionTripleExist(schemaVersion: SchemaVersion): Boolean =
-    jenaInstance.get
+    jenaReference.read
       .map { jena =>
         jena.connection
           .query(s"""

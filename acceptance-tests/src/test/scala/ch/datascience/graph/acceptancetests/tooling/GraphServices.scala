@@ -79,8 +79,8 @@ object GraphServices {
     "triples-generator",
     service          = triplesgenerator.Microservice,
     serviceClient    = triplesGeneratorClient,
-    preServiceStart  = List(IO(RDFStore.stop()), IO(RdfStoreStub.start()), IO(RdfStoreStub.givenRenkuDataSetExists())),
-    postServiceStart = List(IO(RdfStoreStub.shutdown()), IO(RDFStore.start()))
+    preServiceStart  = List(RDFStore.stop(), IO(RdfStoreStub.start()), IO(RdfStoreStub.givenRenkuDataSetExists())),
+    postServiceStart = List(IO(RdfStoreStub.shutdown()), RDFStore.start())
   )
 
   private val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
