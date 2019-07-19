@@ -16,43 +16,55 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.config
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.config.ServiceUrl
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.httpUrls
+import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class GitLabUrlProviderSpec extends WordSpec {
+class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  "get" should {
+  "apply" should {
 
-    "read 'services.gitlab.url' from the config" in {
-      val gitLabUrl = httpUrls.generateOne
+    "return a RenkuBaseUrl if there's a value for 'services.renku.url'" in {
+      forAll(httpUrls) { url =>
+        val config = ConfigFactory.parseMap(
+          Map(
+            "services" -> Map(
+              "renku" -> Map(
+                "url" -> url
+              ).asJava
+            ).asJava
+          ).asJava
+        )
+        val Success(actual) = RenkuBaseUrl[Try](config)
+      }
+    }
+
+    "fail if there's no value for the 'services.renku.url'" in {
+      val Failure(exception) = RenkuBaseUrl[Try](ConfigFactory.empty())
+      exception shouldBe an[ConfigLoadingException]
+    }
+
+    "fail if config value is invalid" in {
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "gitlab" -> Map(
-              "url" -> gitLabUrl
+            "renku" -> Map(
+              "url" -> "abcd"
             ).asJava
           ).asJava
         ).asJava
       )
 
-      new GitLabUrlProvider[Try](config).get shouldBe Success(ServiceUrl(gitLabUrl))
-    }
-
-    "fail if there's no 'services.gitlab.url' entry" in {
-      val config = ConfigFactory.empty()
-
-      val Failure(exception) = new GitLabUrlProvider[Try](config).get
+      val Failure(exception) = RenkuBaseUrl[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }

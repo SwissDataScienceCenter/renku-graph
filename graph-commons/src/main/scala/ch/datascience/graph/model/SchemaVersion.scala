@@ -16,18 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.graph.model
 
-import cats.MonadError
-import ch.datascience.config.{ConfigLoader, ServiceUrl}
-import com.typesafe.config.{Config, ConfigFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-import scala.language.higherKinds
-
-private class GitLabUrlProvider[Interpretation[_]](
-    config:    Config = ConfigFactory.load()
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
-
-  def get: Interpretation[ServiceUrl] = find[ServiceUrl]("services.gitlab.url", config)
-}
+class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
+object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank

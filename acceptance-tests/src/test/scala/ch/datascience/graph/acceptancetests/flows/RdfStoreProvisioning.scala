@@ -25,6 +25,7 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
@@ -34,12 +35,12 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 object RdfStoreProvisioning extends Eventually with IntegrationPatience {
 
-  def `data in the RDF store`(project: Project, commitId: CommitId): Assertion = {
+  def `data in the RDF store`(project: Project, commitId: CommitId, schemaVersion: SchemaVersion): Assertion = {
     val projectId = project.id
 
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-    `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+    `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, schemaVersion)
 
     webhookServiceClient
       .POST("webhooks/events", HookToken(projectId), model.GitLab.pushEvent(project, commitId))

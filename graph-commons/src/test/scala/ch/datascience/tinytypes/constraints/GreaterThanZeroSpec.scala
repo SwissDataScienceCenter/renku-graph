@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -44,8 +44,8 @@ class GreaterThanZeroSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-private class GreaterThanZeroInt private (val value: Int) extends AnyVal with TinyType[Int]
+private class GreaterThanZeroInt private (val value: Int) extends AnyVal with IntTinyType
 
 private object GreaterThanZeroInt
-    extends TinyTypeFactory[Int, GreaterThanZeroInt](new GreaterThanZeroInt(_))
+    extends TinyTypeFactory[GreaterThanZeroInt](new GreaterThanZeroInt(_))
     with GreaterThanZero

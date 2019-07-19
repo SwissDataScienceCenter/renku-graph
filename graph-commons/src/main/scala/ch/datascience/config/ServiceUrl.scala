@@ -18,22 +18,14 @@
 
 package ch.datascience.config
 
-import cats.implicits._
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import pureconfig.ConfigReader
-import pureconfig.error.CannotConvert
 
 import scala.language.implicitConversions
-import scala.util.Try
 
-class ServiceUrl private (val value: String) extends AnyVal with TinyType[String]
+class ServiceUrl private (val value: String) extends AnyVal with StringTinyType
 
-object ServiceUrl extends TinyTypeFactory[String, ServiceUrl](new ServiceUrl(_)) with Url with UrlOps[ServiceUrl] {
-
-  implicit val serviceUrlReader: ConfigReader[ServiceUrl] =
-    ConfigReader.fromString[ServiceUrl] { value =>
-      Try(ServiceUrl(value)).toEither
-        .leftMap(exception => CannotConvert(value, ServiceUrl.getClass.toString, exception.getMessage))
-    }
+object ServiceUrl extends TinyTypeFactory[ServiceUrl](new ServiceUrl(_)) with Url with UrlOps[ServiceUrl] {
+  implicit val serviceUrlReader: ConfigReader[ServiceUrl] = ConfigLoader.stringTinyTypeReader(this)
 }

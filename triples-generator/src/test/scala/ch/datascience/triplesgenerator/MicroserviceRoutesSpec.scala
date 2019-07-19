@@ -20,7 +20,6 @@ package ch.datascience.triplesgenerator
 
 import cats.effect.IO
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.triplesgenerator.reprovisioning.IOCompleteReProvisioningEndpoint
 import org.http4s.Status._
 import org.http4s._
 import org.scalamock.scalatest.MockFactory
@@ -44,7 +43,6 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val completeReProvisionEndpoint = mock[IOCompleteReProvisioningEndpoint]
-    val routes                      = new MicroserviceRoutes[IO](completeReProvisionEndpoint).routes.or(notAvailableResponse)
+    val routes = new MicroserviceRoutes[IO]().routes.or(notAvailableResponse)
   }
 }

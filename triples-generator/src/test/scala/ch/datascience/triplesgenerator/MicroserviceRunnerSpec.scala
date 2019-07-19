@@ -18,7 +18,9 @@
 
 package ch.datascience.triplesgenerator
 
-import cats.effect.{ContextShift, ExitCode, IO}
+import java.util.concurrent.ConcurrentHashMap
+
+import cats.effect._
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -26,6 +28,7 @@ import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessorRunner
 import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
+import ch.datascience.triplesgenerator.reprovisioning.IOReProvisioner
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -40,6 +43,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       "sentry initialization, " +
       "Event Log db verification, " +
       "dataset verification, " +
+      "re-provisioning, " +
       "starting Event Processor and " +
       "http server succeeds" in new TestCase {
       (sentryInitializer.run _)
@@ -51,6 +55,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
 
       (datasetInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (reProvisioner.run _)
         .expects()
         .returning(IO.unit)
 
@@ -110,7 +118,38 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if starting Event Processor fails" in new TestCase {
+    "fail if Http Server fails" in new TestCase {
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventLogDbInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (datasetInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventProcessorRunner.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (reProvisioner.run _)
+        .expects()
+        .returning(IO.unit)
+
+      val exception = exceptions.generateOne
+      (httpServer.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      intercept[Exception] {
+        microserviceRunner.run(Nil).unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "return Success ExitCode even if Event Processor fails" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -128,16 +167,18 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.raiseError(exception))
 
+      (reProvisioner.run _)
+        .expects()
+        .returning(IO.unit)
+
       (httpServer.run _)
         .expects()
         .returning(IO.pure(ExitCode.Success))
 
-      intercept[Exception] {
-        microserviceRunner.run(Nil).unsafeRunSync()
-      } shouldBe exception
+      microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
     }
 
-    "return Success ExitCode regardless of Http Server start-up" in new TestCase {
+    "return Success ExitCode even if re-provisioning fails" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -154,8 +195,12 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      val exception = exceptions.generateOne
       (httpServer.run _)
+        .expects()
+        .returning(IO.pure(ExitCode.Success))
+
+      val exception = exceptions.generateOne
+      (reProvisioner.run _)
         .expects()
         .returning(IO.raiseError(exception))
 
@@ -167,14 +212,17 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
     val sentryInitializer     = mock[IOSentryInitializer]
     val eventLogDbInitializer = mock[IOEventLogDbInitializer]
     val datasetInitializer    = mock[IOFusekiDatasetInitializer]
+    val reProvisioner         = mock[IOReProvisioner]
     val eventProcessorRunner  = mock[IOEventProcessorRunner]
     val httpServer            = mock[IOHttpServer]
     val microserviceRunner = new MicroserviceRunner(
       sentryInitializer,
       eventLogDbInitializer,
       datasetInitializer,
+      reProvisioner,
       eventProcessorRunner,
-      httpServer
+      httpServer,
+      new ConcurrentHashMap[CancelToken[IO], Unit]()
     )
   }
 

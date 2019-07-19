@@ -27,9 +27,10 @@ import cats.implicits._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.graph.model.events.ProjectPath
 import ch.datascience.http.client.AccessToken
+import ch.datascience.triplesgenerator.config.GitLabUrl
 import ch.datascience.triplesgenerator.eventprocessing.Commit._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
-import ch.datascience.triplesgenerator.eventprocessing.{Commit, GitLabUrlProvider, RDFTriples}
+import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.ExecutionContext
@@ -97,7 +98,7 @@ object RenkuLogTriplesGenerator {
               timer:                 Timer[IO]): IO[TriplesGenerator[IO]] =
     for {
       renkuLogTimeout <- new RenkuLogTimeoutConfigProvider[IO].get
-      gitLabUrl       <- new GitLabUrlProvider[IO]().get
+      gitLabUrl       <- GitLabUrl[IO]()
     } yield
       new RenkuLogTriplesGenerator(
         new GitLabRepoUrlFinder[IO](gitLabUrl),

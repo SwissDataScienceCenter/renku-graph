@@ -22,7 +22,7 @@ import ProjectHookUrlFinder.ProjectHookUrl
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.{RefType, Refined}
 import io.circe.Decoder
 
@@ -42,8 +42,8 @@ class ProjectHookUrlFinder[Interpretation[_]](
 object ProjectHookUrlFinder {
   import eu.timepit.refined.string.Url
 
-  class ProjectHookUrl private (val value: String) extends AnyVal with TinyType[String]
-  object ProjectHookUrl extends TinyTypeFactory[String, ProjectHookUrl](new ProjectHookUrl(_)) {
+  class ProjectHookUrl private (val value: String) extends AnyVal with StringTinyType
+  object ProjectHookUrl extends TinyTypeFactory[ProjectHookUrl](new ProjectHookUrl(_)) {
     private type ProjectHookUrlValue = String Refined Url
 
     addConstraint(

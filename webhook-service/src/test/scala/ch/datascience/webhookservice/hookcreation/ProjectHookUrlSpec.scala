@@ -30,7 +30,7 @@ class ProjectHookUrlSpec extends WordSpec {
   "ProjectHookUrl" should {
 
     "be a TinyType" in {
-      ProjectHookUrl(validatedUrls.generateOne.value) shouldBe a[TinyType[_]]
+      ProjectHookUrl(validatedUrls.generateOne.value) shouldBe a[TinyType]
     }
   }
 

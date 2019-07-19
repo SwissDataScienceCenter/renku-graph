@@ -18,33 +18,46 @@
 
 package ch.datascience.tinytypes
 
-trait TinyType[T] extends Any {
+import java.time.Instant
 
-  def value: T
+import cats.MonadError
+
+import scala.language.higherKinds
+
+trait TinyType extends Any {
+
+  type V
+
+  def value: V
 
   override def toString: String = value.toString
 }
 
+trait StringTinyType  extends Any with TinyType { type V = String }
+trait IntTinyType     extends Any with TinyType { type V = Int }
+trait LongTinyType    extends Any with TinyType { type V = Long }
+trait InstantTinyType extends Any with TinyType { type V = Instant }
+
 trait Sensitive extends Any {
-  self: TinyType[_] =>
+  self: TinyType =>
 
   override def toString: String = "<sensitive>"
 }
 
-abstract class TinyTypeFactory[V, TT <: TinyType[V]](instantiate: V => TT) extends Constraints[V] with TypeName {
+abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT) extends Constraints[TT#V] with TypeName {
 
   import cats.implicits._
 
   import scala.util.Try
 
-  final def apply(value: V): TT = from(value).fold(
+  final def apply(value: TT#V): TT = from(value).fold(
     exception => throw exception,
     identity
   )
 
-  final def unapply(tinyType: TT): Option[V] = Some(tinyType.value)
+  final def unapply(tinyType: TT): Option[TT#V] = Some(tinyType.value)
 
-  final def from(value: V): Either[IllegalArgumentException, TT] = {
+  final def from(value: TT#V): Either[IllegalArgumentException, TT] = {
     val maybeErrors = validateConstraints(value)
     if (maybeErrors.isEmpty) Either.fromTry[TT](Try(instantiate(value))) leftMap flattenErrors
     else Left(new IllegalArgumentException(maybeErrors.mkString("; ")))
@@ -54,6 +67,20 @@ abstract class TinyTypeFactory[V, TT <: TinyType[V]](instantiate: V => TT) exten
     case exception: IllegalArgumentException => exception
     case exception => new IllegalArgumentException(exception)
   }
+
+  implicit class TinyTypeConverters(tinyType: TT) {
+
+    def to[Interpretation[_], Out](implicit
+                                   convert: TT => Either[Exception, Out],
+                                   ME:      MonadError[Interpretation, Throwable]): Interpretation[Out] =
+      ME.fromEither(convert(tinyType))
+
+    def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
+  }
+}
+
+trait Renderer[View, T] {
+  def render(value: T): String
 }
 
 trait Constraints[V] extends TypeName {

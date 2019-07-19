@@ -22,8 +22,10 @@ import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.RateLimit
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
+import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl, RdfStoreConfig}
 import org.scalacheck.Gen
 
 object CommonGraphGenerators {
@@ -57,6 +59,17 @@ object CommonGraphGenerators {
     RateLimit.from(s"$items/$unit").getOrElse {
       throw new IllegalArgumentException("Problems with rateLimits generator")
     }
+
+  implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
+    fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
+    datasetName     <- nonEmptyStrings() map DatasetName.apply
+    authCredentials <- basicAuthCredentials
+  } yield RdfStoreConfig(fusekiUrl, datasetName, authCredentials)
+
+  implicit val schemaVersions: Gen[SchemaVersion] = Gen
+    .listOfN(3, positiveInts(max = 50))
+    .map(_.mkString("."))
+    .map(SchemaVersion.apply)
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
     url         <- httpUrls

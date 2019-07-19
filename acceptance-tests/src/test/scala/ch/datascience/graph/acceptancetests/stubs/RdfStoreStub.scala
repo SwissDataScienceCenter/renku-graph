@@ -32,7 +32,17 @@ object RdfStoreStub {
     WireMock.configureFor(fusekiStub.port())
   }
 
-  def shutdown(): Unit = fusekiStub.shutdown()
+  def shutdown(): Unit = {
+    if (fusekiStub.isRunning) fusekiStub.shutdown()
+
+    def waitUntilDown(): Unit =
+      if (fusekiStub.isRunning) {
+        Thread.sleep(100)
+        waitUntilDown()
+      }
+
+    waitUntilDown()
+  }
 
   def givenRenkuDataSetExists(): Unit = {
     stubFor {

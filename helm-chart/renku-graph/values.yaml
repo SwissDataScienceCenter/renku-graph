@@ -31,6 +31,7 @@ triplesGenerator:
     limits:
       memory: 2000Mi
   renkuLogTimeout: 60 minutes
+  reProvisioningInitialDelay: 365 days
   gitlab:
     rateLimit: 30/sec
   ## a demanded number of concurrent triples generation processes

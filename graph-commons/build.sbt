@@ -50,6 +50,11 @@ libraryDependencies += "org.http4s" %% "http4s-dsl"          % http4sVersion
 
 // Test dependencies
 libraryDependencies += "com.github.tomakehurst" % "wiremock"    % "2.23.2" % Test
+
+val jenaVersion = "3.12.0"
+libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
+libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % Test
+
 libraryDependencies += "org.scalamock"          %% "scalamock"  % "4.3.0"  % Test
 libraryDependencies += "org.scalacheck"         %% "scalacheck" % "1.14.0" % Test
 libraryDependencies += "org.scalatest"          %% "scalatest"  % "3.0.8"  % Test

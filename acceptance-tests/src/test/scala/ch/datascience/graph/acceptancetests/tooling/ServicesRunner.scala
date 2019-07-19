@@ -22,11 +22,13 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.effect._
 import cats.effect.concurrent.Semaphore
+import ch.datascience.microservices.IOMicroservice
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-final case class ServiceRun(service:          IOApp,
+final case class ServiceRun(name:             String,
+                            service:          IOMicroservice,
                             serviceClient:    ServiceClient,
                             preServiceStart:  List[IO[Unit]] = List.empty,
                             postServiceStart: List[IO[Unit]] = List.empty)
@@ -48,7 +50,7 @@ class ServicesRunner(
       _ <- semaphore.release
     } yield ()
 
-  private val cancelTokens = new ConcurrentHashMap[CancelToken[IO], Unit]()
+  private val cancelTokens = new ConcurrentHashMap[ServiceRun, CancelToken[IO]]()
 
   private def start(
       serviceRun:              ServiceRun
@@ -59,7 +61,7 @@ class ServicesRunner(
       case _ =>
         for {
           _ <- preServiceStart.sequence
-          _ = service.run(Nil).start.map(fiber => cancelTokens.put(fiber.cancel, ())).unsafeRunAsyncAndForget()
+          _ = service.run(Nil).start.map(fiber => cancelTokens.put(serviceRun, fiber.cancel)).unsafeRunAsyncAndForget()
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }
@@ -71,5 +73,24 @@ class ServicesRunner(
       case _         => timer.sleep(500 millis) *> verifyServiceReady(serviceRun)
     }
 
-  def stopAllServices(): Unit = cancelTokens.keys.asScala.foreach(_.unsafeRunSync())
+  private def verifyServiceDown(serviceRun: ServiceRun)(implicit timer: Timer[IO]): IO[Unit] =
+    serviceRun.serviceClient.ping flatMap {
+      case ServiceUp => timer.sleep(500 millis) *> verifyServiceDown(serviceRun)
+      case _         => IO.unit
+    }
+
+  def restart(service: ServiceRun): Unit = cancelTokens.asScala.get(service) match {
+    case None => throw new IllegalStateException(s"'${service.name}' service not found so cannot be restarted")
+    case Some(cancelToken) => {
+      for {
+        _ <- service.service.stopSubProcesses.sequence
+        _ <- cancelToken
+        _ <- verifyServiceDown(service)
+        _ = cancelTokens.remove(service)
+        _ <- start(service)
+      } yield ()
+    }.unsafeRunSync()
+  }
+
+  def stopAllServices(): Unit = cancelTokens.values().asScala.foreach(_.unsafeRunSync())
 }

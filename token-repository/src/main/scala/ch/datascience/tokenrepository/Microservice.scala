@@ -22,6 +22,7 @@ import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
+import ch.datascience.microservices.IOMicroservice
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
@@ -30,7 +31,7 @@ import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsToke
 
 import scala.language.higherKinds
 
-object Microservice extends IOApp {
+object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {

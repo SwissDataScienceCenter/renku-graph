@@ -37,12 +37,12 @@ import scala.language.{implicitConversions, postfixOps}
 
 object Generators {
 
-  def nonEmptyStrings(maxLength: Int = 10): Gen[String] = {
+  def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
 
     for {
       length <- choose(1, maxLength)
-      chars  <- listOfN(length, alphaChar)
+      chars  <- listOfN(length, charsGenerator)
     } yield chars.mkString("")
   }
 
@@ -67,6 +67,9 @@ object Generators {
       list <- Gen.listOfN(size, generator)
     } yield list
 
+  def setOf[T](generator: Gen[T], size: Int Refined Positive = 5): Gen[Set[T]] =
+    Gen.containerOfN[Set, T](size.value, generator)
+
   def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
     choose(1, max) map Refined.unsafeApply
 
@@ -84,7 +87,10 @@ object Generators {
   def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] =
     for {
       partsNumber <- Gen.choose(minSegments, maxSegments)
-      parts       <- Gen.listOfN(partsNumber, nonEmptyStrings())
+      partsGenerator = nonEmptyStrings(
+        charsGenerator = oneOf(frequency(9 -> alphaChar), frequency(1 -> oneOf('-', '_')))
+      )
+      parts <- Gen.listOfN(partsNumber, partsGenerator)
     } yield parts.mkString("/")
 
   val httpUrls: Gen[String] = for {
@@ -136,10 +142,10 @@ object Generators {
 
     val tuples = for {
       key <- nonEmptyStrings(maxLength = 5)
-      value <- Gen.oneOf(nonEmptyStrings(maxLength = 5),
-                         Arbitrary.arbNumber.arbitrary,
-                         Arbitrary.arbBool.arbitrary,
-                         Gen.nonEmptyListOf(nonEmptyStrings()))
+      value <- oneOf(nonEmptyStrings(maxLength = 5),
+                     Arbitrary.arbNumber.arbitrary,
+                     Arbitrary.arbBool.arbitrary,
+                     Gen.nonEmptyListOf(nonEmptyStrings()))
     } yield key -> value
 
     val objects = for {

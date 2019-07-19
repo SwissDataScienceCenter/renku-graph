@@ -22,7 +22,7 @@ import SentryConfig._
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.language.higherKinds
@@ -46,15 +46,15 @@ object SentryConfig {
         } yield Some(SentryConfig(url, environment, serviceName))
     }
 
-  class SentryBaseUrl private (val value: String) extends AnyVal with TinyType[String]
+  class SentryBaseUrl private (val value: String) extends AnyVal with StringTinyType
   implicit object SentryBaseUrl
-      extends TinyTypeFactory[String, SentryBaseUrl](new SentryBaseUrl(_))
+      extends TinyTypeFactory[SentryBaseUrl](new SentryBaseUrl(_))
       with Url
       with UrlOps[SentryBaseUrl]
 
-  class ServiceName private (val value: String) extends AnyVal with TinyType[String]
-  implicit object ServiceName extends TinyTypeFactory[String, ServiceName](new ServiceName(_)) with NonBlank
+  class ServiceName private (val value: String) extends AnyVal with StringTinyType
+  implicit object ServiceName extends TinyTypeFactory[ServiceName](new ServiceName(_)) with NonBlank
 
-  class EnvironmentName private (val value: String) extends AnyVal with TinyType[String]
-  implicit object EnvironmentName extends TinyTypeFactory[String, EnvironmentName](new EnvironmentName(_)) with NonBlank
+  class EnvironmentName private (val value: String) extends AnyVal with StringTinyType
+  implicit object EnvironmentName extends TinyTypeFactory[EnvironmentName](new EnvironmentName(_)) with NonBlank
 }
