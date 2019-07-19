@@ -61,7 +61,7 @@ object Microservice extends IOApp {
     }
 }
 
-class MicroserviceRunner(
+private class MicroserviceRunner(
     sentryInitializer: SentryInitializer[IO],
     dbInitializer:     IODbInitializer,
     httpServer:        HttpServer[IO]

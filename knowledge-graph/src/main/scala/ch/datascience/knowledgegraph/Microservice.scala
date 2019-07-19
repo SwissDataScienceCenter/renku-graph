@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
+import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.knowledgegraph.graphql.IOQueryEndpoint
 import ch.datascience.http.server.HttpServer
 import pureconfig.loadConfigOrThrow
@@ -39,15 +40,28 @@ object Microservice extends IOApp {
   protected implicit override def timer: Timer[IO] =
     IO.timer(executionContext)
 
-  override def run(args: List[String]): IO[ExitCode] = runMicroservice(args)
+  override def run(args: List[String]): IO[ExitCode] =
+    for {
+      sentryInitializer <- SentryInitializer[IO]
 
-  private def runMicroservice(args: List[String]) = httpServer flatMap (_.run)
+      queryEndpoint <- IOQueryEndpoint()
+      httpServer = new HttpServer[IO](
+        serverPort    = 9004,
+        serviceRoutes = new MicroserviceRoutes[IO](queryEndpoint).routes
+      )
 
-  private lazy val httpServer = for {
-    queryEndpoint <- IOQueryEndpoint()
-  } yield
-    new HttpServer[IO](
-      serverPort    = 9004,
-      serviceRoutes = new MicroserviceRoutes[IO](queryEndpoint).routes
-    )
+      exitCode <- new MicroserviceRunner(sentryInitializer, httpServer).run(args)
+    } yield exitCode
+}
+
+private class MicroserviceRunner(
+    sentryInitializer: SentryInitializer[IO],
+    httpServer:        HttpServer[IO]
+) {
+
+  def run(args: List[String]): IO[ExitCode] =
+    for {
+      _        <- sentryInitializer.run
+      exitCode <- httpServer.run
+    } yield exitCode
 }

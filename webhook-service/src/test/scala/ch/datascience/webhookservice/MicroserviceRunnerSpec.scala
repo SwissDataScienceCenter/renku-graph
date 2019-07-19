@@ -36,12 +36,9 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
   "run" should {
 
-    "return Success Exit Code if all " +
-      "Sentry initialization and " +
-      "Event Log db verification and " +
-      "Events Synchronization Scheduler and " +
-      "Http Server " +
-      "start up successfully" in new TestCase {
+    "return Success Exit Code if " +
+      "Sentry and the Event Log db initialize and " +
+      "Events Synchronization Scheduler and Http Server start up" in new TestCase {
 
       (sentryInitializer.run _)
         .expects()
@@ -90,7 +87,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if starting up Events Synchronization Scheduler fails" in new TestCase {
+    "fail if starting the Events Synchronization Scheduler fails" in new TestCase {
 
       (sentryInitializer.run _)
         .expects()
@@ -114,7 +111,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "return Success ExitCode regardless of Http Server start-up" in new TestCase {
+    "return Success ExitCode even if the Http Server fails to start" in new TestCase {
 
       (sentryInitializer.run _)
         .expects()
