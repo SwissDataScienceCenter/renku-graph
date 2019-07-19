@@ -48,6 +48,7 @@ class TestData(renkuBaseUrl: RenkuBaseUrl) {
     s"""
        |<rdf:RDF
        |   xmlns:prov="http://www.w3.org/ns/prov#"
+       |   xmlns:schema="http://schema.org/"
        |   xmlns:dcterms="http://purl.org/dc/terms/"
        |   xmlns:foaf="http://xmlns.com/foaf/0.1/"
        |   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -55,7 +56,7 @@ class TestData(renkuBaseUrl: RenkuBaseUrl) {
        |  <rdf:Description rdf:about="file:///commit/0000001">
        |    <rdfs:label>0000001</rdfs:label>
        |    <rdf:type rdf:resource="http://www.w3.org/ns/prov#Activity"/>
-       |    <dcterms:isPartOf rdf:resource="${renkuBaseUrl / projectPath}"/>
+       |    <schema:isPartOf rdf:resource="${renkuBaseUrl / projectPath}"/>
        |    <rdfs:comment>renku dataset add zhbikes https://data.stadt-zuerich.ch/dataset/verkehrszaehlungen_werte_fussgaenger_velo/resource/d17a0a74-1073-46f0-a26e-46a403c061ec/download/2019_verkehrszaehlungen_werte_fussgaenger_velo.csv</rdfs:comment>
        |  </rdf:Description>
        |  <rdf:Description rdf:about="file:///commit/0000004/outputs/output_1">
@@ -67,7 +68,7 @@ class TestData(renkuBaseUrl: RenkuBaseUrl) {
        |    <prov:qualifiedAssociation rdf:resource="file:///commit/0000004/association"/>
        |    <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#ProcessRun"/>
        |    <rdfs:comment>renku run python source-file-2 preprocessed-data</rdfs:comment>
-       |    <dcterms:isPartOf rdf:resource="${renkuBaseUrl / projectPath}"/>
+       |    <schema:isPartOf rdf:resource="${renkuBaseUrl / projectPath}"/>
        |    <rdfs:label>.renku/workflow/5e5ac7d7efcc4d829da8b19f9b900a11_python.cwl@0000004</rdfs:label>
        |    <prov:qualifiedUsage rdf:resource="file:///commit/0000004/inputs/input_2"/>
        |    <prov:qualifiedUsage rdf:resource="file:///commit/0000004/inputs/input_1"/>
@@ -96,7 +97,7 @@ class TestData(renkuBaseUrl: RenkuBaseUrl) {
        |  </rdf:Description>
        |  <rdf:Description rdf:about="file:///blob/0000002/src">
        |    <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-       |    <dcterms:isPartOf rdf:resource="${renkuBaseUrl / projectPath}"/>
+       |    <schema:isPartOf rdf:resource="${renkuBaseUrl / projectPath}"/>
        |    <rdfs:label>src@0000002</rdfs:label>
        |    <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
        |    <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
