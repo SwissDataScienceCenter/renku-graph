@@ -22,13 +22,13 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.http.client.IORestClient.validateUri
+import ch.datascience.http.client.{BasicAuthCredentials, IORestClient}
 import ch.datascience.knowledgegraph.config.RenkuBaseUrl
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.graphql.lineage.model._
 import ch.datascience.knowledgegraph.rdfstore.RDFStoreConfig
-import ch.datascience.http.client.{BasicAuthCredentials, IORestClient}
-import ch.datascience.http.client.IORestClient.validateUri
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.tinytypes.{From, TinyType}

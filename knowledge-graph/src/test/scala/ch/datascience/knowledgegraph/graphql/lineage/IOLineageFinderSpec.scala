@@ -23,12 +23,12 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.config.RenkuBaseUrl
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model._
 import ch.datascience.knowledgegraph.rdfstore.InMemoryRdfStore
 import ch.datascience.knowledgegraph.rdfstore.RDFStoreConfig.FusekiBaseUrl
-import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -173,8 +173,9 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
         lineageFinder
           .findLineage(projectPath, None, None)
           .unsafeRunSync()
-      }.getMessage shouldBe s"POST ${rdfStoreConfig.fusekiBaseUrl}/${rdfStoreConfig.datasetName}/sparql returned ${Status.Ok}; " +
-        "error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith {
+        s"POST ${rdfStoreConfig.fusekiBaseUrl}/${rdfStoreConfig.datasetName}/sparql returned ${Status.Ok}; error: "
+      }
     }
   }
 

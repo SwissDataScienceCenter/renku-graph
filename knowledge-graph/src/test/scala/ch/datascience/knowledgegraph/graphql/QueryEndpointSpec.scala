@@ -42,14 +42,31 @@ class QueryEndpointSpec extends WordSpec with MockFactory {
 
   "handleQuery" should {
 
-    "respond with OK and the results found by the Query Runner" in new TestCase {
+    "respond with OK and the results found by the Query Runner when there are no variables in the query" in new TestCase {
 
-      val request = Request[IO](Method.POST, uri"graphql").withEntity(queryPayload)
+      val request = Request[IO](Method.POST, uri"graphql").withEntity(queryWithNoVariablesPayload)
 
       val queryResult = jsons.generateOne
       (queryRunner
         .run(_: UserQuery))
         .expects(queryMatchingRequest)
+        .returning(IO.pure(queryResult))
+
+      val response = handleQuery(request).unsafeRunSync()
+
+      response.status                   shouldBe Ok
+      response.contentType              shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe queryResult
+    }
+
+    "respond with OK and the results found by the Query Runner when there are variables in the query" in new TestCase {
+
+      val request = Request[IO](Method.POST, uri"graphql").withEntity(queryWithVariablesPayload)
+
+      val queryResult = jsons.generateOne
+      (queryRunner
+        .run(_: UserQuery))
+        .expects(queryAndVariablesMatchingRequest)
         .returning(IO.pure(queryResult))
 
       val response = handleQuery(request).unsafeRunSync()
@@ -72,7 +89,7 @@ class QueryEndpointSpec extends WordSpec with MockFactory {
 
     "respond with BAD_REQUEST if running the query fails with QueryAnalysisError" in new TestCase {
 
-      val request = Request[IO](Method.POST, uri"graphql").withEntity(queryPayload)
+      val request = Request[IO](Method.POST, uri"graphql").withEntity(queryWithNoVariablesPayload)
 
       val exception = queryAnalysisErrors.generateOne
       (queryRunner
@@ -89,7 +106,7 @@ class QueryEndpointSpec extends WordSpec with MockFactory {
 
     "respond with INTERNAL_SERVER_ERROR if running the query fails" in new TestCase {
 
-      val request = Request[IO](Method.POST, uri"graphql").withEntity(queryPayload)
+      val request = Request[IO](Method.POST, uri"graphql").withEntity(queryWithNoVariablesPayload)
 
       val exception = exceptions.generateOne
       (queryRunner
@@ -112,14 +129,25 @@ class QueryEndpointSpec extends WordSpec with MockFactory {
     val queryRunner = mock[IOQueryRunner]
     val handleQuery = new QueryEndpoint[IO](querySchema, queryRunner).handleQuery _
 
-    private val queryStatement = """{ resource { property } }"""
-    val queryPayload           = json"""
+    private val queryWithNoVariables     = """{ resource { property } }"""
+    lazy val queryWithNoVariablesPayload = json"""
       {                                                      
-        "query": $queryStatement
+        "query": $queryWithNoVariables
       }"""
-
     val queryMatchingRequest: MatcherBase = argAssert { userQuery: UserQuery =>
-      userQuery.query.source shouldBe Some(queryStatement)
+      userQuery.query.source shouldBe Some(queryWithNoVariables)
+      ()
+    }
+
+    private val queryWithVariables     = """query($variable: Type!) { resource(variable: $variable) { property } }"""
+    lazy val queryWithVariablesPayload = json"""
+      {
+        "query": $queryWithVariables,
+        "variables": {"variable": "value"}
+      }"""
+    val queryAndVariablesMatchingRequest: MatcherBase = argAssert { userQuery: UserQuery =>
+      userQuery.query.source shouldBe Some(queryWithVariables)
+      userQuery.variables    shouldBe Map("variable" -> "value")
       ()
     }
   }

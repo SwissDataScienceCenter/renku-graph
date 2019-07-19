@@ -82,15 +82,26 @@ private object QueryEndpoint {
 
   import io.circe._
 
-  implicit val queryDecoder: Decoder[UserQuery] = (cursor: HCursor) => {
+  implicit val queryDecoder: Decoder[UserQuery] = cursor =>
     for {
       query <- cursor
                 .downField("query")
                 .as[String]
                 .flatMap(rawQuery => Either.fromTry(QueryParser.parse(rawQuery)))
                 .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
-    } yield UserQuery(query)
-  }
+      variables <- cursor
+                    .downField("variables")
+                    .as[Option[Map[String, Any]]]
+                    .map(_.getOrElse(Map.empty))
+    } yield UserQuery(query, variables)
+
+  private implicit lazy val variablesValueDecoder: Decoder[Any] =
+    _.value match {
+      case v if v.isString  => v.as[String]
+      case v if v.isBoolean => v.as[Boolean]
+      case v if v.isNumber  => v.as[Double]
+      case v                => Left(DecodingFailure(s"Cannot find a decoder for variable with value '$v'", Nil))
+    }
 }
 
 object IOQueryEndpoint {

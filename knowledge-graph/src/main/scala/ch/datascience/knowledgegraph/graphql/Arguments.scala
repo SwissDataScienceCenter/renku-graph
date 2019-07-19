@@ -36,7 +36,7 @@ object Arguments {
 
     def toScalarType(
         description:      NonBlank,
-        exceptionMessage: NonBlank = Refined.unsafeApply(s"${typeFactory.shortTypeName} cannot be instantiated")
+        exceptionMessage: NonBlank = Refined.unsafeApply(s"${typeFactory.shortTypeName} has invalid value")
     ): ScalarType[TT] = {
 
       import cats.implicits._

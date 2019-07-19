@@ -54,7 +54,7 @@ class ArgumentsSpec extends WordSpec {
       scalarType.coerceUserInput(value) shouldBe Right(TestTinyType(value))
       val Left(exception) = scalarType.coerceUserInput(positiveInts().generateOne)
       exception              shouldBe a[ValueCoercionViolation]
-      exception.errorMessage shouldBe s"${TestTinyType.shortTypeName} cannot be instantiated"
+      exception.errorMessage shouldBe s"${TestTinyType.shortTypeName} has invalid value"
     }
 
     "provide an extension method toScalarType which returns a ScalarType converting the AST value to the TinyType" in {
@@ -64,7 +64,7 @@ class ArgumentsSpec extends WordSpec {
       scalarType.coerceInput(StringValue(value)) shouldBe Right(TestTinyType(value))
       val Left(exception) = scalarType.coerceUserInput(positiveInts().generateOne)
       exception              shouldBe a[ValueCoercionViolation]
-      exception.errorMessage shouldBe s"${TestTinyType.shortTypeName} cannot be instantiated"
+      exception.errorMessage shouldBe s"${TestTinyType.shortTypeName} has invalid value"
     }
 
     "provide an extension method toScalarType which returns a ScalarType which uses the given exception message on value conversion failures" in {

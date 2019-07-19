@@ -20,4 +20,4 @@ package ch.datascience.knowledgegraph.graphql
 
 import sangria.ast.Document
 
-final case class UserQuery(query: Document)
+final case class UserQuery(query: Document, variables: Map[String, Any])

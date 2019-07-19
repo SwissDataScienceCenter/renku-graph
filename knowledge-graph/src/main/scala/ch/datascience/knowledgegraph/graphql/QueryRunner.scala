@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph.graphql
 import cats.effect.Async
 import io.circe.Json
 import sangria.execution.Executor
+import sangria.marshalling.InputUnmarshaller._
 import sangria.marshalling.circe._
 import sangria.schema.Schema
 
@@ -34,7 +35,7 @@ class QueryRunner[Interpretation[_]: Async, +QueryContext](
 )(implicit executionContext: ExecutionContext) {
 
   def run(userQuery: UserQuery): Interpretation[Json] = Async[Interpretation].async { callback =>
-    Executor.execute(schema, userQuery.query, repository).onComplete {
+    Executor.execute(schema, userQuery.query, repository, variables = mapVars(userQuery.variables)).onComplete {
       case Success(result)    => callback(Right(result))
       case Failure(exception) => callback(Left(exception))
     }
