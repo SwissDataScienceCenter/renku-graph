@@ -94,7 +94,8 @@ private class IOOutdatedTriplesRemover(
        |DELETE { ?s ?p ?o } 
        |WHERE {
        |  {
-       |    ?agentS rdf:type <http://purl.org/dc/terms/SoftwareAgent> .
+       |    ?agentS rdf:type ?agentResource .
+       |    FILTER (?agentResource = <http://www.w3.org/ns/prov#SoftwareAgent> || ?agentResource = <http://purl.org/dc/terms/SoftwareAgent>)
        |    FILTER NOT EXISTS { ?tripleS prov:agent ?agentS }
        |  }
        |  {
