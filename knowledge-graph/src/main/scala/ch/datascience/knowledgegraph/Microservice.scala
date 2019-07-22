@@ -22,14 +22,15 @@ import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.knowledgegraph.graphql.IOQueryEndpoint
 import ch.datascience.http.server.HttpServer
+import ch.datascience.knowledgegraph.graphql.IOQueryEndpoint
+import ch.datascience.microservices.IOMicroservice
 import pureconfig.loadConfigOrThrow
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-object Microservice extends IOApp {
+object Microservice extends IOMicroservice {
 
   private implicit val executionContext: ExecutionContext =
     ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))

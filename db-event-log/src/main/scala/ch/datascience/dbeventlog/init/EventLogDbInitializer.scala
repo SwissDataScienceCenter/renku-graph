@@ -30,9 +30,10 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class EventLogDbInitializer[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+    projectPathAdder: ProjectPathAdder[Interpretation],
+    transactor:       DbTransactor[Interpretation, EventLogDB],
+    logger:           Logger[Interpretation]
+)(implicit ME:        Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
@@ -45,6 +46,7 @@ class EventLogDbInitializer[Interpretation[_]](
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)", transactor)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)", transactor)
       _ <- logger.info("Event Log database initialization success")
+      _ <- projectPathAdder.run
     } yield ()
   } recoverWith logging
 
@@ -81,6 +83,7 @@ class IOEventLogDbInitializer(
     transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
     extends EventLogDbInitializer[IO](
+      new ProjectPathAdder[IO](transactor, ApplicationLogger),
       transactor,
       ApplicationLogger
     )

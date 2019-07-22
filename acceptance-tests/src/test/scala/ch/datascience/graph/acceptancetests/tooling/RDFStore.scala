@@ -18,36 +18,101 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
+import cats.effect.concurrent.MVar
+import cats.effect.{ContextShift, Fiber, IO}
+import ch.datascience.graph.model.SchemaVersion
+import org.apache.jena.fuseki.main.FusekiServer
+import org.apache.jena.query.DatasetFactory
 import org.apache.jena.rdfconnection.RDFConnectionFactory
+
+import scala.concurrent.ExecutionContext
 
 object RDFStore {
 
-  import org.apache.jena.fuseki.main.FusekiServer
-  import org.apache.jena.query.DatasetFactory
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
-  private lazy val renkuDataSet = DatasetFactory.createTxnMem()
+  // There's a problem with restarting Jena so this whole weirdness comes due to that fact
+  private class JenaInstance {
+    lazy val renkuDataSet = DatasetFactory.createTxnMem()
+    lazy val connection   = RDFConnectionFactory.connect(renkuDataSet)
 
-  private lazy val rdfStoreServer: FusekiServer = FusekiServer
-    .create()
-    .loopback(true)
-    .port(3030)
-    .add("/renku", renkuDataSet)
-    .build
+    private val jenaFiber = MVar.empty[IO, Fiber[IO, FusekiServer]].unsafeRunSync()
 
-  private lazy val connnection = RDFConnectionFactory.connect(renkuDataSet)
+    def start(): IO[Unit] =
+      for {
+        _ <- contextShift.shift
+        fiber <- IO {
+                  FusekiServer
+                    .create()
+                    .loopback(true)
+                    .port(3030)
+                    .add("/renku", renkuDataSet)
+                    .build
+                    .start()
+                }.start
+        _ <- jenaFiber.put(fiber)
+      } yield ()
 
-  def start(): Unit = { rdfStoreServer.start(); () }
+    def stop(): IO[Unit] = {
+      connection.close()
+      renkuDataSet.close()
+      jenaFiber.tryTake.flatMap {
+        case None => IO.unit
+        case Some(fiber) =>
+          for {
+            _           <- fiber.join.map(_.stop())
+            cancelToken <- fiber.cancel
+          } yield cancelToken
+      }
+    }
+  }
 
-  def stop(): Unit = { rdfStoreServer.stop(); () }
+  private val jenaReference = MVar.empty[IO, JenaInstance].unsafeRunSync()
+
+  def start(): IO[Unit] =
+    for {
+      _ <- stop()
+      newJena = new JenaInstance()
+      _ <- jenaReference.put(newJena)
+      _ <- newJena.start()
+    } yield ()
+
+  def stop(): IO[Unit] =
+    for {
+      maybeJena <- jenaReference.tryTake
+      _         <- maybeJena.map(_.stop()).getOrElse(IO.unit)
+    } yield ()
 
   def findAllTriplesNumber(): Int =
-    connnection
-      .query(
-        "SELECT (COUNT(*) as ?Triples) WHERE { ?s ?p ?o}"
-      )
-      .execSelect()
-      .next()
-      .get("Triples")
-      .asLiteral()
-      .getInt
+    jenaReference.read
+      .map { jena =>
+        jena.connection
+          .query("SELECT (COUNT(*) as ?Triples) WHERE { ?s ?p ?o}")
+          .execSelect()
+          .next()
+          .get("Triples")
+          .asLiteral()
+          .getInt
+      }
+      .unsafeRunSync()
+
+  def doesVersionTripleExist(schemaVersion: SchemaVersion): Boolean =
+    jenaReference.read
+      .map { jena =>
+        jena.connection
+          .query(s"""
+                    |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    |
+                    |SELECT (COUNT(*) as ?Triples) WHERE { 
+                    |  ?agentS rdf:type <http://purl.org/dc/terms/SoftwareAgent> .
+                    |  ?agentS rdfs:label "renku $schemaVersion".
+                    |}""".stripMargin)
+          .execSelect()
+          .next()
+          .get("Triples")
+          .asLiteral()
+          .getInt != 0
+      }
+      .unsafeRunSync()
 }

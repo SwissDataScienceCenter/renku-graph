@@ -16,18 +16,27 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.triplesgenerator.config
 
 import cats.MonadError
-import ch.datascience.config.{ConfigLoader, ServiceUrl}
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.language.higherKinds
 
-private class GitLabUrlProvider[Interpretation[_]](
-    config:    Config = ConfigFactory.load()
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
+trait TriplesGeneration extends Product with Serializable
 
-  def get: Interpretation[ServiceUrl] = find[ServiceUrl]("services.gitlab.url", config)
+object TriplesGeneration {
+  final case object RenkuLog                extends TriplesGeneration
+  final case object RemoteTriplesGeneration extends TriplesGeneration
+
+  import ch.datascience.config.ConfigLoader._
+  import cats.implicits._
+
+  def apply[Interpretation[_]](
+      config:    Config = ConfigFactory.load
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[TriplesGeneration] =
+    find[Interpretation, String]("triples-generation", config) map {
+      case "renku-log"        => RenkuLog
+      case "remote-generator" => RemoteTriplesGeneration
+    }
 }

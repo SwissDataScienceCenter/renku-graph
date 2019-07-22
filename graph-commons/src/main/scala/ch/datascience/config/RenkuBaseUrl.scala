@@ -16,35 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.config
+package ch.datascience.config
 
 import cats.MonadError
-import cats.implicits._
-import ch.datascience.config.ConfigLoader.find
-import ch.datascience.knowledgegraph.rdfstore.RDFStoreConfig.FusekiBaseUrl
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import com.typesafe.config.{Config, ConfigFactory}
-import pureconfig.ConfigReader
-import pureconfig.error.CannotConvert
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-import scala.language.higherKinds
+import scala.language.{higherKinds, implicitConversions}
 
-class RenkuBaseUrl private (val value: String) extends AnyVal with TinyType[String]
-object RenkuBaseUrl
-    extends TinyTypeFactory[String, RenkuBaseUrl](new RenkuBaseUrl(_))
-    with Url
-    with UrlOps[RenkuBaseUrl] {
+class RenkuBaseUrl private (val value: String) extends AnyVal with StringTinyType
+object RenkuBaseUrl extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_)) with Url with UrlOps[RenkuBaseUrl] {
+  import ConfigLoader._
+  import com.typesafe.config.{Config, ConfigFactory}
+  import pureconfig.ConfigReader
+
+  private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] = stringTinyTypeReader(this)
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load()
   )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RenkuBaseUrl] =
     find[Interpretation, RenkuBaseUrl]("services.renku.url", config)
-
-  private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] =
-    ConfigReader.fromString[RenkuBaseUrl] { value =>
-      RenkuBaseUrl
-        .from(value)
-        .leftMap(exception => CannotConvert(value, FusekiBaseUrl.getClass.toString, exception.getMessage))
-    }
 }

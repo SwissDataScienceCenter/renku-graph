@@ -18,12 +18,12 @@
 
 package ch.datascience.tinytypes.json
 
-import ch.datascience.tinytypes.TinyType
+import ch.datascience.tinytypes.StringTinyType
 import io.circe.{Encoder, Json}
 
 object TinyTypeEncoders {
 
-  implicit def encoder[TT <: TinyType[String]](implicit encode: String => Json): Encoder[TT] =
+  implicit def encoder[TT <: StringTinyType](implicit encode: String => Json): Encoder[TT] =
     Encoder.instance[TT](ttValue => encode(ttValue.value))
 
   implicit val stringEncoder: String => Json = Json.fromString

@@ -27,6 +27,7 @@ import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.graph.gitlab.{GitLabRateLimitProvider, GitLabThrottler}
 import ch.datascience.http.server.HttpServer
+import ch.datascience.microservices.IOMicroservice
 import ch.datascience.webhookservice.eventprocessing.{IOHookEventEndpoint, IOProcessingStatusEndpoint}
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
@@ -36,7 +37,7 @@ import pureconfig.loadConfigOrThrow
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-object Microservice extends IOApp {
+object Microservice extends IOMicroservice {
 
   private implicit val executionContext: ExecutionContext =
     ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))

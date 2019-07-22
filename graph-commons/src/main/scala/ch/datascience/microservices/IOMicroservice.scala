@@ -16,22 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.rdfstore
+package ch.datascience.microservices
 
-import ch.datascience.generators.CommonGraphGenerators.basicAuthCredentials
-import ch.datascience.generators.Generators.{httpUrls, nonEmptyStrings}
-import org.scalacheck.Gen
+import java.util.concurrent.ConcurrentHashMap
 
-object RDFStoreGenerators {
+import cats.effect.{CancelToken, IO, IOApp}
 
-  import RDFStoreConfig._
+import scala.collection.JavaConverters._
 
-  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls map FusekiBaseUrl.apply
-  implicit val datasetNames:   Gen[DatasetName]   = nonEmptyStrings() map DatasetName.apply
+trait IOMicroservice extends IOApp {
 
-  implicit val rdfStoreConfigs: Gen[RDFStoreConfig] = for {
-    fusekiUrl       <- fusekiBaseUrls
-    datasetName     <- datasetNames
-    authCredentials <- basicAuthCredentials
-  } yield RDFStoreConfig(fusekiUrl, datasetName, authCredentials)
+  protected val subProcessesCancelTokens = new ConcurrentHashMap[CancelToken[IO], Unit]()
+
+  def stopSubProcesses: List[CancelToken[IO]] = subProcessesCancelTokens.keys().asScala.toList
 }

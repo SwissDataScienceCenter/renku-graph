@@ -19,9 +19,9 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
 import cats.effect.IO
-import ch.datascience.config.ServiceUrl
+import ch.datascience.triplesgenerator.config.GitLabUrl
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
 
 private class IOGitLabRepoUrlFinder(
-    gitLabUrl: ServiceUrl
+    gitLabUrl: GitLabUrl
 ) extends GitLabRepoUrlFinder[IO](gitLabUrl)

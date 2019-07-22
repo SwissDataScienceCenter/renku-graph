@@ -88,16 +88,16 @@ object TokenRepositoryClient {
   }
 }
 
-object GraphServiceClient {
+object KnowledgeGraphClient {
   import sangria.ast.Document
 
   def apply()(implicit executionContext: ExecutionContext,
               contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): GraphServiceClient = new GraphServiceClient
+              timer:                     Timer[IO]): KnowledgeGraphClient = new KnowledgeGraphClient
 
-  class GraphServiceClient(implicit executionContext: ExecutionContext,
-                           contextShift:              ContextShift[IO],
-                           timer:                     Timer[IO])
+  class KnowledgeGraphClient(implicit executionContext: ExecutionContext,
+                             contextShift:              ContextShift[IO],
+                             timer:                     Timer[IO])
       extends ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9004"
 

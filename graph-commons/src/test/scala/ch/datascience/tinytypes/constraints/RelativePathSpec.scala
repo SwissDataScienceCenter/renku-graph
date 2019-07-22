@@ -19,7 +19,7 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -50,7 +50,7 @@ class RelativePathSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-private class RelativePathString private (val value: String) extends AnyVal with TinyType[String]
+private class RelativePathString private (val value: String) extends AnyVal with StringTinyType
 private object RelativePathString
-    extends TinyTypeFactory[String, RelativePathString](new RelativePathString(_))
+    extends TinyTypeFactory[RelativePathString](new RelativePathString(_))
     with RelativePath

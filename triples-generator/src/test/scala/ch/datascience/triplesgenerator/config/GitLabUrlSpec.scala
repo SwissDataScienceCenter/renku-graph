@@ -16,59 +16,40 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.config
+package ch.datascience.triplesgenerator.config
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.generators.Generators._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.httpUrls
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
+class GitLabUrlSpec extends WordSpec {
 
   "apply" should {
 
-    "return GitLab url if there's a valid value in the config for 'services.renku.url'" in {
-      forAll(httpUrls) { url =>
-        val config = ConfigFactory.parseMap(
-          Map(
-            "services" -> Map(
-              "renku" -> Map(
-                "url" -> url
-              ).asJava
-            ).asJava
-          ).asJava
-        )
-
-        val Success(actual) = RenkuBaseUrl[Try](config)
-
-        actual shouldBe RenkuBaseUrl(url)
-      }
-    }
-
-    "fail if there's no relevant config entry" in {
-      val Failure(exception) = RenkuBaseUrl[Try](ConfigFactory.empty())
-
-      exception shouldBe an[ConfigLoadingException]
-    }
-
-    "fail if config value is invalid" in {
+    "read 'services.gitlab.url' from the config" in {
+      val url = httpUrls.generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "renku" -> Map(
-              "url" -> "abcd"
+            "gitlab" -> Map(
+              "url" -> url
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = RenkuBaseUrl[Try](config)
+      GitLabUrl[Try](config) shouldBe Success(GitLabUrl(url))
+    }
+
+    "fail if there's no 'services.gitlab.url' entry" in {
+      val Failure(exception) = GitLabUrl[Try](ConfigFactory.empty())
 
       exception shouldBe an[ConfigLoadingException]
     }

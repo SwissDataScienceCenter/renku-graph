@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph.graphql
 
-import ch.datascience.tinytypes.{From, TinyType, TypeName}
+import ch.datascience.tinytypes.{From, StringTinyType, TypeName}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.MatchesRegex
@@ -28,7 +28,7 @@ import sangria.validation.ValueCoercionViolation
 
 object Arguments {
 
-  implicit class TinyTypeOps[TT <: TinyType[String]](typeFactory: From[String, TT] with TypeName) {
+  implicit class TinyTypeOps[TT <: StringTinyType](typeFactory: From[TT] with TypeName) {
 
     type NonBlank = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 

@@ -19,12 +19,12 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.acceptancetests.data.KnowledgeGraph.triples
+import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
-import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import flows.RdfStoreProvisioning._
-import org.http4s.Status._
+import model._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
 
@@ -32,39 +32,32 @@ class JenaReProvisioningSpec extends FeatureSpec with GivenWhenThen with GraphSe
 
   feature("RDF Store re-provisioning with the data from the Event Log") {
 
-    scenario("Complete re-provisioning the RDF Store") {
+    scenario("Re-provisioning the RDF triples with outdated version") {
+
+      GraphServices.restart(triplesGenerator)
 
       val project  = projects.generateOne
       val commitId = commitIds.generateOne
 
-      Given("some data in the RDF Store")
-      `data in the RDF store`(project, commitId, triples(project.path))
-      val initialTriplesNumber = RDFStore.findAllTriplesNumber()
-
-      When("user does DELETE triples-generator/triples/projects")
-      triplesGeneratorClient
-        .DELETE("triples/projects", BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("adminpass")))
-        .status shouldBe Accepted
-
-      Then("all the triples should be deleted")
+      Given("the re-provisioning process starts with configured re-provisioning-initial-delay = 5 seconds")
+      And("there are outdated triples in the RDF Store")
+      val oldSchemaVersion = SchemaVersion("0.4.0")
+      `data in the RDF store`(project, commitId, oldSchemaVersion)
       eventually {
-        RDFStore.findAllTriplesNumber() shouldBe 0
+        RDFStore.doesVersionTripleExist(oldSchemaVersion) shouldBe true
       }
 
-      And("then all the RDF Store gets re-provisioned with the events from the Log")
+      When("re-provisioning process detects the outdated triples")
+      Then("all the outdated triples get re-provisioned")
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project,
+                                                                                        commitId,
+                                                                                        currentSchemaVersion)
       eventually {
-        RDFStore.findAllTriplesNumber() shouldBe initialTriplesNumber
+        RDFStore.doesVersionTripleExist(oldSchemaVersion) shouldBe false
       }
-    }
-
-    scenario("Re-provisioning endpoint not available with invalid credentials") {
-
-      When("user does DELETE triples-generator/triples/projects with invalid credentials")
-      val response = triplesGeneratorClient
-        .DELETE("triples/projects", BasicAuthCredentials(BasicAuthUsername("regular"), BasicAuthPassword("user")))
-
-      Then("he gets FORBIDDEN status")
-      response.status shouldBe Unauthorized
+      eventually {
+        RDFStore.doesVersionTripleExist(currentSchemaVersion) shouldBe true
+      }
     }
   }
 }

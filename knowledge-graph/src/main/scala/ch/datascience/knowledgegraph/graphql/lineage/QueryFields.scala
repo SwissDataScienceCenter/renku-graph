@@ -23,7 +23,7 @@ import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.knowledgegraph.graphql.Arguments._
 import ch.datascience.knowledgegraph.graphql.QueryContext
 import ch.datascience.tinytypes.constraints.RelativePath
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
 import sangria.schema._
 
@@ -62,8 +62,8 @@ private[graphql] object QueryFields {
     argumentType = OptionInputType(CommitId.toScalarType(description = "Commit Id"))
   )
 
-  final class FilePath private (val value: String) extends AnyVal with TinyType[String]
-  object FilePath extends TinyTypeFactory[String, FilePath](new FilePath(_)) with RelativePath
+  final class FilePath private (val value: String) extends AnyVal with StringTinyType
+  object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath
   val maybeFilePathArgument = Argument(
     name         = "filePath",
     argumentType = OptionInputType(FilePath.toScalarType(description = "File path"))

@@ -20,20 +20,17 @@ package ch.datascience.knowledgegraph.graphql.lineage
 
 import cats.effect._
 import cats.implicits._
-import ch.datascience.control.Throttler
+import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.http.client.IORestClient.validateUri
-import ch.datascience.http.client.{BasicAuthCredentials, IORestClient}
-import ch.datascience.knowledgegraph.config.RenkuBaseUrl
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.graphql.lineage.model._
-import ch.datascience.knowledgegraph.rdfstore.RDFStoreConfig
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.tinytypes.{From, TinyType}
+import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.tinytypes.{From, StringTinyType}
 import io.chrisdavenport.log4cats.Logger
-import org.http4s.Uri
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -45,42 +42,26 @@ trait LineageFinder[Interpretation[_]] {
 }
 
 class IOLineageFinder(
-    sparqlEndpoint:          Uri,
-    userCredentials:         BasicAuthCredentials,
+    rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     executionTimeRecorder:   ExecutionTimeRecorder[IO],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient[Any](Throttler.noThrottling, logger)
+    extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
     with LineageFinder[IO] {
 
   import IOLineageFinder._
   import executionTimeRecorder._
-  import org.http4s.MediaType.application
-  import org.http4s.MediaType.application._
-  import org.http4s.Method.POST
-  import org.http4s.Status.Ok
-  import org.http4s.headers._
-  import org.http4s.{Request, Response, Status}
 
   override def findLineage(projectPath:   ProjectPath,
                            maybeCommitId: Option[CommitId],
                            maybeFilePath: Option[FilePath]): IO[Option[Lineage]] =
     measureExecutionTime {
       for {
-        edges        <- send(queryRequest(projectPath, maybeCommitId, maybeFilePath))(mapResponse)
+        edges        <- queryExpecting[Set[Edge]](using = Query(projectPath, maybeCommitId, maybeFilePath))
         maybeLineage <- toLineage(edges)
       } yield maybeLineage
     } flatMap logExecutionTime(projectPath, maybeCommitId, maybeFilePath)
-
-  private def queryRequest(projectPath: ProjectPath, maybeCommitId: Option[CommitId], maybeFilePath: Option[FilePath]) =
-    request(POST, sparqlEndpoint, userCredentials)
-      .withEntity(s"query=${Query.create(projectPath, maybeCommitId, maybeFilePath)}")
-      .putHeaders(`Content-Type`(`x-www-form-urlencoded`), Accept(application.json))
-
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Set[Edge]]] = {
-    case (Ok, _, response) => response.as[Set[Edge]]
-  }
 
   private lazy val toLineage: Set[Edge] => IO[Option[Lineage]] = {
     case edges if edges.isEmpty => IO.pure(Option.empty)
@@ -126,7 +107,7 @@ class IOLineageFinder(
 
   private object Query {
 
-    def create(projectPath: ProjectPath, maybeCommitId: Option[CommitId], maybeFilePath: Option[FilePath]): String =
+    def apply(projectPath: ProjectPath, maybeCommitId: Option[CommitId], maybeFilePath: Option[FilePath]): String =
       createQuery(withFilterOn(projectPath, maybeCommitId, maybeFilePath))
 
     private def createQuery(filter: String) =
@@ -206,32 +187,28 @@ class IOLineageFinder(
 object IOLineageFinder {
 
   def apply(
-      rdfStoreConfig:          IO[RDFStoreConfig] = RDFStoreConfig[IO](),
+      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
       renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
       logger:                  Logger[IO] = ApplicationLogger
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[LineageFinder[IO]] =
     for {
-      config         <- rdfStoreConfig
-      sparqlEndpoint <- validateUri(s"${config.fusekiBaseUrl}/${config.datasetName}/sparql")
-      renkuBaseUrl   <- renkuBaseUrl
+      config       <- rdfStoreConfig
+      renkuBaseUrl <- renkuBaseUrl
     } yield
       new IOLineageFinder(
-        sparqlEndpoint,
-        config.authCredentials,
+        config,
         renkuBaseUrl,
         new ExecutionTimeRecorder[IO],
         logger
       )
 
   import io.circe.{Decoder, DecodingFailure, HCursor}
-  import org.http4s.EntityDecoder
-  import org.http4s.circe._
 
-  private implicit val edgesDecoder: EntityDecoder[IO, Set[Edge]] = {
+  private implicit val edgesDecoder: Decoder[Set[Edge]] = {
 
-    def to[TT <: TinyType[String]](tinyTypeFactory: From[String, TT])(value: String): DecodingFailure Either TT =
+    def to[TT <: StringTinyType](tinyTypeFactory: From[TT])(value: String): DecodingFailure Either TT =
       tinyTypeFactory
         .from(value)
         .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
@@ -250,9 +227,6 @@ object IOLineageFinder {
       } yield Edge(sourceNode, targetNode)
     }
 
-    implicit lazy val edgesDecoder: Decoder[Set[Edge]] =
-      _.downField("results").downField("bindings").as[List[Edge]].map(_.toSet)
-
-    jsonOf[IO, Set[Edge]]
+    _.downField("results").downField("bindings").as[List[Edge]].map(_.toSet)
   }
 }

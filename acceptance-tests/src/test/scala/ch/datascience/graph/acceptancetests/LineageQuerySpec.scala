@@ -19,17 +19,16 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.acceptancetests.data.KnowledgeGraph._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
 import ch.datascience.graph.model.events.ProjectPath
-import ch.datascience.knowledgegraph.graphql
+import ch.datascience.rdfstore.RdfStoreData
+import ch.datascience.rdfstore.RdfStoreData.MultiFileAndCommitTriples._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import flows.RdfStoreProvisioning._
-import graphql.lineage.TestData._
-import io.circe.Json
 import io.circe.literal._
+import io.circe.{Encoder, Json}
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -44,12 +43,14 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
       val project  = projects.generateOne.copy(path = ProjectPath("namespace/project"))
       val commitId = commitIds.generateOne
+      val testData = RdfStoreData.multiFileAndCommit(project.path)
+      import testData._
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, commitId, triples(project.path))
+      `data in the RDF store`(project, commitId, triples)
 
       When("user posts a graphql query to fetch lineage")
-      val response = graphServiceClient POST lineageQuery
+      val response = knowledgeGraphClient POST lineageQuery
 
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
@@ -57,25 +58,25 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       val lineageJson = response.bodyAsJson.hcursor.downField("data").downField("lineage")
       lineageJson.downField("edges").as[List[Json]].map(_.toSet) shouldBe Right(
         Set(
-          json"""{"source": ${`commit1-input-data`},        "target": ${`commit3-renku-run`}}""",
-          json"""{"source": ${`commit2-source-file1`},      "target": ${`commit3-renku-run`}}""",
-          json"""{"source": ${`commit3-renku-run`},         "target": ${`commit3-preprocessed-data`}}""",
-          json"""{"source": ${`commit3-preprocessed-data`}, "target": ${`commit4-renku-run`}}""",
-          json"""{"source": ${`commit2-source-file2`},      "target": ${`commit4-renku-run`}}""",
-          json"""{"source": ${`commit4-renku-run`},         "target": ${`commit4-result-file1`}}""",
-          json"""{"source": ${`commit4-renku-run`},         "target": ${`commit4-result-file2`}}"""
+          json"""{"source": ${`commit1-input-data`.name},        "target": ${`commit3-renku-run`.name}}""",
+          json"""{"source": ${`commit2-source-file1`.name},      "target": ${`commit3-renku-run`.name}}""",
+          json"""{"source": ${`commit3-renku-run`.name},         "target": ${`commit3-preprocessed-data`.name}}""",
+          json"""{"source": ${`commit3-preprocessed-data`.name}, "target": ${`commit4-renku-run`.name}}""",
+          json"""{"source": ${`commit2-source-file2`.name},      "target": ${`commit4-renku-run`.name}}""",
+          json"""{"source": ${`commit4-renku-run`.name},         "target": ${`commit4-result-file1`.name}}""",
+          json"""{"source": ${`commit4-renku-run`.name},         "target": ${`commit4-result-file2`.name}}"""
         )
       )
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe Right(
         Set(
-          json"""{"id": ${`commit1-input-data`.id},        "label": ${`commit1-input-data`.label}}""",
-          json"""{"id": ${`commit2-source-file1`.id},      "label": ${`commit2-source-file1`.label}}""",
-          json"""{"id": ${`commit2-source-file2`.id},      "label": ${`commit2-source-file2`.label}}""",
-          json"""{"id": ${`commit3-renku-run`.id},         "label": ${`commit3-renku-run`.label}}""",
-          json"""{"id": ${`commit3-preprocessed-data`.id}, "label": ${`commit3-preprocessed-data`.label}}""",
-          json"""{"id": ${`commit4-renku-run`.id},         "label": ${`commit4-renku-run`.label}}""",
-          json"""{"id": ${`commit4-result-file1`.id},      "label": ${`commit4-result-file1`.label}}""",
-          json"""{"id": ${`commit4-result-file2`.id},      "label": ${`commit4-result-file2`.label}}"""
+          json"""{"id": ${`commit1-input-data`.name},        "label": ${`commit1-input-data`.label}}""",
+          json"""{"id": ${`commit2-source-file1`.name},      "label": ${`commit2-source-file1`.label}}""",
+          json"""{"id": ${`commit2-source-file2`.name},      "label": ${`commit2-source-file2`.label}}""",
+          json"""{"id": ${`commit3-renku-run`.name},         "label": ${`commit3-renku-run`.label}}""",
+          json"""{"id": ${`commit3-preprocessed-data`.name}, "label": ${`commit3-preprocessed-data`.label}}""",
+          json"""{"id": ${`commit4-renku-run`.name},         "label": ${`commit4-renku-run`.label}}""",
+          json"""{"id": ${`commit4-result-file1`.name},      "label": ${`commit4-result-file1`.label}}""",
+          json"""{"id": ${`commit4-result-file2`.name},      "label": ${`commit4-result-file2`.label}}"""
         )
       )
     }
@@ -94,4 +95,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
         }
       }
     }"""
+
+  private implicit val resourceNameEncoder:  Encoder[ResourceName]  = encoder[ResourceName]
+  private implicit val ResourceLabelEncoder: Encoder[ResourceLabel] = encoder[ResourceLabel]
 }

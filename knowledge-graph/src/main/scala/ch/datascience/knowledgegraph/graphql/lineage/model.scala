@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.graphql.lineage
 import cats.MonadError
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 import scala.language.higherKinds
 
@@ -63,9 +63,9 @@ object model {
     }
   }
 
-  final class NodeId private (val value: String) extends AnyVal with TinyType[String]
-  object NodeId extends TinyTypeFactory[String, NodeId](new NodeId(_)) with NonBlank
+  final class NodeId private (val value: String) extends AnyVal with StringTinyType
+  object NodeId extends TinyTypeFactory[NodeId](new NodeId(_)) with NonBlank
 
-  final class NodeLabel private (val value: String) extends AnyVal with TinyType[String]
-  object NodeLabel extends TinyTypeFactory[String, NodeLabel](new NodeLabel(_)) with NonBlank
+  final class NodeLabel private (val value: String) extends AnyVal with StringTinyType
+  object NodeLabel extends TinyTypeFactory[NodeLabel](new NodeLabel(_)) with NonBlank
 }

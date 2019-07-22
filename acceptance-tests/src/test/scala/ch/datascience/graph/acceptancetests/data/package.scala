@@ -16,12 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph
+package ch.datascience.graph.acceptancetests
 
-import ch.datascience.generators.Generators._
-import ch.datascience.knowledgegraph.config.RenkuBaseUrl
-import org.scalacheck.Gen
+import ch.datascience.graph.model.SchemaVersion
 
-object GraphServiceGenerators {
-  val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls map RenkuBaseUrl.apply
+package object model {
+  val currentSchemaVersion: SchemaVersion = SchemaVersion("0.5.0")
 }

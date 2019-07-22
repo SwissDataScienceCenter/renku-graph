@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.graphql
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -78,6 +78,6 @@ class ArgumentsSpec extends WordSpec {
   }
 
   type NonBlank = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-  case class TestTinyType(value: String) extends TinyType[String]
-  object TestTinyType extends TinyTypeFactory[String, TestTinyType](new TestTinyType(_))
+  case class TestTinyType(value: String) extends StringTinyType
+  object TestTinyType extends TinyTypeFactory[TestTinyType](new TestTinyType(_))
 }

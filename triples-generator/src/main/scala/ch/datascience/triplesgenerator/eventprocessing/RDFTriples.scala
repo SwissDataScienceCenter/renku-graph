@@ -19,8 +19,8 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-class RDFTriples private (val value: String) extends AnyVal with TinyType[String]
+class RDFTriples private (val value: String) extends AnyVal with StringTinyType
 
-object RDFTriples extends TinyTypeFactory[String, RDFTriples](new RDFTriples(_)) with NonBlank
+object RDFTriples extends TinyTypeFactory[RDFTriples](new RDFTriples(_)) with NonBlank
