@@ -1,11 +1,13 @@
 // format: off
 organization := "ch.datascience"
 name         := "renku-graph"
-version      := "0.0.1-SNAPSHOT"
 scalaVersion := "2.12.8"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
+
+releaseVersionBump := sbtrelease.Version.Bump.Minor
+releaseTagName := (version in ThisBuild).value.toString
 
 lazy val root = Project(
   id   = "renku-graph",
