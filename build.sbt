@@ -7,6 +7,7 @@ scalaVersion := "2.12.8"
 packagedArtifacts := Map.empty
 
 releaseVersionBump := sbtrelease.Version.Bump.Minor
+releaseIgnoreUntrackedFiles := true
 releaseTagName := (version in ThisBuild).value.toString
 
 lazy val root = Project(
