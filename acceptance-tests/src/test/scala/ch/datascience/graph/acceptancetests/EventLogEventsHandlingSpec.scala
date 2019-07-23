@@ -23,12 +23,13 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
+import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.Matchers._
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.concurrent.Eventually
 import org.scalatest.{FeatureSpec, GivenWhenThen}
 
 class EventLogEventsHandlingSpec
@@ -36,7 +37,7 @@ class EventLogEventsHandlingSpec
     with GivenWhenThen
     with GraphServices
     with Eventually
-    with IntegrationPatience {
+    with AcceptanceTestPatience {
 
   feature("Commit Events from the Event Log get translated to triples in the RDF Store") {
 
