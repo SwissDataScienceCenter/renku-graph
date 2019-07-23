@@ -26,6 +26,8 @@ spec:
           image: "{{ .Values.knowledgeGraph.image.repository }}:{{ .Values.knowledgeGraph.image.tag }}"
           imagePullPolicy: {{ .Values.knowledgeGraph.image.pullPolicy }}
           env:
+            - name: RENKU_BASE_URL
+              value: {{ .Values.knowledgeGraph.services.renku.url }}
             - name: JENA_DATASET_NAME
               {{- if .Values.global.graph.jena.dataset }}
               value: {{ .Values.global.graph.jena.dataset }}
@@ -34,8 +36,6 @@ spec:
               {{- end }}
             - name: JENA_BASE_URL
               value: "http://{{ template "jena.fullname" . }}:{{ .Values.jena.service.port }}"
-            - name: RENKU_BASE_URL
-              value: {{ .Values.knowledgeGraph.services.renku.url }}
             - name: JENA_RENKU_PASSWORD
               valueFrom:
                 secretKeyRef:
