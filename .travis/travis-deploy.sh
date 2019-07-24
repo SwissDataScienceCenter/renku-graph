@@ -26,6 +26,17 @@ chmod 600 deploy_rsa
 eval $(ssh-agent -s)
 ssh-add deploy_rsa
 
+# fixing git setup
+echo "Fixing git setup for $TRAVIS_BRANCH"
+git checkout ${TRAVIS_BRANCH}
+git branch -u origin/${TRAVIS_BRANCH}
+git config branch.${TRAVIS_BRANCH}.remote origin
+git config branch.${TRAVIS_BRANCH}.merge refs/heads/${TRAVIS_BRANCH}
+git config --global user.name "SwissDataScienceCentre"
+git config --global user.email  "contact@datascience.ch"
+git config credential.helper "store --file=.git/credentials"
+echo "https://${GITHUB_TOKEN}:@github.com" > .git/credentials
+
 # releasing graph-services
 sbt "release skip-tests default-tag-exists-answer k  with-defaults"
 
