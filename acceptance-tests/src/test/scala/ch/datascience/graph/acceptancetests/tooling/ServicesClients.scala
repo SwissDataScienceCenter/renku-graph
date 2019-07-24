@@ -101,13 +101,29 @@ object KnowledgeGraphClient {
       extends ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9004"
 
-    def POST(query: Document): Response[IO] = {
+    def POST(query: Document, variables: Map[String, String] = Map.empty): Response[IO] = {
       for {
         uri      <- validateUri(s"$baseUrl/knowledge-graph/graphql")
-        payload  <- IO(json"""{"query": ${query.source.getOrElse("")}}""")
+        payload  <- preparePayload(query, variables)
         response <- send(request(Method.POST, uri) withEntity payload)(mapResponse)
       } yield response
     }.unsafeRunSync()
+
+    private def preparePayload(query: Document, variables: Map[String, String]): IO[Json] = IO {
+      variables match {
+        case vars if vars.isEmpty =>
+          json"""{
+            "query": ${query.source.getOrElse("")}
+          }                                                                     
+          """
+        case nonEmptyVars =>
+          json"""{
+            "query": ${query.source.getOrElse("")},
+            "variables": $nonEmptyVars 
+          }                                                                     
+          """
+      }
+    }
   }
 }
 
