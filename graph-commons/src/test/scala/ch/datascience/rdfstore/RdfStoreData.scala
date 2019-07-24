@@ -23,6 +23,7 @@ import java.util.UUID
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.tinytypes.Renderer
 
 import scala.xml.{Elem, NodeBuffer, NodeSeq}
 
@@ -54,17 +55,17 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
         <prov:endedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2018-12-06T11:26:33+01:00</prov:endedAtTime>
         <rdfs:comment>some change</rdfs:comment>
         {maybeSchemaVersion.map { schemaVersion =>
-          <prov:agent rdf:resource={s"mailto:renku+$schemaVersion@datascience.ch"}/>
+          <prov:agent rdf:resource={s"https://github.com/swissdatasciencecenter/renku-python/tree/${schemaVersion.showAs[ShaLike]}"}/>
         }.getOrElse(NodeSeq.Empty)}
         <rdfs:label>{commitId}</rdfs:label>
         <dcterms:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
         <prov:wasInformedBy rdf:resource={s"file:///commit/$commitId"}/>
       </rdf:Description> &+
       {maybeSchemaVersion.map { schemaVersion =>
-          <rdf:Description rdf:about={s"mailto:renku+$schemaVersion@datascience.ch"}>
+          <rdf:Description rdf:about={s"https://github.com/swissdatasciencecenter/renku-python/tree/${schemaVersion.showAs[ShaLike]}"}>
+            <rdf:type rdf:resource="http://www.w3.org/ns/prov#SoftwareAgent"/>
             <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#WorkflowEngine"/>
             <rdfs:label>{s"renku $schemaVersion"}</rdfs:label>
-            <rdf:type rdf:resource="http://purl.org/dc/terms/SoftwareAgent"/>
           </rdf:Description>
       }.getOrElse(NodeSeq.Empty)} &+
       <rdf:Description rdf:about={s"file:///blob/$commitId/README.md"}>
@@ -97,7 +98,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
         <prov:endedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-15T10:13:39+02:00</prov:endedAtTime>
         <rdfs:label>{s"$commitId"}</rdfs:label>
         <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId"}/>
-        <prov:agent rdf:resource={s"mailto:renku+$schemaVersion@datascience.ch"}/>
+        <prov:agent rdf:resource={s"https://github.com/swissdatasciencecenter/renku-python/tree/${schemaVersion.showAs[ShaLike]}"}/>
         <rdfs:comment>renku dataset add zhbikes https://data.stadt-zuerich.ch/dataset/verkehrszaehlungen_werte_fussgaenger_velo/resource/d17a0a74-1073-46f0-a26e-46a403c061ec/download/2019_verkehrszaehlungen_werte_fussgaenger_velo.csv</rdfs:comment>
         <rdf:type rdf:resource="http://www.w3.org/ns/prov#Activity"/>
         <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
@@ -182,14 +183,19 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
         <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId"}/>
         <rdfs:label>{s".renku/datasets@$commitId"}</rdfs:label>
       </rdf:Description>
-      <rdf:Description rdf:about={s"mailto:renku+$schemaVersion@datascience.ch"}>
+      <rdf:Description rdf:about={s"https://github.com/swissdatasciencecenter/renku-python/tree/${schemaVersion.showAs[ShaLike]}"}>
         <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#WorkflowEngine"/>
         <rdfs:label>{s"renku $schemaVersion"}</rdfs:label>
-        <rdf:type rdf:resource="http://purl.org/dc/terms/SoftwareAgent"/>
+        <rdf:type rdf:resource="http://www.w3.org/ns/prov#SoftwareAgent"/>
       </rdf:Description>
       <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.renku.lock"}>
         <prov:activity rdf:resource={s"file:///commit/$commitId"}/>
         <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
       </rdf:Description>
   // format: on
+
+  private trait ShaLike
+  private object ShaLike {
+    implicit val shaLikeRenderer: Renderer[ShaLike, SchemaVersion] = _.value.replace(".", "")
+  }
 }
