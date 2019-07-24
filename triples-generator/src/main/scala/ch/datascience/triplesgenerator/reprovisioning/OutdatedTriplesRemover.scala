@@ -90,11 +90,13 @@ private class IOOutdatedTriplesRemover(
     s"""
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX prov: <http://www.w3.org/ns/prov#>
+       |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
        |DELETE { ?s ?p ?o } 
        |WHERE {
        |  {
-       |    ?agentS rdf:type <http://purl.org/dc/terms/SoftwareAgent> .
+       |    ?agentS rdf:type ?agentResource .
+       |    VALUES ?agentResource {prov:SoftwareAgent dcterms:SoftwareAgent}
        |    FILTER NOT EXISTS { ?tripleS prov:agent ?agentS }
        |  }
        |  {

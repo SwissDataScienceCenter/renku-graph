@@ -141,8 +141,8 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         .unsafeRunSync()
         .map(row => row("subject"))
         .toSet
-      leftTriples.filter(triplesMatching(outdatedTriples.commits)) shouldBe empty
-      leftTriples.filter(_ contains outdatedSchemaVersion.value)   should not be empty
+      leftTriples.filter(triplesMatching(outdatedTriples.commits))                shouldBe empty
+      leftTriples.filter(_ contains outdatedSchemaVersion.value.replace(".", "")) should not be empty
     }
   }
 
