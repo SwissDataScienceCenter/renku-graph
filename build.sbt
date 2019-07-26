@@ -145,8 +145,9 @@ lazy val commonSettings = Seq(
 // format: on
 
 import ReleaseTransformations._
-import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys.versions
-import sbtrelease.Versions
+import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys._
+import sbtrelease.ReleasePlugin.autoImport._
+import sbtrelease.{Vcs, Versions}
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -164,23 +165,50 @@ releaseProcess := Seq[ReleaseStep](
   pushChanges
 )
 
-val setReleaseVersionToChart: ReleaseStep = setChartVersion(_._1)
-val setNextVersionToChart:    ReleaseStep = setChartVersion(_._2)
+val setReleaseVersionToChart: ReleaseStep = setReleaseVersionChart(_._1)
+val setNextVersionToChart:    ReleaseStep = setNextReleaseVersionChart(_._2)
 
-def setChartVersion(selectVersion: Versions => String): ReleaseStep = { state: State =>
-  val allVersions = state.get(versions).getOrElse {
-    sys.error("No versions are set! Was this release part executed before inquireVersions?")
-  }
+def setReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
+  val version = findVersion(selectVersion, state)
 
-  val version = selectVersion(allVersions)
-  writeChartVersion(state, version)
+  updateAndCommitChart(version)
 
   state
 }
 
+def setNextReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
+  val nextVersion = findVersion(selectVersion, state)
+  val currentHash = Vcs.detect(root.base).map(_.currentHash).getOrElse(sys.error("Current hash cannot be obtained"))
+  val version     = nextVersion.replace("SNAPSHOT", currentHash.take(7))
+
+  updateAndCommitChart(version)
+
+  state
+}
+
+def findVersion(selectVersion: Versions => String, state: State) = {
+  val allVersions = state.get(versions).getOrElse {
+    sys.error("No versions are set! Was this release part executed before inquireVersions?")
+  }
+
+  selectVersion(allVersions)
+}
+
+def updateAndCommitChart(version: String): Unit = {
+  writeChartVersion(version)
+
+  addChartToVcs()
+}
+
 val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
 
-def writeChartVersion(st: State, version: String): Unit = {
+def addChartToVcs(): Unit =
+  for {
+    vcs      <- Vcs.detect(root.base)
+    filePath <- IO.relativize(root.base, chartFile)
+  } yield vcs.add(filePath).run()
+
+def writeChartVersion(version: String): Unit = {
 
   val fileLines = IO.readLines(chartFile)
   val updatedLines = fileLines.map {
