@@ -53,7 +53,7 @@ deploy:
     script: bash ./.travis/travis-release.sh
     on:
       branch: master
-      condition: $TRAVIS_COMMIT_MESSAGE !~ /Setting version to/
+      condition: $TRAVIS_COMMIT_MESSAGE !~ /(Setting version to)/
       repo: SwissDataScienceCenter/renku-graph
   - provider: script
     skip_cleanup: true
