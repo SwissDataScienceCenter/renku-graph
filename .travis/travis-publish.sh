@@ -31,7 +31,7 @@ if [[ -n $TRAVIS_TAG ]]; then
   # build charts/images and push
   cd helm-chart
   chartpress --push --publish-chart
-  git dif
+  git diff
   # push also images tagged with "latest"
   chartpress --tag latest --pus
   git clean -dffx
