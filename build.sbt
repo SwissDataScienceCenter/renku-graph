@@ -145,6 +145,7 @@ lazy val commonSettings = Seq(
 // format: on
 
 import ReleaseTransformations._
+import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys.versions
 import sbtrelease.Versions
 
 releaseProcess := Seq[ReleaseStep](
@@ -166,20 +167,21 @@ releaseProcess := Seq[ReleaseStep](
 val setReleaseVersionToChart: ReleaseStep = setChartVersion(_._1)
 val setNextVersionToChart:    ReleaseStep = setChartVersion(_._2)
 
-private def setChartVersion(selectVersion: Versions => String): ReleaseStep = { state: State =>
-  val versions = state.get(versions).getOrElse {
+def setChartVersion(selectVersion: Versions => String): ReleaseStep = { state: State =>
+  val allVersions = state.get(versions).getOrElse {
     sys.error("No versions are set! Was this release part executed before inquireVersions?")
   }
 
-  val version = selectVersion(versions)
-  updateChartVersion(state, version)
+  val version = selectVersion(allVersions)
+  writeChartVersion(state, version)
 
   state
 }
 
-val chartFile = baseDirectory.value / "helm-chart" / "renku-graph" / "Chart.yaml"
+val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
 
-private def updateChartVersion(st: State, version: String): Unit = {
+def writeChartVersion(st: State, version: String): Unit = {
+
   val fileLines = IO.readLines(chartFile)
   val updatedLines = fileLines.map {
     case line if line.startsWith("version:") => s"version: $version"
