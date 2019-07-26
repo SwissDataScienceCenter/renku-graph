@@ -19,7 +19,8 @@
 set -e
 
 # if this build is not trigger by a tag
-if [[ -z $TRAVIS_TAG ]]; then
+COMMIT_MESSAGE_PATTERN="Setting version to .*"
+if [[ -z $TRAVIS_TAG ]] && [[ ! $TRAVIS_COMMIT_MESSAGE =~ $COMMIT_MESSAGE_PATTERN ]]; then
   # fixing git setup
   echo "Fixing git setup for $TRAVIS_BRANCH"
   git checkout ${TRAVIS_BRANCH}
