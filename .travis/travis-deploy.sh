@@ -32,8 +32,8 @@ git checkout ${TRAVIS_BRANCH}
 git branch -u origin/${TRAVIS_BRANCH}
 git config branch.${TRAVIS_BRANCH}.remote origin
 git config branch.${TRAVIS_BRANCH}.merge refs/heads/${TRAVIS_BRANCH}
-git config --global user.name "SwissDataScienceCentre"
-git config --global user.email  "contact@datascience.ch"
+git config --global user.name "RenkuGraphBot"
+git config --global user.email  "jakub.chrobasik@eplf.ch"
 git config credential.helper "store --file=.git/credentials"
 echo "https://${GITHUB_TOKEN}:@github.com" > .git/credentials
 

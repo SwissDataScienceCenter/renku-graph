@@ -2,7 +2,7 @@ dist: xenial
 branches:
   only:
     - master
-    - /^\d+\.\d+\.\d+$/
+    - "/^\\d+\\.\\d+\\.\\d+$/"
 language: scala
 jdk: openjdk8
 scala:
@@ -23,7 +23,7 @@ env:
     - HELM_TGZ=helm-v2.8.2-linux-amd64.tar.gz
     - SBT_OPTS="-XX:+CMSClassUnloadingEnabled -Xmx1G"
   matrix:
-    - secure: b76cORbier5enxh9ya8ypFvLHRsmSc29jhQBZK4qYjYbLws21aXgqU1832vLwxvIpOPdE66MEiLhbXQcRVjl/a7FZJuhG160EMbV3g+Kx/K16IbsyacP6ZNo1jvy7iSn9fBsbygWJNkA3vPkE5AKK3rvMu8RFz2Mtdr74pNtLkEZpffhBQG/fEs6PW6aSU00OgwKhnAIoGMJzF8h5ZNtQ2IXMfUO9X1ZL98iU28z8w5tVWqiOxJzVgzb2bJgwrN+n0o+LVvbTV4VhmloDVfeLzruaEOiOvWn/ZJoimrWESUUZypOBtrND9Lr23SEOXEMSa04qRTGgQNMeNEh+Pm4lFUohyxjWVgwrXd3PU+iNcPLXgJ7XTN9XRRTUDNOlryvotRydyaNnRnCHc30hplrPd3N6AyoJy9y4/XzczEz5F9B6UundV3bUGlZXm4obQDsng6sJNE0P4NjIRjsB5DIkkv+7RG1Sj4EuTqy1cqsFLoVnjcybVID+v2qMrOXY7oq40xT7l0idWYxIqjepavu16uS7R6nIcgRwdlQk/q3AbVSf63Oj4+A9TGYF+ix4ivKPgRVk+x/PSQ9eeONrwtUWJcTnsmS0smrO1Y6xs+lAFx0tXN8IhqjiC8CsZpl55FeQGCDp0L1A081TCWN6aZXOTaYUE9bPxncm4hJXrfLDas=
+    - secure: mTY6uy3qD/3L98jz010e3hb/C8ozy+HkRKfYGi5C82hNJY4nWtXvZh/C6fG2d3Dv5Ep3WYdRowc4526B+RWWTIS/DCwQLJrxwQzQ7DwivvqJsCgC/iiqyISsFZT6xNYKDgSbgKhTWgzWJezkXYTRFIRcbqYu9GNs/pcZRwjs7htKbGCUJg9hAYoEkSbX6z4UA0VGEYZx6IskHDEGSNkhQOFELzZEQjW2ChRulBIAjCQ17JnFnL/HNWK8ON9Dy6GR/oZGtLUb3iVYynlPpgFhPJhWsw4/rkuIpqu5ehE0CLxbGKvy8vDaOjRrvWOvI2RA8kV4raPbzLRRkVcl10fIxzZqFO+GRObh0xDtU1kEEVF3ft4EiYNqmCHWPRUR1qN1rTUzrGQpHImnSnoq3ijo0dh9bCjNAjzoHf6Uz7YzbVfoFx6g1adqoDHRi10DdKSqukamiIjo+uT8RKcpzVJfSQ1QpQWyqYJ5gJZltgxwe0XQm0p3gJTyKdjYiK7yfzfqvwMa1sBVBmJ0/9yubUBr22zd6SHvS4AGZIozJNPdfHBKkQc0KRD0Lt6GCQpxVdKJs3SQG8m4wDZGvzVWkb7faYGlk3AOJ7qdbgnAyWZHLVXx2z8PLkF/oU8GWvX+Oy/R/5/qJIqUrjBl0mjSG34gGB9Bex0hS7hnclDxgmFcl8o=
 git:
   depth: false
 addons:
