@@ -54,7 +54,7 @@ deploy:
     on:
       branch: master
       repo: SwissDataScienceCenter/renku-graph
-      condition: $TRAVIS_COMMIT_MESSAGE !~ /(Setting version to .*)/
+      condition: $TRAVIS_COMMIT_MESSAGE =~ ^((?!Setting version to ).)*$
   - provider: script
     skip_cleanup: true
     script: bash ./.travis/travis-publish.sh
