@@ -50,7 +50,13 @@ script:
 deploy:
   - provider: script
     skip_cleanup: true
-    script: bash ./.travis/travis-deploy.sh
+    script: bash ./.travis/travis-release.sh
     on:
       branch: master
+      repo: SwissDataScienceCenter/renku-graph
+  - provider: script
+    skip_cleanup: true
+    script: bash ./.travis/travis-publish.sh
+    on:
+      tags: true
       repo: SwissDataScienceCenter/renku-graph
