@@ -137,7 +137,7 @@ abstract class IORestClient[ThrottlingTarget](
 
   private type ResponseMapping[ResultType] = PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
 
-  private object ExceptionMessage {
+  protected object ExceptionMessage {
 
     def apply(request: Request[IO], message: String, cause: Throwable): String =
       s"${request.method} ${request.uri} $message error: ${toSingleLine(cause.getMessage)}"
@@ -151,7 +151,7 @@ abstract class IORestClient[ThrottlingTarget](
     def apply(request: Request[IO], response: Response[IO], cause: Throwable): String =
       s"${request.method} ${request.uri} returned ${response.status}; error: ${toSingleLine(cause.getMessage)}"
 
-    private def toSingleLine(string: String): String = string.split('\n').map(_.trim.filter(_ >= ' ')).mkString
+    def toSingleLine(string: String): String = string.split('\n').map(_.trim.filter(_ >= ' ')).mkString
   }
 }
 
@@ -161,8 +161,8 @@ object IORestClient {
   import scala.concurrent.duration._
   import scala.language.postfixOps
 
-  private val SleepAfterConnectionIssue:        FiniteDuration          = 10 seconds
-  private val MaxRetriesAfterConnectionTimeout: Int Refined NonNegative = 10
+  val SleepAfterConnectionIssue:        FiniteDuration          = 10 seconds
+  val MaxRetriesAfterConnectionTimeout: Int Refined NonNegative = 10
 
   def validateUri(uri: String): IO[Uri] =
     IO.fromEither(Uri.fromString(uri))

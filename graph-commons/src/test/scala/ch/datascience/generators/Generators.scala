@@ -99,14 +99,24 @@ object Generators {
       parts <- Gen.listOfN(partsNumber, partsGenerator)
     } yield parts.mkString("/")
 
+  val httpPorts: Gen[Int Refined Positive] = choose(1000, 10000) map Refined.unsafeApply
+
   val httpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
                  case true  => "http"
                  case false => "https"
                }
-    port <- positiveInts(max = 9999)
+    port <- httpPorts
     host <- nonEmptyStrings()
   } yield s"$protocol://$host:$port"
+
+  val localHttpUrls: Gen[String] = for {
+    protocol <- Arbitrary.arbBool.arbitrary map {
+                 case true  => "http"
+                 case false => "https"
+               }
+    port <- httpPorts
+  } yield s"$protocol://localhost:$port"
 
   val validatedUrls: Gen[String Refined Url] = httpUrls map Refined.unsafeApply
 
