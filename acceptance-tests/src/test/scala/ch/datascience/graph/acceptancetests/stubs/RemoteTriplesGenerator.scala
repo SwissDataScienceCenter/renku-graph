@@ -24,16 +24,30 @@ import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.rdfstore.RdfStoreData._
 import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
 
+import scala.xml.NodeBuffer
+
 object RemoteTriplesGenerator {
 
-  def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
+  def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project:  Project,
+                                                                                        commitId: CommitId,
+                                                                                        schemaVersion: SchemaVersion =
+                                                                                          currentSchemaVersion): Unit =
+    `GET <triples-generator>/projects/:id/commits/:id returning OK`(
+      project,
+      commitId,
+      Seq(singleFileAndCommitTriples(project.path, commitId, Some(schemaVersion))),
+      schemaVersion)
+
+  def `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project:       Project,
       commitId:      CommitId,
-      schemaVersion: SchemaVersion = currentSchemaVersion): Unit = {
+      triples:       Seq[NodeBuffer],
+      schemaVersion: SchemaVersion = currentSchemaVersion
+  ): Unit = {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
-          ok(RDF(singleFileAndCommitTriples(project.path, commitId, Some(schemaVersion))).toString())
+          ok(RDF(triples: _*).toString())
         )
     }
     ()

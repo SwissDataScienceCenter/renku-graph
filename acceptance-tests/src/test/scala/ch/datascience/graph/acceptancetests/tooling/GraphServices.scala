@@ -20,9 +20,9 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect._
 import cats.effect.concurrent.Semaphore
+import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -43,9 +43,11 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
   protected val webhookServiceClient:   WebhookServiceClient = GraphServices.webhookServiceClient
   protected val tokenRepositoryClient:  ServiceClient        = GraphServices.tokenRepositoryClient
   protected val triplesGeneratorClient: ServiceClient        = GraphServices.triplesGeneratorClient
+  protected val knowledgeGraphClient:   KnowledgeGraphClient = GraphServices.knowledgeGraphClient
   protected val webhookService:         ServiceRun           = GraphServices.webhookService
   protected val tokenRepository:        ServiceRun           = GraphServices.tokenRepository
   protected val triplesGenerator:       ServiceRun           = GraphServices.triplesGenerator
+  protected val knowledgeGraph:         ServiceRun           = GraphServices.knowledgeGraph
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -54,7 +56,8 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
       .run(
         webhookService,
         tokenRepository,
-        triplesGenerator
+        triplesGenerator,
+        knowledgeGraph
       )
       .unsafeRunSync()
   }
@@ -63,7 +66,7 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
 object GraphServices {
 
   import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
-  import ch.datascience.{tokenrepository, webhookservice}
+  import ch.datascience.{knowledgegraph, tokenrepository, triplesgenerator, webhookservice}
 
   implicit lazy val executionContext: ExecutionContext = ExecutionContext.global
   implicit lazy val contextShift:     ContextShift[IO] = IO.contextShift(executionContext)
@@ -72,9 +75,11 @@ object GraphServices {
   val webhookServiceClient   = WebhookServiceClient()
   val triplesGeneratorClient = TriplesGeneratorClient()
   val tokenRepositoryClient  = TokenRepositoryClient()
+  val knowledgeGraphClient   = KnowledgeGraphClient()
 
   val webhookService  = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
   val tokenRepository = ServiceRun("token-repository", tokenrepository.Microservice, tokenRepositoryClient)
+  val knowledgeGraph  = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
   val triplesGenerator = ServiceRun(
     "triples-generator",
     service          = triplesgenerator.Microservice,

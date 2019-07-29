@@ -18,6 +18,7 @@
 
 package ch.datascience.generators
 
+import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.RateLimit
@@ -70,6 +71,8 @@ object CommonGraphGenerators {
     .listOfN(3, positiveInts(max = 50))
     .map(_.mkString("."))
     .map(SchemaVersion.apply)
+
+  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls map RenkuBaseUrl.apply
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
     url         <- httpUrls

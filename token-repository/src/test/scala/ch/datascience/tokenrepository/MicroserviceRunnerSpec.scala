@@ -33,7 +33,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
   "run" should {
 
-    "return Success Exit Code if Sentry initialization, db creation and http server start-up were successful" in new TestCase {
+    "return Success Exit Code if Sentry and the db initialize fine and http server starts up" in new TestCase {
 
       (sentryInitializer.run _)
         .expects()
@@ -78,7 +78,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if starting http server fails" in new TestCase {
+    "fail if starting the http server fails" in new TestCase {
 
       (sentryInitializer.run _)
         .expects()
