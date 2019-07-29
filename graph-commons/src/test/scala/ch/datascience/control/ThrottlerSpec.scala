@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 import cats.MonadError
 import cats.effect._
 import cats.implicits._
+import ch.datascience.control.RateLimitUnit._
 import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -42,16 +43,14 @@ class ThrottlerSpec extends WordSpec {
 
       val startTime = {
         for {
-          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(10L, per = 1 second))
+          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(10L, per = Second))
           startTime <- clock.monotonic(MILLISECONDS)
           _         <- processConcurrently(tasksNumber, use = throttler)
         } yield startTime
       }.unsafeRunSync()
 
       val startDelays = tasksStartDelays(startTime)
-      startDelays.tail foreach { delay =>
-        delay should be >= (100 - (100 * 0.30).toLong)
-      }
+      startDelays.sum / startDelays.size should be >= 100L
 
       totalTasksProcessingTime(startTime) should be > (tasksNumber * 100L)
     }
@@ -62,18 +61,13 @@ class ThrottlerSpec extends WordSpec {
 
       val startTime = {
         for {
-          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(200L, per = 1 second))
+          throttler <- Throttler[IO, ThrottlingTarget](RateLimit(200L, per = Second))
           startTime <- clock.monotonic(MILLISECONDS)
-          _         <- processConcurrently(tasksNumber, use = throttler, taskProcessingTime = Some(500 millis))
+          _         <- processConcurrently(tasksNumber, use = throttler, taskProcessingTime = Some(1000 millis))
         } yield startTime
       }.unsafeRunSync()
 
-      val startDelays = tasksStartDelays(startTime)
-      startDelays foreach { delay =>
-        delay should be < (1000 + (1000 * 0.30).toLong)
-      }
-
-      totalTasksProcessingTime(startTime) should be < (tasksNumber * 500L)
+      totalTasksProcessingTime(startTime) should be < (tasksNumber * 1000L)
     }
   }
 
