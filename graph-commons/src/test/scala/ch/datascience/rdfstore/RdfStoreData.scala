@@ -25,6 +25,7 @@ import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.tinytypes.Renderer
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -180,7 +181,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
         <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
         <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId"}/>
         <rdfs:label>{s".renku/datasets@$commitId"}</rdfs:label>
-      </rdf:Description> &+ 
+      </rdf:Description> &+
       agentNode(schemaVersion) &+
       <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.renku.lock"}>
         <prov:activity rdf:resource={s"file:///commit/$commitId"}/>
@@ -459,5 +460,11 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <rdf:type rdf:resource="http://purl.org/dc/terms/SoftwareAgent"/>
     </rdf:Description>
 
-  private def agentNodeResource(schemaVersion: SchemaVersion) = s"mailto:renku+$schemaVersion@datascience.ch"
+  private def agentNodeResource(schemaVersion: SchemaVersion) =
+    s"https://github.com/swissdatasciencecenter/renku-python/tree/v${schemaVersion.showAs[ShaLike]}"
+
+  private trait ShaLike
+  private object ShaLike {
+    implicit val shaLikeRenderer: Renderer[ShaLike, SchemaVersion] = _.value.replace(".", "")
+  }
 }

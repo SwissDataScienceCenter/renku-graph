@@ -1,11 +1,14 @@
 // format: off
 organization := "ch.datascience"
 name         := "renku-graph"
-version      := "0.0.1-SNAPSHOT"
 scalaVersion := "2.12.8"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
+
+releaseVersionBump := sbtrelease.Version.Bump.Minor
+releaseIgnoreUntrackedFiles := true
+releaseTagName := (version in ThisBuild).value.toString
 
 lazy val root = Project(
   id   = "renku-graph",
@@ -154,3 +157,77 @@ lazy val commonSettings = Seq(
   ))
 )
 // format: on
+
+import ReleaseTransformations._
+import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys._
+import sbtrelease.ReleasePlugin.autoImport._
+import sbtrelease.{Vcs, Versions}
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runClean,
+  runTest,
+  setReleaseVersion,
+  setReleaseVersionToChart,
+  commitReleaseVersion,
+  tagRelease,
+  publishArtifacts,
+  setNextVersion,
+  setNextVersionToChart,
+  commitNextVersion,
+  pushChanges
+)
+
+val setReleaseVersionToChart: ReleaseStep = setReleaseVersionChart(_._1)
+val setNextVersionToChart:    ReleaseStep = setNextReleaseVersionChart(_._2)
+
+def setReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
+  val version = findVersion(selectVersion, state)
+
+  updateAndCommitChart(version)
+
+  state
+}
+
+def setNextReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
+  val nextVersion = findVersion(selectVersion, state)
+  val currentHash = Vcs.detect(root.base).map(_.currentHash).getOrElse(sys.error("Current hash cannot be obtained"))
+  val version     = nextVersion.replace("SNAPSHOT", currentHash.take(7))
+
+  updateAndCommitChart(version)
+
+  state
+}
+
+def findVersion(selectVersion: Versions => String, state: State) = {
+  val allVersions = state.get(versions).getOrElse {
+    sys.error("No versions are set! Was this release part executed before inquireVersions?")
+  }
+
+  selectVersion(allVersions)
+}
+
+def updateAndCommitChart(version: String): Unit = {
+  writeChartVersion(version)
+
+  addChartToVcs()
+}
+
+val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
+
+def addChartToVcs(): Unit =
+  for {
+    vcs      <- Vcs.detect(root.base)
+    filePath <- IO.relativize(root.base, chartFile)
+  } yield vcs.add(filePath).run()
+
+def writeChartVersion(version: String): Unit = {
+
+  val fileLines = IO.readLines(chartFile)
+  val updatedLines = fileLines.map {
+    case line if line.startsWith("version:") => s"version: $version"
+    case line                                => line
+  }
+  IO.writeLines(chartFile, updatedLines)
+}

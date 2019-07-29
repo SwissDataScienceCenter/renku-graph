@@ -22,9 +22,10 @@ import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
 import ch.datascience.graph.model.SchemaVersion
 import org.apache.jena.fuseki.main.FusekiServer
-import org.apache.jena.query.DatasetFactory
+import org.apache.jena.query.{DatasetFactory, QuerySolution}
 import org.apache.jena.rdfconnection.RDFConnectionFactory
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
 object RDFStore {
@@ -87,7 +88,7 @@ object RDFStore {
     jenaReference.read
       .map { jena =>
         jena.connection
-          .query("SELECT (COUNT(*) as ?Triples) WHERE { ?s ?p ?o}")
+          .query("SELECT (COUNT(*) as ?Triples) WHERE { ?s ?p ?o }")
           .execSelect()
           .next()
           .get("Triples")
@@ -95,6 +96,32 @@ object RDFStore {
           .getInt
       }
       .unsafeRunSync()
+
+  def getAllTriples: Seq[(String, String, String)] = {
+
+    implicit class RowOps(row: QuerySolution) {
+      def read(variableName: String): String =
+        row.get(variableName).toString
+    }
+
+    jenaReference.read
+      .map { jena =>
+        jena.connection
+          .query("""
+                   |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                   |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                   |
+                   |SELECT ?s ?p ?o WHERE {
+                   |  ?s ?p ?o .
+                   |}
+                   |""".stripMargin)
+          .execSelect()
+          .asScala
+          .toSeq
+          .map(row => (row.read("s"), row.read("p"), row.read("o")))
+      }
+      .unsafeRunSync()
+  }
 
   def doesVersionTripleExist(schemaVersion: SchemaVersion): Boolean =
     jenaReference.read
@@ -105,8 +132,7 @@ object RDFStore {
                     |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
                     |
                     |SELECT (COUNT(*) as ?Triples) WHERE { 
-                    |  ?agentS rdf:type <http://purl.org/dc/terms/SoftwareAgent> .
-                    |  ?agentS rdfs:label "renku $schemaVersion".
+                    |  ?agentS rdfs:label "renku $schemaVersion" .
                     |}""".stripMargin)
           .execSelect()
           .next()
