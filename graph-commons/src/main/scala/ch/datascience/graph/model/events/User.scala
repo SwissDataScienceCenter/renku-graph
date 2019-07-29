@@ -19,7 +19,7 @@
 package ch.datascience.graph.model.events
 
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
 
 case class User(
@@ -27,12 +27,12 @@ case class User(
     email:    Email
 )
 
-class Username private (val value: String) extends AnyVal with TinyType[String]
-object Username extends TinyTypeFactory[String, Username](new Username(_)) with NonBlank {
+class Username private (val value: String) extends AnyVal with StringTinyType
+object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank {
   implicit lazy val userNameDecoder: Decoder[Username] = Decoder.decodeString.map(Username.apply)
 }
 
-class Email private (val value: String) extends AnyVal with TinyType[String]
-object Email extends TinyTypeFactory[String, Email](new Email(_)) with NonBlank {
+class Email private (val value: String) extends AnyVal with StringTinyType
+object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank {
   implicit lazy val emailDecoder: Decoder[Email] = Decoder.decodeString.map(Email.apply)
 }

@@ -20,7 +20,7 @@ package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -47,8 +47,29 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       (url / "path").toString shouldBe s"$url/path"
     }
   }
+
+  "?" should {
+
+    "allow to add a query parameter if there's no such a parameter already" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+      (url ? ("param" -> "value a")).toString shouldBe s"$url?param=value+a"
+    }
+  }
+
+  "&" should {
+
+    "allow to add a query parameter if there's already one" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+      ((url ? ("param1" -> "value 1")) & ("param2" -> "value 2")).toString shouldBe s"$url?param1=value+1&param2=value+2"
+    }
+
+    "allow to add a query parameter if there's more than one" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+      (url ? ("param1" -> "value 1") & ("param2" -> "value 2") & ("param3" -> "value 3")).toString shouldBe s"$url?param1=value+1&param2=value+2&param3=value+3"
+    }
+  }
 }
 
-private class UrlType private (val value: String) extends AnyVal with TinyType[String]
+private class UrlType private (val value: String) extends AnyVal with StringTinyType
 
-private object UrlType extends TinyTypeFactory[String, UrlType](new UrlType(_)) with Url with UrlOps[UrlType]
+private object UrlType extends TinyTypeFactory[UrlType](new UrlType(_)) with Url with UrlOps[UrlType]

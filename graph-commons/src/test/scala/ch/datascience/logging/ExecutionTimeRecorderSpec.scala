@@ -80,7 +80,7 @@ class ExecutionTimeRecorderSpec extends WordSpec with MockFactory {
 
     val block = mockFunction[Try[String]]
 
-    implicit val clock        = mock[Clock[Try]]
+    implicit val clock: Clock[Try] = mock[Clock[Try]]
     val executionTimeRecorder = new ExecutionTimeRecorder
   }
 }

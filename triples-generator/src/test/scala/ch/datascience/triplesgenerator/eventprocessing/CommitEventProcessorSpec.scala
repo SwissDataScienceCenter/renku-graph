@@ -69,7 +69,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       eventProcessor(eventBody) shouldBe context.unit
 
-      logSummary(commits, triples = commitsAndTriples.map(_._2).toList, uploaded = commitsAndTriples.size, failed = 0)
+      logSummary(commits, uploaded = commitsAndTriples.size, failed = 0)
     }
 
     "succeed if a Commit Event can be deserialised, turned into triples and all stored in Jena successfully " +
@@ -101,10 +101,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       eventProcessor(eventBody) shouldBe context.unit
 
       logError(commit2, exception2)
-      logSummary(commits,
-                 triples  = successfulCommitsAndTriples.map(_._2).toList,
-                 uploaded = successfulCommitsAndTriples.size,
-                 failed   = 1)
+      logSummary(commits, uploaded = successfulCommitsAndTriples.size, failed = 1)
     }
 
     s"succeed and mark event with $NonRecoverableFailure if finding triples fails" in new TestCase {
@@ -131,7 +128,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       eventProcessor(eventBody) shouldBe context.unit
 
       logError(commits.head, exception)
-      logSummary(commits, triples = List.empty, uploaded = 0, failed = 1)
+      logSummary(commits, uploaded = 0, failed = 1)
     }
 
     s"succeed and mark event with $TriplesStoreFailure if uploading triples to dataset fails " +
@@ -171,7 +168,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       eventProcessor(eventBody) shouldBe context.unit
 
       logError(commits.head, exception1)
-      logSummary(commits, triples = List.empty, uploaded = 0, failed = 2)
+      logSummary(commits, uploaded = 0, failed = 2)
     }
 
     s"succeed and log an error if marking event in as $TriplesStore fails" in new TestCase {
@@ -207,7 +204,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       eventProcessor(eventBody) shouldBe context.unit
 
       logError(commits.head, exception, s"failed to mark as $TriplesStore in the Event Log")
-      logSummary(commits, triples = List(triples), uploaded = 1, failed = 0)
+      logSummary(commits, uploaded = 1, failed = 0)
     }
 
     "succeed and log an error if CommitEvent deserialization fails" in new TestCase {
@@ -312,7 +309,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(commitEventId, status, EventMessage(exception))
         .returning(context.unit)
 
-    def logSummary(commits: NonEmptyList[Commit], triples: List[RDFTriples], uploaded: Int, failed: Int): Assertion =
+    def logSummary(commits: NonEmptyList[Commit], uploaded: Int, failed: Int): Assertion =
       logger.logged(
         Info(
           s"${commonLogMessage(commits.head)} processed in ${elapsedTime}ms: " +

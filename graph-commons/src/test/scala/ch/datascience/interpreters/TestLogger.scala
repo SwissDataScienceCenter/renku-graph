@@ -45,7 +45,7 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
     loggedOnly(expected.toList)
 
   def loggedOnly(expected: List[LogEntry]): Assertion =
-    invocations should contain only (expected: _*)
+    invocations.to[List] should contain theSameElementsAs expected
 
   def expectNoLogs(): Unit =
     if (invocations.nonEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")

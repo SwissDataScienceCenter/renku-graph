@@ -18,49 +18,36 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
+import ch.datascience.graph.acceptancetests.model._
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.rdfstore.RdfStoreData._
 import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
+
+import scala.xml.NodeBuffer
 
 object RemoteTriplesGenerator {
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project:  Project,
-                                                                                        commitId: CommitId): Unit = {
+                                                                                        commitId: CommitId,
+                                                                                        schemaVersion: SchemaVersion =
+                                                                                          currentSchemaVersion): Unit =
+    `GET <triples-generator>/projects/:id/commits/:id returning OK`(
+      project,
+      commitId,
+      Seq(singleFileAndCommitTriples(project.path, commitId, Some(schemaVersion))),
+      schemaVersion)
+
+  def `GET <triples-generator>/projects/:id/commits/:id returning OK`(
+      project:       Project,
+      commitId:      CommitId,
+      triples:       Seq[NodeBuffer],
+      schemaVersion: SchemaVersion = currentSchemaVersion
+  ): Unit = {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
-          ok(s"""
-                |<rdf:RDF
-                |   xmlns:ns1="http://purl.org/dc/terms/"
-                |   xmlns:ns2="http://www.w3.org/ns/prov#"
-                |   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                |   xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
-                |  <rdf:Description rdf:about="file:///commit/$commitId">
-                |    <ns2:startedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-05-01T14:35:48+02:00</ns2:startedAtTime>
-                |    <ns1:isPartOf rdf:resource="https://dev.renku.ch/${project.path}"/>
-                |    <rdfs:comment>Added line</rdfs:comment>
-                |    <rdfs:label>$commitId</rdfs:label>
-                |    <ns2:endedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-05-01T14:35:48+02:00</ns2:endedAtTime>
-                |    <rdf:type rdf:resource="http://www.w3.org/ns/prov#Activity"/>
-                |    <ns2:wasInformedBy rdf:resource="file:///commit/b318d7f13ae126aa27f3c6600e505cf116e7ba27"/>
-                |  </rdf:Description>
-                |  <rdf:Description rdf:about="file:///blob/$commitId/new-file.txt">
-                |    <ns2:atLocation>new-file.txt</ns2:atLocation>
-                |    <ns2:qualifiedGeneration rdf:resource="file:///commit/$commitId/tree/new-file.txt"/>
-                |    <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-                |    <ns1:isPartOf rdf:resource="https://dev.renku.ch/${project.path}"/>
-                |    <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-                |    <rdfs:label>new-file.txt@$commitId</rdfs:label>
-                |  </rdf:Description>
-                |  <rdf:Description rdf:about="file:///commit/$commitId/tree/new-file.txt">
-                |    <ns2:activity rdf:resource="file:///commit/$commitId"/>
-                |    <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
-                |  </rdf:Description>
-                |  <rdf:Description rdf:about="https://dev.renku.ch/${project.path}">
-                |    <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Project"/>
-                |    <rdf:type rdf:resource="http://www.w3.org/ns/prov#Location"/>
-                |  </rdf:Description>
-                |</rdf:RDF>
-          """.stripMargin)
+          ok(RDF(triples: _*).toString())
         )
     }
     ()

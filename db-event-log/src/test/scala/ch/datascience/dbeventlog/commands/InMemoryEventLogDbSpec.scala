@@ -23,6 +23,8 @@ import java.time.Instant
 import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog._
 import ch.datascience.graph.model.events._
+import EventsGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 import org.scalatest.TestSuite
@@ -35,6 +37,7 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
          |CREATE TABLE IF NOT EXISTS event_log(
          | event_id varchar NOT NULL,
          | project_id int4 NOT NULL,
+         | project_path varchar NOT NULL,
          | status varchar NOT NULL,
          | created_date timestamp NOT NULL,
          | execution_date timestamp NOT NULL,
@@ -55,10 +58,11 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                            executionDate: ExecutionDate,
                            eventDate:     CommittedDate,
                            eventBody:     EventBody,
-                           createdDate:   CreatedDate = CreatedDate(Instant.now)): Unit = execute {
+                           createdDate:   CreatedDate = CreatedDate(Instant.now),
+                           projectPath:   ProjectPath = projectPaths.generateOne): Unit = execute {
     sql"""insert into 
-         |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
-         |values (${commitEventId.id}, ${commitEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
+         |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
+         |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
       """.stripMargin.update.run.map(_ => ())
   }
 

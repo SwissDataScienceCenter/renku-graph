@@ -19,8 +19,10 @@
 package ch.datascience.tokenrepository
 
 import cats.effect._
+import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
+import ch.datascience.microservices.IOMicroservice
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
@@ -29,7 +31,7 @@ import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsToke
 
 import scala.language.higherKinds
 
-object Microservice extends IOApp {
+object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
@@ -39,29 +41,36 @@ object Microservice extends IOApp {
 
   private def runMicroservice(transactorResource: DbTransactorResource[IO, ProjectsTokensDB], args: List[String]) =
     transactorResource.use { transactor =>
-      val httpServer = new HttpServer[IO](
-        serverPort = 9003,
-        serviceRoutes = new MicroserviceRoutes[IO](
-          new IOFetchTokenEndpoint(transactor),
-          new IOAssociateTokenEndpoint(transactor),
-          new IODeleteTokenEndpoint(transactor)
-        ).routes
-      )
+      for {
+        sentryInitializer <- SentryInitializer[IO]
 
-      new MicroserviceRunner(
-        new IODbInitializer(transactor),
-        httpServer
-      ) run args
+        httpServer = new HttpServer[IO](
+          serverPort = 9003,
+          serviceRoutes = new MicroserviceRoutes[IO](
+            new IOFetchTokenEndpoint(transactor),
+            new IOAssociateTokenEndpoint(transactor),
+            new IODeleteTokenEndpoint(transactor)
+          ).routes
+        )
+
+        exitCode <- new MicroserviceRunner(
+                     sentryInitializer,
+                     new IODbInitializer(transactor),
+                     httpServer
+                   ) run args
+      } yield exitCode
     }
 }
 
-class MicroserviceRunner(
-    dbInitializer: IODbInitializer,
-    httpServer:    HttpServer[IO]
+private class MicroserviceRunner(
+    sentryInitializer: SentryInitializer[IO],
+    dbInitializer:     IODbInitializer,
+    httpServer:        HttpServer[IO]
 ) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
+      _      <- sentryInitializer.run
       _      <- dbInitializer.run
       result <- httpServer.run
     } yield result

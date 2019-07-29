@@ -19,3 +19,7 @@ charts:
         contextPath: ..
         dockerfilePath: ../triples-generator/Dockerfile
         valuesPath: triplesGenerator.image
+      knowledge-graph:
+        contextPath: ..
+        dockerfilePath: ../knowledge-graph/Dockerfile
+        valuesPath: knowledgeGraph.image

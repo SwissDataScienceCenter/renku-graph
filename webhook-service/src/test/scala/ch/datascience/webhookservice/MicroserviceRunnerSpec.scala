@@ -24,6 +24,7 @@ import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.http.server.IOHttpServer
+import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.webhookservice.missedevents._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -35,11 +36,13 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
   "run" should {
 
-    "return Success Exit Code if all " +
-      "Event Log db verification and " +
-      "Events Synchronization Scheduler and " +
-      "Http Server " +
-      "start up successfully" in new TestCase {
+    "return Success Exit Code if " +
+      "Sentry and the Event Log db initialize and " +
+      "Events Synchronization Scheduler and Http Server start up" in new TestCase {
+
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
 
       (eventLogDbInitializer.run _)
         .expects()
@@ -56,7 +59,23 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
     }
 
+    "fail if Sentry initialization fails" in new TestCase {
+
+      val exception = Generators.exceptions.generateOne
+      (sentryInitializer.run _)
+        .expects()
+        .returning(context.raiseError(exception))
+
+      intercept[Exception] {
+        runner.run(Nil).unsafeRunSync()
+      } shouldBe exception
+    }
+
     "fail if Event Log db verification fails" in new TestCase {
+
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
 
       val exception = Generators.exceptions.generateOne
       (eventLogDbInitializer.run _)
@@ -68,7 +87,11 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if starting up Events Synchronization Scheduler fails" in new TestCase {
+    "fail if starting the Events Synchronization Scheduler fails" in new TestCase {
+
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
 
       (eventLogDbInitializer.run _)
         .expects()
@@ -88,7 +111,11 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "return Success ExitCode regardless of Http Server start-up" in new TestCase {
+    "return Success ExitCode even if the Http Server fails to start" in new TestCase {
+
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
 
       (eventLogDbInitializer.run _)
         .expects()
@@ -112,10 +139,12 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
+    val sentryInitializer              = mock[IOSentryInitializer]
     val eventLogDbInitializer          = mock[IOEventLogDbInitializer]
     val eventsSynchronizationScheduler = mock[TestIOEventsSynchronizationScheduler]
     val httpServer                     = mock[IOHttpServer]
     val runner = new MicroserviceRunner(
+      sentryInitializer,
       eventLogDbInitializer,
       eventsSynchronizationScheduler,
       httpServer

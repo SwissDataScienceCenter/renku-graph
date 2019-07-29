@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.triplesgenerator.config.FusekiUserConfig
+import ch.datascience.rdfstore.RdfStoreConfig
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Uri
 
@@ -34,7 +34,7 @@ private trait TriplesUploader[Interpretation[_]] {
 }
 
 private class IOTriplesUploader(
-    fusekiUserConfig:        FusekiUserConfig,
+    rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient[Any](Throttler.noThrottling, logger)
@@ -46,7 +46,7 @@ private class IOTriplesUploader(
   import org.http4s.headers._
   import org.http4s.{Request, Response, Status}
 
-  private lazy val dataUploadUrl = fusekiUserConfig.fusekiBaseUrl / fusekiUserConfig.datasetName / "data"
+  private lazy val dataUploadUrl = rdfStoreConfig.fusekiBaseUrl / rdfStoreConfig.datasetName / "data"
 
   def upload(rdfTriples: RDFTriples): IO[Unit] =
     for {
@@ -55,7 +55,7 @@ private class IOTriplesUploader(
     } yield ()
 
   private def uploadRequest(uploadUri: Uri, rdfTriples: RDFTriples) =
-    request(POST, uploadUri, fusekiUserConfig.authCredentials)
+    request(POST, uploadUri, rdfStoreConfig.authCredentials)
       .withEntity(rdfTriples.value)
       .putHeaders(`Content-Type`(`rdf+xml`))
 
@@ -68,5 +68,5 @@ private object IOTriplesUploader {
   def apply()(implicit executionContext: ExecutionContext,
               contextShift:              ContextShift[IO],
               timer:                     Timer[IO]): IO[IOTriplesUploader] =
-    FusekiUserConfig[IO]() map (new IOTriplesUploader(_, ApplicationLogger))
+    RdfStoreConfig[IO]() map (new IOTriplesUploader(_, ApplicationLogger))
 }

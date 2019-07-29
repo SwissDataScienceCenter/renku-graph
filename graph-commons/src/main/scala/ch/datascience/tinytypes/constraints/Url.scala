@@ -18,10 +18,11 @@
 
 package ch.datascience.tinytypes.constraints
 
-import java.net.URL
+import java.net.{URL, URLEncoder}
 
-import ch.datascience.tinytypes.{Constraints, TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes._
 
+import scala.language.implicitConversions
 import scala.util.Try
 
 trait Url extends Constraints[String] {
@@ -31,10 +32,23 @@ trait Url extends Constraints[String] {
   )
 }
 
-trait UrlOps[T <: TinyType[String]] {
-  self: TinyTypeFactory[String, T] with Url =>
+trait UrlOps[T <: StringTinyType] {
+  self: TinyTypeFactory[T] with Url =>
+
+  case class UrlWithQueryParam(value: T) extends TinyType { type V = T }
 
   implicit class UrlOps(url: T) {
-    def /(value: Any): T = apply(s"$url/$value")
+    def /(value:       Any): T = apply(s"$url/$value")
+    def ?(keyAndValue: (String, String)): UrlWithQueryParam = keyAndValue match {
+      case (key, value) => UrlWithQueryParam(apply(s"$url?$key=${URLEncoder.encode(value, "UTF-8")}"))
+    }
   }
+
+  implicit class UrlWithQueryParamOps(url: UrlWithQueryParam) {
+    def &(keyAndValue: (String, String)): UrlWithQueryParam = keyAndValue match {
+      case (key, value) => UrlWithQueryParam(apply(s"$url&$key=${URLEncoder.encode(value, "UTF-8")}"))
+    }
+  }
+
+  implicit def toUrl(url: UrlWithQueryParam): T = url.value
 }
