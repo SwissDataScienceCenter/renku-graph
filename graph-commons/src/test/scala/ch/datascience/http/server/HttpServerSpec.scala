@@ -19,6 +19,8 @@
 package ch.datascience.http.server
 
 import cats.effect._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.httpPorts
 import ch.datascience.http.server.EndpointTester._
 import io.circe.Json
 import io.circe.literal._
@@ -65,9 +67,10 @@ class HttpServerSpec extends WordSpec with Http4sDsl[IO] {
   private implicit val timer:        Timer[IO]        = IO.timer(global)
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
-  private val baseUri = uri"http://localhost:9999"
+  val port            = httpPorts.generateOne
+  private val baseUri = Uri.unsafeFromString(s"http://localhost:$port")
   private val routes = HttpRoutes.of[IO] {
     case GET -> Root / "resource" => Ok("response")
   }
-  new HttpServer[IO](9999, routes).run.unsafeRunAsyncAndForget()
+  new HttpServer[IO](port.value, routes).run.unsafeRunAsyncAndForget()
 }

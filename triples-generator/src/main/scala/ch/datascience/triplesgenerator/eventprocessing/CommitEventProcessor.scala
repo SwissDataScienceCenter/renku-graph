@@ -31,6 +31,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import io.chrisdavenport.log4cats.Logger
 
@@ -82,16 +83,18 @@ class CommitEventProcessor[Interpretation[_]](
                                  maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
       triples <- generateTriples(commit, maybeAccessToken)
-      result <- upload(triples)
-                 .map(_ => Uploaded(commit): UploadingResult)
-                 .recoverWith(recoverableFailure(commit))
+      result  <- upload(triples) map toUploadingResult(commit)
     } yield result
   } recoverWith nonRecoverableFailure(commit)
 
-  private def recoverableFailure(commit: Commit): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"${logMessageCommon(commit)} failed")
-      ME.pure(RecoverableError(commit, exception): UploadingResult)
+  private def toUploadingResult(commit: Commit): TriplesUploadResult => UploadingResult = {
+    case TriplesUploaded => Uploaded(commit)
+    case error @ UploadingError(message) =>
+      logger.error(s"${logMessageCommon(commit)} $message")
+      RecoverableError(commit, error)
+    case error @ MalformedTriples(message) =>
+      logger.error(s"${logMessageCommon(commit)} $message")
+      NonRecoverableError(commit, error)
   }
 
   private def nonRecoverableFailure(commit: Commit): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
