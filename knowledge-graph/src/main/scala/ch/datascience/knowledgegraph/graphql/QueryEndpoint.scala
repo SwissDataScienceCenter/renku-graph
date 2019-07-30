@@ -111,6 +111,6 @@ object IOQueryEndpoint {
               timer:                     Timer[IO]): IO[QueryEndpoint[IO]] =
     for {
       queryContext <- IOQueryContext()
-      querySchema = QuerySchema[IO](lineage.QueryFields())
+      querySchema = QuerySchema[IO](lineage.QueryFields(), datasets.QueryFields())
     } yield new QueryEndpoint[IO](querySchema, new QueryRunner(querySchema, queryContext))
 }

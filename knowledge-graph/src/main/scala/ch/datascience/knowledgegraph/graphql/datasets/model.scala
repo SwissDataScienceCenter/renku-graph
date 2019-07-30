@@ -16,20 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql
+package ch.datascience.knowledgegraph.graphql.datasets
 
-import sangria.schema._
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-import scala.language.higherKinds
+object model {
 
-object QuerySchema {
+  final case class DataSet(name: DataSetName)
 
-  def apply[Interpretation[_]](
-      fields: List[Field[QueryContext[Interpretation], Unit]]*
-  ): Schema[QueryContext[Interpretation], Unit] = Schema {
-    ObjectType(
-      name   = "Query",
-      fields = fields.flatten.toList
-    )
-  }
+  class DataSetName private (val value: String) extends AnyVal with StringTinyType
+  object DataSetName extends TinyTypeFactory[DataSetName](new DataSetName(_)) with NonBlank
 }

@@ -19,9 +19,9 @@
 package ch.datascience.knowledgegraph.graphql.lineage
 
 import cats.effect.IO
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.knowledgegraph.graphql.Arguments._
-import ch.datascience.knowledgegraph.graphql.QueryContext
+import ch.datascience.knowledgegraph.graphql.{QueryContext, common}
 import ch.datascience.tinytypes.constraints.RelativePath
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
@@ -39,23 +39,15 @@ private[graphql] object QueryFields {
         name        = "lineage",
         fieldType   = OptionType(lineageType),
         description = Some("Returns a lineage for a project with the given path"),
-        arguments   = List(projectPathArgument, commitIdArgument, filePathArgument),
+        arguments   = List(common.QueryFields.projectPathArgument, commitIdArgument, filePathArgument),
         resolve = context =>
           context.ctx.lineageFinder
-            .findLineage(context.args arg projectPathArgument,
+            .findLineage(context.args arg common.QueryFields.projectPathArgument,
                          context.args arg commitIdArgument,
                          context.args arg filePathArgument)
             .unsafeToFuture()
       )
     )
-
-  val projectPathArgument = Argument(
-    name = "projectPath",
-    argumentType = ProjectPath.toScalarType(
-      description      = "Project's path in the GitLab.",
-      exceptionMessage = "ProjectPath value expected in format <namespace>/<project>"
-    )
-  )
 
   val commitIdArgument = Argument(
     name         = "commitId",

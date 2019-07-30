@@ -16,20 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql
+package ch.datascience.knowledgegraph.graphql.datasets
 
+import model._
 import sangria.schema._
 
-import scala.language.higherKinds
+object modelSchema {
 
-object QuerySchema {
-
-  def apply[Interpretation[_]](
-      fields: List[Field[QueryContext[Interpretation], Unit]]*
-  ): Schema[QueryContext[Interpretation], Unit] = Schema {
-    ObjectType(
-      name   = "Query",
-      fields = fields.flatten.toList
+  val dataSetType: ObjectType[Unit, DataSet] = ObjectType[Unit, DataSet](
+    name        = "dataSet",
+    description = "DataSet",
+    fields = fields[Unit, DataSet](
+      Field("name", StringType, Some("DataSet name"), resolve = _.value.name.toString)
     )
-  }
+  )
 }

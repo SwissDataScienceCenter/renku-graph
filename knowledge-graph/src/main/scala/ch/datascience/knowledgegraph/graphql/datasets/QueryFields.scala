@@ -16,20 +16,29 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql
+package ch.datascience.knowledgegraph.graphql.datasets
 
+import cats.effect.IO
+import ch.datascience.knowledgegraph.graphql.{QueryContext, common}
 import sangria.schema._
 
 import scala.language.higherKinds
 
-object QuerySchema {
+private[graphql] object QueryFields {
 
-  def apply[Interpretation[_]](
-      fields: List[Field[QueryContext[Interpretation], Unit]]*
-  ): Schema[QueryContext[Interpretation], Unit] = Schema {
-    ObjectType(
-      name   = "Query",
-      fields = fields.flatten.toList
+  import modelSchema._
+
+  def apply(): List[Field[QueryContext[IO], Unit]] =
+    fields[QueryContext[IO], Unit](
+      Field(
+        name        = "dataSets",
+        fieldType   = ListType(dataSetType),
+        description = Some("Returns data-sets defined in the project"),
+        arguments   = List(common.QueryFields.projectPathArgument),
+        resolve = context =>
+          context.ctx.dataSetsFinder
+            .findDataSets(context.args arg common.QueryFields.projectPathArgument)
+            .unsafeToFuture()
+      )
     )
-  }
 }

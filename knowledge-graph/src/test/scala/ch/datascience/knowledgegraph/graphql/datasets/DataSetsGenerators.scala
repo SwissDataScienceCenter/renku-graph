@@ -16,20 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql
+package ch.datascience.knowledgegraph.graphql.datasets
 
-import sangria.schema._
+import ch.datascience.generators.Generators._
+import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetName}
+import org.scalacheck.Gen
 
-import scala.language.higherKinds
+object DataSetsGenerators {
 
-object QuerySchema {
-
-  def apply[Interpretation[_]](
-      fields: List[Field[QueryContext[Interpretation], Unit]]*
-  ): Schema[QueryContext[Interpretation], Unit] = Schema {
-    ObjectType(
-      name   = "Query",
-      fields = fields.flatten.toList
-    )
-  }
+  implicit val dataSetName: Gen[DataSetName] = nonEmptyStrings() map DataSetName.apply
+  implicit val dataSets: Gen[DataSet] = for {
+    name <- dataSetName
+  } yield DataSet(name)
 }

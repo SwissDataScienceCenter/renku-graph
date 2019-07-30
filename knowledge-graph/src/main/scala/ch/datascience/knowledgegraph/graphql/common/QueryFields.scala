@@ -16,20 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql
+package ch.datascience.knowledgegraph.graphql.common
 
+import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.knowledgegraph.graphql.Arguments._
+import eu.timepit.refined.auto._
 import sangria.schema._
 
 import scala.language.higherKinds
 
-object QuerySchema {
+private[graphql] object QueryFields {
 
-  def apply[Interpretation[_]](
-      fields: List[Field[QueryContext[Interpretation], Unit]]*
-  ): Schema[QueryContext[Interpretation], Unit] = Schema {
-    ObjectType(
-      name   = "Query",
-      fields = fields.flatten.toList
+  val projectPathArgument = Argument(
+    name = "projectPath",
+    argumentType = ProjectPath.toScalarType(
+      description      = "Project's path in the GitLab.",
+      exceptionMessage = "ProjectPath value expected in format <namespace>/<project>"
     )
-  }
+  )
 }

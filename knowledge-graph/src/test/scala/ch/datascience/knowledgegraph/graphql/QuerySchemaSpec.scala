@@ -19,7 +19,11 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.knowledgegraph.graphql.datasets.DataSetsFinder
+import ch.datascience.knowledgegraph.graphql.datasets.model.DataSet
 import ch.datascience.knowledgegraph.graphql.lineage.LineageFinder
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
@@ -42,7 +46,7 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
 
   "query" should {
 
-    "allow to search for lineage of a given projectId, commitId and file" in new LineageTestCase {
+    "allow to search for lineage of a given projectPath, commitId and file" in new LineageTestCase {
       val query = graphql"""
         {
           lineage(projectPath: "namespace/project", commitId: "1234567", filePath: "directory/file") {
@@ -62,17 +66,32 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
 
       execute(query) shouldBe json(lineage)
     }
+
+    "allow to search for project's dataSets" in new DataSetsTestCase {
+      val query = graphql"""
+        {
+          dataSets(projectPath: "namespace/project") {
+            name
+          }
+        }"""
+
+      givenFindDataSets(ProjectPath("namespace/project"))
+        .returning(IO.pure(dataSetsList))
+
+      execute(query) shouldBe json(dataSetsList)
+    }
   }
 
   private trait TestCase {
-    val lineageFinder = mock[LineageFinder[IO]]
+    val lineageFinder  = mock[LineageFinder[IO]]
+    val dataSetsFinder = mock[DataSetsFinder[IO]]
 
     def execute(query: Document): Json =
       Executor
         .execute(
-          QuerySchema[IO](lineage.QueryFields()),
+          QuerySchema[IO](lineage.QueryFields(), datasets.QueryFields()),
           query,
-          new QueryContext[IO](lineageFinder)
+          new QueryContext[IO](lineageFinder, dataSetsFinder)
         )
         .futureValue
   }
@@ -115,6 +134,33 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
         {
           "source" : ${edge.source.id.value},
           "target" : ${edge.target.id.value}
+        }"""
+  }
+
+  private trait DataSetsTestCase extends TestCase {
+
+    import ch.datascience.knowledgegraph.graphql.datasets.DataSetsGenerators._
+
+    def givenFindDataSets(projectPath: ProjectPath) = new {
+      def returning(result: IO[List[DataSet]]) =
+        (dataSetsFinder
+          .findDataSets(_: ProjectPath))
+          .expects(projectPath)
+          .returning(result)
+    }
+
+    lazy val dataSetsList = nonEmptyList(dataSets).generateOne.toList
+
+    def json(dataSets: List[DataSet]) = json"""
+        {
+          "data" : {
+            "dataSets" : ${Json.arr(dataSetsList.map(toJson): _*)}
+          }
+        }"""
+
+    private def toJson(dataSet: DataSet) = json"""
+        {
+          "name" : ${dataSet.name.value}
         }"""
   }
 }
