@@ -18,10 +18,12 @@
 
 package ch.datascience.knowledgegraph.graphql.lineage
 
+import LineageGenerators._
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.EventsGenerators.commitIds
+import ch.datascience.graph.model.events.ProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
@@ -37,75 +39,13 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
 
   "findLineage" should {
 
-    "return the whole lineage of the given project" in new InMemoryStoreTestCase {
-      import testData._
-
-      loadToStore(RDF(triples))
-
-      lineageFinder
-        .findLineage(projectPath, maybeCommitId = None, maybeFilePath = None)
-        .unsafeRunSync() shouldBe Some(
-        Lineage(
-          edges = Set(
-            Edge(sourceNode(`commit1-input-data`), targetNode(`commit3-renku-run`)),
-            Edge(sourceNode(`commit2-source-file1`), targetNode(`commit3-renku-run`)),
-            Edge(sourceNode(`commit3-renku-run`), targetNode(`commit3-preprocessed-data`)),
-            Edge(sourceNode(`commit3-preprocessed-data`), targetNode(`commit4-renku-run`)),
-            Edge(sourceNode(`commit2-source-file2`), targetNode(`commit4-renku-run`)),
-            Edge(sourceNode(`commit4-renku-run`), targetNode(`commit4-result-file1`)),
-            Edge(sourceNode(`commit4-renku-run`), targetNode(`commit4-result-file2`))
-          ),
-          nodes = Set(
-            node(`commit1-input-data`),
-            node(`commit2-source-file1`),
-            node(`commit2-source-file2`),
-            node(`commit3-renku-run`),
-            node(`commit3-preprocessed-data`),
-            node(`commit4-renku-run`),
-            node(`commit4-result-file1`),
-            node(`commit4-result-file2`)
-          )
-        )
-      )
-    }
-
-    "return the lineage of the given project for a given commit id" in new InMemoryStoreTestCase {
-      import testData._
-
-      loadToStore(RDF(triples))
-
-      lineageFinder
-        .findLineage(projectPath, maybeCommitId = Some(CommitId("0000003")), maybeFilePath = None)
-        .unsafeRunSync() shouldBe Some(
-        Lineage(
-          edges = Set(
-            Edge(sourceNode(`commit1-input-data`), targetNode(`commit3-renku-run`)),
-            Edge(sourceNode(`commit2-source-file1`), targetNode(`commit3-renku-run`)),
-            Edge(sourceNode(`commit3-renku-run`), targetNode(`commit3-preprocessed-data`)),
-            Edge(sourceNode(`commit3-preprocessed-data`), targetNode(`commit4-renku-run`)),
-            Edge(sourceNode(`commit4-renku-run`), targetNode(`commit4-result-file1`)),
-            Edge(sourceNode(`commit4-renku-run`), targetNode(`commit4-result-file2`))
-          ),
-          nodes = Set(
-            node(`commit1-input-data`),
-            node(`commit2-source-file1`),
-            node(`commit3-renku-run`),
-            node(`commit3-preprocessed-data`),
-            node(`commit4-renku-run`),
-            node(`commit4-result-file1`),
-            node(`commit4-result-file2`)
-          )
-        )
-      )
-    }
-
     "return the lineage of the given project for a given commit id and file path" in new InMemoryStoreTestCase {
       import testData._
 
       loadToStore(RDF(triples))
 
       lineageFinder
-        .findLineage(projectPath, Some(CommitId("0000004")), Some(FilePath("result-file-1")))
+        .findLineage(projectPath, commit4Id, FilePath(resultFile1))
         .unsafeRunSync() shouldBe Some(
         Lineage(
           edges = Set(
@@ -131,7 +71,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
 
     "return None if there's no lineage for the project" in new InMemoryStoreTestCase {
       lineageFinder
-        .findLineage(projectPath, maybeCommitId = None, maybeFilePath = None)
+        .findLineage(projectPath, commitIds.generateOne, filePaths.generateOne)
         .unsafeRunSync() shouldBe None
     }
   }

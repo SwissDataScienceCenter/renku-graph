@@ -208,14 +208,16 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
     import MultiFileAndCommitTriples._
 
     // format: off
-    val `commit1-input-data`: Resource        = resource(name = "file:///blob/0000001/input-data",        label = "input-data@0000001")
-    val `commit2-source-file1`: Resource      = resource(name = "file:///blob/0000002/source-file-1",     label = "source-file-1@0000002")
-    val `commit2-source-file2`: Resource      = resource(name = "file:///blob/0000002/source-file-2",     label = "source-file-2@0000002")
-    val `commit3-renku-run`: Resource         = resource(name = "file:///commit/0000003",                 label = "renku run python source-file-1 input-data preprocessed-data")
-    val `commit3-preprocessed-data`: Resource = resource(name = "file:///blob/0000003/preprocessed-data", label = "preprocessed-data@0000003")
-    val `commit4-renku-run`: Resource         = resource(name = "file:///commit/0000004",                 label = "renku run python source-file-2 preprocessed-data")
-    val `commit4-result-file1`: Resource      = resource(name = "file:///blob/0000004/result-file-1",     label = "result-file-1@0000004")
-    val `commit4-result-file2`: Resource      = resource(name = "file:///blob/0000004/result-file-2",     label = "result-file-2@0000004")
+    val commit4Id: CommitId                   = CommitId("0000004")
+    val resultFile1: String                   = "result-file-1"
+    val `commit1-input-data`: Resource        = resource(name = s"file:///blob/0000001/input-data",        label = s"input-data@0000001")
+    val `commit2-source-file1`: Resource      = resource(name = s"file:///blob/0000002/source-file-1",     label = s"source-file-1@0000002")
+    val `commit2-source-file2`: Resource      = resource(name = s"file:///blob/0000002/source-file-2",     label = s"source-file-2@0000002")
+    val `commit3-renku-run`: Resource         = resource(name = s"file:///commit/0000003",                 label = s"renku run python source-file-1 input-data preprocessed-data")
+    val `commit3-preprocessed-data`: Resource = resource(name = s"file:///blob/0000003/preprocessed-data", label = s"preprocessed-data@0000003")
+    val `commit4-renku-run`: Resource         = resource(name = s"file:///commit/$commit4Id",              label = s"renku run python source-file-2 preprocessed-data")
+    val `commit4-result-file1`: Resource      = resource(name = s"file:///blob/$commit4Id/$resultFile1",   label = s"$resultFile1@$commit4Id")
+    val `commit4-result-file2`: Resource      = resource(name = s"file:///blob/$commit4Id/result-file-2",  label = s"result-file-2@$commit4Id")
     // format: on
 
     private def resource(name: String, label: String) = Resource(ResourceName(name), ResourceLabel(label))
@@ -239,13 +241,13 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
         <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#ProcessRun"/>
         <rdfs:comment>{`commit4-renku-run`.label.toString}</rdfs:comment>
         <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-        <rdfs:label>.renku/workflow/5e5ac7d7efcc4d829da8b19f9b900a11_python.cwl@0000004</rdfs:label>
+        <rdfs:label>{s".renku/workflow/5e5ac7d7efcc4d829da8b19f9b900a11_python.cwl@$commit4Id"}</rdfs:label>
         <prov:qualifiedUsage rdf:resource={s"${`commit4-renku-run`.name}/inputs/input_2"}/>
         <prov:qualifiedUsage rdf:resource={s"${`commit4-renku-run`.name}/inputs/input_1"}/>
         <prov:agent rdf:resource={agentNodeResource(schemaVersion)}/>
       </rdf:Description>
-      <rdf:Description rdf:about="file:///blob/0000004/.renku/workflow/5e5ac7d7efcc4d829da8b19f9b900a11_python.cwl">
-        <rdfs:label>.renku/workflow/5e5ac7d7efcc4d829da8b19f9b900a11_python.cwl@0000004</rdfs:label>
+      <rdf:Description rdf:about={s"file:///blob/$commit4Id/.renku/workflow/5e5ac7d7efcc4d829da8b19f9b900a11_python.cwl"}>
+        <rdfs:label>{s".renku/workflow/5e5ac7d7efcc4d829da8b19f9b900a11_python.cwl@$commit4Id"}</rdfs:label>
         <rdf:type rdf:resource="http://www.w3.org/ns/prov#Plan"/>
         <rdf:type rdf:resource="http://purl.org/wf4ever/wfdesc#Process"/>
         <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>

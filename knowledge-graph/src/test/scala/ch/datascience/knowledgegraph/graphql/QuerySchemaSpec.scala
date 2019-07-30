@@ -42,48 +42,6 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
 
   "query" should {
 
-    "allow to search for lineage of a given projectId" in new LineageTestCase {
-      val query = graphql"""
-        {
-          lineage(projectPath: "namespace/project") {
-            nodes {
-              id
-              label
-            }
-            edges {
-              source
-              target
-            }
-          }
-        }"""
-
-      givenFindLineage(ProjectPath("namespace/project"), None, None)
-        .returning(IO.pure(Some(lineage)))
-
-      execute(query) shouldBe json(lineage)
-    }
-
-    "allow to search for lineage of a given projectId and commitId" in new LineageTestCase {
-      val query = graphql"""
-        {
-          lineage(projectPath: "namespace/project", commitId: "1234567") {
-            nodes {
-              id
-              label
-            }
-            edges {
-              source
-              target
-            }
-          }
-        }"""
-
-      givenFindLineage(ProjectPath("namespace/project"), Some(CommitId("1234567")), None)
-        .returning(IO.pure(Some(lineage)))
-
-      execute(query) shouldBe json(lineage)
-    }
-
     "allow to search for lineage of a given projectId, commitId and file" in new LineageTestCase {
       val query = graphql"""
         {
@@ -99,7 +57,7 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
           }
         }"""
 
-      givenFindLineage(ProjectPath("namespace/project"), Some(CommitId("1234567")), Some(FilePath("directory/file")))
+      givenFindLineage(ProjectPath("namespace/project"), CommitId("1234567"), FilePath("directory/file"))
         .returning(IO.pure(Some(lineage)))
 
       execute(query) shouldBe json(lineage)
@@ -122,14 +80,14 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
   private trait LineageTestCase extends TestCase {
 
     def givenFindLineage(
-        projectPath:   ProjectPath,
-        maybeCommitId: Option[CommitId],
-        maybeFilePath: Option[FilePath]
+        projectPath: ProjectPath,
+        commitId:    CommitId,
+        filePath:    FilePath
     ) = new {
       def returning(result: IO[Option[Lineage]]) =
         (lineageFinder
-          .findLineage(_: ProjectPath, _: Option[CommitId], _: Option[FilePath]))
-          .expects(projectPath, maybeCommitId, maybeFilePath)
+          .findLineage(_: ProjectPath, _: CommitId, _: FilePath))
+          .expects(projectPath, commitId, filePath)
           .returning(result)
     }
 
