@@ -1,6 +1,6 @@
 // format: off
 organization := "ch.datascience"
-name         := "renku-graph"
+name := "renku-graph"
 scalaVersion := "2.12.8"
 
 // This project contains nothing to package, like pure POM maven project
@@ -11,10 +11,10 @@ releaseIgnoreUntrackedFiles := true
 releaseTagName := (version in ThisBuild).value.toString
 
 lazy val root = Project(
-  id   = "renku-graph",
+  id = "renku-graph",
   base = file(".")
 ).settings(
-  skip in publish := true, 
+  skip in publish := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
   graphCommons,
@@ -26,7 +26,7 @@ lazy val root = Project(
 )
 
 lazy val graphCommons = Project(
-  id   = "graph-commons",
+  id = "graph-commons",
   base = file("graph-commons")
 ).settings(
   commonSettings
@@ -35,7 +35,7 @@ lazy val graphCommons = Project(
 )
 
 lazy val dbEventLog = Project(
-  id   = "db-event-log",
+  id = "db-event-log",
   base = file("db-event-log")
 ).settings(
   commonSettings
@@ -47,37 +47,37 @@ lazy val dbEventLog = Project(
 )
 
 lazy val webhookService = Project(
-  id   = "webhook-service",
+  id = "webhook-service",
   base = file("webhook-service")
 ).settings(
   commonSettings
 ).dependsOn(
   graphCommons % "compile->compile",
   graphCommons % "test->test",
-  dbEventLog   % "compile->compile",
-  dbEventLog   % "test->test"
+  dbEventLog % "compile->compile",
+  dbEventLog % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
 )
 
 lazy val triplesGenerator = Project(
-  id   = "triples-generator",
+  id = "triples-generator",
   base = file("triples-generator")
 ).settings(
   commonSettings
 ).dependsOn(
   graphCommons % "compile->compile",
   graphCommons % "test->test",
-  dbEventLog   % "compile->compile",
-  dbEventLog   % "test->test"
+  dbEventLog % "compile->compile",
+  dbEventLog % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
 )
 
 lazy val tokenRepository = Project(
-  id   = "token-repository",
+  id = "token-repository",
   base = file("token-repository")
 ).settings(
   commonSettings
@@ -90,7 +90,7 @@ lazy val tokenRepository = Project(
 )
 
 lazy val knowledgeGraph = Project(
-  id   = "knowledge-graph",
+  id = "knowledge-graph",
   base = file("knowledge-graph")
 ).settings(
   commonSettings
@@ -103,7 +103,7 @@ lazy val knowledgeGraph = Project(
 )
 
 lazy val acceptanceTests = Project(
-  id   = "acceptance-tests",
+  id = "acceptance-tests",
   base = file("acceptance-tests")
 ).settings(
   commonSettings
@@ -113,7 +113,7 @@ lazy val acceptanceTests = Project(
   tokenRepository,
   knowledgeGraph,
   graphCommons % "test->test",
-  dbEventLog   % "test->test"
+  dbEventLog % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -124,19 +124,19 @@ lazy val commonSettings = Seq(
 
   skip in publish := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-  
-  publishArtifact in (Compile, packageDoc) := false,
-  publishArtifact in (Compile, packageSrc) := false,
+
+  publishArtifact in(Compile, packageDoc) := false,
+  publishArtifact in(Compile, packageSrc) := false,
 
   addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3"),
-  
+
   scalacOptions += "-Ypartial-unification",
   scalacOptions += "-feature",
   scalacOptions += "-unchecked",
   scalacOptions += "-deprecation",
   scalacOptions += "-Ywarn-value-discard",
   scalacOptions += "-Xfatal-warnings",
-  
+
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
@@ -164,6 +164,26 @@ import ReleaseTransformations._
 import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys._
 import sbtrelease.ReleasePlugin.autoImport._
 import sbtrelease.{Vcs, Versions}
+
+releaseTagComment := {
+  Vcs.detect(root.base).map { implicit vcs =>
+    collectCommitsMessages() match {
+      case Nil => s"Releasing ${(version in ThisBuild).value}"
+      case messages =>
+        s"Release Notes for ${(version in ThisBuild).value}\n${messages.map(m => s"* $m").mkString("\n")}"
+    }
+  }
+}.getOrElse {
+  sys.error("Release Tag comment cannot be calculated")
+}
+
+@scala.annotation.tailrec
+def collectCommitsMessages(commitsCounter: Int = 1, messages: List[String] = List.empty)(
+    implicit vcs:                          Vcs): List[String] =
+  vcs.cmd("log", "--format=%s", "-1", s"HEAD~$commitsCounter").!!.trim match {
+    case message if message startsWith "Setting version" => messages
+    case message                                         => collectCommitsMessages(commitsCounter + 1, messages :+ message)
+  }
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
