@@ -43,11 +43,15 @@ Endpoint to perform GraphQL queries on the Knowledge Graph data.
 | OK (200)                   | Body containing queried data   |
 | INTERNAL SERVER ERROR (500)| Otherwise                      |
 
-Example of a query:
+**Available queries**
+
+* Lineage
+
+Query example:
 ```
 {
   "query": "{ 
-    lineage(projectPath: \"rokroskar/vom_natt\") {
+    lineage(projectPath: \"namespace/project\", commitId: \"6e4f4cc8d30886a9f17192c65db6c799602bcd7d\", filePath: \"zhbikes.parquet\") {
       nodes { id label } 
       edges { source target } 
     } 
@@ -55,7 +59,7 @@ Example of a query:
 }
 
 ```
-Example of a response body:
+Response body example:
 ```
 {
   "data": {
@@ -85,6 +89,41 @@ Example of a response body:
         }
       ]
     }
+  }
+}
+```
+
+* Data-sets
+
+Query example:
+```
+{
+  "query": "{ 
+    dataSets(projectPath: \"namespace/project\") {
+      id name 
+    } 
+  }"
+}
+
+```
+Response body example:
+```
+{
+  "data": {
+    "dataSets": [
+      {
+        "id" : "e1fc7b62-e021-434b-9264-dda336bddd4f",
+        "name" : "x"
+      },
+      {
+        "id" : "5b7a1394-93b5-4e75-932d-e041cf46349d",
+        "name" : "xr"
+      },
+      {
+        "id" : "b1aa58af-a488-4bae-97b4-d6d349f98412",
+        "name" : "chOorWhraw"
+      }
+    ]
   }
 }
 ```
