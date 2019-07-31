@@ -26,7 +26,6 @@ import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
-import ch.datascience.tinytypes.{From, StringTinyType}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -81,18 +80,12 @@ object IODataSetsFinder {
       renkuBaseUrl <- renkuBaseUrl
     } yield new IODataSetsFinder(config, renkuBaseUrl, logger)
 
-  import cats.implicits._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  import io.circe.{Decoder, DecodingFailure, HCursor}
+  import io.circe.Decoder
 
   private implicit val dataSetsDecoder: Decoder[Set[DataSet]] = {
 
-    def to[TT <: StringTinyType](tinyTypeFactory: From[TT])(value: String): DecodingFailure Either TT =
-      tinyTypeFactory
-        .from(value)
-        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
-
-    implicit lazy val dataSetDecoder: Decoder[DataSet] = { implicit cursor =>
+    implicit lazy val dataSetDecoder: Decoder[DataSet] = { cursor =>
       for {
         id   <- cursor.downField("dataSetId").downField("value").as[DataSetId]
         name <- cursor.downField("dataSetName").downField("value").as[DataSetName]

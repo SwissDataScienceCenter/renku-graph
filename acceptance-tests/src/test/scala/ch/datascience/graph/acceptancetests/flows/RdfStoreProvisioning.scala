@@ -21,8 +21,10 @@ package ch.datascience.graph.acceptancetests.flows
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.db.EventLog
+import ch.datascience.graph.acceptancetests.model._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
+import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.SchemaVersion
@@ -32,11 +34,11 @@ import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.Assertion
 import org.scalatest.Matchers._
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-import ch.datascience.graph.acceptancetests.model._
+import org.scalatest.concurrent.Eventually
+
 import scala.xml.NodeBuffer
 
-object RdfStoreProvisioning extends Eventually with IntegrationPatience {
+object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
 
   def `data in the RDF store`(project: Project, commitId: CommitId, schemaVersion: SchemaVersion): Assertion =
     `data in the RDF store`(project,
@@ -63,7 +65,11 @@ object RdfStoreProvisioning extends Eventually with IntegrationPatience {
     }
 
     eventually {
-      RDFStore.findAllTriplesNumber() should be > 0
+      RDFStore.getAllTriples
+        .map {
+          case (s, p, o) => s"$s $p $o"
+        }
+        .exists(_.contains(commitId.value)) shouldBe true
     }
   }
 }

@@ -19,6 +19,7 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
@@ -35,7 +36,7 @@ import org.scalatest.{FeatureSpec, GivenWhenThen}
 import sangria.ast.Document
 import sangria.macros._
 
-class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices {
+class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
   private val project  = projects.generateOne.copy(path = ProjectPath("namespace/project"))
   private val commitId = CommitId("0000001")

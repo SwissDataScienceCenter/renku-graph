@@ -25,7 +25,7 @@ import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.query.{DatasetFactory, QuerySolution}
 import org.apache.jena.rdfconnection.RDFConnectionFactory
 
-import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext
 
 object RDFStore {
@@ -106,19 +106,20 @@ object RDFStore {
 
     jenaReference.read
       .map { jena =>
-        jena.connection
+        val queryResults = jena.connection
           .query("""
-                   |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                   |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                   |
                    |SELECT ?s ?p ?o WHERE {
                    |  ?s ?p ?o .
                    |}
                    |""".stripMargin)
           .execSelect()
-          .asScala
-          .toSeq
-          .map(row => (row.read("s"), row.read("p"), row.read("o")))
+
+        val results = ArrayBuffer.empty[(String, String, String)]
+        while (queryResults.hasNext) {
+          val row = queryResults.next()
+          results += ((row.read("s"), row.read("p"), row.read("o")))
+        }
+        results.toList
       }
       .unsafeRunSync()
   }
