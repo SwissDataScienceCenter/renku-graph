@@ -40,7 +40,7 @@ private class IOOutdatedTriplesRemover(
   override def removeOutdatedTriples(outdatedTriples: OutdatedTriples): IO[Unit] =
     for {
       _ <- remove(outdatedTriples)
-      _ <- removeOrphanAgentTriples
+      _ <- removeOrphanAgentTriples()
     } yield ()
 
   private def remove(triplesToRemove: OutdatedTriples): IO[Unit] = queryWitNoResult {
@@ -71,7 +71,22 @@ private class IOOutdatedTriplesRemover(
        |        ?activitySubject prov:activity ?object .
        |        BIND (?activitySubject as ?subject)
        |      } UNION {
-       |        ?generationSubject prov:qualifiedGeneration/prov:activity ?object .
+       |        ?memberSubject prov:hadMember ?object .
+       |        BIND (?memberSubject as ?subject)
+       |      } UNION {
+       |        ?commit prov:influenced/prov:hadMember ?memberObject .
+       |        BIND (?memberObject as ?subject)
+       |      } UNION {
+       |        ?commit prov:influenced/prov:hadMember/schema:hasPart ?partObject .
+       |        BIND (?partObject as ?subject)
+       |      } UNION {
+       |        ?commit prov:influenced/prov:hadMember/prov:qualifiedGeneration ?generationObject .
+       |        BIND (?generationObject as ?subject)
+       |      } UNION {
+       |        ?activitySubject prov:activity ?commit .
+       |        BIND (?activitySubject as ?subject)
+       |      } UNION {
+       |        ?generationSubject prov:qualifiedGeneration/prov:activity ?commit .
        |        BIND (?generationSubject as ?subject)
        |      } UNION {
        |        ?memberSubject prov:hadMember/prov:qualifiedGeneration/prov:activity ?object .
@@ -86,7 +101,7 @@ private class IOOutdatedTriplesRemover(
        |}""".stripMargin
   }
 
-  private def removeOrphanAgentTriples: IO[Unit] = queryWitNoResult {
+  private def removeOrphanAgentTriples(): IO[Unit] = queryWitNoResult {
     s"""
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX prov: <http://www.w3.org/ns/prov#>
