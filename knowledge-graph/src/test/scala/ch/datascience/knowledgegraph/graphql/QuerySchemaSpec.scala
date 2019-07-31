@@ -72,6 +72,7 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
       val query = graphql"""
         {
           dataSets(projectPath: "namespace/project") {
+            id
             name
           }
         }"""
@@ -164,6 +165,7 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
 
     private def toJson(dataSet: DataSet) = json"""
         {
+          "id" : ${dataSet.id.value},
           "name" : ${dataSet.name.value}
         }"""
   }

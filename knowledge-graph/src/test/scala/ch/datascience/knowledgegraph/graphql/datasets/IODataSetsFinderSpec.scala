@@ -41,6 +41,9 @@ class IODataSetsFinderSpec extends WordSpec with InMemoryRdfStore with ExternalS
       val dataSet2Name = dataSetNames.generateOne
       loadToStore(
         RDF(
+          singleFileAndCommitWithDataset(projectPaths.generateOne,
+                                         dataSetId              = dataSetIds.generateOne,
+                                         dataSetName            = dataSetNames.generateOne),
           singleFileAndCommitWithDataset(projectPath, dataSetId = dataSet1Id, dataSetName = dataSet1Name),
           singleFileAndCommitWithDataset(projectPath, dataSetId = dataSet2Id, dataSetName = dataSet2Name)
         )
@@ -48,7 +51,7 @@ class IODataSetsFinderSpec extends WordSpec with InMemoryRdfStore with ExternalS
 
       dataSetsFinder
         .findDataSets(projectPath)
-        .unsafeRunSync() shouldBe Set(DataSet(dataSet1Name), DataSet(dataSet2Name))
+        .unsafeRunSync() shouldBe Set(DataSet(dataSet1Id, dataSet1Name), DataSet(dataSet2Id, dataSet2Name))
     }
 
     "return None if there are no data-sets in the project" in new InMemoryStoreTestCase {

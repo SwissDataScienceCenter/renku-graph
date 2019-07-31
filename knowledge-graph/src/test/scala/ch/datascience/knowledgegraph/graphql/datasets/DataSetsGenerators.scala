@@ -25,6 +25,7 @@ import org.scalacheck.Gen
 object DataSetsGenerators {
 
   implicit val dataSets: Gen[DataSet] = for {
+    id   <- dataSetIds
     name <- dataSetNames
-  } yield DataSet(name)
+  } yield DataSet(id, name)
 }

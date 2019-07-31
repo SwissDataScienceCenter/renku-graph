@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.graphql.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets.DataSetName
+import ch.datascience.graph.model.dataSets.{DataSetId, DataSetName}
 import ch.datascience.graph.model.events.ProjectPath
 import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.logging.ApplicationLogger
@@ -57,12 +57,13 @@ class IODataSetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?dataSetName
+       |SELECT ?dataSetId ?dataSetName
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
-       |  ?dataSet rdf:type <http://schema.org/Dataset> .
-       |  ?dataSet schema:name ?dataSetName .
+       |  ?dataSet rdf:type <http://schema.org/Dataset> ;
+       |           rdfs:label ?dataSetId ;
+       |           schema:name ?dataSetName .
        |}""".stripMargin
 }
 
@@ -91,13 +92,11 @@ object IODataSetsFinder {
         .from(value)
         .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
 
-    def dataSetName(implicit cursor: HCursor): Decoder.Result[DataSetName] =
-      cursor.downField("dataSetName").downField("value").as[DataSetName]
-
     implicit lazy val dataSetDecoder: Decoder[DataSet] = { implicit cursor =>
       for {
-        name <- dataSetName
-      } yield DataSet(name)
+        id   <- cursor.downField("dataSetId").downField("value").as[DataSetId]
+        name <- cursor.downField("dataSetName").downField("value").as[DataSetName]
+      } yield DataSet(id, name)
     }
 
     _.downField("results").downField("bindings").as[List[DataSet]].map(_.toSet)

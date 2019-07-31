@@ -27,7 +27,7 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 object dataSets {
 
   final class DataSetId private (val value: String) extends AnyVal with StringTinyType
-  object DataSetId extends TinyTypeFactory[DataSetId](new DataSetId(_)) {
+  implicit object DataSetId extends TinyTypeFactory[DataSetId](new DataSetId(_)) {
     addConstraint(
       check   = value => Validated.catchOnly[IllegalArgumentException](UUID.fromString(value)).isValid,
       message = (value: String) => s"Cannot instantiate $typeName with '$value'"

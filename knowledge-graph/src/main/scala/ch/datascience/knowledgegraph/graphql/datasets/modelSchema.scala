@@ -27,6 +27,7 @@ object modelSchema {
     name        = "dataSet",
     description = "DataSet",
     fields = fields[Unit, DataSet](
+      Field("id", StringType, Some("DataSet id"), resolve     = _.value.id.toString),
       Field("name", StringType, Some("DataSet name"), resolve = _.value.name.toString)
     )
   )
