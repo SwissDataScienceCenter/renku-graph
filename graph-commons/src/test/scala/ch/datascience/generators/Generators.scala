@@ -21,7 +21,8 @@ package ch.datascience.generators
 import java.time.Instant
 import java.time.temporal.ChronoUnit.{DAYS, MINUTES => MINS}
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, NonEmptySet}
+import cats.kernel.Order
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import eu.timepit.refined.api.Refined
@@ -66,6 +67,13 @@ object Generators {
       size <- choose(minElements.value, maxElements.value)
       list <- Gen.listOfN(size, generator)
     } yield NonEmptyList.fromListUnsafe(list)
+
+  def nonEmptySet[T](generator: Gen[T], minElements: Int Refined Positive = 1, maxElements: Int Refined Positive = 5)(
+      implicit T:               Order[T]): Gen[NonEmptySet[T]] =
+    for {
+      size <- choose(minElements.value, maxElements.value)
+      set  <- Gen.containerOfN[Set, T](size, generator)
+    } yield NonEmptySet.of(set.head, set.tail.toList: _*)
 
   def listOf[T](generator: Gen[T], maxElements: Int Refined Positive = 5): Gen[List[T]] =
     for {

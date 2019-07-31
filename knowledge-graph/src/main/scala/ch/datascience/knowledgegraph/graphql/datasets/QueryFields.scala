@@ -38,6 +38,7 @@ private[graphql] object QueryFields {
         resolve = context =>
           context.ctx.dataSetsFinder
             .findDataSets(context.args arg common.QueryFields.projectPathArgument)
+            .map(_.toList)
             .unsafeToFuture()
       )
     )

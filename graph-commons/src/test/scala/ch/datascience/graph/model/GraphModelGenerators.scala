@@ -16,10 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.graph.model
 
-import ch.datascience.graph.model.dataSets.DataSetName
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.dataSets.{DataSetId, DataSetName}
+import org.scalacheck.Gen
+import org.scalacheck.Gen.uuid
 
-object model {
-  final case class DataSet(name: DataSetName)
+object GraphModelGenerators {
+  implicit val dataSetIds:   Gen[DataSetId]   = uuid.map(_.toString) map DataSetId.apply
+  implicit val dataSetNames: Gen[DataSetName] = nonEmptyStrings() map DataSetName.apply
 }

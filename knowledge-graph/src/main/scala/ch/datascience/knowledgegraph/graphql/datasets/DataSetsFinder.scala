@@ -20,18 +20,20 @@ package ch.datascience.knowledgegraph.graphql.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.graph.model.dataSets.DataSetName
 import ch.datascience.graph.model.events.ProjectPath
 import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.tinytypes.{From, StringTinyType}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait DataSetsFinder[Interpretation[_]] {
-  def findDataSets(projectPath: ProjectPath): Interpretation[List[DataSet]]
+  def findDataSets(projectPath: ProjectPath): Interpretation[Set[DataSet]]
 }
 
 class IODataSetsFinder(
@@ -41,7 +43,27 @@ class IODataSetsFinder(
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
     with DataSetsFinder[IO] {
-  override def findDataSets(projectPath: ProjectPath): IO[List[DataSet]] = ???
+
+  import IODataSetsFinder._
+
+  override def findDataSets(projectPath: ProjectPath): IO[Set[DataSet]] =
+    queryExpecting[Set[DataSet]](using = query(projectPath))
+
+  private def query(projectPath: ProjectPath): String =
+    s"""
+       |PREFIX prov: <http://www.w3.org/ns/prov#>
+       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+       |PREFIX schema: <http://schema.org/>
+       |PREFIX dcterms: <http://purl.org/dc/terms/>
+       |
+       |SELECT ?dataSetName
+       |WHERE {
+       |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
+       |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
+       |  ?dataSet rdf:type <http://schema.org/Dataset> .
+       |  ?dataSet schema:name ?dataSetName .
+       |}""".stripMargin
 }
 
 object IODataSetsFinder {
@@ -57,4 +79,27 @@ object IODataSetsFinder {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
     } yield new IODataSetsFinder(config, renkuBaseUrl, logger)
+
+  import cats.implicits._
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  import io.circe.{Decoder, DecodingFailure, HCursor}
+
+  private implicit val dataSetsDecoder: Decoder[Set[DataSet]] = {
+
+    def to[TT <: StringTinyType](tinyTypeFactory: From[TT])(value: String): DecodingFailure Either TT =
+      tinyTypeFactory
+        .from(value)
+        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+
+    def dataSetName(implicit cursor: HCursor): Decoder.Result[DataSetName] =
+      cursor.downField("dataSetName").downField("value").as[DataSetName]
+
+    implicit lazy val dataSetDecoder: Decoder[DataSet] = { implicit cursor =>
+      for {
+        name <- dataSetName
+      } yield DataSet(name)
+    }
+
+    _.downField("results").downField("bindings").as[List[DataSet]].map(_.toSet)
+  }
 }

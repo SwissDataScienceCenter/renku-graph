@@ -18,14 +18,13 @@
 
 package ch.datascience.knowledgegraph.graphql.datasets
 
-import ch.datascience.generators.Generators._
-import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetName}
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.knowledgegraph.graphql.datasets.model.DataSet
 import org.scalacheck.Gen
 
 object DataSetsGenerators {
 
-  implicit val dataSetName: Gen[DataSetName] = nonEmptyStrings() map DataSetName.apply
   implicit val dataSets: Gen[DataSet] = for {
-    name <- dataSetName
+    name <- dataSetNames
   } yield DataSet(name)
 }

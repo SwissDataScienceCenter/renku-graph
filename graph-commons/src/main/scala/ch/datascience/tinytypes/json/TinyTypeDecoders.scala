@@ -16,10 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.tinytypes.json
 
-import ch.datascience.graph.model.dataSets.DataSetName
+import cats.implicits._
+import ch.datascience.tinytypes.{From, StringTinyType}
+import io.circe.Decoder
 
-object model {
-  final case class DataSet(name: DataSetName)
+object TinyTypeDecoders {
+
+  implicit def decoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    Decoder.decodeString.emap { value =>
+      tinyTypeFactory.from(value).leftMap(_.getMessage)
+    }
 }

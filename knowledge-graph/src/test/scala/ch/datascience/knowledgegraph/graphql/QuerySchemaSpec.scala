@@ -18,6 +18,7 @@
 
 package ch.datascience.knowledgegraph.graphql
 
+import cats.Order
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -76,9 +77,9 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
         }"""
 
       givenFindDataSets(ProjectPath("namespace/project"))
-        .returning(IO.pure(dataSetsList))
+        .returning(IO.pure(dataSetsSet))
 
-      execute(query) shouldBe json(dataSetsList)
+      execute(query) shouldBe json(dataSetsSet)
     }
   }
 
@@ -142,19 +143,22 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
     import ch.datascience.knowledgegraph.graphql.datasets.DataSetsGenerators._
 
     def givenFindDataSets(projectPath: ProjectPath) = new {
-      def returning(result: IO[List[DataSet]]) =
+      def returning(result: IO[Set[DataSet]]) =
         (dataSetsFinder
           .findDataSets(_: ProjectPath))
           .expects(projectPath)
           .returning(result)
     }
 
-    lazy val dataSetsList = nonEmptyList(dataSets).generateOne.toList
+    implicit val dataSetOrder: Order[DataSet] = Order.from[DataSet] {
+      case (item1, item2) => item1.name.value.length - item2.name.value.length
+    }
+    lazy val dataSetsSet = nonEmptySet(dataSets).generateOne.toSortedSet
 
-    def json(dataSets: List[DataSet]) = json"""
+    def json(dataSets: Set[DataSet]) = json"""
         {
           "data" : {
-            "dataSets" : ${Json.arr(dataSetsList.map(toJson): _*)}
+            "dataSets" : ${Json.arr(dataSetsSet.map(toJson).to[List]: _*)}
           }
         }"""
 
