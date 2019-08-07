@@ -39,12 +39,12 @@ private[graphql] object QueryFields {
         name        = "lineage",
         fieldType   = OptionType(lineageType),
         description = Some("Returns a lineage for a project with the given path"),
-        arguments   = List(projectPathArgument, maybeCommitIdArgument, maybeFilePathArgument),
+        arguments   = List(projectPathArgument, commitIdArgument, filePathArgument),
         resolve = context =>
           context.ctx.lineageFinder
             .findLineage(context.args arg projectPathArgument,
-                         context.args arg maybeCommitIdArgument,
-                         context.args arg maybeFilePathArgument)
+                         context.args arg commitIdArgument,
+                         context.args arg filePathArgument)
             .unsafeToFuture()
       )
     )
@@ -57,15 +57,15 @@ private[graphql] object QueryFields {
     )
   )
 
-  val maybeCommitIdArgument = Argument(
+  val commitIdArgument = Argument(
     name         = "commitId",
-    argumentType = OptionInputType(CommitId.toScalarType(description = "Commit Id"))
+    argumentType = CommitId.toScalarType(description = "Commit Id")
   )
 
   final class FilePath private (val value: String) extends AnyVal with StringTinyType
   object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath
-  val maybeFilePathArgument = Argument(
+  val filePathArgument = Argument(
     name         = "filePath",
-    argumentType = OptionInputType(FilePath.toScalarType(description = "File path"))
+    argumentType = FilePath.toScalarType(description = "File path")
   )
 }

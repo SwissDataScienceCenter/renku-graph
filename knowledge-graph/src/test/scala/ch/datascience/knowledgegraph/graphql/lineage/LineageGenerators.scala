@@ -19,11 +19,14 @@
 package ch.datascience.knowledgegraph.graphql.lineage
 
 import ch.datascience.generators.Generators._
+import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.knowledgegraph.graphql.lineage.model.{Edge, Node, NodeId, NodeLabel}
+import ch.datascience.knowledgegraph.graphql.lineage.model._
 import org.scalacheck.{Arbitrary, Gen}
 
 object LineageGenerators {
+
+  implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val nodeIds:    Gen[NodeId]    = nonEmptyStrings() map NodeId.apply
   implicit val nodeLabels: Gen[NodeLabel] = nonEmptyStrings() map NodeLabel.apply
