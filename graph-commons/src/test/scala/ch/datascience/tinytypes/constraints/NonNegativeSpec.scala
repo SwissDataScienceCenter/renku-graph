@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -40,6 +40,6 @@ class NonNegativeSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-private class NonNegativeInt private (val value: Int) extends AnyVal with TinyType[Int]
+private class NonNegativeInt private (val value: Int) extends AnyVal with IntTinyType
 
-private object NonNegativeInt extends TinyTypeFactory[Int, NonNegativeInt](new NonNegativeInt(_)) with NonNegative
+private object NonNegativeInt extends TinyTypeFactory[NonNegativeInt](new NonNegativeInt(_)) with NonNegative

@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.generators
 
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
+import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl}
 import ch.datascience.triplesgenerator.config.DatasetType.{Mem, TDB}
 import ch.datascience.triplesgenerator.config._
 import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
@@ -43,10 +44,4 @@ object ServiceTypesGenerators {
     datasetType     <- Gen.oneOf(Mem, TDB)
     authCredentials <- basicAuthCredentials
   } yield FusekiAdminConfig(fusekiUrl, datasetName, datasetType, authCredentials)
-
-  implicit val fusekiUserConfigs: Gen[FusekiUserConfig] = for {
-    fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
-    datasetName     <- nonEmptyStrings() map DatasetName.apply
-    authCredentials <- basicAuthCredentials
-  } yield FusekiUserConfig(fusekiUrl, datasetName, authCredentials)
 }

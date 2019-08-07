@@ -1,28 +1,32 @@
 // format: off
 organization := "ch.datascience"
-name         := "renku-graph"
-version      := "0.0.1-SNAPSHOT"
+name := "renku-graph"
 scalaVersion := "2.12.8"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
 
+releaseVersionBump := sbtrelease.Version.Bump.Minor
+releaseIgnoreUntrackedFiles := true
+releaseTagName := (version in ThisBuild).value.toString
+
 lazy val root = Project(
-  id   = "renku-graph",
+  id = "renku-graph",
   base = file(".")
 ).settings(
-  skip in publish := true, 
+  skip in publish := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
   graphCommons,
   dbEventLog,
   tokenRepository,
   webhookService,
-  triplesGenerator
+  triplesGenerator,
+  knowledgeGraph
 )
 
 lazy val graphCommons = Project(
-  id   = "graph-commons",
+  id = "graph-commons",
   base = file("graph-commons")
 ).settings(
   commonSettings
@@ -31,7 +35,7 @@ lazy val graphCommons = Project(
 )
 
 lazy val dbEventLog = Project(
-  id   = "db-event-log",
+  id = "db-event-log",
   base = file("db-event-log")
 ).settings(
   commonSettings
@@ -43,37 +47,37 @@ lazy val dbEventLog = Project(
 )
 
 lazy val webhookService = Project(
-  id   = "webhook-service",
+  id = "webhook-service",
   base = file("webhook-service")
 ).settings(
   commonSettings
 ).dependsOn(
   graphCommons % "compile->compile",
   graphCommons % "test->test",
-  dbEventLog   % "compile->compile",
-  dbEventLog   % "test->test"
+  dbEventLog % "compile->compile",
+  dbEventLog % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
 )
 
 lazy val triplesGenerator = Project(
-  id   = "triples-generator",
+  id = "triples-generator",
   base = file("triples-generator")
 ).settings(
   commonSettings
 ).dependsOn(
   graphCommons % "compile->compile",
   graphCommons % "test->test",
-  dbEventLog   % "compile->compile",
-  dbEventLog   % "test->test"
+  dbEventLog % "compile->compile",
+  dbEventLog % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
 )
 
 lazy val tokenRepository = Project(
-  id   = "token-repository",
+  id = "token-repository",
   base = file("token-repository")
 ).settings(
   commonSettings
@@ -85,9 +89,21 @@ lazy val tokenRepository = Project(
   AutomateHeaderPlugin
 )
 
+lazy val knowledgeGraph = Project(
+  id = "knowledge-graph",
+  base = file("knowledge-graph")
+).settings(
+  commonSettings
+).dependsOn(
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
+  JavaAppPackaging,
+  AutomateHeaderPlugin
+)
 
 lazy val acceptanceTests = Project(
-  id   = "acceptance-tests",
+  id = "acceptance-tests",
   base = file("acceptance-tests")
 ).settings(
   commonSettings
@@ -95,8 +111,9 @@ lazy val acceptanceTests = Project(
   webhookService,
   triplesGenerator,
   tokenRepository,
+  knowledgeGraph,
   graphCommons % "test->test",
-  dbEventLog   % "test->test"
+  dbEventLog % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -107,9 +124,11 @@ lazy val commonSettings = Seq(
 
   skip in publish := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-  
-  publishArtifact in (Compile, packageDoc) := false,
-  publishArtifact in (Compile, packageSrc) := false,
+
+  publishArtifact in(Compile, packageDoc) := false,
+  publishArtifact in(Compile, packageSrc) := false,
+
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3"),
 
   scalacOptions += "-Ypartial-unification",
   scalacOptions += "-feature",
@@ -117,7 +136,7 @@ lazy val commonSettings = Seq(
   scalacOptions += "-deprecation",
   scalacOptions += "-Ywarn-value-discard",
   scalacOptions += "-Xfatal-warnings",
-  
+
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
@@ -140,3 +159,97 @@ lazy val commonSettings = Seq(
   ))
 )
 // format: on
+
+import ReleaseTransformations._
+import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys._
+import sbtrelease.ReleasePlugin.autoImport._
+import sbtrelease.{Vcs, Versions}
+
+releaseTagComment := {
+  Vcs.detect(root.base).map { implicit vcs =>
+    collectCommitsMessages() match {
+      case Nil => s"Releasing ${(version in ThisBuild).value}"
+      case messages =>
+        s"Release Notes for ${(version in ThisBuild).value}\n${messages.map(m => s"* $m").mkString("\n")}"
+    }
+  }
+}.getOrElse {
+  sys.error("Release Tag comment cannot be calculated")
+}
+
+@scala.annotation.tailrec
+def collectCommitsMessages(commitsCounter: Int = 1, messages: List[String] = List.empty)(
+    implicit vcs:                          Vcs): List[String] =
+  vcs.cmd("log", "--format=%s", "-1", s"HEAD~$commitsCounter").!!.trim match {
+    case message if message startsWith "Setting version" => messages
+    case message                                         => collectCommitsMessages(commitsCounter + 1, messages :+ message)
+  }
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runClean,
+  runTest,
+  setReleaseVersion,
+  setReleaseVersionToChart,
+  commitReleaseVersion,
+  tagRelease,
+  publishArtifacts,
+  setNextVersion,
+  setNextVersionToChart,
+  commitNextVersion,
+  pushChanges
+)
+
+val setReleaseVersionToChart: ReleaseStep = setReleaseVersionChart(_._1)
+val setNextVersionToChart:    ReleaseStep = setNextReleaseVersionChart(_._2)
+
+def setReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
+  val version = findVersion(selectVersion, state)
+
+  updateAndCommitChart(version)
+
+  state
+}
+
+def setNextReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
+  val nextVersion = findVersion(selectVersion, state)
+  val currentHash = Vcs.detect(root.base).map(_.currentHash).getOrElse(sys.error("Current hash cannot be obtained"))
+  val version     = nextVersion.replace("SNAPSHOT", currentHash.take(7))
+
+  updateAndCommitChart(version)
+
+  state
+}
+
+def findVersion(selectVersion: Versions => String, state: State) = {
+  val allVersions = state.get(versions).getOrElse {
+    sys.error("No versions are set! Was this release part executed before inquireVersions?")
+  }
+
+  selectVersion(allVersions)
+}
+
+def updateAndCommitChart(version: String): Unit = {
+  writeChartVersion(version)
+
+  addChartToVcs()
+}
+
+val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
+
+def addChartToVcs(): Unit =
+  for {
+    vcs      <- Vcs.detect(root.base)
+    filePath <- IO.relativize(root.base, chartFile)
+  } yield vcs.add(filePath).run()
+
+def writeChartVersion(version: String): Unit = {
+
+  val fileLines = IO.readLines(chartFile)
+  val updatedLines = fileLines.map {
+    case line if line.startsWith("version:") => s"version: $version"
+    case line                                => line
+  }
+  IO.writeLines(chartFile, updatedLines)
+}

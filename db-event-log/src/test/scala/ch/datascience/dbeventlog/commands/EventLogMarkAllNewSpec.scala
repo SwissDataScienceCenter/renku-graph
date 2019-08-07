@@ -25,8 +25,8 @@ import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.CommitEventId
-import ch.datascience.graph.model.events.EventsGenerators.{commitEventIds, committedDates}
+import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.{CommitEventId, ProjectPath}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -34,26 +34,37 @@ import org.scalatest.WordSpec
 
 class EventLogMarkAllNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
-  "markAllEventsAsNew" should {
+  "markEventsAsNew" should {
 
     s"set status to $New and execution_date to now " +
       s"on all events with status $Processing, $TriplesStore and $TriplesStoreFailure " +
       "and execution_date in the past" in new TestCase {
 
-      val event1Id = commitEventIds.generateOne
-      addEvent(event1Id, EventStatus.Processing, timestampsNotInTheFuture.map(ExecutionDate.apply))
-      val event2Id = commitEventIds.generateOne
-      addEvent(event2Id, EventStatus.Processing, timestampsInTheFuture.map(ExecutionDate.apply))
-      val event3Id = commitEventIds.generateOne
-      addEvent(event3Id, EventStatus.TriplesStore, timestampsNotInTheFuture.map(ExecutionDate.apply))
-      val event4Id = commitEventIds.generateOne
-      addEvent(event4Id, EventStatus.NonRecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply))
-      val event5Id = commitEventIds.generateOne
-      addEvent(event5Id, EventStatus.New, timestampsNotInTheFuture.map(ExecutionDate.apply))
-      val event6Id = commitEventIds.generateOne
-      addEvent(event6Id, EventStatus.TriplesStoreFailure, timestampsNotInTheFuture.map(ExecutionDate.apply))
+      val event1Id     = commitEventIds.generateOne
+      val projectPath1 = projectPaths.generateOne
+      addEvent(event1Id, projectPath1, EventStatus.Processing, timestampsNotInTheFuture.map(ExecutionDate.apply))
+      val event2Id = commitEventIds.generateOne.copy(projectId = event1Id.projectId)
+      addEvent(event2Id, projectPath1, EventStatus.Processing, timestampsInTheFuture.map(ExecutionDate.apply))
+      val event3Id = commitEventIds.generateOne.copy(projectId = event1Id.projectId)
+      addEvent(event3Id, projectPath1, EventStatus.TriplesStore, timestampsNotInTheFuture.map(ExecutionDate.apply))
+      val event4Id     = commitEventIds.generateOne
+      val projectPath4 = projectPaths.generateOne
+      addEvent(event4Id, projectPath4, NonRecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply))
+      val event5Id     = commitEventIds.generateOne
+      val projectPath5 = projectPaths.generateOne
+      addEvent(event5Id, projectPath5, EventStatus.New, timestampsNotInTheFuture.map(ExecutionDate.apply))
+      val event6Id = commitEventIds.generateOne.copy(projectId = event5Id.projectId)
+      addEvent(event6Id, projectPath5, TriplesStoreFailure, timestampsNotInTheFuture.map(ExecutionDate.apply))
 
-      eventLogMarkAllNew.markAllEventsAsNew.unsafeRunSync() shouldBe ((): Unit)
+      eventLogMarkAllNew
+        .markEventsAsNew(projectPath1, Set(event1Id.id, event2Id.id, event3Id.id))
+        .unsafeRunSync() shouldBe ((): Unit)
+      eventLogMarkAllNew
+        .markEventsAsNew(projectPath4, Set(event4Id.id))
+        .unsafeRunSync() shouldBe ((): Unit)
+      eventLogMarkAllNew
+        .markEventsAsNew(projectPath5, Set(event5Id.id, event6Id.id))
+        .unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = New).toSet shouldBe Set(event1Id -> ExecutionDate(now),
                                                   event3Id -> ExecutionDate(now),
@@ -63,10 +74,11 @@ class EventLogMarkAllNewSpec extends WordSpec with InMemoryEventLogDbSpec with M
 
     "do nothing when no events got updated" in new TestCase {
 
-      val event1Id = commitEventIds.generateOne
-      addEvent(event1Id, EventStatus.Processing, timestampsInTheFuture.map(ExecutionDate.apply))
+      val eventId     = commitEventIds.generateOne
+      val projectPath = projectPaths.generateOne
+      addEvent(eventId, projectPath, EventStatus.Processing, timestampsInTheFuture.map(ExecutionDate.apply))
 
-      eventLogMarkAllNew.markAllEventsAsNew.unsafeRunSync() shouldBe ((): Unit)
+      eventLogMarkAllNew.markEventsAsNew(projectPath, Set(eventId.id)).unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = New) shouldBe Nil
     }
@@ -80,7 +92,15 @@ class EventLogMarkAllNewSpec extends WordSpec with InMemoryEventLogDbSpec with M
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def addEvent(commitEventId: CommitEventId, status: EventStatus, executionDate: Gen[ExecutionDate]): Unit =
-      storeEvent(commitEventId, status, executionDate.generateOne, committedDates.generateOne, eventBodies.generateOne)
+    def addEvent(commitEventId: CommitEventId,
+                 projectPath:   ProjectPath,
+                 status:        EventStatus,
+                 executionDate: Gen[ExecutionDate]): Unit =
+      storeEvent(commitEventId,
+                 status,
+                 executionDate.generateOne,
+                 committedDates.generateOne,
+                 eventBodies.generateOne,
+                 projectPath = projectPath)
   }
 }

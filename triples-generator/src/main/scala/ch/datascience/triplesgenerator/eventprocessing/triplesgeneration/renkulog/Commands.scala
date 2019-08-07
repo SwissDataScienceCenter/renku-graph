@@ -24,6 +24,7 @@ import ch.datascience.config.ServiceUrl
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.triplesgenerator.config.GitLabUrl
 import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 
@@ -35,7 +36,7 @@ import scala.util.control.NonFatal
 private object Commands {
 
   class GitLabRepoUrlFinder[Interpretation[_]](
-      gitLabUrl: ServiceUrl
+      gitLabUrl: GitLabUrl
   )(implicit ME: MonadError[Interpretation, Throwable]) {
 
     import java.net.URL
@@ -49,11 +50,11 @@ private object Commands {
       case Some(OAuthAccessToken(token))    => s"oauth2:$token@"
     }
 
-    private def merge(serviceUrl:   ServiceUrl,
+    private def merge(gitLabUrl:    GitLabUrl,
                       urlTokenPart: String,
                       projectPath:  ProjectPath): Interpretation[ServiceUrl] = ME.fromEither {
       ServiceUrl.from {
-        val url              = serviceUrl.value
+        val url              = gitLabUrl.value
         val protocol         = new URL(url).getProtocol
         val serviceWithToken = url.toString.replace(s"$protocol://", s"$protocol://$urlTokenPart")
         s"$serviceWithToken/$projectPath.git"

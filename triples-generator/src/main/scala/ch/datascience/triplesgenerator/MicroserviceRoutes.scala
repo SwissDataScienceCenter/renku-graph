@@ -19,20 +19,16 @@
 package ch.datascience.triplesgenerator
 
 import cats.effect.ConcurrentEffect
-import ch.datascience.triplesgenerator.reprovisioning.CompleteReProvisioningEndpoint
 import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
-private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
-    completeReProvisionEndpoint: CompleteReProvisioningEndpoint[Interpretation]
-) extends Http4sDsl[Interpretation] {
+private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect]() extends Http4sDsl[Interpretation] {
 
   import org.http4s.HttpRoutes
 
   lazy val routes: HttpRoutes[Interpretation] = HttpRoutes
     .of[Interpretation] {
       case GET -> Root / "ping" => Ok("pong")
-      case request @ DELETE -> Root / "triples" / "projects" => completeReProvisionEndpoint.reProvisionAll(request)
     }
 }

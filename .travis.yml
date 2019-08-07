@@ -2,7 +2,7 @@ dist: xenial
 branches:
   only:
     - master
-    - /^\d+\.\d+\.\d+(-\S*)?$/
+    - "/^\\d+\\.\\d+\\.\\d+$/"
 language: scala
 jdk: openjdk8
 scala:
@@ -22,6 +22,8 @@ env:
     - HELM_URL=https://storage.googleapis.com/kubernetes-helm
     - HELM_TGZ=helm-v2.8.2-linux-amd64.tar.gz
     - SBT_OPTS="-XX:+CMSClassUnloadingEnabled -Xmx1G"
+  matrix:
+    - secure: mTY6uy3qD/3L98jz010e3hb/C8ozy+HkRKfYGi5C82hNJY4nWtXvZh/C6fG2d3Dv5Ep3WYdRowc4526B+RWWTIS/DCwQLJrxwQzQ7DwivvqJsCgC/iiqyISsFZT6xNYKDgSbgKhTWgzWJezkXYTRFIRcbqYu9GNs/pcZRwjs7htKbGCUJg9hAYoEkSbX6z4UA0VGEYZx6IskHDEGSNkhQOFELzZEQjW2ChRulBIAjCQ17JnFnL/HNWK8ON9Dy6GR/oZGtLUb3iVYynlPpgFhPJhWsw4/rkuIpqu5ehE0CLxbGKvy8vDaOjRrvWOvI2RA8kV4raPbzLRRkVcl10fIxzZqFO+GRObh0xDtU1kEEVF3ft4EiYNqmCHWPRUR1qN1rTUzrGQpHImnSnoq3ijo0dh9bCjNAjzoHf6Uz7YzbVfoFx6g1adqoDHRi10DdKSqukamiIjo+uT8RKcpzVJfSQ1QpQWyqYJ5gJZltgxwe0XQm0p3gJTyKdjYiK7yfzfqvwMa1sBVBmJ0/9yubUBr22zd6SHvS4AGZIozJNPdfHBKkQc0KRD0Lt6GCQpxVdKJs3SQG8m4wDZGvzVWkb7faYGlk3AOJ7qdbgnAyWZHLVXx2z8PLkF/oU8GWvX+Oy/R/5/qJIqUrjBl0mjSG34gGB9Bex0hS7hnclDxgmFcl8o=
 git:
   depth: false
 addons:
@@ -46,14 +48,15 @@ install:
 script:
   - sbt ++$TRAVIS_SCALA_VERSION clean test && sbt ++$TRAVIS_SCALA_VERSION "project acceptance-tests" clean test && bash ./.travis/check-code-formatting.sh
 deploy:
-  - &script
-    provider: script
+  - provider: script
     skip_cleanup: true
-    script: bash ./.travis/travis-deploy.sh
-    on: &script_on
+    script: bash ./.travis/travis-release.sh
+    on:
       branch: master
       repo: SwissDataScienceCenter/renku-graph
-  - <<: *script
+  - provider: script
+    skip_cleanup: true
+    script: bash ./.travis/travis-publish.sh
     on:
-      <<: *script_on
       tags: true
+      repo: SwissDataScienceCenter/renku-graph
