@@ -19,13 +19,18 @@
 package ch.datascience.knowledgegraph.graphql.datasets
 
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.knowledgegraph.graphql.datasets.model.DataSet
+import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreation}
 import org.scalacheck.Gen
 
 object DataSetsGenerators {
 
+  private implicit val dataSetCreation: Gen[DataSetCreation] = for {
+    creationDate <- dataSetCreationDates
+  } yield DataSetCreation(creationDate)
+
   implicit val dataSets: Gen[DataSet] = for {
-    id   <- dataSetIds
-    name <- dataSetNames
-  } yield DataSet(id, name)
+    id      <- dataSetIds
+    name    <- dataSetNames
+    created <- dataSetCreation
+  } yield DataSet(id, name, created)
 }

@@ -18,11 +18,11 @@
 
 package ch.datascience.knowledgegraph.graphql.datasets
 
+import DataSetsGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.graphql.datasets.model.DataSet
 import ch.datascience.rdfstore.RdfStoreData._
 import ch.datascience.rdfstore.{InMemoryRdfStore, RdfStoreData}
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -35,23 +35,25 @@ class IODataSetsFinderSpec extends WordSpec with InMemoryRdfStore with ExternalS
 
     "return all data-sets of the given project" in new InMemoryStoreTestCase {
 
-      val dataSet1Id   = dataSetIds.generateOne
-      val dataSet1Name = dataSetNames.generateOne
-      val dataSet2Id   = dataSetIds.generateOne
-      val dataSet2Name = dataSetNames.generateOne
+      val dataSet1 = dataSets.generateOne
+      val dataSet2 = dataSets.generateOne
       loadToStore(
         RDF(
           singleFileAndCommitWithDataset(projectPaths.generateOne,
-                                         dataSetId              = dataSetIds.generateOne,
-                                         dataSetName            = dataSetNames.generateOne),
-          singleFileAndCommitWithDataset(projectPath, dataSetId = dataSet1Id, dataSetName = dataSet1Name),
-          singleFileAndCommitWithDataset(projectPath, dataSetId = dataSet2Id, dataSetName = dataSet2Name)
+                                         dataSetId   = dataSetIds.generateOne,
+                                         dataSetName = dataSetNames.generateOne),
+          singleFileAndCommitWithDataset(projectPath,
+                                         dataSetId          = dataSet1.id,
+                                         dataSetName        = dataSet1.name,
+                                         dataSetCreatedDate = dataSet1.created.date),
+          singleFileAndCommitWithDataset(projectPath,
+                                         dataSetId          = dataSet2.id,
+                                         dataSetName        = dataSet2.name,
+                                         dataSetCreatedDate = dataSet2.created.date)
         )
       )
 
-      dataSetsFinder
-        .findDataSets(projectPath)
-        .unsafeRunSync() shouldBe Set(DataSet(dataSet1Id, dataSet1Name), DataSet(dataSet2Id, dataSet2Name))
+      dataSetsFinder.findDataSets(projectPath).unsafeRunSync() shouldBe Set(dataSet1, dataSet2)
     }
 
     "return None if there are no data-sets in the project" in new InMemoryStoreTestCase {

@@ -18,11 +18,12 @@
 
 package ch.datascience.graph.model
 
+import java.time.Instant
 import java.util.UUID
 
 import cats.data.Validated
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
+import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
 object dataSets {
 
@@ -34,6 +35,11 @@ object dataSets {
     )
   }
 
-  class DataSetName private (val value: String) extends AnyVal with StringTinyType
+  final class DataSetName private (val value: String) extends AnyVal with StringTinyType
   implicit object DataSetName extends TinyTypeFactory[DataSetName](new DataSetName(_)) with NonBlank
+
+  final class DataSetCreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DataSetCreatedDate
+      extends TinyTypeFactory[DataSetCreatedDate](new DataSetCreatedDate(_))
+      with InstantNotInTheFuture
 }

@@ -74,6 +74,7 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
           dataSets(projectPath: "namespace/project") {
             id
             name
+            created {date}
           }
         }"""
 
@@ -163,10 +164,14 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
           }
         }"""
 
-    private def toJson(dataSet: DataSet) = json"""
+    private def toJson(dataSet: DataSet) =
+      json"""
         {
-          "id" : ${dataSet.id.value},
-          "name" : ${dataSet.name.value}
+          "id": ${dataSet.id.value},
+          "name": ${dataSet.name.value},
+          "created": {
+            "date": ${dataSet.created.date.value}
+          }
         }"""
   }
 }

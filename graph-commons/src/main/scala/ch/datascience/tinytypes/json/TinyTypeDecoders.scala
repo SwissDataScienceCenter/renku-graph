@@ -18,14 +18,24 @@
 
 package ch.datascience.tinytypes.json
 
+import java.time.Instant
+
 import cats.implicits._
-import ch.datascience.tinytypes.{From, StringTinyType}
+import ch.datascience.tinytypes.{From, InstantTinyType, StringTinyType}
 import io.circe.Decoder
 
 object TinyTypeDecoders {
 
-  implicit def decoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+  implicit def stringDecoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     Decoder.decodeString.emap { value =>
       tinyTypeFactory.from(value).leftMap(_.getMessage)
+    }
+
+  implicit def instantDecoder[TT <: InstantTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    Decoder.decodeString.emap { value =>
+      Either
+        .catchNonFatal(Instant.parse(value))
+        .flatMap(tinyTypeFactory.from)
+        .leftMap(_.getMessage)
     }
 }

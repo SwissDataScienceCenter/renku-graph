@@ -22,10 +22,10 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
-import ch.datascience.graph.model.GraphModelGenerators.{dataSetIds, dataSetNames}
-import ch.datascience.graph.model.dataSets.{DataSetId, DataSetName}
-import ch.datascience.graph.model.events.EventsGenerators.{projects, _}
+import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.knowledgegraph.graphql.datasets.DataSetsGenerators._
+import ch.datascience.knowledgegraph.graphql.datasets.model.DataSet
 import ch.datascience.rdfstore.RdfStoreData._
 import flows.RdfStoreProvisioning._
 import io.circe.Json
@@ -38,12 +38,10 @@ import sangria.macros._
 
 class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
-  private val project      = projects.generateOne.copy(path = ProjectPath("namespace/project"))
-  private val commitId     = commitIds.generateOne
-  private val dataSet1Id   = dataSetIds.generateOne
-  private val dataSet1Name = dataSetNames.generateOne
-  private val dataSet2Id   = dataSetIds.generateOne
-  private val dataSet2Name = dataSetNames.generateOne
+  private val project  = projects.generateOne.copy(path = ProjectPath("namespace/project"))
+  private val commitId = commitIds.generateOne
+  private val dataSet1 = dataSets.generateOne
+  private val dataSet2 = dataSets.generateOne
 
   feature("GraphQL query to find project's data-sets") {
 
@@ -51,8 +49,18 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
 
       Given("some data in the RDF Store")
       val triples =
-        singleFileAndCommitWithDataset(project.path, commitId, model.currentSchemaVersion, dataSet1Id, dataSet1Name) &+
-          singleFileAndCommitWithDataset(project.path, commitId, model.currentSchemaVersion, dataSet2Id, dataSet2Name)
+        singleFileAndCommitWithDataset(project.path,
+                                       commitId,
+                                       model.currentSchemaVersion,
+                                       dataSet1.id,
+                                       dataSet1.name,
+                                       dataSet1.created.date) &+
+          singleFileAndCommitWithDataset(project.path,
+                                         commitId,
+                                         model.currentSchemaVersion,
+                                         dataSet2.id,
+                                         dataSet2.name,
+                                         dataSet2.created.date)
       `data in the RDF store`(project, commitId, triples)
 
       When("user posts a graphql query to fetch data-sets")
@@ -61,12 +69,9 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       Then("he should get OK response with project's data-sets in Json")
       response.status shouldBe Ok
 
-      response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]].map(_.toSet) shouldBe Right {
-        Set(
-          json(dataSet1Id, dataSet1Name),
-          json(dataSet2Id, dataSet2Name)
-        )
-      }
+      val Right(responseJson) =
+        response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]].map(_.toSet)
+      responseJson shouldBe Set(json(dataSet1), json(dataSet2))
     }
 
     scenario("As a user I would like to find project's data-sets with a named GraphQL query") {
@@ -82,12 +87,9 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
 
-      response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]].map(_.toSet) shouldBe Right {
-        Set(
-          json(dataSet1Id, dataSet1Name),
-          json(dataSet2Id, dataSet2Name)
-        )
-      }
+      val Right(responseJson) =
+        response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]].map(_.toSet)
+      responseJson shouldBe Set(json(dataSet1), json(dataSet2))
     }
   }
 
@@ -96,6 +98,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       dataSets(projectPath: "namespace/project") {
         id
         name
+        created { date }
       }
     }"""
 
@@ -104,12 +107,16 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       dataSets(projectPath: $$projectPath) { 
         id
         name
+        created { date }
       }
     }"""
 
-  private def json(dataSetId: DataSetId, dataSetName: DataSetName) = json"""
+  private def json(dataSet: DataSet) = json"""
     {
-      "id": ${dataSetId.value}, 
-      "name": ${dataSetName.value}
+      "id": ${dataSet.id.value}, 
+      "name": ${dataSet.name.value},
+      "created": {
+        "date": ${dataSet.created.date.value}
+      }
     }"""
 }

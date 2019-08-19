@@ -18,8 +18,11 @@
 
 package ch.datascience.knowledgegraph.graphql.datasets
 
-import ch.datascience.graph.model.dataSets.{DataSetId, DataSetName}
+import ch.datascience.graph.model.dataSets._
 
 object model {
-  final case class DataSet(id: DataSetId, name: DataSetName)
+
+  final case class DataSet(id: DataSetId, name: DataSetName, created: DataSetCreation)
+
+  final case class DataSetCreation(date: DataSetCreatedDate)
 }

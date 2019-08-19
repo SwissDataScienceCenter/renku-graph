@@ -81,11 +81,13 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       </rdf:Description>
   // format: on
 
-  def singleFileAndCommitWithDataset(projectPath:   ProjectPath,
-                                     commitId:      CommitId = commitIds.generateOne,
-                                     schemaVersion: SchemaVersion = schemaVersions.generateOne,
-                                     dataSetId:     DataSetId = dataSetIds.generateOne,
-                                     dataSetName:   DataSetName = dataSetNames.generateOne): NodeBuffer =
+  def singleFileAndCommitWithDataset(
+      projectPath:        ProjectPath,
+      commitId:           CommitId = commitIds.generateOne,
+      schemaVersion:      SchemaVersion = schemaVersions.generateOne,
+      dataSetId:          DataSetId = dataSetIds.generateOne,
+      dataSetName:        DataSetName = dataSetNames.generateOne,
+      dataSetCreatedDate: DataSetCreatedDate = dataSetCreationDates.generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
@@ -162,7 +164,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
       <rdfs:label>{dataSetId.toString}</rdfs:label>
       <schema:name>{dataSetName.toString}</schema:name>
-      <schema:dateCreated>2019-07-31 09:18:54.242406</schema:dateCreated>
+      <schema:dateCreated>{dataSetCreatedDate.toString}</schema:dateCreated>
     </rdf:Description>
     <rdf:Description rdf:about={s"file:///blob/$commitId/.gitattributes"}>
       <rdfs:label>{s".gitattributes@$commitId"}</rdfs:label>

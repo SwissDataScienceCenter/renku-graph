@@ -100,7 +100,7 @@ Query example:
 {
   "query": "{ 
     dataSets(projectPath: \"namespace/project\") {
-      id name 
+      id name created {date}
     } 
   }"
 }
@@ -113,15 +113,24 @@ Response body example:
     "dataSets": [
       {
         "id" : "e1fc7b62-e021-434b-9264-dda336bddd4f",
-        "name" : "x"
+        "name" : "x",
+        "created" : {
+            "date": "1981-09-05T10:38:29.457Z"
+        }
       },
       {
         "id" : "5b7a1394-93b5-4e75-932d-e041cf46349d",
-        "name" : "xr"
+        "name" : "xr",
+        "created" : {
+            "date": "1991-09-05T10:38:29.457Z"
+        }
       },
       {
         "id" : "b1aa58af-a488-4bae-97b4-d6d349f98412",
-        "name" : "chOorWhraw"
+        "name" : "chOorWhraw",
+        "created" : {
+            "date": "2001-09-05T10:38:29.457Z"
+        }
       }
     ]
   }
@@ -132,7 +141,7 @@ In case there's no data found for a given query, the response `json` will contai
 ```
 {
   "data": {
-    "lineage": null
+    "dataSets": null
   }
 }
 ```
