@@ -36,9 +36,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait LineageFinder[Interpretation[_]] {
-  def findLineage(projectPath:   ProjectPath,
-                  maybeCommitId: Option[CommitId],
-                  maybeFilePath: Option[FilePath]): Interpretation[Option[Lineage]]
+  def findLineage(projectPath: ProjectPath, commitId: CommitId, filePath: FilePath): Interpretation[Option[Lineage]]
 }
 
 class IOLineageFinder(
@@ -53,15 +51,13 @@ class IOLineageFinder(
   import IOLineageFinder._
   import executionTimeRecorder._
 
-  override def findLineage(projectPath:   ProjectPath,
-                           maybeCommitId: Option[CommitId],
-                           maybeFilePath: Option[FilePath]): IO[Option[Lineage]] =
+  override def findLineage(projectPath: ProjectPath, commitId: CommitId, filePath: FilePath): IO[Option[Lineage]] =
     measureExecutionTime {
       for {
-        edges        <- queryExpecting[Set[Edge]](using = Query(projectPath, maybeCommitId, maybeFilePath))
+        edges        <- queryExpecting[Set[Edge]](using = query(projectPath, commitId, filePath))
         maybeLineage <- toLineage(edges)
       } yield maybeLineage
-    } flatMap logExecutionTime(projectPath, maybeCommitId, maybeFilePath)
+    } flatMap logExecutionTime(projectPath, commitId, filePath)
 
   private lazy val toLineage: Set[Edge] => IO[Option[Lineage]] = {
     case edges if edges.isEmpty => IO.pure(Option.empty)
@@ -91,97 +87,61 @@ class IOLineageFinder(
     }
 
   private def logExecutionTime(
-      projectPath:   ProjectPath,
-      maybeCommitId: Option[CommitId],
-      maybeFilePath: Option[FilePath]
+      projectPath: ProjectPath,
+      commitId:    CommitId,
+      filePath:    FilePath
   ): ((ElapsedTime, Option[Lineage])) => IO[Option[Lineage]] = {
     case (elapsedTime, maybeLineage) =>
-      logger.info(
-        s"Found lineage for $projectPath " +
-          s"${maybeCommitId.map(commit => s"$commit: commitId ").getOrElse("")}" +
-          s"${maybeFilePath.map(filePath => s"$filePath: file ").getOrElse("")}" +
-          s"in ${elapsedTime}ms"
-      )
+      logger.info(s"Found lineage for $projectPath commit: $commitId filePath: $filePath in ${elapsedTime}ms")
       IO.pure(maybeLineage)
   }
 
-  private object Query {
-
-    def apply(projectPath: ProjectPath, maybeCommitId: Option[CommitId], maybeFilePath: Option[FilePath]): String =
-      createQuery(withFilterOn(projectPath, maybeCommitId, maybeFilePath))
-
-    private def createQuery(filter: String) =
-      s"""
-         |PREFIX prov: <http://www.w3.org/ns/prov#>
-         |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-         |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-         |PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>
-         |PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>
-         |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
-         |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-         |PREFIX schema: <http://schema.org/>
-         |PREFIX dcterms: <http://purl.org/dc/terms/>
-         |
-         |SELECT ?target ?source ?target_label ?source_label
-         |WHERE {
-         |  {
-         |    SELECT ?entity
-         |    WHERE {
-         |      $filter
-         |      ?qentity (
-         |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
-         |      ) ?entity .
-         |    }
-         |    GROUP BY ?entity
-         |  }
-         |  {
-         |    ?entity prov:qualifiedGeneration/prov:activity ?activity ;
-         |            rdfs:label ?target_label .
-         |    ?activity rdfs:comment ?source_label .
-         |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
-         |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
-         |    BIND (?entity AS ?target)
-         |    BIND (?activity AS ?source)
-         |  } UNION {
-         |    ?activity prov:qualifiedUsage/prov:entity ?entity ;
-         |              rdfs:comment ?target_label .
-         |    ?entity rdfs:label ?source_label .
-         |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
-         |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
-         |    BIND (?activity AS ?target)
-         |    BIND (?entity AS ?source)
-         |  }
-         |}""".stripMargin
-
-    private def withFilterOn(projectPath:   ProjectPath,
-                             maybeCommitId: Option[CommitId],
-                             maybeFilePath: Option[FilePath]): String =
-      s"""
-         |      ?qentity dcterms:isPartOf|schema:isPartOf ?project .
-         |      FILTER (?project = <${renkuBaseUrl / projectPath}>)
-         |      ${filterOn(maybeCommitId)}
-         |      ${filterOn(maybeCommitId, maybeFilePath)}
-         |""".stripMargin
-
-    private def filterOn(maybeCommitId: Option[CommitId]): String =
-      maybeCommitId
-        .map { commitId =>
-          s"""
-             |    ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?qactivity .
-             |    FILTER (?qactivity = <file:///commit/$commitId>)
-       """.stripMargin
-        }
-        .getOrElse("")
-
-    private def filterOn(maybeCommitId: Option[CommitId], maybeFilePath: Option[FilePath]): String =
-      (maybeCommitId, maybeFilePath)
-        .mapN { (commitId, filePath) =>
-          s"""
-             |    FILTER (?qentity = <file:///blob/$commitId/$filePath>)
-       """.stripMargin
-        }
-        .getOrElse("")
-  }
+  private def query(projectPath: ProjectPath, commitId: CommitId, filePath: FilePath): String =
+    s"""
+       |PREFIX prov: <http://www.w3.org/ns/prov#>
+       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+       |PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>
+       |PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>
+       |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
+       |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+       |PREFIX schema: <http://schema.org/>
+       |PREFIX dcterms: <http://purl.org/dc/terms/>
+       |
+       |SELECT ?target ?source ?target_label ?source_label
+       |WHERE {
+       |  {
+       |    SELECT ?entity
+       |    WHERE {
+       |      ?qentity dcterms:isPartOf|schema:isPartOf ?project .
+       |      FILTER (?project = <${renkuBaseUrl / projectPath}>)
+       |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?qactivity .
+       |      FILTER (?qactivity = <file:///commit/$commitId>)
+       |      FILTER (?qentity = <file:///blob/$commitId/$filePath>)
+       |      ?qentity (
+       |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
+       |      ) ?entity .
+       |    }
+       |    GROUP BY ?entity
+       |  }
+       |  {
+       |    ?entity prov:qualifiedGeneration/prov:activity ?activity ;
+       |            rdfs:label ?target_label .
+       |    ?activity rdfs:comment ?source_label .
+       |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
+       |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
+       |    BIND (?entity AS ?target)
+       |    BIND (?activity AS ?source)
+       |  } UNION {
+       |    ?activity prov:qualifiedUsage/prov:entity ?entity ;
+       |              rdfs:comment ?target_label .
+       |    ?entity rdfs:label ?source_label .
+       |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
+       |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
+       |    BIND (?activity AS ?target)
+       |    BIND (?entity AS ?source)
+       |  }
+       |}""".stripMargin
 }
 
 object IOLineageFinder {

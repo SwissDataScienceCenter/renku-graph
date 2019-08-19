@@ -97,7 +97,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
     }"""
 
   private val namedLineageQuery: Document = graphql"""
-    query($$projectPath: ProjectPath!, $$commitId: CommitId, $$filePath: FilePath) { 
+    query($$projectPath: ProjectPath!, $$commitId: CommitId!, $$filePath: FilePath!) { 
       lineage(projectPath: $$projectPath, commitId: $$commitId, filePath: $$filePath) { 
         nodes {
           id

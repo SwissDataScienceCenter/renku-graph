@@ -56,11 +56,12 @@ affinity: {}
 
 # Jena configuration
 jena:
-  admin:
-    ## Admin user password
-    ## Generate one using: `openssl rand -hex 16`
-    password:
-  renku:
-    ## Dataset user password
-    ## Generate one using: `openssl rand -hex 16`
-    password:
+  users:
+    admin:
+      ## Admin user password
+      ## Generate one using: `openssl rand -hex 16`
+      password:
+    renku:
+      ## Dataset user password
+      ## Generate one using: `openssl rand -hex 16`
+      password:
