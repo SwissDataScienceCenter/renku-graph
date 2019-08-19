@@ -25,7 +25,6 @@ import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.tinytypes.Renderer
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -86,108 +85,110 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
                                      schemaVersion: SchemaVersion,
                                      datasetId:     String = UUID.randomUUID().toString): NodeBuffer =
     // format: off
-    <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.renku/datasets/$datasetId/metadata.yml"}>
+    <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
+      <prov:activity rdf:resource={s"file:///commit/$commitId"}/>
+    </rdf:Description>
+    <rdf:Description rdf:about={s"file:///commit/$commitId"}>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Activity"/>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
+      <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku"}/>
+      <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets"}/>
+      <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId"}/>
+      <prov:agent rdf:resource={agentNodeResource(schemaVersion)}/>
+      <prov:wasInformedBy rdf:resource="file:///commit/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b"/>
+      <rdfs:label>{commitId.value}</rdfs:label>
+      <rdfs:comment>renku dataset add some-dataset https://raw.githubusercontent.com/SwissDataScienceCenter/renku-python/master/README.rst</rdfs:comment>
+      <prov:startedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-31T09:19:57+00:00</prov:startedAtTime>
+      <prov:endedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-31T09:19:57+00:00</prov:endedAtTime>
+    </rdf:Description>
+    <rdf:Description rdf:about="file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/some-dataset/README.rst">
+      <rdf:type rdf:resource="http://schema.org/DigitalDocument"/>
+      <prov:atLocation>data/some-dataset/README.rst</prov:atLocation>
+      <schema:creator rdf:resource="mailto:jakub.chrobasik@gmail.com"/>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
+      <rdfs:label>data/some-dataset/README.rst@4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b</rdfs:label>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+      <schema:url>https://raw.githubusercontent.com/SwissDataScienceCenter/renku-python/master/README.rst</schema:url>
+      <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
+      <schema:dateCreated>2019-07-31 09:19:57.694772</schema:dateCreated>
+    </rdf:Description> &+
+    agentNode(schemaVersion) &+
+    <rdf:Description rdf:about={s"file:///blob/$commitId/.renku"}>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
+      <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
+      <prov:atLocation>.renku</prov:atLocation>
+      <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets"}/>
+      <rdfs:label>{s".renku@$commitId"}</rdfs:label>
+    </rdf:Description>
+    <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets/$datasetId"}>
+      <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+      <prov:atLocation>{s".renku/datasets/$datasetId"}</prov:atLocation>
+      <prov:hadMember rdf:resource={s"file:///$datasetId"}/>
+      <rdfs:label>{s".renku/datasets/$datasetId@$commitId"}</rdfs:label>
+    </rdf:Description>
+    <rdf:Description rdf:about="https://dev.renku.ch/jakub.chrobasik/kuba-bikes">
+      <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Project"/>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Location"/>
+    </rdf:Description>
+    <rdf:Description rdf:about={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$datasetId"}>
       <prov:activity rdf:resource={s"file:///commit/$commitId"}/>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
     </rdf:Description>
-      <rdf:Description rdf:about={s"file:///commit/$commitId"}>
-        <prov:influenced rdf:resource={s"file:///blob/$commitId/data"}/>
-        <prov:influenced rdf:resource={s"file:///blob/$commitId/data/datasetname"}/>
-        <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku"}/>
-        <prov:endedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-15T10:13:39+02:00</prov:endedAtTime>
-        <rdfs:label>{s"$commitId"}</rdfs:label>
-        <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId"}/>
-        <prov:agent rdf:resource={agentNodeResource(schemaVersion)}/>
-        <rdfs:comment>renku dataset add zhbikes https://data.stadt-zuerich.ch/dataset/verkehrszaehlungen_werte_fussgaenger_velo/resource/d17a0a74-1073-46f0-a26e-46a403c061ec/download/2019_verkehrszaehlungen_werte_fussgaenger_velo.csv</rdfs:comment>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Activity"/>
-        <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-        <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets"}/>
-        <prov:startedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-15T12:13:37+02:00</prov:startedAtTime>
-        <prov:wasInformedBy rdf:resource={s"file:///commit/$commitId"}/>
-      </rdf:Description>
-      <rdf:Description rdf:about={s"file:///blob/$commitId/.renku"}>
-        <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
-        <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-        <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets"}/>
-        <prov:atLocation>.renku</prov:atLocation>
-        <rdfs:label>{s".renku@$commitId"}</rdfs:label>
-      </rdf:Description>
-      <rdf:Description rdf:about={s"file:///blob/$commitId/data"}>
-        <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
-        <prov:atLocation>data</prov:atLocation>
-        <prov:hadMember rdf:resource={s"file:///blob/$commitId/data/datasetname"}/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-        <rdfs:label>{s"data@$commitId"}</rdfs:label>
-        <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-      </rdf:Description>
-      <rdf:Description rdf:about={s"file:///blob/$commitId/data/datasetname"}>
-        <rdfs:label>{s"data/zhbikes@$commitId"}</rdfs:label>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
-        <prov:hadMember rdf:resource={s"file:///blob/$commitId/data/zhbikes/2019_verkehrszaehlungen_werte_fussgaenger_velo.csv"}/>
-        <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-        <prov:atLocation>data/zhbikes</prov:atLocation>
-        <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-      </rdf:Description>
-      <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets/$datasetId"}>
-        <rdfs:label>{s".renku/datasets/$datasetId@$commitId"}</rdfs:label>
-        <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId/metadata.yml"}/>
-        <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-        <prov:atLocation>{s".renku/datasets/$datasetId"}</prov:atLocation>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-        <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
-      </rdf:Description>
-      <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets/$datasetId/metadata.yml"}>
-        <prov:atLocation>{s".renku/datasets/$datasetId/metadata.yml"}</prov:atLocation>
-        <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/.renku/datasets/$datasetId/metadata.yml"}/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-        <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-        <rdfs:label>{s".renku/datasets/$datasetId/metadata.yml@$commitId"}</rdfs:label>
-        <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-      </rdf:Description>
-      <rdf:Description rdf:about={(renkuBaseUrl / projectPath).toString}>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Location"/>
-        <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Project"/>
-      </rdf:Description>
-      <rdf:Description rdf:about={s"file:///blob/$commitId/.renku.lock"}>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-        <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-        <rdfs:label>{s".renku.lock@$commitId"}</rdfs:label>
-        <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-        <prov:atLocation>.renku.lock</prov:atLocation>
-        <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/.renku.lock"}/>
-      </rdf:Description>
-      <rdf:Description rdf:about={s"file:///commit/$commitId/tree/data/zhbikes/2019_verkehrszaehlungen_werte_fussgaenger_velo.csv"}>
-        <prov:activity rdf:resource={s"file:///commit/$commitId"}/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
-      </rdf:Description>
-      <rdf:Description rdf:about={s"file:///blob/$commitId/data/zhbikes/2019_verkehrszaehlungen_werte_fussgaenger_velo.csv"}>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-        <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-        <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/data/zhbikes/2019_verkehrszaehlungen_werte_fussgaenger_velo.csv"}/>
-        <prov:atLocation>data/zhbikes/2019_verkehrszaehlungen_werte_fussgaenger_velo.csv</prov:atLocation>
-        <rdfs:label>{s"data/zhbikes/2019_verkehrszaehlungen_werte_fussgaenger_velo.csv@$commitId"}</rdfs:label>
-        <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-      </rdf:Description>
-      <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets"}>
-        <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-        <prov:atLocation>.renku/datasets</prov:atLocation>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
-        <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-        <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId"}/>
-        <rdfs:label>{s".renku/datasets@$commitId"}</rdfs:label>
-      </rdf:Description> &+
-      agentNode(schemaVersion) &+
-      <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.renku.lock"}>
-        <prov:activity rdf:resource={s"file:///commit/$commitId"}/>
-        <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
-      </rdf:Description>
-  // format: on
+    <rdf:Description rdf:about={s"file:///blob/$commitId/.renku.lock"}>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
+      <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
+      <prov:atLocation>.renku.lock</prov:atLocation>
+      <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/.renku.lock"}/>
+      <rdfs:label>{s".renku.lock@$commitId"}</rdfs:label>
+    </rdf:Description>
+    <rdf:Description rdf:about={s"file:///$datasetId"}>
+      <schema:hasPart rdf:resource="file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/some-dataset/README.rst"/>
+      <schema:dateCreated>2019-07-31 09:18:54.242406</schema:dateCreated>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+      <rdf:type rdf:resource="http://schema.org/Dataset"/>
+      <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$datasetId"}/>
+      <schema:creator rdf:resource="mailto:jakub.chrobasik@gmail.com"/>
+      <prov:atLocation>{s"/home/jovyan/kuba-bikes/.renku/datasets/$datasetId"}</prov:atLocation>
+      <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
+      <schema:identifier>{datasetId.toString}</schema:identifier>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
+      <rdfs:label>{datasetId.toString}</rdfs:label>
+      <schema:name>some-dataset</schema:name>
+    </rdf:Description>
+    <rdf:Description rdf:about={s"file:///blob/$commitId/.gitattributes"}>
+      <rdfs:label>{s".gitattributes@$commitId"}</rdfs:label>
+      <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/.gitattributes"}/>
+      <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+      <prov:atLocation>.gitattributes</prov:atLocation>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
+    </rdf:Description>
+    <rdf:Description rdf:about="mailto:jakub.chrobasik@gmail.com">
+      <rdf:type rdf:resource="http://schema.org/Person"/>
+      <schema:email>jakub.chrobasik@gmail.com</schema:email>
+      <schema:name>Jakub Chrobasik</schema:name>
+    </rdf:Description>
+    <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets"}>
+      <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
+      <rdfs:label>{s".renku/datasets@$commitId"}</rdfs:label>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+      <prov:atLocation>.renku/datasets</prov:atLocation>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
+      <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId"}/>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
+    </rdf:Description>
+    <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.renku.lock"}>
+      <prov:activity rdf:resource={s"file:///commit/$commitId"}/>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
+    </rdf:Description>
+    // format: on
 
   def multiFileAndCommit(
       projectPath:   ProjectPath,
@@ -457,16 +458,11 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
 
   private def agentNode(schemaVersion: SchemaVersion) =
     <rdf:Description rdf:about={agentNodeResource(schemaVersion)}>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#SoftwareAgent"/>
       <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#WorkflowEngine"/>
       <rdfs:label>{s"renku $schemaVersion"}</rdfs:label>
-      <rdf:type rdf:resource="http://purl.org/dc/terms/SoftwareAgent"/>
     </rdf:Description>
 
   private def agentNodeResource(schemaVersion: SchemaVersion) =
-    s"https://github.com/swissdatasciencecenter/renku-python/tree/v${schemaVersion.showAs[ShaLike]}"
-
-  private trait ShaLike
-  private object ShaLike {
-    implicit val shaLikeRenderer: Renderer[ShaLike, SchemaVersion] = _.value.replace(".", "")
-  }
+    s"https://github.com/swissdatasciencecenter/renku-python/tree/v$schemaVersion"
 }
