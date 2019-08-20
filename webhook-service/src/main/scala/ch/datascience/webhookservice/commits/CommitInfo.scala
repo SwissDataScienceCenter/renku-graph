@@ -18,6 +18,7 @@
 
 package ch.datascience.webhookservice.commits
 
+import ch.datascience.graph.model.Email
 import ch.datascience.graph.model.events._
 
 case class CommitInfo(

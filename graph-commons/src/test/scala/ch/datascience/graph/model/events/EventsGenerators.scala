@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model.events
 
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -28,10 +29,6 @@ object EventsGenerators {
   implicit val commitMessages: Gen[CommitMessage] = nonEmptyStrings() map CommitMessage.apply
   implicit val committedDates: Gen[CommittedDate] = timestampsNotInTheFuture map CommittedDate.apply
   implicit val usernames:      Gen[Username]      = nonEmptyStrings() map Username.apply
-  implicit val emails: Gen[Email] = for {
-    beforeAt <- nonEmptyStrings()
-    afterAt  <- nonEmptyStrings()
-  } yield Email(s"$beforeAt@$afterAt")
 
   implicit val users: Gen[User] = for {
     username <- usernames
