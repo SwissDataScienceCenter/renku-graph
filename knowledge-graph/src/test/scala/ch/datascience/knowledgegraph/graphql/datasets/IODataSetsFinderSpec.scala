@@ -42,14 +42,20 @@ class IODataSetsFinderSpec extends WordSpec with InMemoryRdfStore with ExternalS
           singleFileAndCommitWithDataset(projectPaths.generateOne,
                                          dataSetId   = dataSetIds.generateOne,
                                          dataSetName = dataSetNames.generateOne),
-          singleFileAndCommitWithDataset(projectPath,
-                                         dataSetId          = dataSet1.id,
-                                         dataSetName        = dataSet1.name,
-                                         dataSetCreatedDate = dataSet1.created.date),
-          singleFileAndCommitWithDataset(projectPath,
-                                         dataSetId          = dataSet2.id,
-                                         dataSetName        = dataSet2.name,
-                                         dataSetCreatedDate = dataSet2.created.date)
+          singleFileAndCommitWithDataset(
+            projectPath,
+            dataSetId           = dataSet1.id,
+            dataSetName         = dataSet1.name,
+            dataSetCreatedDate  = dataSet1.created.date,
+            dataSetCreatorEmail = dataSet1.created.creator.email
+          ),
+          singleFileAndCommitWithDataset(
+            projectPath,
+            dataSetId           = dataSet2.id,
+            dataSetName         = dataSet2.name,
+            dataSetCreatedDate  = dataSet2.created.date,
+            dataSetCreatorEmail = dataSet2.created.creator.email
+          )
         )
       )
 

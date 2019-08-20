@@ -20,6 +20,7 @@ package ch.datascience.knowledgegraph.graphql.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.graph.model.Email
 import ch.datascience.graph.model.dataSets.{DataSetCreatedDate, DataSetId, DataSetName}
 import ch.datascience.graph.model.events.ProjectPath
 import ch.datascience.knowledgegraph.graphql.datasets.model._
@@ -27,6 +28,7 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
+import io.circe.DecodingFailure
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -56,14 +58,15 @@ class IODataSetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?dataSetId ?dataSetName ?dataSetCreationDate
+       |SELECT ?dataSetId ?dataSetName ?dataSetCreationDate ?dataSetCreatorEmail
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
        |  ?dataSet rdf:type <http://schema.org/Dataset> ;
        |           rdfs:label ?dataSetId ;
        |           schema:name ?dataSetName ;
-       |           schema:dateCreated ?dataSetCreationDate .
+       |           schema:dateCreated ?dataSetCreationDate ;
+       |           schema:creator ?dataSetCreatorEmail .
        |}""".stripMargin
 }
 
@@ -81,6 +84,7 @@ object IODataSetsFinder {
       renkuBaseUrl <- renkuBaseUrl
     } yield new IODataSetsFinder(config, renkuBaseUrl, logger)
 
+  import cats.implicits._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe.Decoder
 
@@ -91,8 +95,14 @@ object IODataSetsFinder {
         id           <- cursor.downField("dataSetId").downField("value").as[DataSetId]
         name         <- cursor.downField("dataSetName").downField("value").as[DataSetName]
         creationDate <- cursor.downField("dataSetCreationDate").downField("value").as[DataSetCreatedDate]
-      } yield DataSet(id, name, DataSetCreation(creationDate))
+        creatorEmail <- cursor.downField("dataSetCreatorEmail").downField("value").as[String].flatMap(toEmail)
+      } yield DataSet(id, name, DataSetCreation(creationDate, DataSetCreator(creatorEmail)))
     }
+
+    def toEmail(email: String): Either[DecodingFailure, Email] =
+      Email
+        .from(email.replace("mailto:", ""))
+        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
 
     _.downField("results").downField("bindings").as[List[DataSet]].map(_.toSet)
   }

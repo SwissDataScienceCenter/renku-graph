@@ -18,11 +18,14 @@
 
 package ch.datascience.knowledgegraph.graphql.datasets
 
+import ch.datascience.graph.model.Email
 import ch.datascience.graph.model.dataSets._
 
 object model {
 
   final case class DataSet(id: DataSetId, name: DataSetName, created: DataSetCreation)
 
-  final case class DataSetCreation(date: DataSetCreatedDate)
+  final case class DataSetCreation(date: DataSetCreatedDate, creator: DataSetCreator)
+
+  final case class DataSetCreator(email: Email)
 }

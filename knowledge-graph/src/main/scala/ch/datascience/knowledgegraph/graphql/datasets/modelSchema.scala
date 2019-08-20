@@ -37,7 +37,16 @@ object modelSchema {
     name        = "dataSetCreation",
     description = "DataSetCreation",
     fields = fields[Unit, DataSetCreation](
-      Field("date", StringType, Some("DataSet creation date"), resolve = _.value.date.toString)
+      Field("date", StringType, Some("DataSet creation date"), resolve      = _.value.date.toString),
+      Field("creator", dataSetCreatorType, Some("DataSet creator"), resolve = _.value.creator)
+    )
+  )
+
+  private lazy val dataSetCreatorType: ObjectType[Unit, DataSetCreator] = ObjectType[Unit, DataSetCreator](
+    name        = "dataSetCreator",
+    description = "DataSetCreator",
+    fields = fields[Unit, DataSetCreator](
+      Field("email", StringType, Some("DataSet creator email"), resolve = _.value.email.toString)
     )
   )
 }

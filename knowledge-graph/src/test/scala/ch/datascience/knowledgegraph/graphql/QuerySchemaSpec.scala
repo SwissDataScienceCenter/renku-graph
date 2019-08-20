@@ -74,7 +74,7 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
           dataSets(projectPath: "namespace/project") {
             id
             name
-            created {date}
+            created { date creator { email } }
           }
         }"""
 
@@ -170,7 +170,10 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
           "id": ${dataSet.id.value},
           "name": ${dataSet.name.value},
           "created": {
-            "date": ${dataSet.created.date.value}
+            "date": ${dataSet.created.date.value},
+            "creator": {
+              "email": ${dataSet.created.creator.email.value}
+            }
           }
         }"""
   }

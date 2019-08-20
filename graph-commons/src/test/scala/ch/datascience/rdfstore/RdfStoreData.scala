@@ -19,13 +19,13 @@
 package ch.datascience.rdfstore
 
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.generators.CommonGraphGenerators.schemaVersions
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.dataSets._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.{Email, SchemaVersion}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -81,13 +81,13 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       </rdf:Description>
   // format: on
 
-  def singleFileAndCommitWithDataset(
-      projectPath:        ProjectPath,
-      commitId:           CommitId = commitIds.generateOne,
-      schemaVersion:      SchemaVersion = schemaVersions.generateOne,
-      dataSetId:          DataSetId = dataSetIds.generateOne,
-      dataSetName:        DataSetName = dataSetNames.generateOne,
-      dataSetCreatedDate: DataSetCreatedDate = dataSetCreationDates.generateOne): NodeBuffer =
+  def singleFileAndCommitWithDataset(projectPath:         ProjectPath,
+                                     commitId:            CommitId = commitIds.generateOne,
+                                     schemaVersion:       SchemaVersion = schemaVersions.generateOne,
+                                     dataSetId:           DataSetId = dataSetIds.generateOne,
+                                     dataSetName:         DataSetName = dataSetNames.generateOne,
+                                     dataSetCreatedDate:  DataSetCreatedDate = dataSetCreationDates.generateOne,
+                                     dataSetCreatorEmail: Email = emails.generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
@@ -158,7 +158,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <rdf:type rdf:resource="http://schema.org/Dataset"/>
       <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
       <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}/>
-      <schema:creator rdf:resource="mailto:jakub.chrobasik@gmail.com"/>
+      <schema:creator rdf:resource={s"mailto:$dataSetCreatorEmail"}/>
       <prov:atLocation>{s"/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}</prov:atLocation>
       <schema:identifier>{dataSetId.toString}</schema:identifier>
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>

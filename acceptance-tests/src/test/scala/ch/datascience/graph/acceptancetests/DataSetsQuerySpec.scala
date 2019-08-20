@@ -54,13 +54,15 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
                                        model.currentSchemaVersion,
                                        dataSet1.id,
                                        dataSet1.name,
-                                       dataSet1.created.date) &+
+                                       dataSet1.created.date,
+                                       dataSet1.created.creator.email) &+
           singleFileAndCommitWithDataset(project.path,
                                          commitId,
                                          model.currentSchemaVersion,
                                          dataSet2.id,
                                          dataSet2.name,
-                                         dataSet2.created.date)
+                                         dataSet2.created.date,
+                                         dataSet2.created.creator.email)
       `data in the RDF store`(project, commitId, triples)
 
       When("user posts a graphql query to fetch data-sets")
@@ -98,7 +100,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       dataSets(projectPath: "namespace/project") {
         id
         name
-        created { date }
+        created { date creator { email } }
       }
     }"""
 
@@ -107,7 +109,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       dataSets(projectPath: $$projectPath) { 
         id
         name
-        created { date }
+        created { date creator { email } }
       }
     }"""
 
@@ -116,7 +118,10 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       "id": ${dataSet.id.value}, 
       "name": ${dataSet.name.value},
       "created": {
-        "date": ${dataSet.created.date.value}
+        "date": ${dataSet.created.date.value},
+        "creator": {
+          "email": ${dataSet.created.creator.email.value}
+        }
       }
     }"""
 }
