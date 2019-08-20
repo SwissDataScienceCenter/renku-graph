@@ -22,7 +22,7 @@ Depending on your global configuration of sbt you have installed, you might need
 If such error is raised, try setting the variable with the following:
 
 ```bash
-export SBT_OPTS="-Xmx2G -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=2G -Xss2M"
+export SBT_OPTS="-XX:+UseG1GC -XX:+CMSClassUnloadingEnabled -Xmx1G"
 ```
 
 #### Releasing
