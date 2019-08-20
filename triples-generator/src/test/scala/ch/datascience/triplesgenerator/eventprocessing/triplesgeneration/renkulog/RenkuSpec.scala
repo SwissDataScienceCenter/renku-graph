@@ -32,7 +32,7 @@ import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -45,7 +45,7 @@ class RenkuSpec extends WordSpec {
       val commandBody   = nonEmptyStrings().generateOne
       val commandResult = CommandResult(exitCode = 0, chunks = Seq(Left(new Bytes(commandBody.getBytes()))))
 
-      val triples = renku.log(commit, path)(triplesGeneration(returning = commandResult)).unsafeRunSync()
+      val triples = renku().log(commit, path)(triplesGeneration(returning = commandResult)).unsafeRunSync()
 
       triples.value shouldBe commandBody
     }
@@ -54,15 +54,17 @@ class RenkuSpec extends WordSpec {
       val exception = exceptions.generateOne
 
       intercept[Exception] {
-        renku.log(commit, path)(triplesGeneration(failingWith = exception)).unsafeRunSync()
+        renku().log(commit, path)(triplesGeneration(failingWith = exception)).unsafeRunSync()
       } shouldBe exception
     }
 
     "get terminated if calling 'renku log' takes longer than the defined timeout" in new TestCase {
+      val timeout = 100 millis
+
       intercept[Exception] {
-        renku.log(commit, path)(triplesGenerationTakingTooLong).unsafeRunSync()
+        renku(timeout).log(commit, path)(triplesGenerationTakingTooLong).unsafeRunSync()
       }.getMessage shouldBe s"'renku log' execution for commit: ${commit.id}, project: ${commit.project.id} " +
-        s"took longer than $renkuLogTimeout - terminating"
+        s"took longer than $timeout - terminating"
     }
   }
 
@@ -73,8 +75,8 @@ class RenkuSpec extends WordSpec {
     val commit = commits.generateOne
     val path   = paths.generateOne
 
-    val renkuLogTimeout = 1500 millis
-    val renku           = new Renku(renkuLogTimeout)
+    private val renkuLogTimeout = 1500 millis
+    def renku(timeout: FiniteDuration = renkuLogTimeout) = new Renku(timeout)
 
     def triplesGeneration(returning: CommandResult): (Commit, Path) => CommandResult =
       (_, _) => {
@@ -87,7 +89,7 @@ class RenkuSpec extends WordSpec {
 
     val triplesGenerationTakingTooLong: (Commit, Path) => CommandResult =
       (_, _) => {
-        Thread.sleep((renkuLogTimeout + (5 seconds)).toMillis)
+        blocking(Thread.sleep((renkuLogTimeout * 10).toMillis))
         CommandResult(exitCode = 0, chunks = Nil)
       }
   }

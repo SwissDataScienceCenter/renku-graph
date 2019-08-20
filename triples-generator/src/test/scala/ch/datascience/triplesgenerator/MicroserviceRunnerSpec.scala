@@ -40,12 +40,8 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   "run" should {
 
     "return Success ExitCode if " +
-      "sentry initialization, " +
-      "Event Log db verification, " +
-      "dataset verification, " +
-      "re-provisioning, " +
-      "starting Event Processor and " +
-      "http server succeeds" in new TestCase {
+      "Sentry, Event Log db and RDF dataset initialize fine and " +
+      "the re-provisioning, the Event Processor and the http server start up" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -73,7 +69,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
     }
 
-    "fail if sentry initialization fails" in new TestCase {
+    "fail if Sentry initialization fails" in new TestCase {
       val exception = exceptions.generateOne
       (sentryInitializer.run _)
         .expects()
@@ -99,7 +95,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if dataset verification fails" in new TestCase {
+    "fail if RDF dataset verification fails" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -118,7 +114,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if Http Server fails" in new TestCase {
+    "fail if starting the Http Server fails" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -178,7 +174,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
     }
 
-    "return Success ExitCode even if re-provisioning fails" in new TestCase {
+    "return Success ExitCode even if starting the http Server fails" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)

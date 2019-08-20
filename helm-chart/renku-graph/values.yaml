@@ -13,7 +13,7 @@ tokenRepository:
   resources:
     limits:
       memory: 250Mi
-  connectionPool: 3
+  connectionPool: 2
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
     ## Generated using: `openssl rand -hex 8|base64`
@@ -31,14 +31,14 @@ triplesGenerator:
     limits:
       memory: 2000Mi
   renkuLogTimeout: 60 minutes
-  reProvisioningInitialDelay: 365 days
+  reProvisioningInitialDelay: 2 minutes
   gitlab:
     rateLimit: 30/sec
   ## a demanded number of concurrent triples generation processes
   generationProcessesNumber: 4
   threadsNumber: 6
   dbEventLog:
-    connectionPool: 4
+    connectionPool: 2
 
 webhookService:
   image:
@@ -56,13 +56,30 @@ webhookService:
     interval: 30 minutes
   gitlab:
     rateLimit: 100/sec
-  threadsNumber: 5
+  threadsNumber: 3
   dbEventLog:
-    connectionPool: 4
+    connectionPool: 2
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
     secret:
+
+knowledgeGraph:
+  image:
+    repository: renku/knowledge-graph
+    tag: 'latest'
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      memory: 350Mi
+  threadsNumber: 3
+  services:
+    renku:
+      ## Renku UI base url e.g. https://dev.renku.ch
+      url:
 
 sentry:
   enabled: false

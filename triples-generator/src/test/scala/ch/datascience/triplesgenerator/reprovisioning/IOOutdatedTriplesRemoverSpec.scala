@@ -50,7 +50,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         singleFileAndCommitTriples(project2, project2OutdatedCommit.toCommitId, None)
       )
 
-      loadToStore(triples.toString)
+      loadToStore(triples)
 
       val outdatedTriples = OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1),
                                             Set(project1Commit1NoAgent, project1Commit2Outdated))
@@ -76,7 +76,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         singleFileAndCommitWithDataset(project, projectCommitUpToDate.toCommitId, schemaVersions.generateOne)
       )
 
-      loadToStore(triples.toString)
+      loadToStore(triples)
 
       val outdatedTriples = OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project), Set(projectCommitOutdated))
 
@@ -101,7 +101,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         singleFileAndCommitWithDataset(project, projectCommitOutdated.toCommitId, outdatedSchemaVersion)
       )
 
-      loadToStore(triples.toString)
+      loadToStore(triples)
 
       val outdatedTriples = OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project), Set(projectCommitOutdated))
 
@@ -129,7 +129,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         singleFileAndCommitWithDataset(project2, project2OutdatedCommit.toCommitId, outdatedSchemaVersion)
       )
 
-      loadToStore(triples.toString)
+      loadToStore(triples)
 
       val outdatedTriples = OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1), Set(project1OutdatedCommit))
 

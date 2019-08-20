@@ -18,6 +18,5 @@
 
 name := "triples-generator"
 
-libraryDependencies += "ch.qos.logback"  % "logback-classic"    % "1.2.3"
-libraryDependencies += "com.lihaoyi"     %% "ammonite-ops"      % "1.6.8"
-libraryDependencies += "io.sentry"       % "sentry-logback"     % "1.7.23"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
+libraryDependencies += "com.lihaoyi"    %% "ammonite-ops"   % "1.6.8"

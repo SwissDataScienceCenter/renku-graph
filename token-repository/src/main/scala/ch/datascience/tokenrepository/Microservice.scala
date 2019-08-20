@@ -62,7 +62,7 @@ object Microservice extends IOMicroservice {
     }
 }
 
-class MicroserviceRunner(
+private class MicroserviceRunner(
     sentryInitializer: SentryInitializer[IO],
     dbInitializer:     IODbInitializer,
     httpServer:        HttpServer[IO]

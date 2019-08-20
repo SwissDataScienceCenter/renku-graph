@@ -19,7 +19,7 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator.`GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`
+import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}

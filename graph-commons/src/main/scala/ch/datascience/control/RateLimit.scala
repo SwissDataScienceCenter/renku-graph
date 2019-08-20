@@ -18,9 +18,7 @@
 
 package ch.datascience.control
 
-import java.util.concurrent.TimeUnit
-
-import cats.implicits._
+import cats.MonadError
 import ch.datascience.tinytypes.TypeName
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.numeric.Positive
@@ -28,67 +26,96 @@ import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
+import scala.language.{higherKinds, postfixOps}
 import scala.util.Try
 
-case class RateLimit(items: Long Refined Positive, per: FiniteDuration) {
+case class RateLimit(items: Long Refined Positive, per: RateLimitUnit) {
+  import RateLimitUnit._
 
-  assert(per._1 == 1L, s"RateLimit's per has to have value 1")
-  assert(
-    Set(TimeUnit.SECONDS, TimeUnit.MINUTES, TimeUnit.HOURS, TimeUnit.DAYS) contains per.unit,
-    s"RateLimit does not support ${per.unit.name()}"
-  )
+  override lazy val toString: String = per match {
+    case Second => s"$items/sec"
+    case Minute => s"$items/min"
+    case Hour   => s"$items/hour"
+    case Day    => s"$items/day"
+  }
+}
 
-  override lazy val toString: String = per.unit match {
-    case TimeUnit.SECONDS => s"$items/sec"
-    case TimeUnit.MINUTES => s"$items/min"
-    case TimeUnit.HOURS   => s"$items/hour"
-    case TimeUnit.DAYS    => s"$items/day"
-    case other            => throw new IllegalStateException(s"Cannot generate toString for RateLimit with from = $other")
+sealed trait RateLimitUnit extends Product with Serializable
+object RateLimitUnit extends TypeName {
+  case object Second extends RateLimitUnit
+  case object Minute extends RateLimitUnit
+  case object Hour   extends RateLimitUnit
+  case object Day    extends RateLimitUnit
+
+  def from[Interpretation[_]](
+      value:     String
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RateLimitUnit] = value match {
+    case "sec"  => ME.pure(Second)
+    case "min"  => ME.pure(Minute)
+    case "hour" => ME.pure(Hour)
+    case "day"  => ME.pure(Day)
+    case other  => ME.raiseError(new IllegalArgumentException(s"Unknown '$other' for $typeName"))
+  }
+
+  implicit class RateLimitUnitOps(unit: RateLimitUnit) {
+
+    def multiplierFor(newUnit: TimeUnit): Double =
+      finiteDurationFrom(unit) toUnit newUnit
+
+    private lazy val finiteDurationFrom: RateLimitUnit => FiniteDuration = {
+      case Second => 1 second
+      case Minute => 1 minute
+      case Hour   => 1 hour
+      case Day    => 1 day
+    }
   }
 }
 
 object RateLimit extends TypeName {
+  import cats.implicits._
 
   private val RateExtractor = """(\d+)[ ]*/(\w+)""".r
 
-  def from(value: String): Either[IllegalArgumentException, RateLimit] = value match {
-    case RateExtractor(rate, unit) => (toPositiveLong(rate), toDuration(unit)) mapN (RateLimit(_, _))
-    case other                     => Left(new IllegalArgumentException(s"Invalid value for $typeName: '$other'"))
+  def from[Interpretation[_]](
+      value:     String
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RateLimit] = value match {
+    case RateExtractor(rate, unit) =>
+      (toPositiveLong[Interpretation](rate), RateLimitUnit.from[Interpretation](unit)) mapN (RateLimit(_, _))
+    case other => ME.raiseError(new IllegalArgumentException(s"Invalid value for $typeName: '$other'"))
   }
 
-  private val toPositiveLong: String => Either[IllegalArgumentException, Long Refined Positive] = rate =>
+  private def toPositiveLong[Interpretation[_]](
+      rate:      String
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Long Refined Positive] =
     for {
-      long <- Try(rate.toLong).toEither
-               .leftMap(_ => new IllegalArgumentException(s"$typeName has to be positive"))
-      positiveLong <- RefType
-                       .applyRef[Long Refined Positive](long)
-                       .leftMap(_ => new IllegalArgumentException(s"$typeName has to be positive"))
+      long <- ME
+               .fromTry(Try(rate.toLong))
+               .adaptError { case _ => new IllegalArgumentException(s"$typeName has to be positive") }
+      positiveLong <- ME.fromEither(
+                       RefType
+                         .applyRef[Long Refined Positive](long)
+                         .leftMap(_ => new IllegalArgumentException(s"$typeName has to be positive"))
+                     )
     } yield positiveLong
-
-  private val toDuration: String => Either[IllegalArgumentException, FiniteDuration] = {
-    case "sec"  => Right(1 second)
-    case "min"  => Right(1 minute)
-    case "hour" => Right(1 hour)
-    case "day"  => Right(1 day)
-    case other  => Left(new IllegalArgumentException(s"Unknown unit '$other' for $typeName"))
-  }
 
   implicit val rateLimitReader: ConfigReader[RateLimit] =
     ConfigReader.fromString[RateLimit] { value =>
       RateLimit
-        .from(value)
+        .from[Try](value)
+        .toEither
         .leftMap(exception => CannotConvert(value, RateLimit.getClass.toString, exception.getMessage))
     }
 
   implicit class RateLimitOps(rateLimit: RateLimit) {
+    import RateLimitUnit._
 
     def /(divider: Int Refined Positive): Either[IllegalArgumentException, RateLimit] =
       RefType
         .applyRef[Long Refined Positive](
-          rateLimit.items.value * (1 day).toMillis / (rateLimit.per.toMillis * divider.value)
+          (rateLimit.items.value * (1 day).toMillis / (rateLimit.per
+            .multiplierFor(MILLISECONDS) * divider.value)).toLong
         )
         .leftMap(_ => new IllegalArgumentException("RateLimits below 1/day not supported"))
-        .map(RateLimit(_, 1 day))
+        .map(RateLimit(_, per = Day))
   }
 }

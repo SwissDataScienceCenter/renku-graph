@@ -59,6 +59,7 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 import scala.language.reflectiveCalls
+import scala.xml.Elem
 
 trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   this: Suite =>
@@ -118,12 +119,12 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     super.afterAll()
   }
 
-  protected def loadToStore(triples: String): Unit =
+  protected def loadToStore(triples: Elem): Unit =
     rdfConnectionResource
       .use { connection =>
         IO {
           connection.load {
-            ModelFactory.createDefaultModel.read(new ByteArrayInputStream(triples.getBytes), "")
+            ModelFactory.createDefaultModel.read(new ByteArrayInputStream(triples.toString().getBytes), "")
           }
         }
       }

@@ -44,7 +44,10 @@ trait Sensitive extends Any {
   override def toString: String = "<sensitive>"
 }
 
-abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT) extends Constraints[TT#V] with TypeName {
+abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
+    extends From[TT]
+    with Constraints[TT#V]
+    with TypeName {
 
   import cats.implicits._
 
@@ -83,6 +86,10 @@ trait Renderer[View, T] {
   def render(value: T): String
 }
 
+trait From[TT <: TinyType] {
+  def from(value: TT#V): Either[IllegalArgumentException, TT]
+}
+
 trait Constraints[V] extends TypeName {
 
   private val constraints: collection.mutable.ListBuffer[Constraint] = collection.mutable.ListBuffer.empty
@@ -100,9 +107,16 @@ trait Constraints[V] extends TypeName {
 }
 
 trait TypeName {
-  protected[this] lazy val typeName: String = {
+
+  lazy val typeName: String = {
     val className = getClass.getName.replace("$", ".")
     if (className.endsWith(".")) className take className.length - 1
     else className
+  }
+
+  lazy val shortTypeName: String = {
+    val lastDotIndex = typeName.lastIndexOf(".")
+    if (lastDotIndex > -1) typeName.substring(lastDotIndex + 1)
+    else typeName
   }
 }

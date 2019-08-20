@@ -18,9 +18,10 @@
 
 package ch.datascience.generators
 
+import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
-import ch.datascience.control.RateLimit
+import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -53,12 +54,9 @@ object CommonGraphGenerators {
   } yield BasicAuthCredentials(username, password)
 
   implicit val rateLimits: Gen[RateLimit] = for {
-    items <- Gen.choose(1L, 50000L)
-    unit  <- Gen.oneOf("sec", "min", "hour", "day")
-  } yield
-    RateLimit.from(s"$items/$unit").getOrElse {
-      throw new IllegalArgumentException("Problems with rateLimits generator")
-    }
+    items <- positiveLongs()
+    unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
+  } yield RateLimit(items, per = unit)
 
   implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
     fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
@@ -70,6 +68,8 @@ object CommonGraphGenerators {
     .listOfN(3, positiveInts(max = 50))
     .map(_.mkString("."))
     .map(SchemaVersion.apply)
+
+  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls map RenkuBaseUrl.apply
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
     url         <- httpUrls

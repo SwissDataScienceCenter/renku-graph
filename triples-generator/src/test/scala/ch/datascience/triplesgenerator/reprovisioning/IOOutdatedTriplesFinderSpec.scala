@@ -47,7 +47,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
         singleFileAndCommitTriples(project2, project2OutdatedCommit.toCommitId, None)
       )
 
-      loadToStore(triples.toString())
+      loadToStore(triples)
 
       // format: off
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() should (
@@ -70,7 +70,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
         singleFileAndCommitTriples(project1, project1Commit3UpToDate.toCommitId, Some(schemaVersion))
       )
 
-      loadToStore(triples.toString())
+      loadToStore(triples)
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe Some(
         OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1),
@@ -86,7 +86,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
         singleFileAndCommitTriples(project, projectCommitUpToDate.toCommitId, Some(schemaVersion))
       )
 
-      loadToStore(triples.toString())
+      loadToStore(triples)
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe None
     }

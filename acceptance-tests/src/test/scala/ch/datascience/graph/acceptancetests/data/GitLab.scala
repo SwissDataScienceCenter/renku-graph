@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.model
+package ch.datascience.graph.acceptancetests.data
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}

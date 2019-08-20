@@ -29,6 +29,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
 import io.circe.Json
+import io.circe.literal._
 import org.http4s.Status.Ok
 import org.http4s.{Header, Method, Response}
 
@@ -79,11 +80,49 @@ object TokenRepositoryClient {
     }
 
   implicit class AccessTokenOps(accessToken: AccessToken) {
-    import io.circe.literal._
 
     lazy val toJson: Json = accessToken match {
       case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}"""
       case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
+    }
+  }
+}
+
+object KnowledgeGraphClient {
+  import sangria.ast.Document
+
+  def apply()(implicit executionContext: ExecutionContext,
+              contextShift:              ContextShift[IO],
+              timer:                     Timer[IO]): KnowledgeGraphClient = new KnowledgeGraphClient
+
+  class KnowledgeGraphClient(implicit executionContext: ExecutionContext,
+                             contextShift:              ContextShift[IO],
+                             timer:                     Timer[IO])
+      extends ServiceClient {
+    override val baseUrl: String Refined Url = "http://localhost:9004"
+
+    def POST(query: Document, variables: Map[String, String] = Map.empty): Response[IO] = {
+      for {
+        uri      <- validateUri(s"$baseUrl/knowledge-graph/graphql")
+        payload  <- preparePayload(query, variables)
+        response <- send(request(Method.POST, uri) withEntity payload)(mapResponse)
+      } yield response
+    }.unsafeRunSync()
+
+    private def preparePayload(query: Document, variables: Map[String, String]): IO[Json] = IO {
+      variables match {
+        case vars if vars.isEmpty =>
+          json"""{
+            "query": ${query.source.getOrElse("")}
+          }                                                                     
+          """
+        case nonEmptyVars =>
+          json"""{
+            "query": ${query.source.getOrElse("")},
+            "variables": $nonEmptyVars 
+          }                                                                     
+          """
+      }
     }
   }
 }
