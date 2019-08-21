@@ -18,13 +18,11 @@
 
 package ch.datascience.knowledgegraph.graphql
 
-import cats.Order
 import cats.effect.IO
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.knowledgegraph.graphql.datasets.DataSetsFinder
-import ch.datascience.knowledgegraph.graphql.datasets.model.DataSet
+import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetPublishing}
 import ch.datascience.knowledgegraph.graphql.lineage.LineageFinder
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
@@ -35,6 +33,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import sangria.ast.Document
 import sangria.execution.Executor
 import sangria.macros._
@@ -43,7 +42,12 @@ import sangria.marshalling.circe._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.reflectiveCalls
 
-class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with IntegrationPatience {
+class QuerySchemaSpec
+    extends WordSpec
+    with ScalaCheckPropertyChecks
+    with MockFactory
+    with ScalaFutures
+    with IntegrationPatience {
 
   "query" should {
 
@@ -69,19 +73,22 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
     }
 
     "allow to search for project's dataSets" in new DataSetsTestCase {
-      val query = graphql"""
+      forAll(dataSetsLists) { dataSets =>
+        val query = graphql"""
         {
           dataSets(projectPath: "namespace/project") {
             identifier
             name
             created { dateCreated creator { email name } }
+            published { datePublished }
           }
         }"""
 
-      givenFindDataSets(ProjectPath("namespace/project"))
-        .returning(IO.pure(dataSetsSet))
+        givenFindDataSets(ProjectPath("namespace/project"))
+          .returning(IO.pure(dataSets))
 
-      execute(query) shouldBe json(dataSetsSet)
+        execute(query) shouldBe json(dataSets)
+      }
     }
   }
 
@@ -145,26 +152,23 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
     import ch.datascience.knowledgegraph.graphql.datasets.DataSetsGenerators._
 
     def givenFindDataSets(projectPath: ProjectPath) = new {
-      def returning(result: IO[Set[DataSet]]) =
+      def returning(result: IO[List[DataSet]]) =
         (dataSetsFinder
           .findDataSets(_: ProjectPath))
           .expects(projectPath)
           .returning(result)
     }
 
-    implicit val dataSetOrder: Order[DataSet] = Order.from[DataSet] {
-      case (item1, item2) => item1.name.value.length - item2.name.value.length
-    }
-    lazy val dataSetsSet = nonEmptySet(dataSets).generateOne.toSortedSet
+    lazy val dataSetsLists = nonEmptyList(dataSets).map(_.toList)
 
-    def json(dataSets: Set[DataSet]) = json"""
+    def json(dataSets: List[DataSet]) = json"""
         {
           "data" : {
-            "dataSets" : ${Json.arr(dataSetsSet.map(toJson).to[List]: _*)}
+            "dataSets" : ${Json.arr(dataSets.map(toJson): _*)}
           }
         }"""
 
-    private def toJson(dataSet: DataSet) =
+    private def toJson(dataSet: DataSet): Json =
       json"""
         {
           "identifier": ${dataSet.id.value},
@@ -176,6 +180,18 @@ class QuerySchemaSpec extends WordSpec with MockFactory with ScalaFutures with I
               "name": ${dataSet.created.creator.name.value}
             }
           }
+        }""" deepMerge toJson(dataSet.maybePublished)
+
+    private def toJson(maybePublished: Option[DataSetPublishing]): Json =
+      maybePublished.fold(
+        ifEmpty = json"""{"published": ${Json.Null}}"""
+      ) { published =>
+        json"""
+        {
+          "published": {
+            "datePublished": ${published.date.value}  
+          }
         }"""
+      }
   }
 }

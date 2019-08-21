@@ -42,4 +42,9 @@ object dataSets {
   implicit object DataSetCreatedDate
       extends TinyTypeFactory[DataSetCreatedDate](new DataSetCreatedDate(_))
       with InstantNotInTheFuture
+
+  final class DataSetPublishedDate private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DataSetPublishedDate
+      extends TinyTypeFactory[DataSetPublishedDate](new DataSetPublishedDate(_))
+      with InstantNotInTheFuture
 }

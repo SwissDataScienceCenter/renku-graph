@@ -27,13 +27,14 @@ object modelSchema {
     name        = "dataSet",
     description = "DataSet",
     fields = fields[Unit, DataSet](
-      Field("identifier", StringType, Some("DataSet id"), resolve                  = _.value.id.toString),
-      Field("name", StringType, Some("DataSet name"), resolve                      = _.value.name.toString),
-      Field("created", dataSetCreationType, Some("DataSet creation info"), resolve = _.value.created)
+      Field("identifier", StringType, Some("DataSet id"), resolve                            = _.value.id.toString),
+      Field("name", StringType, Some("DataSet name"), resolve                                = _.value.name.toString),
+      Field("created", createdType, Some("DataSet creation info"), resolve                   = _.value.created),
+      Field("published", OptionType(publishedType), Some("DataSet publishing info"), resolve = _.value.maybePublished)
     )
   )
 
-  private lazy val dataSetCreationType: ObjectType[Unit, DataSetCreation] = ObjectType[Unit, DataSetCreation](
+  private lazy val createdType: ObjectType[Unit, DataSetCreation] = ObjectType[Unit, DataSetCreation](
     name        = "dataSetCreation",
     description = "DataSetCreation",
     fields = fields[Unit, DataSetCreation](
@@ -48,6 +49,14 @@ object modelSchema {
     fields = fields[Unit, DataSetCreator](
       Field("email", StringType, Some("DataSet creator email"), resolve = _.value.email.toString),
       Field("name", StringType, Some("DataSet creator name"), resolve   = _.value.name.toString)
+    )
+  )
+
+  private lazy val publishedType: ObjectType[Unit, DataSetPublishing] = ObjectType[Unit, DataSetPublishing](
+    name        = "dataSetPublishing",
+    description = "DataSetPublishing",
+    fields = fields[Unit, DataSetPublishing](
+      Field("datePublished", StringType, Some("DataSet publishing date"), resolve = _.value.date.toString)
     )
   )
 }

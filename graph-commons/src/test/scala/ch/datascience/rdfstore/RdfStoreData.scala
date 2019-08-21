@@ -22,13 +22,14 @@ import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.dataSets._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import org.scalacheck.Gen
 
 import scala.xml.{Elem, NodeBuffer, NodeSeq}
 
@@ -87,9 +88,11 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
                                      schemaVersion:       SchemaVersion = schemaVersions.generateOne,
                                      dataSetId:           DataSetId = dataSetIds.generateOne,
                                      dataSetName:         DataSetName = dataSetNames.generateOne,
-                                     dataSetCreatedDate:  DataSetCreatedDate = dataSetCreationDates.generateOne,
+                                     dataSetCreatedDate:  DataSetCreatedDate = dataSetCreatedDates.generateOne,
                                      dataSetCreatorEmail: Email = emails.generateOne,
-                                     dataSetCreatorName:  Name = names.generateOne): NodeBuffer =
+                                     dataSetCreatorName:  Name = names.generateOne,
+                                     maybeDataSetPublishedDate: Option[DataSetPublishedDate] =
+                                       Gen.option(dataSetPublishedDates).generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
@@ -155,18 +158,21 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <rdfs:label>{s".renku.lock@$commitId"}</rdfs:label>
     </rdf:Description>
     <rdf:Description rdf:about={s"file:///$dataSetId"}>
-      <schema:hasPart rdf:resource={s"file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/$dataSetName/README.rst"}/>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
       <rdf:type rdf:resource="http://schema.org/Dataset"/>
       <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-      <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}/>
-      <schema:creator rdf:resource={s"mailto:$dataSetCreatorEmail"}/>
       <prov:atLocation>{s"/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}</prov:atLocation>
+      <schema:hasPart rdf:resource={s"file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/$dataSetName/README.rst"}/>
+      <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}/>
       <schema:identifier>{dataSetId.toString}</schema:identifier>
-      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
       <rdfs:label>{dataSetId.toString}</rdfs:label>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
       <schema:name>{dataSetName.toString}</schema:name>
       <schema:dateCreated>{dataSetCreatedDate.toString}</schema:dateCreated>
+      <schema:creator rdf:resource={s"mailto:$dataSetCreatorEmail"}/>
+      {maybeDataSetPublishedDate.map { publishedDate =>
+        <schema:datePublished rdf:datatype="http://schema.org/Date">{publishedDate.toString}</schema:datePublished>
+      }.getOrElse(NodeSeq.Empty)}
     </rdf:Description>
     <rdf:Description rdf:about={s"file:///blob/$commitId/.gitattributes"}>
       <rdfs:label>{s".gitattributes@$commitId"}</rdfs:label>

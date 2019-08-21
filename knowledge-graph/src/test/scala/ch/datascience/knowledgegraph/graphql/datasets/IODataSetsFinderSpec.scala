@@ -28,52 +28,58 @@ import ch.datascience.rdfstore.{InMemoryRdfStore, RdfStoreData}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IODataSetsFinderSpec extends WordSpec with InMemoryRdfStore with ExternalServiceStubbing {
+class IODataSetsFinderSpec
+    extends WordSpec
+    with InMemoryRdfStore
+    with ExternalServiceStubbing
+    with ScalaCheckPropertyChecks {
 
   "findDataSets" should {
 
     "return all data-sets of the given project" in new InMemoryStoreTestCase {
-
-      val dataSet1 = dataSets.generateOne
-      val dataSet2 = dataSets.generateOne
-      loadToStore(
-        RDF(
-          singleFileAndCommitWithDataset(projectPaths.generateOne,
-                                         dataSetId   = dataSetIds.generateOne,
-                                         dataSetName = dataSetNames.generateOne),
-          singleFileAndCommitWithDataset(
-            projectPath,
-            dataSetId           = dataSet1.id,
-            dataSetName         = dataSet1.name,
-            dataSetCreatedDate  = dataSet1.created.date,
-            dataSetCreatorEmail = dataSet1.created.creator.email,
-            dataSetCreatorName  = dataSet1.created.creator.name
-          ),
-          singleFileAndCommitWithDataset(
-            projectPath,
-            dataSetId           = dataSet2.id,
-            dataSetName         = dataSet2.name,
-            dataSetCreatedDate  = dataSet2.created.date,
-            dataSetCreatorEmail = dataSet2.created.creator.email,
-            dataSetCreatorName  = dataSet2.created.creator.name
+      forAll(projectPaths, dataSets, dataSets) { (projectPath, dataSet1, dataSet2) =>
+        loadToStore(
+          RDF(
+            singleFileAndCommitWithDataset(projectPaths.generateOne,
+                                           dataSetId   = dataSetIds.generateOne,
+                                           dataSetName = dataSetNames.generateOne),
+            singleFileAndCommitWithDataset(
+              projectPath,
+              dataSetId                 = dataSet1.id,
+              dataSetName               = dataSet1.name,
+              dataSetCreatedDate        = dataSet1.created.date,
+              dataSetCreatorEmail       = dataSet1.created.creator.email,
+              dataSetCreatorName        = dataSet1.created.creator.name,
+              maybeDataSetPublishedDate = dataSet1.maybePublished.map(_.date)
+            ),
+            singleFileAndCommitWithDataset(
+              projectPath,
+              dataSetId                 = dataSet2.id,
+              dataSetName               = dataSet2.name,
+              dataSetCreatedDate        = dataSet2.created.date,
+              dataSetCreatorEmail       = dataSet2.created.creator.email,
+              dataSetCreatorName        = dataSet2.created.creator.name,
+              maybeDataSetPublishedDate = dataSet2.maybePublished.map(_.date)
+            )
           )
         )
-      )
 
-      dataSetsFinder.findDataSets(projectPath).unsafeRunSync() shouldBe Set(dataSet1, dataSet2)
+        val foundDataSets = dataSetsFinder.findDataSets(projectPath).unsafeRunSync()
+
+        foundDataSets should contain theSameElementsAs List(dataSet1, dataSet2)
+      }
     }
 
     "return None if there are no data-sets in the project" in new InMemoryStoreTestCase {
-      dataSetsFinder.findDataSets(projectPath).unsafeRunSync() shouldBe Set.empty
+      val projectPath = projectPaths.generateOne
+
+      dataSetsFinder.findDataSets(projectPath).unsafeRunSync() shouldBe List.empty
     }
   }
 
   private trait InMemoryStoreTestCase {
-
-    val renkuBaseUrl = RdfStoreData.renkuBaseUrl
-    val projectPath  = projectPaths.generateOne
-
-    val dataSetsFinder = new IODataSetsFinder(rdfStoreConfig, renkuBaseUrl, TestLogger())
+    val dataSetsFinder = new IODataSetsFinder(rdfStoreConfig, RdfStoreData.renkuBaseUrl, TestLogger())
   }
 }

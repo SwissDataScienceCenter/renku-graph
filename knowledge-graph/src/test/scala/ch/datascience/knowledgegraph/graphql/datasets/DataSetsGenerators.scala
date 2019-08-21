@@ -20,24 +20,29 @@ package ch.datascience.knowledgegraph.graphql.datasets
 
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreation, DataSetCreator}
+import ch.datascience.knowledgegraph.graphql.datasets.model._
 import org.scalacheck.Gen
 
 object DataSetsGenerators {
 
-  private implicit val dataSetCreator: Gen[DataSetCreator] = for {
+  implicit val dataSets: Gen[DataSet] = for {
+    id        <- dataSetIds
+    name      <- dataSetNames
+    created   <- dataSetCreations
+    published <- Gen.option(dataSetPublishingInfos)
+  } yield DataSet(id, name, created, published)
+
+  private implicit lazy val dataSetCreators: Gen[DataSetCreator] = for {
     email <- emails
     name  <- names
   } yield DataSetCreator(email, name)
 
-  private implicit val dataSetCreation: Gen[DataSetCreation] = for {
-    creationDate <- dataSetCreationDates
-    creator      <- dataSetCreator
-  } yield DataSetCreation(creationDate, creator)
+  private implicit lazy val dataSetCreations: Gen[DataSetCreation] = for {
+    createdDate <- dataSetCreatedDates
+    creator     <- dataSetCreators
+  } yield DataSetCreation(createdDate, creator)
 
-  implicit val dataSets: Gen[DataSet] = for {
-    id      <- dataSetIds
-    name    <- dataSetNames
-    created <- dataSetCreation
-  } yield DataSet(id, name, created)
+  implicit lazy val dataSetPublishingInfos: Gen[DataSetPublishing] = for {
+    publishedDate <- dataSetPublishedDates
+  } yield DataSetPublishing(publishedDate)
 }

@@ -100,14 +100,17 @@ Query example:
 {
   "query": "{ 
     dataSets(projectPath: \"namespace/project\") {
-      identifier
-      name
-      created {
-        dateCreated 
+      identifier!
+      name!
+      created! {
+        dateCreated! 
         creator { 
-          email
-          name
+          email!
+          name!
         }
+      }
+      published {
+        datePublished
       }
     } 
   }"
@@ -123,33 +126,39 @@ Response body example:
         "identifier" : "e1fc7b62-e021-434b-9264-dda336bddd4f",
         "name" : "x",
         "created" : {
-            "dateCreated": "1981-09-05T10:38:29.457Z",
-            "creator": {
-                "email": "user1@host",
-                "name": "user 1"
-            }
+          "dateCreated": "1981-09-05T10:38:29.457Z",
+          "creator": {
+            "email": "user1@host",
+            "name": "user 1"
+          }
+        }
+        "published" {
+          "datePublished": "2019-07-30"
         }
       },
       {
         "identifier" : "5b7a1394-93b5-4e75-932d-e041cf46349d",
         "name" : "xr",
         "created" : {
-            "dateCreated": "1991-09-05T10:38:29.457Z",
-            "creator": {
-                "email": "user2@host",
-                "name": "user 2"
-            }
+          "dateCreated": "1991-09-05T10:38:29.457Z",
+          "creator": {
+            "email": "user2@host",
+            "name": "user 2"
+          }
         }
       },
       {
         "identifier" : "b1aa58af-a488-4bae-97b4-d6d349f98412",
         "name" : "chOorWhraw",
         "created" : {
-            "dateCreated": "2001-09-05T10:38:29.457Z",
-            "creator": {
-                "email": "user3@host",
-                "name": "user 3"
-            }
+          "dateCreated": "2001-09-05T10:38:29.457Z",
+          "creator": {
+            "email": "user3@host",
+            "name": "user 3"
+          }
+        }
+        "published" {
+          "datePublished": "2009-07-30"
         }
       }
     ]

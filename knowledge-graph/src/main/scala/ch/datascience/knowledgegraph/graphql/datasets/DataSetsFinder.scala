@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.graphql.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets.{DataSetCreatedDate, DataSetId, DataSetName}
+import ch.datascience.graph.model.dataSets._
 import ch.datascience.graph.model.events.ProjectPath
 import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.knowledgegraph.graphql.datasets.model._
@@ -28,12 +28,13 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Decoder.decodeList
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait DataSetsFinder[Interpretation[_]] {
-  def findDataSets(projectPath: ProjectPath): Interpretation[Set[DataSet]]
+  def findDataSets(projectPath: ProjectPath): Interpretation[List[DataSet]]
 }
 
 class IODataSetsFinder(
@@ -46,8 +47,8 @@ class IODataSetsFinder(
 
   import IODataSetsFinder._
 
-  override def findDataSets(projectPath: ProjectPath): IO[Set[DataSet]] =
-    queryExpecting[Set[DataSet]](using = query(projectPath))
+  override def findDataSets(projectPath: ProjectPath): IO[List[DataSet]] =
+    queryExpecting[List[DataSet]](using = query(projectPath))
 
   private def query(projectPath: ProjectPath): String =
     s"""
@@ -57,7 +58,7 @@ class IODataSetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?dataSetId ?dataSetName ?dataSetCreationDate ?dataSetCreatorEmail ?dataSetCreatorName
+       |SELECT ?dataSetId ?dataSetName ?dataSetCreationDate ?dataSetCreatorEmail ?dataSetCreatorName ?maybeDataSetPublishedDate
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
@@ -69,6 +70,9 @@ class IODataSetsFinder(
        |  ?creatorResource rdf:type <http://schema.org/Person> ;
        |           schema:email ?dataSetCreatorEmail ;
        |           schema:name ?dataSetCreatorName .
+       |  OPTIONAL { 
+       |    ?dataSet schema:datePublished ?maybeDataSetPublishedDate
+       |  } .         
        |}""".stripMargin
 }
 
@@ -86,21 +90,31 @@ object IODataSetsFinder {
       renkuBaseUrl <- renkuBaseUrl
     } yield new IODataSetsFinder(config, renkuBaseUrl, logger)
 
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe.Decoder
 
-  private implicit val dataSetsDecoder: Decoder[Set[DataSet]] = {
+  private implicit val dataSetsDecoder: Decoder[List[DataSet]] = {
+    import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit lazy val dataSetDecoder: Decoder[DataSet] = { cursor =>
+    implicit val dataSetDecoder: Decoder[DataSet] = { cursor =>
       for {
         id           <- cursor.downField("dataSetId").downField("value").as[DataSetId]
         name         <- cursor.downField("dataSetName").downField("value").as[DataSetName]
         creationDate <- cursor.downField("dataSetCreationDate").downField("value").as[DataSetCreatedDate]
         creatorEmail <- cursor.downField("dataSetCreatorEmail").downField("value").as[Email]
         creatorName  <- cursor.downField("dataSetCreatorName").downField("value").as[Name]
-      } yield DataSet(id, name, DataSetCreation(creationDate, DataSetCreator(creatorEmail, creatorName)))
+        maybePublishedDate <- cursor
+                               .downField("maybeDataSetPublishedDate")
+                               .downField("value")
+                               .as[Option[DataSetPublishedDate]]
+      } yield
+        DataSet(
+          id,
+          name,
+          DataSetCreation(creationDate, DataSetCreator(creatorEmail, creatorName)),
+          maybePublishedDate.map(DataSetPublishing.apply)
+        )
     }
 
-    _.downField("results").downField("bindings").as[List[DataSet]].map(_.toSet)
+    _.downField("results").downField("bindings").as(decodeList[DataSet])
   }
 }

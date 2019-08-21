@@ -24,7 +24,9 @@ import org.scalacheck.Gen
 import org.scalacheck.Gen.uuid
 
 object GraphModelGenerators {
-  implicit val dataSetIds:           Gen[DataSetId]          = uuid.map(_.toString) map DataSetId.apply
-  implicit val dataSetNames:         Gen[DataSetName]        = nonEmptyStrings() map DataSetName.apply
-  implicit val dataSetCreationDates: Gen[DataSetCreatedDate] = timestampsNotInTheFuture map DataSetCreatedDate.apply
+  implicit val dataSetIds:          Gen[DataSetId]          = uuid.map(_.toString) map DataSetId.apply
+  implicit val dataSetNames:        Gen[DataSetName]        = nonEmptyStrings() map DataSetName.apply
+  implicit val dataSetCreatedDates: Gen[DataSetCreatedDate] = timestampsNotInTheFuture map DataSetCreatedDate.apply
+  implicit val dataSetPublishedDates: Gen[DataSetPublishedDate] =
+    timestampsNotInTheFuture map DataSetPublishedDate.apply
 }

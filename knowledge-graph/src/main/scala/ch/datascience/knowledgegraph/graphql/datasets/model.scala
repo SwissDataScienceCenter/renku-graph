@@ -23,9 +23,13 @@ import ch.datascience.graph.model.users.{Email, Name}
 
 object model {
 
-  final case class DataSet(id: DataSetId, name: DataSetName, created: DataSetCreation)
+  final case class DataSet(id:             DataSetId,
+                           name:           DataSetName,
+                           created:        DataSetCreation,
+                           maybePublished: Option[DataSetPublishing])
 
   final case class DataSetCreation(date: DataSetCreatedDate, creator: DataSetCreator)
+  final case class DataSetCreator(email: Email, name:                 Name)
 
-  final case class DataSetCreator(email: Email, name: Name)
+  final case class DataSetPublishing(date: DataSetPublishedDate)
 }

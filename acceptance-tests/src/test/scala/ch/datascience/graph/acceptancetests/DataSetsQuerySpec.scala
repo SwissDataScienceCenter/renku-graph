@@ -40,8 +40,8 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
 
   private val project  = projects.generateOne.copy(path = ProjectPath("namespace/project"))
   private val commitId = commitIds.generateOne
-  private val dataSet1 = dataSets.generateOne
-  private val dataSet2 = dataSets.generateOne
+  private val dataSet1 = dataSets.generateOne.copy(maybePublished = Some(dataSetPublishingInfos.generateOne))
+  private val dataSet2 = dataSets.generateOne.copy(maybePublished = Some(dataSetPublishingInfos.generateOne))
 
   feature("GraphQL query to find project's data-sets") {
 
@@ -56,7 +56,8 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         dataSet1.name,
         dataSet1.created.date,
         dataSet1.created.creator.email,
-        dataSet1.created.creator.name
+        dataSet1.created.creator.name,
+        dataSet1.maybePublished.map(_.date)
       ) &+ singleFileAndCommitWithDataset(
         project.path,
         commitId,
@@ -65,7 +66,8 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         dataSet2.name,
         dataSet2.created.date,
         dataSet2.created.creator.email,
-        dataSet2.created.creator.name
+        dataSet2.created.creator.name,
+        dataSet2.maybePublished.map(_.date)
       )
 
       `data in the RDF store`(project, commitId, triples)
@@ -76,9 +78,9 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       Then("he should get OK response with project's data-sets in Json")
       response.status shouldBe Ok
 
-      val Right(responseJson) =
-        response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]].map(_.toSet)
-      responseJson shouldBe Set(json(dataSet1), json(dataSet2))
+      val Right(responseJson) = response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]]
+
+      responseJson should contain theSameElementsAs List(json(dataSet1), json(dataSet2))
     }
 
     scenario("As a user I would like to find project's data-sets with a named GraphQL query") {
@@ -94,9 +96,9 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
 
-      val Right(responseJson) =
-        response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]].map(_.toSet)
-      responseJson shouldBe Set(json(dataSet1), json(dataSet2))
+      val Right(responseJson) = response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]]
+
+      responseJson should contain theSameElementsAs List(json(dataSet1), json(dataSet2))
     }
   }
 
@@ -106,6 +108,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         identifier
         name
         created { dateCreated creator { email name } }
+        published { datePublished }
       }
     }"""
 
@@ -115,10 +118,14 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         identifier
         name
         created { dateCreated creator { email name } }
+        published { datePublished }
       }
     }"""
 
-  private def json(dataSet: DataSet) = json"""
+  private def json(dataSet: DataSet) = {
+    val published = dataSet.maybePublished.getOrElse(throw new IllegalStateException("published expected"))
+
+    json"""
     {
       "identifier": ${dataSet.id.value}, 
       "name": ${dataSet.name.value},
@@ -128,6 +135,10 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
           "email": ${dataSet.created.creator.email.value},
           "name": ${dataSet.created.creator.name.value}
         }
+      },
+      "published": {
+        "datePublished": ${published.date.value}
       }
     }"""
+  }
 }
