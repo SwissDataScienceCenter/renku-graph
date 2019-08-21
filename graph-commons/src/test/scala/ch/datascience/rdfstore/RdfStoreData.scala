@@ -109,7 +109,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
     <rdf:Description rdf:about={s"file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/$dataSetName/README.rst"}>
       <rdf:type rdf:resource="http://schema.org/DigitalDocument"/>
       <prov:atLocation>{s"data/$dataSetName/README.rst"}</prov:atLocation>
-      <schema:creator rdf:resource="mailto:jakub.chrobasik@gmail.com"/>
+      <schema:creator rdf:resource={s"mailto:$dataSetCreatorEmail"}/>
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
       <rdfs:label>{s"data/$dataSetName/README.rst@4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b"}</rdfs:label>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
@@ -174,9 +174,9 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <prov:atLocation>.gitattributes</prov:atLocation>
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
     </rdf:Description>
-    <rdf:Description rdf:about="mailto:jakub.chrobasik@gmail.com">
+    <rdf:Description rdf:about={s"mailto:$dataSetCreatorEmail"}>
       <rdf:type rdf:resource="http://schema.org/Person"/>
-      <schema:email>jakub.chrobasik@gmail.com</schema:email>
+      <schema:email>{dataSetCreatorEmail.toString}</schema:email>
       <schema:name>Jakub Chrobasik</schema:name>
     </rdf:Description>
     <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets"}>
