@@ -20,10 +20,12 @@ package ch.datascience.graph.model
 
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.circe.Decoder
 
-class Email private (val value: String) extends AnyVal with StringTinyType
-object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  implicit val decoder: Decoder[Email] = stringDecoder(this)
+object users {
+
+  final class Email private (val value: String) extends AnyVal with StringTinyType
+  implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank
+
+  final class Username private (val value: String) extends AnyVal with StringTinyType
+  implicit object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank
 }

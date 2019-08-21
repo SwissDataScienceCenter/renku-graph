@@ -25,7 +25,8 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.dataSets._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.graph.model.{Email, SchemaVersion}
+import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.users.Email
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 

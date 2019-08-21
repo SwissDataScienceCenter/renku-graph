@@ -23,7 +23,8 @@ import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.{Email, SchemaVersion, Username}
+import ch.datascience.graph.model.users.{Email, Username}
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
 import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl, RdfStoreConfig}

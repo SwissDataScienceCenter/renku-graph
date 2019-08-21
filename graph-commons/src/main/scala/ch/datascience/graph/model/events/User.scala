@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model.events
 
-import ch.datascience.graph.model.{Email, Username}
+import ch.datascience.graph.model.users.{Email, Username}
 
 case class User(
     username: Username,

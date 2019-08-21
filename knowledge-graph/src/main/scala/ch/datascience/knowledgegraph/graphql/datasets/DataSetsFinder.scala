@@ -20,9 +20,9 @@ package ch.datascience.knowledgegraph.graphql.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.Email
 import ch.datascience.graph.model.dataSets.{DataSetCreatedDate, DataSetId, DataSetName}
 import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.graph.model.users.Email
 import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery

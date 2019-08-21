@@ -18,8 +18,8 @@
 
 package ch.datascience.webhookservice.commits
 
-import ch.datascience.graph.model.{Email, Username}
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.users.{Email, Username}
 
 case class CommitInfo(
     id:            CommitId,
@@ -32,6 +32,7 @@ case class CommitInfo(
 
 object CommitInfo {
 
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
 
   private[commits] implicit val commitInfoDecoder: Decoder[CommitInfo] = (cursor: HCursor) =>
