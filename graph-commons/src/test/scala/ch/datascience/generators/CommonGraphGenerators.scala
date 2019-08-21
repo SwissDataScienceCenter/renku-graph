@@ -23,7 +23,7 @@ import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.users.{Email, Username}
+import ch.datascience.graph.model.users.{Email, Name, Username}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
@@ -38,6 +38,11 @@ object CommonGraphGenerators {
   } yield Email(s"$beforeAt@$afterAt")
 
   implicit val usernames: Gen[Username] = nonEmptyStrings() map Username.apply
+
+  implicit val names: Gen[Name] = for {
+    first  <- nonEmptyStrings()
+    second <- nonEmptyStrings()
+  } yield Name(s"$first $second")
 
   implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
     length <- Gen.choose(5, 40)

@@ -18,8 +18,8 @@
 
 package ch.datascience.knowledgegraph.graphql.datasets
 
-import ch.datascience.graph.model.Email
 import ch.datascience.graph.model.dataSets._
+import ch.datascience.graph.model.users.{Email, Name}
 
 object model {
 
@@ -27,5 +27,5 @@ object model {
 
   final case class DataSetCreation(date: DataSetCreatedDate, creator: DataSetCreator)
 
-  final case class DataSetCreator(email: Email)
+  final case class DataSetCreator(email: Email, name: Name)
 }

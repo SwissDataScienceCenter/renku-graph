@@ -47,14 +47,16 @@ class IODataSetsFinderSpec extends WordSpec with InMemoryRdfStore with ExternalS
             dataSetId           = dataSet1.id,
             dataSetName         = dataSet1.name,
             dataSetCreatedDate  = dataSet1.created.date,
-            dataSetCreatorEmail = dataSet1.created.creator.email
+            dataSetCreatorEmail = dataSet1.created.creator.email,
+            dataSetCreatorName  = dataSet1.created.creator.name
           ),
           singleFileAndCommitWithDataset(
             projectPath,
             dataSetId           = dataSet2.id,
             dataSetName         = dataSet2.name,
             dataSetCreatedDate  = dataSet2.created.date,
-            dataSetCreatorEmail = dataSet2.created.creator.email
+            dataSetCreatorEmail = dataSet2.created.creator.email,
+            dataSetCreatorName  = dataSet2.created.creator.name
           )
         )
       )

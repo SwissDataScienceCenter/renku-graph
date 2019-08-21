@@ -46,7 +46,8 @@ object modelSchema {
     name        = "dataSetCreator",
     description = "DataSetCreator",
     fields = fields[Unit, DataSetCreator](
-      Field("email", StringType, Some("DataSet creator email"), resolve = _.value.email.toString)
+      Field("email", StringType, Some("DataSet creator email"), resolve = _.value.email.toString),
+      Field("name", StringType, Some("DataSet creator name"), resolve   = _.value.name.toString)
     )
   )
 }

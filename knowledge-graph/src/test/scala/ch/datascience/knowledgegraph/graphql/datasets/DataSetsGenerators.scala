@@ -27,7 +27,8 @@ object DataSetsGenerators {
 
   private implicit val dataSetCreator: Gen[DataSetCreator] = for {
     email <- emails
-  } yield DataSetCreator(email)
+    name  <- names
+  } yield DataSetCreator(email, name)
 
   private implicit val dataSetCreation: Gen[DataSetCreation] = for {
     creationDate <- dataSetCreationDates

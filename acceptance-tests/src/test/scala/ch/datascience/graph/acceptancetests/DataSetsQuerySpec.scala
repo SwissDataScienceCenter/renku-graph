@@ -48,21 +48,26 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
     scenario("As a user I would like to find project's data-sets with a GraphQL query") {
 
       Given("some data in the RDF Store")
-      val triples =
-        singleFileAndCommitWithDataset(project.path,
-                                       commitId,
-                                       model.currentSchemaVersion,
-                                       dataSet1.id,
-                                       dataSet1.name,
-                                       dataSet1.created.date,
-                                       dataSet1.created.creator.email) &+
-          singleFileAndCommitWithDataset(project.path,
-                                         commitId,
-                                         model.currentSchemaVersion,
-                                         dataSet2.id,
-                                         dataSet2.name,
-                                         dataSet2.created.date,
-                                         dataSet2.created.creator.email)
+      val triples = singleFileAndCommitWithDataset(
+        project.path,
+        commitId,
+        model.currentSchemaVersion,
+        dataSet1.id,
+        dataSet1.name,
+        dataSet1.created.date,
+        dataSet1.created.creator.email,
+        dataSet1.created.creator.name
+      ) &+ singleFileAndCommitWithDataset(
+        project.path,
+        commitId,
+        model.currentSchemaVersion,
+        dataSet2.id,
+        dataSet2.name,
+        dataSet2.created.date,
+        dataSet2.created.creator.email,
+        dataSet2.created.creator.name
+      )
+
       `data in the RDF store`(project, commitId, triples)
 
       When("user posts a graphql query to fetch data-sets")
@@ -100,7 +105,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       dataSets(projectPath: "namespace/project") {
         identifier
         name
-        created { dateCreated creator { email } }
+        created { dateCreated creator { email name } }
       }
     }"""
 
@@ -109,7 +114,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       dataSets(projectPath: $$projectPath) { 
         identifier
         name
-        created { dateCreated creator { email } }
+        created { dateCreated creator { email name } }
       }
     }"""
 
@@ -120,7 +125,8 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       "created": {
         "dateCreated": ${dataSet.created.date.value},
         "creator": {
-          "email": ${dataSet.created.creator.email.value}
+          "email": ${dataSet.created.creator.email.value},
+          "name": ${dataSet.created.creator.name.value}
         }
       }
     }"""

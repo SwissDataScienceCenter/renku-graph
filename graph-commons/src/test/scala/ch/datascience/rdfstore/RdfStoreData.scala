@@ -26,7 +26,7 @@ import ch.datascience.graph.model.dataSets._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -88,7 +88,8 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
                                      dataSetId:           DataSetId = dataSetIds.generateOne,
                                      dataSetName:         DataSetName = dataSetNames.generateOne,
                                      dataSetCreatedDate:  DataSetCreatedDate = dataSetCreationDates.generateOne,
-                                     dataSetCreatorEmail: Email = emails.generateOne): NodeBuffer =
+                                     dataSetCreatorEmail: Email = emails.generateOne,
+                                     dataSetCreatorName:  Name = names.generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
@@ -178,7 +179,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
     <rdf:Description rdf:about={s"mailto:$dataSetCreatorEmail"}>
       <rdf:type rdf:resource="http://schema.org/Person"/>
       <schema:email>{dataSetCreatorEmail.toString}</schema:email>
-      <schema:name>Jakub Chrobasik</schema:name>
+      <schema:name>{dataSetCreatorName.toString}</schema:name>
     </rdf:Description>
     <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets"}>
       <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>

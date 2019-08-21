@@ -106,6 +106,7 @@ Query example:
         dateCreated 
         creator { 
           email
+          name
         }
       }
     } 
@@ -124,7 +125,8 @@ Response body example:
         "created" : {
             "dateCreated": "1981-09-05T10:38:29.457Z",
             "creator": {
-                "email": "user1@host"
+                "email": "user1@host",
+                "name": "user 1"
             }
         }
       },
@@ -134,7 +136,8 @@ Response body example:
         "created" : {
             "dateCreated": "1991-09-05T10:38:29.457Z",
             "creator": {
-                "email": "user2@host"
+                "email": "user2@host",
+                "name": "user 2"
             }
         }
       },
@@ -144,7 +147,8 @@ Response body example:
         "created" : {
             "dateCreated": "2001-09-05T10:38:29.457Z",
             "creator": {
-                "email": "user3@host"
+                "email": "user3@host",
+                "name": "user 3"
             }
         }
       }

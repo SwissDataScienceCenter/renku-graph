@@ -26,6 +26,9 @@ object users {
   final class Email private (val value: String) extends AnyVal with StringTinyType
   implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank
 
+  final class Name private (val value: String) extends AnyVal with StringTinyType
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+
   final class Username private (val value: String) extends AnyVal with StringTinyType
   implicit object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank
 }

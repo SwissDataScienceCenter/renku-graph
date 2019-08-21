@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.dataSets.{DataSetCreatedDate, DataSetId, DataSetName}
 import ch.datascience.graph.model.events.ProjectPath
-import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
@@ -57,7 +57,7 @@ class IODataSetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?dataSetId ?dataSetName ?dataSetCreationDate ?dataSetCreatorEmail
+       |SELECT ?dataSetId ?dataSetName ?dataSetCreationDate ?dataSetCreatorEmail ?dataSetCreatorName
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
@@ -67,7 +67,8 @@ class IODataSetsFinder(
        |           schema:dateCreated ?dataSetCreationDate ;
        |           schema:creator ?creatorResource .
        |  ?creatorResource rdf:type <http://schema.org/Person> ;
-       |           schema:email ?dataSetCreatorEmail .
+       |           schema:email ?dataSetCreatorEmail ;
+       |           schema:name ?dataSetCreatorName .
        |}""".stripMargin
 }
 
@@ -96,7 +97,8 @@ object IODataSetsFinder {
         name         <- cursor.downField("dataSetName").downField("value").as[DataSetName]
         creationDate <- cursor.downField("dataSetCreationDate").downField("value").as[DataSetCreatedDate]
         creatorEmail <- cursor.downField("dataSetCreatorEmail").downField("value").as[Email]
-      } yield DataSet(id, name, DataSetCreation(creationDate, DataSetCreator(creatorEmail)))
+        creatorName  <- cursor.downField("dataSetCreatorName").downField("value").as[Name]
+      } yield DataSet(id, name, DataSetCreation(creationDate, DataSetCreator(creatorEmail, creatorName)))
     }
 
     _.downField("results").downField("bindings").as[List[DataSet]].map(_.toSet)
