@@ -98,27 +98,27 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
   private val query: Document = graphql"""
     {
       dataSets(projectPath: "namespace/project") {
-        id
+        identifier
         name
-        created { date creator { email } }
+        created { dateCreated creator { email } }
       }
     }"""
 
   private val namedQuery: Document = graphql"""
     query($$projectPath: ProjectPath!) { 
       dataSets(projectPath: $$projectPath) { 
-        id
+        identifier
         name
-        created { date creator { email } }
+        created { dateCreated creator { email } }
       }
     }"""
 
   private def json(dataSet: DataSet) = json"""
     {
-      "id": ${dataSet.id.value}, 
+      "identifier": ${dataSet.id.value}, 
       "name": ${dataSet.name.value},
       "created": {
-        "date": ${dataSet.created.date.value},
+        "dateCreated": ${dataSet.created.date.value},
         "creator": {
           "email": ${dataSet.created.creator.email.value}
         }

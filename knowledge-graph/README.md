@@ -100,7 +100,14 @@ Query example:
 {
   "query": "{ 
     dataSets(projectPath: \"namespace/project\") {
-      id name created {date}
+      identifier
+      name
+      created {
+        dateCreated 
+        creator { 
+          email
+        }
+      }
     } 
   }"
 }
@@ -112,24 +119,33 @@ Response body example:
   "data": {
     "dataSets": [
       {
-        "id" : "e1fc7b62-e021-434b-9264-dda336bddd4f",
+        "identifier" : "e1fc7b62-e021-434b-9264-dda336bddd4f",
         "name" : "x",
         "created" : {
-            "date": "1981-09-05T10:38:29.457Z"
+            "dateCreated": "1981-09-05T10:38:29.457Z",
+            "creator": {
+                "email": "user1@host"
+            }
         }
       },
       {
-        "id" : "5b7a1394-93b5-4e75-932d-e041cf46349d",
+        "identifier" : "5b7a1394-93b5-4e75-932d-e041cf46349d",
         "name" : "xr",
         "created" : {
-            "date": "1991-09-05T10:38:29.457Z"
+            "dateCreated": "1991-09-05T10:38:29.457Z",
+            "creator": {
+                "email": "user2@host"
+            }
         }
       },
       {
-        "id" : "b1aa58af-a488-4bae-97b4-d6d349f98412",
+        "identifier" : "b1aa58af-a488-4bae-97b4-d6d349f98412",
         "name" : "chOorWhraw",
         "created" : {
-            "date": "2001-09-05T10:38:29.457Z"
+            "dateCreated": "2001-09-05T10:38:29.457Z",
+            "creator": {
+                "email": "user3@host"
+            }
         }
       }
     ]
