@@ -16,11 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.events
+package ch.datascience.graph.model
 
-import ch.datascience.graph.model.{Email, Username}
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.circe.Decoder
 
-case class User(
-    username: Username,
-    email:    Email
-)
+class Username private (val value: String) extends AnyVal with StringTinyType
+
+object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank {
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  implicit val decoder: Decoder[Username] = stringDecoder(this)
+}

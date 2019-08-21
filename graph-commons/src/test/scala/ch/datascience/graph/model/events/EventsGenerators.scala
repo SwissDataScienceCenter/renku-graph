@@ -28,7 +28,6 @@ object EventsGenerators {
   implicit val commitIds:      Gen[CommitId]      = shas map CommitId.apply
   implicit val commitMessages: Gen[CommitMessage] = nonEmptyStrings() map CommitMessage.apply
   implicit val committedDates: Gen[CommittedDate] = timestampsNotInTheFuture map CommittedDate.apply
-  implicit val usernames:      Gen[Username]      = nonEmptyStrings() map Username.apply
 
   implicit val users: Gen[User] = for {
     username <- usernames
