@@ -103,7 +103,7 @@ class EventsProcessingStatusSpec
         `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
         webhookServiceClient
-          .POST("webhooks/events", HookToken(projectId), model.GitLab.pushEvent(projectId, commitId))
+          .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(projectId, commitId))
           .status shouldBe Accepted
       }
 }

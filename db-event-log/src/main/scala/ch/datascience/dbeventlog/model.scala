@@ -21,19 +21,19 @@ package ch.datascience.dbeventlog
 import java.time.Instant
 
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
-final class EventBody private (val value: String) extends AnyVal with TinyType[String]
-object EventBody extends TinyTypeFactory[String, EventBody](new EventBody(_)) with NonBlank
+final class EventBody private (val value: String) extends AnyVal with StringTinyType
+object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank
 
-final class CreatedDate private (val value: Instant) extends AnyVal with TinyType[Instant]
-object CreatedDate extends TinyTypeFactory[Instant, CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture
+final class CreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
+object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture
 
-final class ExecutionDate private (val value: Instant) extends AnyVal with TinyType[Instant]
-object ExecutionDate extends TinyTypeFactory[Instant, ExecutionDate](new ExecutionDate(_))
+final class ExecutionDate private (val value: Instant) extends AnyVal with InstantTinyType
+object ExecutionDate extends TinyTypeFactory[ExecutionDate](new ExecutionDate(_))
 
-final class EventMessage private (val value: String) extends AnyVal with TinyType[String]
-object EventMessage extends TinyTypeFactory[String, EventMessage](new EventMessage(_)) with NonBlank {
+final class EventMessage private (val value: String) extends AnyVal with StringTinyType
+object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) with NonBlank {
 
   import java.io.{PrintWriter, StringWriter}
 
@@ -49,8 +49,8 @@ object EventMessage extends TinyTypeFactory[String, EventMessage](new EventMessa
   }
 }
 
-sealed trait EventStatus extends TinyType[String] with Product with Serializable
-object EventStatus extends TinyTypeFactory[String, EventStatus](EventStatusInstantiator) {
+sealed trait EventStatus extends StringTinyType with Product with Serializable
+object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
   final case object New extends EventStatus {
     override val value: String = "NEW"
   }

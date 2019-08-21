@@ -19,25 +19,30 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator.config.FusekiBaseUrl
+import ch.datascience.triplesgenerator.eventprocessing.TriplesUploadResult._
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
-import org.http4s.Status
+import eu.timepit.refined.auto._
+import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
 
   "upload" should {
 
-    "succeed if upload the triples to Jena Fuseki is successful" in new TestCase {
+    "return success if upload to the Triples Store was successful" in new TestCase {
 
       stubFor {
         post(s"/${fusekiUserConfig.datasetName}/data")
@@ -48,10 +53,12 @@ class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalService
           .willReturn(ok())
       }
 
-      triplesUploader.upload(rdfTriples).unsafeRunSync() shouldBe ((): Unit)
+      triplesUploader.upload(rdfTriples).unsafeRunSync() shouldBe TriplesUploaded
     }
 
-    "return a RuntimeException if remote client responds with status different than OK" in new TestCase {
+    "return MalformedTriples if remote client responds with BAD_REQUEST" in new TestCase {
+
+      val errorMessage = nonEmptyStrings().generateOne
 
       stubFor {
         post(s"/${fusekiUserConfig.datasetName}/data")
@@ -59,12 +66,40 @@ class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalService
                          fusekiUserConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/rdf+xml"))
           .withRequestBody(equalTo(rdfTriples.value))
-          .willReturn(unauthorized().withBody("some error"))
+          .willReturn(badRequest().withBody(errorMessage))
       }
 
-      intercept[Exception] {
-        triplesUploader.upload(rdfTriples).unsafeRunSync()
-      }.getMessage shouldBe s"POST ${fusekiUserConfig.fusekiBaseUrl}/${fusekiUserConfig.datasetName}/data returned ${Status.Unauthorized}; body: some error"
+      triplesUploader.upload(rdfTriples).unsafeRunSync() shouldBe MalformedTriples(errorMessage)
+    }
+
+    "return UploadingError if remote client responds with status different than OK or BAD_REQUEST" in new TestCase {
+
+      val errorMessage = nonEmptyStrings().generateOne
+
+      stubFor {
+        post(s"/${fusekiUserConfig.datasetName}/data")
+          .withBasicAuth(fusekiUserConfig.authCredentials.username.value,
+                         fusekiUserConfig.authCredentials.password.value)
+          .withHeader("content-type", equalTo("application/rdf+xml"))
+          .withRequestBody(equalTo(rdfTriples.value))
+          .willReturn(unauthorized().withBody(errorMessage))
+      }
+
+      triplesUploader.upload(rdfTriples).unsafeRunSync() shouldBe UploadingError(s"$Unauthorized: $errorMessage")
+    }
+
+    "return UploadingError for connectivity issues" in new TestCase {
+
+      val fusekiBaseUrl = localHttpUrls.map(FusekiBaseUrl.apply).generateOne
+      override val fusekiUserConfig = rdfStoreConfigs.generateOne.copy(
+        fusekiBaseUrl = fusekiBaseUrl
+      )
+
+      triplesUploader
+        .upload(rdfTriples)
+        .unsafeRunSync() shouldBe UploadingError(
+        s"POST $fusekiBaseUrl/${fusekiUserConfig.datasetName}/data error: Connection refused"
+      )
     }
   }
 
@@ -75,9 +110,14 @@ class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalService
 
     val rdfTriples = rdfTriplesSets.generateOne
 
-    val fusekiUserConfig = fusekiUserConfigs.generateOne.copy(
+    val fusekiUserConfig = rdfStoreConfigs.generateOne.copy(
       fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     )
-    val triplesUploader = new IOTriplesUploader(fusekiUserConfig, TestLogger())
+    lazy val triplesUploader = new IOTriplesUploader(
+      fusekiUserConfig,
+      TestLogger(),
+      retryInterval = 100 millis,
+      maxRetries    = 1
+    )
   }
 }

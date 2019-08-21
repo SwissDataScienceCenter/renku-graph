@@ -18,6 +18,13 @@
 sbt clean test && sbt "project acceptance-tests" test
 ```
 
+Depending on your global configuration of sbt you have installed, you might need to set `SBT_OPTS` to avoid OutOfMemory exception. 
+If such error is raised, try setting the variable with the following:
+
+```bash
+export SBT_OPTS="-XX:+UseG1GC -XX:+CMSClassUnloadingEnabled -Xmx1G"
+```
+
 #### Releasing
 
 - create a release branch,

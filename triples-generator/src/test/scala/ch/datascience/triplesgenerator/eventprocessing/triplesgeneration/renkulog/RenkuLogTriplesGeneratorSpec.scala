@@ -30,7 +30,7 @@ import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, Project, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
-import ch.datascience.triplesgenerator.eventprocessing.{GitLabUrlProvider, RDFTriples}
+import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -344,7 +344,6 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
     val rdfTriplesStream:    InputStream = mock[InputStream]
     val rdfTriples:          RDFTriples  = rdfTriplesSets.generateOne
 
-    class IOGitLabUrlProvider extends GitLabUrlProvider[IO]
     val gitLabRepoUrlFinder = mock[IOGitLabRepoUrlFinder]
     val file                = mock[Commands.File]
     val git                 = mock[Commands.Git]

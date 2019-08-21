@@ -27,7 +27,8 @@ class TinyTypeSpec extends WordSpec {
 
     "return a String value of the 'value' property" in {
       ("abc" +: 2 +: 2L +: true +: Nil) foreach { someValue =>
-        val tinyType: TinyType[Any] = new TinyType[Any] {
+        val tinyType: TinyType = new TinyType {
+          type V = Any
           override val value: Any = someValue
         }
 
@@ -43,7 +44,8 @@ class SensitiveSpec extends WordSpec {
 
     "return a '<sensitive>' instead of the value" in {
       ("abc" +: 2 +: 2L +: true +: Nil) foreach { someValue =>
-        val tinyType: TinyType[Any] = new TinyType[Any] with Sensitive {
+        val tinyType: TinyType = new TinyType with Sensitive {
+          type V = Any
           override val value: Any = someValue
         }
 
@@ -92,9 +94,36 @@ class TinyTypeFactorySpec extends WordSpec {
   }
 }
 
-private class TinyTypeTest private (val value: String) extends AnyVal with TinyType[String]
+class TypeNameSpec extends WordSpec {
 
-private object TinyTypeTest extends TinyTypeFactory[String, TinyTypeTest](new TinyTypeTest(_)) {
+  "typeName" should {
+
+    "return type name without $ signs in case of nested types" in {
+      TestTypeName.typeName shouldBe "ch.datascience.tinytypes.TypeNameSpec.TestTypeName"
+    }
+
+    "return type name for non-nested types" in {
+      TinyTypeTest.typeName shouldBe "ch.datascience.tinytypes.TinyTypeTest"
+    }
+  }
+
+  "shortTypeName" should {
+
+    "return the type name without the package info and $ signs in case of nested types" in {
+      TestTypeName.shortTypeName shouldBe "TestTypeName"
+    }
+
+    "return type name without the package info for non-nested types" in {
+      TinyTypeTest.shortTypeName shouldBe "TinyTypeTest"
+    }
+  }
+
+  private object TestTypeName extends TypeName
+}
+
+private class TinyTypeTest private (val value: String) extends AnyVal with StringTinyType
+
+private object TinyTypeTest extends TinyTypeFactory[TinyTypeTest](new TinyTypeTest(_)) {
 
   addConstraint(
     check   = !_.contains("abc"),

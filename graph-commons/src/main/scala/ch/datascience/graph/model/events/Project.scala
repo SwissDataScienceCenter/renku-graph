@@ -19,7 +19,7 @@
 package ch.datascience.graph.model.events
 
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegative}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
 
 case class Project(
@@ -27,13 +27,13 @@ case class Project(
     path: ProjectPath
 )
 
-class ProjectId private (val value: Int) extends AnyVal with TinyType[Int]
-object ProjectId extends TinyTypeFactory[Int, ProjectId](new ProjectId(_)) with NonNegative {
+class ProjectId private (val value: Int) extends AnyVal with IntTinyType
+object ProjectId extends TinyTypeFactory[ProjectId](new ProjectId(_)) with NonNegative {
   implicit lazy val projectIdDecoder: Decoder[ProjectId] = Decoder.decodeInt.map(ProjectId.apply)
 }
 
-class ProjectPath private (val value: String) extends AnyVal with TinyType[String]
-object ProjectPath extends TinyTypeFactory[String, ProjectPath](new ProjectPath(_)) with NonBlank {
+class ProjectPath private (val value: String) extends AnyVal with StringTinyType
+object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with NonBlank {
   addConstraint(
     check = value =>
       value.contains("/") &&

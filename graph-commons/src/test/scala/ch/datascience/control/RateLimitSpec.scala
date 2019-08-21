@@ -18,8 +18,8 @@
 
 package ch.datascience.control
 
-import java.time.temporal.ChronoUnit
-
+import cats.implicits._
+import ch.datascience.control.RateLimitUnit._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
 import eu.timepit.refined.api.Refined
@@ -33,58 +33,60 @@ import scala.language.postfixOps
 
 class RateLimitSpec extends WordSpec with ScalaCheckPropertyChecks {
 
+  private type EitherWithThrowable[T] = Either[Throwable, T]
+
   "apply" should {
 
     "instantiate from '<number>/seq' value" in {
       forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
-        RateLimit.from(s"$int/sec") shouldBe Right(RateLimit(int, 1 second))
+        RateLimit.from[EitherWithThrowable](s"$int/sec") shouldBe Right(RateLimit(int, Second))
       }
     }
 
     "instantiate from '<number>/min' value" in {
       forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
-        RateLimit.from(s"$int/min") shouldBe Right(RateLimit(int, 1 minute))
+        RateLimit.from[EitherWithThrowable](s"$int/min") shouldBe Right(RateLimit(int, Minute))
       }
     }
 
     "instantiate from '<number>/hour' value" in {
       forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
-        RateLimit.from(s"$int/hour") shouldBe Right(RateLimit(int, 1 hour))
+        RateLimit.from[EitherWithThrowable](s"$int/hour") shouldBe Right(RateLimit(int, Hour))
       }
     }
 
     "instantiate from '<number>/day' value" in {
       forAll(positiveLongs(max = Integer.MAX_VALUE)) { int =>
-        RateLimit.from(s"$int/day") shouldBe Right(RateLimit(int, 1 day))
+        RateLimit.from[EitherWithThrowable](s"$int/day") shouldBe Right(RateLimit(int, Day))
       }
     }
 
     "return failure if 0" in {
-      val Left(exception) = RateLimit.from("0/sec")
+      val Left(exception) = RateLimit.from[EitherWithThrowable]("0/sec")
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe "ch.datascience.control.RateLimit has to be positive"
     }
 
     "return failure if negative number" in {
-      val Left(exception) = RateLimit.from("-1/sec")
+      val Left(exception) = RateLimit.from[EitherWithThrowable]("-1/sec")
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe "Invalid value for ch.datascience.control.RateLimit: '-1/sec'"
     }
 
     "return failure if not a number" in {
-      val Left(exception) = RateLimit.from("add/sec")
+      val Left(exception) = RateLimit.from[EitherWithThrowable]("add/sec")
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe "Invalid value for ch.datascience.control.RateLimit: 'add/sec'"
     }
 
     "return failure if unit not sec/hour/day" in {
-      val Left(exception) = RateLimit.from("2/month")
+      val Left(exception) = RateLimit.from[EitherWithThrowable]("2/month")
 
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe "Unknown unit 'month' for ch.datascience.control.RateLimit"
+      exception.getMessage shouldBe "Unknown 'month' for ch.datascience.control.RateLimitUnit"
     }
   }
 
@@ -92,14 +94,10 @@ class RateLimitSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "produce a string in format '<number>/<unit>'" in {
       forAll(rateLimits) {
-        case rateLimit @ RateLimit(rate, unit) if unit._2.name() == ChronoUnit.SECONDS.name() =>
-          rateLimit.toString shouldBe s"$rate/sec"
-        case rateLimit @ RateLimit(rate, unit) if unit._2.name() == ChronoUnit.MINUTES.name() =>
-          rateLimit.toString shouldBe s"$rate/min"
-        case rateLimit @ RateLimit(rate, unit) if unit._2.name() == ChronoUnit.HOURS.name() =>
-          rateLimit.toString shouldBe s"$rate/hour"
-        case rateLimit @ RateLimit(rate, unit) if unit._2.name() == ChronoUnit.DAYS.name() =>
-          rateLimit.toString shouldBe s"$rate/day"
+        case rateLimit @ RateLimit(rate, Second) => rateLimit.toString shouldBe s"$rate/sec"
+        case rateLimit @ RateLimit(rate, Minute) => rateLimit.toString shouldBe s"$rate/min"
+        case rateLimit @ RateLimit(rate, Hour)   => rateLimit.toString shouldBe s"$rate/hour"
+        case rateLimit @ RateLimit(rate, Day)    => rateLimit.toString shouldBe s"$rate/day"
       }
     }
   }
@@ -108,19 +106,24 @@ class RateLimitSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "make the rate limit x times slower than initially" in {
       forAll(rateLimits, positiveInts()) { (rateLimit, value) =>
-        whenever(rateLimit.items.value * (1 day).toMillis / (rateLimit.per.toMillis * value) > 0) {
-          rateLimit / value shouldBe Right(
+        whenever {
+          (rateLimit.items.value * (1 day).toMillis / (rateLimit.per.multiplierFor(MILLISECONDS) * value)).toLong > 0
+        } {
+          rateLimit / value shouldBe Right {
             RateLimit(
-              Refined.unsafeApply(rateLimit.items.value * (1 day).toMillis / (rateLimit.per.toMillis * value.value)),
-              1 day
+              Refined.unsafeApply(
+                (rateLimit.items.value * (1 day).toMillis /
+                  (rateLimit.per.multiplierFor(MILLISECONDS) * value.value)).toLong
+              ),
+              per = Day
             )
-          )
+          }
         }
       }
     }
 
     "fail if resulting RateLimit below 1/day" in {
-      val Left(exception) = RateLimit(1L, per = 1 day) / 2
+      val Left(exception) = RateLimit(1L, per = Day) / 2
       exception.getMessage shouldBe "RateLimits below 1/day not supported"
     }
   }

@@ -21,19 +21,26 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.EventLogMarkAllNew
-import ch.datascience.http.client.BasicAuthCredentials
+import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogMarkAllNew}
+import io.chrisdavenport.log4cats.Logger
 
+import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 
-class IOCompleteReProvisioningEndpoint(
-    basicAuthCredentials: BasicAuthCredentials,
-    reProvisioner:        ReProvisioner[IO]
-)(implicit contextShift:  ContextShift[IO], concurrent: Concurrent[IO])
-    extends CompleteReProvisioningEndpoint[IO](basicAuthCredentials, reProvisioner)
-
-private class IOReProvisioner(datasetTruncator: DatasetTruncator[IO], eventLogMarkAllNew: EventLogMarkAllNew[IO])
-    extends ReProvisioner[IO](datasetTruncator, eventLogMarkAllNew)
+class IOReProvisioner(triplesFinder:       OutdatedTriplesFinder[IO],
+                      triplesRemover:      OutdatedTriplesRemover[IO],
+                      eventLogMarkAllNew:  EventLogMarkAllNew[IO],
+                      eventLogFetch:       EventLogFetch[IO],
+                      reProvisioningDelay: ReProvisioningDelay,
+                      logger:              Logger[IO],
+                      sleepWhenBusy:       FiniteDuration)(implicit timer: Timer[IO])
+    extends ReProvisioner[IO](triplesFinder,
+                              triplesRemover,
+                              eventLogMarkAllNew,
+                              eventLogFetch,
+                              reProvisioningDelay,
+                              logger,
+                              sleepWhenBusy)
 
 class TryEventLogMarkAllNew(transactor: DbTransactor[Try, EventLogDB])(implicit ME: Bracket[Try, Throwable])
     extends EventLogMarkAllNew[Try](transactor)

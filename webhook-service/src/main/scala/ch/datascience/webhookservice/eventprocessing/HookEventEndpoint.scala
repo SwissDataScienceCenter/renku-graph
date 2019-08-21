@@ -50,8 +50,8 @@ class HookEventEndpoint[Interpretation[_]: Effect](
     extends Http4sDsl[Interpretation] {
 
   import HookEventEndpoint._
-  import hookTokenCrypto._
   import commitToEventLog._
+  import hookTokenCrypto._
 
   def processPushEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
@@ -64,7 +64,7 @@ class HookEventEndpoint[Interpretation[_]: Effect](
     } yield response
   } recoverWith httpResponse
 
-  private implicit lazy val pushEventEntityDecoder: EntityDecoder[Interpretation, StartCommit] =
+  private implicit lazy val startCommitEntityDecoder: EntityDecoder[Interpretation, StartCommit] =
     jsonOf[Interpretation, StartCommit]
 
   private lazy val badRequest: PartialFunction[Throwable, Interpretation[StartCommit]] = {
@@ -104,8 +104,6 @@ class HookEventEndpoint[Interpretation[_]: Effect](
 
 private object HookEventEndpoint {
 
-  import io.circe.DecodingFailure
-
   private implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) => {
     for {
       id   <- cursor.downField("id").as[ProjectId]
@@ -118,16 +116,6 @@ private object HookEventEndpoint {
       commitTo <- cursor.downField("after").as[CommitId]
       project  <- cursor.downField("project").as[Project]
     } yield StartCommit(commitTo, project)
-
-  private lazy val emptyToNone: Option[String] => Either[DecodingFailure, Option[Email]] = {
-    case Some("") => Right(None)
-    case None     => Right(None)
-    case Some(nonBlankEmail) =>
-      Email
-        .from(nonBlankEmail)
-        .map(Some(_))
-        .leftMap(exception => DecodingFailure.apply(exception.getMessage, Nil))
-  }
 }
 
 class IOHookEventEndpoint(

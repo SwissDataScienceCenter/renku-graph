@@ -29,6 +29,9 @@ package object commands {
   implicit val projectIdGet: Get[ProjectId] = Get[Int].tmap(ProjectId.apply)
   implicit val projectIdPut: Put[ProjectId] = Put[Int].contramap(_.value)
 
+  implicit val projectPathGet: Get[ProjectPath] = Get[String].tmap(ProjectPath.apply)
+  implicit val projectPathPut: Put[ProjectPath] = Put[String].contramap(_.value)
+
   implicit val eventBodyGet: Get[EventBody] = Get[String].tmap(EventBody.apply)
   implicit val eventBodyPut: Put[EventBody] = Put[String].contramap(_.value)
 

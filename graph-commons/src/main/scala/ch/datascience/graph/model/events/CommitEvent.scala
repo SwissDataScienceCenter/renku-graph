@@ -21,7 +21,7 @@ package ch.datascience.graph.model.events
 import java.time.Instant
 
 import ch.datascience.tinytypes.constraints.{GitSha, InstantInThePast, NonBlank}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyType, TinyTypeFactory}
 import io.circe.Decoder
 
 final case class CommitEvent(
@@ -45,18 +45,18 @@ final case class CommitEventId(id: CommitId, projectId: ProjectId) {
   override lazy val toString: String = s"id = $id, projectId = $projectId"
 }
 
-final class CommitId private (val value: String) extends AnyVal with TinyType[String]
-object CommitId extends TinyTypeFactory[String, CommitId](new CommitId(_)) with GitSha {
+final class CommitId private (val value: String) extends AnyVal with StringTinyType
+object CommitId extends TinyTypeFactory[CommitId](new CommitId(_)) with GitSha {
   implicit lazy val commitIdDecoder: Decoder[CommitId] = Decoder.decodeString.map(CommitId.apply)
 }
 
-final class CommitMessage private (val value: String) extends AnyVal with TinyType[String]
-object CommitMessage extends TinyTypeFactory[String, CommitMessage](new CommitMessage(_)) with NonBlank {
+final class CommitMessage private (val value: String) extends AnyVal with StringTinyType
+object CommitMessage extends TinyTypeFactory[CommitMessage](new CommitMessage(_)) with NonBlank {
   implicit lazy val commitMessageDecoder: Decoder[CommitMessage] = Decoder.decodeString.map(CommitMessage.apply)
 }
 
-final class CommittedDate private (val value: Instant) extends AnyVal with TinyType[Instant]
-object CommittedDate extends TinyTypeFactory[Instant, CommittedDate](new CommittedDate(_)) with InstantInThePast {
+final class CommittedDate private (val value: Instant) extends AnyVal with TinyType { type V = Instant }
+object CommittedDate extends TinyTypeFactory[CommittedDate](new CommittedDate(_)) with InstantInThePast {
   implicit lazy val committedDateDecoder: Decoder[CommittedDate] =
     Decoder.decodeZonedDateTime.map(t => CommittedDate(t.toInstant))
 }

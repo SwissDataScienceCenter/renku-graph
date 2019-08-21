@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.Clock
 import cats.implicits._
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}
 
 import scala.concurrent.duration._
 import scala.language.higherKinds
@@ -43,8 +43,8 @@ class ExecutionTimeRecorder[Interpretation[_]](
 
 object ExecutionTimeRecorder {
 
-  class ElapsedTime private (val value: Long) extends AnyVal with TinyType[Long]
-  object ElapsedTime extends TinyTypeFactory[Long, ElapsedTime](new ElapsedTime(_)) {
+  class ElapsedTime private (val value: Long) extends AnyVal with LongTinyType
+  object ElapsedTime extends TinyTypeFactory[ElapsedTime](new ElapsedTime(_)) {
     addConstraint(
       check   = _ >= 0,
       message = (_: Long) => s"$typeName cannot be < 0"

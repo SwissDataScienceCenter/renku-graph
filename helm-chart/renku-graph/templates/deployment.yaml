@@ -22,7 +22,7 @@ spec:
         release: {{ .Release.Name }}
     spec:
       containers:
-        - name: {{ .Chart.Name }}-webhook-service
+        - name: webhook-service
           image: "{{ .Values.webhookService.image.repository }}:{{ .Values.webhookService.image.tag }}"
           imagePullPolicy: {{ .Values.webhookService.image.pullPolicy }}
           env:
@@ -96,7 +96,7 @@ spec:
               port: http-webhook-sv
           resources:
 {{ toYaml .Values.webhookService.resources | indent 12 }}
-        - name: {{ .Chart.Name }}-triples-generator
+        - name: triples-generator
           image: "{{ .Values.triplesGenerator.image.repository }}:{{ .Values.triplesGenerator.image.tag }}"
           imagePullPolicy: {{ .Values.triplesGenerator.image.pullPolicy }}
           env:
@@ -137,6 +137,8 @@ spec:
                   key: jena-renku-password
             - name: RENKU_LOG_TIMEOUT
               value: "{{ .Values.triplesGenerator.renkuLogTimeout }}"
+            - name: RE_PROVISIONING_INITIAL_DELAY
+              value: "{{ .Values.triplesGenerator.reProvisioningInitialDelay }}"
             - name: SENTRY_DSN
               value: {{ .Values.sentry.sentryDsnRenkuPython }}
             - name: SENTRY_ENABLED
@@ -173,7 +175,7 @@ spec:
             failureThreshold: 3
           resources:
 {{ toYaml .Values.triplesGenerator.resources | indent 12 }}
-        - name: {{ .Chart.Name }}-token-repository
+        - name: token-repository
           image: "{{ .Values.tokenRepository.image.repository }}:{{ .Values.tokenRepository.image.tag }}"
           imagePullPolicy: {{ .Values.tokenRepository.image.pullPolicy }}
           env:
