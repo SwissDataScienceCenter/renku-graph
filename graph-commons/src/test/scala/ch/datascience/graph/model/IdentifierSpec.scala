@@ -20,19 +20,19 @@ package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.dataSets.DataSetId
+import ch.datascience.graph.model.dataSets.Identifier
 import org.scalacheck.Gen._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DataSetIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class IdentifierSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "from" should {
 
-    "return DataSetId for valid uuid" in {
+    "return Identifier for valid uuid" in {
       forAll(uuid) { expected =>
-        val Right(DataSetId(actual)) = DataSetId.from(expected.toString)
+        val Right(Identifier(actual)) = Identifier.from(expected.toString)
         actual shouldBe expected.toString
       }
     }
@@ -41,10 +41,10 @@ class DataSetIdSpec extends WordSpec with ScalaCheckPropertyChecks {
 
       val invalidUuid = nonEmptyStrings().generateOne
 
-      val Left(exception) = DataSetId.from(invalidUuid)
+      val Left(exception) = Identifier.from(invalidUuid)
 
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"Cannot instantiate ${DataSetId.typeName} with '$invalidUuid'"
+      exception.getMessage shouldBe s"Cannot instantiate ${Identifier.typeName} with '$invalidUuid'"
     }
   }
 }

@@ -19,18 +19,18 @@
 package ch.datascience.knowledgegraph.graphql.datasets
 
 import ch.datascience.graph.model.dataSets._
-import ch.datascience.graph.model.users.{Email, Name}
+import ch.datascience.graph.model.users.{Email, Name => UserName}
 
 object model {
 
-  final case class DataSet(id:               DataSetId,
-                           name:             DataSetName,
-                           maybeDescription: Option[DataSetDescription],
+  final case class DataSet(id:               Identifier,
+                           name:             Name,
+                           maybeDescription: Option[Description],
                            created:          DataSetCreation,
                            maybePublished:   Option[DataSetPublishing])
 
-  final case class DataSetCreation(date: DataSetCreatedDate, creator: DataSetCreator)
-  final case class DataSetCreator(email: Email, name:                 Name)
+  final case class DataSetCreation(date: CreatedDate, creator: DataSetCreator)
+  final case class DataSetCreator(email: Email, name:          UserName)
 
-  final case class DataSetPublishing(date: DataSetPublishedDate)
+  final case class DataSetPublishing(date: PublishedDate)
 }

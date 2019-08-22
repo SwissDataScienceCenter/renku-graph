@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.dataSets._
 import ch.datascience.graph.model.events.ProjectPath
-import ch.datascience.graph.model.users.{Email, Name}
+import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
@@ -58,20 +58,20 @@ class IODataSetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?dataSetId ?dataSetName ?dataSetCreationDate ?dataSetCreatorEmail ?dataSetCreatorName ?maybeDataSetPublishedDate ?maybeDataSetDescription
+       |SELECT ?identifier ?name ?description ?creationDate ?creatorEmail ?creatorName ?publishedDate
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
        |  ?dataSet rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label ?dataSetId ;
-       |           schema:name ?dataSetName ;
-       |           schema:dateCreated ?dataSetCreationDate ;
+       |           rdfs:label ?identifier ;
+       |           schema:name ?name ;
+       |           schema:dateCreated ?creationDate ;
        |           schema:creator ?creatorResource .
        |  ?creatorResource rdf:type <http://schema.org/Person> ;
-       |           schema:email ?dataSetCreatorEmail ;
-       |           schema:name ?dataSetCreatorName .
-       |  OPTIONAL { ?dataSet schema:description ?maybeDataSetDescription } .         
-       |  OPTIONAL { ?dataSet schema:datePublished ?maybeDataSetPublishedDate } .         
+       |           schema:email ?creatorEmail ;
+       |           schema:name ?creatorName .
+       |  OPTIONAL { ?dataSet schema:description ?description } .         
+       |  OPTIONAL { ?dataSet schema:datePublished ?publishedDate } .         
        |}""".stripMargin
 }
 
@@ -96,19 +96,13 @@ object IODataSetsFinder {
 
     implicit val dataSetDecoder: Decoder[DataSet] = { cursor =>
       for {
-        id   <- cursor.downField("dataSetId").downField("value").as[DataSetId]
-        name <- cursor.downField("dataSetName").downField("value").as[DataSetName]
-        maybeDescription <- cursor
-                             .downField("maybeDataSetDescription")
-                             .downField("value")
-                             .as[Option[DataSetDescription]]
-        creationDate <- cursor.downField("dataSetCreationDate").downField("value").as[DataSetCreatedDate]
-        creatorEmail <- cursor.downField("dataSetCreatorEmail").downField("value").as[Email]
-        creatorName  <- cursor.downField("dataSetCreatorName").downField("value").as[Name]
-        maybePublishedDate <- cursor
-                               .downField("maybeDataSetPublishedDate")
-                               .downField("value")
-                               .as[Option[DataSetPublishedDate]]
+        id                 <- cursor.downField("identifier").downField("value").as[Identifier]
+        name               <- cursor.downField("name").downField("value").as[Name]
+        maybeDescription   <- cursor.downField("description").downField("value").as[Option[Description]]
+        creationDate       <- cursor.downField("creationDate").downField("value").as[CreatedDate]
+        creatorEmail       <- cursor.downField("creatorEmail").downField("value").as[Email]
+        creatorName        <- cursor.downField("creatorName").downField("value").as[UserName]
+        maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
       } yield
         DataSet(
           id,

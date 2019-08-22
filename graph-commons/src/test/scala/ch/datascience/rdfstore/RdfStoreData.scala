@@ -26,7 +26,7 @@ import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.dataSets._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.graph.model.users.{Email, Name}
+import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalacheck.Gen
@@ -83,18 +83,17 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       </rdf:Description>
   // format: on
 
-  def singleFileAndCommitWithDataset(projectPath:   ProjectPath,
-                                     commitId:      CommitId = commitIds.generateOne,
-                                     schemaVersion: SchemaVersion = schemaVersions.generateOne,
-                                     dataSetId:     DataSetId = dataSetIds.generateOne,
-                                     dataSetName:   DataSetName = dataSetNames.generateOne,
-                                     maybeDataSetDescription: Option[DataSetDescription] =
-                                       Gen.option(dataSetDescriptions).generateOne,
-                                     dataSetCreatedDate:  DataSetCreatedDate = dataSetCreatedDates.generateOne,
-                                     dataSetCreatorEmail: Email              = emails.generateOne,
-                                     dataSetCreatorName:  Name               = names.generateOne,
-                                     maybeDataSetPublishedDate: Option[DataSetPublishedDate] =
-                                       Gen.option(dataSetPublishedDates).generateOne): NodeBuffer =
+  def singleFileAndCommitWithDataset(
+      projectPath:               ProjectPath,
+      commitId:                  CommitId = commitIds.generateOne,
+      schemaVersion:             SchemaVersion = schemaVersions.generateOne,
+      dataSetId:                 Identifier = dataSetIds.generateOne,
+      dataSetName:               Name = dataSetNames.generateOne,
+      maybeDataSetDescription:   Option[Description] = Gen.option(dataSetDescriptions).generateOne,
+      dataSetCreatedDate:        CreatedDate = dataSetCreatedDates.generateOne,
+      dataSetCreatorEmail:       Email = emails.generateOne,
+      dataSetCreatorName:        UserName = names.generateOne,
+      maybeDataSetPublishedDate: Option[PublishedDate] = Gen.option(dataSetPublishedDates).generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>

@@ -27,29 +27,23 @@ import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactor
 
 object dataSets {
 
-  final class DataSetId private (val value: String) extends AnyVal with StringTinyType
-  implicit object DataSetId extends TinyTypeFactory[DataSetId](new DataSetId(_)) {
+  final class Identifier private (val value: String) extends AnyVal with StringTinyType
+  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) {
     addConstraint(
       check   = value => Validated.catchOnly[IllegalArgumentException](UUID.fromString(value)).isValid,
       message = (value: String) => s"Cannot instantiate $typeName with '$value'"
     )
   }
 
-  final class DataSetName private (val value: String) extends AnyVal with StringTinyType
-  implicit object DataSetName extends TinyTypeFactory[DataSetName](new DataSetName(_)) with NonBlank
+  final class Name private (val value: String) extends AnyVal with StringTinyType
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
 
-  final class DataSetDescription private (val value: String) extends AnyVal with StringTinyType
-  implicit object DataSetDescription
-      extends TinyTypeFactory[DataSetDescription](new DataSetDescription(_))
-      with NonBlank
+  final class Description private (val value: String) extends AnyVal with StringTinyType
+  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
 
-  final class DataSetCreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object DataSetCreatedDate
-      extends TinyTypeFactory[DataSetCreatedDate](new DataSetCreatedDate(_))
-      with InstantNotInTheFuture
+  final class CreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture
 
-  final class DataSetPublishedDate private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object DataSetPublishedDate
-      extends TinyTypeFactory[DataSetPublishedDate](new DataSetPublishedDate(_))
-      with InstantNotInTheFuture
+  final class PublishedDate private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object PublishedDate extends TinyTypeFactory[PublishedDate](new PublishedDate(_)) with InstantNotInTheFuture
 }
