@@ -58,7 +58,7 @@ class IODataSetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?identifier ?name ?description ?creationDate ?creatorEmail ?creatorName ?publishedDate
+       |SELECT ?identifier ?name ?description ?creationDate ?agentEmail ?agentName ?publishedDate
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
@@ -66,10 +66,10 @@ class IODataSetsFinder(
        |           rdfs:label ?identifier ;
        |           schema:name ?name ;
        |           schema:dateCreated ?creationDate ;
-       |           schema:creator ?creatorResource .
-       |  ?creatorResource rdf:type <http://schema.org/Person> ;
-       |           schema:email ?creatorEmail ;
-       |           schema:name ?creatorName .
+       |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
+       |  ?agentResource rdf:type <http://schema.org/Person> ;
+       |           schema:email ?agentEmail ;
+       |           schema:name ?agentName .
        |  OPTIONAL { ?dataSet schema:description ?description } .         
        |  OPTIONAL { ?dataSet schema:datePublished ?publishedDate } .         
        |}""".stripMargin
@@ -100,15 +100,15 @@ object IODataSetsFinder {
         name               <- cursor.downField("name").downField("value").as[Name]
         maybeDescription   <- cursor.downField("description").downField("value").as[Option[Description]]
         creationDate       <- cursor.downField("creationDate").downField("value").as[CreatedDate]
-        creatorEmail       <- cursor.downField("creatorEmail").downField("value").as[Email]
-        creatorName        <- cursor.downField("creatorName").downField("value").as[UserName]
+        agentEmail         <- cursor.downField("agentEmail").downField("value").as[Email]
+        agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
       } yield
         DataSet(
           id,
           name,
           maybeDescription,
-          DataSetCreation(creationDate, DataSetCreator(creatorEmail, creatorName)),
+          DataSetCreation(creationDate, DataSetAgent(agentEmail, agentName)),
           maybePublishedDate.map(DataSetPublishing.apply)
         )
     }

@@ -80,7 +80,7 @@ class QuerySchemaSpec
             identifier
             name
             description
-            created { dateCreated creator { email name } }
+            created { dateCreated agent { email name } }
             published { datePublished }
           }
         }"""
@@ -177,9 +177,9 @@ class QuerySchemaSpec
         "description": ${dataSet.maybeDescription.map(_.value).map(Json.fromString).getOrElse(Json.Null)},
         "created": {
           "dateCreated": ${dataSet.created.date.value},
-          "creator": {
-            "email": ${dataSet.created.creator.email.value},
-            "name": ${dataSet.created.creator.name.value}
+          "agent": {
+            "email": ${dataSet.created.agent.email.value},
+            "name": ${dataSet.created.agent.name.value}
           }
         },
         "published": ${dataSet.maybePublished.map { published => json"""{

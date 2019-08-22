@@ -39,12 +39,13 @@ import sangria.macros._
 
 class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
-  private val project  = projects.generateOne.copy(path = ProjectPath("namespace/project"))
-  private val commitId = commitIds.generateOne
+  private val project          = projects.generateOne.copy(path = ProjectPath("namespace/project"))
+  private val dataSet1CommitId = commitIds.generateOne
   private val dataSet1 = dataSets.generateOne.copy(
     maybeDescription = Some(dataSetDescriptions.generateOne),
     maybePublished   = Some(dataSetPublishingInfos.generateOne)
   )
+  private val dataSet2CommitId = commitIds.generateOne
   private val dataSet2 = dataSets.generateOne.copy(
     maybeDescription = None,
     maybePublished   = None
@@ -57,29 +58,29 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       Given("some data in the RDF Store")
       val triples = singleFileAndCommitWithDataset(
         project.path,
-        commitId,
-        model.currentSchemaVersion,
+        dataSet1CommitId,
+        dataSet1.created.agent.email,
+        dataSet1.created.agent.name,
         dataSet1.id,
         dataSet1.name,
         dataSet1.maybeDescription,
         dataSet1.created.date,
-        dataSet1.created.creator.email,
-        dataSet1.created.creator.name,
-        dataSet1.maybePublished.map(_.date)
+        dataSet1.maybePublished.map(_.date),
+        model.currentSchemaVersion
       ) &+ singleFileAndCommitWithDataset(
         project.path,
-        commitId,
-        model.currentSchemaVersion,
+        dataSet2CommitId,
+        dataSet2.created.agent.email,
+        dataSet2.created.agent.name,
         dataSet2.id,
         dataSet2.name,
         dataSet2.maybeDescription,
         dataSet2.created.date,
-        dataSet2.created.creator.email,
-        dataSet2.created.creator.name,
-        dataSet2.maybePublished.map(_.date)
+        dataSet2.maybePublished.map(_.date),
+        model.currentSchemaVersion
       )
 
-      `data in the RDF store`(project, commitId, triples)
+      `data in the RDF store`(project, dataSet1CommitId, triples)
 
       When("user posts a graphql query to fetch data-sets")
       val response = knowledgeGraphClient POST query
@@ -117,7 +118,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         identifier
         name
         description
-        created { dateCreated creator { email name } }
+        created { dateCreated agent { email name } }
         published { datePublished }
       }
     }"""
@@ -128,7 +129,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         identifier
         name
         description
-        created { dateCreated creator { email name } }
+        created { dateCreated agent { email name } }
         published { datePublished }
       }
     }"""
@@ -141,9 +142,9 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       "description": ${dataSet.maybeDescription.map(_.value).map(Json.fromString).getOrElse(Json.Null)},
       "created": {
         "dateCreated": ${dataSet.created.date.value},
-        "creator": {
-          "email": ${dataSet.created.creator.email.value},
-          "name": ${dataSet.created.creator.name.value}
+        "agent": {
+          "email": ${dataSet.created.agent.email.value},
+          "name": ${dataSet.created.agent.name.value}
         }
       },
       "published": ${dataSet.maybePublished.map { published => json"""{

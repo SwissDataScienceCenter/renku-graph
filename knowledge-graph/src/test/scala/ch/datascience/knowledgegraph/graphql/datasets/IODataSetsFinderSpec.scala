@@ -47,22 +47,22 @@ class IODataSetsFinderSpec
                                            dataSetName = dataSetNames.generateOne),
             singleFileAndCommitWithDataset(
               projectPath,
+              committerEmail            = dataSet1.created.agent.email,
+              committerName             = dataSet1.created.agent.name,
               dataSetId                 = dataSet1.id,
               dataSetName               = dataSet1.name,
               maybeDataSetDescription   = dataSet1.maybeDescription,
               dataSetCreatedDate        = dataSet1.created.date,
-              dataSetCreatorEmail       = dataSet1.created.creator.email,
-              dataSetCreatorName        = dataSet1.created.creator.name,
               maybeDataSetPublishedDate = dataSet1.maybePublished.map(_.date)
             ),
             singleFileAndCommitWithDataset(
               projectPath,
+              committerEmail            = dataSet2.created.agent.email,
+              committerName             = dataSet2.created.agent.name,
               dataSetId                 = dataSet2.id,
               dataSetName               = dataSet2.name,
               maybeDataSetDescription   = dataSet2.maybeDescription,
               dataSetCreatedDate        = dataSet2.created.date,
-              dataSetCreatorEmail       = dataSet2.created.creator.email,
-              dataSetCreatorName        = dataSet2.created.creator.name,
               maybeDataSetPublishedDate = dataSet2.maybePublished.map(_.date)
             )
           )

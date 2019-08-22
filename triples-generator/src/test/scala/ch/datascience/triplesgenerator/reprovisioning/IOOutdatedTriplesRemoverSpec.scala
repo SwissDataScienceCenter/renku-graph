@@ -72,8 +72,12 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
       val projectCommitOutdated = commitIdResources.generateOne
       val projectCommitUpToDate = commitIdResources.generateOne
       val triples = RDF(
-        singleFileAndCommitWithDataset(project, projectCommitOutdated.toCommitId, schemaVersions.generateOne),
-        singleFileAndCommitWithDataset(project, projectCommitUpToDate.toCommitId, schemaVersions.generateOne)
+        singleFileAndCommitWithDataset(project,
+                                       projectCommitOutdated.toCommitId,
+                                       schemaVersion = schemaVersions.generateOne),
+        singleFileAndCommitWithDataset(project,
+                                       projectCommitUpToDate.toCommitId,
+                                       schemaVersion = schemaVersions.generateOne)
       )
 
       loadToStore(triples)
@@ -98,7 +102,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
       val projectCommitOutdated = commitIdResources.generateOne
       val projectCommitUpToDate = commitIdResources.generateOne
       val triples = RDF(
-        singleFileAndCommitWithDataset(project, projectCommitOutdated.toCommitId, outdatedSchemaVersion)
+        singleFileAndCommitWithDataset(project, projectCommitOutdated.toCommitId, schemaVersion = outdatedSchemaVersion)
       )
 
       loadToStore(triples)
@@ -125,8 +129,12 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
       val project2               = projectPaths.generateOne
       val project2OutdatedCommit = commitIdResources.generateOne
       val triples = RDF(
-        singleFileAndCommitWithDataset(project1, project1OutdatedCommit.toCommitId, outdatedSchemaVersion),
-        singleFileAndCommitWithDataset(project2, project2OutdatedCommit.toCommitId, outdatedSchemaVersion)
+        singleFileAndCommitWithDataset(project1,
+                                       project1OutdatedCommit.toCommitId,
+                                       schemaVersion = outdatedSchemaVersion),
+        singleFileAndCommitWithDataset(project2,
+                                       project2OutdatedCommit.toCommitId,
+                                       schemaVersion = outdatedSchemaVersion)
       )
 
       loadToStore(triples)

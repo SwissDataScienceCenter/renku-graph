@@ -43,14 +43,14 @@ object modelSchema {
     description = "DataSetCreation",
     fields = fields[Unit, DataSetCreation](
       Field("dateCreated", StringType, Some("DataSet creation date"), resolve = _.value.date.toString),
-      Field("creator", dataSetCreatorType, Some("DataSet creator"), resolve   = _.value.creator)
+      Field("agent", dataSetCreatorType, Some("DataSet creator"), resolve     = _.value.agent)
     )
   )
 
-  private lazy val dataSetCreatorType: ObjectType[Unit, DataSetCreator] = ObjectType[Unit, DataSetCreator](
+  private lazy val dataSetCreatorType: ObjectType[Unit, DataSetAgent] = ObjectType[Unit, DataSetAgent](
     name        = "dataSetCreator",
     description = "DataSetCreator",
-    fields = fields[Unit, DataSetCreator](
+    fields = fields[Unit, DataSetAgent](
       Field("email", StringType, Some("DataSet creator email"), resolve = _.value.email.toString),
       Field("name", StringType, Some("DataSet creator name"), resolve   = _.value.name.toString)
     )

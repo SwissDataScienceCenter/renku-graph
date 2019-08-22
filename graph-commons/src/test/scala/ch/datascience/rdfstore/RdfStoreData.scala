@@ -86,14 +86,14 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
   def singleFileAndCommitWithDataset(
       projectPath:               ProjectPath,
       commitId:                  CommitId = commitIds.generateOne,
-      schemaVersion:             SchemaVersion = schemaVersions.generateOne,
+      committerEmail:            Email = emails.generateOne,
+      committerName:             UserName = names.generateOne,
       dataSetId:                 Identifier = dataSetIds.generateOne,
       dataSetName:               Name = dataSetNames.generateOne,
       maybeDataSetDescription:   Option[Description] = Gen.option(dataSetDescriptions).generateOne,
       dataSetCreatedDate:        CreatedDate = dataSetCreatedDates.generateOne,
-      dataSetCreatorEmail:       Email = emails.generateOne,
-      dataSetCreatorName:        UserName = names.generateOne,
-      maybeDataSetPublishedDate: Option[PublishedDate] = Gen.option(dataSetPublishedDates).generateOne): NodeBuffer =
+      maybeDataSetPublishedDate: Option[PublishedDate] = Gen.option(dataSetPublishedDates).generateOne,
+      schemaVersion:             SchemaVersion = schemaVersions.generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
@@ -106,16 +106,17 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets"}/>
       <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets/$dataSetId"}/>
       <prov:agent rdf:resource={agentNodeResource(schemaVersion)}/>
+      <prov:agent rdf:resource={personNodeResource(committerName)}/>
       <prov:wasInformedBy rdf:resource="file:///commit/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b"/>
       <rdfs:label>{commitId.toString}</rdfs:label>
       <rdfs:comment>{s"renku dataset add $dataSetName https://raw.githubusercontent.com/SwissDataScienceCenter/renku-python/master/README.rst"}</rdfs:comment>
       <prov:startedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-31T09:19:57+00:00</prov:startedAtTime>
       <prov:endedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-31T09:19:57+00:00</prov:endedAtTime>
-    </rdf:Description>
+    </rdf:Description> &+
+    personNode(committerName, Some(committerEmail)) &+
     <rdf:Description rdf:about={s"file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/$dataSetName/README.rst"}>
       <rdf:type rdf:resource="http://schema.org/DigitalDocument"/>
       <prov:atLocation>{s"data/$dataSetName/README.rst"}</prov:atLocation>
-      <schema:creator rdf:resource={s"mailto:$dataSetCreatorEmail"}/>
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
       <rdfs:label>{s"data/$dataSetName/README.rst@4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b"}</rdfs:label>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
@@ -170,14 +171,14 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
       <schema:name>{dataSetName.toString}</schema:name>
       <schema:dateCreated>{dataSetCreatedDate.toString}</schema:dateCreated>
-      <schema:creator rdf:resource={s"mailto:$dataSetCreatorEmail"}/>
+      <schema:creator rdf:resource={personNodeResource(names.generateOne)}/>
       {maybeDataSetPublishedDate.map { publishedDate =>
         <schema:datePublished rdf:datatype="http://schema.org/Date">{publishedDate.toString}</schema:datePublished>
       }.getOrElse(NodeSeq.Empty)}
       {maybeDataSetDescription.map { description =>
         <schema:description>{description.toString}</schema:description>
       }.getOrElse(NodeSeq.Empty)}
-    </rdf:Description>
+    </rdf:Description> 
     <rdf:Description rdf:about={s"file:///blob/$commitId/.gitattributes"}>
       <rdfs:label>{s".gitattributes@$commitId"}</rdfs:label>
       <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/.gitattributes"}/>
@@ -185,11 +186,6 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
       <prov:atLocation>.gitattributes</prov:atLocation>
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-    </rdf:Description>
-    <rdf:Description rdf:about={s"mailto:$dataSetCreatorEmail"}>
-      <rdf:type rdf:resource="http://schema.org/Person"/>
-      <schema:email>{dataSetCreatorEmail.toString}</schema:email>
-      <schema:name>{dataSetCreatorName.toString}</schema:name>
     </rdf:Description>
     <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets"}>
       <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
@@ -481,4 +477,16 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
 
   private def agentNodeResource(schemaVersion: SchemaVersion) =
     s"https://github.com/swissdatasciencecenter/renku-python/tree/v$schemaVersion"
+
+  private def personNode(name: UserName, maybeEmail: Option[Email]) =
+    <rdf:Description rdf:about={personNodeResource(name)}>
+      <rdf:type rdf:resource="http://schema.org/Person"/>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Person"/>
+      <schema:name>{name.toString}</schema:name>
+      {maybeEmail.map { email =>
+      <schema:email>{email.toString}</schema:email>
+      }.getOrElse(NodeSeq.Empty)}
+    </rdf:Description>
+
+  private def personNodeResource(name: UserName) = s"file:///_${name.value.replace(" ", "-")}"
 }

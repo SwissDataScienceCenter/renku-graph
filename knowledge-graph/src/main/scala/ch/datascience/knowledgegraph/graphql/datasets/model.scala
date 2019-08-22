@@ -29,8 +29,8 @@ object model {
                            created:          DataSetCreation,
                            maybePublished:   Option[DataSetPublishing])
 
-  final case class DataSetCreation(date: CreatedDate, creator: DataSetCreator)
-  final case class DataSetCreator(email: Email, name:          UserName)
+  final case class DataSetCreation(date: CreatedDate, agent: DataSetAgent)
+  final case class DataSetAgent(email:   Email, name:        UserName)
 
   final case class DataSetPublishing(date: PublishedDate)
 }

@@ -105,7 +105,7 @@ Query example:
       description
       created! {
         dateCreated! 
-        creator { 
+        agent { 
           email!
           name!
         }
@@ -129,7 +129,7 @@ Response body example:
         "description": "Data-set long description",
         "created" : {
           "dateCreated": "1981-09-05T10:38:29.457Z",
-          "creator": {
+          "agent": {
             "email": "user1@host",
             "name": "user 1"
           }
@@ -144,7 +144,7 @@ Response body example:
         "description": null,
         "created" : {
           "dateCreated": "1991-09-05T10:38:29.457Z",
-          "creator": {
+          "agent": {
             "email": "user2@host",
             "name": "user 2"
           }
@@ -157,7 +157,7 @@ Response body example:
         "description": null,
         "created" : {
           "dateCreated": "2001-09-05T10:38:29.457Z",
-          "creator": {
+          "agent": {
             "email": "user3@host",
             "name": "user 3"
           }

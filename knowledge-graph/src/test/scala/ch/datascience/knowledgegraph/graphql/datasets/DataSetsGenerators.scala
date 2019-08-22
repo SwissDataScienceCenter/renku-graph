@@ -33,15 +33,15 @@ object DataSetsGenerators {
     maybePublished   <- Gen.option(dataSetPublishingInfos)
   } yield DataSet(id, name, maybeDescription, created, maybePublished)
 
-  private implicit lazy val dataSetCreators: Gen[DataSetCreator] = for {
+  private implicit lazy val dataSetAgents: Gen[DataSetAgent] = for {
     email <- emails
     name  <- names
-  } yield DataSetCreator(email, name)
+  } yield DataSetAgent(email, name)
 
   private implicit lazy val dataSetCreations: Gen[DataSetCreation] = for {
     createdDate <- dataSetCreatedDates
-    creator     <- dataSetCreators
-  } yield DataSetCreation(createdDate, creator)
+    agent       <- dataSetAgents
+  } yield DataSetCreation(createdDate, agent)
 
   implicit lazy val dataSetPublishingInfos: Gen[DataSetPublishing] = for {
     publishedDate <- dataSetPublishedDates
