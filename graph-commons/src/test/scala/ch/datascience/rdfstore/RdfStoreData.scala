@@ -83,14 +83,16 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       </rdf:Description>
   // format: on
 
-  def singleFileAndCommitWithDataset(projectPath:         ProjectPath,
-                                     commitId:            CommitId = commitIds.generateOne,
-                                     schemaVersion:       SchemaVersion = schemaVersions.generateOne,
-                                     dataSetId:           DataSetId = dataSetIds.generateOne,
-                                     dataSetName:         DataSetName = dataSetNames.generateOne,
+  def singleFileAndCommitWithDataset(projectPath:   ProjectPath,
+                                     commitId:      CommitId = commitIds.generateOne,
+                                     schemaVersion: SchemaVersion = schemaVersions.generateOne,
+                                     dataSetId:     DataSetId = dataSetIds.generateOne,
+                                     dataSetName:   DataSetName = dataSetNames.generateOne,
+                                     maybeDataSetDescription: Option[DataSetDescription] =
+                                       Gen.option(dataSetDescriptions).generateOne,
                                      dataSetCreatedDate:  DataSetCreatedDate = dataSetCreatedDates.generateOne,
-                                     dataSetCreatorEmail: Email = emails.generateOne,
-                                     dataSetCreatorName:  Name = names.generateOne,
+                                     dataSetCreatorEmail: Email              = emails.generateOne,
+                                     dataSetCreatorName:  Name               = names.generateOne,
                                      maybeDataSetPublishedDate: Option[DataSetPublishedDate] =
                                        Gen.option(dataSetPublishedDates).generateOne): NodeBuffer =
     // format: off
@@ -172,6 +174,9 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <schema:creator rdf:resource={s"mailto:$dataSetCreatorEmail"}/>
       {maybeDataSetPublishedDate.map { publishedDate =>
         <schema:datePublished rdf:datatype="http://schema.org/Date">{publishedDate.toString}</schema:datePublished>
+      }.getOrElse(NodeSeq.Empty)}
+      {maybeDataSetDescription.map { description =>
+        <schema:description>{description.toString}</schema:description>
       }.getOrElse(NodeSeq.Empty)}
     </rdf:Description>
     <rdf:Description rdf:about={s"file:///blob/$commitId/.gitattributes"}>

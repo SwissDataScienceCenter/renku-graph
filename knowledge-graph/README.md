@@ -102,6 +102,7 @@ Query example:
     dataSets(projectPath: \"namespace/project\") {
       identifier!
       name!
+      description
       created! {
         dateCreated! 
         creator { 
@@ -125,39 +126,43 @@ Response body example:
       {
         "identifier" : "e1fc7b62-e021-434b-9264-dda336bddd4f",
         "name" : "x",
+        "description": "Data-set long description",
         "created" : {
           "dateCreated": "1981-09-05T10:38:29.457Z",
           "creator": {
             "email": "user1@host",
             "name": "user 1"
           }
-        }
-        "published" {
+        },
+        "published": {
           "datePublished": "2019-07-30"
         }
       },
       {
         "identifier" : "5b7a1394-93b5-4e75-932d-e041cf46349d",
         "name" : "xr",
+        "description": null,
         "created" : {
           "dateCreated": "1991-09-05T10:38:29.457Z",
           "creator": {
             "email": "user2@host",
             "name": "user 2"
           }
-        }
+        },
+        "published": null
       },
       {
         "identifier" : "b1aa58af-a488-4bae-97b4-d6d349f98412",
         "name" : "chOorWhraw",
+        "description": null,
         "created" : {
           "dateCreated": "2001-09-05T10:38:29.457Z",
           "creator": {
             "email": "user3@host",
             "name": "user 3"
           }
-        }
-        "published" {
+        },
+        "published": {
           "datePublished": "2009-07-30"
         }
       }

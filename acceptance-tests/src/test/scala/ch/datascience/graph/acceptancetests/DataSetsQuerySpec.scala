@@ -22,6 +22,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectPath
 import ch.datascience.knowledgegraph.graphql.datasets.DataSetsGenerators._
@@ -40,8 +41,14 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
 
   private val project  = projects.generateOne.copy(path = ProjectPath("namespace/project"))
   private val commitId = commitIds.generateOne
-  private val dataSet1 = dataSets.generateOne.copy(maybePublished = Some(dataSetPublishingInfos.generateOne))
-  private val dataSet2 = dataSets.generateOne.copy(maybePublished = Some(dataSetPublishingInfos.generateOne))
+  private val dataSet1 = dataSets.generateOne.copy(
+    maybeDescription = Some(dataSetDescriptions.generateOne),
+    maybePublished   = Some(dataSetPublishingInfos.generateOne)
+  )
+  private val dataSet2 = dataSets.generateOne.copy(
+    maybeDescription = None,
+    maybePublished   = None
+  )
 
   feature("GraphQL query to find project's data-sets") {
 
@@ -54,6 +61,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         model.currentSchemaVersion,
         dataSet1.id,
         dataSet1.name,
+        dataSet1.maybeDescription,
         dataSet1.created.date,
         dataSet1.created.creator.email,
         dataSet1.created.creator.name,
@@ -64,6 +72,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         model.currentSchemaVersion,
         dataSet2.id,
         dataSet2.name,
+        dataSet2.maybeDescription,
         dataSet2.created.date,
         dataSet2.created.creator.email,
         dataSet2.created.creator.name,
@@ -107,6 +116,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       dataSets(projectPath: "namespace/project") {
         identifier
         name
+        description
         created { dateCreated creator { email name } }
         published { datePublished }
       }
@@ -117,18 +127,18 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       dataSets(projectPath: $$projectPath) { 
         identifier
         name
+        description
         created { dateCreated creator { email name } }
         published { datePublished }
       }
     }"""
 
-  private def json(dataSet: DataSet) = {
-    val published = dataSet.maybePublished.getOrElse(throw new IllegalStateException("published expected"))
-
-    json"""
+  // format: off
+  private def json(dataSet: DataSet) = json"""
     {
       "identifier": ${dataSet.id.value}, 
       "name": ${dataSet.name.value},
+      "description": ${dataSet.maybeDescription.map(_.value).map(Json.fromString).getOrElse(Json.Null)},
       "created": {
         "dateCreated": ${dataSet.created.date.value},
         "creator": {
@@ -136,9 +146,9 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
           "name": ${dataSet.created.creator.name.value}
         }
       },
-      "published": {
+      "published": ${dataSet.maybePublished.map { published => json"""{
         "datePublished": ${published.date.value}
-      }
+      }"""}.getOrElse(Json.Null)}
     }"""
-  }
+  // format: on
 }

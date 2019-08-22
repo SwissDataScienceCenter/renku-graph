@@ -27,8 +27,12 @@ object modelSchema {
     name        = "dataSet",
     description = "DataSet",
     fields = fields[Unit, DataSet](
-      Field("identifier", StringType, Some("DataSet id"), resolve                            = _.value.id.toString),
-      Field("name", StringType, Some("DataSet name"), resolve                                = _.value.name.toString),
+      Field("identifier", StringType, Some("DataSet id"), resolve = _.value.id.toString),
+      Field("name", StringType, Some("DataSet name"), resolve     = _.value.name.toString),
+      Field("description",
+            OptionType(StringType),
+            Some("DataSet description"),
+            resolve                                                                          = _.value.maybeDescription.map(_.toString)),
       Field("created", createdType, Some("DataSet creation info"), resolve                   = _.value.created),
       Field("published", OptionType(publishedType), Some("DataSet publishing info"), resolve = _.value.maybePublished)
     )

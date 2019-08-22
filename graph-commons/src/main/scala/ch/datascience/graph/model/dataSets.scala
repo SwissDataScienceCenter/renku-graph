@@ -38,6 +38,11 @@ object dataSets {
   final class DataSetName private (val value: String) extends AnyVal with StringTinyType
   implicit object DataSetName extends TinyTypeFactory[DataSetName](new DataSetName(_)) with NonBlank
 
+  final class DataSetDescription private (val value: String) extends AnyVal with StringTinyType
+  implicit object DataSetDescription
+      extends TinyTypeFactory[DataSetDescription](new DataSetDescription(_))
+      with NonBlank
+
   final class DataSetCreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DataSetCreatedDate
       extends TinyTypeFactory[DataSetCreatedDate](new DataSetCreatedDate(_))

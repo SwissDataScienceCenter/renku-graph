@@ -58,7 +58,7 @@ class IODataSetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?dataSetId ?dataSetName ?dataSetCreationDate ?dataSetCreatorEmail ?dataSetCreatorName ?maybeDataSetPublishedDate
+       |SELECT ?dataSetId ?dataSetName ?dataSetCreationDate ?dataSetCreatorEmail ?dataSetCreatorName ?maybeDataSetPublishedDate ?maybeDataSetDescription
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
@@ -70,9 +70,8 @@ class IODataSetsFinder(
        |  ?creatorResource rdf:type <http://schema.org/Person> ;
        |           schema:email ?dataSetCreatorEmail ;
        |           schema:name ?dataSetCreatorName .
-       |  OPTIONAL { 
-       |    ?dataSet schema:datePublished ?maybeDataSetPublishedDate
-       |  } .         
+       |  OPTIONAL { ?dataSet schema:description ?maybeDataSetDescription } .         
+       |  OPTIONAL { ?dataSet schema:datePublished ?maybeDataSetPublishedDate } .         
        |}""".stripMargin
 }
 
@@ -97,8 +96,12 @@ object IODataSetsFinder {
 
     implicit val dataSetDecoder: Decoder[DataSet] = { cursor =>
       for {
-        id           <- cursor.downField("dataSetId").downField("value").as[DataSetId]
-        name         <- cursor.downField("dataSetName").downField("value").as[DataSetName]
+        id   <- cursor.downField("dataSetId").downField("value").as[DataSetId]
+        name <- cursor.downField("dataSetName").downField("value").as[DataSetName]
+        maybeDescription <- cursor
+                             .downField("maybeDataSetDescription")
+                             .downField("value")
+                             .as[Option[DataSetDescription]]
         creationDate <- cursor.downField("dataSetCreationDate").downField("value").as[DataSetCreatedDate]
         creatorEmail <- cursor.downField("dataSetCreatorEmail").downField("value").as[Email]
         creatorName  <- cursor.downField("dataSetCreatorName").downField("value").as[Name]
@@ -110,6 +113,7 @@ object IODataSetsFinder {
         DataSet(
           id,
           name,
+          maybeDescription,
           DataSetCreation(creationDate, DataSetCreator(creatorEmail, creatorName)),
           maybePublishedDate.map(DataSetPublishing.apply)
         )

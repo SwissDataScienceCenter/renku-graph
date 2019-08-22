@@ -26,11 +26,12 @@ import org.scalacheck.Gen
 object DataSetsGenerators {
 
   implicit val dataSets: Gen[DataSet] = for {
-    id        <- dataSetIds
-    name      <- dataSetNames
-    created   <- dataSetCreations
-    published <- Gen.option(dataSetPublishingInfos)
-  } yield DataSet(id, name, created, published)
+    id               <- dataSetIds
+    name             <- dataSetNames
+    maybeDescription <- Gen.option(dataSetDescriptions)
+    created          <- dataSetCreations
+    maybePublished   <- Gen.option(dataSetPublishingInfos)
+  } yield DataSet(id, name, maybeDescription, created, maybePublished)
 
   private implicit lazy val dataSetCreators: Gen[DataSetCreator] = for {
     email <- emails

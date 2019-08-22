@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.knowledgegraph.graphql.datasets.DataSetsFinder
-import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetPublishing}
+import ch.datascience.knowledgegraph.graphql.datasets.model.DataSet
 import ch.datascience.knowledgegraph.graphql.lineage.LineageFinder
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
@@ -79,6 +79,7 @@ class QuerySchemaSpec
           dataSets(projectPath: "namespace/project") {
             identifier
             name
+            description
             created { dateCreated creator { email name } }
             published { datePublished }
           }
@@ -168,30 +169,23 @@ class QuerySchemaSpec
           }
         }"""
 
-    private def toJson(dataSet: DataSet): Json =
-      json"""
-        {
-          "identifier": ${dataSet.id.value},
-          "name": ${dataSet.name.value},
-          "created": {
-            "dateCreated": ${dataSet.created.date.value},
-            "creator": {
-              "email": ${dataSet.created.creator.email.value},
-              "name": ${dataSet.created.creator.name.value}
-            }
+    // format: off
+    private def toJson(dataSet: DataSet): Json =json"""
+      {
+        "identifier": ${dataSet.id.value},
+        "name": ${dataSet.name.value},
+        "description": ${dataSet.maybeDescription.map(_.value).map(Json.fromString).getOrElse(Json.Null)},
+        "created": {
+          "dateCreated": ${dataSet.created.date.value},
+          "creator": {
+            "email": ${dataSet.created.creator.email.value},
+            "name": ${dataSet.created.creator.name.value}
           }
-        }""" deepMerge toJson(dataSet.maybePublished)
-
-    private def toJson(maybePublished: Option[DataSetPublishing]): Json =
-      maybePublished.fold(
-        ifEmpty = json"""{"published": ${Json.Null}}"""
-      ) { published =>
-        json"""
-        {
-          "published": {
-            "datePublished": ${published.date.value}  
-          }
-        }"""
-      }
+        },
+        "published": ${dataSet.maybePublished.map { published => json"""{
+          "datePublished": ${published.date.value}
+        }"""}.getOrElse(Json.Null)}
+      }"""
+    // format: on
   }
 }
