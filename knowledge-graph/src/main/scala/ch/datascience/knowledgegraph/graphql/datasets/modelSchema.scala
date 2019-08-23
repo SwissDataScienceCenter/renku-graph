@@ -25,42 +25,61 @@ object modelSchema {
 
   val dataSetType: ObjectType[Unit, DataSet] = ObjectType[Unit, DataSet](
     name        = "dataSet",
-    description = "DataSet",
+    description = "Data-set info",
     fields = fields[Unit, DataSet](
-      Field("identifier", StringType, Some("DataSet id"), resolve = _.value.id.toString),
-      Field("name", StringType, Some("DataSet name"), resolve     = _.value.name.toString),
+      Field("identifier", StringType, Some("Data-set identifier"), resolve = _.value.id.toString),
+      Field("name", StringType, Some("Data-set name"), resolve             = _.value.name.toString),
       Field("description",
             OptionType(StringType),
-            Some("DataSet description"),
-            resolve                                                                          = _.value.maybeDescription.map(_.toString)),
-      Field("created", createdType, Some("DataSet creation info"), resolve                   = _.value.created),
-      Field("published", OptionType(publishedType), Some("DataSet publishing info"), resolve = _.value.maybePublished)
+            Some("Data-set description"),
+            resolve                                                               = _.value.maybeDescription.map(_.toString)),
+      Field("created", createdType, Some("Data-set creation info"), resolve       = _.value.created),
+      Field("published", publishedType, Some("Data-set publishing info"), resolve = _.value.published)
     )
   )
 
   private lazy val createdType: ObjectType[Unit, DataSetCreation] = ObjectType[Unit, DataSetCreation](
     name        = "dataSetCreation",
-    description = "DataSetCreation",
+    description = "Data-set creation info",
     fields = fields[Unit, DataSetCreation](
-      Field("dateCreated", StringType, Some("DataSet creation date"), resolve = _.value.date.toString),
-      Field("agent", dataSetCreatorType, Some("DataSet creator"), resolve     = _.value.agent)
+      Field("dateCreated", StringType, Some("Data-set creation date"), resolve                     = _.value.date.toString),
+      Field("agent", dataSetAgentType, Some("A person who created the data-set in Renku"), resolve = _.value.agent)
     )
   )
 
-  private lazy val dataSetCreatorType: ObjectType[Unit, DataSetAgent] = ObjectType[Unit, DataSetAgent](
-    name        = "dataSetCreator",
-    description = "DataSetCreator",
+  private lazy val dataSetAgentType: ObjectType[Unit, DataSetAgent] = ObjectType[Unit, DataSetAgent](
+    name        = "dataSetAgent",
+    description = "A person who created the data-set in Renku",
     fields = fields[Unit, DataSetAgent](
-      Field("email", StringType, Some("DataSet creator email"), resolve = _.value.email.toString),
-      Field("name", StringType, Some("DataSet creator name"), resolve   = _.value.name.toString)
+      Field("email", StringType, Some("DataSet agent email"), resolve = _.value.email.toString),
+      Field("name", StringType, Some("DataSet agent name"), resolve   = _.value.name.toString)
     )
   )
 
   private lazy val publishedType: ObjectType[Unit, DataSetPublishing] = ObjectType[Unit, DataSetPublishing](
     name        = "dataSetPublishing",
-    description = "DataSetPublishing",
+    description = "Data-set publishing info",
     fields = fields[Unit, DataSetPublishing](
-      Field("datePublished", StringType, Some("DataSet publishing date"), resolve = _.value.date.toString)
+      Field("datePublished",
+            OptionType(StringType),
+            Some("Data-set publishing date"),
+            resolve = _.value.maybeDate.map(_.toString)),
+      Field("creator",
+            ListType(dataSetCreatorType),
+            Some("A list of data-set creators"),
+            resolve = _.value.creators.toList)
+    )
+  )
+
+  private lazy val dataSetCreatorType: ObjectType[Unit, DataSetCreator] = ObjectType[Unit, DataSetCreator](
+    name        = "dataSetCreator",
+    description = "An author of imported data-set or data-set creator if originating in Renku",
+    fields = fields[Unit, DataSetCreator](
+      Field("email",
+            OptionType(StringType),
+            Some("DataSet creator email"),
+            resolve                                                   = _.value.maybeEmail.map(_.toString)),
+      Field("name", StringType, Some("DataSet creator name"), resolve = _.value.name.toString)
     )
   )
 }

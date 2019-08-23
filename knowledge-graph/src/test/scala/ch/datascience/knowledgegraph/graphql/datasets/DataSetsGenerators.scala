@@ -18,9 +18,12 @@
 
 package ch.datascience.knowledgegraph.graphql.datasets
 
+import cats.Order
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.knowledgegraph.graphql.datasets.model._
+import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
 object DataSetsGenerators {
@@ -30,8 +33,8 @@ object DataSetsGenerators {
     name             <- dataSetNames
     maybeDescription <- Gen.option(dataSetDescriptions)
     created          <- dataSetCreations
-    maybePublished   <- Gen.option(dataSetPublishingInfos)
-  } yield DataSet(id, name, maybeDescription, created, maybePublished)
+    published        <- dataSetPublishingInfos
+  } yield DataSet(id, name, maybeDescription, created, published)
 
   private implicit lazy val dataSetAgents: Gen[DataSetAgent] = for {
     email <- emails
@@ -43,7 +46,16 @@ object DataSetsGenerators {
     agent       <- dataSetAgents
   } yield DataSetCreation(createdDate, agent)
 
+  private implicit lazy val dataSetCreators: Gen[DataSetCreator] = for {
+    maybeEmail <- Gen.option(emails)
+    name       <- names
+  } yield DataSetCreator(maybeEmail, name)
+
   implicit lazy val dataSetPublishingInfos: Gen[DataSetPublishing] = for {
-    publishedDate <- dataSetPublishedDates
-  } yield DataSetPublishing(publishedDate)
+    maybePublishedDate <- Gen.option(dataSetPublishedDates)
+    creators           <- nonEmptySet(dataSetCreators, maxElements = 4)
+  } yield DataSetPublishing(maybePublishedDate, creators.toSortedSet)
+
+  private implicit lazy val dataSetCreatorsOrdering: Order[DataSetCreator] =
+    (creator1: DataSetCreator, creator2: DataSetCreator) => creator1.name.value compareTo creator2.name.value
 }

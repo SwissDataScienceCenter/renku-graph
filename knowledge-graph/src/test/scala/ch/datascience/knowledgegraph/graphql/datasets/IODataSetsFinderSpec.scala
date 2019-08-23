@@ -53,7 +53,8 @@ class IODataSetsFinderSpec
               dataSetName               = dataSet1.name,
               maybeDataSetDescription   = dataSet1.maybeDescription,
               dataSetCreatedDate        = dataSet1.created.date,
-              maybeDataSetPublishedDate = dataSet1.maybePublished.map(_.date)
+              maybeDataSetPublishedDate = dataSet1.published.maybeDate,
+              maybeDataSetCreators      = dataSet1.published.creators.map(creator => (creator.maybeEmail, creator.name))
             ),
             singleFileAndCommitWithDataset(
               projectPath,
@@ -63,7 +64,8 @@ class IODataSetsFinderSpec
               dataSetName               = dataSet2.name,
               maybeDataSetDescription   = dataSet2.maybeDescription,
               dataSetCreatedDate        = dataSet2.created.date,
-              maybeDataSetPublishedDate = dataSet2.maybePublished.map(_.date)
+              maybeDataSetPublishedDate = dataSet2.published.maybeDate,
+              maybeDataSetCreators      = dataSet2.published.creators.map(creator => (creator.maybeEmail, creator.name))
             )
           )
         )

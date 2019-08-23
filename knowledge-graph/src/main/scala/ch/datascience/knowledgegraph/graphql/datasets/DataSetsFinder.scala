@@ -49,6 +49,7 @@ class IODataSetsFinder(
 
   override def findDataSets(projectPath: ProjectPath): IO[List[DataSet]] =
     queryExpecting[List[DataSet]](using = query(projectPath))
+      .map(combineCreatorRecords)
 
   private def query(projectPath: ProjectPath): String =
     s"""
@@ -58,7 +59,7 @@ class IODataSetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?identifier ?name ?description ?creationDate ?agentEmail ?agentName ?publishedDate
+       |SELECT ?identifier ?name ?description ?creationDate ?agentEmail ?agentName ?publishedDate ?creatorEmail ?creatorName
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
@@ -66,13 +67,44 @@ class IODataSetsFinder(
        |           rdfs:label ?identifier ;
        |           schema:name ?name ;
        |           schema:dateCreated ?creationDate ;
-       |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
+       |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource ;
+       |           schema:creator ?creatorResource .
        |  ?agentResource rdf:type <http://schema.org/Person> ;
        |           schema:email ?agentEmail ;
        |           schema:name ?agentName .
        |  OPTIONAL { ?dataSet schema:description ?description } .         
        |  OPTIONAL { ?dataSet schema:datePublished ?publishedDate } .         
+       |  OPTIONAL { ?creatorResource rdf:type <http://schema.org/Person> ;
+       |                      schema:email ?creatorEmail . } .         
+       |  ?creatorResource rdf:type <http://schema.org/Person> ;
+       |                      schema:name ?creatorName .         
        |}""".stripMargin
+
+  private def combineCreatorRecords(raw: List[DataSet]): List[DataSet] = {
+    val baseAndCreators = raw.foldLeft(List.empty[(DataSet, Set[DataSetCreator])]) { (combined, nextRecord) =>
+      val nextBase = nextRecord.copy(
+        published = nextRecord.published.copy(
+          maybeDate = nextRecord.published.maybeDate,
+          creators  = Set.empty
+        )
+      )
+      val nextCreators = nextRecord.published.creators
+
+      combined.headOption match {
+        case Some((lastBase, lastCreators)) if lastBase == nextBase =>
+          (lastBase, lastCreators ++ nextCreators) +: combined.tail
+        case _ =>
+          (nextBase, nextCreators) +: combined
+      }
+    }
+
+    baseAndCreators.reverse.map {
+      case (base, creators) =>
+        base.copy(
+          published = base.published.copy(creators = creators)
+        )
+    }
+  }
 }
 
 object IODataSetsFinder {
@@ -103,13 +135,15 @@ object IODataSetsFinder {
         agentEmail         <- cursor.downField("agentEmail").downField("value").as[Email]
         agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
+        maybeCreatorEmail  <- cursor.downField("creatorEmail").downField("value").as[Option[Email]]
+        creatorName        <- cursor.downField("creatorName").downField("value").as[UserName]
       } yield
         DataSet(
           id,
           name,
           maybeDescription,
           DataSetCreation(creationDate, DataSetAgent(agentEmail, agentName)),
-          maybePublishedDate.map(DataSetPublishing.apply)
+          DataSetPublishing(maybePublishedDate, Set(DataSetCreator(maybeCreatorEmail, creatorName)))
         )
     }
 

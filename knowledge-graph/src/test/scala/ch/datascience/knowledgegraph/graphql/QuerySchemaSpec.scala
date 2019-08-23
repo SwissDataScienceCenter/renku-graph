@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.knowledgegraph.graphql.datasets.DataSetsFinder
-import ch.datascience.knowledgegraph.graphql.datasets.model.DataSet
+import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreator}
 import ch.datascience.knowledgegraph.graphql.lineage.LineageFinder
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
@@ -81,7 +81,7 @@ class QuerySchemaSpec
             name
             description
             created { dateCreated agent { email name } }
-            published { datePublished }
+            published { datePublished creator { email name } }
           }
         }"""
 
@@ -182,10 +182,18 @@ class QuerySchemaSpec
             "name": ${dataSet.created.agent.name.value}
           }
         },
-        "published": ${dataSet.maybePublished.map { published => json"""{
-          "datePublished": ${published.date.value}
-        }"""}.getOrElse(Json.Null)}
+        "published": {
+          "datePublished": ${dataSet.published.maybeDate.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
+          "creator": ${dataSet.published.creators.map(_.toJson).toList}
+        }
       }"""
     // format: on
+
+    private implicit class CreatorOps(creator: DataSetCreator) {
+      lazy val toJson: Json = json"""{
+          "email": ${creator.maybeEmail.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
+          "name": ${creator.name.value}
+        }"""
+    }
   }
 }

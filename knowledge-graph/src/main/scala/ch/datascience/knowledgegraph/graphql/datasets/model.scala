@@ -27,10 +27,11 @@ object model {
                            name:             Name,
                            maybeDescription: Option[Description],
                            created:          DataSetCreation,
-                           maybePublished:   Option[DataSetPublishing])
+                           published:        DataSetPublishing)
 
   final case class DataSetCreation(date: CreatedDate, agent: DataSetAgent)
   final case class DataSetAgent(email:   Email, name:        UserName)
 
-  final case class DataSetPublishing(date: PublishedDate)
+  final case class DataSetPublishing(maybeDate: Option[PublishedDate], creators: Set[DataSetCreator])
+  final case class DataSetCreator(maybeEmail:   Option[Email], name:             UserName)
 }

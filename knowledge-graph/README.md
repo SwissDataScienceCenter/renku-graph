@@ -112,6 +112,10 @@ Query example:
       }
       published {
         datePublished
+        creator {
+          name!
+          email
+        }
       }
     } 
   }"
@@ -124,10 +128,10 @@ Response body example:
   "data": {
     "dataSets": [
       {
-        "identifier" : "e1fc7b62-e021-434b-9264-dda336bddd4f",
-        "name" : "x",
+        "identifier": "e1fc7b62-e021-434b-9264-dda336bddd4f",
+        "name": "x",
         "description": "Data-set long description",
-        "created" : {
+        "created": {
           "dateCreated": "1981-09-05T10:38:29.457Z",
           "agent": {
             "email": "user1@host",
@@ -135,27 +139,34 @@ Response body example:
           }
         },
         "published": {
-          "datePublished": "2019-07-30"
+          "datePublished": "2019-07-30",
+          "creator": []
         }
       },
       {
-        "identifier" : "5b7a1394-93b5-4e75-932d-e041cf46349d",
-        "name" : "xr",
+        "identifier": "5b7a1394-93b5-4e75-932d-e041cf46349d",
+        "name": "xr",
         "description": null,
-        "created" : {
+        "created": {
           "dateCreated": "1991-09-05T10:38:29.457Z",
           "agent": {
             "email": "user2@host",
             "name": "user 2"
           }
         },
-        "published": null
+        "published": {
+          "datePublished": null,
+          "creator": [{
+            "name": "author1 name",
+            "email": null
+          }]
+        }
       },
       {
-        "identifier" : "b1aa58af-a488-4bae-97b4-d6d349f98412",
-        "name" : "chOorWhraw",
+        "identifier": "b1aa58af-a488-4bae-97b4-d6d349f98412",
+        "name": "chOorWhraw",
         "description": null,
-        "created" : {
+        "created": {
           "dateCreated": "2001-09-05T10:38:29.457Z",
           "agent": {
             "email": "user3@host",
@@ -163,7 +174,14 @@ Response body example:
           }
         },
         "published": {
-          "datePublished": "2009-07-30"
+          "datePublished": "2001-09-05T10:38:29.457Z",
+          "creator": [{
+            "name": "author1 name",
+            "email": "author1@mail.org"
+          }, {
+            "name": "author2 name",
+            "email": "author2@mail.org"
+          }]
         }
       }
     ]

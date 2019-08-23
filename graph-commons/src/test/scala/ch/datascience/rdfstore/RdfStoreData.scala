@@ -21,6 +21,7 @@ package ch.datascience.rdfstore
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.dataSets._
@@ -93,6 +94,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       maybeDataSetDescription:   Option[Description] = Gen.option(dataSetDescriptions).generateOne,
       dataSetCreatedDate:        CreatedDate = dataSetCreatedDates.generateOne,
       maybeDataSetPublishedDate: Option[PublishedDate] = Gen.option(dataSetPublishedDates).generateOne,
+      maybeDataSetCreators:      Set[(Option[Email], UserName)] = setOf(dataSetCreators).generateOne,
       schemaVersion:             SchemaVersion = schemaVersions.generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
@@ -171,14 +173,19 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
       <schema:name>{dataSetName.toString}</schema:name>
       <schema:dateCreated>{dataSetCreatedDate.toString}</schema:dateCreated>
-      <schema:creator rdf:resource={personNodeResource(names.generateOne)}/>
+      {maybeDataSetCreators.map { creator =>
+        <schema:creator rdf:resource={personNodeResource(creator._2)}/>
+      }}
       {maybeDataSetPublishedDate.map { publishedDate =>
         <schema:datePublished rdf:datatype="http://schema.org/Date">{publishedDate.toString}</schema:datePublished>
       }.getOrElse(NodeSeq.Empty)}
       {maybeDataSetDescription.map { description =>
         <schema:description>{description.toString}</schema:description>
       }.getOrElse(NodeSeq.Empty)}
-    </rdf:Description> 
+    </rdf:Description> ++
+    {maybeDataSetCreators.map { creator =>
+      personNode(creator._2, creator._1)
+    }} ++
     <rdf:Description rdf:about={s"file:///blob/$commitId/.gitattributes"}>
       <rdfs:label>{s".gitattributes@$commitId"}</rdfs:label>
       <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/.gitattributes"}/>
@@ -201,6 +208,11 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
     </rdf:Description>
     // format: on
+
+  private val dataSetCreators: Gen[(Option[Email], UserName)] = for {
+    maybeEmail <- Gen.option(emails)
+    name       <- names
+  } yield (maybeEmail, name)
 
   def multiFileAndCommit(
       projectPath:   ProjectPath,
