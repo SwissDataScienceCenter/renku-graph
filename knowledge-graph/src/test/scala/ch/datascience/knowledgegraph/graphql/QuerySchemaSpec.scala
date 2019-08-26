@@ -82,7 +82,7 @@ class QuerySchemaSpec
             description
             created { dateCreated agent { email name } }
             published { datePublished creator { email name } }
-            hasPart { name atLocation }    
+            hasPart { name atLocation }
           }
         }"""
 

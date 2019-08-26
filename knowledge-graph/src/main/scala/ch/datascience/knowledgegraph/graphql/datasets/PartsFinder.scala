@@ -51,7 +51,7 @@ private class PartsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?partName ?partLocation 
+       |SELECT ?partName ?partLocation
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)

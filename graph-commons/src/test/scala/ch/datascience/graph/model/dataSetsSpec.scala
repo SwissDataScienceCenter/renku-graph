@@ -16,17 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.datasets
+package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.relativePaths
-import ch.datascience.graph.model.dataSets.PartLocation
-import ch.datascience.tinytypes.constraints.RelativePath
+import ch.datascience.graph.model.dataSets.{Identifier, PartLocation}
+import ch.datascience.tinytypes.constraints.{RelativePath, UUID}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PartLocationSpec extends WordSpec with ScalaCheckPropertyChecks {
+class dataSetsSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "Identifier" should {
+    "be a UUID" in {
+      Identifier shouldBe a[UUID]
+    }
+  }
 
   "PartLocation" should {
 

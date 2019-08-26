@@ -19,21 +19,14 @@
 package ch.datascience.graph.model
 
 import java.time.Instant
-import java.util.UUID
 
-import cats.data.Validated
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank, RelativePath}
+import ch.datascience.tinytypes.constraints._
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
 object dataSets {
 
   final class Identifier private (val value: String) extends AnyVal with StringTinyType
-  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) {
-    addConstraint(
-      check   = value => Validated.catchOnly[IllegalArgumentException](UUID.fromString(value)).isValid,
-      message = (value: String) => s"Cannot instantiate $typeName with '$value'"
-    )
-  }
+  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with UUID
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank

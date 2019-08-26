@@ -16,35 +16,39 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model
+package ch.datascience.tinytypes.constraints
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.dataSets.Identifier
-import org.scalacheck.Gen._
+import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import org.scalacheck.Gen.uuid
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IdentifierSpec extends WordSpec with ScalaCheckPropertyChecks {
+class UUIDSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  "from" should {
+  "UUID" should {
 
-    "return Identifier for valid uuid" in {
+    "be a NonBlank" in {
+      new UUID {} shouldBe a[NonBlank]
+    }
+
+    "be instantiatable when values are valid UUIDs" in {
       forAll(uuid) { expected =>
-        val Right(Identifier(actual)) = Identifier.from(expected.toString)
+        val Right(UUIDString(actual)) = UUIDString.from(expected.toString)
         actual shouldBe expected.toString
       }
     }
 
-    "fail for invalid value" in {
-
-      val invalidUuid = nonEmptyStrings().generateOne
-
-      val Left(exception) = Identifier.from(invalidUuid)
-
-      exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"Cannot instantiate ${Identifier.typeName} with '$invalidUuid'"
+    "fail instantiation for non-UUID values" in {
+      forAll(nonEmptyStrings()) { value =>
+        intercept[IllegalArgumentException] {
+          UUIDString(value)
+        }.getMessage shouldBe s"'$value' is not a valid UUID value for ch.datascience.tinytypes.constraints.UUIDString"
+      }
     }
   }
 }
+
+private class UUIDString private (val value: String) extends AnyVal with StringTinyType
+private object UUIDString extends TinyTypeFactory[UUIDString](new UUIDString(_)) with UUID
