@@ -19,12 +19,14 @@
 package ch.datascience.knowledgegraph.graphql.datasets
 
 import DataSetsGenerators._
+import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.knowledgegraph.graphql.datasets.model.DataSetPart
+import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.RdfStoreData._
-import ch.datascience.rdfstore.{InMemoryRdfStore, RdfStoreData}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -54,7 +56,8 @@ class IODataSetsFinderSpec
               maybeDataSetDescription   = dataSet1.maybeDescription,
               dataSetCreatedDate        = dataSet1.created.date,
               maybeDataSetPublishedDate = dataSet1.published.maybeDate,
-              maybeDataSetCreators      = dataSet1.published.creators.map(creator => (creator.maybeEmail, creator.name))
+              maybeDataSetCreators      = dataSet1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
+              maybeDataSetParts         = dataSet1.part.map(part => (part.name, part.atLocation))
             ),
             singleFileAndCommitWithDataset(
               projectPath,
@@ -65,14 +68,18 @@ class IODataSetsFinderSpec
               maybeDataSetDescription   = dataSet2.maybeDescription,
               dataSetCreatedDate        = dataSet2.created.date,
               maybeDataSetPublishedDate = dataSet2.published.maybeDate,
-              maybeDataSetCreators      = dataSet2.published.creators.map(creator => (creator.maybeEmail, creator.name))
+              maybeDataSetCreators      = dataSet2.published.creators.map(creator => (creator.maybeEmail, creator.name)),
+              maybeDataSetParts         = dataSet2.part.map(part => (part.name, part.atLocation))
             )
           )
         )
 
         val foundDataSets = dataSetsFinder.findDataSets(projectPath).unsafeRunSync()
 
-        foundDataSets should contain theSameElementsAs List(dataSet1, dataSet2)
+        foundDataSets should contain theSameElementsAs List(
+          dataSet1.copy(part = dataSet1.part.sorted),
+          dataSet2.copy(part = dataSet2.part.sorted)
+        )
       }
     }
 
@@ -84,6 +91,14 @@ class IODataSetsFinderSpec
   }
 
   private trait InMemoryStoreTestCase {
-    val dataSetsFinder = new IODataSetsFinder(rdfStoreConfig, RdfStoreData.renkuBaseUrl, TestLogger())
+    private val logger = TestLogger[IO]()
+    val dataSetsFinder = new IODataSetsFinder(
+      new BaseInfosFinder(rdfStoreConfig, renkuBaseUrl, logger),
+      new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger),
+      new PartsFinder(rdfStoreConfig, renkuBaseUrl, logger)
+    )
   }
+
+  private implicit lazy val alphabeticalOrdering: Ordering[DataSetPart] =
+    (part1: DataSetPart, part2: DataSetPart) => part1.name.value compareTo part2.name.value
 }

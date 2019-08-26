@@ -22,13 +22,13 @@ import cats.effect.IO
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.knowledgegraph.graphql.datasets.DataSetsFinder
-import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreator}
+import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreator, DataSetPart}
 import ch.datascience.knowledgegraph.graphql.lineage.LineageFinder
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.graphql.lineage.model._
-import io.circe.Json
 import io.circe.literal._
+import io.circe.{Encoder, Json}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -82,6 +82,7 @@ class QuerySchemaSpec
             description
             created { dateCreated agent { email name } }
             published { datePublished creator { email name } }
+            hasPart { name atLocation }    
           }
         }"""
 
@@ -170,7 +171,7 @@ class QuerySchemaSpec
         }"""
 
     // format: off
-    private def toJson(dataSet: DataSet): Json =json"""
+    private def toJson(dataSet: DataSet): Json = json"""
       {
         "identifier": ${dataSet.id.value},
         "name": ${dataSet.name.value},
@@ -184,16 +185,24 @@ class QuerySchemaSpec
         },
         "published": {
           "datePublished": ${dataSet.published.maybeDate.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
-          "creator": ${dataSet.published.creators.map(_.toJson).toList}
-        }
+          "creator": ${dataSet.published.creators.toList}
+        },
+        "hasPart": ${dataSet.part}
       }"""
     // format: on
 
-    private implicit class CreatorOps(creator: DataSetCreator) {
-      lazy val toJson: Json = json"""{
-          "email": ${creator.maybeEmail.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
-          "name": ${creator.name.value}
-        }"""
+    private implicit lazy val creatorEncoder: Encoder[DataSetCreator] = Encoder.instance[DataSetCreator] { creator =>
+      json"""{
+        "email": ${creator.maybeEmail.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
+        "name": ${creator.name.value}
+      }"""
+    }
+
+    private implicit lazy val partEncoder: Encoder[DataSetPart] = Encoder.instance[DataSetPart] { part =>
+      json"""{
+        "name": ${part.name.value},
+        "atLocation": ${part.atLocation.value}
+      }"""
     }
   }
 }

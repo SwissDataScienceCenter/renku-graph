@@ -29,4 +29,9 @@ object GraphModelGenerators {
   implicit val dataSetDescriptions:   Gen[Description]   = nonEmptyStrings(maxLength = 1000) map Description.apply
   implicit val dataSetCreatedDates:   Gen[CreatedDate]   = timestampsNotInTheFuture map CreatedDate.apply
   implicit val dataSetPublishedDates: Gen[PublishedDate] = timestampsNotInTheFuture map PublishedDate.apply
+  implicit val dataSetPartNames:      Gen[PartName]      = nonEmptyStrings() map PartName.apply
+  implicit val dataSetPartLocations: Gen[PartLocation] =
+    relativePaths(minSegments = 2, maxSegments = 2)
+      .map(path => s"data/$path")
+      .map(PartLocation.apply)
 }

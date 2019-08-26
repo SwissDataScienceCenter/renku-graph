@@ -34,13 +34,13 @@ class RelativePathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "be instantiatable when values are not starting and ending with '/'" in {
       forAll(nonEmptyStrings()) { someValue =>
-        RelativePathString(someValue).toString shouldBe someValue.toString
+        RelativePathString(someValue).toString shouldBe someValue
       }
     }
 
     "be instantiatable when values are not starting and ending with '/' but have the '/' sign inside" in {
       forAll(relativePaths()) { someValue =>
-        RelativePathString(someValue).toString shouldBe someValue.toString
+        RelativePathString(someValue).toString shouldBe someValue
       }
     }
 

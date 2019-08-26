@@ -22,7 +22,7 @@ import java.time.Instant
 import java.util.UUID
 
 import cats.data.Validated
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
+import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank, RelativePath}
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
 object dataSets {
@@ -46,4 +46,15 @@ object dataSets {
 
   final class PublishedDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object PublishedDate extends TinyTypeFactory[PublishedDate](new PublishedDate(_)) with InstantNotInTheFuture
+
+  final class PartName private (val value: String) extends AnyVal with StringTinyType
+  implicit object PartName extends TinyTypeFactory[PartName](new PartName(_)) with NonBlank
+
+  final class PartLocation private (val value: String) extends AnyVal with StringTinyType
+  implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath {
+    addConstraint(
+      check   = value => value.startsWith("data/"),
+      message = value => s"'$value' does not point to 'data/' folder which is invalid for $typeName"
+    )
+  }
 }

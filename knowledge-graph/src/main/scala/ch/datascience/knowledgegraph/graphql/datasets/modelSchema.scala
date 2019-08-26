@@ -34,7 +34,8 @@ object modelSchema {
             Some("Data-set description"),
             resolve                                                               = _.value.maybeDescription.map(_.toString)),
       Field("created", createdType, Some("Data-set creation info"), resolve       = _.value.created),
-      Field("published", publishedType, Some("Data-set publishing info"), resolve = _.value.published)
+      Field("published", publishedType, Some("Data-set publishing info"), resolve = _.value.published),
+      Field("hasPart", ListType(partType), Some("Data-set files"), resolve        = _.value.part)
     )
   )
 
@@ -80,6 +81,15 @@ object modelSchema {
             Some("DataSet creator email"),
             resolve                                                   = _.value.maybeEmail.map(_.toString)),
       Field("name", StringType, Some("DataSet creator name"), resolve = _.value.name.toString)
+    )
+  )
+
+  private lazy val partType: ObjectType[Unit, DataSetPart] = ObjectType[Unit, DataSetPart](
+    name        = "dataSetPart",
+    description = "The data-sets files",
+    fields = fields[Unit, DataSetPart](
+      Field("name", StringType, Some("DataSet part name"), resolve           = _.value.name.toString),
+      Field("atLocation", StringType, Some("DataSet part location"), resolve = _.value.atLocation.toString)
     )
   )
 }

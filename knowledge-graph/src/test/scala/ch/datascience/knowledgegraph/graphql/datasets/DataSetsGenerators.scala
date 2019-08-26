@@ -34,7 +34,8 @@ object DataSetsGenerators {
     maybeDescription <- Gen.option(dataSetDescriptions)
     created          <- dataSetCreations
     published        <- dataSetPublishingInfos
-  } yield DataSet(id, name, maybeDescription, created, published)
+    part             <- listOf(dataSetPart)
+  } yield DataSet(id, name, maybeDescription, created, published, part)
 
   private implicit lazy val dataSetAgents: Gen[DataSetAgent] = for {
     email <- emails
@@ -58,4 +59,9 @@ object DataSetsGenerators {
 
   private implicit lazy val dataSetCreatorsOrdering: Order[DataSetCreator] =
     (creator1: DataSetCreator, creator2: DataSetCreator) => creator1.name.value compareTo creator2.name.value
+
+  private implicit lazy val dataSetPart: Gen[DataSetPart] = for {
+    name     <- dataSetPartNames
+    location <- dataSetPartLocations
+  } yield DataSetPart(name, location)
 }

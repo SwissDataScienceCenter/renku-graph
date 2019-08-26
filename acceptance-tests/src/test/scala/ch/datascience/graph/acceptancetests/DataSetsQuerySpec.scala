@@ -27,11 +27,11 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectPath
 import ch.datascience.knowledgegraph.graphql.datasets.DataSetsGenerators._
-import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreator}
+import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreator, DataSetPart}
 import ch.datascience.rdfstore.RdfStoreData._
 import flows.RdfStoreProvisioning._
-import io.circe.Json
 import io.circe.literal._
+import io.circe.{Encoder, Json}
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -68,6 +68,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         dataSet1.created.date,
         dataSet1.published.maybeDate,
         dataSet1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
+        dataSet1.part.map(part => (part.name, part.atLocation)),
         model.currentSchemaVersion
       ) &+ singleFileAndCommitWithDataset(
         project.path,
@@ -80,6 +81,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         dataSet2.created.date,
         dataSet2.published.maybeDate,
         dataSet2.published.creators.map(creator => (creator.maybeEmail, creator.name)),
+        dataSet2.part.map(part => (part.name, part.atLocation)),
         model.currentSchemaVersion
       )
 
@@ -94,7 +96,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       val Right(responseJson) = response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]]
 
       val actual   = responseJson flatMap sortCreators
-      val expected = List(json(dataSet1), json(dataSet2)) flatMap sortCreators
+      val expected = List(json(dataSet1), json(dataSet2)) flatMap sortCreators flatMap sortPartsAlphabetically
       actual should contain theSameElementsAs expected
     }
 
@@ -114,7 +116,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       val Right(responseJson) = response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]]
 
       val actual   = responseJson flatMap sortCreators
-      val expected = List(json(dataSet1), json(dataSet2)) flatMap sortCreators
+      val expected = List(json(dataSet1), json(dataSet2)) flatMap sortCreators flatMap sortPartsAlphabetically
       actual should contain theSameElementsAs expected
     }
   }
@@ -125,10 +127,22 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       case (json1, json2) =>
         (json1.hcursor.get[String]("name").toOption -> json2.hcursor.get[String]("name").toOption)
           .mapN(_ < _)
-          .getOrElse(true)
+          .getOrElse(false)
     }
 
     json.hcursor.downField("published").downField("creator").withFocus(_.mapArray(orderByName)).top
+  }
+
+  private def sortPartsAlphabetically(json: Json) = {
+
+    def orderByName(parts: Vector[Json]): Vector[Json] = parts.sortWith {
+      case (json1, json2) =>
+        (json1.hcursor.get[String]("name").toOption -> json2.hcursor.get[String]("name").toOption)
+          .mapN(_ < _)
+          .getOrElse(false)
+    }
+
+    json.hcursor.downField("hasPart").withFocus(_.mapArray(orderByName)).top
   }
 
   private val query: Document = graphql"""
@@ -139,6 +153,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         description
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
+        hasPart { name atLocation }
       }
     }"""
 
@@ -150,6 +165,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         description
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
+        hasPart { name atLocation }
       }
     }"""
 
@@ -168,15 +184,23 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       },
       "published": {
         "datePublished": ${dataSet.published.maybeDate.map(_.value).map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
-        "creator": ${dataSet.published.creators.map(_.toJson).toList}
-      }
+        "creator": ${dataSet.published.creators.toList}
+      },
+      "hasPart": ${dataSet.part}
     }"""
   // format: on
 
-  private implicit class CreatorOps(creator: DataSetCreator) {
-    lazy val toJson: Json = json"""{
+  private implicit lazy val creatorEncoder: Encoder[DataSetCreator] = Encoder.instance[DataSetCreator] { creator =>
+    json"""{
         "email": ${creator.maybeEmail.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
         "name": ${creator.name.value}
+      }"""
+  }
+
+  private implicit lazy val partEncoder: Encoder[DataSetPart] = Encoder.instance[DataSetPart] { part =>
+    json"""{
+        "name": ${part.name.value},
+        "atLocation": ${part.atLocation.value}
       }"""
   }
 }

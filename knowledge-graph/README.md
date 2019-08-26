@@ -117,6 +117,10 @@ Query example:
           email
         }
       }
+      hasPart {
+        name
+        atLocation
+      }    
     } 
   }"
 }
@@ -129,7 +133,7 @@ Response body example:
     "dataSets": [
       {
         "identifier": "e1fc7b62-e021-434b-9264-dda336bddd4f",
-        "name": "x",
+        "name": "data-set name",
         "description": "Data-set long description",
         "created": {
           "dateCreated": "1981-09-05T10:38:29.457Z",
@@ -141,7 +145,8 @@ Response body example:
         "published": {
           "datePublished": "2019-07-30",
           "creator": []
-        }
+        },
+        "hasPart": []
       },
       {
         "identifier": "5b7a1394-93b5-4e75-932d-e041cf46349d",
@@ -160,7 +165,11 @@ Response body example:
             "name": "author1 name",
             "email": null
           }]
-        }
+        },
+        "hasPart": [{
+          "name": "file1",
+          "atLocation"": "data/data-set-name/file1"  
+        }]
       },
       {
         "identifier": "b1aa58af-a488-4bae-97b4-d6d349f98412",
@@ -182,7 +191,14 @@ Response body example:
             "name": "author2 name",
             "email": "author2@mail.org"
           }]
-        }
+        },
+        "hasPart": [{
+          "name": "file1",  
+          "atLocation"": "data/chOorWhraw-name/file1"  
+        }, {
+          "name": "file2"  
+          "atLocation"": "data/chOorWhraw-name/file2"  
+        }]
       }
     ]
   }

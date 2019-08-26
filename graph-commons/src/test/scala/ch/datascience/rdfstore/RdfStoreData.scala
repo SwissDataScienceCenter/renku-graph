@@ -95,6 +95,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       dataSetCreatedDate:        CreatedDate = dataSetCreatedDates.generateOne,
       maybeDataSetPublishedDate: Option[PublishedDate] = Gen.option(dataSetPublishedDates).generateOne,
       maybeDataSetCreators:      Set[(Option[Email], UserName)] = setOf(dataSetCreators).generateOne,
+      maybeDataSetParts:         List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
       schemaVersion:             SchemaVersion = schemaVersions.generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
@@ -116,16 +117,6 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <prov:endedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-31T09:19:57+00:00</prov:endedAtTime>
     </rdf:Description> &+
     personNode(committerName, Some(committerEmail)) &+
-    <rdf:Description rdf:about={s"file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/$dataSetName/README.rst"}>
-      <rdf:type rdf:resource="http://schema.org/DigitalDocument"/>
-      <prov:atLocation>{s"data/$dataSetName/README.rst"}</prov:atLocation>
-      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-      <rdfs:label>{s"data/$dataSetName/README.rst@4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b"}</rdfs:label>
-      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-      <schema:url>https://raw.githubusercontent.com/SwissDataScienceCenter/renku-python/master/README.rst</schema:url>
-      <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-      <schema:dateCreated>2019-07-31 09:19:57.694772</schema:dateCreated>
-    </rdf:Description> &+
     agentNode(schemaVersion) &+
     <rdf:Description rdf:about={s"file:///blob/$commitId/.renku"}>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
@@ -166,7 +157,6 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <rdf:type rdf:resource="http://schema.org/Dataset"/>
       <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
       <prov:atLocation>{s"/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}</prov:atLocation>
-      <schema:hasPart rdf:resource={s"file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/$dataSetName/README.rst"}/>
       <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}/>
       <schema:identifier>{dataSetId.toString}</schema:identifier>
       <rdfs:label>{dataSetId.toString}</rdfs:label>
@@ -176,6 +166,9 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       {maybeDataSetCreators.map { creator =>
         <schema:creator rdf:resource={personNodeResource(creator._2)}/>
       }}
+      {maybeDataSetParts.map { case (_, location) =>
+        <schema:hasPart rdf:resource={partNodeResource(commitId, location)}/>
+      }}
       {maybeDataSetPublishedDate.map { publishedDate =>
         <schema:datePublished rdf:datatype="http://schema.org/Date">{publishedDate.toString}</schema:datePublished>
       }.getOrElse(NodeSeq.Empty)}
@@ -183,8 +176,11 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
         <schema:description>{description.toString}</schema:description>
       }.getOrElse(NodeSeq.Empty)}
     </rdf:Description> ++
-    {maybeDataSetCreators.map { creator =>
-      personNode(creator._2, creator._1)
+    {maybeDataSetCreators.map { case (maybeEmail, name) =>
+      personNode(name, maybeEmail)
+    }} ++
+    {maybeDataSetParts.map { case (name, location) =>
+      partNode(commitId, projectPath, name, location)
     }} ++
     <rdf:Description rdf:about={s"file:///blob/$commitId/.gitattributes"}>
       <rdfs:label>{s".gitattributes@$commitId"}</rdfs:label>
@@ -213,6 +209,11 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
     maybeEmail <- Gen.option(emails)
     name       <- names
   } yield (maybeEmail, name)
+
+  private val dataSetParts: Gen[(PartName, PartLocation)] = for {
+    name     <- dataSetPartNames
+    location <- dataSetPartLocations
+  } yield (name, location)
 
   def multiFileAndCommit(
       projectPath:   ProjectPath,
@@ -501,4 +502,19 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
     </rdf:Description>
 
   private def personNodeResource(name: UserName) = s"file:///_${name.value.replace(" ", "-")}"
+
+  private def partNode(commitId: CommitId, projectPath: ProjectPath, name: PartName, location: PartLocation) =
+    <rdf:Description rdf:about={partNodeResource(commitId, location)}>
+      <rdf:type rdf:resource="http://schema.org/DigitalDocument"/>
+      <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
+      <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
+      <prov:atLocation>{location.toString}</prov:atLocation>
+      <schema:name>{name.toString}</schema:name>
+      <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
+      <rdfs:label>{s"$location@$commitId"}</rdfs:label>
+      <schema:url>{s"https://raw.githubusercontent.com/SwissDataScienceCenter/renku-python/master/$name"}</schema:url>
+      <schema:dateCreated>2019-07-31 09:19:57.694772</schema:dateCreated>
+    </rdf:Description>
+
+  private def partNodeResource(commitId: CommitId, location: PartLocation) = s"file:///blob/$commitId/$location"
 }
