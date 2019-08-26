@@ -82,7 +82,7 @@ class QuerySchemaSpec
             description
             created { dateCreated agent { email name } }
             published { datePublished creator { email name } }
-            hasPart { name atLocation }
+            hasPart { name atLocation dateCreated }
           }
         }"""
 
@@ -201,7 +201,8 @@ class QuerySchemaSpec
     private implicit lazy val partEncoder: Encoder[DataSetPart] = Encoder.instance[DataSetPart] { part =>
       json"""{
         "name": ${part.name.value},
-        "atLocation": ${part.atLocation.value}
+        "atLocation": ${part.atLocation.value},
+        "dateCreated": ${part.dateCreated.value}
       }"""
     }
   }

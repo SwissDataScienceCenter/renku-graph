@@ -52,14 +52,14 @@ private class BaseInfosFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?identifier ?name ?description ?creationDate ?agentEmail ?agentName ?publishedDate
+       |SELECT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
        |  ?dataSet rdf:type <http://schema.org/Dataset> ;
        |           rdfs:label ?identifier ;
        |           schema:name ?name ;
-       |           schema:dateCreated ?creationDate ;
+       |           schema:dateCreated ?dateCreated ;
        |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
        |  ?agentResource rdf:type <http://schema.org/Person> ;
        |           schema:email ?agentEmail ;
@@ -81,7 +81,7 @@ private object BaseInfosFinder {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
         maybeDescription   <- cursor.downField("description").downField("value").as[Option[Description]]
-        creationDate       <- cursor.downField("creationDate").downField("value").as[CreatedDate]
+        dateCreated        <- cursor.downField("dateCreated").downField("value").as[DateCreated]
         agentEmail         <- cursor.downField("agentEmail").downField("value").as[Email]
         agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
@@ -90,7 +90,7 @@ private object BaseInfosFinder {
           id,
           name,
           maybeDescription,
-          DataSetCreation(creationDate, DataSetAgent(agentEmail, agentName)),
+          DataSetCreation(dateCreated, DataSetAgent(agentEmail, agentName)),
           DataSetPublishing(maybePublishedDate, Set.empty),
           part = List.empty
         )

@@ -68,7 +68,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         dataSet1.created.date,
         dataSet1.published.maybeDate,
         dataSet1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
-        dataSet1.part.map(part => (part.name, part.atLocation)),
+        dataSet1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
         model.currentSchemaVersion
       ) &+ singleFileAndCommitWithDataset(
         project.path,
@@ -81,7 +81,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         dataSet2.created.date,
         dataSet2.published.maybeDate,
         dataSet2.published.creators.map(creator => (creator.maybeEmail, creator.name)),
-        dataSet2.part.map(part => (part.name, part.atLocation)),
+        dataSet2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
         model.currentSchemaVersion
       )
 
@@ -153,7 +153,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         description
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
-        hasPart { name atLocation }
+        hasPart { name atLocation dateCreated }
       }
     }"""
 
@@ -165,7 +165,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         description
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
-        hasPart { name atLocation }
+        hasPart { name atLocation dateCreated }
       }
     }"""
 
@@ -200,7 +200,8 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
   private implicit lazy val partEncoder: Encoder[DataSetPart] = Encoder.instance[DataSetPart] { part =>
     json"""{
         "name": ${part.name.value},
-        "atLocation": ${part.atLocation.value}
+        "atLocation": ${part.atLocation.value},
+        "dateCreated": ${part.dateCreated.value}
       }"""
   }
 }

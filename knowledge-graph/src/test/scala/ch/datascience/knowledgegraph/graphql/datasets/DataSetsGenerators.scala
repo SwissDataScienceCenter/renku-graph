@@ -61,7 +61,8 @@ object DataSetsGenerators {
     (creator1: DataSetCreator, creator2: DataSetCreator) => creator1.name.value compareTo creator2.name.value
 
   private implicit lazy val dataSetPart: Gen[DataSetPart] = for {
-    name     <- dataSetPartNames
-    location <- dataSetPartLocations
-  } yield DataSetPart(name, location)
+    name        <- dataSetPartNames
+    location    <- dataSetPartLocations
+    dateCreated <- dataSetPartCreatedDates
+  } yield DataSetPart(name, location, dateCreated)
 }

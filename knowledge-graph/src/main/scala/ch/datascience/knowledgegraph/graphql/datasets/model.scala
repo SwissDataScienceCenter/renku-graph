@@ -30,11 +30,11 @@ object model {
                            published:        DataSetPublishing,
                            part:             List[DataSetPart])
 
-  final case class DataSetCreation(date: CreatedDate, agent: DataSetAgent)
+  final case class DataSetCreation(date: DateCreated, agent: DataSetAgent)
   final case class DataSetAgent(email:   Email, name:        UserName)
 
   final case class DataSetPublishing(maybeDate: Option[PublishedDate], creators: Set[DataSetCreator])
   final case class DataSetCreator(maybeEmail:   Option[Email], name:             UserName)
 
-  final case class DataSetPart(name: PartName, atLocation: PartLocation)
+  final case class DataSetPart(name: PartName, atLocation: PartLocation, dateCreated: PartDateCreated)
 }

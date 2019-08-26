@@ -51,7 +51,7 @@ private class PartsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?partName ?partLocation
+       |SELECT ?partName ?partLocation ?dateCreated
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
@@ -60,7 +60,8 @@ private class PartsFinder(
        |           schema:hasPart ?partResource .
        |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
        |                schema:name ?partName ;         
-       |                prov:atLocation ?partLocation .         
+       |                prov:atLocation ?partLocation ;         
+       |                schema:dateCreated ?dateCreated .         
        |}
        |ORDER BY ASC(?partName)
        |""".stripMargin
@@ -77,7 +78,8 @@ private object PartsFinder {
       for {
         partName     <- cursor.downField("partName").downField("value").as[PartName]
         partLocation <- cursor.downField("partLocation").downField("value").as[PartLocation]
-      } yield DataSetPart(partName, partLocation)
+        dateCreated  <- cursor.downField("dateCreated").downField("value").as[PartDateCreated]
+      } yield DataSetPart(partName, partLocation, dateCreated)
     }
 
     _.downField("results").downField("bindings").as(decodeList[DataSetPart])

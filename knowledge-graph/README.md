@@ -118,8 +118,9 @@ Query example:
         }
       }
       hasPart {
-        name
-        atLocation
+        name!
+        atLocation!
+        dateCreated!
       }    
     } 
   }"
@@ -168,7 +169,8 @@ Response body example:
         },
         "hasPart": [{
           "name": "file1",
-          "atLocation"": "data/data-set-name/file1"  
+          "atLocation"": "data/data-set-name/file1",
+          "dateCreated": "1991-09-05T10:38:29.457Z"
         }]
       },
       {
@@ -194,10 +196,12 @@ Response body example:
         },
         "hasPart": [{
           "name": "file1",  
-          "atLocation"": "data/chOorWhraw-name/file1"  
+          "atLocation"": "data/chOorWhraw-name/file1",
+          "dateCreated": "2001-09-05T10:38:29.457Z"
         }, {
           "name": "file2"  
-          "atLocation"": "data/chOorWhraw-name/file2"  
+          "atLocation"": "data/chOorWhraw-name/file2",
+          "dateCreated": "2001-09-05T10:48:29.457Z"
         }]
       }
     ]

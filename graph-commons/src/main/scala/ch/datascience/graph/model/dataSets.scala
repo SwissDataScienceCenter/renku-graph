@@ -34,8 +34,8 @@ object dataSets {
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
 
-  final class CreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture
+  final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
 
   final class PublishedDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object PublishedDate extends TinyTypeFactory[PublishedDate](new PublishedDate(_)) with InstantNotInTheFuture
@@ -50,4 +50,8 @@ object dataSets {
       message = value => s"'$value' does not point to 'data/' folder which is invalid for $typeName"
     )
   }
+  final class PartDateCreated private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object PartDateCreated
+      extends TinyTypeFactory[PartDateCreated](new PartDateCreated(_))
+      with InstantNotInTheFuture
 }
