@@ -97,6 +97,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       maybeDataSetPublishedDate: Option[PublishedDate] = Gen.option(dataSetPublishedDates).generateOne,
       maybeDataSetCreators:      Set[(Option[Email], UserName)] = setOf(dataSetCreators).generateOne,
       maybeDataSetParts:         List[(PartName, PartLocation, PartDateCreated)] = listOf(dataSetParts).generateOne,
+      maybeDataSetUrl:           Option[String] = Gen.option(dataSetUrl).generateOne,
       schemaVersion:             SchemaVersion = schemaVersions.generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
@@ -176,6 +177,9 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       {maybeDataSetDescription.map { description =>
         <schema:description>{description.toString}</schema:description>
       }.getOrElse(NodeSeq.Empty)}
+      {maybeDataSetUrl.map { url =>
+        <schema:url>{url.toString}</schema:url>
+      }.getOrElse(NodeSeq.Empty)}
     </rdf:Description> ++
     {maybeDataSetCreators.map { case (maybeEmail, name) =>
       personNode(name, maybeEmail)
@@ -216,6 +220,11 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
     location    <- dataSetPartLocations
     dateCreated <- dataSetPartCreatedDates
   } yield (name, location, dateCreated)
+
+  private val dataSetUrl: Gen[String] = for {
+    url  <- Gen.option(httpUrls)
+    uuid <- Gen.uuid.map(_.toString)
+  } yield s"$url/$uuid"
 
   def multiFileAndCommit(
       projectPath:   ProjectPath,

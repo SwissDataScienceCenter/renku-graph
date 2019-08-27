@@ -30,7 +30,7 @@ object model {
                            created:          DataSetCreation,
                            published:        DataSetPublishing,
                            part:             List[DataSetPart],
-                           project:          DataSetProject)
+                           project:          List[DataSetProject])
 
   final case class DataSetCreation(date: DateCreated, agent: DataSetAgent)
   final case class DataSetAgent(email:   Email, name:        UserName)

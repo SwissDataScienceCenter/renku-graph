@@ -37,20 +37,23 @@ trait DataSetsFinder[Interpretation[_]] {
 class IODataSetsFinder(
     baseInfosFinder:         BaseInfosFinder,
     creatorsFinder:          CreatorsFinder,
-    partsFinder:             PartsFinder
+    partsFinder:             PartsFinder,
+    projectsFinder:          ProjectsFinder
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends DataSetsFinder[IO] {
 
   import baseInfosFinder._
   import creatorsFinder._
   import partsFinder._
+  import projectsFinder._
 
   override def findDataSets(projectPath: ProjectPath): IO[List[DataSet]] =
     for {
       baseInfos    <- findBaseInfos(projectPath)
-      withCreators <- (baseInfos map addCreators(projectPath)).parSequence
-      withParts    <- (withCreators map addParts(projectPath)).parSequence
-    } yield withParts
+      withCreators <- (baseInfos map addCreators(projectPath)).sequence
+      withParts    <- (withCreators map addParts(projectPath)).sequence
+      withProjects <- (withParts map addProjects(projectPath)).sequence
+    } yield withProjects
 
   private def addCreators(projectPath: ProjectPath)(baseInfo: DataSet): IO[DataSet] =
     findCreators(projectPath, baseInfo.id).map { creators =>
@@ -60,6 +63,11 @@ class IODataSetsFinder(
   private def addParts(projectPath: ProjectPath)(baseInfo: DataSet): IO[DataSet] =
     findParts(projectPath, baseInfo.id).map { parts =>
       baseInfo.copy(part = parts)
+    }
+
+  private def addProjects(projectPath: ProjectPath)(baseInfo: DataSet): IO[DataSet] =
+    findProjects(projectPath, baseInfo.id).map { projects =>
+      baseInfo.copy(project = projects)
     }
 }
 
@@ -79,6 +87,7 @@ object IODataSetsFinder {
       new IODataSetsFinder(
         new BaseInfosFinder(config, renkuBaseUrl, logger),
         new CreatorsFinder(config, renkuBaseUrl, logger),
-        new PartsFinder(config, renkuBaseUrl, logger)
+        new PartsFinder(config, renkuBaseUrl, logger),
+        new ProjectsFinder(config, renkuBaseUrl, logger)
       )
 }

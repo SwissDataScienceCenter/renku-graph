@@ -32,11 +32,11 @@ object modelSchema {
       Field("description",
             OptionType(StringType),
             Some("Data-set description"),
-            resolve                                                               = _.value.maybeDescription.map(_.toString)),
-      Field("created", createdType, Some("Data-set creation info"), resolve       = _.value.created),
-      Field("published", publishedType, Some("Data-set publishing info"), resolve = _.value.published),
-      Field("hasPart", ListType(partType), Some("Data-set files"), resolve        = _.value.part),
-      Field("project", projectType, Some("Data-set project"), resolve             = _.value.project)
+            resolve                                                                                  = _.value.maybeDescription.map(_.toString)),
+      Field("created", createdType, Some("Data-set creation info"), resolve                          = _.value.created),
+      Field("published", publishedType, Some("Data-set publishing info"), resolve                    = _.value.published),
+      Field("hasPart", ListType(partType), Some("Data-set files"), resolve                           = _.value.part),
+      Field("isPartOf", ListType(projectType), Some("Projects where this data-set is used"), resolve = _.value.project)
     )
   )
 
@@ -97,9 +97,9 @@ object modelSchema {
 
   private lazy val projectType: ObjectType[Unit, DataSetProject] = ObjectType[Unit, DataSetProject](
     name        = "dataSetProject",
-    description = "A project where this data-set was created",
+    description = "A project where this data-set is used",
     fields = fields[Unit, DataSetProject](
-      Field("name", StringType, Some("DataSet agent name"), resolve = _.value.name.toString)
+      Field("name", StringType, Some("Project name"), resolve = _.value.name.toString)
     )
   )
 }

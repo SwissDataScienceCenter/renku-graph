@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.knowledgegraph.graphql.datasets.DataSetsFinder
-import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreator, DataSetPart}
+import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.knowledgegraph.graphql.lineage.LineageFinder
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
@@ -84,7 +84,7 @@ class QuerySchemaSpec
             created { dateCreated agent { email name } }
             published { datePublished creator { email name } }
             hasPart { name atLocation dateCreated }
-            project { name }
+            isPartOf { name }
           }
         }"""
 
@@ -190,9 +190,7 @@ class QuerySchemaSpec
           "creator": ${dataSet.published.creators.toList}
         },
         "hasPart": ${dataSet.part},
-        "project": {
-          "name": ${dataSet.project.name.value}
-        }
+        "isPartOf": ${dataSet.project}
       }"""
     // format: on
 
@@ -208,6 +206,12 @@ class QuerySchemaSpec
         "name": ${part.name.value},
         "atLocation": ${part.atLocation.value},
         "dateCreated": ${part.dateCreated.value}
+      }"""
+    }
+
+    private implicit lazy val projectEncoder: Encoder[DataSetProject] = Encoder.instance[DataSetProject] { project =>
+      json"""{
+        "name": ${project.name.value}
       }"""
     }
   }

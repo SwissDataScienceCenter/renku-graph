@@ -21,12 +21,14 @@ package ch.datascience.knowledgegraph.graphql.datasets
 import DataSetsGenerators._
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.httpUrls
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.graphql.datasets.model.DataSetPart
+import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSetPart, DataSetProject}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.RdfStoreData._
 import ch.datascience.stubbing.ExternalServiceStubbing
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -41,11 +43,18 @@ class IODataSetsFinderSpec
 
     "return all data-sets of the given project" in new InMemoryStoreTestCase {
       forAll(projectPaths, dataSets, dataSets) { (projectPath, dataSet1, dataSet2) =>
+        val otherProject = projectPaths.generateOne
+        val reusedDataSetUrl = (for {
+          url  <- httpUrls
+          uuid <- Gen.uuid
+        } yield s"$url/$uuid").generateOne
+
         loadToStore(
           RDF(
-            singleFileAndCommitWithDataset(projectPaths.generateOne,
-                                           dataSetId   = dataSetIds.generateOne,
-                                           dataSetName = dataSetNames.generateOne),
+            singleFileAndCommitWithDataset(otherProject,
+                                           dataSetId       = dataSetIds.generateOne,
+                                           dataSetName     = dataSetNames.generateOne,
+                                           maybeDataSetUrl = Some(reusedDataSetUrl)),
             singleFileAndCommitWithDataset(
               projectPath,
               committerEmail            = dataSet1.created.agent.email,
@@ -56,7 +65,8 @@ class IODataSetsFinderSpec
               dataSetCreatedDate        = dataSet1.created.date,
               maybeDataSetPublishedDate = dataSet1.published.maybeDate,
               maybeDataSetCreators      = dataSet1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
-              maybeDataSetParts         = dataSet1.part.map(part => (part.name, part.atLocation, part.dateCreated))
+              maybeDataSetParts         = dataSet1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+              maybeDataSetUrl           = Some(reusedDataSetUrl)
             ),
             singleFileAndCommitWithDataset(
               projectPath,
@@ -76,8 +86,9 @@ class IODataSetsFinderSpec
         val foundDataSets = dataSetsFinder.findDataSets(projectPath).unsafeRunSync()
 
         foundDataSets should contain theSameElementsAs List(
-          dataSet1.copy(part = dataSet1.part.sorted, project = dataSet1.project.copy(name = projectPath)),
-          dataSet2.copy(part = dataSet2.part.sorted, project = dataSet2.project.copy(name = projectPath))
+          dataSet1.copy(part    = dataSet1.part.sorted,
+                        project = List(DataSetProject(projectPath), DataSetProject(otherProject)).sorted),
+          dataSet2.copy(part    = dataSet2.part.sorted, project = List(DataSetProject(projectPath)).sorted)
         )
       }
     }
@@ -94,10 +105,14 @@ class IODataSetsFinderSpec
     val dataSetsFinder = new IODataSetsFinder(
       new BaseInfosFinder(rdfStoreConfig, renkuBaseUrl, logger),
       new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger),
-      new PartsFinder(rdfStoreConfig, renkuBaseUrl, logger)
+      new PartsFinder(rdfStoreConfig, renkuBaseUrl, logger),
+      new ProjectsFinder(rdfStoreConfig, renkuBaseUrl, logger)
     )
   }
 
-  private implicit lazy val alphabeticalOrdering: Ordering[DataSetPart] =
+  private implicit lazy val partsAlphabeticalOrdering: Ordering[DataSetPart] =
     (part1: DataSetPart, part2: DataSetPart) => part1.name.value compareTo part2.name.value
+
+  private implicit lazy val projectsAlphabeticalOrdering: Ordering[DataSetProject] =
+    (project1: DataSetProject, project2: DataSetProject) => project1.name.value compareTo project2.name.value
 }

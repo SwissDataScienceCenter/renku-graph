@@ -12,7 +12,7 @@ This is a microservice which provides API for the Graph DB.
 
 #### GET /ping
 
-Verifies service's health.
+Verifies service health.
 
 **Response**
 
@@ -122,7 +122,7 @@ Query example:
         atLocation!
         dateCreated!
       }
-      project {
+      isPartOf {
         name
       }
     } 
@@ -151,9 +151,9 @@ Response body example:
           "creator": []
         },
         "hasPart": [],
-        "project": {
+        "isPartOf": [{
           "name": "namespace/project"
-        }
+        }]
       },
       {
         "identifier": "5b7a1394-93b5-4e75-932d-e041cf46349d",
@@ -178,9 +178,9 @@ Response body example:
           "atLocation"": "data/data-set-name/file1",
           "dateCreated": "1991-09-05T10:38:29.457Z"
         }],
-        "project": {
+        "isPartOf": [{
           "name": "namespace/project"
-        }
+        }]
       },
       {
         "identifier": "b1aa58af-a488-4bae-97b4-d6d349f98412",
@@ -212,9 +212,11 @@ Response body example:
           "atLocation"": "data/chOorWhraw-name/file2",
           "dateCreated": "2001-09-05T10:48:29.457Z"
         }],
-        "project": {
-          "name": "namespace/project"
-        }
+        "isPartOf": [{
+          "name": "namespace/project1"
+        }, {
+          "name": "namespace/project2"
+        }]
       }
     ]
   }
