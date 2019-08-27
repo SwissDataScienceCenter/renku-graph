@@ -19,15 +19,10 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventsGenerators.projectPaths
+import ch.datascience.graph.model.GraphModelGenerators._
 import org.scalacheck.Gen
 
 private object ReProvisioningGenerators {
-
-  implicit val fullProjectPaths: Gen[FullProjectPath] = for {
-    url  <- httpUrls
-    path <- projectPaths
-  } yield FullProjectPath.from(s"$url/$path").fold(throw _, identity)
 
   implicit val commitIdResources: Gen[CommitIdResource] = for {
     sha <- shas

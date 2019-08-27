@@ -16,19 +16,52 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.graph.model
 
-import ReProvisioningGenerators._
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.httpUrls
-import ch.datascience.graph.model.events.EventsGenerators.projectPaths
-import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.tinytypes.constraints.NonBlank
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.{Success, Try}
+
+class ProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "ProjectPath" should {
+
+    "be a NonBlank" in {
+      ProjectPath shouldBe a[NonBlank]
+    }
+  }
+
+  "apply" should {
+
+    "successfully instantiate from values having two segments separated with a '/'" in {
+      forAll(relativePaths(minSegments = 2, maxSegments = 2)) { path =>
+        ProjectPath(path).value shouldBe path
+      }
+    }
+
+    "fail single segment values" in {
+      an[IllegalArgumentException] shouldBe thrownBy {
+        ProjectPath(nonEmptyStrings().generateOne).value
+      }
+    }
+
+    "fail for values with more than two segments" in {
+      forAll(relativePaths(minSegments = 3, maxSegments = 11)) { path =>
+        an[IllegalArgumentException] shouldBe thrownBy {
+          ProjectPath(path).value
+        }
+      }
+    }
+  }
+}
 
 class FullProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
@@ -60,14 +93,6 @@ class FullProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
       forAll(httpUrls, projectPaths) { (url, projectPath) =>
         FullProjectPath(s"$url/$projectPath").to[Try, ProjectPath] shouldBe Success(projectPath)
       }
-    }
-  }
-
-  "rdfResourceRenderer" should {
-
-    "wrap the value into <>" in {
-      val projectPath = fullProjectPaths.generateOne
-      projectPath.showAs[RdfResource] shouldBe s"<$projectPath>"
     }
   }
 }

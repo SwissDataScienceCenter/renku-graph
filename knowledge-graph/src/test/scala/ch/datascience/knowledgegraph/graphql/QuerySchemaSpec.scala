@@ -20,7 +20,8 @@ package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.knowledgegraph.graphql.datasets.DataSetsFinder
 import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreator, DataSetPart}
 import ch.datascience.knowledgegraph.graphql.lineage.LineageFinder
@@ -83,6 +84,7 @@ class QuerySchemaSpec
             created { dateCreated agent { email name } }
             published { datePublished creator { email name } }
             hasPart { name atLocation dateCreated }
+            project { name }
           }
         }"""
 
@@ -187,7 +189,10 @@ class QuerySchemaSpec
           "datePublished": ${dataSet.published.maybeDate.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
           "creator": ${dataSet.published.creators.toList}
         },
-        "hasPart": ${dataSet.part}
+        "hasPart": ${dataSet.part},
+        "project": {
+          "name": ${dataSet.project.name.value}
+        }
       }"""
     // format: on
 

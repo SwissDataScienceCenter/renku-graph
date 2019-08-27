@@ -21,8 +21,9 @@ package ch.datascience.triplesgenerator.reprovisioning
 import ReProvisioningGenerators._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.projects.FullProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.RdfStoreData._

@@ -16,22 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.common
+package ch.datascience.triplesgenerator.reprovisioning
 
-import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.graphql.Arguments._
-import eu.timepit.refined.auto._
-import sangria.schema._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
-import scala.language.higherKinds
+class RdfResourceSpec extends WordSpec {
 
-private[graphql] object QueryFields {
+  "fullProjectPathResourceRenderer" should {
 
-  val projectPathArgument = Argument(
-    name = "projectPath",
-    argumentType = ProjectPath.toScalarType(
-      description      = "Project's path in the GitLab.",
-      exceptionMessage = "ProjectPath value expected in format <namespace>/<project>"
-    )
-  )
+    "wrap the value into <>" in {
+      val projectPath = fullProjectPaths.generateOne
+      projectPath.showAs[RdfResource] shouldBe s"<$projectPath>"
+    }
+  }
 }

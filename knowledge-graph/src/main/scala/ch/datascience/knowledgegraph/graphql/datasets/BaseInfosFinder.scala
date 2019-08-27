@@ -18,16 +18,18 @@
 
 package ch.datascience.knowledgegraph.graphql.datasets
 
+import cats.implicits._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.dataSets._
-import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
+import io.circe.DecodingFailure
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -52,7 +54,7 @@ private class BaseInfosFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
+       |SELECT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate ?projectPath
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
@@ -60,7 +62,8 @@ private class BaseInfosFinder(
        |           rdfs:label ?identifier ;
        |           schema:name ?name ;
        |           schema:dateCreated ?dateCreated ;
-       |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
+       |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource ;
+       |           schema:isPartOf ?projectPath .
        |  ?agentResource rdf:type <http://schema.org/Person> ;
        |           schema:email ?agentEmail ;
        |           schema:name ?agentName .
@@ -75,6 +78,13 @@ private object BaseInfosFinder {
 
   private implicit val baseInfosDecoder: Decoder[List[DataSet]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import scala.util.Try
+
+    def toProjectName(projectPath: FullProjectPath) =
+      projectPath
+        .to[Try, ProjectPath]
+        .toEither
+        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
 
     implicit val dataSetDecoder: Decoder[DataSet] = { cursor =>
       for {
@@ -85,6 +95,7 @@ private object BaseInfosFinder {
         agentEmail         <- cursor.downField("agentEmail").downField("value").as[Email]
         agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
+        projectName        <- cursor.downField("projectPath").downField("value").as[FullProjectPath].flatMap(toProjectName)
       } yield
         DataSet(
           id,
@@ -92,7 +103,8 @@ private object BaseInfosFinder {
           maybeDescription,
           DataSetCreation(dateCreated, DataSetAgent(agentEmail, agentName)),
           DataSetPublishing(maybePublishedDate, Set.empty),
-          part = List.empty
+          part = List.empty,
+          DataSetProject(projectName)
         )
     }
 

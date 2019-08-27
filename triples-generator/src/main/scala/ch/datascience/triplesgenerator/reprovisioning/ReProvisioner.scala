@@ -25,7 +25,8 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogMarkAllNew}
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.RdfStoreConfig
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}

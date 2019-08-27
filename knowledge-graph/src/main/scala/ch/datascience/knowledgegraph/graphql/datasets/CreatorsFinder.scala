@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.graphql.datasets
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.dataSets._
-import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery

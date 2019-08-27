@@ -27,7 +27,8 @@ import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.dbeventlog.commands.{IOEventLogFetch, IOEventLogMarkAllNew}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import org.scalamock.scalatest.MockFactory

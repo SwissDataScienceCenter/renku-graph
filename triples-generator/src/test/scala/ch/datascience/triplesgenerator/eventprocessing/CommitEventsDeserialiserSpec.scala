@@ -23,8 +23,9 @@ import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.dbeventlog.EventBody
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import io.circe._
 import org.scalatest.Matchers._

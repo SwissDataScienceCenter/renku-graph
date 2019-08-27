@@ -23,6 +23,8 @@ import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.dbeventlog.EventBody
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}

@@ -21,7 +21,8 @@ package ch.datascience.knowledgegraph.graphql.lineage
 import cats.effect._
 import cats.implicits._
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
 import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.graphql.lineage.model._

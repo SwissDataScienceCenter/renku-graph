@@ -22,7 +22,6 @@ import DataSetsGenerators._
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.graphql.datasets.model.DataSetPart
 import ch.datascience.rdfstore.InMemoryRdfStore
@@ -77,8 +76,8 @@ class IODataSetsFinderSpec
         val foundDataSets = dataSetsFinder.findDataSets(projectPath).unsafeRunSync()
 
         foundDataSets should contain theSameElementsAs List(
-          dataSet1.copy(part = dataSet1.part.sorted),
-          dataSet2.copy(part = dataSet2.part.sorted)
+          dataSet1.copy(part = dataSet1.part.sorted, project = dataSet1.project.copy(name = projectPath)),
+          dataSet2.copy(part = dataSet2.part.sorted, project = dataSet2.project.copy(name = projectPath))
         )
       }
     }

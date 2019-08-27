@@ -22,6 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.gitlab.GitLab
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLabConfigProvider
 import ch.datascience.webhookservice.project.ProjectVisibility.Public
@@ -47,6 +48,7 @@ class IOProjectInfoFinder(
 
   import cats.effect._
   import ch.datascience.http.client.RestClientError.UnauthorizedException
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized

@@ -22,8 +22,9 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
-import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.EventsGenerators.projects
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.rdfstore.RdfStoreData
 import ch.datascience.rdfstore.RdfStoreData.MultiFileAndCommitTriples._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._

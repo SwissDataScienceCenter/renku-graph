@@ -20,6 +20,7 @@ package ch.datascience.graph.model.events
 
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 
@@ -39,7 +40,6 @@ object EventsGenerators {
     max <- choose(1001, 100000)
     id  <- choose(min, max)
   } yield ProjectId(id)
-  implicit val projectPaths: Gen[ProjectPath] = relativePaths(minSegments = 2, maxSegments = 2) map ProjectPath.apply
 
   implicit val projects: Gen[Project] = for {
     projectId <- projectIds

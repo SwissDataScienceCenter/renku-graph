@@ -26,7 +26,8 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus.{New, NonRecoverableFailure}
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.ProjectPath
 import doobie.implicits._
 import doobie.util.fragments.in
 

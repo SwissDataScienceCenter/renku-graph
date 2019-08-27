@@ -18,8 +18,9 @@
 
 package ch.datascience.graph.model.events
 
-import ch.datascience.tinytypes.constraints.{NonBlank, NonNegative}
-import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.tinytypes.constraints.NonNegative
+import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import io.circe.Decoder
 
 case class Project(
@@ -30,17 +31,4 @@ case class Project(
 class ProjectId private (val value: Int) extends AnyVal with IntTinyType
 object ProjectId extends TinyTypeFactory[ProjectId](new ProjectId(_)) with NonNegative {
   implicit lazy val projectIdDecoder: Decoder[ProjectId] = Decoder.decodeInt.map(ProjectId.apply)
-}
-
-class ProjectPath private (val value: String) extends AnyVal with StringTinyType
-object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with NonBlank {
-  addConstraint(
-    check = value =>
-      value.contains("/") &&
-        (value.indexOf("/") == value.lastIndexOf("/")) &&
-        !value.startsWith("/") &&
-        !value.endsWith("/"),
-    message = (value: String) => s"'$value' is not a valid $typeName"
-  )
-  implicit lazy val projectPathDecoder: Decoder[ProjectPath] = Decoder.decodeString.map(ProjectPath.apply)
 }

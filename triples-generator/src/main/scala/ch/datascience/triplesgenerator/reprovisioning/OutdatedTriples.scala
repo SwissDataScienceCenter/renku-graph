@@ -18,36 +18,14 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
-import ch.datascience.tinytypes.constraints.Url
-import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.FullProjectPath
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
 
 import scala.language.higherKinds
 
 private final case class OutdatedTriples(projectPath: FullProjectPath, commits: Set[CommitIdResource])
-
-class FullProjectPath private (val value: String) extends AnyVal with StringTinyType
-object FullProjectPath extends TinyTypeFactory[FullProjectPath](new FullProjectPath(_)) with Url {
-
-  def from(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath): FullProjectPath =
-    FullProjectPath((renkuBaseUrl / projectPath).value)
-
-  implicit lazy val projectPathDecoder: Decoder[FullProjectPath] = Decoder.decodeString.map(FullProjectPath.apply)
-
-  implicit lazy val projectPathConverter: FullProjectPath => Either[Exception, ProjectPath] = {
-    val projectPathExtractor = "^.*\\/(.*\\/.*)$".r
-
-    {
-      case FullProjectPath(projectPathExtractor(path)) => ProjectPath.from(path)
-      case illegalValue                                => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
-    }
-  }
-
-  implicit lazy val rdfResourceRenderer: Renderer[RdfResource, FullProjectPath] =
-    value => s"<$value>"
-}
 
 final class CommitIdResource private (val value: String) extends AnyVal with StringTinyType
 object CommitIdResource extends TinyTypeFactory[CommitIdResource](new CommitIdResource(_)) {
@@ -66,9 +44,4 @@ object CommitIdResource extends TinyTypeFactory[CommitIdResource](new CommitIdRe
     case CommitIdResource(factory.validationRegex(commitId)) => CommitId.from(commitId)
     case illegalValue                                        => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to CommitId"))
   }
-
-  implicit lazy val rdfResourceRenderer: Renderer[RdfResource, CommitIdResource] =
-    value => s"<$value>"
 }
-
-trait RdfResource

@@ -35,7 +35,8 @@ object DataSetsGenerators {
     created          <- dataSetCreations
     published        <- dataSetPublishingInfos
     part             <- listOf(dataSetPart)
-  } yield DataSet(id, name, maybeDescription, created, published, part)
+    project          <- dataSetProjects
+  } yield DataSet(id, name, maybeDescription, created, published, part, project)
 
   private implicit lazy val dataSetAgents: Gen[DataSetAgent] = for {
     email <- emails
@@ -65,4 +66,8 @@ object DataSetsGenerators {
     location    <- dataSetPartLocations
     dateCreated <- dataSetPartCreatedDates
   } yield DataSetPart(name, location, dateCreated)
+
+  implicit lazy val dataSetProjects: Gen[DataSetProject] = for {
+    name <- projectPaths
+  } yield DataSetProject(name)
 }

@@ -19,6 +19,7 @@
 package ch.datascience.knowledgegraph.graphql.datasets
 
 import ch.datascience.graph.model.dataSets._
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 
 object model {
@@ -28,7 +29,8 @@ object model {
                            maybeDescription: Option[Description],
                            created:          DataSetCreation,
                            published:        DataSetPublishing,
-                           part:             List[DataSetPart])
+                           part:             List[DataSetPart],
+                           project:          DataSetProject)
 
   final case class DataSetCreation(date: DateCreated, agent: DataSetAgent)
   final case class DataSetAgent(email:   Email, name:        UserName)
@@ -37,4 +39,6 @@ object model {
   final case class DataSetCreator(maybeEmail:   Option[Email], name:             UserName)
 
   final case class DataSetPart(name: PartName, atLocation: PartLocation, dateCreated: PartDateCreated)
+
+  final case class DataSetProject(name: ProjectPath)
 }

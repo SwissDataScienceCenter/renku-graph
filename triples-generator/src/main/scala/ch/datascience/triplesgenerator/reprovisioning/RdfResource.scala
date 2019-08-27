@@ -16,22 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.common
+package ch.datascience.triplesgenerator.reprovisioning
 
-import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.graphql.Arguments._
-import eu.timepit.refined.auto._
-import sangria.schema._
+import ch.datascience.graph.model.projects.FullProjectPath
+import ch.datascience.tinytypes.Renderer
 
-import scala.language.higherKinds
+trait RdfResource
 
-private[graphql] object QueryFields {
+object RdfResource {
 
-  val projectPathArgument = Argument(
-    name = "projectPath",
-    argumentType = ProjectPath.toScalarType(
-      description      = "Project's path in the GitLab.",
-      exceptionMessage = "ProjectPath value expected in format <namespace>/<project>"
-    )
-  )
+  implicit lazy val commitIdResourceRenderer: Renderer[RdfResource, CommitIdResource] =
+    value => s"<$value>"
+
+  implicit lazy val fullProjectPathResourceRenderer: Renderer[RdfResource, FullProjectPath] =
+    value => s"<$value>"
 }

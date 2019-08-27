@@ -121,7 +121,10 @@ Query example:
         name!
         atLocation!
         dateCreated!
-      }    
+      }
+      project {
+        name
+      }
     } 
   }"
 }
@@ -147,7 +150,10 @@ Response body example:
           "datePublished": "2019-07-30",
           "creator": []
         },
-        "hasPart": []
+        "hasPart": [],
+        "project": {
+          "name": "namespace/project"
+        }
       },
       {
         "identifier": "5b7a1394-93b5-4e75-932d-e041cf46349d",
@@ -171,7 +177,10 @@ Response body example:
           "name": "file1",
           "atLocation"": "data/data-set-name/file1",
           "dateCreated": "1991-09-05T10:38:29.457Z"
-        }]
+        }],
+        "project": {
+          "name": "namespace/project"
+        }
       },
       {
         "identifier": "b1aa58af-a488-4bae-97b4-d6d349f98412",
@@ -202,7 +211,10 @@ Response body example:
           "name": "file2"  
           "atLocation"": "data/chOorWhraw-name/file2",
           "dateCreated": "2001-09-05T10:48:29.457Z"
-        }]
+        }],
+        "project": {
+          "name": "namespace/project"
+        }
       }
     ]
   }

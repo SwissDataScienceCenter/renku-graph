@@ -25,7 +25,7 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.knowledgegraph.graphql.datasets.DataSetsGenerators._
 import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSet, DataSetCreator, DataSetPart}
 import ch.datascience.rdfstore.RdfStoreData._
@@ -44,12 +44,14 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
   private val dataSet1CommitId = commitIds.generateOne
   private val dataSet1 = dataSets.generateOne.copy(
     maybeDescription = Some(dataSetDescriptions.generateOne),
-    published        = dataSetPublishingInfos.generateOne.copy(maybeDate = Some(dataSetPublishedDates.generateOne))
+    published        = dataSetPublishingInfos.generateOne.copy(maybeDate = Some(dataSetPublishedDates.generateOne)),
+    project          = dataSetProjects.generateOne.copy(name = project.path)
   )
   private val dataSet2CommitId = commitIds.generateOne
   private val dataSet2 = dataSets.generateOne.copy(
     maybeDescription = None,
-    published        = dataSetPublishingInfos.generateOne.copy(maybeDate = None)
+    published        = dataSetPublishingInfos.generateOne.copy(maybeDate = None),
+    project          = dataSetProjects.generateOne.copy(name = project.path)
   )
 
   feature("GraphQL query to find project's data-sets") {
@@ -154,6 +156,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
         hasPart { name atLocation dateCreated }
+        project { name }
       }
     }"""
 
@@ -166,6 +169,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
         hasPart { name atLocation dateCreated }
+        project { name }
       }
     }"""
 
@@ -186,7 +190,10 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         "datePublished": ${dataSet.published.maybeDate.map(_.value).map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
         "creator": ${dataSet.published.creators.toList}
       },
-      "hasPart": ${dataSet.part}
+      "hasPart": ${dataSet.part},
+      "project": {
+        "name": ${dataSet.project.name.value}
+      }
     }"""
   // format: on
 
