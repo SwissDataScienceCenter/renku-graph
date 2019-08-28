@@ -16,16 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.knowledgegraph.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.RdfStoreConfig
 import io.chrisdavenport.log4cats.Logger
+import model._
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds

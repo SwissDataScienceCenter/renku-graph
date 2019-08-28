@@ -16,20 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.lineage
+package ch.datascience.knowledgegraph.lineage.graphql
 
 import cats.effect.IO
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.knowledgegraph.graphql.Arguments._
-import ch.datascience.knowledgegraph.graphql.{QueryContext, common}
-import ch.datascience.tinytypes.constraints.RelativePath
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.knowledgegraph.graphql.CommonQueryFields._
+import ch.datascience.knowledgegraph.graphql.QueryContext
+import ch.datascience.knowledgegraph.lineage.model.FilePath
 import eu.timepit.refined.auto._
 import sangria.schema._
 
 import scala.language.higherKinds
 
-private[graphql] object QueryFields {
+object QueryFields {
 
   import modelSchema._
 
@@ -39,24 +39,22 @@ private[graphql] object QueryFields {
         name        = "lineage",
         fieldType   = OptionType(lineageType),
         description = Some("Returns a lineage for a project with the given path"),
-        arguments   = List(common.QueryFields.projectPathArgument, commitIdArgument, filePathArgument),
+        arguments   = List(projectPathArgument, commitIdArgument, filePathArgument),
         resolve = context =>
           context.ctx.lineageFinder
-            .findLineage(context.args arg common.QueryFields.projectPathArgument,
+            .findLineage(context.args arg projectPathArgument,
                          context.args arg commitIdArgument,
                          context.args arg filePathArgument)
             .unsafeToFuture()
       )
     )
 
-  val commitIdArgument = Argument(
+  private val commitIdArgument = Argument(
     name         = "commitId",
     argumentType = CommitId.toScalarType(description = "Commit Id")
   )
 
-  final class FilePath private (val value: String) extends AnyVal with StringTinyType
-  object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath
-  val filePathArgument = Argument(
+  private val filePathArgument = Argument(
     name         = "filePath",
     argumentType = FilePath.toScalarType(description = "File path")
   )

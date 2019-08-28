@@ -16,22 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.lineage
+package ch.datascience.knowledgegraph.lineage
 
 import cats.effect._
 import cats.implicits._
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
-import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.knowledgegraph.graphql.lineage.model._
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import ch.datascience.tinytypes.{From, StringTinyType}
 import io.chrisdavenport.log4cats.Logger
+import model.Node.{SourceNode, TargetNode}
+import model._
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds

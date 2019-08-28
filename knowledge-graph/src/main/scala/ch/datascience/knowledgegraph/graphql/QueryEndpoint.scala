@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.effect._
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
+import ch.datascience.knowledgegraph.{datasets, lineage}
 import io.circe.Json
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
@@ -111,6 +112,6 @@ object IOQueryEndpoint {
               timer:                     Timer[IO]): IO[QueryEndpoint[IO]] =
     for {
       queryContext <- IOQueryContext()
-      querySchema = QuerySchema[IO](lineage.QueryFields(), datasets.QueryFields())
+      querySchema = QuerySchema[IO](lineage.graphql.QueryFields(), datasets.graphql.QueryFields())
     } yield new QueryEndpoint[IO](querySchema, new QueryRunner(querySchema, queryContext))
 }

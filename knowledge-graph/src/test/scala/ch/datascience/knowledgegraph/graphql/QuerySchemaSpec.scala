@@ -22,12 +22,12 @@ import cats.effect.IO
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.graphql.datasets.DataSetsFinder
-import ch.datascience.knowledgegraph.graphql.datasets.model._
-import ch.datascience.knowledgegraph.graphql.lineage.LineageFinder
-import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
-import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.knowledgegraph.graphql.lineage.model._
+import ch.datascience.knowledgegraph.datasets.DataSetsFinder
+import ch.datascience.knowledgegraph.datasets.model._
+import ch.datascience.knowledgegraph.lineage.LineageFinder
+import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
+import ch.datascience.knowledgegraph.lineage.model._
+import ch.datascience.knowledgegraph.{datasets, lineage}
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 import org.scalamock.scalatest.MockFactory
@@ -103,7 +103,7 @@ class QuerySchemaSpec
     def execute(query: Document): Json =
       Executor
         .execute(
-          QuerySchema[IO](lineage.QueryFields(), datasets.QueryFields()),
+          QuerySchema[IO](lineage.graphql.QueryFields(), datasets.graphql.QueryFields()),
           query,
           new QueryContext[IO](lineageFinder, dataSetsFinder)
         )
@@ -153,7 +153,7 @@ class QuerySchemaSpec
 
   private trait DataSetsTestCase extends TestCase {
 
-    import ch.datascience.knowledgegraph.graphql.datasets.DataSetsGenerators._
+    import ch.datascience.knowledgegraph.datasets.DataSetsGenerators._
 
     def givenFindDataSets(projectPath: ProjectPath) = new {
       def returning(result: IO[List[DataSet]]) =

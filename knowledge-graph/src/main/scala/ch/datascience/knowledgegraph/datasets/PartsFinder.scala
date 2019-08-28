@@ -16,35 +16,32 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.knowledgegraph.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets.Identifier
-import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
-import ch.datascience.knowledgegraph.graphql.datasets.model._
+import ch.datascience.graph.model.dataSets._
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
-import io.circe.DecodingFailure
+import model._
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
-import scala.util.Try
 
-private class ProjectsFinder(
+private class PartsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger) {
 
-  import ProjectsFinder._
+  import PartsFinder._
 
-  def findProjects(projectPath: ProjectPath, dataSetIdentifier: Identifier): IO[List[DataSetProject]] =
-    queryExpecting[List[DataSetProject]](using = query(projectPath, dataSetIdentifier))
+  def findParts(projectPath: ProjectPath, dataSetIdentifier: Identifier): IO[List[DataSetPart]] =
+    queryExpecting[List[DataSetPart]](using = query(projectPath, dataSetIdentifier))
 
   private def query(projectPath: ProjectPath, dataSetIdentifier: Identifier): String =
     s"""
@@ -54,49 +51,37 @@ private class ProjectsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT DISTINCT ?isPartOf
+       |SELECT ?partName ?partLocation ?dateCreated
        |WHERE {
-       |  {
-       |    SELECT ?dataSet
-       |    WHERE {
-       |      ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
-       |      FILTER (?project = <${renkuBaseUrl / projectPath}>)
-       |      ?dataSet rdf:type <http://schema.org/Dataset> ;
-       |               rdfs:label "$dataSetIdentifier" .
-       |    }
-       |  }
-       |  {
-       |    ?dataSet dcterms:isPartOf|schema:isPartOf ?isPartOf .
-       |  } UNION {
-       |    ?dataSet schema:url ?dataSetUrl .
-       |    ?otherDataSet rdf:type <http://schema.org/Dataset> ;
-       |                  schema:url ?dataSetUrl ;
-       |                  dcterms:isPartOf|schema:isPartOf ?isPartOf .
-       |  }
+       |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
+       |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
+       |  ?dataSet rdf:type <http://schema.org/Dataset> ;
+       |           rdfs:label "$dataSetIdentifier" ;
+       |           schema:hasPart ?partResource .
+       |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
+       |                schema:name ?partName ;         
+       |                prov:atLocation ?partLocation ;         
+       |                schema:dateCreated ?dateCreated .         
        |}
-       |ORDER BY ASC(?isPartOf)
+       |ORDER BY ASC(?partName)
        |""".stripMargin
 }
 
-private object ProjectsFinder {
+private object PartsFinder {
 
   import io.circe.Decoder
 
-  private implicit val projectsDecoder: Decoder[List[DataSetProject]] = {
+  private implicit val partsDecoder: Decoder[List[DataSetPart]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    def toProjectName(projectPath: FullProjectPath) =
-      projectPath
-        .to[Try, ProjectPath]
-        .toEither
-        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
-
-    implicit val projectDecoder: Decoder[DataSetProject] = { cursor =>
+    implicit val dataSetDecoder: Decoder[DataSetPart] = { cursor =>
       for {
-        name <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectName)
-      } yield DataSetProject(name)
+        partName     <- cursor.downField("partName").downField("value").as[PartName]
+        partLocation <- cursor.downField("partLocation").downField("value").as[PartLocation]
+        dateCreated  <- cursor.downField("dateCreated").downField("value").as[PartDateCreated]
+      } yield DataSetPart(partName, partLocation, dateCreated)
     }
 
-    _.downField("results").downField("bindings").as(decodeList[DataSetProject])
+    _.downField("results").downField("bindings").as(decodeList[DataSetPart])
   }
 }

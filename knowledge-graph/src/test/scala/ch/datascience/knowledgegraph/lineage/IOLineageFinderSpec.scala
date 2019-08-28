@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.lineage
+package ch.datascience.knowledgegraph.lineage
 
 import LineageGenerators._
 import cats.effect.IO
@@ -25,9 +25,8 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
-import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.knowledgegraph.graphql.lineage.model._
+import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
+import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.RdfStoreData.RDF
 import ch.datascience.rdfstore.{InMemoryRdfStore, RdfStoreData}

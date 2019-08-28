@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.lineage
+package ch.datascience.knowledgegraph.lineage
 
 import ch.datascience.generators.Generators._
-import ch.datascience.knowledgegraph.graphql.lineage.QueryFields.FilePath
-import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.knowledgegraph.graphql.lineage.model._
+import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
+import ch.datascience.knowledgegraph.lineage.model._
 import org.scalacheck.{Arbitrary, Gen}
 
 object LineageGenerators {

@@ -16,16 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.lineage
+package ch.datascience.knowledgegraph.lineage
 
 import cats.MonadError
-import ch.datascience.knowledgegraph.graphql.lineage.model.Node.{SourceNode, TargetNode}
-import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import model.Node.{SourceNode, TargetNode}
 
 import scala.language.higherKinds
 
 object model {
+
+  final class FilePath private (val value: String) extends AnyVal with StringTinyType
+  object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath
 
   final case class Lineage private (edges: Set[Edge], nodes: Set[Node])
 

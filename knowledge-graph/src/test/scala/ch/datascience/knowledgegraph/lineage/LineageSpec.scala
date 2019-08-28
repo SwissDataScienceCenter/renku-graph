@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.lineage
+package ch.datascience.knowledgegraph.lineage
 
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.knowledgegraph.graphql.lineage.LineageGenerators._
-import ch.datascience.knowledgegraph.graphql.lineage.model.{Edge, Lineage, Node}
+import ch.datascience.knowledgegraph.lineage.LineageGenerators._
+import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

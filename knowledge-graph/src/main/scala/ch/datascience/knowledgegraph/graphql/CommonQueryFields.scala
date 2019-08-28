@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.common
+package ch.datascience.knowledgegraph.graphql
 
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.knowledgegraph.graphql.Arguments._
@@ -25,7 +25,7 @@ import sangria.schema._
 
 import scala.language.higherKinds
 
-private[graphql] object QueryFields {
+object CommonQueryFields {
 
   val projectPathArgument = Argument(
     name = "projectPath",

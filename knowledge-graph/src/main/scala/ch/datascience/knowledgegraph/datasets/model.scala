@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.knowledgegraph.datasets
 
 import ch.datascience.graph.model.dataSets._
 import ch.datascience.graph.model.projects.ProjectPath

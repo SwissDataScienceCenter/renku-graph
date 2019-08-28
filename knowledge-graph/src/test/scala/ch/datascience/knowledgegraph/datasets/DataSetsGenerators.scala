@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.knowledgegraph.datasets
 
 import cats.Order
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.knowledgegraph.graphql.datasets.model._
+import ch.datascience.knowledgegraph.datasets.model._
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 

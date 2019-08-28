@@ -26,8 +26,8 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.graphql.datasets.DataSetsGenerators._
-import ch.datascience.knowledgegraph.graphql.datasets.model._
+import ch.datascience.knowledgegraph.datasets.DataSetsGenerators._
+import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.RdfStoreData._
 import flows.RdfStoreProvisioning._
 import io.circe.literal._

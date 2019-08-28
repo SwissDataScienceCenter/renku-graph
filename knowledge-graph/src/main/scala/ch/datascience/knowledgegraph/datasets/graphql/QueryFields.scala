@@ -16,15 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.knowledgegraph.datasets.graphql
 
 import cats.effect.IO
-import ch.datascience.knowledgegraph.graphql.{QueryContext, common}
+import ch.datascience.knowledgegraph.graphql.CommonQueryFields._
+import ch.datascience.knowledgegraph.graphql.QueryContext
 import sangria.schema._
 
 import scala.language.higherKinds
 
-private[graphql] object QueryFields {
+object QueryFields {
 
   import modelSchema._
 
@@ -34,10 +35,10 @@ private[graphql] object QueryFields {
         name        = "dataSets",
         fieldType   = ListType(dataSetType),
         description = Some("Returns data-sets defined in the project"),
-        arguments   = List(common.QueryFields.projectPathArgument),
+        arguments   = List(projectPathArgument),
         resolve = context =>
           context.ctx.dataSetsFinder
-            .findDataSets(context.args arg common.QueryFields.projectPathArgument)
+            .findDataSets(context.args arg projectPathArgument)
             .unsafeToFuture()
       )
     )

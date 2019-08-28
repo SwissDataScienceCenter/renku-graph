@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.lineage
+package ch.datascience.knowledgegraph.lineage.graphql
 
-import ch.datascience.knowledgegraph.graphql.lineage.model._
+import ch.datascience.knowledgegraph.lineage.model._
 import sangria.schema._
 
 private object modelSchema {

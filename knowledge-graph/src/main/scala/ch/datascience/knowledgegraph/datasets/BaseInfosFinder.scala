@@ -16,36 +16,35 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.knowledgegraph.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.dataSets._
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Email, Name => UserName}
-import ch.datascience.knowledgegraph.graphql.datasets.model._
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
+import model._
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private class CreatorsFinder(
+private class BaseInfosFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger) {
 
-  import CreatorsFinder._
+  import BaseInfosFinder._
 
-  def findCreators(projectPath: ProjectPath, dataSetIdentifier: Identifier): IO[Set[DataSetCreator]] =
-    queryExpecting[List[DataSetCreator]](using = query(projectPath, dataSetIdentifier))
-      .map(_.toSet)
+  def findBaseInfos(projectPath: ProjectPath): IO[List[DataSet]] =
+    queryExpecting[List[DataSet]](using = query(projectPath))
 
-  private def query(projectPath: ProjectPath, dataSetIdentifier: Identifier): String =
+  private def query(projectPath: ProjectPath): String =
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -53,34 +52,51 @@ private class CreatorsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?creatorEmail ?creatorName 
+       |SELECT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
        |WHERE {
        |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
        |  ?dataSet rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label "$dataSetIdentifier" ;
-       |           schema:creator ?creatorResource .
-       |  OPTIONAL { ?creatorResource rdf:type <http://schema.org/Person> ;
-       |                              schema:email ?creatorEmail . } .         
-       |  ?creatorResource rdf:type <http://schema.org/Person> ;
-       |                   schema:name ?creatorName .         
+       |           rdfs:label ?identifier ;
+       |           schema:name ?name ;
+       |           schema:dateCreated ?dateCreated ;
+       |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
+       |  ?agentResource rdf:type <http://schema.org/Person> ;
+       |           schema:email ?agentEmail ;
+       |           schema:name ?agentName .
+       |  OPTIONAL { ?dataSet schema:description ?description } .         
+       |  OPTIONAL { ?dataSet schema:datePublished ?publishedDate } .         
        |}""".stripMargin
 }
 
-private object CreatorsFinder {
+private object BaseInfosFinder {
 
   import io.circe.Decoder
 
-  private implicit val creatorsDecoder: Decoder[List[DataSetCreator]] = {
+  private implicit val baseInfosDecoder: Decoder[List[DataSet]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val dataSetDecoder: Decoder[DataSetCreator] = { cursor =>
+    implicit val dataSetDecoder: Decoder[DataSet] = { cursor =>
       for {
-        maybeCreatorEmail <- cursor.downField("creatorEmail").downField("value").as[Option[Email]]
-        creatorName       <- cursor.downField("creatorName").downField("value").as[UserName]
-      } yield DataSetCreator(maybeCreatorEmail, creatorName)
+        id                 <- cursor.downField("identifier").downField("value").as[Identifier]
+        name               <- cursor.downField("name").downField("value").as[Name]
+        maybeDescription   <- cursor.downField("description").downField("value").as[Option[Description]]
+        dateCreated        <- cursor.downField("dateCreated").downField("value").as[DateCreated]
+        agentEmail         <- cursor.downField("agentEmail").downField("value").as[Email]
+        agentName          <- cursor.downField("agentName").downField("value").as[UserName]
+        maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
+      } yield
+        DataSet(
+          id,
+          name,
+          maybeDescription,
+          DataSetCreation(dateCreated, DataSetAgent(agentEmail, agentName)),
+          DataSetPublishing(maybePublishedDate, Set.empty),
+          part    = List.empty,
+          project = List.empty
+        )
     }
 
-    _.downField("results").downField("bindings").as(decodeList[DataSetCreator])
+    _.downField("results").downField("bindings").as(decodeList[DataSet])
   }
 }

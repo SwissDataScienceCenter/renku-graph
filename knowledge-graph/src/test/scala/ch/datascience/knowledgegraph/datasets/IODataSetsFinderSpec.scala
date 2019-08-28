@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.knowledgegraph.datasets
 
 import DataSetsGenerators._
 import cats.effect.IO
@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.graphql.datasets.model.{DataSetPart, DataSetProject}
+import ch.datascience.knowledgegraph.datasets.model.{DataSetPart, DataSetProject}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.RdfStoreData._
 import ch.datascience.stubbing.ExternalServiceStubbing

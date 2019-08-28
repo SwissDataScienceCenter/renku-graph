@@ -19,8 +19,8 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.knowledgegraph.graphql.datasets.{DataSetsFinder, IODataSetsFinder}
-import ch.datascience.knowledgegraph.graphql.lineage.{IOLineageFinder, LineageFinder}
+import ch.datascience.knowledgegraph.datasets.{DataSetsFinder, IODataSetsFinder}
+import ch.datascience.knowledgegraph.lineage.{IOLineageFinder, LineageFinder}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds

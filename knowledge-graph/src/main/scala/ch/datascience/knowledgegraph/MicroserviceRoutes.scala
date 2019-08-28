@@ -28,8 +28,8 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     queryEndpoint: QueryEndpoint[F]
 ) extends Http4sDsl[F] {
 
-  import queryEndpoint._
   import org.http4s.HttpRoutes
+  import queryEndpoint._
 
   // format: off
   lazy val routes: HttpRoutes[F] = HttpRoutes

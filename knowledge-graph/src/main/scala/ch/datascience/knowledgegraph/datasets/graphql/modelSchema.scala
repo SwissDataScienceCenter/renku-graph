@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.graphql.datasets
+package ch.datascience.knowledgegraph.datasets.graphql
 
-import model._
+import ch.datascience.knowledgegraph.datasets.model._
 import sangria.schema._
 
 object modelSchema {
