@@ -19,24 +19,32 @@
 package ch.datascience.knowledgegraph
 
 import cats.effect.ConcurrentEffect
+import ch.datascience.graph.http.server.ProjectPathBinder
+import ch.datascience.knowledgegraph.datasets.rest.{DataSetIdPathBinder, DataSetsEndpoint, ProjectDataSetsEndpoint}
 import ch.datascience.knowledgegraph.graphql.QueryEndpoint
 import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    queryEndpoint: QueryEndpoint[F]
+    queryEndpoint:           QueryEndpoint[F],
+    projectDataSetsEndpoint: ProjectDataSetsEndpoint[F],
+    dataSetsEndpoint:        DataSetsEndpoint[F]
 ) extends Http4sDsl[F] {
 
+  import dataSetsEndpoint._
   import org.http4s.HttpRoutes
+  import projectDataSetsEndpoint._
   import queryEndpoint._
 
   // format: off
   lazy val routes: HttpRoutes[F] = HttpRoutes
     .of[F] {
-      case           GET  -> Root / "ping"    => Ok("pong")
-      case           GET  -> Root / "knowledge-graph" / "graphql" => schema
-      case request @ POST -> Root / "knowledge-graph" / "graphql" => handleQuery(request)
+      case           GET  -> Root / "ping"                                                                           => Ok("pong")
+      case           GET  -> Root / "knowledge-graph" / "data-sets" / DataSetIdPathBinder(id)                        => getDataSet(id)
+      case           GET  -> Root / "knowledge-graph" / "graphql"                                                    => schema
+      case request @ POST -> Root / "knowledge-graph" / "graphql"                                                    => handleQuery(request)
+      case           GET  -> Root / "knowledge-graph" / "projects" / ProjectPathBinder(projectPath) / "data-sets"    => getProjectDataSets(projectPath)
     }
   // format: on
 }

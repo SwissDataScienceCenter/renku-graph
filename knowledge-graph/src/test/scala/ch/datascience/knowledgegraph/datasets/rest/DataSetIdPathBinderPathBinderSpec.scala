@@ -16,32 +16,28 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.json
+package ch.datascience.knowledgegraph.datasets.rest
 
-import DecodingTestTypes._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import io.circe.literal._
+import ch.datascience.graph.model.GraphModelGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class TinyTypeDecodersSpec extends WordSpec {
+class DataSetIdPathBinderPathBinderSpec extends WordSpec {
 
-  import TinyTypeDecoders._
+  "unapply" should {
 
-  "stringDecoder" should {
-
-    "decode JSON String value" in {
-      val value = nonEmptyStrings().generateOne
-      json"""$value""".as[StringTestType] shouldBe Right(StringTestType(value))
+    "convert valid data-set id as string to Identifier" in {
+      val id = dataSetIds.generateOne
+      DataSetIdPathBinder.unapply(id.toString) shouldBe Some(id)
     }
-  }
 
-  "instantDecoder" should {
+    "return None if string value cannot be converted to in Identifier" in {
+      DataSetIdPathBinder.unapply("a") shouldBe None
+    }
 
-    "decode JSON String value" in {
-      val value = timestamps.generateOne
-      json"""$value""".as[InstantTestType] shouldBe Right(InstantTestType(value))
+    "return None if string value is blank" in {
+      DataSetIdPathBinder.unapply(" ") shouldBe None
     }
   }
 }

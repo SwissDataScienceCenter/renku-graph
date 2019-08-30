@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
-import ch.datascience.graph.acceptancetests.model._
+import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.rdfstore.RdfStoreData._

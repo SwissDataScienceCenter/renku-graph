@@ -105,7 +105,7 @@ object Generators {
     for {
       partsNumber <- Gen.choose(minSegments, maxSegments)
       partsGenerator = nonEmptyStrings(
-        charsGenerator = oneOf(frequency(9 -> alphaChar), frequency(1 -> oneOf('-', '_')))
+        charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
       )
       parts <- Gen.listOfN(partsNumber, partsGenerator)
     } yield parts.mkString("/")

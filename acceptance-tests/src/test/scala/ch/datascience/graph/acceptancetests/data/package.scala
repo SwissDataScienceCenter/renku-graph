@@ -18,8 +18,10 @@
 
 package ch.datascience.graph.acceptancetests
 
+import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.graph.model.SchemaVersion
 
-package object model {
-  val currentSchemaVersion: SchemaVersion = SchemaVersion("0.5.0")
+package object data {
+  val currentSchemaVersion: SchemaVersion     = SchemaVersion("0.5.0")
+  val renkuResourceUrl:     RenkuResourcesUrl = RenkuResourcesUrl("http://localhost:9004/knowledge-graph")
 }

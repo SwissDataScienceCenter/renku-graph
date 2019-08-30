@@ -59,6 +59,7 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 import scala.language.reflectiveCalls
+import scala.util.Random.shuffle
 import scala.xml.Elem
 
 trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
@@ -69,7 +70,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected implicit val timer: Timer[IO]                 = IO.timer(global)
   protected val context:        MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-  private val fusekiServerPort = Gen.choose(3000, 3100).retryUntil(portAvailable).generateOne
+  private val fusekiServerPort = Gen.oneOf(shuffle((3000 to 3100).toList)).retryUntil(portAvailable).generateOne
 
   private lazy val portAvailable: Int => Boolean = { port =>
     Validated

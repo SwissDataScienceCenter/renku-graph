@@ -82,7 +82,7 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
         case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
       }
       tokenRepositoryClient
-        .GET(s"projects/$projectId/tokens", maybeAccessToken = None)
+        .GET(s"projects/$projectId/tokens")
         .bodyAsJson shouldBe expectedAccessTokenJson
     }
   }

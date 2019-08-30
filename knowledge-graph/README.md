@@ -4,22 +4,79 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method  | Path                               | Description                                  |
-|---------|------------------------------------|----------------------------------------------|
-|  GET    | ```/ping```                        | To check if service is healthy               |
-|  GET    | ```/knowledge-graph/graphql```     | Returns GraphQL endpoint schema              |
-|  POST   | ```/knowledge-graph/graphql```     | GraphQL query endpoint                       |
+| Method  | Path                                                    | Description                                            |
+|---------|---------------------------------------------------------|--------------------------------------------------------|
+|  GET    | ```/knowledge-graph/data-sets/:id```                    | Returns details of the data-set with the given `id`    |
+|  GET    | ```/knowledge-graph/graphql```                          | Returns GraphQL endpoint schema                        |
+|  POST   | ```/knowledge-graph/graphql```                          | GraphQL query endpoint                                 |
+|  GET    | ```/knowledge-graph/projects/:project-path/data-sets``` | Returns data-sets of the project with the given `path` |
+|  GET    | ```/ping```                                             | To check if service is healthy                         |
 
-#### GET /ping
+#### GET /knowledge-graph/data-sets/:id
 
-Verifies service health.
+Finds details of the data-set with the given `id`.
 
 **Response**
 
-| Status                     | Description             |
-|----------------------------|-------------------------|
-| OK (200)                   | If service is healthy   |
-| INTERNAL SERVER ERROR (500)| Otherwise               |
+| Status                     | Description                   |
+|----------------------------|-------------------------------|
+| OK (200)                   | If data-set details are found |
+| NOT_FOUND (404)            | If data-set is not found      |
+| INTERNAL SERVER ERROR (500)| Otherwise                     |
+
+Response body example:
+```
+{
+  "_links" : [
+    {
+      "rel" : "self",
+      "href" : "https://zemdgsw:9540/data-sets/6f622603-2129-4058-ad29-3ff927481461"
+    }
+  ],
+  "identifier" : "6f622603-2129-4058-ad29-3ff927481461",
+  "name" : "data-set name",
+  "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
+  "created" : {
+    "dateCreated" : "1970-05-12T06:06:41.448Z",
+    "agent" : {
+      "email" : "n@ulQdsXl",
+      "name" : "v imzn"
+    }
+  },
+  "published" : {
+    "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
+    "creator" : [
+      {
+        "name" : "e wmtnxmcguz"
+      },
+      {
+        "name" : "iilmadw vcxabmh",
+        "email" : "ticUnrW@cBmrdomoa"             // optional property
+      }
+    ]
+  },
+  "hasPart" : [
+    {
+      "name" : "o",
+      "atLocation" : "data/dataset-name/file1",
+      "dateCreated" : "1970-05-11T09:08:19.742Z"
+    },
+    {
+      "name" : "rldzpwo",
+      "atLocation" : "data/dataset-name/file2",
+      "dateCreated" : "1970-01-31T00:45:58.577Z"
+    }
+  ],
+  "isPartOf" : [
+    {
+      "name" : "namespace1/project1-name"
+    },
+    {
+      "name" : "namespace2/project2-name"
+    }
+  ]
+}
+```
 
 #### GET /knowledge-graph/graphql
 
@@ -231,6 +288,57 @@ In case there's no data found for a given query, the response `json` will contai
   }
 }
 ```
+
+#### GET /knowledge-graph/projects/:project-path/data-sets
+
+Finds list of data-sets of the project with the given `project-path`.
+
+**NOTICE**: `project-path` has to be in format: `namespace/project-name` and **url encoded**.
+
+**Response**
+
+| Status                     | Description                            |
+|----------------------------|----------------------------------------|
+| OK (200)                   | If there are data-sets for the project |
+| NOT_FOUND (404)            | If there are no data-sets found        |
+| INTERNAL SERVER ERROR (500)| Otherwise                              |
+
+Response body example:
+```
+[  
+   {  
+      "identifier":"9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
+      "name":"rmDaYfpehl",
+      "_links":[  
+         {  
+            "rel":"details",
+            "href":"http://t:5511/data-sets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
+         }
+      ]
+   },
+   {  
+      "identifier":"a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
+      "name":"a",
+      "_links":[  
+         {  
+            "rel":"details",
+            "href":"http://t:5511/data-sets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+         }
+      ]
+   }
+]
+```
+
+#### GET /ping
+
+Verifies service health.
+
+**Response**
+
+| Status                     | Description             |
+|----------------------------|-------------------------|
+| OK (200)                   | If service is healthy   |
+| INTERNAL SERVER ERROR (500)| Otherwise               |
 
 **A curl command example**
 ```

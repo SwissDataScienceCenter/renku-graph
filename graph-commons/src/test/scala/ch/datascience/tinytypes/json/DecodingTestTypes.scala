@@ -18,30 +18,14 @@
 
 package ch.datascience.tinytypes.json
 
-import DecodingTestTypes._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import io.circe.literal._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import java.time.Instant
 
-class TinyTypeDecodersSpec extends WordSpec {
+import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
-  import TinyTypeDecoders._
+private object DecodingTestTypes {
+  class StringTestType private (val value: String) extends AnyVal with StringTinyType
+  implicit object StringTestType extends TinyTypeFactory[StringTestType](new StringTestType(_))
 
-  "stringDecoder" should {
-
-    "decode JSON String value" in {
-      val value = nonEmptyStrings().generateOne
-      json"""$value""".as[StringTestType] shouldBe Right(StringTestType(value))
-    }
-  }
-
-  "instantDecoder" should {
-
-    "decode JSON String value" in {
-      val value = timestamps.generateOne
-      json"""$value""".as[InstantTestType] shouldBe Right(InstantTestType(value))
-    }
-  }
+  class InstantTestType private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object InstantTestType extends TinyTypeFactory[InstantTestType](new InstantTestType(_))
 }

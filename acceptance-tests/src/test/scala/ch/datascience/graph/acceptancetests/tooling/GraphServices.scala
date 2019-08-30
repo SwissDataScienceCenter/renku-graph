@@ -40,6 +40,7 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
   protected implicit lazy val contextShift:     ContextShift[IO] = GraphServices.contextShift
   protected implicit lazy val timer:            Timer[IO]        = GraphServices.timer
 
+  protected val restClient:             RestClient           = new RestClient()
   protected val webhookServiceClient:   WebhookServiceClient = GraphServices.webhookServiceClient
   protected val tokenRepositoryClient:  ServiceClient        = GraphServices.tokenRepositoryClient
   protected val triplesGeneratorClient: ServiceClient        = GraphServices.triplesGeneratorClient

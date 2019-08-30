@@ -16,32 +16,29 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.json
+package ch.datascience.graph.http.server
 
-import DecodingTestTypes._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import io.circe.literal._
+import ch.datascience.graph.model.GraphModelGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class TinyTypeDecodersSpec extends WordSpec {
+class ProjectPathBinderSpec extends WordSpec {
 
-  import TinyTypeDecoders._
+  "unapply" should {
 
-  "stringDecoder" should {
+    "convert valid projectPath as string to ProjectPath" in {
+      val projectPath = projectPaths.generateOne
 
-    "decode JSON String value" in {
-      val value = nonEmptyStrings().generateOne
-      json"""$value""".as[StringTestType] shouldBe Right(StringTestType(value))
+      ProjectPathBinder.unapply(projectPath.toString) shouldBe Some(projectPath)
     }
-  }
 
-  "instantDecoder" should {
+    "return None if string value cannot be converted to a ProjectPath" in {
+      ProjectPathBinder.unapply("a") shouldBe None
+    }
 
-    "decode JSON String value" in {
-      val value = timestamps.generateOne
-      json"""$value""".as[InstantTestType] shouldBe Right(InstantTestType(value))
+    "return None if string value is blank" in {
+      ProjectPathBinder.unapply(" ") shouldBe None
     }
   }
 }

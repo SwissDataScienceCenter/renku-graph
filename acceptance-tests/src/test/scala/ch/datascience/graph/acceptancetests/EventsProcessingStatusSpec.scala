@@ -56,13 +56,13 @@ class EventsProcessingStatusSpec
 
       When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")
-      webhookServiceClient.GET(s"projects/$projectId/events/status", maybeAccessToken = None).status shouldBe NotFound
+      webhookServiceClient.GET(s"projects/$projectId/events/status").status shouldBe NotFound
 
       When("there is a webhook but no events in the Event Log")
       givenHookValidationToHookExists(projectId)
 
       Then("the status endpoint should return OK with done = total = 0")
-      val noEventsResponse = webhookServiceClient.GET(s"projects/$projectId/events/status", maybeAccessToken = None)
+      val noEventsResponse = webhookServiceClient.GET(s"projects/$projectId/events/status")
       noEventsResponse.status shouldBe Ok
       val noEventsResponseJson = noEventsResponse.bodyAsJson.hcursor
       noEventsResponseJson.downField("done").as[Int]        shouldBe Right(0)
@@ -74,7 +74,7 @@ class EventsProcessingStatusSpec
 
       Then("the status endpoint should return OK with some progress info")
       eventually {
-        val response = webhookServiceClient.GET(s"projects/$projectId/events/status", maybeAccessToken = None)
+        val response = webhookServiceClient.GET(s"projects/$projectId/events/status")
 
         response.status shouldBe Ok
 

@@ -16,32 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.json
+package ch.datascience.graph.http.server
 
-import DecodingTestTypes._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import io.circe.literal._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
 
-class TinyTypeDecodersSpec extends WordSpec {
+import scala.util.Try
 
-  import TinyTypeDecoders._
+object ProjectIdPathBinder {
 
-  "stringDecoder" should {
+  def unapply(value: String): Option[ProjectId] =
+    Try {
+      ProjectId(value.toInt)
+    }.toOption
+}
 
-    "decode JSON String value" in {
-      val value = nonEmptyStrings().generateOne
-      json"""$value""".as[StringTestType] shouldBe Right(StringTestType(value))
-    }
-  }
-
-  "instantDecoder" should {
-
-    "decode JSON String value" in {
-      val value = timestamps.generateOne
-      json"""$value""".as[InstantTestType] shouldBe Right(InstantTestType(value))
-    }
-  }
+object ProjectPathBinder {
+  def unapply(value: String): Option[ProjectPath] = ProjectPath.from(value).toOption
 }

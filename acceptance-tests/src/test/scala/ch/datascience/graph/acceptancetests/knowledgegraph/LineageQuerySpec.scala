@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests
+package ch.datascience.graph.acceptancetests.knowledgegraph
 
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
@@ -28,7 +29,6 @@ import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.rdfstore.RdfStoreData
 import ch.datascience.rdfstore.RdfStoreData.MultiFileAndCommitTriples._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import flows.RdfStoreProvisioning._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 import org.http4s.Status._
@@ -137,6 +137,6 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
     )
   }
 
-  private implicit val resourceNameEncoder:  Encoder[ResourceName]  = encoder[ResourceName]
-  private implicit val ResourceLabelEncoder: Encoder[ResourceLabel] = encoder[ResourceLabel]
+  private implicit val resourceNameEncoder:  Encoder[ResourceName]  = stringEncoder[ResourceName]
+  private implicit val ResourceLabelEncoder: Encoder[ResourceLabel] = stringEncoder[ResourceLabel]
 }

@@ -16,10 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests
+package ch.datascience.graph.acceptancetests.knowledgegraph
 
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data._
+import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
@@ -29,8 +31,9 @@ import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.knowledgegraph.datasets.DataSetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.RdfStoreData._
-import flows.RdfStoreProvisioning._
+import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.literal._
+import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.http4s.Status._
 import org.scalatest.Matchers._
@@ -71,7 +74,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         dataSet1.published.maybeDate,
         dataSet1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
         dataSet1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-        schemaVersion = model.currentSchemaVersion
+        schemaVersion = currentSchemaVersion
       ) &+ singleFileAndCommitWithDataset(
         project.path,
         dataSet2CommitId,
@@ -84,7 +87,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         dataSet2.published.maybeDate,
         dataSet2.published.creators.map(creator => (creator.maybeEmail, creator.name)),
         dataSet2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-        schemaVersion = model.currentSchemaVersion
+        schemaVersion = currentSchemaVersion
       )
 
       `data in the RDF store`(project, dataSet1CommitId, triples)
@@ -176,18 +179,18 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
   // format: off
   private def json(dataSet: DataSet) = json"""
     {
-      "identifier": ${dataSet.id.value}, 
-      "name": ${dataSet.name.value},
-      "description": ${dataSet.maybeDescription.map(_.value).map(Json.fromString).getOrElse(Json.Null)},
+      "identifier": ${dataSet.id}, 
+      "name": ${dataSet.name},
+      "description": ${dataSet.maybeDescription.map(_.asJson).getOrElse(Json.Null)},
       "created": {
-        "dateCreated": ${dataSet.created.date.value},
+        "dateCreated": ${dataSet.created.date},
         "agent": {
-          "email": ${dataSet.created.agent.email.value},
-          "name": ${dataSet.created.agent.name.value}
+          "email": ${dataSet.created.agent.email},
+          "name": ${dataSet.created.agent.name}
         }
       },
       "published": {
-        "datePublished": ${dataSet.published.maybeDate.map(_.value).map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
+        "datePublished": ${dataSet.published.maybeDate.map(_.asJson).getOrElse(Json.Null)},
         "creator": ${dataSet.published.creators.toList}
       },
       "hasPart": ${dataSet.part},
@@ -197,22 +200,22 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
 
   private implicit lazy val creatorEncoder: Encoder[DataSetCreator] = Encoder.instance[DataSetCreator] { creator =>
     json"""{
-        "email": ${creator.maybeEmail.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
-        "name": ${creator.name.value}
+        "email": ${creator.maybeEmail.map(_.asJson).getOrElse(Json.Null)},
+        "name": ${creator.name}
       }"""
   }
 
   private implicit lazy val partEncoder: Encoder[DataSetPart] = Encoder.instance[DataSetPart] { part =>
     json"""{
-        "name": ${part.name.value},
-        "atLocation": ${part.atLocation.value},
-        "dateCreated": ${part.dateCreated.value}
+        "name": ${part.name},
+        "atLocation": ${part.atLocation},
+        "dateCreated": ${part.dateCreated}
       }"""
   }
 
   private implicit lazy val projectEncoder: Encoder[DataSetProject] = Encoder.instance[DataSetProject] { project =>
     json"""{
-        "name": ${project.name.value}
+        "name": ${project.name}
       }"""
   }
 }

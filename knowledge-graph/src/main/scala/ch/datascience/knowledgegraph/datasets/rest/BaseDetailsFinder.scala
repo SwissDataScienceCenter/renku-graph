@@ -16,35 +16,34 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.datasets
+package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets._
-import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.graph.model.dataSets.Identifier
+import ch.datascience.knowledgegraph.datasets.model.DataSet
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
-import model._
+import io.circe.DecodingFailure
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private class BaseInfosFinder(
+private class BaseDetailsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger) {
 
-  import BaseInfosFinder._
+  import BaseDetailsFinder._
 
-  def findBaseInfos(projectPath: ProjectPath): IO[List[DataSet]] =
-    queryExpecting[List[DataSet]](using = query(projectPath))
+  def findBaseDetails(identifier: Identifier): IO[Option[DataSet]] =
+    queryExpecting[Option[DataSet]](using = query(identifier))
 
-  private def query(projectPath: ProjectPath): String =
+  private def query(identifier: Identifier): String =
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -54,10 +53,9 @@ private class BaseInfosFinder(
        |
        |SELECT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
        |WHERE {
-       |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
-       |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
-       |  ?dataSet rdf:type <http://schema.org/Dataset> ;
+       |  ?dataSet rdfs:label "$identifier" ;
        |           rdfs:label ?identifier ;
+       |           rdf:type <http://schema.org/Dataset> ;
        |           schema:name ?name ;
        |           schema:dateCreated ?dateCreated ;
        |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
@@ -69,14 +67,16 @@ private class BaseInfosFinder(
        |}""".stripMargin
 }
 
-private object BaseInfosFinder {
-
+private object BaseDetailsFinder {
   import io.circe.Decoder
 
-  private implicit val baseInfosDecoder: Decoder[List[DataSet]] = {
+  private implicit val maybeRecordDecoder: Decoder[Option[DataSet]] = {
+    import ch.datascience.graph.model.dataSets._
+    import ch.datascience.graph.model.users.{Email, Name => UserName}
+    import ch.datascience.knowledgegraph.datasets.model._
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val dataSetDecoder: Decoder[DataSet] = { cursor =>
+    val dataSet: Decoder[DataSet] = { cursor =>
       for {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
@@ -97,6 +97,10 @@ private object BaseInfosFinder {
         )
     }
 
-    _.downField("results").downField("bindings").as(decodeList[DataSet])
+    _.downField("results").downField("bindings").as(decodeList(dataSet)).flatMap {
+      case Nil            => Right(None)
+      case dataSet +: Nil => Right(Some(dataSet))
+      case manyDataSets   => Left(DecodingFailure(s"More than one data-set with ${manyDataSets.head.id} id", Nil))
+    }
   }
 }

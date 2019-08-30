@@ -20,8 +20,8 @@ package ch.datascience.graph.acceptancetests.flows
 
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.graph.acceptancetests.data
+import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.db.EventLog
-import ch.datascience.graph.acceptancetests.model._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience

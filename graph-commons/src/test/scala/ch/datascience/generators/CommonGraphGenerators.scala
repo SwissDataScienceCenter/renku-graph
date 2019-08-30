@@ -18,15 +18,17 @@
 
 package ch.datascience.generators
 
-import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.config.{RenkuBaseUrl, RenkuResourcesUrl}
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.users.{Email, Name, Username}
 import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.users.{Email, Name, Username}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
+import ch.datascience.http.rest.Links
+import ch.datascience.http.rest.Links.{Href, Link, Rel}
 import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl, RdfStoreConfig}
 import org.scalacheck.Gen
 
@@ -82,7 +84,8 @@ object CommonGraphGenerators {
     .map(_.mkString("."))
     .map(SchemaVersion.apply)
 
-  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls map RenkuBaseUrl.apply
+  implicit val renkuBaseUrls:      Gen[RenkuBaseUrl]      = httpUrls map RenkuBaseUrl.apply
+  implicit val renkuResourcesUrls: Gen[RenkuResourcesUrl] = httpUrls map RenkuResourcesUrl.apply
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
     url         <- httpUrls
@@ -96,4 +99,15 @@ object CommonGraphGenerators {
     serviceName     <- serviceNames
     environmentName <- environmentNames
   } yield SentryConfig(url, environmentName, serviceName)
+
+  implicit val rels: Gen[Rel] = nonEmptyStrings() map Rel.apply
+  implicit val hrefs: Gen[Href] = for {
+    baseUrl <- httpUrls
+    path    <- relativePaths()
+  } yield Href(s"$baseUrl/$path")
+  implicit val linkObjects: Gen[Link] = for {
+    rel  <- rels
+    href <- hrefs
+  } yield Link(rel, href)
+  implicit val linksObjects: Gen[Links] = nonEmptyList(linkObjects) map Links.apply
 }

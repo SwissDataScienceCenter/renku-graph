@@ -16,32 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.json
+package ch.datascience.graph.acceptancetests.tooling
 
-import DecodingTestTypes._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import io.circe.literal._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.Assertions._
 
-class TinyTypeDecodersSpec extends WordSpec {
+object TestReadabilityTools {
 
-  import TinyTypeDecoders._
-
-  "stringDecoder" should {
-
-    "decode JSON String value" in {
-      val value = nonEmptyStrings().generateOne
-      json"""$value""".as[StringTestType] shouldBe Right(StringTestType(value))
-    }
-  }
-
-  "instantDecoder" should {
-
-    "decode JSON String value" in {
-      val value = timestamps.generateOne
-      json"""$value""".as[InstantTestType] shouldBe Right(InstantTestType(value))
+  implicit class OptionOps[V](maybeValue: Option[V]) {
+    def getOrFail(message: String): V = maybeValue match {
+      case Some(value) => value
+      case None        => fail(message)
     }
   }
 }

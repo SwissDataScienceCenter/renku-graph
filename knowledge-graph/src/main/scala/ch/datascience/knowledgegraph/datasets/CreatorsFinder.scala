@@ -21,7 +21,6 @@ package ch.datascience.knowledgegraph.datasets
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.dataSets._
-import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -41,11 +40,11 @@ private class CreatorsFinder(
 
   import CreatorsFinder._
 
-  def findCreators(projectPath: ProjectPath, dataSetIdentifier: Identifier): IO[Set[DataSetCreator]] =
-    queryExpecting[List[DataSetCreator]](using = query(projectPath, dataSetIdentifier))
+  def findCreators(dataSetIdentifier: Identifier): IO[Set[DataSetCreator]] =
+    queryExpecting[List[DataSetCreator]](using = query(dataSetIdentifier))
       .map(_.toSet)
 
-  private def query(projectPath: ProjectPath, dataSetIdentifier: Identifier): String =
+  private def query(dataSetIdentifier: Identifier): String =
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -55,8 +54,6 @@ private class CreatorsFinder(
        |
        |SELECT ?creatorEmail ?creatorName 
        |WHERE {
-       |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
-       |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
        |  ?dataSet rdf:type <http://schema.org/Dataset> ;
        |           rdfs:label "$dataSetIdentifier" ;
        |           schema:creator ?creatorResource .

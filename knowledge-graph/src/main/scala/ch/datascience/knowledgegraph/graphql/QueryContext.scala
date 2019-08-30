@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.knowledgegraph.datasets.{DataSetsFinder, IODataSetsFinder}
+import ch.datascience.knowledgegraph.datasets.graphql.{IOProjectDataSetsFinder, ProjectDataSetsFinder}
 import ch.datascience.knowledgegraph.lineage.{IOLineageFinder, LineageFinder}
 
 import scala.concurrent.ExecutionContext
@@ -27,7 +27,7 @@ import scala.language.higherKinds
 
 class QueryContext[Interpretation[_]](
     val lineageFinder:  LineageFinder[Interpretation],
-    val dataSetsFinder: DataSetsFinder[Interpretation]
+    val dataSetsFinder: ProjectDataSetsFinder[Interpretation]
 )
 
 object IOQueryContext {
@@ -36,6 +36,6 @@ object IOQueryContext {
               timer:                     Timer[IO]): IO[QueryContext[IO]] =
     for {
       lineageFinder  <- IOLineageFinder()
-      dataSetsFinder <- IODataSetsFinder()
+      dataSetsFinder <- IOProjectDataSetsFinder()
     } yield new QueryContext[IO](lineageFinder, dataSetsFinder)
 }

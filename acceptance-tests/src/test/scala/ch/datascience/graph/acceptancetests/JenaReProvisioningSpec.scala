@@ -19,13 +19,13 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
 import flows.RdfStoreProvisioning._
-import model._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
 

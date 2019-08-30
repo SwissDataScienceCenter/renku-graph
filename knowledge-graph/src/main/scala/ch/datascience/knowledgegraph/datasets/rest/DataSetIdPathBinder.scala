@@ -16,16 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.http.server
+package ch.datascience.knowledgegraph.datasets.rest
 
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.dataSets
 
-import scala.util.Try
-
-object ProjectIdPathBinder {
-
-  def unapply(value: String): Option[ProjectId] =
-    Try {
-      ProjectId(value.toInt)
-    }.toOption
+object DataSetIdPathBinder {
+  def unapply(value: String): Option[dataSets.Identifier] = dataSets.Identifier.from(value).toOption
 }

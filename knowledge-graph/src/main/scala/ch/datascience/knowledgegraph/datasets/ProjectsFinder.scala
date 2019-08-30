@@ -43,10 +43,10 @@ private class ProjectsFinder(
 
   import ProjectsFinder._
 
-  def findProjects(projectPath: ProjectPath, dataSetIdentifier: Identifier): IO[List[DataSetProject]] =
-    queryExpecting[List[DataSetProject]](using = query(projectPath, dataSetIdentifier))
+  def findProjects(dataSetIdentifier: Identifier): IO[List[DataSetProject]] =
+    queryExpecting[List[DataSetProject]](using = query(dataSetIdentifier))
 
-  private def query(projectPath: ProjectPath, dataSetIdentifier: Identifier): String =
+  private def query(dataSetIdentifier: Identifier): String =
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -59,8 +59,6 @@ private class ProjectsFinder(
        |  {
        |    SELECT ?dataSet
        |    WHERE {
-       |      ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
-       |      FILTER (?project = <${renkuBaseUrl / projectPath}>)
        |      ?dataSet rdf:type <http://schema.org/Dataset> ;
        |               rdfs:label "$dataSetIdentifier" .
        |    }

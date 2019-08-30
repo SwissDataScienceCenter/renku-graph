@@ -16,33 +16,38 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.datasets
+package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets._
+import ch.datascience.graph.model.dataSets.{Identifier, Name}
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
-import model._
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private class PartsFinder(
+private trait ProjectDataSetsFinder[Interpretation[_]] {
+  def findProjectDataSets(projectPath: ProjectPath): Interpretation[List[(Identifier, Name)]]
+}
+
+private class IOProjectDataSetsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger) {
+    extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
+    with ProjectDataSetsFinder[IO] {
 
-  import PartsFinder._
+  import IOProjectDataSetsFinder._
 
-  def findParts(dataSetIdentifier: Identifier): IO[List[DataSetPart]] =
-    queryExpecting[List[DataSetPart]](using = query(dataSetIdentifier))
+  def findProjectDataSets(projectPath: ProjectPath): IO[List[(Identifier, Name)]] =
+    queryExpecting[List[(Identifier, Name)]](using = query(projectPath))
 
-  private def query(dataSetIdentifier: Identifier): String =
+  private def query(projectPath: ProjectPath): String =
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -50,35 +55,29 @@ private class PartsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?partName ?partLocation ?dateCreated
+       |SELECT ?identifier ?name
        |WHERE {
+       |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
+       |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
        |  ?dataSet rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label "$dataSetIdentifier" ;
-       |           schema:hasPart ?partResource .
-       |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
-       |                schema:name ?partName ;         
-       |                prov:atLocation ?partLocation ;         
-       |                schema:dateCreated ?dateCreated .         
-       |}
-       |ORDER BY ASC(?partName)
-       |""".stripMargin
+       |           rdfs:label ?identifier ;
+       |           schema:name ?name .
+       |}""".stripMargin
 }
 
-private object PartsFinder {
-
+private object IOProjectDataSetsFinder {
   import io.circe.Decoder
 
-  private implicit val partsDecoder: Decoder[List[DataSetPart]] = {
+  private implicit val recordsDecoder: Decoder[List[(Identifier, Name)]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val dataSetDecoder: Decoder[DataSetPart] = { cursor =>
+    implicit val recordDecoder: Decoder[(Identifier, Name)] = { cursor =>
       for {
-        partName     <- cursor.downField("partName").downField("value").as[PartName]
-        partLocation <- cursor.downField("partLocation").downField("value").as[PartLocation]
-        dateCreated  <- cursor.downField("dateCreated").downField("value").as[PartDateCreated]
-      } yield DataSetPart(partName, partLocation, dateCreated)
+        id   <- cursor.downField("identifier").downField("value").as[Identifier]
+        name <- cursor.downField("name").downField("value").as[Name]
+      } yield id -> name
     }
 
-    _.downField("results").downField("bindings").as(decodeList[DataSetPart])
+    _.downField("results").downField("bindings").as(decodeList[(Identifier, Name)])
   }
 }

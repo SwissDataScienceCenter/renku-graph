@@ -18,30 +18,33 @@
 
 package ch.datascience.tinytypes.json
 
+import java.time.format.DateTimeFormatter
+
 import DecodingTestTypes._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import io.circe.literal._
+import io.circe.Json
+import io.circe.syntax._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class TinyTypeDecodersSpec extends WordSpec {
+class TinyTypeEncodersSpec extends WordSpec {
 
-  import TinyTypeDecoders._
+  import TinyTypeEncoders._
 
-  "stringDecoder" should {
+  "stringEncoder" should {
 
-    "decode JSON String value" in {
+    "encode StringTinyType to Json" in {
       val value = nonEmptyStrings().generateOne
-      json"""$value""".as[StringTestType] shouldBe Right(StringTestType(value))
+      StringTestType(value).asJson shouldBe Json.fromString(value)
     }
   }
 
-  "instantDecoder" should {
+  "instantEncoder" should {
 
-    "decode JSON String value" in {
+    "encode InstantTinyType to Json" in {
       val value = timestamps.generateOne
-      json"""$value""".as[InstantTestType] shouldBe Right(InstantTestType(value))
+      InstantTestType(value).asJson shouldBe Json.fromString(DateTimeFormatter.ISO_INSTANT.format(value))
     }
   }
 }

@@ -28,6 +28,8 @@ spec:
           env:
             - name: RENKU_BASE_URL
               value: {{ .Values.knowledgeGraph.services.renku.url }}
+            - name: RENKU_RESOURCES_URL
+              value: {{ .Values.knowledgeGraph.services.renku.resources-url }}
             - name: JENA_DATASET_NAME
               {{- if .Values.global.graph.jena.dataset }}
               value: {{ .Values.global.graph.jena.dataset }}

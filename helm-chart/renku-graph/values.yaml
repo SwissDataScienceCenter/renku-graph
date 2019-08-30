@@ -80,6 +80,8 @@ knowledgeGraph:
     renku:
       ## Renku UI base url e.g. https://dev.renku.ch
       url:
+      ## Renku knowledge-graph resources base url e.g. https://dev.renku.ch/knowledge-graph
+      resources-url:
 
 sentry:
   enabled: false

@@ -29,28 +29,27 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
+class RenkuResourcesUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "apply" should {
 
-    "return a RenkuBaseUrl if there's a value for 'services.renku.url'" in {
+    "return a RenkuResourceUrl if there's a value for 'services.renku.resource-url'" in {
       forAll(httpUrls) { url =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
               "renku" -> Map(
-                "url" -> url
+                "resources-url" -> url
               ).asJava
             ).asJava
           ).asJava
         )
-
-        RenkuBaseUrl[Try](config) shouldBe Success(RenkuBaseUrl(url))
+        RenkuResourcesUrl[Try](config) shouldBe Success(RenkuResourcesUrl(url))
       }
     }
 
     "fail if there's no value for the 'services.renku.url'" in {
-      val Failure(exception) = RenkuBaseUrl[Try](ConfigFactory.empty())
+      val Failure(exception) = RenkuResourcesUrl[Try](ConfigFactory.empty())
       exception shouldBe an[ConfigLoadingException]
     }
 
@@ -59,13 +58,13 @@ class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
         Map(
           "services" -> Map(
             "renku" -> Map(
-              "url" -> "abcd"
+              "resources-url" -> "abcd"
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = RenkuBaseUrl[Try](config)
+      val Failure(exception) = RenkuResourcesUrl[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }

@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.datasets.DataSetsFinder
+import ch.datascience.knowledgegraph.datasets.graphql.ProjectDataSetsFinder
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.lineage.LineageFinder
 import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
@@ -98,7 +98,7 @@ class QuerySchemaSpec
 
   private trait TestCase {
     val lineageFinder  = mock[LineageFinder[IO]]
-    val dataSetsFinder = mock[DataSetsFinder[IO]]
+    val dataSetsFinder = mock[ProjectDataSetsFinder[IO]]
 
     def execute(query: Document): Json =
       Executor
