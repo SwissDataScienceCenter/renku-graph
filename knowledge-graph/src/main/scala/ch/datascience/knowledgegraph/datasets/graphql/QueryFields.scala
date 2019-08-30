@@ -32,13 +32,13 @@ object QueryFields {
   def apply(): List[Field[QueryContext[IO], Unit]] =
     fields[QueryContext[IO], Unit](
       Field(
-        name        = "dataSets",
-        fieldType   = ListType(dataSetType),
-        description = Some("Returns data-sets defined in the project"),
+        name        = "datasets",
+        fieldType   = ListType(datasetType),
+        description = Some("Returns datasets defined in the project"),
         arguments   = List(projectPathArgument),
         resolve = context =>
-          context.ctx.dataSetsFinder
-            .findDataSets(context.args arg projectPathArgument)
+          context.ctx.datasetsFinder
+            .findDatasets(context.args arg projectPathArgument)
             .unsafeToFuture()
       )
     )

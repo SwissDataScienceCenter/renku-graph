@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets._
+import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -40,11 +40,11 @@ private class CreatorsFinder(
 
   import CreatorsFinder._
 
-  def findCreators(dataSetIdentifier: Identifier): IO[Set[DataSetCreator]] =
-    queryExpecting[List[DataSetCreator]](using = query(dataSetIdentifier))
+  def findCreators(identifier: Identifier): IO[Set[DatasetCreator]] =
+    queryExpecting[List[DatasetCreator]](using = query(identifier))
       .map(_.toSet)
 
-  private def query(dataSetIdentifier: Identifier): String =
+  private def query(identifier: Identifier): String =
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -54,8 +54,8 @@ private class CreatorsFinder(
        |
        |SELECT ?creatorEmail ?creatorName 
        |WHERE {
-       |  ?dataSet rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label "$dataSetIdentifier" ;
+       |  ?dataset rdf:type <http://schema.org/Dataset> ;
+       |           rdfs:label "$identifier" ;
        |           schema:creator ?creatorResource .
        |  OPTIONAL { ?creatorResource rdf:type <http://schema.org/Person> ;
        |                              schema:email ?creatorEmail . } .         
@@ -68,16 +68,16 @@ private object CreatorsFinder {
 
   import io.circe.Decoder
 
-  private implicit val creatorsDecoder: Decoder[List[DataSetCreator]] = {
+  private implicit val creatorsDecoder: Decoder[List[DatasetCreator]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val dataSetDecoder: Decoder[DataSetCreator] = { cursor =>
+    implicit val datasetDecoder: Decoder[DatasetCreator] = { cursor =>
       for {
         maybeCreatorEmail <- cursor.downField("creatorEmail").downField("value").as[Option[Email]]
         creatorName       <- cursor.downField("creatorName").downField("value").as[UserName]
-      } yield DataSetCreator(maybeCreatorEmail, creatorName)
+      } yield DatasetCreator(maybeCreatorEmail, creatorName)
     }
 
-    _.downField("results").downField("bindings").as(decodeList[DataSetCreator])
+    _.downField("results").downField("bindings").as(decodeList[DatasetCreator])
   }
 }

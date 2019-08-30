@@ -22,7 +22,7 @@ import cats.implicits._
 import ch.datascience.config.{RenkuBaseUrl, RenkuResourcesUrl}
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.graph.model.dataSets.{Identifier, Name}
+import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.Links
 import cats.effect.{ContextShift, Effect, IO, Timer}
@@ -40,60 +40,60 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class ProjectDataSetsEndpoint[Interpretation[_]: Effect](
-    projectDataSetsFinder: ProjectDataSetsFinder[Interpretation],
+class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
+    projectDatasetsFinder: ProjectDatasetsFinder[Interpretation],
     renkuResourcesUrl:     RenkuResourcesUrl,
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
   import org.http4s.circe._
 
-  def getProjectDataSets(projectPath: ProjectPath): Interpretation[Response[Interpretation]] =
-    projectDataSetsFinder
-      .findProjectDataSets(projectPath)
+  def getProjectDatasets(projectPath: ProjectPath): Interpretation[Response[Interpretation]] =
+    projectDatasetsFinder
+      .findProjectDatasets(projectPath)
       .flatMap(toHttpResult(projectPath))
       .recoverWith(httpResult(projectPath))
 
   private def toHttpResult(
       projectPath: ProjectPath
   ): List[(Identifier, Name)] => Interpretation[Response[Interpretation]] = {
-    case Nil           => NotFound(InfoMessage(s"No data-sets found for '$projectPath'"))
-    case dataSetsInfos => Ok(dataSetsInfos.asJson)
+    case Nil      => NotFound(InfoMessage(s"No datasets found for '$projectPath'"))
+    case datasets => Ok(datasets.asJson)
   }
 
   private def httpResult(
       projectPath: ProjectPath
   ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding $projectPath's data-sets failed")
+      val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
 
-  private implicit val dataSetEncoder: Encoder[(Identifier, Name)] = Encoder.instance[(Identifier, Name)] {
+  private implicit val datasetEncoder: Encoder[(Identifier, Name)] = Encoder.instance[(Identifier, Name)] {
     case (id, name) =>
       json"""
       {
         "identifier": ${id.toString},
         "name": ${name.toString}
       }""" deepMerge _links(
-        Link(Rel("details") -> Href(renkuResourcesUrl / "data-sets" / id))
+        Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
       )
   }
 }
 
-object IOProjectDataSetsEndpoint {
+object IOProjectDatasetsEndpoint {
 
   def apply()(implicit executionContext: ExecutionContext,
               contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[ProjectDataSetsEndpoint[IO]] =
+              timer:                     Timer[IO]): IO[ProjectDatasetsEndpoint[IO]] =
     for {
       rdfStoreConfig   <- RdfStoreConfig[IO]()
       renkuBaseUrl     <- RenkuBaseUrl[IO]()
       renkuResourceUrl <- RenkuResourcesUrl[IO]()
     } yield
-      new ProjectDataSetsEndpoint[IO](
-        new IOProjectDataSetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
+      new ProjectDatasetsEndpoint[IO](
+        new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
         renkuResourceUrl,
         ApplicationLogger
       )

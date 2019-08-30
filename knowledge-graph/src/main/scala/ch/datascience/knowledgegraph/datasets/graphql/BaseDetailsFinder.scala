@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.graphql
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.datasets.model.DataSet
+import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -39,8 +39,8 @@ private class BaseDetailsFinder(
 
   import BaseDetailsFinder._
 
-  def findBaseDetails(projectPath: ProjectPath): IO[List[DataSet]] =
-    queryExpecting[List[DataSet]](using = query(projectPath))
+  def findBaseDetails(projectPath: ProjectPath): IO[List[Dataset]] =
+    queryExpecting[List[Dataset]](using = query(projectPath))
 
   private def query(projectPath: ProjectPath): String =
     s"""
@@ -52,9 +52,9 @@ private class BaseDetailsFinder(
        |
        |SELECT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
        |WHERE {
-       |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
+       |  ?dataset dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
-       |  ?dataSet rdf:type <http://schema.org/Dataset> ;
+       |  ?dataset rdf:type <http://schema.org/Dataset> ;
        |           rdfs:label ?identifier ;
        |           schema:name ?name ;
        |           schema:dateCreated ?dateCreated ;
@@ -62,8 +62,8 @@ private class BaseDetailsFinder(
        |  ?agentResource rdf:type <http://schema.org/Person> ;
        |           schema:email ?agentEmail ;
        |           schema:name ?agentName .
-       |  OPTIONAL { ?dataSet schema:description ?description } .         
-       |  OPTIONAL { ?dataSet schema:datePublished ?publishedDate } .         
+       |  OPTIONAL { ?dataset schema:description ?description } .         
+       |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .         
        |}""".stripMargin
 }
 
@@ -71,13 +71,13 @@ private object BaseDetailsFinder {
 
   import io.circe.Decoder
 
-  private implicit val baseDetailsDecoder: Decoder[List[DataSet]] = {
-    import ch.datascience.graph.model.dataSets._
+  private implicit val baseDetailsDecoder: Decoder[List[Dataset]] = {
+    import ch.datascience.graph.model.datasets._
     import ch.datascience.graph.model.users.{Email, Name => UserName}
     import ch.datascience.knowledgegraph.datasets.model._
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val dataSetDecoder: Decoder[DataSet] = { cursor =>
+    implicit val datasetDecoder: Decoder[Dataset] = { cursor =>
       for {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
@@ -87,17 +87,17 @@ private object BaseDetailsFinder {
         agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
       } yield
-        DataSet(
+        Dataset(
           id,
           name,
           maybeDescription,
-          DataSetCreation(dateCreated, DataSetAgent(agentEmail, agentName)),
-          DataSetPublishing(maybePublishedDate, Set.empty),
+          DatasetCreation(dateCreated, DatasetAgent(agentEmail, agentName)),
+          DatasetPublishing(maybePublishedDate, Set.empty),
           part    = List.empty,
           project = List.empty
         )
     }
 
-    _.downField("results").downField("bindings").as(decodeList[DataSet])
+    _.downField("results").downField("bindings").as(decodeList[Dataset])
   }
 }

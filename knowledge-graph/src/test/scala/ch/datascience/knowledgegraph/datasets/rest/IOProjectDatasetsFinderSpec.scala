@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.datasets.DataSetsGenerators._
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.RdfStoreData._
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -30,47 +30,47 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IOProjectDataSetsFinderSpec
+class IOProjectDatasetsFinderSpec
     extends WordSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
     with ScalaCheckPropertyChecks {
 
-  "findProjectDataSets" should {
+  "findProjectDatasets" should {
 
-    "return all data-sets of the given project" in new InMemoryStoreTestCase {
-      forAll(projectPaths, dataSets, dataSets) { (projectPath, dataSet1, dataSet2) =>
+    "return all datasets of the given project" in new InMemoryStoreTestCase {
+      forAll(projectPaths, datasets, datasets) { (projectPath, dataset1, dataset2) =>
         loadToStore(
           RDF(
             singleFileAndCommitWithDataset(projectPaths.generateOne),
             singleFileAndCommitWithDataset(
               projectPath,
-              dataSetId   = dataSet1.id,
-              dataSetName = dataSet1.name
+              datasetId   = dataset1.id,
+              datasetName = dataset1.name
             ),
             singleFileAndCommitWithDataset(
               projectPath,
-              dataSetId   = dataSet2.id,
-              dataSetName = dataSet2.name,
+              datasetId   = dataset2.id,
+              datasetName = dataset2.name,
             )
           )
         )
 
-        dataSetsFinder.findProjectDataSets(projectPath).unsafeRunSync() should contain theSameElementsAs List(
-          (dataSet1.id, dataSet1.name),
-          (dataSet2.id, dataSet2.name)
+        datasetsFinder.findProjectDatasets(projectPath).unsafeRunSync() should contain theSameElementsAs List(
+          (dataset1.id, dataset1.name),
+          (dataset2.id, dataset2.name)
         )
       }
     }
 
-    "return None if there are no data-sets in the project" in new InMemoryStoreTestCase {
+    "return None if there are no datasets in the project" in new InMemoryStoreTestCase {
       val projectPath = projectPaths.generateOne
-      dataSetsFinder.findProjectDataSets(projectPath).unsafeRunSync() shouldBe List.empty
+      datasetsFinder.findProjectDatasets(projectPath).unsafeRunSync() shouldBe List.empty
     }
   }
 
   private trait InMemoryStoreTestCase {
     private val logger = TestLogger[IO]()
-    val dataSetsFinder = new IOProjectDataSetsFinder(rdfStoreConfig, renkuBaseUrl, logger)
+    val datasetsFinder = new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, logger)
   }
 }

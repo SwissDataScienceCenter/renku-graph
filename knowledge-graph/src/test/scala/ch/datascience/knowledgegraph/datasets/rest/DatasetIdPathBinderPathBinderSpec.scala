@@ -23,21 +23,21 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class DataSetIdPathBinderPathBinderSpec extends WordSpec {
+class DatasetIdPathBinderPathBinderSpec extends WordSpec {
 
   "unapply" should {
 
-    "convert valid data-set id as string to Identifier" in {
-      val id = dataSetIds.generateOne
-      DataSetIdPathBinder.unapply(id.toString) shouldBe Some(id)
+    "convert valid dataset id as string to Identifier" in {
+      val id = datasetIds.generateOne
+      DatasetIdPathBinder.unapply(id.toString) shouldBe Some(id)
     }
 
     "return None if string value cannot be converted to in Identifier" in {
-      DataSetIdPathBinder.unapply("a") shouldBe None
+      DatasetIdPathBinder.unapply("a") shouldBe None
     }
 
     "return None if string value is blank" in {
-      DataSetIdPathBinder.unapply(" ") shouldBe None
+      DatasetIdPathBinder.unapply(" ") shouldBe None
     }
   }
 }

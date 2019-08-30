@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets._
+import ch.datascience.graph.model.datasets._
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -39,10 +39,10 @@ private class PartsFinder(
 
   import PartsFinder._
 
-  def findParts(dataSetIdentifier: Identifier): IO[List[DataSetPart]] =
-    queryExpecting[List[DataSetPart]](using = query(dataSetIdentifier))
+  def findParts(identifier: Identifier): IO[List[DatasetPart]] =
+    queryExpecting[List[DatasetPart]](using = query(identifier))
 
-  private def query(dataSetIdentifier: Identifier): String =
+  private def query(identifier: Identifier): String =
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -52,8 +52,8 @@ private class PartsFinder(
        |
        |SELECT ?partName ?partLocation ?dateCreated
        |WHERE {
-       |  ?dataSet rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label "$dataSetIdentifier" ;
+       |  ?dataset rdf:type <http://schema.org/Dataset> ;
+       |           rdfs:label "$identifier" ;
        |           schema:hasPart ?partResource .
        |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
        |                schema:name ?partName ;         
@@ -68,17 +68,17 @@ private object PartsFinder {
 
   import io.circe.Decoder
 
-  private implicit val partsDecoder: Decoder[List[DataSetPart]] = {
+  private implicit val partsDecoder: Decoder[List[DatasetPart]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val dataSetDecoder: Decoder[DataSetPart] = { cursor =>
+    implicit val datasetDecoder: Decoder[DatasetPart] = { cursor =>
       for {
         partName     <- cursor.downField("partName").downField("value").as[PartName]
         partLocation <- cursor.downField("partLocation").downField("value").as[PartLocation]
         dateCreated  <- cursor.downField("dateCreated").downField("value").as[PartDateCreated]
-      } yield DataSetPart(partName, partLocation, dateCreated)
+      } yield DatasetPart(partName, partLocation, dateCreated)
     }
 
-    _.downField("results").downField("bindings").as(decodeList[DataSetPart])
+    _.downField("results").downField("bindings").as(decodeList[DatasetPart])
   }
 }

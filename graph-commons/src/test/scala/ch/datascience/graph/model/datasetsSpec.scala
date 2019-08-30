@@ -20,13 +20,13 @@ package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.relativePaths
-import ch.datascience.graph.model.dataSets.{Identifier, PartLocation}
+import ch.datascience.graph.model.datasets.{Identifier, PartLocation}
 import ch.datascience.tinytypes.constraints.{RelativePath, UUID}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class dataSetsSpec extends WordSpec with ScalaCheckPropertyChecks {
+class datasetsSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "Identifier" should {
     "be a UUID" in {
@@ -51,7 +51,7 @@ class dataSetsSpec extends WordSpec with ScalaCheckPropertyChecks {
 
       intercept[IllegalArgumentException] {
         PartLocation(path)
-      }.getMessage shouldBe s"'$path' does not point to 'data/' folder which is invalid for ch.datascience.graph.model.dataSets.PartLocation"
+      }.getMessage shouldBe s"'$path' does not point to 'data/' folder which is invalid for ch.datascience.graph.model.datasets.PartLocation"
     }
   }
 }

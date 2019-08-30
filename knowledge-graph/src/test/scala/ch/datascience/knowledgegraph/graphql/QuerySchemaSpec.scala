@@ -22,7 +22,8 @@ import cats.effect.IO
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.datasets.graphql.ProjectDataSetsFinder
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators
+import ch.datascience.knowledgegraph.datasets.graphql.ProjectDatasetsFinder
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.lineage.LineageFinder
 import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
@@ -73,11 +74,11 @@ class QuerySchemaSpec
       execute(query) shouldBe json(lineage)
     }
 
-    "allow to search for project's dataSets" in new DataSetsTestCase {
-      forAll(dataSetsLists) { dataSets =>
+    "allow to search for project's datasets" in new DatasetsTestCase {
+      forAll(datasetsLists) { datasets =>
         val query = graphql"""
         {
-          dataSets(projectPath: "namespace/project") {
+          datasets(projectPath: "namespace/project") {
             identifier
             name
             description
@@ -88,24 +89,24 @@ class QuerySchemaSpec
           }
         }"""
 
-        givenFindDataSets(ProjectPath("namespace/project"))
-          .returning(IO.pure(dataSets))
+        givenFindDatasets(ProjectPath("namespace/project"))
+          .returning(IO.pure(datasets))
 
-        execute(query) shouldBe json(dataSets)
+        execute(query) shouldBe json(datasets)
       }
     }
   }
 
   private trait TestCase {
     val lineageFinder  = mock[LineageFinder[IO]]
-    val dataSetsFinder = mock[ProjectDataSetsFinder[IO]]
+    val datasetsFinder = mock[ProjectDatasetsFinder[IO]]
 
     def execute(query: Document): Json =
       Executor
         .execute(
           QuerySchema[IO](lineage.graphql.QueryFields(), datasets.graphql.QueryFields()),
           query,
-          new QueryContext[IO](lineageFinder, dataSetsFinder)
+          new QueryContext[IO](lineageFinder, datasetsFinder)
         )
         .futureValue
   }
@@ -151,57 +152,55 @@ class QuerySchemaSpec
         }"""
   }
 
-  private trait DataSetsTestCase extends TestCase {
+  private trait DatasetsTestCase extends TestCase {
 
-    import ch.datascience.knowledgegraph.datasets.DataSetsGenerators._
-
-    def givenFindDataSets(projectPath: ProjectPath) = new {
-      def returning(result: IO[List[DataSet]]) =
-        (dataSetsFinder
-          .findDataSets(_: ProjectPath))
+    def givenFindDatasets(projectPath: ProjectPath) = new {
+      def returning(result: IO[List[Dataset]]) =
+        (datasetsFinder
+          .findDatasets(_: ProjectPath))
           .expects(projectPath)
           .returning(result)
     }
 
-    lazy val dataSetsLists = nonEmptyList(dataSets).map(_.toList)
+    lazy val datasetsLists = nonEmptyList(DatasetsGenerators.datasets).map(_.toList)
 
-    def json(dataSets: List[DataSet]) = json"""
+    def json(datasets: List[Dataset]) = json"""
         {
           "data" : {
-            "dataSets" : ${Json.arr(dataSets.map(toJson): _*)}
+            "datasets" : ${Json.arr(datasets.map(toJson): _*)}
           }
         }"""
 
     // format: off
-    private def toJson(dataSet: DataSet): Json = json"""
+    private def toJson(dataset: Dataset): Json = json"""
       {
-        "identifier": ${dataSet.id.value},
-        "name": ${dataSet.name.value},
-        "description": ${dataSet.maybeDescription.map(_.value).map(Json.fromString).getOrElse(Json.Null)},
+        "identifier": ${dataset.id.value},
+        "name": ${dataset.name.value},
+        "description": ${dataset.maybeDescription.map(_.value).map(Json.fromString).getOrElse(Json.Null)},
         "created": {
-          "dateCreated": ${dataSet.created.date.value},
+          "dateCreated": ${dataset.created.date.value},
           "agent": {
-            "email": ${dataSet.created.agent.email.value},
-            "name": ${dataSet.created.agent.name.value}
+            "email": ${dataset.created.agent.email.value},
+            "name": ${dataset.created.agent.name.value}
           }
         },
         "published": {
-          "datePublished": ${dataSet.published.maybeDate.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
-          "creator": ${dataSet.published.creators.toList}
+          "datePublished": ${dataset.published.maybeDate.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
+          "creator": ${dataset.published.creators.toList}
         },
-        "hasPart": ${dataSet.part},
-        "isPartOf": ${dataSet.project}
+        "hasPart": ${dataset.part},
+        "isPartOf": ${dataset.project}
       }"""
     // format: on
 
-    private implicit lazy val creatorEncoder: Encoder[DataSetCreator] = Encoder.instance[DataSetCreator] { creator =>
+    private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] { creator =>
       json"""{
         "email": ${creator.maybeEmail.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
         "name": ${creator.name.value}
       }"""
     }
 
-    private implicit lazy val partEncoder: Encoder[DataSetPart] = Encoder.instance[DataSetPart] { part =>
+    private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
       json"""{
         "name": ${part.name.value},
         "atLocation": ${part.atLocation.value},
@@ -209,7 +208,7 @@ class QuerySchemaSpec
       }"""
     }
 
-    private implicit lazy val projectEncoder: Encoder[DataSetProject] = Encoder.instance[DataSetProject] { project =>
+    private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
       json"""{
         "name": ${project.name.value}
       }"""

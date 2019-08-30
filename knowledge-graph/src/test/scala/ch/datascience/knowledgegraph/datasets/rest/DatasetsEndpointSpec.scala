@@ -26,7 +26,7 @@ import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.dataSets._
+import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.http.rest.Links
@@ -34,7 +34,7 @@ import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.knowledgegraph.datasets.DataSetsGenerators._
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder._
@@ -49,121 +49,121 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DataSetsEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class DatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
 
-  "getDataSet" should {
+  "getDataset" should {
 
-    "respond with OK and the found data-set" in new TestCase {
-      forAll { dataSet: DataSet =>
-        (dataSetsFinder
-          .findDataSet(_: Identifier))
-          .expects(dataSet.id)
-          .returning(context.pure(Some(dataSet)))
+    "respond with OK and the found dataset" in new TestCase {
+      forAll { dataset: Dataset =>
+        (datasetsFinder
+          .findDataset(_: Identifier))
+          .expects(dataset.id)
+          .returning(context.pure(Some(dataset)))
 
-        val response = getDataSet(dataSet.id).unsafeRunSync()
+        val response = getDataset(dataset.id).unsafeRunSync()
 
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
 
-        response.as[DataSet].unsafeRunSync shouldBe dataSet
+        response.as[Dataset].unsafeRunSync shouldBe dataset
         response.as[Json].unsafeRunSync._links shouldBe Right(
-          Links(Rel.Self, Href(renkuResourcesUrl / "data-sets" / dataSet.id))
+          Links(Rel.Self, Href(renkuResourcesUrl / "datasets" / dataset.id))
         )
 
         logger.expectNoLogs()
       }
     }
 
-    "respond with NOT_FOUND if there is no data-set with the given id" in new TestCase {
+    "respond with NOT_FOUND if there is no dataset with the given id" in new TestCase {
 
-      val identifier = dataSetIds.generateOne
+      val identifier = datasetIds.generateOne
 
-      (dataSetsFinder
-        .findDataSet(_: Identifier))
+      (datasetsFinder
+        .findDataset(_: Identifier))
         .expects(identifier)
         .returning(context.pure(None))
 
-      val response = getDataSet(identifier).unsafeRunSync()
+      val response = getDataset(identifier).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
 
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No data-set with '$identifier' id found").asJson
+      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No dataset with '$identifier' id found").asJson
 
       logger.expectNoLogs()
     }
 
-    "respond with INTERNAL_SERVER_ERROR if finding the data-set fails" in new TestCase {
+    "respond with INTERNAL_SERVER_ERROR if finding the dataset fails" in new TestCase {
 
-      val identifier = dataSetIds.generateOne
+      val identifier = datasetIds.generateOne
 
       val exception = exceptions.generateOne
-      (dataSetsFinder
-        .findDataSet(_: Identifier))
+      (datasetsFinder
+        .findDataset(_: Identifier))
         .expects(identifier)
         .returning(context.raiseError(exception))
 
-      val response = getDataSet(identifier).unsafeRunSync()
+      val response = getDataset(identifier).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
 
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(s"Finding data-set with '$identifier' id failed").asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(s"Finding dataset with '$identifier' id failed").asJson
 
-      logger.loggedOnly(Error(s"Finding data-set with '$identifier' id failed", exception))
+      logger.loggedOnly(Error(s"Finding dataset with '$identifier' id failed", exception))
     }
   }
 
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val dataSetsFinder    = mock[DataSetFinder[IO]]
+    val datasetsFinder    = mock[DatasetFinder[IO]]
     val renkuResourcesUrl = renkuResourcesUrls.generateOne
     val logger            = TestLogger[IO]()
-    val getDataSet        = new DataSetsEndpoint[IO](dataSetsFinder, renkuResourcesUrl, logger).getDataSet _
+    val getDataset        = new DatasetsEndpoint[IO](datasetsFinder, renkuResourcesUrl, logger).getDataset _
   }
 
-  private implicit val dataSetEntityDecoder: EntityDecoder[IO, DataSet] = jsonOf[IO, DataSet]
+  private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]
 
-  private implicit lazy val dataSetDecoder: Decoder[DataSet] = (cursor: HCursor) =>
+  private implicit lazy val datasetDecoder: Decoder[Dataset] = (cursor: HCursor) =>
     for {
       id               <- cursor.downField("identifier").as[Identifier]
       name             <- cursor.downField("name").as[Name]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
-      created          <- cursor.downField("created").as[DataSetCreation]
-      published        <- cursor.downField("published").as[DataSetPublishing]
-      parts            <- cursor.downField("hasPart").as[List[DataSetPart]]
-      projects         <- cursor.downField("isPartOf").as[List[DataSetProject]]
-    } yield DataSet(id, name, maybeDescription, created, published, parts, projects)
+      created          <- cursor.downField("created").as[DatasetCreation]
+      published        <- cursor.downField("published").as[DatasetPublishing]
+      parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
+      projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
+    } yield Dataset(id, name, maybeDescription, created, published, parts, projects)
 
-  private implicit lazy val dataSetCreationDecoder: Decoder[DataSetCreation] = (cursor: HCursor) =>
+  private implicit lazy val datasetCreationDecoder: Decoder[DatasetCreation] = (cursor: HCursor) =>
     for {
       date       <- cursor.downField("dateCreated").as[DateCreated]
       agentEmail <- cursor.downField("agent").downField("email").as[Email]
       agentName  <- cursor.downField("agent").downField("name").as[UserName]
-    } yield DataSetCreation(date, DataSetAgent(agentEmail, agentName))
+    } yield DatasetCreation(date, DatasetAgent(agentEmail, agentName))
 
-  private implicit lazy val dataSetPublishingDecoder: Decoder[DataSetPublishing] = (cursor: HCursor) =>
+  private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>
     for {
       maybeDate <- cursor.downField("datePublished").as[Option[PublishedDate]]
-      creators  <- cursor.downField("creator").as[List[DataSetCreator]].map(_.toSet)
-    } yield DataSetPublishing(maybeDate, creators)
+      creators  <- cursor.downField("creator").as[List[DatasetCreator]].map(_.toSet)
+    } yield DatasetPublishing(maybeDate, creators)
 
-  private implicit lazy val dataSetCreatorDecoder: Decoder[DataSetCreator] = (cursor: HCursor) =>
+  private implicit lazy val datasetCreatorDecoder: Decoder[DatasetCreator] = (cursor: HCursor) =>
     for {
       name       <- cursor.downField("name").as[UserName]
       maybeEmail <- cursor.downField("email").as[Option[Email]]
-    } yield DataSetCreator(maybeEmail, name)
+    } yield DatasetCreator(maybeEmail, name)
 
-  private implicit lazy val dataSetPartDecoder: Decoder[DataSetPart] = (cursor: HCursor) =>
+  private implicit lazy val datasetPartDecoder: Decoder[DatasetPart] = (cursor: HCursor) =>
     for {
       name        <- cursor.downField("name").as[PartName]
       location    <- cursor.downField("atLocation").as[PartLocation]
       dateCreated <- cursor.downField("dateCreated").as[PartDateCreated]
-    } yield DataSetPart(name, location, dateCreated)
+    } yield DatasetPart(name, location, dateCreated)
 
-  private implicit lazy val dataSetProjectDecoder: Decoder[DataSetProject] = (cursor: HCursor) =>
+  private implicit lazy val datasetProjectDecoder: Decoder[DatasetProject] = (cursor: HCursor) =>
     for {
       name <- cursor.downField("name").as[ProjectPath]
-    } yield DataSetProject(name)
+    } yield DatasetProject(name)
 }

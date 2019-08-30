@@ -20,8 +20,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets.Identifier
-import ch.datascience.knowledgegraph.datasets.model.DataSet
+import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.RdfStoreConfig
@@ -30,24 +30,24 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait DataSetFinder[Interpretation[_]] {
-  def findDataSet(identifier: Identifier): Interpretation[Option[DataSet]]
+private trait DatasetFinder[Interpretation[_]] {
+  def findDataset(identifier: Identifier): Interpretation[Option[Dataset]]
 }
 
-private class IODataSetFinder(
+private class IODatasetFinder(
     baseDetailsFinder:       BaseDetailsFinder,
     creatorsFinder:          CreatorsFinder,
     partsFinder:             PartsFinder,
     projectsFinder:          ProjectsFinder
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends DataSetFinder[IO] {
+    extends DatasetFinder[IO] {
 
   import baseDetailsFinder._
   import creatorsFinder._
   import partsFinder._
   import projectsFinder._
 
-  def findDataSet(identifier: Identifier): IO[Option[DataSet]] =
+  def findDataset(identifier: Identifier): IO[Option[Dataset]] =
     findBaseDetails(identifier) flatMap {
       case None => IO.pure(None)
       case Some(baseDetails) =>
@@ -58,23 +58,23 @@ private class IODataSetFinder(
         } yield Some(withProjects)
     }
 
-  private def addCreators(baseInfo: DataSet): IO[DataSet] =
+  private def addCreators(baseInfo: Dataset): IO[Dataset] =
     findCreators(baseInfo.id).map { creators =>
       baseInfo.copy(published = baseInfo.published.copy(creators = creators))
     }
 
-  private def addParts(baseInfo: DataSet): IO[DataSet] =
+  private def addParts(baseInfo: Dataset): IO[Dataset] =
     findParts(baseInfo.id).map { parts =>
       baseInfo.copy(part = parts)
     }
 
-  private def addProjects(baseInfo: DataSet): IO[DataSet] =
+  private def addProjects(baseInfo: Dataset): IO[Dataset] =
     findProjects(baseInfo.id).map { projects =>
       baseInfo.copy(project = projects)
     }
 }
 
-private object IODataSetFinder {
+private object IODatasetFinder {
 
   def apply(
       rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
@@ -82,12 +82,12 @@ private object IODataSetFinder {
       logger:                  Logger[IO] = ApplicationLogger
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[DataSetFinder[IO]] =
+    timer:                     Timer[IO]): IO[DatasetFinder[IO]] =
     for {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
     } yield
-      new IODataSetFinder(
+      new IODatasetFinder(
         new BaseDetailsFinder(config, renkuBaseUrl, logger),
         new CreatorsFinder(config, renkuBaseUrl, logger),
         new PartsFinder(config, renkuBaseUrl, logger),

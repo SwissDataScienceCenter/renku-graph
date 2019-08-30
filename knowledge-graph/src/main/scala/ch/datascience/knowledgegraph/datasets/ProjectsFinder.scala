@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets.Identifier
+import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -43,10 +43,10 @@ private class ProjectsFinder(
 
   import ProjectsFinder._
 
-  def findProjects(dataSetIdentifier: Identifier): IO[List[DataSetProject]] =
-    queryExpecting[List[DataSetProject]](using = query(dataSetIdentifier))
+  def findProjects(identifier: Identifier): IO[List[DatasetProject]] =
+    queryExpecting[List[DatasetProject]](using = query(identifier))
 
-  private def query(dataSetIdentifier: Identifier): String =
+  private def query(identifier: Identifier): String =
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -57,18 +57,18 @@ private class ProjectsFinder(
        |SELECT DISTINCT ?isPartOf
        |WHERE {
        |  {
-       |    SELECT ?dataSet
+       |    SELECT ?dataset
        |    WHERE {
-       |      ?dataSet rdf:type <http://schema.org/Dataset> ;
-       |               rdfs:label "$dataSetIdentifier" .
+       |      ?dataset rdf:type <http://schema.org/Dataset> ;
+       |               rdfs:label "$identifier" .
        |    }
        |  }
        |  {
-       |    ?dataSet dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |    ?dataset dcterms:isPartOf|schema:isPartOf ?isPartOf .
        |  } UNION {
-       |    ?dataSet schema:url ?dataSetUrl .
-       |    ?otherDataSet rdf:type <http://schema.org/Dataset> ;
-       |                  schema:url ?dataSetUrl ;
+       |    ?dataset schema:url ?datasetUrl .
+       |    ?otherDataset rdf:type <http://schema.org/Dataset> ;
+       |                  schema:url ?datasetUrl ;
        |                  dcterms:isPartOf|schema:isPartOf ?isPartOf .
        |  }
        |}
@@ -80,7 +80,7 @@ private object ProjectsFinder {
 
   import io.circe.Decoder
 
-  private implicit val projectsDecoder: Decoder[List[DataSetProject]] = {
+  private implicit val projectsDecoder: Decoder[List[DatasetProject]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     def toProjectName(projectPath: FullProjectPath) =
@@ -89,12 +89,12 @@ private object ProjectsFinder {
         .toEither
         .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
 
-    implicit val projectDecoder: Decoder[DataSetProject] = { cursor =>
+    implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
         name <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectName)
-      } yield DataSetProject(name)
+      } yield DatasetProject(name)
     }
 
-    _.downField("results").downField("bindings").as(decodeList[DataSetProject])
+    _.downField("results").downField("bindings").as(decodeList[DatasetProject])
   }
 }

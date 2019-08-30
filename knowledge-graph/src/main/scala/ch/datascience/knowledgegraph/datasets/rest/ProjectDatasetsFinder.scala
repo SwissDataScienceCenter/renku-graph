@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets.{Identifier, Name}
+import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -30,21 +30,21 @@ import io.circe.Decoder.decodeList
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait ProjectDataSetsFinder[Interpretation[_]] {
-  def findProjectDataSets(projectPath: ProjectPath): Interpretation[List[(Identifier, Name)]]
+private trait ProjectDatasetsFinder[Interpretation[_]] {
+  def findProjectDatasets(projectPath: ProjectPath): Interpretation[List[(Identifier, Name)]]
 }
 
-private class IOProjectDataSetsFinder(
+private class IOProjectDatasetsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
-    with ProjectDataSetsFinder[IO] {
+    with ProjectDatasetsFinder[IO] {
 
-  import IOProjectDataSetsFinder._
+  import IOProjectDatasetsFinder._
 
-  def findProjectDataSets(projectPath: ProjectPath): IO[List[(Identifier, Name)]] =
+  def findProjectDatasets(projectPath: ProjectPath): IO[List[(Identifier, Name)]] =
     queryExpecting[List[(Identifier, Name)]](using = query(projectPath))
 
   private def query(projectPath: ProjectPath): String =
@@ -57,15 +57,15 @@ private class IOProjectDataSetsFinder(
        |
        |SELECT ?identifier ?name
        |WHERE {
-       |  ?dataSet dcterms:isPartOf|schema:isPartOf ?project .
+       |  ?dataset dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
-       |  ?dataSet rdf:type <http://schema.org/Dataset> ;
+       |  ?dataset rdf:type <http://schema.org/Dataset> ;
        |           rdfs:label ?identifier ;
        |           schema:name ?name .
        |}""".stripMargin
 }
 
-private object IOProjectDataSetsFinder {
+private object IOProjectDatasetsFinder {
   import io.circe.Decoder
 
   private implicit val recordsDecoder: Decoder[List[(Identifier, Name)]] = {

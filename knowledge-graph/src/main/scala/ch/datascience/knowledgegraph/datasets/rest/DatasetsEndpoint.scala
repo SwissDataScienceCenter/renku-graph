@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.graph.model.dataSets.Identifier
+import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.ApplicationLogger
@@ -38,8 +38,8 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class DataSetsEndpoint[Interpretation[_]: Effect](
-    dataSetFinder:     DataSetFinder[Interpretation],
+class DatasetsEndpoint[Interpretation[_]: Effect](
+    datasetFinder:     DatasetFinder[Interpretation],
     renkuResourcesUrl: RenkuResourcesUrl,
     logger:            Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
@@ -47,58 +47,58 @@ class DataSetsEndpoint[Interpretation[_]: Effect](
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
   import org.http4s.circe._
 
-  def getDataSet(identifier: Identifier): Interpretation[Response[Interpretation]] =
-    dataSetFinder
-      .findDataSet(identifier)
+  def getDataset(identifier: Identifier): Interpretation[Response[Interpretation]] =
+    datasetFinder
+      .findDataset(identifier)
       .flatMap(toHttpResult(identifier))
       .recoverWith(httpResult(identifier))
 
   private def toHttpResult(
       identifier: Identifier
-  ): Option[DataSet] => Interpretation[Response[Interpretation]] = {
-    case None          => NotFound(InfoMessage(s"No data-set with '$identifier' id found"))
-    case Some(dataSet) => Ok(dataSet.asJson)
+  ): Option[Dataset] => Interpretation[Response[Interpretation]] = {
+    case None          => NotFound(InfoMessage(s"No dataset with '$identifier' id found"))
+    case Some(dataset) => Ok(dataset.asJson)
   }
 
   private def httpResult(
       identifier: Identifier
   ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding data-set with '$identifier' id failed")
+      val errorMessage = ErrorMessage(s"Finding dataset with '$identifier' id failed")
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
 
   // format: off
-  private implicit lazy val dataSetEncoder: Encoder[DataSet] = Encoder.instance[DataSet] { dataSet =>
+  private implicit lazy val datasetEncoder: Encoder[Dataset] = Encoder.instance[Dataset] { dataset =>
     Json.obj(
       List(
-        Some("identifier" -> dataSet.id.asJson),
-        Some("name" -> dataSet.name.asJson),
-        dataSet.maybeDescription.map(description => "description" -> description.asJson),
+        Some("identifier" -> dataset.id.asJson),
+        Some("name" -> dataset.name.asJson),
+        dataset.maybeDescription.map(description => "description" -> description.asJson),
         Some("created" ->
           json"""{
-          "dateCreated": ${dataSet.created.date},
+          "dateCreated": ${dataset.created.date},
           "agent": {
-            "email": ${dataSet.created.agent.email},
-            "name": ${dataSet.created.agent.name}
+            "email": ${dataset.created.agent.email},
+            "name": ${dataset.created.agent.name}
           }
         }"""),
         Some("published" -> Json.obj(List(
-          dataSet.published.maybeDate.map(date => "datePublished" -> date.asJson),
-          Some("creator" -> dataSet.published.creators.toList.asJson)
+          dataset.published.maybeDate.map(date => "datePublished" -> date.asJson),
+          Some("creator" -> dataset.published.creators.toList.asJson)
         ).flatten: _*)),
-        Some("hasPart" -> dataSet.part.asJson),
-        Some("isPartOf" -> dataSet.project.asJson)
+        Some("hasPart" -> dataset.part.asJson),
+        Some("isPartOf" -> dataset.project.asJson)
       ).flatten: _*
     ) deepMerge _links(
-      Link(Rel.Self -> Href(renkuResourcesUrl / "data-sets" / dataSet.id))
+      Link(Rel.Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
     )
   } 
   // format: on
 
   // format: off
-  private implicit lazy val creatorEncoder: Encoder[DataSetCreator] = Encoder.instance[DataSetCreator] { creator =>
+  private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] { creator =>
     Json.obj(List(
       Some("name" -> creator.name.asJson),
       creator.maybeEmail.map(email => "email" -> email.asJson)
@@ -106,7 +106,7 @@ class DataSetsEndpoint[Interpretation[_]: Effect](
   }
   // format: on
 
-  private implicit lazy val partEncoder: Encoder[DataSetPart] = Encoder.instance[DataSetPart] { part =>
+  private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
     json"""{
       "name": ${part.name},
       "atLocation": ${part.atLocation},
@@ -114,24 +114,24 @@ class DataSetsEndpoint[Interpretation[_]: Effect](
     }"""
   }
 
-  private implicit lazy val projectEncoder: Encoder[DataSetProject] = Encoder.instance[DataSetProject] { project =>
+  private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
       "name": ${project.name}
     }"""
   }
 }
 
-object IODataSetsEndpoint {
+object IODatasetsEndpoint {
 
   def apply()(implicit executionContext: ExecutionContext,
               contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[DataSetsEndpoint[IO]] =
+              timer:                     Timer[IO]): IO[DatasetsEndpoint[IO]] =
     for {
-      dataSetFinder    <- IODataSetFinder(logger = ApplicationLogger)
+      datasetFinder    <- IODatasetFinder(logger = ApplicationLogger)
       renkuResourceUrl <- RenkuResourcesUrl[IO]()
     } yield
-      new DataSetsEndpoint[IO](
-        dataSetFinder,
+      new DatasetsEndpoint[IO](
+        datasetFinder,
         renkuResourceUrl,
         ApplicationLogger
       )

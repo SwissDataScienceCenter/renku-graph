@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.dataSets._
+import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.projects.ProjectPath
@@ -90,14 +90,14 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       commitId:                  CommitId = commitIds.generateOne,
       committerEmail:            Email = emails.generateOne,
       committerName:             UserName = names.generateOne,
-      dataSetId:                 Identifier = dataSetIds.generateOne,
-      dataSetName:               Name = dataSetNames.generateOne,
-      maybeDataSetDescription:   Option[Description] = Gen.option(dataSetDescriptions).generateOne,
-      dataSetCreatedDate:        DateCreated = dataSetCreatedDates.generateOne,
-      maybeDataSetPublishedDate: Option[PublishedDate] = Gen.option(dataSetPublishedDates).generateOne,
-      maybeDataSetCreators:      Set[(Option[Email], UserName)] = setOf(dataSetCreators).generateOne,
-      maybeDataSetParts:         List[(PartName, PartLocation, PartDateCreated)] = listOf(dataSetParts).generateOne,
-      maybeDataSetUrl:           Option[String] = Gen.option(dataSetUrl).generateOne,
+      datasetId:                 Identifier = datasetIds.generateOne,
+      datasetName:               Name = datasetNames.generateOne,
+      maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
+      datasetCreatedDate:        DateCreated = datasetCreatedDates.generateOne,
+      maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+      maybeDatasetCreators:      Set[(Option[Email], UserName)] = setOf(datasetCreators).generateOne,
+      maybeDatasetParts:         List[(PartName, PartLocation, PartDateCreated)] = listOf(datasetParts).generateOne,
+      maybeDatasetUrl:           Option[String] = Gen.option(datasetUrl).generateOne,
       schemaVersion:             SchemaVersion = schemaVersions.generateOne): NodeBuffer =
     // format: off
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.gitattributes"}>
@@ -109,12 +109,12 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
       <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku"}/>
       <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets"}/>
-      <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets/$dataSetId"}/>
+      <prov:influenced rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId"}/>
       <prov:agent rdf:resource={agentNodeResource(schemaVersion)}/>
       <prov:agent rdf:resource={personNodeResource(committerName)}/>
       <prov:wasInformedBy rdf:resource="file:///commit/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b"/>
       <rdfs:label>{commitId.toString}</rdfs:label>
-      <rdfs:comment>{s"renku dataset add $dataSetName https://raw.githubusercontent.com/SwissDataScienceCenter/renku-python/master/README.rst"}</rdfs:comment>
+      <rdfs:comment>{s"renku dataset add $datasetName https://raw.githubusercontent.com/SwissDataScienceCenter/renku-python/master/README.rst"}</rdfs:comment>
       <prov:startedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-31T09:19:57+00:00</prov:startedAtTime>
       <prov:endedAtTime rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2019-07-31T09:19:57+00:00</prov:endedAtTime>
     </rdf:Description> &+
@@ -129,20 +129,20 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets"}/>
       <rdfs:label>{s".renku@$commitId"}</rdfs:label>
     </rdf:Description>
-    <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets/$dataSetId"}>
+    <rdf:Description rdf:about={s"file:///blob/$commitId/.renku/datasets/$datasetId"}>
       <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-      <prov:atLocation>{s".renku/datasets/$dataSetId"}</prov:atLocation>
-      <prov:hadMember rdf:resource={s"file:///$dataSetId"}/>
-      <rdfs:label>{s".renku/datasets/$dataSetId@$commitId"}</rdfs:label>
+      <prov:atLocation>{s".renku/datasets/$datasetId"}</prov:atLocation>
+      <prov:hadMember rdf:resource={s"file:///$datasetId"}/>
+      <rdfs:label>{s".renku/datasets/$datasetId@$commitId"}</rdfs:label>
     </rdf:Description>
     <rdf:Description rdf:about="https://dev.renku.ch/jakub.chrobasik/kuba-bikes">
       <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Project"/>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Location"/>
     </rdf:Description>
-    <rdf:Description rdf:about={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}>
+    <rdf:Description rdf:about={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$datasetId"}>
       <prov:activity rdf:resource={s"file:///commit/$commitId"}/>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Generation"/>
     </rdf:Description>
@@ -154,37 +154,37 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/.renku.lock"}/>
       <rdfs:label>{s".renku.lock@$commitId"}</rdfs:label>
     </rdf:Description>
-    <rdf:Description rdf:about={s"file:///$dataSetId"}>
+    <rdf:Description rdf:about={s"file:///$datasetId"}>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
       <rdf:type rdf:resource="http://schema.org/Dataset"/>
       <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-      <prov:atLocation>{s"/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}</prov:atLocation>
-      <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$dataSetId"}/>
-      <schema:identifier>{dataSetId.toString}</schema:identifier>
-      <rdfs:label>{dataSetId.toString}</rdfs:label>
+      <prov:atLocation>{s"/home/jovyan/kuba-bikes/.renku/datasets/$datasetId"}</prov:atLocation>
+      <prov:qualifiedGeneration rdf:resource={s"file:///commit/$commitId/tree/home/jovyan/kuba-bikes/.renku/datasets/$datasetId"}/>
+      <schema:identifier>{datasetId.toString}</schema:identifier>
+      <rdfs:label>{datasetId.toString}</rdfs:label>
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-      <schema:name>{dataSetName.toString}</schema:name>
-      <schema:dateCreated>{dataSetCreatedDate.toString}</schema:dateCreated>
-      {maybeDataSetCreators.map { creator =>
+      <schema:name>{datasetName.toString}</schema:name>
+      <schema:dateCreated>{datasetCreatedDate.toString}</schema:dateCreated>
+      {maybeDatasetCreators.map { creator =>
         <schema:creator rdf:resource={personNodeResource(creator._2)}/>
       }}
-      {maybeDataSetParts.map { case (_, location, _) =>
+      {maybeDatasetParts.map { case (_, location, _) =>
         <schema:hasPart rdf:resource={partNodeResource(commitId, location)}/>
       }}
-      {maybeDataSetPublishedDate.map { publishedDate =>
+      {maybeDatasetPublishedDate.map { publishedDate =>
         <schema:datePublished rdf:datatype="http://schema.org/Date">{publishedDate.toString}</schema:datePublished>
       }.getOrElse(NodeSeq.Empty)}
-      {maybeDataSetDescription.map { description =>
+      {maybeDatasetDescription.map { description =>
         <schema:description>{description.toString}</schema:description>
       }.getOrElse(NodeSeq.Empty)}
-      {maybeDataSetUrl.map { url =>
+      {maybeDatasetUrl.map { url =>
         <schema:url>{url.toString}</schema:url>
       }.getOrElse(NodeSeq.Empty)}
     </rdf:Description> ++
-    {maybeDataSetCreators.map { case (maybeEmail, name) =>
+    {maybeDatasetCreators.map { case (maybeEmail, name) =>
       personNode(name, maybeEmail)
     }} ++
-    {maybeDataSetParts.map { case (name, location, dateCreated) =>
+    {maybeDatasetParts.map { case (name, location, dateCreated) =>
       partNode(commitId, projectPath, name, location, dateCreated)
     }} ++
     <rdf:Description rdf:about={s"file:///blob/$commitId/.gitattributes"}>
@@ -201,7 +201,7 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
       <prov:atLocation>.renku/datasets</prov:atLocation>
       <schema:isPartOf rdf:resource={(renkuBaseUrl / projectPath).toString}/>
-      <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets/$dataSetId"}/>
+      <prov:hadMember rdf:resource={s"file:///blob/$commitId/.renku/datasets/$datasetId"}/>
       <rdf:type rdf:resource="http://www.w3.org/ns/prov#Collection"/>
     </rdf:Description>
     <rdf:Description rdf:about={s"file:///commit/$commitId/tree/.renku.lock"}>
@@ -210,18 +210,18 @@ class RdfStoreData(val renkuBaseUrl: RenkuBaseUrl) {
     </rdf:Description>
     // format: on
 
-  private val dataSetCreators: Gen[(Option[Email], UserName)] = for {
+  private val datasetCreators: Gen[(Option[Email], UserName)] = for {
     maybeEmail <- Gen.option(emails)
     name       <- names
   } yield (maybeEmail, name)
 
-  private val dataSetParts: Gen[(PartName, PartLocation, PartDateCreated)] = for {
-    name        <- dataSetPartNames
-    location    <- dataSetPartLocations
-    dateCreated <- dataSetPartCreatedDates
+  private val datasetParts: Gen[(PartName, PartLocation, PartDateCreated)] = for {
+    name        <- datasetPartNames
+    location    <- datasetPartLocations
+    dateCreated <- datasetPartCreatedDates
   } yield (name, location, dateCreated)
 
-  private val dataSetUrl: Gen[String] = for {
+  private val datasetUrl: Gen[String] = for {
     url  <- Gen.option(httpUrls)
     uuid <- Gen.uuid.map(_.toString)
   } yield s"$url/$uuid"

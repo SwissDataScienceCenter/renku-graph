@@ -34,8 +34,8 @@ object RDFStore {
 
   // There's a problem with restarting Jena so this whole weirdness comes due to that fact
   private class JenaInstance {
-    lazy val renkuDataSet = DatasetFactory.createTxnMem()
-    lazy val connection   = RDFConnectionFactory.connect(renkuDataSet)
+    lazy val renkuDataset = DatasetFactory.createTxnMem()
+    lazy val connection   = RDFConnectionFactory.connect(renkuDataset)
 
     private val jenaFiber = MVar.empty[IO, Fiber[IO, FusekiServer]].unsafeRunSync()
 
@@ -47,7 +47,7 @@ object RDFStore {
                     .create()
                     .loopback(true)
                     .port(3030)
-                    .add("/renku", renkuDataSet)
+                    .add("/renku", renkuDataset)
                     .build
                     .start()
                 }.start
@@ -56,7 +56,7 @@ object RDFStore {
 
     def stop(): IO[Unit] = {
       connection.close()
-      renkuDataSet.close()
+      renkuDataset.close()
       jenaFiber.tryTake.flatMap {
         case None => IO.unit
         case Some(fiber) =>

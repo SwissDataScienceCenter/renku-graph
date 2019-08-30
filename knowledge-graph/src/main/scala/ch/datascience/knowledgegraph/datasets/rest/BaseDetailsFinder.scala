@@ -20,8 +20,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.graph.model.dataSets.Identifier
-import ch.datascience.knowledgegraph.datasets.model.DataSet
+import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -40,8 +40,8 @@ private class BaseDetailsFinder(
 
   import BaseDetailsFinder._
 
-  def findBaseDetails(identifier: Identifier): IO[Option[DataSet]] =
-    queryExpecting[Option[DataSet]](using = query(identifier))
+  def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
+    queryExpecting[Option[Dataset]](using = query(identifier))
 
   private def query(identifier: Identifier): String =
     s"""
@@ -53,7 +53,7 @@ private class BaseDetailsFinder(
        |
        |SELECT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
        |WHERE {
-       |  ?dataSet rdfs:label "$identifier" ;
+       |  ?dataset rdfs:label "$identifier" ;
        |           rdfs:label ?identifier ;
        |           rdf:type <http://schema.org/Dataset> ;
        |           schema:name ?name ;
@@ -62,21 +62,21 @@ private class BaseDetailsFinder(
        |  ?agentResource rdf:type <http://schema.org/Person> ;
        |           schema:email ?agentEmail ;
        |           schema:name ?agentName .
-       |  OPTIONAL { ?dataSet schema:description ?description } .         
-       |  OPTIONAL { ?dataSet schema:datePublished ?publishedDate } .         
+       |  OPTIONAL { ?dataset schema:description ?description } .         
+       |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .         
        |}""".stripMargin
 }
 
 private object BaseDetailsFinder {
   import io.circe.Decoder
 
-  private implicit val maybeRecordDecoder: Decoder[Option[DataSet]] = {
-    import ch.datascience.graph.model.dataSets._
+  private implicit val maybeRecordDecoder: Decoder[Option[Dataset]] = {
+    import ch.datascience.graph.model.datasets._
     import ch.datascience.graph.model.users.{Email, Name => UserName}
     import ch.datascience.knowledgegraph.datasets.model._
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    val dataSet: Decoder[DataSet] = { cursor =>
+    val dataset: Decoder[Dataset] = { cursor =>
       for {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
@@ -86,21 +86,21 @@ private object BaseDetailsFinder {
         agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
       } yield
-        DataSet(
+        Dataset(
           id,
           name,
           maybeDescription,
-          DataSetCreation(dateCreated, DataSetAgent(agentEmail, agentName)),
-          DataSetPublishing(maybePublishedDate, Set.empty),
+          DatasetCreation(dateCreated, DatasetAgent(agentEmail, agentName)),
+          DatasetPublishing(maybePublishedDate, Set.empty),
           part    = List.empty,
           project = List.empty
         )
     }
 
-    _.downField("results").downField("bindings").as(decodeList(dataSet)).flatMap {
+    _.downField("results").downField("bindings").as(decodeList(dataset)).flatMap {
       case Nil            => Right(None)
-      case dataSet +: Nil => Right(Some(dataSet))
-      case manyDataSets   => Left(DecodingFailure(s"More than one data-set with ${manyDataSets.head.id} id", Nil))
+      case dataset +: Nil => Right(Some(dataset))
+      case manyDatasets   => Left(DecodingFailure(s"More than one dataset with ${manyDatasets.head.id} id", Nil))
     }
   }
 }

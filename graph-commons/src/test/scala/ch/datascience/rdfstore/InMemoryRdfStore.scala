@@ -82,12 +82,12 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
   )
   import rdfStoreConfig._
-  private lazy val renkuDataSet = DatasetFactory.createTxnMem()
+  private lazy val renkuDataset = DatasetFactory.createTxnMem()
   private lazy val rdfStoreServer: FusekiServer = FusekiServer
     .create()
     .loopback(true)
     .port(fusekiServerPort)
-    .add(s"/$datasetName", renkuDataSet)
+    .add(s"/$datasetName", renkuDataset)
     .build
 
   protected val sparqlEndpoint: Uri = Uri
@@ -111,8 +111,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   }
 
   before {
-    renkuDataSet.asDatasetGraph().clear()
-    renkuDataSet.asDatasetGraph().isEmpty shouldBe true
+    renkuDataset.asDatasetGraph().clear()
+    renkuDataset.asDatasetGraph().isEmpty shouldBe true
   }
 
   protected override def afterAll(): Unit = {

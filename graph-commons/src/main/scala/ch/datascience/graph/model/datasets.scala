@@ -23,7 +23,7 @@ import java.time.Instant
 import ch.datascience.tinytypes.constraints._
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
-object dataSets {
+object datasets {
 
   final class Identifier private (val value: String) extends AnyVal with StringTinyType
   implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with UUID

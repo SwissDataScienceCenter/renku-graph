@@ -6,22 +6,22 @@ This is a microservice which provides API for the Graph DB.
 
 | Method  | Path                                                    | Description                                            |
 |---------|---------------------------------------------------------|--------------------------------------------------------|
-|  GET    | ```/knowledge-graph/data-sets/:id```                    | Returns details of the data-set with the given `id`    |
+|  GET    | ```/knowledge-graph/datasets/:id```                     | Returns details of the dataset with the given `id`     |
 |  GET    | ```/knowledge-graph/graphql```                          | Returns GraphQL endpoint schema                        |
 |  POST   | ```/knowledge-graph/graphql```                          | GraphQL query endpoint                                 |
-|  GET    | ```/knowledge-graph/projects/:project-path/data-sets``` | Returns data-sets of the project with the given `path` |
+|  GET    | ```/knowledge-graph/projects/:project-path/datasets```  | Returns datasets of the project with the given `path`      |
 |  GET    | ```/ping```                                             | To check if service is healthy                         |
 
-#### GET /knowledge-graph/data-sets/:id
+#### GET /knowledge-graph/datasets/:id
 
-Finds details of the data-set with the given `id`.
+Finds details of the dataset with the given `id`.
 
 **Response**
 
 | Status                     | Description                   |
 |----------------------------|-------------------------------|
-| OK (200)                   | If data-set details are found |
-| NOT_FOUND (404)            | If data-set is not found      |
+| OK (200)                   | If dataset details are found  |
+| NOT_FOUND (404)            | If dataset is not found       |
 | INTERNAL SERVER ERROR (500)| Otherwise                     |
 
 Response body example:
@@ -30,11 +30,11 @@ Response body example:
   "_links" : [
     {
       "rel" : "self",
-      "href" : "https://zemdgsw:9540/data-sets/6f622603-2129-4058-ad29-3ff927481461"
+      "href" : "https://zemdgsw:9540/datasets/6f622603-2129-4058-ad29-3ff927481461"
     }
   ],
   "identifier" : "6f622603-2129-4058-ad29-3ff927481461",
-  "name" : "data-set name",
+  "name" : "dataset name",
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
   "created" : {
     "dateCreated" : "1970-05-12T06:06:41.448Z",
@@ -156,7 +156,7 @@ Query example:
 ```
 {
   "query": "{ 
-    dataSets(projectPath: \"namespace/project\") {
+    datasets(projectPath: \"namespace/project\") {
       identifier!
       name!
       description
@@ -191,10 +191,10 @@ Response body example:
 ```
 {
   "data": {
-    "dataSets": [
+    "datasets": [
       {
         "identifier": "e1fc7b62-e021-434b-9264-dda336bddd4f",
-        "name": "data-set name",
+        "name": "dataset name",
         "description": "Data-set long description",
         "created": {
           "dateCreated": "1981-09-05T10:38:29.457Z",
@@ -232,7 +232,7 @@ Response body example:
         },
         "hasPart": [{
           "name": "file1",
-          "atLocation"": "data/data-set-name/file1",
+          "atLocation"": "data/dataset-name/file1",
           "dateCreated": "1991-09-05T10:38:29.457Z"
         }],
         "isPartOf": [{
@@ -284,14 +284,14 @@ In case there's no data found for a given query, the response `json` will contai
 ```
 {
   "data": {
-    "dataSets": null
+    "datasets": null
   }
 }
 ```
 
-#### GET /knowledge-graph/projects/:project-path/data-sets
+#### GET /knowledge-graph/projects/:project-path/datasets
 
-Finds list of data-sets of the project with the given `project-path`.
+Finds list of datasets of the project with the given `project-path`.
 
 **NOTICE**: `project-path` has to be in format: `namespace/project-name` and **url encoded**.
 
@@ -299,8 +299,8 @@ Finds list of data-sets of the project with the given `project-path`.
 
 | Status                     | Description                            |
 |----------------------------|----------------------------------------|
-| OK (200)                   | If there are data-sets for the project |
-| NOT_FOUND (404)            | If there are no data-sets found        |
+| OK (200)                   | If there are datasets for the project  |
+| NOT_FOUND (404)            | If there are no datasets found         |
 | INTERNAL SERVER ERROR (500)| Otherwise                              |
 
 Response body example:
@@ -312,7 +312,7 @@ Response body example:
       "_links":[  
          {  
             "rel":"details",
-            "href":"http://t:5511/data-sets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
+            "href":"http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
          }
       ]
    },
@@ -322,7 +322,7 @@ Response body example:
       "_links":[  
          {  
             "rel":"details",
-            "href":"http://t:5511/data-sets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+            "href":"http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
          }
       ]
    }

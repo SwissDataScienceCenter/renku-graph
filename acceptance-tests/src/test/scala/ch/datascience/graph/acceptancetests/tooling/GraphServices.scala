@@ -85,7 +85,7 @@ object GraphServices {
     "triples-generator",
     service          = triplesgenerator.Microservice,
     serviceClient    = triplesGeneratorClient,
-    preServiceStart  = List(RDFStore.stop(), IO(RdfStoreStub.start()), IO(RdfStoreStub.givenRenkuDataSetExists())),
+    preServiceStart  = List(RDFStore.stop(), IO(RdfStoreStub.start()), IO(RdfStoreStub.givenRenkuDatasetExists())),
     postServiceStart = List(IO(RdfStoreStub.shutdown()), RDFStore.start())
   )
 

@@ -18,8 +18,8 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import ch.datascience.graph.model.dataSets
+import ch.datascience.graph.model.datasets
 
-object DataSetIdPathBinder {
-  def unapply(value: String): Option[dataSets.Identifier] = dataSets.Identifier.from(value).toOption
+object DatasetIdPathBinder {
+  def unapply(value: String): Option[datasets.Identifier] = datasets.Identifier.from(value).toOption
 }

@@ -28,7 +28,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.datasets.DataSetsGenerators._
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.RdfStoreData._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
@@ -41,75 +41,75 @@ import org.scalatest.{FeatureSpec, GivenWhenThen}
 import sangria.ast.Document
 import sangria.macros._
 
-class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
+class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
   private val project          = projects.generateOne.copy(path = ProjectPath("namespace/project"))
-  private val dataSet1CommitId = commitIds.generateOne
-  private val dataSet1 = dataSets.generateOne.copy(
-    maybeDescription = Some(dataSetDescriptions.generateOne),
-    published        = dataSetPublishingInfos.generateOne.copy(maybeDate = Some(dataSetPublishedDates.generateOne)),
-    project          = List(DataSetProject(project.path))
+  private val dataset1CommitId = commitIds.generateOne
+  private val dataset1 = datasets.generateOne.copy(
+    maybeDescription = Some(datasetDescriptions.generateOne),
+    published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
+    project          = List(DatasetProject(project.path))
   )
-  private val dataSet2CommitId = commitIds.generateOne
-  private val dataSet2 = dataSets.generateOne.copy(
+  private val dataset2CommitId = commitIds.generateOne
+  private val dataset2 = datasets.generateOne.copy(
     maybeDescription = None,
-    published        = dataSetPublishingInfos.generateOne.copy(maybeDate = None),
-    project          = List(DataSetProject(project.path))
+    published        = datasetPublishingInfos.generateOne.copy(maybeDate = None),
+    project          = List(DatasetProject(project.path))
   )
 
-  feature("GraphQL query to find project's data-sets") {
+  feature("GraphQL query to find project's datasets") {
 
-    scenario("As a user I would like to find project's data-sets with a GraphQL query") {
+    scenario("As a user I would like to find project's datasets with a GraphQL query") {
 
       Given("some data in the RDF Store")
       val triples = singleFileAndCommitWithDataset(
         project.path,
-        dataSet1CommitId,
-        dataSet1.created.agent.email,
-        dataSet1.created.agent.name,
-        dataSet1.id,
-        dataSet1.name,
-        dataSet1.maybeDescription,
-        dataSet1.created.date,
-        dataSet1.published.maybeDate,
-        dataSet1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
-        dataSet1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+        dataset1CommitId,
+        dataset1.created.agent.email,
+        dataset1.created.agent.name,
+        dataset1.id,
+        dataset1.name,
+        dataset1.maybeDescription,
+        dataset1.created.date,
+        dataset1.published.maybeDate,
+        dataset1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
+        dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
         schemaVersion = currentSchemaVersion
       ) &+ singleFileAndCommitWithDataset(
         project.path,
-        dataSet2CommitId,
-        dataSet2.created.agent.email,
-        dataSet2.created.agent.name,
-        dataSet2.id,
-        dataSet2.name,
-        dataSet2.maybeDescription,
-        dataSet2.created.date,
-        dataSet2.published.maybeDate,
-        dataSet2.published.creators.map(creator => (creator.maybeEmail, creator.name)),
-        dataSet2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+        dataset2CommitId,
+        dataset2.created.agent.email,
+        dataset2.created.agent.name,
+        dataset2.id,
+        dataset2.name,
+        dataset2.maybeDescription,
+        dataset2.created.date,
+        dataset2.published.maybeDate,
+        dataset2.published.creators.map(creator => (creator.maybeEmail, creator.name)),
+        dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
         schemaVersion = currentSchemaVersion
       )
 
-      `data in the RDF store`(project, dataSet1CommitId, triples)
+      `data in the RDF store`(project, dataset1CommitId, triples)
 
-      When("user posts a graphql query to fetch data-sets")
+      When("user posts a graphql query to fetch datasets")
       val response = knowledgeGraphClient POST query
 
-      Then("he should get OK response with project's data-sets in Json")
+      Then("he should get OK response with project's datasets in Json")
       response.status shouldBe Ok
 
-      val Right(responseJson) = response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]]
+      val Right(responseJson) = response.bodyAsJson.hcursor.downField("data").downField("datasets").as[List[Json]]
 
       val actual   = responseJson flatMap sortCreators
-      val expected = List(json(dataSet1), json(dataSet2)) flatMap sortCreators flatMap sortPartsAlphabetically
+      val expected = List(json(dataset1), json(dataset2)) flatMap sortCreators flatMap sortPartsAlphabetically
       actual should contain theSameElementsAs expected
     }
 
-    scenario("As a user I would like to find project's data-sets with a named GraphQL query") {
+    scenario("As a user I would like to find project's datasets with a named GraphQL query") {
 
       Given("some data in the RDF Store")
 
-      When("user posts a graphql query to fetch the data-sets")
+      When("user posts a graphql query to fetch the datasets")
       val response = knowledgeGraphClient.POST(
         namedQuery,
         variables = Map("projectPath" -> project.path.toString)
@@ -118,10 +118,10 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
 
-      val Right(responseJson) = response.bodyAsJson.hcursor.downField("data").downField("dataSets").as[List[Json]]
+      val Right(responseJson) = response.bodyAsJson.hcursor.downField("data").downField("datasets").as[List[Json]]
 
       val actual   = responseJson flatMap sortCreators
-      val expected = List(json(dataSet1), json(dataSet2)) flatMap sortCreators flatMap sortPartsAlphabetically
+      val expected = List(json(dataset1), json(dataset2)) flatMap sortCreators flatMap sortPartsAlphabetically
       actual should contain theSameElementsAs expected
     }
   }
@@ -152,7 +152,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
 
   private val query: Document = graphql"""
     {
-      dataSets(projectPath: "namespace/project") {
+      datasets(projectPath: "namespace/project") {
         identifier
         name
         description
@@ -165,7 +165,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
 
   private val namedQuery: Document = graphql"""
     query($$projectPath: ProjectPath!) { 
-      dataSets(projectPath: $$projectPath) { 
+      datasets(projectPath: $$projectPath) { 
         identifier
         name
         description
@@ -177,35 +177,35 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
     }"""
 
   // format: off
-  private def json(dataSet: DataSet) = json"""
+  private def json(dataset: Dataset) = json"""
     {
-      "identifier": ${dataSet.id}, 
-      "name": ${dataSet.name},
-      "description": ${dataSet.maybeDescription.map(_.asJson).getOrElse(Json.Null)},
+      "identifier": ${dataset.id}, 
+      "name": ${dataset.name},
+      "description": ${dataset.maybeDescription.map(_.asJson).getOrElse(Json.Null)},
       "created": {
-        "dateCreated": ${dataSet.created.date},
+        "dateCreated": ${dataset.created.date},
         "agent": {
-          "email": ${dataSet.created.agent.email},
-          "name": ${dataSet.created.agent.name}
+          "email": ${dataset.created.agent.email},
+          "name": ${dataset.created.agent.name}
         }
       },
       "published": {
-        "datePublished": ${dataSet.published.maybeDate.map(_.asJson).getOrElse(Json.Null)},
-        "creator": ${dataSet.published.creators.toList}
+        "datePublished": ${dataset.published.maybeDate.map(_.asJson).getOrElse(Json.Null)},
+        "creator": ${dataset.published.creators.toList}
       },
-      "hasPart": ${dataSet.part},
-      "isPartOf": ${dataSet.project}
+      "hasPart": ${dataset.part},
+      "isPartOf": ${dataset.project}
     }"""
   // format: on
 
-  private implicit lazy val creatorEncoder: Encoder[DataSetCreator] = Encoder.instance[DataSetCreator] { creator =>
+  private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] { creator =>
     json"""{
         "email": ${creator.maybeEmail.map(_.asJson).getOrElse(Json.Null)},
         "name": ${creator.name}
       }"""
   }
 
-  private implicit lazy val partEncoder: Encoder[DataSetPart] = Encoder.instance[DataSetPart] { part =>
+  private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
     json"""{
         "name": ${part.name},
         "atLocation": ${part.atLocation},
@@ -213,7 +213,7 @@ class DataSetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       }"""
   }
 
-  private implicit lazy val projectEncoder: Encoder[DataSetProject] = Encoder.instance[DataSetProject] { project =>
+  private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
         "name": ${project.name}
       }"""

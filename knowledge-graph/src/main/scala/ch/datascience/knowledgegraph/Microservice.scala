@@ -23,7 +23,7 @@ import java.util.concurrent.Executors.newFixedThreadPool
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.http.server.HttpServer
-import ch.datascience.knowledgegraph.datasets.rest.{IODataSetsEndpoint, IOProjectDataSetsEndpoint}
+import ch.datascience.knowledgegraph.datasets.rest.{IODatasetsEndpoint, IOProjectDatasetsEndpoint}
 import ch.datascience.knowledgegraph.graphql.IOQueryEndpoint
 import ch.datascience.microservices.IOMicroservice
 import pureconfig.loadConfigOrThrow
@@ -47,11 +47,11 @@ object Microservice extends IOMicroservice {
       sentryInitializer <- SentryInitializer[IO]
 
       queryEndpoint           <- IOQueryEndpoint()
-      projectDataSetsEndpoint <- IOProjectDataSetsEndpoint()
-      dataSetsEndpoint        <- IODataSetsEndpoint()
+      projectDatasetsEndpoint <- IOProjectDatasetsEndpoint()
+      datasetsEndpoint        <- IODatasetsEndpoint()
       httpServer = new HttpServer[IO](
         serverPort    = 9004,
-        serviceRoutes = new MicroserviceRoutes[IO](queryEndpoint, projectDataSetsEndpoint, dataSetsEndpoint).routes
+        serviceRoutes = new MicroserviceRoutes[IO](queryEndpoint, projectDatasetsEndpoint, datasetsEndpoint).routes
       )
 
       exitCode <- new MicroserviceRunner(sentryInitializer, httpServer).run(args)
