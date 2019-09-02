@@ -101,7 +101,7 @@ class QueryEndpointSpec extends WordSpec with MockFactory {
 
       response.status                   shouldBe BadRequest
       response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception.getMessage).asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception).asJson
     }
 
     "respond with INTERNAL_SERVER_ERROR if running the query fails" in new TestCase {
@@ -118,7 +118,7 @@ class QueryEndpointSpec extends WordSpec with MockFactory {
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception.getMessage).asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception).asJson
     }
   }
 

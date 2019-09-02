@@ -103,7 +103,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe Unauthorized
       response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
     }
 
     "return INTERNAL_SERVER_ERROR when there was an error during hook creation" in new TestCase {
@@ -149,7 +149,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe Unauthorized
       response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
     }
   }
 
