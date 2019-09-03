@@ -32,13 +32,33 @@ object ErrorMessage {
 
   type ErrorMessage = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 
-  def apply(errorMessage: String): ErrorMessage =
-    RefType
-      .applyRef[ErrorMessage](errorMessage.split('\n').map(_.trim.filter(_ >= ' ')).mkString)
-      .fold(
-        _ => throw new IllegalArgumentException("Error message cannot be blank"),
-        identity
-      )
+  def apply(errorMessage: String): ErrorMessage = toErrorMessage {
+    blankToNone(errorMessage)
+      .map(toSingleLine)
+      .getOrElse(throw new IllegalArgumentException("ErrorMessage cannot be instantiated with a blank String"))
+  }
+
+  def apply(exception: Throwable): ErrorMessage = toErrorMessage {
+    blankToNone(exception.getMessage)
+      .fold(ifEmpty = exception.getClass.getName)(toSingleLine)
+  }
+
+  private def blankToNone(message: String): Option[String] =
+    Option(message)
+      .map(_.trim)
+      .flatMap {
+        case ""       => None
+        case nonBlank => Some(nonBlank)
+      }
+
+  private lazy val toSingleLine: String => String = _.split('\n').map(_.trim.filter(_ >= ' ')).mkString("", " ", "")
+
+  private val toErrorMessage: String => ErrorMessage = RefType
+    .applyRef[ErrorMessage](_)
+    .fold(
+      error => throw new IllegalArgumentException(error),
+      identity
+    )
 
   implicit val errorMessageEncoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
     Json.obj("message" -> Json.fromString(message.value))

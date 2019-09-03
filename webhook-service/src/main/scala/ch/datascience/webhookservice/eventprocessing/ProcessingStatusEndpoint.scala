@@ -80,7 +80,7 @@ class ProcessingStatusEndpoint[Interpretation[_]: Effect](
   }
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))
+    case NonFatal(exception) => InternalServerError(ErrorMessage(exception))
   }
 }
 

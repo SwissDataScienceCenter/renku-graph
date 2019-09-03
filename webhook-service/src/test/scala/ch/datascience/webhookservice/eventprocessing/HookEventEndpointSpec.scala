@@ -84,7 +84,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe InternalServerError
       response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception.getMessage).asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception).asJson
     }
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
@@ -95,9 +95,11 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       val response = processPushEvent(request).unsafeRunSync()
 
-      response.status                 shouldBe BadRequest
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage("Invalid message body: Could not decode JSON: {}").asJson
+      response.status      shouldBe BadRequest
+      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(
+        s"Invalid message body: Could not decode JSON: ${Json.obj()}"
+      ).asJson
     }
 
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
@@ -109,7 +111,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe Unauthorized
       response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
     }
 
     "return UNAUTHORIZED when user X-Gitlab-Token is invalid" in new TestCase {
@@ -127,7 +129,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe Unauthorized
       response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
     }
 
     "return UNAUTHORIZED when X-Gitlab-Token decryption fails" in new TestCase {
@@ -146,7 +148,7 @@ class HookEventEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe Unauthorized
       response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException.getMessage).asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
     }
   }
 
