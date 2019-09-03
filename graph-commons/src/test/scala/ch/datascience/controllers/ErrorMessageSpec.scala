@@ -18,27 +18,61 @@
 
 package ch.datascience.controllers
 
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 class ErrorMessageSpec extends WordSpec {
 
-  "ErrorResponse" should {
+  "ErrorMessage" should {
 
     "be instantiatable from a non blank String" in {
-      ErrorMessage("abc").value shouldBe "abc"
+      val line1                 = nonEmptyStrings().generateOne
+      val (line2Message, line2) = tabbedLines.generateOne
+
+      ErrorMessage(s"$line1\n$line2").value shouldBe s"$line1 $line2Message"
     }
 
-    "throw an IllegalArgumentException for an empty String" in {
-      intercept[IllegalArgumentException] {
-        ErrorMessage("")
-      }.getMessage shouldBe "Error message cannot be blank"
+    "be instantiable from an Exception with a non-null, non-blank, single line message" in {
+      val exception = exceptions.generateOne
+
+      val message = ErrorMessage(exception)
+
+      message.value shouldBe exception.getMessage
     }
 
-    "throw an IllegalArgumentException for a blank String" in {
-      intercept[IllegalArgumentException] {
-        ErrorMessage(" ")
-      }.getMessage shouldBe "Error message cannot be blank"
+    "be instantiable from an Exception with a multi-line message having some tabbing" in {
+      val line1                 = nonEmptyStrings().generateOne
+      val (line2Message, line2) = tabbedLines.generateOne
+      val exception             = new Exception(s"$line1\n$line2")
+
+      val message = ErrorMessage(exception)
+
+      message.value shouldBe s"$line1 $line2Message"
+    }
+
+    "be instantiable from an Exception with a null message" in {
+      val exception = new Exception()
+      assume(exception.getMessage == null)
+
+      val message = ErrorMessage(exception)
+
+      message.value shouldBe s"${exception.getClass.getName}"
+    }
+
+    "be instantiable from an Exception with a blank message" in {
+      val exception = new Exception(blankStrings().generateOne)
+
+      val message = ErrorMessage(exception)
+
+      message.value shouldBe s"${exception.getClass.getName}"
     }
   }
+
+  private val tabbedLines: Gen[(String, String)] = for {
+    lineTabbing <- nonEmptyList(Gen.const(' ')).map(_.toList.mkString(""))
+    lineMessage <- nonEmptyStrings()
+  } yield lineMessage -> s"$lineTabbing$lineMessage"
 }

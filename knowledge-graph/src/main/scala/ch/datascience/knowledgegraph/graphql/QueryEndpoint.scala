@@ -70,8 +70,8 @@ class QueryEndpoint[Interpretation[_]: Effect](
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case BadRequestError(exception) => BadRequest(ErrorMessage(exception.getMessage))
-    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception.getMessage))
+    case BadRequestError(exception) => BadRequest(ErrorMessage(exception))
+    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception))
   }
 
   private implicit lazy val queryEntityDecoder: EntityDecoder[Interpretation, UserQuery] =
