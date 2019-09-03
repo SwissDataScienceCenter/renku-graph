@@ -105,15 +105,15 @@ class RateLimitSpec extends WordSpec with ScalaCheckPropertyChecks {
   "/" should {
 
     "make the rate limit x times slower than initially" in {
-      forAll(rateLimits, positiveInts()) { (rateLimit, value) =>
+      forAll(rateLimits, positiveInts()) { (rateLimit, divider) =>
         whenever {
-          (rateLimit.items.value * (1 day).toMillis / (rateLimit.per.multiplierFor(MILLISECONDS) * value)).toLong > 0
+          (rateLimit.items.value * (1 day).toMillis / (rateLimit.per.multiplierFor(MILLISECONDS) * divider)).toLong > 0
         } {
-          rateLimit / value shouldBe Right {
+          rateLimit / divider shouldBe Right {
             RateLimit(
               Refined.unsafeApply(
                 (rateLimit.items.value * (1 day).toMillis /
-                  (rateLimit.per.multiplierFor(MILLISECONDS) * value.value)).toLong
+                  (rateLimit.per.multiplierFor(MILLISECONDS) * divider.value)).toLong
               ),
               per = Day
             )
