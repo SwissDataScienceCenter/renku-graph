@@ -116,13 +116,14 @@ private class IOHookCreator(
     tokenRepositoryUrl:      TokenRepositoryUrl,
     projectHookUrl:          ProjectHookUrl,
     gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab]
+    gitLabThrottler:         Throttler[IO, GitLab],
+    hookTokenCrypto:         HookTokenCrypto[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookCreator[IO](
       projectHookUrl,
       new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
       new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
-      HookTokenCrypto[IO],
+      hookTokenCrypto,
       new IOProjectHookCreator(gitLabUrl, gitLabThrottler, ApplicationLogger),
       new IOAccessTokenAssociator(tokenRepositoryUrl, ApplicationLogger),
       new IOEventsHistoryLoader(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler),
