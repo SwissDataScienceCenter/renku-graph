@@ -26,7 +26,7 @@ import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
-import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.project.ProjectHookUrl
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 

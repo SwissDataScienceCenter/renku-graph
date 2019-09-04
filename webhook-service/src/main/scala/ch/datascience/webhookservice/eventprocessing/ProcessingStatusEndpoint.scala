@@ -33,6 +33,7 @@ import ch.datascience.graph.model.events._
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
 import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
+import ch.datascience.webhookservice.project.ProjectHookUrl
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -105,8 +106,9 @@ private object ProcessingStatusEndpoint {
 
 class IOProcessingStatusEndpoint(
     transactor:              DbTransactor[IO, EventLogDB],
+    projectHookUrl:          ProjectHookUrl,
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
-    extends ProcessingStatusEndpoint[IO](new IOHookValidator(gitLabUrl, gitLabThrottler),
+    extends ProcessingStatusEndpoint[IO](new IOHookValidator(projectHookUrl, gitLabUrl, gitLabThrottler),
                                          new IOEventLogProcessingStatus(transactor))

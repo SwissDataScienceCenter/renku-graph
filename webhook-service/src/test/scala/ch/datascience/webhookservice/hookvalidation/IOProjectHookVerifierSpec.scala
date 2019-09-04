@@ -31,7 +31,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
-import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.project.ProjectHookUrl
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import org.http4s.Status

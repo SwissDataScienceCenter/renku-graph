@@ -31,6 +31,7 @@ import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
+import ch.datascience.webhookservice.project.ProjectHookUrl
 import ch.datascience.webhookservice.security.AccessTokenExtractor
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response, Status}
@@ -70,10 +71,11 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 
 class IOHookCreationEndpoint(
     transactor:              DbTransactor[IO, EventLogDB],
+    projectHookUrl:          ProjectHookUrl,
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookCreationEndpoint[IO](
-      new IOHookCreator(transactor, gitLabUrl, gitLabThrottler),
+      new IOHookCreator(transactor, projectHookUrl, gitLabUrl, gitLabThrottler),
       new AccessTokenExtractor[IO]
     )

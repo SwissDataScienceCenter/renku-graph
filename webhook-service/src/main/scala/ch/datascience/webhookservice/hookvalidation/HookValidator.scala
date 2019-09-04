@@ -39,8 +39,8 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class HookValidator[Interpretation[_]](
+    projectHookUrl:        ProjectHookUrl,
     projectInfoFinder:     ProjectInfoFinder[Interpretation],
-    projectHookUrlFinder:  ProjectHookUrlFinder[Interpretation],
     projectHookVerifier:   ProjectHookVerifier[Interpretation],
     accessTokenFinder:     AccessTokenFinder[Interpretation],
     accessTokenAssociator: AccessTokenAssociator[Interpretation],
@@ -55,7 +55,6 @@ class HookValidator[Interpretation[_]](
   import accessTokenAssociator._
   import accessTokenFinder._
   import accessTokenRemover._
-  import projectHookUrlFinder._
   import projectHookVerifier._
   import projectInfoFinder._
 
@@ -63,22 +62,19 @@ class HookValidator[Interpretation[_]](
     findVisibilityAndToken(projectId, maybeAccessToken) flatMap {
       case (Public, token) =>
         for {
-          hookUrl          <- findProjectHookUrl
-          hookPresent      <- checkHookPresence(HookIdentifier(projectId, hookUrl), token.value)
+          hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token.value)
           validationResult <- toValidationResult(hookPresent, projectId)
         } yield validationResult
       case (_: TokenProtectedProject, GivenToken(token)) =>
         for {
-          hookUrl          <- findProjectHookUrl
-          hookPresent      <- checkHookPresence(HookIdentifier(projectId, hookUrl), token)
+          hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
           _                <- if (hookPresent) associate(projectId, token) else ME.unit
           _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
           validationResult <- toValidationResult(hookPresent, projectId)
         } yield validationResult
       case (_: TokenProtectedProject, StoredToken(token)) =>
         for {
-          hookUrl          <- findProjectHookUrl
-          hookPresent      <- checkHookPresence(HookIdentifier(projectId, hookUrl), token)
+          hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
           _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
           validationResult <- toValidationResult(hookPresent, projectId)
         } yield validationResult
@@ -152,12 +148,13 @@ object HookValidator {
 }
 
 class IOHookValidator(
+    projectHookUrl:          ProjectHookUrl,
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends HookValidator[IO](
+      projectHookUrl,
       new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
-      new IOProjectHookUrlFinder,
       new IOProjectHookVerifier(gitLabUrl, gitLabThrottler, ApplicationLogger),
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO], ApplicationLogger),
       new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO], ApplicationLogger),

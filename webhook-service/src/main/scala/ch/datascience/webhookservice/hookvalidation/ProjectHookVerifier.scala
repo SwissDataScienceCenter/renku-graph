@@ -25,7 +25,7 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLab
-import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
+import ch.datascience.webhookservice.project.ProjectHookUrl
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
 

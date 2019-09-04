@@ -34,6 +34,7 @@ import ch.datascience.webhookservice.eventprocessing.{IOHookEventEndpoint, IOPro
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
 import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, EventsSynchronizationThrottler, IOEventsSynchronizationScheduler}
+import ch.datascience.webhookservice.project.ProjectHookUrl
 import pureconfig.loadConfigOrThrow
 
 import scala.concurrent.ExecutionContext
@@ -60,6 +61,7 @@ object Microservice extends IOMicroservice {
     transactorResource.use { transactor =>
       for {
         sentryInitializer              <- SentryInitializer[IO]
+        projectHookUrl                 <- ProjectHookUrl.fromConfig[IO]()
         gitLabUrl                      <- GitLabUrl[IO]()
         gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
         gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
@@ -69,9 +71,9 @@ object Microservice extends IOMicroservice {
           serverPort = 9001,
           serviceRoutes = new MicroserviceRoutes[IO](
             new IOHookEventEndpoint(transactor, gitLabUrl, gitLabThrottler),
-            new IOHookCreationEndpoint(transactor, gitLabUrl, gitLabThrottler),
-            new IOHookValidationEndpoint(gitLabUrl, gitLabThrottler),
-            new IOProcessingStatusEndpoint(transactor, gitLabUrl, gitLabThrottler)
+            new IOHookCreationEndpoint(transactor, projectHookUrl, gitLabUrl, gitLabThrottler),
+            new IOHookValidationEndpoint(projectHookUrl, gitLabUrl, gitLabThrottler),
+            new IOProcessingStatusEndpoint(transactor, projectHookUrl, gitLabUrl, gitLabThrottler)
           ).routes
         )
 
