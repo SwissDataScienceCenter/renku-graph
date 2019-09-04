@@ -39,10 +39,6 @@ private class IOOrphanMailtoNoneRemover(
 
   override def removeOrphanMailtoNoneTriples(): IO[Unit] = queryWitNoResult {
     s"""
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX prov: <http://www.w3.org/ns/prov#>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
-       |
        |DELETE { ?s ?p ?o } 
        |WHERE {
        |  {
