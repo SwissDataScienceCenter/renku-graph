@@ -44,6 +44,8 @@ class PushEventsConsumptionSpec
 
     scenario("Push Event not being processed yet gets translated into Commit Events in the Event Log") {
 
+      GraphServices.restart(triplesGenerator)
+
       val projectId = projectIds.generateOne
       val commitId  = commitIds.generateOne
 
