@@ -18,13 +18,13 @@
 
 package ch.datascience.knowledgegraph.lineage
 
-import LineageGenerators._
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder

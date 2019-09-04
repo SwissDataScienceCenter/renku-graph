@@ -33,7 +33,7 @@ if [[ -n $TRAVIS_TAG ]]; then
   chartpress --push --publish-chart
   git diff
   # push also images tagged with "latest"
-  chartpress --tag latest --pus
+  chartpress --tag latest --push
   git clean -dffx
   chartpress --tag $TRAVIS_TAG --push --publish-chart
 

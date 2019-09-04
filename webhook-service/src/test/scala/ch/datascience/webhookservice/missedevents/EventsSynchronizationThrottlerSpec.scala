@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.missedevents
 
 import cats.MonadError
 import cats.effect._
-import ch.datascience.control.{RateLimit, Throttler}
+import ch.datascience.control.{RateLimit, RateLimitUnit, Throttler}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -37,7 +37,7 @@ class EventsSynchronizationThrottlerSpec extends WordSpec with MockFactory {
   "apply" should {
 
     "read the GitLab rate limit, divide it by 10 and instantiate the throttle with it" in new TestCase {
-      val rateLimit = rateLimits.generateOne
+      val rateLimit = (rateLimits retryUntil (limit => (limit / 10).isRight)).generateOne
       (gitLabRateLimitProvider.get _)
         .expects()
         .returning(context.pure(rateLimit))

@@ -135,7 +135,7 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe InternalServerError
       response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception.getMessage).asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception).asJson
     }
 
     "return INTERNAL_SERVER_ERROR when finding progress status fails" in new TestCase {
@@ -155,7 +155,7 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe InternalServerError
       response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception.getMessage).asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception).asJson
     }
   }
 
