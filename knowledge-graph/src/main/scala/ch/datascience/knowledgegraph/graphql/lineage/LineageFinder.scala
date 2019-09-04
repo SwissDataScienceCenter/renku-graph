@@ -61,30 +61,13 @@ class IOLineageFinder(
 
   private lazy val toLineage: Set[Edge] => IO[Option[Lineage]] = {
     case edges if edges.isEmpty => IO.pure(Option.empty)
-    case edges =>
-      val nodes                              = collectNodes(edges)
-      val (edgesForRemoval, nodesForRemoval) = orphanRenkuNodes(edges, nodes)
-      Lineage
-        .from[IO](edges diff edgesForRemoval, nodes diff nodesForRemoval)
-        .map(Option.apply)
+    case edges                  => Lineage.from[IO](edges, collectNodes(edges)) map Option.apply
   }
 
   private def collectNodes(edges: Set[Edge]): Set[Node] =
-    edges.foldLeft(Set.empty[Node])((nodes, edge) => nodes + edge.source + edge.target)
-
-  private def orphanRenkuNodes(edges: Set[Edge], nodes: Set[Node]): (Set[Edge], Set[Node]) =
-    nodes.filter(_.label.value.startsWith("renku")).foldLeft(Set.empty[Edge] -> Set.empty[Node]) {
-      case ((edgesForRemoval, nodesForRemoval), renkuNode) =>
-        val nodesMatchingTargetEdges = edges filter (_.target == renkuNode)
-        val nodesMatchingSourceEdges = edges filter (_.source == renkuNode)
-
-        if (nodesMatchingTargetEdges.size == 1 && nodesMatchingSourceEdges.isEmpty)
-          edgesForRemoval + nodesMatchingTargetEdges.head -> (nodesForRemoval + renkuNode)
-        else if (nodesMatchingSourceEdges.size == 1 && nodesMatchingTargetEdges.isEmpty)
-          (edgesForRemoval + nodesMatchingSourceEdges.head) -> (nodesForRemoval + renkuNode)
-        else
-          edgesForRemoval -> nodesForRemoval
-    }
+    edges.foldLeft(Set.empty[Node])(
+      (nodes, edge) => nodes + edge.source + edge.target
+    )
 
   private def logExecutionTime(
       projectPath: ProjectPath,
