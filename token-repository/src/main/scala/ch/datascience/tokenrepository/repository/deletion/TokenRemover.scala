@@ -18,7 +18,7 @@
 
 package ch.datascience.tokenrepository.repository.deletion
 
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.effect.Bracket
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
@@ -46,8 +46,3 @@ private class TokenRemover[Interpretation[_]](
     case n => throw new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
   }
 }
-
-private class IOTokenRemover(
-    transactor:          DbTransactor[IO, ProjectsTokensDB]
-)(implicit contextShift: ContextShift[IO])
-    extends TokenRemover[IO](transactor)

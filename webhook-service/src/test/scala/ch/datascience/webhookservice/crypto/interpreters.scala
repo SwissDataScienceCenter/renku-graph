@@ -20,10 +20,8 @@ package ch.datascience.webhookservice.crypto
 
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.crypto.AesCrypto.Secret
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
 
-import scala.util.Try
-
-class TryHookTokenCrypto(secret: Secret)(implicit ME: MonadError[Try, Throwable]) extends HookTokenCrypto[Try](secret)
-
-class IOHookTokenCrypto(secret: Secret)(implicit ME: MonadError[IO, Throwable]) extends HookTokenCrypto[IO](secret)
+class IOHookTokenCrypto()(implicit ME: MonadError[IO, Throwable])
+    extends HookTokenCrypto[IO](aesCryptoSecrets.generateOne)

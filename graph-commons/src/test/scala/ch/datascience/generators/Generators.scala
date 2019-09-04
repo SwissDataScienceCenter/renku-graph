@@ -46,6 +46,9 @@ object Generators {
     } yield chars.mkString("")
   }
 
+  def stringsOfLength(length: Int Refined Positive = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] =
+    listOfN(length, charsGenerator).map(_.mkString(""))
+
   def blankStrings(maxLength: Int Refined NonNegative = 10): Gen[String] =
     for {
       length <- choose(0, maxLength.value)
