@@ -23,13 +23,13 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.control.Throttler
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository._
 import io.chrisdavenport.log4cats.Logger
@@ -152,12 +152,13 @@ object HookValidator {
 }
 
 class IOHookValidator(
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends HookValidator[IO](
-      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
+      new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
       new IOProjectHookUrlFinder,
-      new IOProjectHookVerifier(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
+      new IOProjectHookVerifier(gitLabUrl, gitLabThrottler, ApplicationLogger),
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO], ApplicationLogger),
       new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO], ApplicationLogger),
       new IOAccessTokenRemover(new TokenRepositoryUrlProvider[IO], ApplicationLogger),

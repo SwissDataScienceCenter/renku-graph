@@ -24,11 +24,12 @@ import cats.{Monad, MonadError}
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.CommitEvent
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.commitevent._
 import io.chrisdavenport.log4cats.Logger
@@ -123,11 +124,12 @@ private object CommitToEventLog {
 
 class IOCommitToEventLog(
     transactor:              DbTransactor[IO, EventLogDB],
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends CommitToEventLog[IO](
       new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
-      new IOCommitEventsSourceBuilder(transactor, gitLabThrottler),
+      new IOCommitEventsSourceBuilder(transactor, gitLabUrl, gitLabThrottler),
       new IOCommitEventSender(transactor),
       ApplicationLogger,
       new ExecutionTimeRecorder[IO]

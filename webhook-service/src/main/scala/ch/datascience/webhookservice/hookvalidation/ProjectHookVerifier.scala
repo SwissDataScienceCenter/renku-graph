@@ -21,10 +21,10 @@ package ch.datascience.webhookservice.hookvalidation
 import ProjectHookVerifier.HookIdentifier
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
@@ -48,7 +48,7 @@ private object ProjectHookVerifier {
 }
 
 private class IOProjectHookVerifier(
-    gitLabUrlProvider:       GitLabConfigProvider[IO],
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
@@ -66,8 +66,7 @@ private class IOProjectHookVerifier(
 
   override def checkHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): IO[Boolean] =
     for {
-      gitLabHostUrl      <- gitLabUrlProvider.get
-      uri                <- validateUri(s"$gitLabHostUrl/api/v4/projects/${projectHookId.projectId}/hooks")
+      uri                <- validateUri(s"$gitLabUrl/api/v4/projects/${projectHookId.projectId}/hooks")
       existingHooksNames <- send(request(GET, uri, accessToken))(mapResponse)
     } yield checkProjectHookExists(existingHooksNames, projectHookId.projectHookUrl)
 

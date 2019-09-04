@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}

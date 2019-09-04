@@ -16,47 +16,57 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.gitlab
+package ch.datascience.graph.config
 
-import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class GitLabRateLimitProviderSpec extends WordSpec {
+class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+  "apply" should {
 
-  "get" should {
+    "return a RenkuBaseUrl if there's a value for 'services.renku.url'" in {
+      forAll(httpUrls) { url =>
+        val config = ConfigFactory.parseMap(
+          Map(
+            "services" -> Map(
+              "renku" -> Map(
+                "url" -> url
+              ).asJava
+            ).asJava
+          ).asJava
+        )
+        val Success(actual) = RenkuBaseUrl[Try](config)
+      }
+    }
 
-    "return RateLimit if defined" in {
-      val rateLimit = rateLimits.generateOne
+    "fail if there's no value for the 'services.renku.url'" in {
+      val Failure(exception) = RenkuBaseUrl[Try](ConfigFactory.empty())
+      exception shouldBe an[ConfigLoadingException]
+    }
+
+    "fail if config value is invalid" in {
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "gitlab" -> Map(
-              "rate-limit" -> rateLimit.toString
+            "renku" -> Map(
+              "url" -> "abcd"
             ).asJava
           ).asJava
         ).asJava
       )
 
-      new GitLabRateLimitProvider[Try](config).get shouldBe Success(rateLimit)
-    }
+      val Failure(exception) = RenkuBaseUrl[Try](config)
 
-    "fail if there is no 'services.gitlab.rate-limit' in the config" in {
-      val config = ConfigFactory.empty
-
-      val Failure(exception) = new GitLabRateLimitProvider[Try](config).get
-
-      exception shouldBe a[ConfigLoadingException]
+      exception shouldBe an[ConfigLoadingException]
     }
   }
 }

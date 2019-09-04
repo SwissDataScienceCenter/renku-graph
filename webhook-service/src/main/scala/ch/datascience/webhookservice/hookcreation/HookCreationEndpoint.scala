@@ -25,9 +25,10 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.security.AccessTokenExtractor
@@ -69,9 +70,10 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 
 class IOHookCreationEndpoint(
     transactor:              DbTransactor[IO, EventLogDB],
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookCreationEndpoint[IO](
-      new IOHookCreator(transactor, gitLabThrottler),
+      new IOHookCreator(transactor, gitLabUrl, gitLabThrottler),
       new AccessTokenExtractor[IO]
     )

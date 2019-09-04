@@ -21,12 +21,12 @@ package ch.datascience.generators
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
-import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
@@ -66,10 +66,11 @@ object CommonGraphGenerators {
     password <- basicAuthPasswords
   } yield BasicAuthCredentials(username, password)
 
-  implicit val rateLimits: Gen[RateLimit] = for {
-    items <- positiveLongs()
-    unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
-  } yield RateLimit(items, per = unit)
+  def rateLimits[Target]: Gen[RateLimit[Target]] =
+    for {
+      items <- positiveLongs()
+      unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
+    } yield RateLimit[Target](items, per = unit)
 
   implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
     fusekiUrl       <- httpUrls map FusekiBaseUrl.apply

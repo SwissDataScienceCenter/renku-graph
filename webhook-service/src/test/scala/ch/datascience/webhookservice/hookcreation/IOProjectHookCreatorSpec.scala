@@ -22,17 +22,14 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.EventsGenerators.projectIds
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.config.{GitLabConfigProvider, IOGitLabConfigProvider}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators.{projectHookUrls, serializedHookTokens}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import com.github.tomakehurst.wiremock.client.WireMock._
-import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.string.Url
 import io.circe.Json
 import org.http4s.Status
 import org.scalacheck.Gen
@@ -49,7 +46,6 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
     "send relevant Json payload and 'PRIVATE-TOKEN' header (when Personal Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
-      expectGitLabHostProvider(returning = IO.pure(gitLabUrl))
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -65,7 +61,6 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
     "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
-      expectGitLabHostProvider(returning = IO.pure(gitLabUrl))
       val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -78,18 +73,8 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
       hookCreator.create(projectHook, oauthAccessToken).unsafeRunSync() shouldBe ((): Unit)
     }
 
-    "return an error if gitLabUrl cannot be read" in new TestCase {
-      val exception = exceptions.generateOne
-      expectGitLabHostProvider(returning = IO.raiseError(exception))
-      val accessToken = accessTokens.generateOne
-
-      intercept[Exception] {
-        hookCreator.create(projectHook, accessToken).unsafeRunSync()
-      } shouldBe exception
-    }
-
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-      expectGitLabHostProvider(returning = IO.pure(gitLabUrl))
+
       val accessToken = accessTokens.generateOne
 
       stubFor {
@@ -104,7 +89,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
     }
 
     "return an Exception if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
-      expectGitLabHostProvider(returning = IO.pure(gitLabUrl))
+
       val accessToken = accessTokens.generateOne
 
       stubFor {
@@ -125,7 +110,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
   private trait TestCase {
     val projectHook = projectHooks.generateOne
     val projectId   = projectHook.projectId
-    val gitLabUrl   = url(externalServiceBaseUrl)
+    val gitLabUrl   = GitLabUrl(externalServiceBaseUrl)
 
     def toJson(projectHook: ProjectHook) =
       Json
@@ -137,18 +122,7 @@ class IOProjectHookCreatorSpec extends WordSpec with MockFactory with ExternalSe
         )
         .toString()
 
-    val configProvider = mock[IOGitLabConfigProvider]
-    val hookCreator    = new IOProjectHookCreator(configProvider, Throttler.noThrottling, TestLogger())
-
-    def expectGitLabHostProvider(returning: IO[GitLabConfigProvider.HostUrl]) =
-      (configProvider.get _)
-        .expects()
-        .returning(returning)
-
-    private def url(value: String) =
-      RefType
-        .applyRef[String Refined Url](value)
-        .getOrElse(throw new IllegalArgumentException("Invalid url value"))
+    val hookCreator = new IOProjectHookCreator(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
   private implicit val projectHooks: Gen[ProjectHook] = for {

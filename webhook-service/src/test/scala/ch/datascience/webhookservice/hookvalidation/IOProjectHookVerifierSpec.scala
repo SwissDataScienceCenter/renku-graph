@@ -23,18 +23,16 @@ import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.EventsGenerators.projectIds
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.config.{GitLabConfigProvider, IOGitLabConfigProvider}
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import com.github.tomakehurst.wiremock.client.WireMock._
-import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.string.Url
 import io.circe.Json
 import org.http4s.Status
 import org.scalacheck.Gen
@@ -49,7 +47,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
   "checkHookPresence" should {
 
     "return true if there's a hook with url pointing to expected project hook url - personal access token case" in new TestCase {
-      expectGitLabUrlProvider(returning = IO.pure(gitLabUrl))
+
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -62,7 +60,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
     }
 
     "return true if there's a hook with url pointing to expected project hook url - oauth token case" in new TestCase {
-      expectGitLabUrlProvider(returning = IO.pure(gitLabUrl))
+
       val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -75,7 +73,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
     }
 
     "return false if there's no hook with url pointing to expected project hook url" in new TestCase {
-      expectGitLabUrlProvider(returning = IO.pure(gitLabUrl))
+
       val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -88,19 +86,8 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
       verifier.checkHookPresence(projectHookId, oauthAccessToken).unsafeRunSync() shouldBe false
     }
 
-    "fail if fetching the GitLab url fails" in new TestCase {
-      val personalAccessToken = personalAccessTokens.generateOne
-      val exception           = exceptions.generateOne
-
-      expectGitLabUrlProvider(returning = IO.raiseError(exception))
-
-      intercept[Exception] {
-        verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
-      } shouldBe exception
-    }
-
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-      expectGitLabUrlProvider(returning = IO.pure(gitLabUrl))
+
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -115,7 +102,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
     }
 
     "return a RuntimeException if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
-      expectGitLabUrlProvider(returning = IO.pure(gitLabUrl))
+
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -130,7 +117,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
-      expectGitLabUrlProvider(returning = IO.pure(gitLabUrl))
+
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -149,19 +136,12 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val gitLabUrl     = url(externalServiceBaseUrl)
+    val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
     val selfUrl       = validatedUrls.generateOne
     val projectHookId = projectHookIds.generateOne
     val projectId     = projectHookId.projectId
 
-    val gitLabUrlProvider = mock[IOGitLabConfigProvider]
-
-    def expectGitLabUrlProvider(returning: IO[GitLabConfigProvider.HostUrl]) =
-      (gitLabUrlProvider.get _)
-        .expects()
-        .returning(returning)
-
-    val verifier = new IOProjectHookVerifier(gitLabUrlProvider, Throttler.noThrottling, TestLogger())
+    val verifier = new IOProjectHookVerifier(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
   private def withHooks(projectId: ProjectId, oneHookUrl: ProjectHookUrl): String =
@@ -187,11 +167,6 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
     "url"        -> Json.fromString(url.value),
     "project_id" -> Json.fromInt(projectId.value)
   )
-
-  private def url(value: String) =
-    RefType
-      .applyRef[String Refined Url](value)
-      .getOrElse(throw new IllegalArgumentException("Invalid url value"))
 
   private val projectHookIds: Gen[HookIdentifier] = for {
     projectId <- projectIds

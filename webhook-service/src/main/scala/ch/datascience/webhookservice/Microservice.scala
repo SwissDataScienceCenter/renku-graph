@@ -22,12 +22,14 @@ import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
+import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
-import ch.datascience.graph.gitlab.{GitLabRateLimitProvider, GitLabThrottler}
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.http.server.HttpServer
 import ch.datascience.microservices.IOMicroservice
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.eventprocessing.{IOHookEventEndpoint, IOProcessingStatusEndpoint}
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
@@ -58,24 +60,28 @@ object Microservice extends IOMicroservice {
     transactorResource.use { transactor =>
       for {
         sentryInitializer              <- SentryInitializer[IO]
-        gitLabRateLimitProvider        <- IO.pure(new GitLabRateLimitProvider[IO]())
-        gitLabThrottler                <- GitLabThrottler[IO](gitLabRateLimitProvider)
-        eventsSynchronizationThrottler <- EventsSynchronizationThrottler[IO](gitLabRateLimitProvider)
+        gitLabUrl                      <- GitLabUrl[IO]()
+        gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+        gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
+        eventsSynchronizationThrottler <- EventsSynchronizationThrottler[IO](gitLabRateLimit = gitLabRateLimit)
 
         httpServer = new HttpServer[IO](
           serverPort = 9001,
           serviceRoutes = new MicroserviceRoutes[IO](
-            new IOHookEventEndpoint(transactor, gitLabThrottler),
-            new IOHookCreationEndpoint(transactor, gitLabThrottler),
-            new IOHookValidationEndpoint(gitLabThrottler),
-            new IOProcessingStatusEndpoint(transactor, gitLabThrottler)
+            new IOHookEventEndpoint(transactor, gitLabUrl, gitLabThrottler),
+            new IOHookCreationEndpoint(transactor, gitLabUrl, gitLabThrottler),
+            new IOHookValidationEndpoint(gitLabUrl, gitLabThrottler),
+            new IOProcessingStatusEndpoint(transactor, gitLabUrl, gitLabThrottler)
           ).routes
         )
 
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,
                      new IOEventLogDbInitializer(transactor),
-                     new IOEventsSynchronizationScheduler(transactor, gitLabThrottler, eventsSynchronizationThrottler),
+                     new IOEventsSynchronizationScheduler(transactor,
+                                                          gitLabUrl,
+                                                          gitLabThrottler,
+                                                          eventsSynchronizationThrottler),
                      httpServer
                    ) run args
       } yield exitCode

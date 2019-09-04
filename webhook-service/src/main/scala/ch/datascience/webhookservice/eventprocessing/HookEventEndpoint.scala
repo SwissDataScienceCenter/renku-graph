@@ -26,9 +26,10 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
@@ -119,6 +120,7 @@ private object HookEventEndpoint {
 
 class IOHookEventEndpoint(
     transactor:              DbTransactor[IO, EventLogDB],
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
-    extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOCommitToEventLog(transactor, gitLabThrottler))
+    extends HookEventEndpoint[IO](HookTokenCrypto[IO], new IOCommitToEventLog(transactor, gitLabUrl, gitLabThrottler))
