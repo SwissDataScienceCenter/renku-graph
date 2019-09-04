@@ -25,7 +25,7 @@ import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ApplicationLogger
@@ -148,6 +148,7 @@ object HookValidator {
 }
 
 class IOHookValidator(
+    tokenRepositoryUrl:      TokenRepositoryUrl,
     projectHookUrl:          ProjectHookUrl,
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
@@ -156,8 +157,8 @@ class IOHookValidator(
       projectHookUrl,
       new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
       new IOProjectHookVerifier(gitLabUrl, gitLabThrottler, ApplicationLogger),
-      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO], ApplicationLogger),
-      new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO], ApplicationLogger),
-      new IOAccessTokenRemover(new TokenRepositoryUrlProvider[IO], ApplicationLogger),
+      new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
+      new IOAccessTokenAssociator(tokenRepositoryUrl, ApplicationLogger),
+      new IOAccessTokenRemover(tokenRepositoryUrl, ApplicationLogger),
       ApplicationLogger
     )

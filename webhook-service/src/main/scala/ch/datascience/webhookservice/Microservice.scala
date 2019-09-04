@@ -27,6 +27,7 @@ import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.server.HttpServer
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.webhookservice.config.GitLab
@@ -61,6 +62,7 @@ object Microservice extends IOMicroservice {
     transactorResource.use { transactor =>
       for {
         sentryInitializer              <- SentryInitializer[IO]
+        tokenRepositoryUrl             <- TokenRepositoryUrl[IO]()
         projectHookUrl                 <- ProjectHookUrl.fromConfig[IO]()
         gitLabUrl                      <- GitLabUrl[IO]()
         gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
@@ -70,10 +72,10 @@ object Microservice extends IOMicroservice {
         httpServer = new HttpServer[IO](
           serverPort = 9001,
           serviceRoutes = new MicroserviceRoutes[IO](
-            new IOHookEventEndpoint(transactor, gitLabUrl, gitLabThrottler),
-            new IOHookCreationEndpoint(transactor, projectHookUrl, gitLabUrl, gitLabThrottler),
-            new IOHookValidationEndpoint(projectHookUrl, gitLabUrl, gitLabThrottler),
-            new IOProcessingStatusEndpoint(transactor, projectHookUrl, gitLabUrl, gitLabThrottler)
+            new IOHookEventEndpoint(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler),
+            new IOHookCreationEndpoint(transactor, tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
+            new IOHookValidationEndpoint(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
+            new IOProcessingStatusEndpoint(transactor, tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler)
           ).routes
         )
 
@@ -81,6 +83,7 @@ object Microservice extends IOMicroservice {
                      sentryInitializer,
                      new IOEventLogDbInitializer(transactor),
                      new IOEventsSynchronizationScheduler(transactor,
+                                                          tokenRepositoryUrl,
                                                           gitLabUrl,
                                                           gitLabThrottler,
                                                           eventsSynchronizationThrottler),

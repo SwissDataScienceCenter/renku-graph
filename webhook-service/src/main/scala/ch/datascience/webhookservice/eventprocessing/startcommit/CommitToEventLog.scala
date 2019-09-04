@@ -26,7 +26,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.CommitEvent
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.config.GitLab
@@ -124,11 +124,12 @@ private object CommitToEventLog {
 
 class IOCommitToEventLog(
     transactor:              DbTransactor[IO, EventLogDB],
+    tokenRepositoryUrl:      TokenRepositoryUrl,
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends CommitToEventLog[IO](
-      new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
+      new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
       new IOCommitEventsSourceBuilder(transactor, gitLabUrl, gitLabThrottler),
       new IOCommitEventSender(transactor),
       ApplicationLogger,

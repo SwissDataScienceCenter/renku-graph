@@ -27,7 +27,7 @@ import pureconfig.ConfigReader
 
 import scala.language.higherKinds
 
-class GitLabUrl private (val value: String) extends AnyVal with StringTinyType
+final class GitLabUrl private (val value: String) extends AnyVal with StringTinyType
 object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url with UrlOps[GitLabUrl] {
 
   private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = stringTinyTypeReader(GitLabUrl)

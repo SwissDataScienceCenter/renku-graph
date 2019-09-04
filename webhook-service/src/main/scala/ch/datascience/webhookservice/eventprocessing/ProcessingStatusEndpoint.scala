@@ -30,6 +30,7 @@ import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogProcessingStatus, IOEventLogProcessingStatus, ProcessingStatus}
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
 import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
@@ -106,9 +107,11 @@ private object ProcessingStatusEndpoint {
 
 class IOProcessingStatusEndpoint(
     transactor:              DbTransactor[IO, EventLogDB],
+    tokenRepositoryUrl:      TokenRepositoryUrl,
     projectHookUrl:          ProjectHookUrl,
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
-    extends ProcessingStatusEndpoint[IO](new IOHookValidator(projectHookUrl, gitLabUrl, gitLabThrottler),
-                                         new IOEventLogProcessingStatus(transactor))
+    extends ProcessingStatusEndpoint[IO](
+      new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
+      new IOEventLogProcessingStatus(transactor))

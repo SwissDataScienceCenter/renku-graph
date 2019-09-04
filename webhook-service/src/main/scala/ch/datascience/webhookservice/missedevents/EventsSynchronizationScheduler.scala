@@ -26,7 +26,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.tokenrepository.{IOAccessTokenFinder, TokenRepositoryUrlProvider}
+import ch.datascience.graph.tokenrepository.{IOAccessTokenFinder, TokenRepositoryUrl}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.commits.IOLatestCommitFinder
 import ch.datascience.webhookservice.config.GitLab
@@ -73,6 +73,7 @@ class EventsSynchronizationScheduler[Interpretation[_]](
 
 class IOEventsSynchronizationScheduler(
     transactor:                     DbTransactor[IO, EventLogDB],
+    tokenRepositoryUrl:             TokenRepositoryUrl,
     gitLabUrl:                      GitLabUrl,
     gitLabThrottler:                Throttler[IO, GitLab],
     eventsSynchronizationThrottler: Throttler[IO, EventsSynchronization]
@@ -81,10 +82,10 @@ class IOEventsSynchronizationScheduler(
       new SchedulerConfigProvider[IO](),
       new IOMissedEventsLoader(
         new IOEventLogLatestEvents(transactor),
-        new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
+        new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
         new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
         new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
-        new IOCommitToEventLog(transactor, gitLabUrl, gitLabThrottler),
+        new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler),
         eventsSynchronizationThrottler,
         ApplicationLogger,
         new ExecutionTimeRecorder[IO]

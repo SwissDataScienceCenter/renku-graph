@@ -20,7 +20,6 @@ package ch.datascience.graph.tokenrepository
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
 import com.typesafe.config.ConfigFactory
@@ -30,9 +29,9 @@ import org.scalatest.WordSpec
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class TokenRepositoryUrlProviderSpec extends WordSpec {
+class TokenRepositoryUrlSpec extends WordSpec {
 
-  "get" should {
+  "apply" should {
 
     "read 'services.token-repository.url' from the config" in {
       val url = httpUrls.generateOne
@@ -46,13 +45,13 @@ class TokenRepositoryUrlProviderSpec extends WordSpec {
         ).asJava
       )
 
-      new TokenRepositoryUrlProvider[Try](config).get shouldBe Success(ServiceUrl(url))
+      TokenRepositoryUrl[Try](config) shouldBe Success(TokenRepositoryUrl(url))
     }
 
     "fail if there's no 'services.token-repository.url' entry" in {
       val config = ConfigFactory.empty()
 
-      val Failure(exception) = new TokenRepositoryUrlProvider[Try](config).get
+      val Failure(exception) = TokenRepositoryUrl[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }

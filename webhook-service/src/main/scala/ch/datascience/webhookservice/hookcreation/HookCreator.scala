@@ -27,7 +27,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.config.GitLab
@@ -113,17 +113,18 @@ private object HookCreator {
 
 private class IOHookCreator(
     transactor:              DbTransactor[IO, EventLogDB],
+    tokenRepositoryUrl:      TokenRepositoryUrl,
     projectHookUrl:          ProjectHookUrl,
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookCreator[IO](
       projectHookUrl,
-      new IOHookValidator(projectHookUrl, gitLabUrl, gitLabThrottler),
+      new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
       new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
       HookTokenCrypto[IO],
       new IOProjectHookCreator(gitLabUrl, gitLabThrottler, ApplicationLogger),
-      new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
-      new IOEventsHistoryLoader(transactor, gitLabUrl, gitLabThrottler),
+      new IOAccessTokenAssociator(tokenRepositoryUrl, ApplicationLogger),
+      new IOEventsHistoryLoader(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler),
       ApplicationLogger
     )

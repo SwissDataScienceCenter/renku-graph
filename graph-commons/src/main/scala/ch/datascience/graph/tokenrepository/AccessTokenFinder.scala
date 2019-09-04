@@ -32,9 +32,9 @@ trait AccessTokenFinder[Interpretation[_]] {
 }
 
 class IOAccessTokenFinder(
-    tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO],
-    logger:                     Logger[IO]
-)(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    tokenRepositoryUrl:      TokenRepositoryUrl,
+    logger:                  Logger[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient(Throttler.noThrottling, logger)
     with AccessTokenFinder[IO] {
 
@@ -46,9 +46,8 @@ class IOAccessTokenFinder(
 
   def findAccessToken(projectId: ProjectId): IO[Option[AccessToken]] =
     for {
-      tokenRepositoryUrl <- tokenRepositoryUrlProvider.get
-      uri                <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
-      accessToken        <- send(request(GET, uri))(mapResponse)
+      uri         <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
+      accessToken <- send(request(GET, uri))(mapResponse)
     } yield accessToken
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[AccessToken]]] = {
