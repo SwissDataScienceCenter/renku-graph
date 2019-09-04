@@ -21,15 +21,14 @@ package ch.datascience.http.server
 import cats.data.Kleisli
 import cats.effect.{ContextShift, IO, Sync}
 import cats.implicits._
-import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
+import eu.timepit.refined.api.RefType
 import io.circe.{Decoder, DecodingFailure, Json}
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, Request, Response, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
-import scala.util.Try
 
 object EndpointTester {
 
@@ -59,8 +58,8 @@ object EndpointTester {
   implicit val errorMessageDecoder: Decoder[ErrorMessage] = Decoder.instance[ErrorMessage] {
     _.downField("message")
       .as[String]
-      .flatMap(message => Either.fromTry(Try(ErrorMessage(message))))
-      .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+      .flatMap(RefType.applyRef[ErrorMessage](_))
+      .leftMap(error => DecodingFailure(s"Cannot deserialize 'message' to ErrorMessage: $error", Nil))
   }
 
   implicit def errorMessageEntityDecoder[F[_]: Sync]: EntityDecoder[F, ErrorMessage] = jsonOf[F, ErrorMessage]

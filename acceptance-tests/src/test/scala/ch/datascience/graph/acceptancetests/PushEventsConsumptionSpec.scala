@@ -22,13 +22,14 @@ import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
+import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.Matchers._
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.concurrent.Eventually
 import org.scalatest.{FeatureSpec, GivenWhenThen}
 
 class PushEventsConsumptionSpec
@@ -36,7 +37,7 @@ class PushEventsConsumptionSpec
     with GivenWhenThen
     with GraphServices
     with Eventually
-    with IntegrationPatience {
+    with AcceptanceTestPatience {
 
   feature("A Push Event sent to the services generates Commit Events in the Event Log") {
 
@@ -51,7 +52,7 @@ class PushEventsConsumptionSpec
       When("user does POST webhook-service/webhooks/events happens")
       val payload  = json"""
         {
-          "after":         ${commitId.value},
+          "after": ${commitId.value},
           "project": {
             "id":                  ${projectId.value},
             "path_with_namespace": ${projectPaths.generateOne.value}

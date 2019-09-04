@@ -91,11 +91,7 @@ object RateLimit extends TypeName {
       long <- ME
                .fromTry(Try(rate.toLong))
                .adaptError { case _ => new IllegalArgumentException(s"$typeName has to be positive") }
-      positiveLong <- ME.fromEither(
-                       RefType
-                         .applyRef[Long Refined Positive](long)
-                         .leftMap(_ => new IllegalArgumentException(s"$typeName has to be positive"))
-                     )
+      positiveLong <- ME.fromEither(long.toPositiveLong(errorWhenNotPositive = s"$typeName has to be positive"))
     } yield positiveLong
 
   implicit val rateLimitReader: ConfigReader[RateLimit] =
@@ -110,12 +106,15 @@ object RateLimit extends TypeName {
     import RateLimitUnit._
 
     def /(divider: Int Refined Positive): Either[IllegalArgumentException, RateLimit] =
-      RefType
-        .applyRef[Long Refined Positive](
-          (rateLimit.items.value * (1 day).toMillis / (rateLimit.per
-            .multiplierFor(MILLISECONDS) * divider.value)).toLong
-        )
-        .leftMap(_ => new IllegalArgumentException("RateLimits below 1/day not supported"))
+      (rateLimit.items.value * (1 day).toMillis / (rateLimit.per.multiplierFor(MILLISECONDS) * divider.value)).toLong
+        .toPositiveLong("RateLimits below 1/day not supported")
         .map(RateLimit(_, per = Day))
+  }
+
+  private implicit class LongOps(value: Long) {
+    def toPositiveLong(errorWhenNotPositive: String): Either[IllegalArgumentException, Long Refined Positive] =
+      RefType
+        .applyRef[Long Refined Positive](value)
+        .leftMap(_ => new IllegalArgumentException(errorWhenNotPositive))
   }
 }

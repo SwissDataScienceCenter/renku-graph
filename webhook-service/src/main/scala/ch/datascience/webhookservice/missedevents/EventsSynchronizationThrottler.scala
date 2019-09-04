@@ -37,7 +37,7 @@ object EventsSynchronizationThrottler {
                   Concurrent[Interpretation],
                   Timer[Interpretation]) => Interpretation[Throttler[Interpretation, EventsSynchronization]] =
         (rateLimit: RateLimit, concurrent: Concurrent[Interpretation], timer: Timer[Interpretation]) =>
-          Throttler.apply[Interpretation, EventsSynchronization](rateLimit)(concurrent, timer)
+          Throttler[Interpretation, EventsSynchronization](rateLimit)(concurrent, timer)
   )(
       implicit ME: MonadError[Interpretation, Throwable],
       concurrent:  Concurrent[Interpretation],

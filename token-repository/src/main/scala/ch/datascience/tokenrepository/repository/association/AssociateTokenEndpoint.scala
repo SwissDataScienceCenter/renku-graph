@@ -64,7 +64,7 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 
   private def httpResponse(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case BadRequestError(exception) =>
-      BadRequest(ErrorMessage(exception.getMessage))
+      BadRequest(ErrorMessage(exception))
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Associating token with projectId: $projectId failed")
       logger.error(exception)(errorMessage.value)

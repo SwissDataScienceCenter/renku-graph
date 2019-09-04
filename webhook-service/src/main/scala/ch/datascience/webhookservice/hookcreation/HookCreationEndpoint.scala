@@ -61,9 +61,9 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case ex @ UnauthorizedException =>
       Response[Interpretation](Status.Unauthorized)
-        .withEntity[ErrorMessage](ErrorMessage(ex.getMessage))
+        .withEntity[ErrorMessage](ErrorMessage(ex))
         .pure[Interpretation]
-    case NonFatal(exception) => InternalServerError(ErrorMessage(exception.getMessage))
+    case NonFatal(exception) => InternalServerError(ErrorMessage(exception))
   }
 }
 
