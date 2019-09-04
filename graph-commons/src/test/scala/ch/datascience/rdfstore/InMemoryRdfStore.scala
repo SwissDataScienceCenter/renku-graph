@@ -70,7 +70,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected implicit val timer: Timer[IO]                 = IO.timer(global)
   protected val context:        MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-  private val fusekiServerPort = Gen.oneOf(shuffle((3000 to 3100).toList)).retryUntil(portAvailable).generateOne
+  private val fusekiServerPort = Gen.oneOf(shuffle((3000 to 3200).toList)).retryUntil(portAvailable).generateOne
 
   private lazy val portAvailable: Int => Boolean = { port =>
     Validated

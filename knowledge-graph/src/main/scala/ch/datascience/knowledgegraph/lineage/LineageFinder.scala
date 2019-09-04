@@ -96,10 +96,8 @@ class IOLineageFinder(
        |  {
        |    SELECT ?entity
        |    WHERE {
-       |      ?qentity dcterms:isPartOf|schema:isPartOf ?project .
-       |      FILTER (?project = <${renkuBaseUrl / projectPath}>)
-       |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?qactivity .
-       |      FILTER (?qactivity = <file:///commit/$commitId>)
+       |      ?qentity dcterms:isPartOf|schema:isPartOf <${renkuBaseUrl / projectPath}> .
+       |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) <file:///commit/$commitId> .
        |      FILTER (?qentity = <file:///blob/$commitId/$filePath>)
        |      ?qentity (
        |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*

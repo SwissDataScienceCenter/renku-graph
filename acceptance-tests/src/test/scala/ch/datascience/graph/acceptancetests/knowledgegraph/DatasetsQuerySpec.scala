@@ -115,7 +115,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         variables = Map("projectPath" -> project.path.toString)
       )
 
-      Then("he should get OK response with project lineage in Json")
+      Then("he should get OK response with project's datasets in Json")
       response.status shouldBe Ok
 
       val Right(responseJson) = response.bodyAsJson.hcursor.downField("data").downField("datasets").as[List[Json]]
