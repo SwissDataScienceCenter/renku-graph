@@ -25,12 +25,13 @@ import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.Project
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.commits._
-import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import ch.datascience.webhookservice.project.ProjectInfo
@@ -73,10 +74,12 @@ private class EventsHistoryLoader[Interpretation[_]](
 
 private class IOEventsHistoryLoader(
     transactor:              DbTransactor[IO, EventLogDB],
+    tokenRepositoryUrl:      TokenRepositoryUrl,
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends EventsHistoryLoader[IO](
-      new IOLatestCommitFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
-      new IOCommitToEventLog(transactor, gitLabThrottler),
+      new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
+      new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler),
       ApplicationLogger
     )

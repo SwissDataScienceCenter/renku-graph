@@ -21,10 +21,10 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.triplesgenerator.config.GitLabUrl
 import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 

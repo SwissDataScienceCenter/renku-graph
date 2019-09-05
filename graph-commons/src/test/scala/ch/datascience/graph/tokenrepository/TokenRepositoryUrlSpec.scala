@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.gitlab
+package ch.datascience.graph.tokenrepository
 
-import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.httpUrls
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -30,33 +29,31 @@ import org.scalatest.WordSpec
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class GitLabRateLimitProviderSpec extends WordSpec {
+class TokenRepositoryUrlSpec extends WordSpec {
 
-  private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+  "apply" should {
 
-  "get" should {
-
-    "return RateLimit if defined" in {
-      val rateLimit = rateLimits.generateOne
+    "read 'services.token-repository.url' from the config" in {
+      val url = httpUrls.generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "gitlab" -> Map(
-              "rate-limit" -> rateLimit.toString
+            "token-repository" -> Map(
+              "url" -> url
             ).asJava
           ).asJava
         ).asJava
       )
 
-      new GitLabRateLimitProvider[Try](config).get shouldBe Success(rateLimit)
+      TokenRepositoryUrl[Try](config) shouldBe Success(TokenRepositoryUrl(url))
     }
 
-    "fail if there is no 'services.gitlab.rate-limit' in the config" in {
-      val config = ConfigFactory.empty
+    "fail if there's no 'services.token-repository.url' entry" in {
+      val config = ConfigFactory.empty()
 
-      val Failure(exception) = new GitLabRateLimitProvider[Try](config).get
+      val Failure(exception) = TokenRepositoryUrl[Try](config)
 
-      exception shouldBe a[ConfigLoadingException]
+      exception shouldBe an[ConfigLoadingException]
     }
   }
 }

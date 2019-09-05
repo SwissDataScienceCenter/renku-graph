@@ -18,53 +18,41 @@
 
 package ch.datascience.webhookservice.project
 
-import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
-import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
-import ch.datascience.webhookservice.project.SelfUrlConfigProvider.SelfUrl
+import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class ProjectHookUrlFinderSpec extends WordSpec with MockFactory {
+class ProjectHookUrlSpec extends WordSpec with MockFactory {
 
-  "findProjectHookUrl" should {
+  "fromConfig" should {
 
     "return project hook url composed of selfUrl and /webhooks/events " +
-      "if selfUrl can be obtained" in new TestCase {
-      expectSelfUrlConfig(returning = context.pure(selfUrl))
+      "if selfUrl can be obtained" in {
+      val selfUrl = selfUrls.generateOne
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "self" -> Map(
+              "url" -> selfUrl.toString()
+            ).asJava
+          ).asJava
+        ).asJava
+      )
 
-      hookUrlFinder.findProjectHookUrl shouldBe Success(
-        ProjectHookUrl(
-          s"$selfUrl/webhooks/events"
-        )
+      ProjectHookUrl.fromConfig[Try](config).map(_.value) shouldBe Success(
+        s"$selfUrl/webhooks/events"
       )
     }
 
-    "fail if finding selfUrl fails" in new TestCase {
-      val exception = exceptions.generateOne
-      expectSelfUrlConfig(returning = context.raiseError(exception))
-
-      hookUrlFinder.findProjectHookUrl shouldBe Failure(exception)
+    "fail if finding selfUrl fails" in {
+      ProjectHookUrl.fromConfig[Try](ConfigFactory.empty()) shouldBe a[Failure[_]]
     }
-  }
-
-  private trait TestCase {
-    val context = MonadError[Try, Throwable]
-
-    val selfUrl = selfUrls.generateOne
-
-    def expectSelfUrlConfig(returning: Try[SelfUrl]) =
-      (selfUrlConfig.get _)
-        .expects()
-        .returning(returning)
-
-    val selfUrlConfig = mock[TrySelfUrlConfigProvider]
-    val hookUrlFinder = new ProjectHookUrlFinder[Try](selfUrlConfig)
   }
 }

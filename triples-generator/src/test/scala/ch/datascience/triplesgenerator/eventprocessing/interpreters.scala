@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed, EventLogMarkNew}
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, TokenRepositoryUrlProvider}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 
 import scala.util.Try
@@ -48,5 +48,3 @@ private abstract class TryEventLogMarkFailed(
 abstract class IOEventProcessorRunner(
     eventProcessor: EventProcessor[IO]
 ) extends EventProcessorRunner[IO](eventProcessor)
-
-private class IOTokenRepositoryUrlProvider extends TokenRepositoryUrlProvider[IO]

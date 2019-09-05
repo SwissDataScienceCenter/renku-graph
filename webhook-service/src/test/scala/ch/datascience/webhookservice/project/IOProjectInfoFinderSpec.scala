@@ -22,18 +22,14 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.config.GitLabConfigProvider.HostUrl
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
-import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.string.Url
 import io.circe.literal._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
@@ -47,7 +43,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
   "findProjectInfo" should {
 
     "return fetched project info if service responds with 200 and a valid body - personal access token case" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
+
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -64,7 +60,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
     }
 
     "return fetched project info if service responds with 200 and a valid body - oauth token case" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
+
       val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -81,7 +77,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
     }
 
     "return fetched public project info if service responds with 200 and a valid body - no token case" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
+
       val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -96,17 +92,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
       )
     }
 
-    "fail if fetching the the config fails" in new TestCase {
-      val exception = exceptions.generateOne
-      expectGitLabConfigProvider(returning = IO.raiseError(exception))
-
-      intercept[Exception] {
-        projectInfoFinder.findProjectInfo(projectId, maybeAccessToken = None).unsafeRunSync()
-      } shouldBe exception
-    }
-
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
@@ -119,7 +105,6 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
     }
 
     "return a RuntimeException if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
@@ -132,7 +117,6 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
@@ -149,19 +133,12 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val gitLabUrl         = url(externalServiceBaseUrl)
+    val gitLabUrl         = GitLabUrl(externalServiceBaseUrl)
     val projectId         = projectIds.generateOne
     val projectVisibility = projectVisibilities.generateOne
     val projectPath       = projectPaths.generateOne
 
-    val configProvider = mock[IOGitLabConfigProvider]
-
-    def expectGitLabConfigProvider(returning: IO[HostUrl]) =
-      (configProvider.get _)
-        .expects()
-        .returning(returning)
-
-    val projectInfoFinder = new IOProjectInfoFinder(configProvider, Throttler.noThrottling, TestLogger())
+    val projectInfoFinder = new IOProjectInfoFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
 
     def projectJson(maybeAccessToken: Option[AccessToken]): String = maybeAccessToken match {
       case Some(_) =>
@@ -177,9 +154,4 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
         }""".noSpaces
     }
   }
-
-  private def url(value: String) =
-    RefType
-      .applyRef[String Refined Url](value)
-      .getOrElse(throw new IllegalArgumentException("Invalid url value"))
 }

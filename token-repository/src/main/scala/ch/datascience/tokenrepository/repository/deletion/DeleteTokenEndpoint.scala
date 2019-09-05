@@ -25,7 +25,6 @@ import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Response
@@ -55,6 +54,7 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
 }
 
 class IODeleteTokenEndpoint(
-    transactor:          DbTransactor[IO, ProjectsTokensDB]
+    transactor:          DbTransactor[IO, ProjectsTokensDB],
+    logger:              Logger[IO]
 )(implicit contextShift: ContextShift[IO])
-    extends DeleteTokenEndpoint[IO](new IOTokenRemover(transactor), ApplicationLogger)
+    extends DeleteTokenEndpoint[IO](new TokenRemover[IO](transactor), logger)

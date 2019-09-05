@@ -22,17 +22,13 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{accessTokens, oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.config.GitLabConfigProvider.HostUrl
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
-import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.string.Url
 import io.circe.Json
 import io.circe.literal._
 import org.http4s.Status
@@ -47,7 +43,6 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
   "findLatestCommit" should {
 
     "return latest Commit info if remote responds with OK and valid body - personal access token case" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -62,7 +57,6 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
     }
 
     "return latest Commit info if remote responds with OK and valid body - oauth token case" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
       val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -77,7 +71,6 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
     }
 
     "return latest Commit info if remote responds with OK and valid body - no token case" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
@@ -90,7 +83,6 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
     }
 
     "return None if remote responds with OK and no commits" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
@@ -101,7 +93,6 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
     }
 
     "return None if remote responds with NOT_FOUND" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
@@ -111,17 +102,7 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
       latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync() shouldBe None
     }
 
-    "fail if fetching the the config fails" in new TestCase {
-      val exception = exceptions.generateOne
-      expectGitLabConfigProvider(returning = IO.raiseError(exception))
-
-      intercept[Exception] {
-        latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync()
-      } shouldBe exception
-    }
-
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
@@ -134,7 +115,6 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
@@ -147,7 +127,6 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
@@ -164,19 +143,12 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val gitLabUrl   = url(externalServiceBaseUrl)
+    val gitLabUrl   = GitLabUrl(externalServiceBaseUrl)
     val projectId   = projectIds.generateOne
     val accessToken = accessTokens.generateOne
     val commitInfo  = commitInfos.generateOne
 
-    val configProvider = mock[IOGitLabConfigProvider]
-
-    def expectGitLabConfigProvider(returning: IO[HostUrl]) =
-      (configProvider.get _)
-        .expects()
-        .returning(returning)
-
-    val latestCommitFinder = new IOLatestCommitFinder(configProvider, Throttler.noThrottling, TestLogger())
+    val latestCommitFinder = new IOLatestCommitFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
   private def commitsJson(from: CommitInfo) =
@@ -193,9 +165,4 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
       "committed_date":  ${commitInfo.committedDate.value},
       "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
     }"""
-
-  private def url(value: String) =
-    RefType
-      .applyRef[String Refined Url](value)
-      .getOrElse(throw new IllegalArgumentException("Invalid url value"))
 }

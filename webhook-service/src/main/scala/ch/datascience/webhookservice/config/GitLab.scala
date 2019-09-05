@@ -18,7 +18,4 @@
 
 package ch.datascience.webhookservice.config
 
-import cats.MonadError
-import cats.effect.IO
-
-class IOGitLabConfigProvider(implicit ME: MonadError[IO, Throwable]) extends GitLabConfigProvider[IO]
+sealed trait GitLab

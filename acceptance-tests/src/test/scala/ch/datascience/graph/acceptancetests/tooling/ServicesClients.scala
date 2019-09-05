@@ -53,7 +53,8 @@ object WebhookServiceClient {
 
     def POST(url: String, hookToken: HookToken, payload: Json): Response[IO] = {
       for {
-        encryptedHookToken <- HookTokenCrypto[IO].encrypt(hookToken)
+        hookTokenCrypto    <- HookTokenCrypto[IO]()
+        encryptedHookToken <- hookTokenCrypto.encrypt(hookToken)
         tokenHeader        <- IO.pure(Header("X-Gitlab-Token", encryptedHookToken.value))
         uri                <- validateUri(s"$baseUrl/$url")
         response           <- send(request(Method.POST, uri) withHeaders tokenHeader withEntity payload)(mapResponse)

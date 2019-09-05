@@ -16,28 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.config
+package ch.datascience.graph.config
 
 import cats.MonadError
-import ch.datascience.config.ConfigLoader
-import ch.datascience.webhookservice.config.GitLabConfigProvider._
+import ch.datascience.config.ConfigLoader.{find, stringTinyTypeReader}
+import ch.datascience.tinytypes.constraints.{Url, UrlOps}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.api.Refined
+import pureconfig.ConfigReader
 
 import scala.language.higherKinds
 
-class GitLabConfigProvider[Interpretation[_]](
-    configuration: Config = ConfigFactory.load()
-)(implicit ME:     MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
-  import eu.timepit.refined.pureconfig._
+final class GitLabUrl private (val value: String) extends AnyVal with StringTinyType
+object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url with UrlOps[GitLabUrl] {
 
-  def get: Interpretation[HostUrl] = find[HostUrl]("services.gitlab.url", configuration)
-}
+  private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = stringTinyTypeReader(GitLabUrl)
 
-object GitLabConfigProvider {
-
-  import eu.timepit.refined.string.Url
-
-  type HostUrl = String Refined Url
+  def apply[Interpretation[_]](
+      config:    Config = ConfigFactory.load
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[GitLabUrl] =
+    find[Interpretation, GitLabUrl]("services.gitlab.url", config)
 }
