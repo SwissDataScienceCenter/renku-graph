@@ -20,14 +20,12 @@ package ch.datascience.webhookservice.tokenrepository
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.ServiceUrl
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.tokenrepository.IOTokenRepositoryUrlProvider
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.interpreters.TestLogger
@@ -49,10 +47,6 @@ class IOAccessTokenAssociatorSpec extends WordSpec with MockFactory with Externa
     personalAccessTokens.generateOne +: oauthAccessTokens.generateOne +: Nil foreach { accessToken =>
       s"succeed if association projectId with a ${accessToken.getClass.getSimpleName} on a remote is successful" in new TestCase {
 
-        (tokenRepositoryUrlProvider.get _)
-          .expects()
-          .returning(context.pure(tokenRepositoryUrl))
-
         stubFor {
           put(s"/projects/$projectId/tokens")
             .withRequestBody(equalToJson(toJson(accessToken)))
@@ -63,26 +57,9 @@ class IOAccessTokenAssociatorSpec extends WordSpec with MockFactory with Externa
       }
     }
 
-    "fail if fetching token-repository service url fails" in new TestCase {
-
-      val accessToken = accessTokens.generateOne
-
-      val exception = exceptions.generateOne
-      (tokenRepositoryUrlProvider.get _)
-        .expects()
-        .returning(context.raiseError(exception))
-
-      intercept[Exception] {
-        associator.associate(projectId, accessToken).unsafeRunSync()
-      } shouldBe exception
-    }
-
     "return an Exception if remote client responds with a status other than NO_CONTENT" in new TestCase {
-      val accessToken = accessTokens.generateOne
 
-      (tokenRepositoryUrlProvider.get _)
-        .expects()
-        .returning(context.pure(tokenRepositoryUrl))
+      val accessToken = accessTokens.generateOne
 
       val responseBody = ErrorMessage("some error").asJson.noSpaces
       stubFor {
@@ -104,11 +81,10 @@ class IOAccessTokenAssociatorSpec extends WordSpec with MockFactory with Externa
 
     val context = MonadError[IO, Throwable]
 
-    val tokenRepositoryUrl = ServiceUrl(externalServiceBaseUrl)
+    val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
     val projectId          = projectIds.generateOne
 
-    val tokenRepositoryUrlProvider = mock[IOTokenRepositoryUrlProvider]
-    val associator                 = new IOAccessTokenAssociator(tokenRepositoryUrlProvider, TestLogger())
+    val associator = new IOAccessTokenAssociator(tokenRepositoryUrl, TestLogger())
   }
 
   private lazy val toJson: AccessToken => String = {

@@ -20,9 +20,9 @@ package ch.datascience.rdfstore
 
 import java.util.UUID
 
-import ch.datascience.config.RenkuBaseUrl
 import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, ProjectPath}
 import ch.datascience.tinytypes.constraints.NonBlank

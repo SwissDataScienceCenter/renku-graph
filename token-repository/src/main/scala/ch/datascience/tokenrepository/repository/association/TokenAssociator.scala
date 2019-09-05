@@ -43,10 +43,11 @@ private class TokenAssociator[Interpretiation[_]](
     } yield ()
 }
 
-private class IOTokenAssociator(
-    transactor:          DbTransactor[IO, ProjectsTokensDB]
-)(implicit contextShift: ContextShift[IO])
-    extends TokenAssociator[IO](
-      AccessTokenCrypto[IO](),
-      new IOAssociationPersister(transactor)
-    )
+private object IOTokenAssociator {
+  def apply(
+      transactor:          DbTransactor[IO, ProjectsTokensDB]
+  )(implicit contextShift: ContextShift[IO]): IO[TokenAssociator[IO]] =
+    for {
+      accessTokenCrypto <- AccessTokenCrypto[IO]()
+    } yield new TokenAssociator[IO](accessTokenCrypto, new IOAssociationPersister(transactor))
+}

@@ -16,24 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.config
+package ch.datascience.graph.config
 
 import cats.MonadError
-import ch.datascience.config.ConfigLoader.{find, stringTinyTypeReader}
+import ch.datascience.config.ConfigLoader
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import com.typesafe.config.{Config, ConfigFactory}
-import pureconfig.ConfigReader
 
-import scala.language.higherKinds
+import scala.language.{higherKinds, implicitConversions}
 
-class GitLabUrl private (val value: String) extends AnyVal with StringTinyType
-object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url with UrlOps[GitLabUrl] {
+class RenkuBaseUrl private (val value: String) extends AnyVal with StringTinyType
+object RenkuBaseUrl extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_)) with Url with UrlOps[RenkuBaseUrl] {
+  import ConfigLoader._
+  import com.typesafe.config.{Config, ConfigFactory}
+  import pureconfig.ConfigReader
 
-  private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = stringTinyTypeReader(GitLabUrl)
+  private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] = stringTinyTypeReader(this)
 
   def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[GitLabUrl] =
-    find[Interpretation, GitLabUrl]("services.gitlab.url", config)
+      config:    Config = ConfigFactory.load()
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RenkuBaseUrl] =
+    find[Interpretation, RenkuBaseUrl]("services.renku.url", config)
 }

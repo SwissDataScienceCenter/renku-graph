@@ -26,7 +26,6 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe._
@@ -72,10 +71,12 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
   }
 }
 
-class IOAssociateTokenEndpoint(
-    transactor:          DbTransactor[IO, ProjectsTokensDB]
-)(implicit contextShift: ContextShift[IO])
-    extends AssociateTokenEndpoint[IO](
-      new IOTokenAssociator(transactor),
-      ApplicationLogger
-    )
+object IOAssociateTokenEndpoint {
+  def apply(
+      transactor:          DbTransactor[IO, ProjectsTokensDB],
+      logger:              Logger[IO]
+  )(implicit contextShift: ContextShift[IO]): IO[AssociateTokenEndpoint[IO]] =
+    for {
+      tokenAssociator <- IOTokenAssociator(transactor)
+    } yield new AssociateTokenEndpoint[IO](tokenAssociator, logger)
+}

@@ -18,17 +18,25 @@
 
 package ch.datascience.webhookservice.crypto
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.security.InvalidKeyException
 import java.util.Base64
 
+import cats.implicits._
 import ch.datascience.crypto.AesCrypto.Secret
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.model.HookToken
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
+import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
 class HookTokenCryptoSpec extends WordSpec {
@@ -52,6 +60,44 @@ class HookTokenCryptoSpec extends WordSpec {
 
       decryptException            shouldBe an[Exception]
       decryptException.getMessage shouldBe "HookToken decryption failed"
+    }
+  }
+
+  "apply" should {
+
+    "read the secret from the 'services.gitlab.hook-token-secret' key in the config" in {
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "gitlab" -> Map(
+              "hook-token-secret" -> aesCryptoSecrets.generateOne.value
+            ).asJava
+          ).asJava
+        ).asJava
+      )
+
+      val Success(crypto) = HookTokenCrypto[Try](config)
+
+      val token = hookTokens.generateOne
+      crypto.encrypt(token) flatMap crypto.decrypt shouldBe Success(token)
+    }
+
+    "fail if there's wrong key in the 'services.gitlab.hook-token-secret' key in the config" in {
+      val invalidRawSecret = stringsOfLength(15).generateOne
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "gitlab" -> Map(
+              "hook-token-secret" -> new String(Base64.getEncoder.encode(invalidRawSecret.getBytes(UTF_8)), UTF_8)
+            ).asJava
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = HookTokenCrypto[Try](config)
+
+      exception            shouldBe a[InvalidKeyException]
+      exception.getMessage shouldBe "Invalid AES key length: 15 bytes"
     }
   }
 

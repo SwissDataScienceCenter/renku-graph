@@ -24,17 +24,13 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.config.GitLabConfigProvider._
-import ch.datascience.webhookservice.config.IOGitLabConfigProvider
 import com.github.tomakehurst.wiremock.client.WireMock._
-import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.string.Url
 import io.circe.literal._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
@@ -50,7 +46,6 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with Personal Access Token" in new TestCase {
 
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
       val accessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -72,7 +67,6 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with OAuth Access Token" in new TestCase {
 
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
       val accessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -94,8 +88,6 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with no access token" in new TestCase {
 
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
-
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
           .willReturn(okJson(responseJson.toString()))
@@ -111,17 +103,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
       )
     }
 
-    "return an error if config cannot be read" in new TestCase {
-      val exception = exceptions.generateOne
-      expectGitLabConfigProvider(returning = IO.raiseError(exception))
-
-      intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
-      } shouldBe exception
-    }
-
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
@@ -134,7 +116,6 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     }
 
     "return an Error if remote client responds with invalid json" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
@@ -147,7 +128,6 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     }
 
     "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
-      expectGitLabConfigProvider(returning = IO.pure(gitLabUrl))
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
@@ -164,7 +144,7 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val gitLabUrl     = url(externalServiceBaseUrl)
+    val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
     val projectId     = projectIds.generateOne
     val commitId      = commitIds.generateOne
     val commitMessage = commitMessages.generateOne
@@ -185,18 +165,6 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
       "parent_ids":      ${parents.map(_.value).toArray}
     }"""
 
-    val configProvider = mock[IOGitLabConfigProvider]
-
-    def expectGitLabConfigProvider(returning: IO[HostUrl]) =
-      (configProvider.get _)
-        .expects()
-        .returning(returning)
-
-    val finder = new IOCommitInfoFinder(configProvider, Throttler.noThrottling, TestLogger())
-
-    private def url(value: String) =
-      RefType
-        .applyRef[String Refined Url](value)
-        .getOrElse(throw new IllegalArgumentException("Invalid url value"))
+    val finder = new IOCommitInfoFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 }

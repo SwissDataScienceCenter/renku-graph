@@ -25,7 +25,6 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import io.circe.syntax._
@@ -63,10 +62,12 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
   }
 }
 
-class IOFetchTokenEndpoint(
-    transactor:          DbTransactor[IO, ProjectsTokensDB]
-)(implicit contextShift: ContextShift[IO])
-    extends FetchTokenEndpoint[IO](
-      new IOTokenFinder(transactor),
-      ApplicationLogger
-    )
+object IOFetchTokenEndpoint {
+  def apply(
+      transactor:          DbTransactor[IO, ProjectsTokensDB],
+      logger:              Logger[IO]
+  )(implicit contextShift: ContextShift[IO]): IO[FetchTokenEndpoint[IO]] =
+    for {
+      tokenFinder <- IOTokenFinder(transactor)
+    } yield new FetchTokenEndpoint[IO](tokenFinder, logger)
+}

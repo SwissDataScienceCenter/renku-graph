@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.tokenrepository
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.IORestClient
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
@@ -34,9 +34,9 @@ trait AccessTokenRemover[Interpretation[_]] {
 }
 
 class IOAccessTokenRemover(
-    tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO],
-    logger:                     Logger[IO]
-)(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    tokenRepositoryUrl:      TokenRepositoryUrl,
+    logger:                  Logger[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient(Throttler.noThrottling, logger)
     with AccessTokenRemover[IO] {
 
@@ -47,9 +47,8 @@ class IOAccessTokenRemover(
 
   override def removeAccessToken(projectId: ProjectId): IO[Unit] =
     for {
-      tokenRepositoryUrl <- tokenRepositoryUrlProvider.get
-      uri                <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
-      _                  <- send(request(DELETE, uri))(mapResponse)
+      uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
+      _   <- send(request(DELETE, uri))(mapResponse)
     } yield ()
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {

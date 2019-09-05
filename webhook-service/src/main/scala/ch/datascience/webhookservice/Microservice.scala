@@ -22,16 +22,21 @@ import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
+import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
-import ch.datascience.graph.gitlab.{GitLabRateLimitProvider, GitLabThrottler}
+import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.server.HttpServer
 import ch.datascience.microservices.IOMicroservice
+import ch.datascience.webhookservice.config.GitLab
+import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.{IOHookEventEndpoint, IOProcessingStatusEndpoint}
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
 import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, EventsSynchronizationThrottler, IOEventsSynchronizationScheduler}
+import ch.datascience.webhookservice.project.ProjectHookUrl
 import pureconfig.loadConfigOrThrow
 
 import scala.concurrent.ExecutionContext
@@ -58,24 +63,37 @@ object Microservice extends IOMicroservice {
     transactorResource.use { transactor =>
       for {
         sentryInitializer              <- SentryInitializer[IO]
-        gitLabRateLimitProvider        <- IO.pure(new GitLabRateLimitProvider[IO]())
-        gitLabThrottler                <- GitLabThrottler[IO](gitLabRateLimitProvider)
-        eventsSynchronizationThrottler <- EventsSynchronizationThrottler[IO](gitLabRateLimitProvider)
+        tokenRepositoryUrl             <- TokenRepositoryUrl[IO]()
+        projectHookUrl                 <- ProjectHookUrl.fromConfig[IO]()
+        gitLabUrl                      <- GitLabUrl[IO]()
+        gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+        gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
+        eventsSynchronizationThrottler <- EventsSynchronizationThrottler[IO](gitLabRateLimit = gitLabRateLimit)
+        hookTokenCrypto                <- HookTokenCrypto[IO]()
 
         httpServer = new HttpServer[IO](
           serverPort = 9001,
           serviceRoutes = new MicroserviceRoutes[IO](
-            new IOHookEventEndpoint(transactor, gitLabThrottler),
-            new IOHookCreationEndpoint(transactor, gitLabThrottler),
-            new IOHookValidationEndpoint(gitLabThrottler),
-            new IOProcessingStatusEndpoint(transactor, gitLabThrottler)
+            new IOHookEventEndpoint(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, hookTokenCrypto),
+            new IOHookCreationEndpoint(transactor,
+                                       tokenRepositoryUrl,
+                                       projectHookUrl,
+                                       gitLabUrl,
+                                       gitLabThrottler,
+                                       hookTokenCrypto),
+            new IOHookValidationEndpoint(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
+            new IOProcessingStatusEndpoint(transactor, tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler)
           ).routes
         )
 
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,
                      new IOEventLogDbInitializer(transactor),
-                     new IOEventsSynchronizationScheduler(transactor, gitLabThrottler, eventsSynchronizationThrottler),
+                     new IOEventsSynchronizationScheduler(transactor,
+                                                          tokenRepositoryUrl,
+                                                          gitLabUrl,
+                                                          gitLabThrottler,
+                                                          eventsSynchronizationThrottler),
                      httpServer
                    ) run args
       } yield exitCode

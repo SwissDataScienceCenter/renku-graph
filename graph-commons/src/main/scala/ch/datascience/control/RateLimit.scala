@@ -19,17 +19,17 @@
 package ch.datascience.control
 
 import cats.MonadError
+import ch.datascience.config.ConfigLoader
 import ch.datascience.tinytypes.TypeName
+import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.numeric.Positive
-import pureconfig.ConfigReader
-import pureconfig.error.CannotConvert
 
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 import scala.util.Try
 
-case class RateLimit(items: Long Refined Positive, per: RateLimitUnit) {
+case class RateLimit[Target](items: Long Refined Positive, per: RateLimitUnit) {
   import RateLimitUnit._
 
   override lazy val toString: String = per match {
@@ -76,12 +76,31 @@ object RateLimit extends TypeName {
 
   private val RateExtractor = """(\d+)[ ]*/(\w+)""".r
 
-  def from[Interpretation[_]](
+  def from[Interpretation[_], Target](
       value:     String
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RateLimit] = value match {
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RateLimit[Target]] = value match {
     case RateExtractor(rate, unit) =>
-      (toPositiveLong[Interpretation](rate), RateLimitUnit.from[Interpretation](unit)) mapN (RateLimit(_, _))
+      (toPositiveLong[Interpretation](rate), RateLimitUnit.from[Interpretation](unit)) mapN RateLimit[Target]
     case other => ME.raiseError(new IllegalArgumentException(s"Invalid value for $typeName: '$other'"))
+  }
+
+  def fromConfig[Interpretation[_], Target](
+      key:       String,
+      config:    Config = ConfigFactory.load()
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RateLimit[Target]] = {
+    import ConfigLoader._
+    import pureconfig.ConfigReader
+    import pureconfig.error.CannotConvert
+
+    implicit val rateLimitReader: ConfigReader[RateLimit[Target]] =
+      ConfigReader.fromString[RateLimit[Target]] { value =>
+        RateLimit
+          .from[Try, Target](value)
+          .toEither
+          .leftMap(exception => CannotConvert(value, RateLimit.getClass.toString, exception.getMessage))
+      }
+
+    find[Interpretation, RateLimit[Target]](key, config)
   }
 
   private def toPositiveLong[Interpretation[_]](
@@ -94,21 +113,13 @@ object RateLimit extends TypeName {
       positiveLong <- ME.fromEither(long.toPositiveLong(errorWhenNotPositive = s"$typeName has to be positive"))
     } yield positiveLong
 
-  implicit val rateLimitReader: ConfigReader[RateLimit] =
-    ConfigReader.fromString[RateLimit] { value =>
-      RateLimit
-        .from[Try](value)
-        .toEither
-        .leftMap(exception => CannotConvert(value, RateLimit.getClass.toString, exception.getMessage))
-    }
-
-  implicit class RateLimitOps(rateLimit: RateLimit) {
+  implicit class RateLimitOps[OldTarget](rateLimit: RateLimit[OldTarget]) {
     import RateLimitUnit._
 
-    def /(divider: Int Refined Positive): Either[IllegalArgumentException, RateLimit] =
+    def /[NewTarget](divider: Int Refined Positive): Either[IllegalArgumentException, RateLimit[NewTarget]] =
       (rateLimit.items.value * (1 day).toMillis / (rateLimit.per.multiplierFor(MILLISECONDS) * divider.value)).toLong
         .toPositiveLong("RateLimits below 1/day not supported")
-        .map(RateLimit(_, per = Day))
+        .map(RateLimit[NewTarget](_, per = Day))
   }
 
   private implicit class LongOps(value: Long) {
