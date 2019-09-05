@@ -11,7 +11,7 @@ spec:
   type: {{ .Values.knowledgeGraph.service.type }}
   ports:
     - port: {{ .Values.knowledgeGraph.service.port }}
-      targetPort: http-graph-sv
+      targetPort: http-kg
       protocol: TCP
       name: http
   selector:
