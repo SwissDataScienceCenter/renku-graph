@@ -87,9 +87,14 @@ class IOProjectDatasetsFinderSpec
         val foundDatasets = datasetsFinder.findDatasets(projectPath).unsafeRunSync()
 
         foundDatasets should contain theSameElementsAs List(
-          dataset1.copy(part    = dataset1.part.sorted,
-                        project = List(DatasetProject(projectPath), DatasetProject(otherProject)).sorted),
-          dataset2.copy(part    = dataset2.part.sorted, project = List(DatasetProject(projectPath)).sorted)
+          dataset1.copy(
+            part    = dataset1.part sorted byPartName,
+            project = List(DatasetProject(projectPath), DatasetProject(otherProject)) sorted byProjectName
+          ),
+          dataset2.copy(
+            part    = dataset2.part sorted byPartName,
+            project = List(DatasetProject(projectPath)) sorted byProjectName
+          )
         )
       }
     }
@@ -111,9 +116,9 @@ class IOProjectDatasetsFinderSpec
     )
   }
 
-  private implicit lazy val partsAlphabeticalOrdering: Ordering[DatasetPart] =
+  private lazy val byPartName: Ordering[DatasetPart] =
     (part1: DatasetPart, part2: DatasetPart) => part1.name.value compareTo part2.name.value
 
-  private implicit lazy val projectsAlphabeticalOrdering: Ordering[DatasetProject] =
+  private lazy val byProjectName: Ordering[DatasetProject] =
     (project1: DatasetProject, project2: DatasetProject) => project1.name.value compareTo project2.name.value
 }

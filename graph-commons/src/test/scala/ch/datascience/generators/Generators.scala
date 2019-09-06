@@ -41,8 +41,12 @@ object Generators {
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
 
+    val lengths =
+      if (maxLength == 1) choose(1, maxLength)
+      else frequency(1 -> choose(1, maxLength), 9 -> choose(2, maxLength))
+
     for {
-      length <- choose(1, maxLength)
+      length <- lengths
       chars  <- listOfN(length, charsGenerator)
     } yield chars.mkString("")
   }
