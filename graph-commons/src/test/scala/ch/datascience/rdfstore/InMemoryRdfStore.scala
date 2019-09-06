@@ -38,6 +38,7 @@ package ch.datascience.rdfstore
 
 import java.io.ByteArrayInputStream
 import java.net.{ServerSocket, SocketException}
+import java.nio.charset.StandardCharsets.UTF_8
 
 import cats.MonadError
 import cats.data.Validated
@@ -51,6 +52,7 @@ import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.query.DatasetFactory
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
+import org.apache.jena.riot.{Lang, RDFDataMgr}
 import org.http4s.Uri
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
@@ -126,6 +128,19 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
         IO {
           connection.load {
             ModelFactory.createDefaultModel.read(new ByteArrayInputStream(triples.toString().getBytes), "")
+          }
+        }
+      }
+      .unsafeRunSync()
+
+  protected def loadToStore(triples: Json): Unit =
+    rdfConnectionResource
+      .use { connection =>
+        IO {
+          connection.load {
+            val model = ModelFactory.createDefaultModel()
+            RDFDataMgr.read(model, new ByteArrayInputStream(triples.noSpaces.getBytes(UTF_8)), null, Lang.JSONLD)
+            model
           }
         }
       }
