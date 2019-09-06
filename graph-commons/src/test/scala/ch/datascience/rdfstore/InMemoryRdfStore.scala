@@ -197,4 +197,12 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   }
 
   protected def runQuery(query: String): IO[List[Map[String, String]]] = queryRunner.run(query)
+
+  protected def rdfStoreSize: Int =
+    runQuery("SELECT (COUNT(*) as ?triples) WHERE { ?s ?p ?o }")
+      .unsafeRunSync()
+      .map(row => row("triples"))
+      .headOption
+      .map(_.toInt)
+      .getOrElse(throw new Exception("Cannot find the count of all the triples"))
 }

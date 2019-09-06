@@ -19,7 +19,6 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.MonadError
-import cats.data.OptionT._
 import cats.effect.Timer
 import cats.implicits._
 import ch.datascience.db.DbTransactor
@@ -39,17 +38,19 @@ import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
 class ReProvisioner[Interpretation[_]](
-    triplesFinder:       OutdatedTriplesFinder[Interpretation],
-    triplesRemover:      OutdatedTriplesRemover[Interpretation],
-    eventLogMarkAllNew:  EventLogMarkAllNew[Interpretation],
-    eventLogFetch:       EventLogFetch[Interpretation],
-    reProvisioningDelay: ReProvisioningDelay,
-    logger:              Logger[Interpretation],
-    sleepWhenBusy:       FiniteDuration
-)(implicit ME:           MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
+    triplesFinder:           OutdatedTriplesFinder[Interpretation],
+    triplesRemover:          OutdatedTriplesRemover[Interpretation],
+    orphanMailtoNoneRemover: OrphanMailtoNoneRemover[Interpretation],
+    eventLogMarkAllNew:      EventLogMarkAllNew[Interpretation],
+    eventLogFetch:           EventLogFetch[Interpretation],
+    reProvisioningDelay:     ReProvisioningDelay,
+    logger:                  Logger[Interpretation],
+    sleepWhenBusy:           FiniteDuration
+)(implicit ME:               MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
 
   import eventLogFetch._
   import eventLogMarkAllNew._
+  import orphanMailtoNoneRemover._
   import triplesFinder._
   import triplesRemover._
 
@@ -58,21 +59,33 @@ class ReProvisioner[Interpretation[_]](
 
   private def startReProvisioning: Interpretation[Unit] =
     isEventToProcess flatMap {
-      case false => reProvisionNextProject
+      case false => maybeReProvisionNextProject
       case true  => (timer sleep sleepWhenBusy) *> startReProvisioning
     } recoverWith tryAgain
 
-  private def reProvisionNextProject: Interpretation[Unit] = {
+  private def maybeReProvisionNextProject: Interpretation[Unit] =
+    findOutdatedTriples.value.flatMap {
+      case Some(outdatedTriples) => reProvisionNextProject(outdatedTriples)
+      case None                  => postReProvisioningSteps()
+    }
+
+  private def reProvisionNextProject(outdatedTriples: OutdatedTriples) =
     for {
-      outdatedTriples <- findOutdatedTriples
-      projectPath     <- liftF(outdatedTriples.projectPath.to[Interpretation, ProjectPath])
-      commitIds       <- liftF(outdatedTriples.commits.toList.map(_.to[Interpretation, CommitId]).sequence)
-      _               <- liftF(markEventsAsNew(projectPath, commitIds.toSet))
-      _               <- liftF(removeOutdatedTriples(outdatedTriples))
-      _               <- liftF(logger.info(s"ReProvisioning '${outdatedTriples.projectPath}' project"))
-      _               <- liftF(startReProvisioning)
+      projectPath <- outdatedTriples.projectPath.to[Interpretation, ProjectPath]
+      commitIds   <- outdatedTriples.commits.toList.map(_.to[Interpretation, CommitId]).sequence
+      _           <- markEventsAsNew(projectPath, commitIds.toSet)
+      _           <- removeOutdatedTriples(outdatedTriples)
+      _           <- logger.info(s"ReProvisioning '${outdatedTriples.projectPath}' project")
+      _           <- startReProvisioning
     } yield ()
-  }.value.flatMap(loggingAllProcessed)
+
+  private def postReProvisioningSteps() =
+    for {
+      _ <- logger.info("All projects' triples up to date")
+      _ <- removeOrphanMailtoNoneTriples() recoverWith {
+            case NonFatal(exception) => logger.error(exception)("Removing orphan 'mailto:None' triples failed")
+          }
+    } yield ()
 
   private lazy val tryAgain: PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -81,11 +94,6 @@ class ReProvisioner[Interpretation[_]](
         _ <- timer sleep sleepWhenBusy
         _ <- startReProvisioning
       } yield ()
-  }
-
-  private lazy val loggingAllProcessed: Option[Unit] => Interpretation[Unit] = {
-    case None => logger.info("All projects' triples up to date")
-    case _    => ME.unit
   }
 }
 
@@ -123,6 +131,7 @@ object IOReProvisioner {
       new ReProvisioner[IO](
         new IOOutdatedTriplesFinder(rdfStoreConfig, schemaVersion, logger),
         new IOOutdatedTriplesRemover(rdfStoreConfig, logger),
+        new IOOrphanMailtoNoneRemover(rdfStoreConfig, logger),
         new EventLogMarkAllNew[IO](dbTransactor),
         new EventLogFetch[IO](dbTransactor),
         initialDelay,

@@ -27,15 +27,17 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 
-class IOReProvisioner(triplesFinder:       OutdatedTriplesFinder[IO],
-                      triplesRemover:      OutdatedTriplesRemover[IO],
-                      eventLogMarkAllNew:  EventLogMarkAllNew[IO],
-                      eventLogFetch:       EventLogFetch[IO],
-                      reProvisioningDelay: ReProvisioningDelay,
-                      logger:              Logger[IO],
-                      sleepWhenBusy:       FiniteDuration)(implicit timer: Timer[IO])
+class IOReProvisioner(triplesFinder:              OutdatedTriplesFinder[IO],
+                      triplesRemover:             OutdatedTriplesRemover[IO],
+                      orphanMailtoTriplesRemover: OrphanMailtoNoneRemover[IO],
+                      eventLogMarkAllNew:         EventLogMarkAllNew[IO],
+                      eventLogFetch:              EventLogFetch[IO],
+                      reProvisioningDelay:        ReProvisioningDelay,
+                      logger:                     Logger[IO],
+                      sleepWhenBusy:              FiniteDuration)(implicit timer: Timer[IO])
     extends ReProvisioner[IO](triplesFinder,
                               triplesRemover,
+                              orphanMailtoTriplesRemover,
                               eventLogMarkAllNew,
                               eventLogFetch,
                               reProvisioningDelay,
