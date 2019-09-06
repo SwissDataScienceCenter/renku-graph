@@ -38,7 +38,8 @@ class NodeSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "return false if compared to a Node with a different id" in {
-      forAll { (nodeId1: NodeId, nodeId2: NodeId, nodeLabel: NodeLabel) =>
+      forAll { (nodeId1: NodeId, nodeLabel: NodeLabel) =>
+        val nodeId2 = nodeIds generateDifferentThan nodeId1
         SourceNode(nodeId1, nodeLabel) should not be SourceNode(nodeId2, nodeLabel)
         TargetNode(nodeId1, nodeLabel) should not be TargetNode(nodeId2, nodeLabel)
       }

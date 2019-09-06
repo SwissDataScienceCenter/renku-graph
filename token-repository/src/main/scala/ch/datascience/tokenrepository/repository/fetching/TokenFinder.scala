@@ -42,10 +42,15 @@ private class TokenFinder[Interpretation[_]](
     } yield accessToken
 }
 
-private class IOTokenFinder(
-    transactor:          DbTransactor[IO, ProjectsTokensDB]
-)(implicit contextShift: ContextShift[IO])
-    extends TokenFinder[IO](
-      new IOPersistedTokensFinder(transactor),
-      AccessTokenCrypto[IO]()
-    )
+private object IOTokenFinder {
+  def apply(
+      transactor:          DbTransactor[IO, ProjectsTokensDB]
+  )(implicit contextShift: ContextShift[IO]): IO[TokenFinder[IO]] =
+    for {
+      accessTokenCrypto <- AccessTokenCrypto[IO]()
+    } yield
+      new TokenFinder[IO](
+        new IOPersistedTokensFinder(transactor),
+        accessTokenCrypto
+      )
+}

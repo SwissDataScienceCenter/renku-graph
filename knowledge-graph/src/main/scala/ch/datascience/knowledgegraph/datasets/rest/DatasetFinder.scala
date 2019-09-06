@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}

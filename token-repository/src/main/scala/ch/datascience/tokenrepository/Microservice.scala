@@ -22,6 +22,7 @@ import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
@@ -42,14 +43,15 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, ProjectsTokensDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
-        sentryInitializer <- SentryInitializer[IO]
-
+        sentryInitializer      <- SentryInitializer[IO]
+        fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger)
+        associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
         httpServer = new HttpServer[IO](
           serverPort = 9003,
           serviceRoutes = new MicroserviceRoutes[IO](
-            new IOFetchTokenEndpoint(transactor),
-            new IOAssociateTokenEndpoint(transactor),
-            new IODeleteTokenEndpoint(transactor)
+            fetchTokenEndpoint,
+            associateTokenEndpoint,
+            new IODeleteTokenEndpoint(transactor, ApplicationLogger)
           ).routes
         )
 

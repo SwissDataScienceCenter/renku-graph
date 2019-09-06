@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.tinytypes.constraints.{NonBlank, Url}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 

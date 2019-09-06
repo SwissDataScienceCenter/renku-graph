@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.tokenrepository
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
@@ -34,9 +34,9 @@ trait AccessTokenAssociator[Interpretation[_]] {
 }
 
 class IOAccessTokenAssociator(
-    tokenRepositoryUrlProvider: TokenRepositoryUrlProvider[IO],
-    logger:                     Logger[IO]
-)(implicit executionContext:    ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    tokenRepositoryUrl:      TokenRepositoryUrl,
+    logger:                  Logger[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient(Throttler.noThrottling, logger)
     with AccessTokenAssociator[IO] {
 
@@ -49,8 +49,7 @@ class IOAccessTokenAssociator(
 
   override def associate(projectId: ProjectId, accessToken: AccessToken): IO[Unit] =
     for {
-      tokenRepositoryUrl <- tokenRepositoryUrlProvider.get
-      uri                <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
+      uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
       requestWithPayload = request(PUT, uri).withEntity(accessToken.asJson)
       _ <- send(requestWithPayload)(mapResponse)
     } yield ()

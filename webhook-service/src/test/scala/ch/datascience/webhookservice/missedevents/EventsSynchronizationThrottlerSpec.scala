@@ -20,11 +20,10 @@ package ch.datascience.webhookservice.missedevents
 
 import cats.MonadError
 import cats.effect._
-import ch.datascience.control.{RateLimit, RateLimitUnit, Throttler}
+import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.gitlab.IOGitLabRateLimitProvider
+import ch.datascience.webhookservice.config.GitLab
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -36,29 +35,16 @@ class EventsSynchronizationThrottlerSpec extends WordSpec with MockFactory {
 
   "apply" should {
 
-    "read the GitLab rate limit, divide it by 10 and instantiate the throttle with it" in new TestCase {
-      val rateLimit = (rateLimits retryUntil (limit => (limit / 10).isRight)).generateOne
-      (gitLabRateLimitProvider.get _)
-        .expects()
-        .returning(context.pure(rateLimit))
+    "divide the given GitLab RateLimit by 10 and instantiate the throttler with it" in new TestCase {
+      val gitLabRateLimit = (rateLimits[GitLab] retryUntil (limit => (limit / 10).isRight)).generateOne
 
-      val throttler = mock[Throttler[IO, EventsSynchronization]]
+      val throttler                      = mock[Throttler[IO, EventsSynchronization]]
+      val eventsSynchronizationRateLimit = gitLabRateLimit./[EventsSynchronization](10).fold(throw _, identity)
       newThrottler
-        .expects((rateLimit / 10).getOrElse(throw new Exception("Illegal RateLimit")), concurrent, timer)
+        .expects(eventsSynchronizationRateLimit, concurrent, timer)
         .returning(IO.pure(throttler))
 
-      EventsSynchronizationThrottler(gitLabRateLimitProvider, newThrottler).unsafeRunSync()
-    }
-
-    "fail if reading the GitLab rate limit fails" in new TestCase {
-      val exception = exceptions.generateOne
-      (gitLabRateLimitProvider.get _)
-        .expects()
-        .returning(context.raiseError(exception))
-
-      intercept[Exception] {
-        EventsSynchronizationThrottler(gitLabRateLimitProvider, newThrottler).unsafeRunSync()
-      } shouldBe exception
+      EventsSynchronizationThrottler(gitLabRateLimit, newThrottler).unsafeRunSync()
     }
   }
 
@@ -68,7 +54,9 @@ class EventsSynchronizationThrottlerSpec extends WordSpec with MockFactory {
   private implicit val context:      MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
   private trait TestCase {
-    val gitLabRateLimitProvider = mock[IOGitLabRateLimitProvider]
-    val newThrottler            = mockFunction[RateLimit, Concurrent[IO], Timer[IO], IO[Throttler[IO, EventsSynchronization]]]
+    val newThrottler = mockFunction[RateLimit[EventsSynchronization],
+                                    Concurrent[IO],
+                                    Timer[IO],
+                                    IO[Throttler[IO, EventsSynchronization]]]
   }
 }

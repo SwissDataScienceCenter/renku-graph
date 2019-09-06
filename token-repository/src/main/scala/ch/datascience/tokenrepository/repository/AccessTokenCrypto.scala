@@ -18,21 +18,20 @@
 
 package ch.datascience.tokenrepository.repository
 
-import eu.timepit.refined.pureconfig._
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
+import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
+import eu.timepit.refined.pureconfig._
 import eu.timepit.refined.string.MatchesRegex
 import io.circe._
 import io.circe.parser._
-import pureconfig._
-import pureconfig.error.ConfigReaderException
 
 import scala.language.{higherKinds, implicitConversions}
 import scala.util.control.NonFatal
@@ -98,15 +97,12 @@ private class AccessTokenCrypto[Interpretation[_]](
 
 private object AccessTokenCrypto {
 
-  def apply[Interpretation[_]]()(
-      implicit ME: MonadError[Interpretation, Throwable]
-  ): AccessTokenCrypto[Interpretation] =
-    new AccessTokenCrypto[Interpretation](
-      loadConfig[Secret]("projects-tokens.secret").fold(
-        failures => throw new ConfigReaderException(failures),
-        identity
-      )
-    )
+  import ch.datascience.config.ConfigLoader._
+
+  def apply[Interpretation[_]](
+      config:    Config = ConfigFactory.load()
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[AccessTokenCrypto[Interpretation]] =
+    find[Interpretation, Secret]("projects-tokens.secret", config) map (new AccessTokenCrypto[Interpretation](_))
 
   type EncryptedAccessToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 

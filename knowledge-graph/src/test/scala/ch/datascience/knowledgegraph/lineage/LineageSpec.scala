@@ -56,11 +56,10 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "fail if there are orphan nodes" in {
-      val edgesSet        = edgesSets.generateOne
-      val nodesSet        = collectNodes(edgesSet) + nodes.generateOne
-      val nodeToBeMissing = Gen.oneOf(nodesSet.toList).generateOne
+      val edgesSet = edgesSets.generateOne
+      val nodesSet = collectNodes(edgesSet) + nodes.generateOne
 
-      val Left(exception) = Lineage.from[EitherLineage](edgesSet, nodesSet - nodeToBeMissing)
+      val Left(exception) = Lineage.from[EitherLineage](edgesSet, nodesSet)
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe "There are orphan nodes"

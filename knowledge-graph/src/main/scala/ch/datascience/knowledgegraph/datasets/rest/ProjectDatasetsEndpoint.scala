@@ -18,15 +18,16 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
+import cats.effect._
 import cats.implicits._
-import ch.datascience.config.{RenkuBaseUrl, RenkuResourcesUrl}
+import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.Links
-import cats.effect.{ContextShift, Effect, IO, Timer}
 import Links._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.RdfStoreConfig
 import io.chrisdavenport.log4cats.Logger

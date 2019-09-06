@@ -26,7 +26,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.commands._
 import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrlProvider}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -199,11 +199,12 @@ object IOCommitEventProcessor {
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      triplesUploader <- IOTriplesUploader()
+      triplesUploader    <- IOTriplesUploader()
+      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
     } yield
       new CommitEventProcessor[IO](
         new CommitEventsDeserialiser[IO](),
-        new IOAccessTokenFinder(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
+        new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
         triplesGenerator,
         triplesUploader,
         new IOEventLogMarkDone(transactor),

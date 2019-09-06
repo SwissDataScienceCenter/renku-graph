@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect._
 import cats.implicits._
-import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime

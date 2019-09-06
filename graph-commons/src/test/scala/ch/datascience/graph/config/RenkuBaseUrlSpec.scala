@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.config
+package ch.datascience.graph.config
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException

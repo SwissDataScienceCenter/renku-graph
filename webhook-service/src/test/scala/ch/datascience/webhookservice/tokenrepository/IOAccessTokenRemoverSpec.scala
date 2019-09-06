@@ -20,14 +20,12 @@ package ch.datascience.webhookservice.tokenrepository
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.ServiceUrl
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.tokenrepository.IOTokenRepositoryUrlProvider
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -45,10 +43,6 @@ class IOAccessTokenRemoverSpec extends WordSpec with MockFactory with ExternalSe
 
     "succeed if removing token for the given projectId on a remote is successful" in new TestCase {
 
-      (tokenRepositoryUrlProvider.get _)
-        .expects()
-        .returning(context.pure(tokenRepositoryUrl))
-
       stubFor {
         delete(s"/projects/$projectId/tokens")
           .willReturn(noContent())
@@ -57,26 +51,8 @@ class IOAccessTokenRemoverSpec extends WordSpec with MockFactory with ExternalSe
       tokenRemover.removeAccessToken(projectId).unsafeRunSync() shouldBe ((): Unit)
     }
 
-    "fail if fetching token-repository service url fails" in new TestCase {
-
-      val accessToken = accessTokens.generateOne
-
-      val exception = exceptions.generateOne
-      (tokenRepositoryUrlProvider.get _)
-        .expects()
-        .returning(context.raiseError(exception))
-
-      intercept[Exception] {
-        tokenRemover.removeAccessToken(projectId).unsafeRunSync()
-      } shouldBe exception
-    }
-
     "return an Exception if remote client responds with a status other than NO_CONTENT" in new TestCase {
       val accessToken = accessTokens.generateOne
-
-      (tokenRepositoryUrlProvider.get _)
-        .expects()
-        .returning(context.pure(tokenRepositoryUrl))
 
       val responseBody = ErrorMessage("some error").asJson.noSpaces
       stubFor {
@@ -97,10 +73,9 @@ class IOAccessTokenRemoverSpec extends WordSpec with MockFactory with ExternalSe
 
     val context = MonadError[IO, Throwable]
 
-    val tokenRepositoryUrl = ServiceUrl(externalServiceBaseUrl)
+    val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
     val projectId          = projectIds.generateOne
 
-    val tokenRepositoryUrlProvider = mock[IOTokenRepositoryUrlProvider]
-    val tokenRemover               = new IOAccessTokenRemover(tokenRepositoryUrlProvider, TestLogger())
+    val tokenRemover = new IOAccessTokenRemover(tokenRepositoryUrl, TestLogger())
   }
 }

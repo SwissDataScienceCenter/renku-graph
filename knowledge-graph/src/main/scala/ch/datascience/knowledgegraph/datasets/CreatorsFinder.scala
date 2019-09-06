@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery

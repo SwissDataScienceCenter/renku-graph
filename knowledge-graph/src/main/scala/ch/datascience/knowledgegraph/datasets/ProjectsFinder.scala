@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery

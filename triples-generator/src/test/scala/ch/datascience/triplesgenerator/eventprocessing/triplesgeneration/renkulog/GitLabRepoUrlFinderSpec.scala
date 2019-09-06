@@ -24,9 +24,9 @@ import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.triplesgenerator.config.GitLabUrl
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

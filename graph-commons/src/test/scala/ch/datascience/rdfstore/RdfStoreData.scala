@@ -18,10 +18,10 @@
 
 package ch.datascience.rdfstore
 
-import ch.datascience.config.RenkuBaseUrl
-import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.CommonGraphGenerators.{schemaVersions, _}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.datasets._

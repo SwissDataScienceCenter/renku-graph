@@ -25,8 +25,6 @@ import ch.datascience.webhookservice.commits.CommitInfo
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.model._
-import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
-import ch.datascience.webhookservice.project.SelfUrlConfigProvider.SelfUrl
 import ch.datascience.webhookservice.project._
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
@@ -56,11 +54,8 @@ object WebhookServiceGenerators {
     path       <- projectPaths
   } yield ProjectInfo(id, visibility, path)
 
-  implicit val selfUrls: Gen[SelfUrl] =
-    validatedUrls map (url => SelfUrl.apply(url.value))
-
-  implicit val projectHookUrls: Gen[ProjectHookUrl] =
-    validatedUrls map (url => ProjectHookUrl.apply(url.value))
+  implicit val selfUrls:        Gen[SelfUrl]        = validatedUrls map (url => SelfUrl.apply(url.value))
+  implicit val projectHookUrls: Gen[ProjectHookUrl] = selfUrls map ProjectHookUrl.from
 
   implicit val commitInfos: Gen[CommitInfo] = for {
     id            <- commitIds

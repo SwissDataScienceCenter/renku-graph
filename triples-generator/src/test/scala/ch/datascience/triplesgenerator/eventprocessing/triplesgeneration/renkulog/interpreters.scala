@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
 import cats.effect.IO
-import ch.datascience.triplesgenerator.config.GitLabUrl
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
 
 private class IOGitLabRepoUrlFinder(

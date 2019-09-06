@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.project
+package ch.datascience.graph.tokenrepository
 
-import cats.MonadError
 import cats.implicits._
+import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
+import ch.datascience.generators.Generators.httpUrls
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -29,47 +29,31 @@ import org.scalatest.WordSpec
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class SelfUrlConfigProviderProviderSpec extends WordSpec {
+class TokenRepositoryUrlSpec extends WordSpec {
 
-  private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+  "apply" should {
 
-  "get" should {
-
-    "return SelfUrl" in {
-      val selfUrl = selfUrls.generateOne
+    "read 'services.token-repository.url' from the config" in {
+      val url = httpUrls.generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "self" -> Map(
-              "url" -> selfUrl.toString()
+            "token-repository" -> Map(
+              "url" -> url
             ).asJava
           ).asJava
         ).asJava
       )
 
-      new SelfUrlConfigProvider[Try](config).get shouldBe Success(selfUrl)
+      TokenRepositoryUrl[Try](config) shouldBe Success(TokenRepositoryUrl(url))
     }
 
-    "fail if the value for 'services.self.url' is invalid" in {
-      val config = ConfigFactory.parseMap(
-        Map(
-          "services" -> Map(
-            "self" -> Map(
-              "url" -> "123"
-            ).asJava
-          ).asJava
-        ).asJava
-      )
+    "fail if there's no 'services.token-repository.url' entry" in {
+      val config = ConfigFactory.empty()
 
-      val Failure(exception) = new SelfUrlConfigProvider[Try](config).get
+      val Failure(exception) = TokenRepositoryUrl[Try](config)
 
-      exception.getMessage should startWith(
-        "Cannot convert '123'"
-      )
-    }
-
-    "fail if there is no 'services.self.url' in the config" in {
-      new SelfUrlConfigProvider[Try](ConfigFactory.empty).get shouldBe a[Failure[_]]
+      exception shouldBe an[ConfigLoadingException]
     }
   }
 }

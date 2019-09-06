@@ -25,12 +25,12 @@ import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrlProvider
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
@@ -38,7 +38,6 @@ import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidation
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.HookMissing
 import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
 import ch.datascience.webhookservice.model.HookToken
-import ch.datascience.webhookservice.project.ProjectHookUrlFinder.ProjectHookUrl
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, IOAccessTokenAssociator}
 import io.chrisdavenport.log4cats.Logger
@@ -48,7 +47,7 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private class HookCreator[Interpretation[_]](
-    projectHookUrlFinder:  ProjectHookUrlFinder[Interpretation],
+    projectHookUrl:        ProjectHookUrl,
     projectHookValidator:  HookValidator[Interpretation],
     projectInfoFinder:     ProjectInfoFinder[Interpretation],
     hookTokenCrypto:       HookTokenCrypto[Interpretation],
@@ -64,13 +63,11 @@ private class HookCreator[Interpretation[_]](
   import accessTokenAssociator._
   import hookTokenCrypto._
   import projectHookCreator.create
-  import projectHookUrlFinder._
   import projectHookValidator._
   import projectInfoFinder._
 
   def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[CreationResult] = {
     for {
-      projectHookUrl      <- right(findProjectHookUrl)
       hookValidation      <- right(validateHook(projectId, Some(accessToken)))
       _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
       projectInfo         <- right(findProjectInfo(projectId, Some(accessToken)))
@@ -116,15 +113,19 @@ private object HookCreator {
 
 private class IOHookCreator(
     transactor:              DbTransactor[IO, EventLogDB],
-    gitLabThrottler:         Throttler[IO, GitLab]
+    tokenRepositoryUrl:      TokenRepositoryUrl,
+    projectHookUrl:          ProjectHookUrl,
+    gitLabUrl:               GitLabUrl,
+    gitLabThrottler:         Throttler[IO, GitLab],
+    hookTokenCrypto:         HookTokenCrypto[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookCreator[IO](
-      new IOProjectHookUrlFinder,
-      new IOHookValidator(gitLabThrottler),
-      new IOProjectInfoFinder(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
-      HookTokenCrypto[IO],
-      new IOProjectHookCreator(new GitLabConfigProvider[IO], gitLabThrottler, ApplicationLogger),
-      new IOAccessTokenAssociator(new TokenRepositoryUrlProvider[IO](), ApplicationLogger),
-      new IOEventsHistoryLoader(transactor, gitLabThrottler),
+      projectHookUrl,
+      new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
+      new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
+      hookTokenCrypto,
+      new IOProjectHookCreator(gitLabUrl, gitLabThrottler, ApplicationLogger),
+      new IOAccessTokenAssociator(tokenRepositoryUrl, ApplicationLogger),
+      new IOEventsHistoryLoader(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler),
       ApplicationLogger
     )

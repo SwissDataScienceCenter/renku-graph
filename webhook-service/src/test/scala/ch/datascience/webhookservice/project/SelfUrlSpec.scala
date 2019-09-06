@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.config
+package ch.datascience.webhookservice.project
 
-import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -30,33 +29,47 @@ import org.scalatest.WordSpec
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class GitLabConfigProviderProviderSpec extends WordSpec {
+class SelfUrlSpec extends WordSpec {
 
-  private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+  "apply" should {
 
-  "get" should {
-
-    "return HostUrl" in {
-      val gitLabUrl = validatedUrls.generateOne
+    "read 'services.self.url' from the config" in {
+      val selfUrl = selfUrls.generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "gitlab" -> Map(
-              "url" -> gitLabUrl.toString()
+            "self" -> Map(
+              "url" -> selfUrl.toString()
             ).asJava
           ).asJava
         ).asJava
       )
 
-      new GitLabConfigProvider[Try](config).get shouldBe Success(gitLabUrl)
+      SelfUrl[Try](config) shouldBe Success(selfUrl)
     }
 
-    "fail if there is no 'services.gitlab.url' in the config" in {
-      val config = ConfigFactory.empty
+    "fail if the value for 'services.self.url' is invalid" in {
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "self" -> Map(
+              "url" -> "123"
+            ).asJava
+          ).asJava
+        ).asJava
+      )
 
-      val Failure(exception) = new GitLabConfigProvider[Try](config).get
+      val Failure(exception) = SelfUrl[Try](config)
 
-      exception shouldBe a[ConfigLoadingException]
+      exception.getMessage should startWith(
+        "Cannot convert '123'"
+      )
+    }
+
+    "fail if there's no 'services.self.url' entry" in {
+      val Failure(exception) = SelfUrl[Try](ConfigFactory.empty())
+
+      exception shouldBe an[ConfigLoadingException]
     }
   }
 }
