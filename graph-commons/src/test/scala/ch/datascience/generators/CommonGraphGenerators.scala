@@ -18,18 +18,31 @@
 
 package ch.datascience.generators
 
-import ch.datascience.config.RenkuBaseUrl
+import java.nio.charset.StandardCharsets.UTF_8
+import java.util.Base64
+
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
+import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
 import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl, RdfStoreConfig}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
 object CommonGraphGenerators {
+
+  implicit val aesCryptoSecrets: Gen[AesCrypto.Secret] =
+    stringsOfLength(16)
+      .map(_.getBytes(UTF_8))
+      .map(Base64.getEncoder.encode)
+      .map(new String(_, UTF_8))
+      .map(Refined.unsafeApply)
 
   implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
     length <- Gen.choose(5, 40)
@@ -53,10 +66,11 @@ object CommonGraphGenerators {
     password <- basicAuthPasswords
   } yield BasicAuthCredentials(username, password)
 
-  implicit val rateLimits: Gen[RateLimit] = for {
-    items <- positiveLongs()
-    unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
-  } yield RateLimit(items, per = unit)
+  def rateLimits[Target]: Gen[RateLimit[Target]] =
+    for {
+      items <- positiveLongs()
+      unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
+    } yield RateLimit[Target](items, per = unit)
 
   implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
     fusekiUrl       <- httpUrls map FusekiBaseUrl.apply

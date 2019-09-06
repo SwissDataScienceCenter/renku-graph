@@ -19,7 +19,6 @@
 package ch.datascience.graph.tokenrepository
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventsGenerators._
@@ -38,7 +37,7 @@ class AccessTokenFinderSpec extends WordSpec with ExternalServiceStubbing with M
   "findAccessToken" should {
 
     "return Some Personal Access Token if remote responds with OK and valid body" in new TestCase {
-      expectTokenRepositoryConfigProvider(returning = IO.pure(tokenRepositoryUrl))
+
       val accessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -50,7 +49,7 @@ class AccessTokenFinderSpec extends WordSpec with ExternalServiceStubbing with M
     }
 
     "return Some OAuth Access Token if remote responds with OK and valid body" in new TestCase {
-      expectTokenRepositoryConfigProvider(returning = IO.pure(tokenRepositoryUrl))
+
       val accessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -62,7 +61,7 @@ class AccessTokenFinderSpec extends WordSpec with ExternalServiceStubbing with M
     }
 
     "return None if remote responds with NOT_FOUND" in new TestCase {
-      expectTokenRepositoryConfigProvider(returning = IO.pure(tokenRepositoryUrl))
+
       val accessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -74,7 +73,6 @@ class AccessTokenFinderSpec extends WordSpec with ExternalServiceStubbing with M
     }
 
     "return a RuntimeException if remote responds with status neither OK nor NOT_FOUND" in new TestCase {
-      expectTokenRepositoryConfigProvider(returning = IO.pure(tokenRepositoryUrl))
 
       stubFor {
         get(s"/projects/$projectId/tokens")
@@ -92,7 +90,7 @@ class AccessTokenFinderSpec extends WordSpec with ExternalServiceStubbing with M
     }
 
     "return a RuntimeException if remote responds with unexpected body" in new TestCase {
-      expectTokenRepositoryConfigProvider(returning = IO.pure(tokenRepositoryUrl))
+
       val accessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -110,16 +108,9 @@ class AccessTokenFinderSpec extends WordSpec with ExternalServiceStubbing with M
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val tokenRepositoryUrl = ServiceUrl(externalServiceBaseUrl)
+    val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
     val projectId          = projectIds.generateOne
 
-    val configProvider = mock[IOTokenRepositoryUrlProvider]
-
-    def expectTokenRepositoryConfigProvider(returning: IO[ServiceUrl]) =
-      (configProvider.get _)
-        .expects()
-        .returning(returning)
-
-    val accessTokenFinder = new IOAccessTokenFinder(configProvider, TestLogger())
+    val accessTokenFinder = new IOAccessTokenFinder(tokenRepositoryUrl, TestLogger())
   }
 }

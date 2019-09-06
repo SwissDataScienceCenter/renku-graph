@@ -18,17 +18,24 @@
 
 package ch.datascience.tokenrepository.repository
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.security.InvalidKeyException
 import java.util.Base64
 
-import ch.datascience.http.client.AccessToken
+import cats.implicits._
 import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
+import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
 class AccessTokenCryptoSpec extends WordSpec {
@@ -65,11 +72,45 @@ class AccessTokenCryptoSpec extends WordSpec {
     }
   }
 
+  "apply" should {
+
+    "read the secret from the 'projects-tokens.secret' key in the config" in {
+      val config = ConfigFactory.parseMap(
+        Map(
+          "projects-tokens" -> Map(
+            "secret" -> aesCryptoSecrets.generateOne.value
+          ).asJava
+        ).asJava
+      )
+
+      val Success(crypto) = AccessTokenCrypto[Try](config)
+
+      val token = accessTokens.generateOne
+      crypto.encrypt(token) flatMap crypto.decrypt shouldBe Success(token)
+    }
+
+    "fail if there's wrong key in the 'projects-tokens.secret' key in the config" in {
+      val invalidRawSecret = stringsOfLength(15).generateOne
+      val config = ConfigFactory.parseMap(
+        Map(
+          "projects-tokens" -> Map(
+            "secret" -> new String(Base64.getEncoder.encode(invalidRawSecret.getBytes(UTF_8)), UTF_8)
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = AccessTokenCrypto[Try](config)
+
+      exception            shouldBe a[InvalidKeyException]
+      exception.getMessage shouldBe "Invalid AES key length: 15 bytes"
+    }
+  }
+
   private trait TestCase {
 
     import cats.implicits._
 
-    private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes("utf-8")), "utf-8")
+    private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes(UTF_8)), UTF_8)
     val hookTokenCrypto = new AccessTokenCrypto[Try](
       RefType
         .applyRef[Secret](secret)

@@ -16,42 +16,36 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.tokenrepository
+package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
-import ch.datascience.http.client.IORestClient
+import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
-import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-trait AccessTokenRemover[Interpretation[_]] {
-  def removeAccessToken(projectId: ProjectId): Interpretation[Unit]
+private trait OrphanMailtoNoneRemover[Interpretation[_]] {
+  def removeOrphanMailtoNoneTriples(): Interpretation[Unit]
 }
 
-class IOAccessTokenRemover(
-    tokenRepositoryUrl:      TokenRepositoryUrl,
+private class IOOrphanMailtoNoneRemover(
+    rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
-    with AccessTokenRemover[IO] {
+    extends IORdfStoreClient[RdfDelete](rdfStoreConfig, logger)
+    with OrphanMailtoNoneRemover[IO] {
 
-  import cats.effect._
-  import org.http4s.Method.DELETE
-  import org.http4s.Status.NoContent
-  import org.http4s.{Request, Response}
-
-  override def removeAccessToken(projectId: ProjectId): IO[Unit] =
-    for {
-      uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
-      _   <- send(request(DELETE, uri))(mapResponse)
-    } yield ()
-
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (NoContent, _, _) => IO.unit
+  override def removeOrphanMailtoNoneTriples(): IO[Unit] = queryWitNoResult {
+    s"""
+       |DELETE { ?s ?p ?o } 
+       |WHERE {
+       |  {
+       |    ?s ?p ?o .
+       |    VALUES ?s { <mailto:None> }
+       |    FILTER NOT EXISTS { ?someSubject ?somePredicate <mailto:None> }
+       |  }
+       |}""".stripMargin
   }
 }

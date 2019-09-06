@@ -49,10 +49,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     "return HookCreated if hook does not exists and it was successfully created" in new TestCase {
 
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
-
       (projectHookValidator
         .validateHook(_: ProjectId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
@@ -87,10 +83,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
     "return HookExisted if hook was already created for that project" in new TestCase {
 
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
-
       (projectHookValidator
         .validateHook(_: ProjectId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
@@ -101,25 +93,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
       logger.expectNoLogs()
     }
 
-    "log an error if finding project hook url fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.raiseError(exception))
-
-      intercept[Exception] {
-        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
-      } shouldBe exception
-
-      logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
-    }
-
     "log an error if hook validation fails" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
 
       val exception = exceptions.generateOne
       (projectHookValidator
@@ -135,10 +109,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     }
 
     "log an error if project info fetching fails" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
         .validateHook(_: ProjectId, _: Option[AccessToken]))
@@ -159,10 +129,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     }
 
     "log an error if hook token encryption fails" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
         .validateHook(_: ProjectId, _: Option[AccessToken]))
@@ -188,10 +154,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     }
 
     "log an error if hook creation fails" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
         .validateHook(_: ProjectId, _: Option[AccessToken]))
@@ -222,10 +184,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     }
 
     "log an error if associating projectId with accessToken fails" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
         .validateHook(_: ProjectId, _: Option[AccessToken]))
@@ -261,10 +219,6 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     }
 
     "return either HookExisted/HookCreated if loading all events fails" in new TestCase {
-
-      (projectHookUrlFinder.findProjectHookUrl _)
-        .expects()
-        .returning(context.pure(projectHookUrl))
 
       (projectHookValidator
         .validateHook(_: ProjectId, _: Option[AccessToken]))
@@ -315,13 +269,12 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     val projectInfoFinder     = mock[ProjectInfoFinder[IO]]
     val projectHookValidator  = mock[IOHookValidator]
     val projectHookCreator    = mock[ProjectHookCreator[IO]]
-    val projectHookUrlFinder  = mock[IOProjectHookUrlFinder]
     val hookTokenCrypto       = mock[IOHookTokenCrypto]
     val accessTokenAssociator = mock[AccessTokenAssociator[IO]]
     val eventsHistoryLoader   = mock[IOEventsHistoryLoader]
 
     val hookCreation = new HookCreator[IO](
-      projectHookUrlFinder,
+      projectHookUrl,
       projectHookValidator,
       projectInfoFinder,
       hookTokenCrypto,

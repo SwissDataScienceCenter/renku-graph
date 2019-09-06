@@ -18,8 +18,8 @@
 
 package ch.datascience.webhookservice.project
 
-import cats.MonadError
 import cats.implicits._
+import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.typesafe.config.ConfigFactory
@@ -29,13 +29,11 @@ import org.scalatest.WordSpec
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class SelfUrlConfigProviderProviderSpec extends WordSpec {
+class SelfUrlSpec extends WordSpec {
 
-  private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+  "apply" should {
 
-  "get" should {
-
-    "return SelfUrl" in {
+    "read 'services.self.url' from the config" in {
       val selfUrl = selfUrls.generateOne
       val config = ConfigFactory.parseMap(
         Map(
@@ -47,7 +45,7 @@ class SelfUrlConfigProviderProviderSpec extends WordSpec {
         ).asJava
       )
 
-      new SelfUrlConfigProvider[Try](config).get shouldBe Success(selfUrl)
+      SelfUrl[Try](config) shouldBe Success(selfUrl)
     }
 
     "fail if the value for 'services.self.url' is invalid" in {
@@ -61,15 +59,17 @@ class SelfUrlConfigProviderProviderSpec extends WordSpec {
         ).asJava
       )
 
-      val Failure(exception) = new SelfUrlConfigProvider[Try](config).get
+      val Failure(exception) = SelfUrl[Try](config)
 
       exception.getMessage should startWith(
         "Cannot convert '123'"
       )
     }
 
-    "fail if there is no 'services.self.url' in the config" in {
-      new SelfUrlConfigProvider[Try](ConfigFactory.empty).get shouldBe a[Failure[_]]
+    "fail if there's no 'services.self.url' entry" in {
+      val Failure(exception) = SelfUrl[Try](ConfigFactory.empty())
+
+      exception shouldBe an[ConfigLoadingException]
     }
   }
 }

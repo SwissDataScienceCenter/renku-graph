@@ -19,8 +19,9 @@
 package ch.datascience.tokenrepository.repository
 
 import cats.implicits._
-import ch.datascience.crypto.AesCrypto.Secret
+import ch.datascience.generators.CommonGraphGenerators.aesCryptoSecrets
+import ch.datascience.generators.Generators.Implicits._
 
 import scala.util.Try
 
-private class TryAccessTokenCrypto(secret: Secret) extends AccessTokenCrypto[Try](secret)
+private class TryAccessTokenCrypto extends AccessTokenCrypto[Try](aesCryptoSecrets.generateOne)

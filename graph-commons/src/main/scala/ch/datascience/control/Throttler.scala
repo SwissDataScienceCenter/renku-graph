@@ -34,7 +34,7 @@ trait Throttler[Interpretation[_], ThrottlingTarget] {
 }
 
 final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[control] (
-    rateLimit:         RateLimit,
+    rateLimit:         RateLimit[ThrottlingTarget],
     semaphore:         Semaphore[Interpretation],
     workersStartTimes: Ref[Interpretation, List[Long]]
 )(implicit ME:         MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
@@ -79,7 +79,7 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[contr
 object Throttler {
 
   def apply[Interpretation[_], ThrottlingTarget](
-      rateLimit: RateLimit
+      rateLimit: RateLimit[ThrottlingTarget]
   )(implicit F:  Concurrent[Interpretation],
     timer:       Timer[Interpretation]): Interpretation[Throttler[Interpretation, ThrottlingTarget]] =
     for {

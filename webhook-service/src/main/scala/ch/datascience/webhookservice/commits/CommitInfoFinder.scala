@@ -20,10 +20,10 @@ package ch.datascience.webhookservice.commits
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.config.GitLab
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
@@ -40,7 +40,7 @@ trait CommitInfoFinder[Interpretation[_]] {
 }
 
 class IOCommitInfoFinder(
-    gitLabConfigProvider:    GitLabConfigProvider[IO],
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
@@ -56,9 +56,8 @@ class IOCommitInfoFinder(
 
   def findCommitInfo(projectId: ProjectId, commitId: CommitId, maybeAccessToken: Option[AccessToken]): IO[CommitInfo] =
     for {
-      gitLabHost <- gitLabConfigProvider.get
-      uri        <- validateUri(s"$gitLabHost/api/v4/projects/$projectId/repository/commits/$commitId")
-      result     <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+      uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId")
+      result <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield result
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[CommitInfo]] = {

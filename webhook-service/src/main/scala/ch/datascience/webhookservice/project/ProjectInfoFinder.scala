@@ -20,10 +20,10 @@ package ch.datascience.webhookservice.project
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.project.ProjectVisibility.Public
 import io.chrisdavenport.log4cats.Logger
 
@@ -38,7 +38,7 @@ trait ProjectInfoFinder[Interpretation[_]] {
 }
 
 class IOProjectInfoFinder(
-    gitLabConfigProvider:    GitLabConfigProvider[IO],
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
@@ -56,9 +56,8 @@ class IOProjectInfoFinder(
 
   def findProjectInfo(projectId: ProjectId, maybeAccessToken: Option[AccessToken]): IO[ProjectInfo] =
     for {
-      gitLabHostUrl <- gitLabConfigProvider.get
-      uri           <- validateUri(s"$gitLabHostUrl/api/v4/projects/$projectId")
-      projectInfo   <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+      uri         <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
+      projectInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield projectInfo
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ProjectInfo]] = {

@@ -21,10 +21,10 @@ package ch.datascience.webhookservice.commits
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import ch.datascience.webhookservice.config.GitLabConfigProvider
+import ch.datascience.webhookservice.config.GitLab
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
@@ -42,7 +42,7 @@ trait LatestCommitFinder[Interpretation[_]] {
 }
 
 class IOLatestCommitFinder(
-    gitLabConfigProvider:    GitLabConfigProvider[IO],
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
@@ -60,8 +60,7 @@ class IOLatestCommitFinder(
       maybeAccessToken: Option[AccessToken]
   ): OptionT[IO, CommitInfo] = OptionT {
     for {
-      gitLabHost      <- gitLabConfigProvider.get
-      stringUri       <- IO.pure(s"$gitLabHost/api/v4/projects/$projectId/repository/commits")
+      stringUri       <- IO.pure(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits")
       uri             <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
       maybeCommitInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield maybeCommitInfo

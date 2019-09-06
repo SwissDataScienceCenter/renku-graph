@@ -25,11 +25,15 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.webhookservice.config.GitLab
+import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
+import ch.datascience.webhookservice.project.ProjectHookUrl
 import ch.datascience.webhookservice.security.AccessTokenExtractor
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response, Status}
@@ -69,9 +73,13 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 
 class IOHookCreationEndpoint(
     transactor:              DbTransactor[IO, EventLogDB],
-    gitLabThrottler:         Throttler[IO, GitLab]
+    tokenRepositoryUrl:      TokenRepositoryUrl,
+    projectHookUrl:          ProjectHookUrl,
+    gitLabUrl:               GitLabUrl,
+    gitLabThrottler:         Throttler[IO, GitLab],
+    hookTokenCrypto:         HookTokenCrypto[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookCreationEndpoint[IO](
-      new IOHookCreator(transactor, gitLabThrottler),
+      new IOHookCreator(transactor, tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler, hookTokenCrypto),
       new AccessTokenExtractor[IO]
     )

@@ -18,7 +18,6 @@
 
 package ch.datascience.webhookservice.crypto
 
-import eu.timepit.refined.pureconfig._
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.crypto.AesCrypto
@@ -26,13 +25,13 @@ import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.model.HookToken
+import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
+import eu.timepit.refined.pureconfig._
 import eu.timepit.refined.string.MatchesRegex
 import io.circe.parser._
 import io.circe.{Decoder, HCursor, Json}
-import pureconfig._
-import pureconfig.error.ConfigReaderException
 
 import scala.language.{higherKinds, implicitConversions}
 import scala.util.control.NonFatal
@@ -80,15 +79,13 @@ class HookTokenCrypto[Interpretation[_]](
 }
 
 object HookTokenCrypto {
+  import ch.datascience.config.ConfigLoader._
 
   def apply[Interpretation[_]](
-      implicit ME: MonadError[Interpretation, Throwable]
-  ): HookTokenCrypto[Interpretation] = new HookTokenCrypto[Interpretation](
-    loadConfig[Secret]("services.gitlab.hook-token-secret").fold(
-      failures => throw new ConfigReaderException(failures),
-      identity
-    )
-  )
+      config:    Config = ConfigFactory.load()
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[HookTokenCrypto[Interpretation]] =
+    find[Interpretation, Secret]("services.gitlab.hook-token-secret", config)
+      .map(new HookTokenCrypto[Interpretation](_))
 
   type SerializedHookToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 

@@ -28,13 +28,16 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogProcessingStatus, IOEventLogProcessingStatus, ProcessingStatus}
-import ch.datascience.graph.gitlab.GitLab
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
+import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
 import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
-import io.circe.{Encoder, Json}
+import ch.datascience.webhookservice.project.ProjectHookUrl
 import io.circe.literal._
 import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import org.http4s.Response
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -104,7 +107,11 @@ private object ProcessingStatusEndpoint {
 
 class IOProcessingStatusEndpoint(
     transactor:              DbTransactor[IO, EventLogDB],
+    tokenRepositoryUrl:      TokenRepositoryUrl,
+    projectHookUrl:          ProjectHookUrl,
+    gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
-    extends ProcessingStatusEndpoint[IO](new IOHookValidator(gitLabThrottler),
-                                         new IOEventLogProcessingStatus(transactor))
+    extends ProcessingStatusEndpoint[IO](
+      new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
+      new IOEventLogProcessingStatus(transactor))

@@ -18,6 +18,7 @@
 
 package ch.datascience.crypto
 
+import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
 import cats.MonadError
@@ -36,14 +37,13 @@ abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](
     secret:    Secret
 )(implicit ME: MonadError[Interpretation, Throwable]) {
 
-  private lazy val base64Decoder    = Base64.getDecoder
-  private lazy val base64Encoder    = Base64.getEncoder
-  private lazy val algorithm        = "AES/CBC/PKCS5Padding"
-  private lazy val key              = new SecretKeySpec(base64Decoder.decode(secret.value).takeWhile(_ != 10), "AES")
-  private lazy val ivSpec           = new IvParameterSpec(new Array[Byte](16))
-  private lazy val charset          = "utf-8"
-  private lazy val encryptingCipher = cipher(ENCRYPT_MODE)
-  private lazy val decryptingCipher = cipher(DECRYPT_MODE)
+  private val base64Decoder    = Base64.getDecoder
+  private val base64Encoder    = Base64.getEncoder
+  private val algorithm        = "AES/CBC/PKCS5Padding"
+  private val key              = new SecretKeySpec(base64Decoder.decode(secret.value).takeWhile(_ != 10), "AES")
+  private val ivSpec           = new IvParameterSpec(new Array[Byte](16))
+  private val encryptingCipher = cipher(ENCRYPT_MODE)
+  private val decryptingCipher = cipher(DECRYPT_MODE)
 
   def encrypt(nonEncrypted: NONENCRYPTED): Interpretation[ENCRYPTED]
   def decrypt(encrypted:    ENCRYPTED):    Interpretation[NONENCRYPTED]
@@ -56,15 +56,15 @@ abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](
 
   protected def encryptAndEncode(toEncryptAndEncode: String): Interpretation[String] = pure {
     new String(
-      base64Encoder.encode(encryptingCipher.doFinal(toEncryptAndEncode.getBytes(charset))),
-      charset
+      base64Encoder.encode(encryptingCipher.doFinal(toEncryptAndEncode.getBytes(UTF_8))),
+      UTF_8
     )
   }
 
   protected def decodeAndDecrypt(toDecodeAndDecrypt: String): Interpretation[String] = pure {
     new String(
-      decryptingCipher.doFinal(base64Decoder.decode(toDecodeAndDecrypt.getBytes(charset))),
-      charset
+      decryptingCipher.doFinal(base64Decoder.decode(toDecodeAndDecrypt.getBytes(UTF_8))),
+      UTF_8
     )
   }
 
