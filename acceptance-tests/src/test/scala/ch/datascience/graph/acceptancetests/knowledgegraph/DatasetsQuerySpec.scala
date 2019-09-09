@@ -30,7 +30,7 @@ import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.rdfstore.RdfStoreData._
+import ch.datascience.rdfstore.triples._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.literal._
 import io.circe.syntax._
@@ -62,35 +62,38 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
     scenario("As a user I would like to find project's datasets with a GraphQL query") {
 
       Given("some data in the RDF Store")
-      val triples = singleFileAndCommitWithDataset(
-        project.path,
-        dataset1CommitId,
-        dataset1.created.agent.email,
-        dataset1.created.agent.name,
-        dataset1.id,
-        dataset1.name,
-        dataset1.maybeDescription,
-        dataset1.created.date,
-        dataset1.published.maybeDate,
-        dataset1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
-        dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-        schemaVersion = currentSchemaVersion
-      ) &+ singleFileAndCommitWithDataset(
-        project.path,
-        dataset2CommitId,
-        dataset2.created.agent.email,
-        dataset2.created.agent.name,
-        dataset2.id,
-        dataset2.name,
-        dataset2.maybeDescription,
-        dataset2.created.date,
-        dataset2.published.maybeDate,
-        dataset2.published.creators.map(creator => (creator.maybeEmail, creator.name)),
-        dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-        schemaVersion = currentSchemaVersion
+      val jsonLDTriples = triples(
+        singleFileAndCommitWithDataset(
+          project.path,
+          dataset1CommitId,
+          dataset1.created.agent.name,
+          dataset1.created.agent.email,
+          dataset1.id,
+          dataset1.name,
+          dataset1.maybeDescription,
+          dataset1.created.date,
+          dataset1.published.maybeDate,
+          dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          schemaVersion = currentSchemaVersion
+        ),
+        singleFileAndCommitWithDataset(
+          project.path,
+          dataset2CommitId,
+          dataset2.created.agent.name,
+          dataset2.created.agent.email,
+          dataset2.id,
+          dataset2.name,
+          dataset2.maybeDescription,
+          dataset2.created.date,
+          dataset2.published.maybeDate,
+          dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          schemaVersion = currentSchemaVersion
+        )
       )
 
-      `data in the RDF store`(project, dataset1CommitId, triples)
+      `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
 
       When("user posts a graphql query to fetch datasets")
       val response = knowledgeGraphClient POST query

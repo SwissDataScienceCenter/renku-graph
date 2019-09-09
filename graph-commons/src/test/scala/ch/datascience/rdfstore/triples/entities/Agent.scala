@@ -16,21 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.rdfstore.triples
+package entities
 
-import ch.datascience.tinytypes.{Constraints, StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.SchemaVersion
+import io.circe.literal._
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
+private[triples] object Agent {
 
-trait RelativePathOps[T <: StringTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
+  def apply(schemaVersion: SchemaVersion) = json"""
+  {
+    "@id": ${Id(schemaVersion)},
+    "@type": [
+      "prov:SoftwareAgent",
+      "http://purl.org/wf4ever/wfprov#WorkflowEngine"
+    ],
+    "rdfs:label": ${s"renku $schemaVersion"}
+  }"""
 
-  implicit class UrlOps(url: T) {
-    def /(value: Any): T = apply(s"$url/$value")
+  final case class Id(schemaVersion: SchemaVersion) extends EntityId {
+    override val value: String = s"https://github.com/swissdatasciencecenter/renku-python/tree/v$schemaVersion"
   }
 }

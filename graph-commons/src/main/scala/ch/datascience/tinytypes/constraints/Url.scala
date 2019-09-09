@@ -37,16 +37,18 @@ trait UrlOps[T <: StringTinyType] {
 
   case class UrlWithQueryParam(value: T) extends TinyType { type V = T }
 
+  import java.nio.charset.StandardCharsets.UTF_8
+
   implicit class UrlOps(url: T) {
     def /(value:       Any): T = apply(s"$url/$value")
     def ?(keyAndValue: (String, String)): UrlWithQueryParam = keyAndValue match {
-      case (key, value) => UrlWithQueryParam(apply(s"$url?$key=${URLEncoder.encode(value, "UTF-8")}"))
+      case (key, value) => UrlWithQueryParam(apply(s"$url?$key=${URLEncoder.encode(value, UTF_8.name())}"))
     }
   }
 
   implicit class UrlWithQueryParamOps(url: UrlWithQueryParam) {
     def &(keyAndValue: (String, String)): UrlWithQueryParam = keyAndValue match {
-      case (key, value) => UrlWithQueryParam(apply(s"$url&$key=${URLEncoder.encode(value, "UTF-8")}"))
+      case (key, value) => UrlWithQueryParam(apply(s"$url&$key=${URLEncoder.encode(value, UTF_8.name())}"))
     }
   }
 

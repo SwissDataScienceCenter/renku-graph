@@ -26,8 +26,8 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.events.EventsGenerators.projects
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.rdfstore.RdfStoreData
-import ch.datascience.rdfstore.RdfStoreData.MultiFileAndCommitTriples._
+import ch.datascience.rdfstore.triples._
+import ch.datascience.rdfstore.triples.multiFileAndCommit._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
@@ -41,14 +41,13 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private val project  = projects.generateOne.copy(path = ProjectPath("namespace/project"))
   private val commitId = CommitId("0000001")
-  private val testData = RdfStoreData.multiFileAndCommit(project.path)
 
   feature("GraphQL query to find lineage") {
 
     scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, commitId, testData.triples)
+      `data in the RDF store`(project, commitId, triples(multiFileAndCommit(project.path)))
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery
@@ -113,7 +112,6 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
     }"""
 
   private lazy val theExpectedEdges = Right {
-    import testData._
     Set(
       json"""{"source": ${`commit1-input-data`.name},        "target": ${`commit3-renku-run`.name}}""",
       json"""{"source": ${`commit2-source-file1`.name},      "target": ${`commit3-renku-run`.name}}""",
@@ -125,7 +123,6 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
   }
 
   private lazy val theExpectedNodes = Right {
-    import testData._
     Set(
       json"""{"id": ${`commit1-input-data`.name},        "label": ${`commit1-input-data`.label}}""",
       json"""{"id": ${`commit2-source-file1`.name},      "label": ${`commit2-source-file1`.label}}""",

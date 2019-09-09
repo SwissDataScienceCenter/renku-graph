@@ -44,7 +44,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "allow to add next path part" in {
       val url = (httpUrls map UrlType.apply).generateOne
-      (url / "path").toString shouldBe s"$url/path"
+      (url / "path") shouldBe UrlType(s"$url/path")
     }
   }
 

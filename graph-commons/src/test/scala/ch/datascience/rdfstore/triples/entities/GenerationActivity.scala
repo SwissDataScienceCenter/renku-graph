@@ -16,21 +16,29 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.rdfstore.triples
+package entities
 
-import ch.datascience.tinytypes.{Constraints, StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.FilePath
+import io.circe.Json
+import io.circe.literal._
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
+private[triples] object GenerationActivity {
 
-trait RelativePathOps[T <: StringTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
+  def apply(commitId: CommitId, filePath: FilePath, activityId: EntityId): Json =
+    apply(Id(commitId, filePath), activityId)
 
-  implicit class UrlOps(url: T) {
-    def /(value: Any): T = apply(s"$url/$value")
+  def apply(id: Id, activityId: EntityId): Json = json"""
+  {
+    "@id": $id,
+    "@type": "prov:Generation",
+    "prov:activity": {
+      "@id": $activityId
+    }
+  }"""
+
+  final case class Id(commitId: CommitId, filePath: FilePath) extends EntityId {
+    override val value: String = s"file:///commit/$commitId/$filePath"
   }
 }

@@ -25,8 +25,6 @@ import org.scalacheck.{Arbitrary, Gen}
 
 object LineageGenerators {
 
-  implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
-
   implicit val nodeIds:    Gen[NodeId]    = nonEmptyStrings() map NodeId.apply
   implicit val nodeLabels: Gen[NodeLabel] = nonEmptyStrings() map NodeLabel.apply
 

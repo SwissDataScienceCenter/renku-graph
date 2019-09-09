@@ -21,13 +21,14 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{DatasetPart, DatasetProject}
 import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.RdfStoreData._
+import ch.datascience.rdfstore.triples._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
@@ -51,21 +52,21 @@ class IODatasetFinderSpec
         } yield s"$url/$uuid").generateOne
 
         loadToStore(
-          RDF(
+          triples(
             singleFileAndCommitWithDataset(otherProject,
-                                           datasetId       = datasetIds.generateOne,
-                                           datasetName     = datasetNames.generateOne,
-                                           maybeDatasetUrl = Some(reusedDatasetUrl)),
+                                           datasetIdentifier = datasetIds.generateOne,
+                                           datasetName       = datasetNames.generateOne,
+                                           maybeDatasetUrl   = Some(reusedDatasetUrl)),
             singleFileAndCommitWithDataset(
               projectPath,
-              committerEmail            = dataset1.created.agent.email,
               committerName             = dataset1.created.agent.name,
-              datasetId                 = dataset1.id,
+              committerEmail            = dataset1.created.agent.email,
+              datasetIdentifier         = dataset1.id,
               datasetName               = dataset1.name,
               maybeDatasetDescription   = dataset1.maybeDescription,
               datasetCreatedDate        = dataset1.created.date,
               maybeDatasetPublishedDate = dataset1.published.maybeDate,
-              maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
+              maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
               maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
               maybeDatasetUrl           = Some(reusedDatasetUrl)
             ),

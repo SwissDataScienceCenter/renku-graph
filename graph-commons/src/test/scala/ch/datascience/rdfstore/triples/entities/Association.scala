@@ -16,11 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.rdfstore.triples.entities
 
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.rdfstore.triples.EntityId
+import io.circe.Json
+import io.circe.literal._
 
-class RDFTriples private (val value: String) extends AnyVal with StringTinyType
+private[triples] object Association {
 
-object RDFTriples extends TinyTypeFactory[RDFTriples](new RDFTriples(_)) with NonBlank
+  def apply(id: Id): Json = json"""
+  {
+    "@id": $id,
+    "@type": "prov:Association"
+  }"""
+
+  final case class Id(commitId: CommitId) extends EntityId {
+    override val value: String = s"file:///commit/$commitId/association"
+  }
+}

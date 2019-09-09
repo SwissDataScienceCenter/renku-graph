@@ -34,9 +34,9 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.TriplesUploadResult.{MalformedTriples, TriplesUploaded, UploadingError}
-import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -146,7 +146,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       givenFetchingAccessToken(forProjectId = commits.head.project.id)
         .returning(context.pure(maybeAccessToken))
 
-      val triples1 = rdfTriplesSets.generateOne
+      val triples1 = jsonLDTriples.generateOne
       (triplesFinder
         .generateTriples(_: Commit, _: Option[AccessToken]))
         .expects(commit1, maybeAccessToken)
@@ -154,7 +154,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       val uploadingError = nonEmptyStrings().map(UploadingError.apply).generateOne
       (triplesUploader
-        .upload(_: RDFTriples))
+        .upload(_: JsonLDTriples))
         .expects(triples1)
         .returning(context.pure(uploadingError))
 
@@ -186,7 +186,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       givenFetchingAccessToken(forProjectId = commits.head.project.id)
         .returning(context.pure(maybeAccessToken))
 
-      val triples1 = rdfTriplesSets.generateOne
+      val triples1 = jsonLDTriples.generateOne
       (triplesFinder
         .generateTriples(_: Commit, _: Option[AccessToken]))
         .expects(commit1, maybeAccessToken)
@@ -194,7 +194,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
       val malformedTriples = nonEmptyStrings().map(MalformedTriples.apply).generateOne
       (triplesUploader
-        .upload(_: RDFTriples))
+        .upload(_: JsonLDTriples))
         .expects(triples1)
         .returning(context.pure(malformedTriples))
 
@@ -225,14 +225,14 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       givenFetchingAccessToken(forProjectId = commits.head.project.id)
         .returning(context.pure(maybeAccessToken))
 
-      val triples = rdfTriplesSets.generateOne
+      val triples = jsonLDTriples.generateOne
       (triplesFinder
         .generateTriples(_: Commit, _: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
         .returning(context.pure(triples))
 
       (triplesUploader
-        .upload(_: RDFTriples))
+        .upload(_: JsonLDTriples))
         .expects(triples)
         .returning(context.pure(TriplesUploaded))
 
@@ -322,10 +322,10 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .findAccessToken(_: ProjectId))
         .expects(forProjectId)
 
-    def generateTriples(forCommits: NonEmptyList[Commit]): NonEmptyList[(Commit, RDFTriples)] =
-      forCommits map (_ -> rdfTriplesSets.generateOne)
+    def generateTriples(forCommits: NonEmptyList[Commit]): NonEmptyList[(Commit, JsonLDTriples)] =
+      forCommits map (_ -> jsonLDTriples.generateOne)
 
-    def successfulTriplesGenerationAndUpload(commitAndTriples: (Commit, RDFTriples)) = {
+    def successfulTriplesGenerationAndUpload(commitAndTriples: (Commit, JsonLDTriples)) = {
       val (commit, triples) = commitAndTriples
       (triplesFinder
         .generateTriples(_: Commit, _: Option[AccessToken]))
@@ -333,7 +333,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .returning(context.pure(triples))
 
       (triplesUploader
-        .upload(_: RDFTriples))
+        .upload(_: JsonLDTriples))
         .expects(triples)
         .returning(context.pure(TriplesUploaded))
     }

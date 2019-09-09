@@ -23,11 +23,13 @@ import ch.datascience.config.ConfigLoader
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
+import ch.datascience.triplesgenerator.eventprocessing.Commit
 import com.typesafe.config.Config
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
 
 import languageFeature.higherKinds
 import scala.concurrent.ExecutionContext
@@ -59,17 +61,18 @@ class RemoteTriplesGenerator(
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
   import org.http4s._
+  import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  override def generateTriples(commit: Commit, maybeAccessToken: Option[AccessToken]): IO[RDFTriples] =
+  override def generateTriples(commit: Commit, maybeAccessToken: Option[AccessToken]): IO[JsonLDTriples] =
     for {
       uri             <- validateUri(s"$serviceUrl/projects/${commit.project.id}/commits/${commit.id}")
       triplesAsString <- send(request(GET, uri))(mapResponse)
-      triples         <- IO.fromEither(RDFTriples.from(triplesAsString))
+      triples         <- IO.fromEither(JsonLDTriples.from(triplesAsString))
     } yield triples
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[String]] = {
-    case (Ok, _, response)    => response.as[String]
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {
+    case (Ok, _, response)    => response.as[Json]
     case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
   }
 }

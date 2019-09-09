@@ -16,21 +16,27 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.rdfstore.triples
+package entities
 
-import ch.datascience.tinytypes.{Constraints, StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.users.{Email, Name}
+import ch.datascience.tinytypes.json.TinyTypeEncoders._
+import io.circe.Json
+import io.circe.literal._
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
+object Person {
 
-trait RelativePathOps[T <: StringTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
+  def apply(id: Id, maybeEmail: Option[Email]): Json = json"""
+  {
+    "@id": $id,
+    "@type": [
+      "schema:Person",
+      "prov:Person"
+    ],
+    "schema:name": ${id.userName}
+  }""" deepMerge (maybeEmail to "schema:email")
 
-  implicit class UrlOps(url: T) {
-    def /(value: Any): T = apply(s"$url/$value")
+  final case class Id(userName: Name) extends EntityId {
+    override val value: String = s"file:///_${userName.value.replace(" ", "-")}"
   }
 }

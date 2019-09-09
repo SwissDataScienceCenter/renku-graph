@@ -20,7 +20,7 @@ package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.{FilePath, FullProjectPath, ProjectPath}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.uuid
 
@@ -31,6 +31,7 @@ object GraphModelGenerators {
     url  <- httpUrls
     path <- projectPaths
   } yield FullProjectPath.from(s"$url/$path").fold(throw _, identity)
+  implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIds:            Gen[Identifier]    = uuid.map(_.toString) map Identifier.apply
   implicit val datasetNames:          Gen[Name]          = nonEmptyStrings() map Name.apply

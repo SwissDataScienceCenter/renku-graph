@@ -27,7 +27,7 @@ import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasets
 import ch.datascience.knowledgegraph.datasets.model.{DatasetPart, DatasetProject}
 import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.RdfStoreData._
+import ch.datascience.rdfstore.triples._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
@@ -51,35 +51,35 @@ class IOProjectDatasetsFinderSpec
         } yield s"$url/$uuid").generateOne
 
         loadToStore(
-          RDF(
+          triples(
             singleFileAndCommitWithDataset(otherProject,
-                                           datasetId       = datasetIds.generateOne,
-                                           datasetName     = datasetNames.generateOne,
-                                           maybeDatasetUrl = Some(reusedDatasetUrl)),
+                                           datasetIdentifier = datasetIds.generateOne,
+                                           datasetName       = datasetNames.generateOne,
+                                           maybeDatasetUrl   = Some(reusedDatasetUrl)),
             singleFileAndCommitWithDataset(
               projectPath,
-              committerEmail            = dataset1.created.agent.email,
               committerName             = dataset1.created.agent.name,
-              datasetId                 = dataset1.id,
+              committerEmail            = dataset1.created.agent.email,
+              datasetIdentifier         = dataset1.id,
               datasetName               = dataset1.name,
               maybeDatasetDescription   = dataset1.maybeDescription,
               datasetCreatedDate        = dataset1.created.date,
               maybeDatasetPublishedDate = dataset1.published.maybeDate,
-              maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.maybeEmail, creator.name)),
+              maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
               maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-              maybeDatasetUrl           = Some(reusedDatasetUrl)
+              maybeDatasetUrl           = Some(reusedDatasetUrl),
             ),
             singleFileAndCommitWithDataset(
               projectPath,
-              committerEmail            = dataset2.created.agent.email,
               committerName             = dataset2.created.agent.name,
-              datasetId                 = dataset2.id,
+              committerEmail            = dataset2.created.agent.email,
+              datasetIdentifier         = dataset2.id,
               datasetName               = dataset2.name,
               maybeDatasetDescription   = dataset2.maybeDescription,
               datasetCreatedDate        = dataset2.created.date,
               maybeDatasetPublishedDate = dataset2.published.maybeDate,
-              maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.maybeEmail, creator.name)),
-              maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated))
+              maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+              maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
             )
           )
         )

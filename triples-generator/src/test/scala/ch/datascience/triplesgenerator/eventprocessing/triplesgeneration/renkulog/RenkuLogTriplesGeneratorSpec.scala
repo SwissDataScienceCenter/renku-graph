@@ -30,8 +30,8 @@ import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
-import ch.datascience.triplesgenerator.eventprocessing.RDFTriples
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -75,7 +75,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(IO.pure(rdfTriples))
+        .returning(IO.pure(triples))
 
       (file
         .delete(_: Path))
@@ -83,7 +83,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync() shouldBe rdfTriples
+      triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync() shouldBe triples
     }
 
     "create a temp directory, " +
@@ -117,7 +117,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitWithParent, _: Path)(_: (CommitWithParent, Path) => CommandResult))
         .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
-        .returning(IO.pure(rdfTriples))
+        .returning(IO.pure(triples))
 
       (file
         .delete(_: Path))
@@ -125,7 +125,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithParent, maybeAccessToken).unsafeRunSync() shouldBe rdfTriples
+      triplesGenerator.generateTriples(commitWithParent, maybeAccessToken).unsafeRunSync() shouldBe triples
     }
 
     "fail if temp directory creation fails" in new TestCase {
@@ -302,7 +302,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(IO.pure(rdfTriples))
+        .returning(IO.pure(triples))
 
       val exception = exceptions.generateOne
       (file
@@ -340,10 +340,10 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
 
     val pathDifferentiator: Int = Gen.choose(1, 100).generateOne
 
-    val workDirectory:       Path        = root / "tmp"
-    val repositoryDirectory: Path        = workDirectory / s"$repositoryName-$pathDifferentiator"
-    val rdfTriplesStream:    InputStream = mock[InputStream]
-    val rdfTriples:          RDFTriples  = rdfTriplesSets.generateOne
+    val workDirectory:       Path          = root / "tmp"
+    val repositoryDirectory: Path          = workDirectory / s"$repositoryName-$pathDifferentiator"
+    val rdfTriplesStream:    InputStream   = mock[InputStream]
+    val triples:             JsonLDTriples = jsonLDTriples.generateOne
 
     val gitLabRepoUrlFinder = mock[IOGitLabRepoUrlFinder]
     val file                = mock[Commands.File]

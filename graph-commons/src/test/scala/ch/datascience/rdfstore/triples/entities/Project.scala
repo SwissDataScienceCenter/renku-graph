@@ -16,21 +16,32 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.rdfstore.triples
+package entities
 
-import ch.datascience.tinytypes.{Constraints, StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.projects.ProjectPath
+import io.circe.Json
+import io.circe.literal._
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
+object Project {
 
-trait RelativePathOps[T <: StringTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
+  def apply(id: Id): Json = json"""
+  {
+    "@id": $id,
+    "@type": [
+      "prov:Location",
+      "foaf:Project"
+    ]
+  }"""
 
-  implicit class UrlOps(url: T) {
-    def /(value: Any): T = apply(s"$url/$value")
+  final case class Id(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath) extends EntityId {
+    override val value: String = (renkuBaseUrl / projectPath).value
   }
+
+  def `schema:isPartOf`(projectId: Project.Id): Json = json"""{
+    "schema:isPartOf": {
+      "@id": ${projectId.toString}
+    }
+  }"""
 }

@@ -21,5 +21,5 @@ package ch.datascience.graph.model
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
+final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
 object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank

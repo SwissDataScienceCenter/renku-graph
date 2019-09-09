@@ -24,7 +24,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.RdfStoreData._
+import ch.datascience.rdfstore.triples._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -41,17 +41,17 @@ class IOProjectDatasetsFinderSpec
     "return all datasets of the given project" in new InMemoryStoreTestCase {
       forAll(projectPaths, datasets, datasets) { (projectPath, dataset1, dataset2) =>
         loadToStore(
-          RDF(
+          triples(
             singleFileAndCommitWithDataset(projectPaths.generateOne),
             singleFileAndCommitWithDataset(
               projectPath,
-              datasetId   = dataset1.id,
-              datasetName = dataset1.name
+              datasetIdentifier = dataset1.id,
+              datasetName       = dataset1.name
             ),
             singleFileAndCommitWithDataset(
               projectPath,
-              datasetId   = dataset2.id,
-              datasetName = dataset2.name,
+              datasetIdentifier = dataset2.id,
+              datasetName       = dataset2.name,
             )
           )
         )

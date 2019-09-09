@@ -48,7 +48,7 @@ object datasets {
   final class PartLocation private (val value: String) extends AnyVal with StringTinyType
   implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath {
     addConstraint(
-      check   = value => value.startsWith("data/"),
+      check   = value => value startsWith "data/",
       message = value => s"'$value' does not point to 'data/' folder which is invalid for $typeName"
     )
   }

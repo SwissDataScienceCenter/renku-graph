@@ -21,15 +21,16 @@ package ch.datascience.knowledgegraph.lineage
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.RdfStoreData.RDF
-import ch.datascience.rdfstore.{InMemoryRdfStore, RdfStoreData}
+import ch.datascience.rdfstore.InMemoryRdfStore
+import ch.datascience.rdfstore.triples._
+import ch.datascience.rdfstore.triples.multiFileAndCommit._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -39,12 +40,11 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
   "findLineage" should {
 
     "return the lineage of the given project for a given commit id and file path" in new InMemoryStoreTestCase {
-      import testData._
 
-      loadToStore(RDF(triples))
+      loadToStore(triples(multiFileAndCommit(projectPath)))
 
       lineageFinder
-        .findLineage(projectPath, commit4Id, FilePath(resultFile1))
+        .findLineage(projectPath, commit4Id, resultFile1)
         .unsafeRunSync() shouldBe Some(
         Lineage(
           edges = Set(
@@ -77,15 +77,11 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
 
   private trait InMemoryStoreTestCase {
 
-    val renkuBaseUrl = RdfStoreData.renkuBaseUrl
-    val projectPath  = ProjectPath("kuba/zurich-bikes")
-    val testData     = RdfStoreData.multiFileAndCommit(projectPath)
+    val projectPath = ProjectPath("kuba/zurich-bikes")
 
-    def sourceNode(node: RdfStoreData.MultiFileAndCommitTriples.Resource): SourceNode =
-      SourceNode(NodeId(node.name.value), NodeLabel(node.label.value))
-    def targetNode(node: RdfStoreData.MultiFileAndCommitTriples.Resource): TargetNode =
-      TargetNode(NodeId(node.name.value), NodeLabel(node.label.value))
-    def node(node: RdfStoreData.MultiFileAndCommitTriples.Resource): Node = sourceNode(node)
+    def sourceNode(node: Resource): SourceNode = SourceNode(NodeId(node.name.value), NodeLabel(node.label.value))
+    def targetNode(node: Resource): TargetNode = TargetNode(NodeId(node.name.value), NodeLabel(node.label.value))
+    def node(node:       Resource): Node       = sourceNode(node)
 
     val lineageFinder = new IOLineageFinder(rdfStoreConfig,
                                             renkuBaseUrl,

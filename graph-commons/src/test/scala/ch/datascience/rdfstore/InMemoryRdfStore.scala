@@ -133,13 +133,13 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
       .unsafeRunSync()
 
-  protected def loadToStore(triples: Json): Unit =
+  protected def loadToStore(triples: JsonLDTriples): Unit =
     rdfConnectionResource
       .use { connection =>
         IO {
           connection.load {
             val model = ModelFactory.createDefaultModel()
-            RDFDataMgr.read(model, new ByteArrayInputStream(triples.noSpaces.getBytes(UTF_8)), null, Lang.JSONLD)
+            RDFDataMgr.read(model, new ByteArrayInputStream(triples.value.noSpaces.getBytes(UTF_8)), null, Lang.JSONLD)
             model
           }
         }

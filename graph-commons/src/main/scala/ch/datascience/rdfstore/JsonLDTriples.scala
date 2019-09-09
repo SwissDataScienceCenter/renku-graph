@@ -16,21 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.rdfstore
 
-import ch.datascience.tinytypes.{Constraints, StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{JsonTinyType, TinyTypeFactory}
+import io.circe.Json
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
+import scala.language.higherKinds
 
-trait RelativePathOps[T <: StringTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
+class JsonLDTriples private (val value: Json) extends AnyVal with JsonTinyType
 
-  implicit class UrlOps(url: T) {
-    def /(value: Any): T = apply(s"$url/$value")
+object JsonLDTriples extends TinyTypeFactory[JsonLDTriples](new JsonLDTriples(_)) {
+  import cats.MonadError
+  import io.circe.parser
+
+  def parse[Interpretation[_]](
+      string:    String
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[JsonLDTriples] = ME.fromEither {
+    for {
+      json    <- parser parse string
+      triples <- JsonLDTriples from json
+    } yield triples
   }
 }

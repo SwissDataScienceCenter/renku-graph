@@ -108,7 +108,10 @@ object Generators {
     choose(1, max.toMillis)
       .map(FiniteDuration(_, MILLISECONDS))
 
-  def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] =
+  def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] = {
+    require(minSegments <= maxSegments,
+            s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense")
+
     for {
       partsNumber <- Gen.choose(minSegments, maxSegments)
       partsGenerator = nonEmptyStrings(
@@ -116,6 +119,7 @@ object Generators {
       )
       parts <- Gen.listOfN(partsNumber, partsGenerator)
     } yield parts.mkString("/")
+  }
 
   val httpPorts: Gen[Int Refined Positive] = choose(1000, 10000) map Refined.unsafeApply
 

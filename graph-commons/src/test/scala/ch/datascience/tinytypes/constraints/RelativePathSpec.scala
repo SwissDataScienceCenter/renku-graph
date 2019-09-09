@@ -18,6 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
@@ -48,9 +49,18 @@ class RelativePathSpec extends WordSpec with ScalaCheckPropertyChecks {
       intercept[IllegalArgumentException](RelativePathString("")).getMessage shouldBe "ch.datascience.tinytypes.constraints.RelativePathString cannot be blank"
     }
   }
+
+  "/" should {
+
+    "allow to add next path part" in {
+      val path = (relativePaths() map RelativePathString.apply).generateOne
+      (path / "path") shouldBe RelativePathString(s"$path/path")
+    }
+  }
 }
 
 private class RelativePathString private (val value: String) extends AnyVal with StringTinyType
 private object RelativePathString
     extends TinyTypeFactory[RelativePathString](new RelativePathString(_))
     with RelativePath
+    with RelativePathOps[RelativePathString]

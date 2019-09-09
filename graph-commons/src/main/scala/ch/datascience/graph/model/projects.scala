@@ -19,7 +19,7 @@
 package ch.datascience.graph.model
 
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.tinytypes.constraints.{NonBlank, Url}
+import ch.datascience.tinytypes.constraints._
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object projects {
@@ -51,4 +51,7 @@ object projects {
       }
     }
   }
+
+  final class FilePath private (val value: String) extends AnyVal with StringTinyType
+  object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
 }

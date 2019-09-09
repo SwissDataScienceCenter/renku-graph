@@ -16,21 +16,29 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.rdfstore
 
-import ch.datascience.tinytypes.{Constraints, StringTinyType, TinyTypeFactory}
+import cats.implicits._
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
+import io.circe.ParsingFailure
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
+import scala.util.{Failure, Success, Try}
 
-trait RelativePathOps[T <: StringTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
+class JsonLDTriplesSpec extends WordSpec {
 
-  implicit class UrlOps(url: T) {
-    def /(value: Any): T = apply(s"$url/$value")
+  "parse" should {
+
+    "return JsonLDTriples if the given String is a valid json-ld" in {
+      val jsonLD = jsonLDTriples.generateOne
+      JsonLDTriples.parse[Try](jsonLD.value.noSpaces) shouldBe Success(jsonLD)
+    }
+
+    "fail if the given String is not a valid json-ld" in {
+      val Failure(exception) = JsonLDTriples.parse[Try]("asbc")
+      exception shouldBe a[ParsingFailure]
+    }
   }
 }

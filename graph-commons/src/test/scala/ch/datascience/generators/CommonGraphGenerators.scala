@@ -34,9 +34,10 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.http.client._
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
-import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl, RdfStoreConfig}
+import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import io.circe.literal._
 import org.scalacheck.Gen
 
 object CommonGraphGenerators {
@@ -125,4 +126,20 @@ object CommonGraphGenerators {
     href <- hrefs
   } yield Link(rel, href)
   implicit val linksObjects: Gen[Links] = nonEmptyList(linkObjects) map Links.apply
+
+  implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
+    subject <- nonEmptyStrings()
+    obj     <- nonEmptyStrings()
+  } yield
+    JsonLDTriples {
+      json"""{
+        "@context": {
+          "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+          "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+          "xsd": "http://www.w3.org/2001/XMLSchema#"
+        },
+        "@id": $subject,
+        "rdfs:label": $obj
+      }"""
+    }
 }

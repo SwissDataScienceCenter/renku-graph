@@ -26,7 +26,7 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FullProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.RdfStoreData._
+import ch.datascience.rdfstore.triples._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -43,12 +43,13 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
       val project1OutdatedCommit = commitIdResources.generateOne
       val project2               = projectPaths.generateOne
       val project2OutdatedCommit = commitIdResources.generateOne
-      val triples = RDF(
-        singleFileAndCommitTriples(project1, project1OutdatedCommit.toCommitId, None),
-        singleFileAndCommitTriples(project2, project2OutdatedCommit.toCommitId, None)
-      )
 
-      loadToStore(triples)
+      loadToStore(
+        triples(
+          singleFileAndCommit(project1, project1OutdatedCommit.toCommitId, maybeSchemaVersion = None),
+          singleFileAndCommit(project2, project2OutdatedCommit.toCommitId, maybeSchemaVersion = None)
+        )
+      )
 
       // format: off
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() should (
@@ -65,13 +66,14 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
       val project1Commit1NoAgent  = commitIdResources.generateOne
       val project1Commit2Outdated = commitIdResources.generateOne
       val project1Commit3UpToDate = commitIdResources.generateOne
-      val triples = RDF(
-        singleFileAndCommitTriples(project1, project1Commit1NoAgent.toCommitId, None),
-        singleFileAndCommitTriples(project1, project1Commit2Outdated.toCommitId, Some(schemaVersions.generateOne)),
-        singleFileAndCommitTriples(project1, project1Commit3UpToDate.toCommitId, Some(schemaVersion))
-      )
 
-      loadToStore(triples)
+      loadToStore(
+        triples(
+          singleFileAndCommit(project1, project1Commit1NoAgent.toCommitId, maybeSchemaVersion = None),
+          singleFileAndCommit(project1, project1Commit2Outdated.toCommitId, Some(schemaVersions.generateOne)),
+          singleFileAndCommit(project1, project1Commit3UpToDate.toCommitId, Some(schemaVersion))
+        )
+      )
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe Some(
         OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1),
@@ -83,11 +85,12 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       val project               = projectPaths.generateOne
       val projectCommitUpToDate = commitIdResources.generateOne
-      val triples = RDF(
-        singleFileAndCommitTriples(project, projectCommitUpToDate.toCommitId, Some(schemaVersion))
-      )
 
-      loadToStore(triples)
+      loadToStore(
+        triples(
+          singleFileAndCommit(project, projectCommitUpToDate.toCommitId, Some(schemaVersion))
+        )
+      )
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe None
     }
