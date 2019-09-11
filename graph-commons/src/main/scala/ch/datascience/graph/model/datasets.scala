@@ -18,10 +18,10 @@
 
 package ch.datascience.graph.model
 
-import java.time.Instant
+import java.time.{Instant, LocalDate}
 
 import ch.datascience.tinytypes.constraints._
-import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes._
 
 object datasets {
 
@@ -37,8 +37,10 @@ object datasets {
   final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
 
-  final class PublishedDate private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object PublishedDate extends TinyTypeFactory[PublishedDate](new PublishedDate(_)) with InstantNotInTheFuture
+  final class PublishedDate private (val value: LocalDate) extends AnyVal with LocalDateTinyType
+  implicit object PublishedDate
+      extends TinyTypeFactory[PublishedDate](new PublishedDate(_))
+      with LocalDateNotInTheFuture
 
   final class PartName private (val value: String) extends AnyVal with StringTinyType
   implicit object PartName extends TinyTypeFactory[PartName](new PartName(_)) with NonBlank

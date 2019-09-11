@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.json
 
-import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatter.{ISO_DATE, ISO_INSTANT}
 
 import DecodingTestTypes._
 import ch.datascience.generators.Generators.Implicits._
@@ -40,11 +40,19 @@ class TinyTypeEncodersSpec extends WordSpec {
     }
   }
 
+  "localDateEncoder" should {
+
+    "encode LocalDateTinyType to Json" in {
+      val value = localDates.generateOne
+      LocalDateTestType(value).asJson shouldBe Json.fromString(ISO_DATE.format(value))
+    }
+  }
+
   "instantEncoder" should {
 
     "encode InstantTinyType to Json" in {
       val value = timestamps.generateOne
-      InstantTestType(value).asJson shouldBe Json.fromString(DateTimeFormatter.ISO_INSTANT.format(value))
+      InstantTestType(value).asJson shouldBe Json.fromString(ISO_INSTANT.format(value))
     }
   }
 }

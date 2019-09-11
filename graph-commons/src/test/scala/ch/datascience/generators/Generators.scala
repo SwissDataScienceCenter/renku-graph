@@ -18,7 +18,7 @@
 
 package ch.datascience.generators
 
-import java.time.Instant
+import java.time._
 import java.time.temporal.ChronoUnit.{DAYS, MINUTES => MINS}
 
 import cats.data.{NonEmptyList, NonEmptySet}
@@ -157,6 +157,20 @@ object Generators {
     Gen
       .choose(Instant.now().plus(10, MINS).toEpochMilli, Instant.now().plus(2000, DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)
+
+  val zonedDateTimes: Gen[ZonedDateTime] =
+    timestamps
+      .map(ZonedDateTime.ofInstant(_, ZoneId.systemDefault))
+
+  val localDates: Gen[LocalDate] =
+    timestamps
+      .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
+      .map(_.toLocalDate)
+
+  val localDatesNotInTheFuture: Gen[LocalDate] =
+    timestampsNotInTheFuture
+      .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
+      .map(_.toLocalDate)
 
   implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls.map(ServiceUrl.apply)
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply

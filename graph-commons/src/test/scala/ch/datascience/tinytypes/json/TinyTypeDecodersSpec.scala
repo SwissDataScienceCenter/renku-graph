@@ -18,6 +18,9 @@
 
 package ch.datascience.tinytypes.json
 
+import java.time.ZoneOffset.UTC
+import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
+
 import DecodingTestTypes._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -37,11 +40,26 @@ class TinyTypeDecodersSpec extends WordSpec {
     }
   }
 
-  "instantDecoder" should {
+  "localDateDecoder" should {
 
     "decode JSON String value" in {
+      val value = localDates.generateOne
+      json"""$value""".as[LocalDateTestType] shouldBe Right(LocalDateTestType(value))
+    }
+  }
+
+  "instantDecoder" should {
+
+    "decode JSON String value in the Zulu format" in {
       val value = timestamps.generateOne
       json"""$value""".as[InstantTestType] shouldBe Right(InstantTestType(value))
+    }
+
+    "decode JSON String value with the offset" in {
+      val value = zonedDateTimes.generateOne
+      json"""${ISO_OFFSET_DATE_TIME format value}""".as[InstantTestType] shouldBe Right(
+        InstantTestType(value.toOffsetDateTime.atZoneSameInstant(UTC).toInstant)
+      )
     }
   }
 }

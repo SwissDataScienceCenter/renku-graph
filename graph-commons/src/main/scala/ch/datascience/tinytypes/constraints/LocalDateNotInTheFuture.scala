@@ -16,19 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.json
+package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes.{InstantTinyType, LocalDateTinyType, StringTinyType}
-import io.circe.{Encoder, Json}
+import java.time.LocalDate
 
-object TinyTypeEncoders {
+import ch.datascience.tinytypes.Constraints
 
-  implicit def stringEncoder[TT <: StringTinyType]: Encoder[TT] =
-    Encoder.instance[TT](ttValue => Json.fromString(ttValue.value))
+trait LocalDateNotInTheFuture extends Constraints[LocalDate] {
+  protected[this] def now: LocalDate = LocalDate.now()
 
-  implicit def localDateEncoder[TT <: LocalDateTinyType]: Encoder[TT] =
-    Encoder.instance[TT](ttValue => Json.fromString(ttValue.value.toString))
-
-  implicit def instantEncoder[TT <: InstantTinyType]: Encoder[TT] =
-    Encoder.instance[TT](ttValue => Json.fromString(ttValue.value.toString))
+  addConstraint(
+    check   = _.compareTo(now) <= 0,
+    message = (_: LocalDate) => s"$typeName cannot be in the future"
+  )
 }

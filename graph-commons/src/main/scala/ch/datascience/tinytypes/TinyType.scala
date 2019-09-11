@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes
 
-import java.time.Instant
+import java.time.{Instant, LocalDate}
 
 import cats.MonadError
 
@@ -33,10 +33,11 @@ trait TinyType extends Any {
   override def toString: String = value.toString
 }
 
-trait StringTinyType  extends Any with TinyType { type V = String }
-trait IntTinyType     extends Any with TinyType { type V = Int }
-trait LongTinyType    extends Any with TinyType { type V = Long }
-trait InstantTinyType extends Any with TinyType { type V = Instant }
+trait StringTinyType    extends Any with TinyType { type V = String }
+trait IntTinyType       extends Any with TinyType { type V = Int }
+trait LongTinyType      extends Any with TinyType { type V = Long }
+trait InstantTinyType   extends Any with TinyType { type V = Instant }
+trait LocalDateTinyType extends Any with TinyType { type V = LocalDate }
 
 trait Sensitive extends Any {
   self: TinyType =>

@@ -18,10 +18,11 @@
 
 package ch.datascience.tinytypes.json
 
-import java.time.Instant
+import java.time.ZoneOffset.UTC
+import java.time.{Instant, LocalDate, OffsetDateTime}
 
 import cats.implicits._
-import ch.datascience.tinytypes.{From, InstantTinyType, StringTinyType}
+import ch.datascience.tinytypes._
 import io.circe.Decoder
 
 object TinyTypeDecoders {
@@ -31,10 +32,20 @@ object TinyTypeDecoders {
       tinyTypeFactory.from(value).leftMap(_.getMessage)
     }
 
+  implicit def localDateDecoder[TT <: LocalDateTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    Decoder.decodeString.emap { value =>
+      Either
+        .catchNonFatal(LocalDate.parse(value))
+        .flatMap(tinyTypeFactory.from)
+        .leftMap(_.getMessage)
+    }
+
   implicit def instantDecoder[TT <: InstantTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     Decoder.decodeString.emap { value =>
       Either
-        .catchNonFatal(Instant.parse(value))
+        .catchNonFatal(OffsetDateTime.parse(value))
+        .flatMap(offsetDateTime => Either.catchNonFatal(offsetDateTime.atZoneSameInstant(UTC).toInstant))
+        .orElse(Either.catchNonFatal(Instant.parse(value)))
         .flatMap(tinyTypeFactory.from)
         .leftMap(_.getMessage)
     }

@@ -18,13 +18,17 @@
 
 package ch.datascience.tinytypes.json
 
-import java.time.Instant
+import java.time.{Instant, LocalDate}
 
-import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes._
 
 private object DecodingTestTypes {
+
   class StringTestType private (val value: String) extends AnyVal with StringTinyType
   implicit object StringTestType extends TinyTypeFactory[StringTestType](new StringTestType(_))
+
+  class LocalDateTestType private (val value: LocalDate) extends AnyVal with LocalDateTinyType
+  implicit object LocalDateTestType extends TinyTypeFactory[LocalDateTestType](new LocalDateTestType(_))
 
   class InstantTestType private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object InstantTestType extends TinyTypeFactory[InstantTestType](new InstantTestType(_))
