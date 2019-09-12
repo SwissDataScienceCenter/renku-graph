@@ -4,7 +4,7 @@ metadata:
   name: {{ include "knowledgeGraph.fullname" . }}
   labels:
     app: {{ template "knowledgeGraph.name" . }}
-    chart: {{ template "knowledgeGraph.chart" . }}
+    chart: {{ template "graph.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
