@@ -37,7 +37,7 @@ class TinyTypeDecodersSpec extends WordSpec {
 
     "map a non-blank String value to a NonBlank" in {
       val value = nonEmptyStrings().generateOne
-      blankToNone(Some(value)) shouldBe Some(Refined.unsafeApply(value))
+      blankToNone(Some(value)).map(_.value) shouldBe Some(value)
     }
 
     "map a blank String value to None" in {

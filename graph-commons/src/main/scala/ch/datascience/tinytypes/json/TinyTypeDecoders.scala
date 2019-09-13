@@ -23,20 +23,18 @@ import java.time.{Instant, LocalDate, OffsetDateTime}
 
 import cats.implicits._
 import ch.datascience.tinytypes._
-import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.string.MatchesRegex
+import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder.decodeString
 import io.circe.{Decoder, DecodingFailure}
 
 object TinyTypeDecoders {
 
-  type NonBlank = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+  type NonBlank = String Refined NonEmpty
 
-  lazy val blankToNone: Option[String] => Option[NonBlank] = {
-    case None           => None
-    case Some("")       => None
-    case Some(nonBlank) => RefType.applyRef[NonBlank](nonBlank).map(Option.apply).leftMap(_ => None).merge
+  def blankToNone(maybeValue: Option[String]): Option[NonBlank] = maybeValue.map(_.trim).flatMap {
+    case ""       => None
+    case nonBlank => RefType.applyRef[NonBlank](nonBlank).fold(e => { print(e); None }, Option.apply)
   }
 
   def toOption[TT <: StringTinyType](
