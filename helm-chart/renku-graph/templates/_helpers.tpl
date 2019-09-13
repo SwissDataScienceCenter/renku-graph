@@ -2,8 +2,16 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "graph.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- define "webhookService.name" -}}
+{{- "webhook-service" -}}
+{{- end -}}
+
+{{- define "triplesGenerator.name" -}}
+{{- "triples-generator" -}}
+{{- end -}}
+
+{{- define "tokenRepository.name" -}}
+{{- "token-repository" -}}
 {{- end -}}
 
 {{- define "knowledgeGraph.name" -}}
@@ -15,16 +23,27 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "graph.fullname" -}}
+{{- define "webhookService.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
-{{- $name := default .Chart.Name .Values.nameOverride -}}
-{{- if contains $name .Release.Name -}}
-{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-webhook-service" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+{{- end -}}
+
+{{- define "triplesGenerator.fullname" -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-triples-generator" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "tokenRepository.fullname" -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-token-repository" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 {{- end -}}
 
@@ -41,18 +60,6 @@ Create chart name and version as used by the chart label.
 */}}
 {{- define "graph.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
-{{- define "knowledgeGraph.chart" -}}
-{{- printf "%s-knowledge-graph" .Chart.Name | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
-{{/*
-Create token-repository.fullname
-*/}}
-{{- define "token-repository.fullname" -}}
-{{- $graphFullName := include "graph.fullname" . -}}
-{{- printf "%s-%s" $graphFullName "token-repository" }}
 {{- end -}}
 
 {{/*

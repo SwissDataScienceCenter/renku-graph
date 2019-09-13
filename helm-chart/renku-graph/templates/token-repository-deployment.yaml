@@ -1,0 +1,86 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ include "tokenRepository.fullname" . }}
+  labels:
+    app: {{ template "tokenRepository.name" . }}
+    chart: {{ template "graph.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ include "tokenRepository.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "tokenRepository.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: token-repository
+          image: "{{ .Values.tokenRepository.image.repository }}:{{ .Values.tokenRepository.image.tag }}"
+          imagePullPolicy: {{ .Values.tokenRepository.image.pullPolicy }}
+          env:
+            - name: TOKEN_ENCRYPTION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "tokenRepository.fullname" . }}
+                  key: tokenRepository-tokenEncryption-secret
+            - name: TOKEN_REPOSITORY_POSTGRES_HOST
+              value: "{{ template "postgresql.fullname" . }}:5432"
+            - name: TOKEN_REPOSITORY_POSTGRES_USER
+              value: {{ .Values.global.graph.tokenRepository.postgresUser }}
+            - name: TOKEN_REPOSITORY_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "tokenRepository.fullname" . }}
+                  key: tokenRepository-postgresPassword
+            - name: TOKEN_REPOSITORY_POSTGRES_CONNECTION_POOL
+              value: "{{ .Values.tokenRepository.connectionPool }}"
+            - name: SENTRY_ENABLED
+              value: "{{ .Values.sentry.enabled }}"
+              {{- if .Values.sentry.enabled }}
+            - name: SENTRY_BASE_URL
+              value: {{ .Values.sentry.url }}
+            - name: SENTRY_ENVIRONMENT_NAME
+              value: {{ .Values.sentry.environmentName }}
+              {{- end }}
+            - name: JAVA_OPTS
+              value: -Xmx100m -XX:+UseG1GC
+          ports:
+            - name: http-token-repo
+              containerPort: 9003
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http-token-repo
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http-token-repo
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+  {{ toYaml .Values.tokenRepository.resources | indent 12 }}
+  {{- with .Values.nodeSelector }}
+nodeSelector:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+affinity:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+tolerations:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
