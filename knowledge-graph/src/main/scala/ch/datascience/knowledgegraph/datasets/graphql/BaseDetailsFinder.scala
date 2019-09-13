@@ -80,11 +80,16 @@ private object BaseDetailsFinder {
       for {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
-        maybeDescription   <- cursor.downField("description").downField("value").as[Option[Description]]
         dateCreated        <- cursor.downField("dateCreated").downField("value").as[DateCreated]
         agentEmail         <- cursor.downField("agentEmail").downField("value").as[Email]
         agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
+        maybeDescription <- cursor
+                             .downField("description")
+                             .downField("value")
+                             .as[Option[String]]
+                             .map(blankToNone)
+                             .flatMap(toOption[Description])
       } yield
         Dataset(
           id,

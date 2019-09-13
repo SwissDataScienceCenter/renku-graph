@@ -24,6 +24,7 @@ import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
 import DecodingTestTypes._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import eu.timepit.refined.api.Refined
 import io.circe.literal._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -31,6 +32,40 @@ import org.scalatest.WordSpec
 class TinyTypeDecodersSpec extends WordSpec {
 
   import TinyTypeDecoders._
+
+  "blankToNone" should {
+
+    "map a non-blank String value to a NonBlank" in {
+      val value = nonEmptyStrings().generateOne
+      blankToNone(Some(value)) shouldBe Some(Refined.unsafeApply(value))
+    }
+
+    "map a blank String value to None" in {
+      val value = blankStrings().generateOne
+      blankToNone(Some(value)) shouldBe None
+    }
+
+    "map None to None" in {
+      blankToNone(None) shouldBe None
+    }
+  }
+
+  "toOption" should {
+
+    "map a valid for the type non-blank value to an instance of that type" in {
+      val value: NonBlank = Refined.unsafeApply(nonEmptyStrings().generateOne)
+      toOption[StringTestType](StringTestType)(Option(value)) shouldBe Right(Some(StringTestType(value.toString())))
+    }
+
+    "map a non-valid for the type non-blank value to an error" in {
+      val value: NonBlank = Refined.unsafeApply(StringTestType.InvalidValue)
+      toOption[StringTestType](StringTestType)(Option(value)) shouldBe a[Left[_, _]]
+    }
+
+    "map None to None" in {
+      toOption[StringTestType](StringTestType)(None) shouldBe Right(None)
+    }
+  }
 
   "stringDecoder" should {
 

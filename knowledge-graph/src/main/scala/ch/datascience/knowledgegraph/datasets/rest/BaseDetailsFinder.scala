@@ -25,7 +25,6 @@ import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Decoder.decodeList
 import io.circe.DecodingFailure
 
 import scala.concurrent.ExecutionContext
@@ -69,7 +68,8 @@ private class BaseDetailsFinder(
 private object BaseDetailsFinder {
   import io.circe.Decoder
 
-  private implicit val maybeRecordDecoder: Decoder[Option[Dataset]] = {
+  private[rest] implicit val maybeRecordDecoder: Decoder[Option[Dataset]] = {
+    import Decoder._
     import ch.datascience.graph.model.datasets._
     import ch.datascience.graph.model.users.{Email, Name => UserName}
     import ch.datascience.knowledgegraph.datasets.model._
@@ -79,11 +79,16 @@ private object BaseDetailsFinder {
       for {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
-        maybeDescription   <- cursor.downField("description").downField("value").as[Option[Description]]
         dateCreated        <- cursor.downField("dateCreated").downField("value").as[DateCreated]
         agentEmail         <- cursor.downField("agentEmail").downField("value").as[Email]
         agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
+        maybeDescription <- cursor
+                             .downField("description")
+                             .downField("value")
+                             .as[Option[String]]
+                             .map(blankToNone)
+                             .flatMap(toOption[Description])
       } yield
         Dataset(
           id,

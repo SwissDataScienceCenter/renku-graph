@@ -25,7 +25,13 @@ import ch.datascience.tinytypes._
 private object DecodingTestTypes {
 
   class StringTestType private (val value: String) extends AnyVal with StringTinyType
-  implicit object StringTestType extends TinyTypeFactory[StringTestType](new StringTestType(_))
+  implicit object StringTestType extends TinyTypeFactory[StringTestType](new StringTestType(_)) {
+    val InvalidValue: String = "invalid value"
+    addConstraint(
+      check   = _ != InvalidValue,
+      message = (_: String) => s"$typeName cannot be '$InvalidValue'"
+    )
+  }
 
   class LocalDateTestType private (val value: LocalDate) extends AnyVal with LocalDateTinyType
   implicit object LocalDateTestType extends TinyTypeFactory[LocalDateTestType](new LocalDateTestType(_))

@@ -23,17 +23,40 @@ import java.time.{Instant, LocalDate, OffsetDateTime}
 
 import cats.implicits._
 import ch.datascience.tinytypes._
-import io.circe.Decoder
+import eu.timepit.refined.W
+import eu.timepit.refined.api.{RefType, Refined}
+import eu.timepit.refined.string.MatchesRegex
+import io.circe.Decoder.decodeString
+import io.circe.{Decoder, DecodingFailure}
 
 object TinyTypeDecoders {
 
+  type NonBlank = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+
+  lazy val blankToNone: Option[String] => Option[NonBlank] = {
+    case None           => None
+    case Some("")       => None
+    case Some(nonBlank) => RefType.applyRef[NonBlank](nonBlank).map(Option.apply).leftMap(_ => None).merge
+  }
+
+  def toOption[TT <: StringTinyType](
+      implicit tinyTypeFactory: From[TT]
+  ): Option[NonBlank] => Either[DecodingFailure, Option[TT]] = {
+    case Some(nonBlank) =>
+      tinyTypeFactory
+        .from(nonBlank.value)
+        .map(Option.apply)
+        .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+    case None => Right(None)
+  }
+
   implicit def stringDecoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
-    Decoder.decodeString.emap { value =>
+    decodeString.emap { value =>
       tinyTypeFactory.from(value).leftMap(_.getMessage)
     }
 
   implicit def localDateDecoder[TT <: LocalDateTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
-    Decoder.decodeString.emap { value =>
+    decodeString.emap { value =>
       Either
         .catchNonFatal(LocalDate.parse(value))
         .flatMap(tinyTypeFactory.from)
@@ -41,7 +64,7 @@ object TinyTypeDecoders {
     }
 
   implicit def instantDecoder[TT <: InstantTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
-    Decoder.decodeString.emap { value =>
+    decodeString.emap { value =>
       Either
         .catchNonFatal(OffsetDateTime.parse(value))
         .flatMap(offsetDateTime => Either.catchNonFatal(offsetDateTime.atZoneSameInstant(UTC).toInstant))
