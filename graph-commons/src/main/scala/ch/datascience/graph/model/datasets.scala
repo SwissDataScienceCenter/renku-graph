@@ -46,12 +46,8 @@ object datasets {
   implicit object PartName extends TinyTypeFactory[PartName](new PartName(_)) with NonBlank
 
   final class PartLocation private (val value: String) extends AnyVal with StringTinyType
-  implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath {
-    addConstraint(
-      check   = value => value startsWith "data/",
-      message = value => s"'$value' does not point to 'data/' folder which is invalid for $typeName"
-    )
-  }
+  implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath
+
   final class PartDateCreated private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object PartDateCreated
       extends TinyTypeFactory[PartDateCreated](new PartDateCreated(_))

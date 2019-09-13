@@ -18,8 +18,6 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.relativePaths
 import ch.datascience.graph.model.datasets.{Identifier, PartLocation}
 import ch.datascience.tinytypes.constraints.{RelativePath, UUID}
 import org.scalatest.Matchers._
@@ -38,20 +36,6 @@ class datasetsSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "be a RelativePath" in {
       PartLocation shouldBe a[RelativePath]
-    }
-
-    "be instantiatable when the path starts with 'data/'" in {
-      forAll(relativePaths(minSegments = 2)) { path =>
-        PartLocation(s"data/$path").toString shouldBe s"data/$path"
-      }
-    }
-
-    "throw an IllegalArgumentException when path does not start with 'data/'" in {
-      val path = relativePaths(minSegments = 2).generateOne
-
-      intercept[IllegalArgumentException] {
-        PartLocation(path)
-      }.getMessage shouldBe s"'$path' does not point to 'data/' folder which is invalid for ch.datascience.graph.model.datasets.PartLocation"
     }
   }
 }
