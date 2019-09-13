@@ -49,7 +49,7 @@ private class BaseDetailsFinder(
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
        |
-       |SELECT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
+       |SELECT DISTINCT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
        |WHERE {
        |  ?dataset rdfs:label "$identifier" ;
        |           rdfs:label ?identifier ;

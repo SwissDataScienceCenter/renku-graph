@@ -54,7 +54,7 @@ private class IOProjectDatasetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?identifier ?name
+       |SELECT DISTINCT ?identifier ?name
        |WHERE {
        |  ?dataset dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)

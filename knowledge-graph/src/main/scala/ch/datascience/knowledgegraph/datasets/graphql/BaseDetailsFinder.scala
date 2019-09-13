@@ -50,7 +50,7 @@ private class BaseDetailsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
+       |SELECT DISTINCT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
        |WHERE {
        |  ?dataset dcterms:isPartOf|schema:isPartOf <${renkuBaseUrl / projectPath}> .
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
