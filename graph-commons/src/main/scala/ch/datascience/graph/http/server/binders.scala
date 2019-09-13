@@ -18,19 +18,43 @@
 
 package ch.datascience.graph.http.server
 
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.events.{ProjectId => ProjectIdType}
+import ch.datascience.graph.model.projects.{ProjectPath => ProjectPathType}
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 import scala.util.Try
 
-object ProjectIdPathBinder {
+object binders {
 
-  def unapply(value: String): Option[ProjectId] =
-    Try {
-      ProjectId(value.toInt)
-    }.toOption
-}
+  object ProjectId {
 
-object ProjectPathBinder {
-  def unapply(value: String): Option[ProjectPath] = ProjectPath.from(value).toOption
+    def unapply(value: String): Option[ProjectIdType] =
+      Try {
+        ProjectIdType(value.toInt)
+      }.toOption
+  }
+
+  object ProjectPath {
+
+    class Namespace private (val value: String) extends AnyVal with StringTinyType
+    object Namespace {
+
+      private object NamespaceFactory extends TinyTypeFactory[Namespace](new Namespace(_)) with NonBlank
+
+      def unapply(value: String): Option[Namespace] = NamespaceFactory.from(value).toOption
+
+      implicit class NamespaceOps(namespace: Namespace) {
+        def /(name: Name): ProjectPathType = ProjectPathType(s"$namespace/$name")
+      }
+    }
+
+    class Name private (val value: String) extends AnyVal with StringTinyType
+    object Name {
+
+      private object NameFactory extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+
+      def unapply(value: String): Option[Name] = NameFactory.from(value).toOption
+    }
+  }
 }

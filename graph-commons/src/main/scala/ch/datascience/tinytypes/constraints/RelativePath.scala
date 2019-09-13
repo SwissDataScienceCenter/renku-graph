@@ -30,7 +30,7 @@ trait RelativePath extends Constraints[String] with NonBlank {
 trait RelativePathOps[T <: StringTinyType] {
   self: TinyTypeFactory[T] with RelativePath =>
 
-  implicit class UrlOps(url: T) {
+  implicit class RelativePathOps(url: T) {
     def /(value: Any): T = apply(s"$url/$value")
   }
 }

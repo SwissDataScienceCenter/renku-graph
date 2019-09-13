@@ -20,6 +20,6 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import ch.datascience.graph.model.datasets
 
-object DatasetIdPathBinder {
+object DatasetId {
   def unapply(value: String): Option[datasets.Identifier] = datasets.Identifier.from(value).toOption
 }

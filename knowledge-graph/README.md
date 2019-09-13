@@ -9,7 +9,7 @@ This is a microservice which provides API for the Graph DB.
 |  GET    | ```/knowledge-graph/datasets/:id```                     | Returns details of the dataset with the given `id`     |
 |  GET    | ```/knowledge-graph/graphql```                          | Returns GraphQL endpoint schema                        |
 |  POST   | ```/knowledge-graph/graphql```                          | GraphQL query endpoint                                 |
-|  GET    | ```/knowledge-graph/projects/:project-path/datasets```  | Returns datasets of the project with the given `path`      |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```  | Returns datasets of the project with the given `path`      |
 |  GET    | ```/ping```                                             | To check if service is healthy                         |
 
 #### GET /knowledge-graph/datasets/:id
@@ -289,11 +289,9 @@ In case there's no data found for a given query, the response `json` will contai
 }
 ```
 
-#### GET /knowledge-graph/projects/:project-path/datasets
+#### GET /knowledge-graph/projects/:namespace/:name/datasets
 
-Finds list of datasets of the project with the given `project-path`.
-
-**NOTICE**: `project-path` has to be in format: `namespace/project-name` and **url encoded**.
+Finds list of datasets of the project with the given `namespace/name`.
 
 **Response**
 

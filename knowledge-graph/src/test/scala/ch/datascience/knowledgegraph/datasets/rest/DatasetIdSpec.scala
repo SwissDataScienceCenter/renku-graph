@@ -16,13 +16,28 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.tooling
+package ch.datascience.knowledgegraph.datasets.rest
 
-object RequestTools {
-  import ch.datascience.tinytypes.StringTinyType
-  import java.net.URLEncoder
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
-  implicit class UrlOps[TT <: StringTinyType](value: TT) {
-    lazy val asUrlEncoded: String = URLEncoder.encode(value.value, "UTF-8")
+class DatasetIdSpec extends WordSpec {
+
+  "unapply" should {
+
+    "convert valid dataset id as string to Identifier" in {
+      val id = datasetIds.generateOne
+      DatasetId.unapply(id.toString) shouldBe Some(id)
+    }
+
+    "return None if string value cannot be converted to in Identifier" in {
+      DatasetId.unapply("a") shouldBe None
+    }
+
+    "return None if string value is blank" in {
+      DatasetId.unapply(" ") shouldBe None
+    }
   }
 }

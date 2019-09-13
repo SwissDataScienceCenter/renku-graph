@@ -23,22 +23,23 @@ import ch.datascience.graph.model.events.EventsGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class ProjectIdPathBinderSpec extends WordSpec {
+class ProjectIdSpec extends WordSpec {
+  import binders._
 
   "unapply" should {
 
     "convert valid projectId as string to ProjectId" in {
       val projectId = projectIds.generateOne
 
-      ProjectIdPathBinder.unapply(projectId.toString) shouldBe Some(projectId)
+      ProjectId.unapply(projectId.toString) shouldBe Some(projectId)
     }
 
     "return None if string value cannot be converted to an int" in {
-      ProjectIdPathBinder.unapply("a") shouldBe None
+      ProjectId.unapply("a") shouldBe None
     }
 
     "return None if string value is blank" in {
-      ProjectIdPathBinder.unapply(" ") shouldBe None
+      ProjectId.unapply(" ") shouldBe None
     }
   }
 }

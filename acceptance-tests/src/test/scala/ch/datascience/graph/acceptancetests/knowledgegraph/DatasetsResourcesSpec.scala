@@ -23,7 +23,6 @@ import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
-import ch.datascience.graph.acceptancetests.tooling.RequestTools._
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -43,7 +42,7 @@ import org.scalatest.{FeatureSpec, GivenWhenThen}
 
 import scala.util.Random
 
-class DatasetsResourceSpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
+class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
   private val project          = projects.generateOne
   private val dataset1CommitId = commitIds.generateOne
@@ -59,7 +58,7 @@ class DatasetsResourceSpec extends FeatureSpec with GivenWhenThen with GraphServ
     project          = List(DatasetProject(project.path))
   )
 
-  feature("GET knowledge-graph/projects/<project-name>/datasets to find project's datasets") {
+  feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
     scenario("As a user I would like to find project's datasets by calling a REST enpoint") {
 
@@ -98,7 +97,7 @@ class DatasetsResourceSpec extends FeatureSpec with GivenWhenThen with GraphServ
       `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
-      val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path.asUrlEncoded}/datasets"
+      val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
 
       Then("he should get OK response with project's datasets")
       projectDatasetsResponse.status shouldBe Ok
