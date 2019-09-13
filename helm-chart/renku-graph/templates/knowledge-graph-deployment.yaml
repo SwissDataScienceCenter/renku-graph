@@ -4,7 +4,7 @@ metadata:
   name: {{ include "knowledgeGraph.fullname" . }}
   labels:
     app: {{ template "knowledgeGraph.name" . }}
-    chart: {{ template "knowledgeGraph.chart" . }}
+    chart: {{ template "graph.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
@@ -54,17 +54,17 @@ spec:
             - name: JAVA_OPTS
               value: -Xmx200m -XX:+UseG1GC
           ports:
-            - name: http-graph-sv
+            - name: http-kg
               containerPort: 9004
               protocol: TCP
           livenessProbe:
             httpGet:
               path: /ping
-              port: http-graph-sv
+              port: http-kg
           readinessProbe:
             httpGet:
               path: /ping
-              port: http-graph-sv
+              port: http-kg
           resources:
   {{ toYaml .Values.knowledgeGraph.resources | indent 12 }}
   {{- with .Values.nodeSelector }}

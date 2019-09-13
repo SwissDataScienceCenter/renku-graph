@@ -1,0 +1,110 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ include "webhookService.fullname" . }}
+  labels:
+    app: {{ template "webhookService.name" . }}
+    chart: {{ template "graph.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ include "webhookService.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "webhookService.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: webhook-service
+          image: "{{ .Values.webhookService.image.repository }}:{{ .Values.webhookService.image.tag }}"
+          imagePullPolicy: {{ .Values.webhookService.image.pullPolicy }}
+          env:
+            - name: HOOK_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "webhookService.fullname" . }}
+                  key: webhookService-hookToken-secret
+            - name: EVENT_LOG_POSTGRES_HOST
+              value: "{{ template "postgresql.fullname" . }}:5432"
+            - name: EVENT_LOG_POSTGRES_USER
+              value: {{ .Values.global.graph.dbEventLog.postgresUser }}
+            - name: EVENT_LOG_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "webhookService.fullname" . }}
+                  key: dbEventLog-postgresPassword
+            - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
+              value: "{{ .Values.webhookService.dbEventLog.connectionPool }}"
+            - name: TOKEN_REPOSITORY_BASE_URL
+              value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
+            - name: GITLAB_BASE_URL
+              value: {{ .Values.gitlab.url }}
+            - name: GITLAB_RATE_LIMIT
+              value: {{ .Values.webhookService.gitlab.rateLimit }}
+            - name: SELF_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SELF_URL
+              {{- if .Values.global.renku.domain }}
+              value: {{ template "http" . }}://{{ .Values.global.renku.domain }}
+              {{- else }}
+              value: {{ printf "http://$(SELF_IP):9001" | quote }}
+              {{- end }}
+            - name: EVENTS_SYNCHRONIZATION_JOB_DELAY
+              {{- if .Values.webhookService.eventsSynchronization.initialDelay }}
+              value: {{ .Values.webhookService.eventsSynchronization.initialDelay }}
+              {{- else }}
+              value: 1 minute
+              {{- end }}
+            - name: EVENTS_SYNCHRONIZATION_JOB_INTERVAL
+              {{- if .Values.webhookService.eventsSynchronization.interval }}
+              value: {{ .Values.webhookService.eventsSynchronization.interval }}
+              {{- else }}
+              value: 1 hour
+              {{- end }}
+            - name: SENTRY_ENABLED
+              value: "{{ .Values.sentry.enabled }}"
+              {{- if .Values.sentry.enabled }}
+            - name: SENTRY_BASE_URL
+              value: {{ .Values.sentry.url }}
+            - name: SENTRY_ENVIRONMENT_NAME
+              value: {{ .Values.sentry.environmentName }}
+              {{- end }}
+            - name: THREADS_NUMBER
+              value: "{{ .Values.webhookService.threadsNumber }}"
+            - name: JAVA_OPTS
+              value: -Xmx200m -XX:+UseG1GC
+          ports:
+            - name: http-webhook-sv
+              containerPort: 9001
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http-webhook-sv
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http-webhook-sv
+          resources:
+  {{ toYaml .Values.webhookService.resources | indent 12 }}
+  {{- with .Values.nodeSelector }}
+nodeSelector:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+affinity:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+tolerations:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
