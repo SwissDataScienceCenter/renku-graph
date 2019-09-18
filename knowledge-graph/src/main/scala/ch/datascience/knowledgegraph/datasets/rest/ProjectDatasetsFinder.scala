@@ -56,8 +56,7 @@ private class IOProjectDatasetsFinder(
        |
        |SELECT DISTINCT ?identifier ?name
        |WHERE {
-       |  ?dataset dcterms:isPartOf|schema:isPartOf ?project .
-       |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
+       |  ?dataset dcterms:isPartOf|schema:isPartOf <${renkuBaseUrl / projectPath}> .
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
        |           rdfs:label ?identifier ;
        |           schema:name ?name .
