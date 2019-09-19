@@ -16,27 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.graph.acceptancetests.tooling
 
-import ch.datascience.graph.model.users.{Email, Name}
-import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import io.circe.Json
-import io.circe.literal._
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets.UTF_8
 
-object Person {
+object RequestTools {
 
-  def apply(id: Id, maybeEmail: Option[Email]): Json = json"""
-  {
-    "@id": $id,
-    "@type": [
-      "schema:Person",
-      "prov:Person"
-    ],
-    "schema:name": ${id.userName}
-  }""" deepMerge (maybeEmail to "schema:email")
-
-  final case class Id(userName: Name) extends EntityId {
-    override val value: String = s"file:///_${userName.value.hashCode()}"
-  }
+  def urlEncode(value: String): String = URLEncoder.encode(value, UTF_8.name())
 }

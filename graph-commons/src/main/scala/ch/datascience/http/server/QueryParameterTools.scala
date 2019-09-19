@@ -16,27 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.http.server
 
-import ch.datascience.graph.model.users.{Email, Name}
-import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import io.circe.Json
-import io.circe.literal._
+import cats.MonadError
+import cats.data.NonEmptyList
+import cats.effect.ConcurrentEffect
+import ch.datascience.controllers.ErrorMessage
+import ch.datascience.controllers.ErrorMessage._
+import io.circe.syntax._
+import org.http4s.circe._
+import org.http4s.{ParseFailure, Response, Status}
 
-object Person {
+import scala.language.higherKinds
 
-  def apply(id: Id, maybeEmail: Option[Email]): Json = json"""
-  {
-    "@id": $id,
-    "@type": [
-      "schema:Person",
-      "prov:Person"
-    ],
-    "schema:name": ${id.userName}
-  }""" deepMerge (maybeEmail to "schema:email")
+object QueryParameterTools {
 
-  final case class Id(userName: Name) extends EntityId {
-    override val value: String = s"file:///_${userName.value.hashCode()}"
+  def toBadRequest[F[_]: ConcurrentEffect](
+      parameterName: String
+  )(errors:          NonEmptyList[ParseFailure])(implicit ME: MonadError[F, Throwable]): F[Response[F]] = ME.pure {
+    Response[F](Status.BadRequest)
+      .withEntity(ErrorMessage(s"'$parameterName' parameter with invalid value").asJson)
   }
 }

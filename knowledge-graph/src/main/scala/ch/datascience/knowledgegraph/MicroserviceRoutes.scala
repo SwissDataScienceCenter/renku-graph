@@ -20,7 +20,9 @@ package ch.datascience.knowledgegraph
 
 import cats.effect.ConcurrentEffect
 import ch.datascience.graph.http.server.binders.ProjectPath._
-import ch.datascience.knowledgegraph.datasets.rest.{DatasetId, DatasetsEndpoint, ProjectDatasetsEndpoint}
+import ch.datascience.http.server.QueryParameterTools._
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.QueryParameter
+import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.QueryEndpoint
 import org.http4s.dsl.Http4sDsl
 
@@ -29,10 +31,12 @@ import scala.language.higherKinds
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     queryEndpoint:           QueryEndpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
-    datasetsEndpoint:        DatasetsEndpoint[F]
+    datasetsEndpoint:        DatasetsEndpoint[F],
+    datasetsSearchEndpoint:  DatasetsSearchEndpoint[F]
 ) extends Http4sDsl[F] {
 
   import datasetsEndpoint._
+  import datasetsSearchEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
   import queryEndpoint._
@@ -40,6 +44,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   // format: off
   lazy val routes: HttpRoutes[F] = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"                                                                          => Ok("pong")
+    case           GET  -> Root / "knowledge-graph" / "datasets" :? QueryParameter(maybePhrase)                   => maybePhrase.fold(toBadRequest(QueryParameter.name), searchForDatasets)
     case           GET  -> Root / "knowledge-graph" / "datasets" / DatasetId(id)                                  => getDataset(id)
     case           GET  -> Root / "knowledge-graph" / "graphql"                                                   => schema
     case request @ POST -> Root / "knowledge-graph" / "graphql"                                                   => handleQuery(request)

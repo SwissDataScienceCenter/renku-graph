@@ -16,27 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.knowledgegraph.datasets
 
-import ch.datascience.graph.model.users.{Email, Name}
-import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import io.circe.Json
-import io.circe.literal._
+import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Phrase
+import org.scalacheck.Gen
 
-object Person {
-
-  def apply(id: Id, maybeEmail: Option[Email]): Json = json"""
-  {
-    "@id": $id,
-    "@type": [
-      "schema:Person",
-      "prov:Person"
-    ],
-    "schema:name": ${id.userName}
-  }""" deepMerge (maybeEmail to "schema:email")
-
-  final case class Id(userName: Name) extends EntityId {
-    override val value: String = s"file:///_${userName.value.hashCode()}"
-  }
+package object rest {
+  val phrases: Gen[Phrase] = nonEmptyStrings() map Phrase.apply
 }

@@ -19,6 +19,7 @@
 package ch.datascience.config.sentry
 
 import java.net.URLEncoder
+import java.nio.charset.StandardCharsets.UTF_8
 
 import cats.MonadError
 import cats.implicits._
@@ -68,6 +69,6 @@ class SentryInitializerSpec extends WordSpec with MockFactory {
 
     val initSentry        = mockFunction[String, Unit]
     val sentryInitializer = new SentryInitializer[Try](_, initSentry)
-    val urlEncode         = URLEncoder.encode(_: String, "UTF-8")
+    val urlEncode         = URLEncoder.encode(_: String, UTF_8.name())
   }
 }

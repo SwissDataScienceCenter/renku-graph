@@ -48,7 +48,7 @@ object DatasetsGenerators {
     agent       <- datasetAgents
   } yield DatasetCreation(createdDate, agent)
 
-  private implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
+  implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
     maybeEmail <- Gen.option(emails)
     name       <- names
   } yield DatasetCreator(maybeEmail, name)

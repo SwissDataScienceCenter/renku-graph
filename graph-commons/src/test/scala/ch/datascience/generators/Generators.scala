@@ -27,6 +27,7 @@ import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.{NonNegative, Positive}
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
@@ -38,21 +39,37 @@ import scala.language.{implicitConversions, postfixOps}
 
 object Generators {
 
+  type NonBlank = String Refined NonEmpty
+
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
+    nonBlankStrings(maxLength = Refined.unsafeApply(maxLength)) map (_.value)
+  }
+
+  def nonBlankStrings(minLength:      Int Refined Positive = 1,
+                      maxLength:      Int Refined Positive = 10,
+                      charsGenerator: Gen[Char]            = alphaChar): Gen[NonBlank] = {
+    require(minLength.value <= maxLength.value)
 
     val lengths =
-      if (maxLength == 1) choose(1, maxLength)
-      else frequency(1 -> choose(1, maxLength), 9 -> choose(2, maxLength))
+      if (maxLength.value == 1) const(maxLength.value)
+      else if (minLength.value == maxLength.value) const(maxLength.value)
+      else frequency(1 -> choose(minLength.value, maxLength.value), 9 -> choose(minLength.value + 1, maxLength.value))
 
     for {
       length <- lengths
       chars  <- listOfN(length, charsGenerator)
-    } yield chars.mkString("")
+    } yield Refined.unsafeApply(chars.mkString(""))
   }
 
   def stringsOfLength(length: Int Refined Positive = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] =
     listOfN(length, charsGenerator).map(_.mkString(""))
+
+  def sentenceContaining(phrase: NonBlank): Gen[NonBlank] =
+    for {
+      prefix <- nonEmptyStrings()
+      suffix <- nonEmptyStrings()
+    } yield Refined.unsafeApply(s"$prefix $phrase $suffix")
 
   def blankStrings(maxLength: Int Refined NonNegative = 10): Gen[String] =
     for {

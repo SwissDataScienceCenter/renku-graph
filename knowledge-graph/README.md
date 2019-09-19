@@ -4,13 +4,55 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method  | Path                                                    | Description                                            |
-|---------|---------------------------------------------------------|--------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets/:id```                     | Returns details of the dataset with the given `id`     |
-|  GET    | ```/knowledge-graph/graphql```                          | Returns GraphQL endpoint schema                        |
-|  POST   | ```/knowledge-graph/graphql```                          | GraphQL query endpoint                                 |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```  | Returns datasets of the project with the given `path`      |
-|  GET    | ```/ping```                                             | To check if service is healthy                         |
+| Method  | Path                                                       | Description                                            |
+|---------|------------------------------------------------------------|--------------------------------------------------------|
+|  GET    | ```/knowledge-graph/datasets?query=<phrase>```             | Returns datasets matching the given `phrase`.          |
+|  GET    | ```/knowledge-graph/datasets/:id```                        | Returns details of the dataset with the given `id`     |
+|  GET    | ```/knowledge-graph/graphql```                             | Returns GraphQL endpoint schema                        |
+|  POST   | ```/knowledge-graph/graphql```                             | GraphQL query endpoint                                 |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```  | Returns datasets of the project with the given `path`  |
+|  GET    | ```/ping```                                                | To check if service is healthy                         |
+
+#### GET /knowledge-graph/datasets?query=<phrase>
+
+Finds datasets which `name`, `description` or creator `name` matches the given `phrase`.
+
+NOTE: the `phrase` query parameter has to be url encoded.
+
+**Response**
+
+| Status                     | Description                                            |
+|----------------------------|----------------------------------------                |
+| OK (200)                   | If there are datasets for the project                  |
+| BAD_REQUEST (400)          | If the `query` parameter is blank                      |
+| NOT_FOUND (404)            | If there are no datasets found or no `query` parameter |
+| INTERNAL SERVER ERROR (500)| Otherwise                                              |
+
+Response body example:
+```
+[  
+   {  
+      "identifier":"9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
+      "name":"rmDaYfpehl",
+      "_links":[  
+         {  
+            "rel":"details",
+            "href":"http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
+         }
+      ]
+   },
+   {  
+      "identifier":"a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
+      "name":"a",
+      "_links":[  
+         {  
+            "rel":"details",
+            "href":"http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+         }
+      ]
+   }
+]
+```
 
 #### GET /knowledge-graph/datasets/:id
 

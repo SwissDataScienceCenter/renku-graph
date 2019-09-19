@@ -49,7 +49,6 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import io.circe.{Decoder, HCursor, Json}
 import org.apache.jena.fuseki.main.FusekiServer
-import org.apache.jena.query.DatasetFactory
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 import org.apache.jena.riot.{Lang, RDFDataMgr}
@@ -83,13 +82,34 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
     fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
   )
+
   import rdfStoreConfig._
-  private lazy val renkuDataset = DatasetFactory.createTxnMem()
+
+  private lazy val dataset = {
+    import org.apache.jena.graph.NodeFactory
+    import org.apache.jena.query.DatasetFactory
+    import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
+    import org.apache.lucene.store.RAMDirectory
+
+    val entityDefinition: EntityDefinition = {
+      val definition = new EntityDefinition("uri", "name")
+      definition.setPrimaryPredicate(NodeFactory.createURI("http://schema.org/name"))
+      definition.set("description", NodeFactory.createURI("http://schema.org/description"))
+      definition
+    }
+
+    TextDatasetFactory.createLucene(
+      DatasetFactory.create(),
+      new RAMDirectory,
+      new TextIndexConfig(entityDefinition)
+    )
+  }
+
   private lazy val rdfStoreServer: FusekiServer = FusekiServer
     .create()
     .loopback(true)
     .port(fusekiServerPort)
-    .add(s"/$datasetName", renkuDataset)
+    .add(s"/$datasetName", dataset)
     .build
 
   protected val sparqlEndpoint: Uri = Uri
@@ -113,8 +133,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   }
 
   before {
-    renkuDataset.asDatasetGraph().clear()
-    renkuDataset.asDatasetGraph().isEmpty shouldBe true
+    dataset.asDatasetGraph().clear()
+    dataset.asDatasetGraph().isEmpty shouldBe true
   }
 
   protected override def afterAll(): Unit = {
