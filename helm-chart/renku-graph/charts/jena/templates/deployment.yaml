@@ -38,15 +38,33 @@ spec:
               path: /
               port: http
           volumeMounts:
+            - name: lucene-config
+              mountPath: /fuseki/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
+              subPath: {{ .Values.global.graph.jena.dataset }}.ttl
+              readOnly: true
             - name: shiro-config
               mountPath: /fuseki/shiro.ini
               subPath: shiro.ini
               readOnly: true
+            - name: fuseki-server
+              mountPath: /fuseki/fuseki-server.sh
+              subPath: fuseki-server.sh
             - name: jena-persistence
               mountPath: /fuseki
+            - name: docker-entrypoint
+              mountPath: /docker-entrypoint.sh
+              subPath: docker-entrypoint.sh
           resources:
 {{ toYaml .Values.resources | indent 12 }}
       volumes:
+        - name: docker-entrypoint
+          configMap:
+            name: docker-entrypoint-sh
+            defaultMode: 0555
+        - name: fuseki-server
+          configMap:
+            name: fuseki-server-sh
+            defaultMode: 0555
         - name: jena-persistence
         {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
@@ -57,6 +75,9 @@ spec:
         - name: shiro-config
           secret:
             secretName: jena-shiro-ini
+        - name: lucene-config
+          configMap:
+            name: lucene-config-ttl
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}

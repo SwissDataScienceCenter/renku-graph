@@ -43,7 +43,7 @@ class IODatasetFinderSpec
 
   "findDataset" should {
 
-    "return the details of the dataset with the given id" in new InMemoryStoreTestCase {
+    "return the details of the dataset with the given id" in new TestCase {
       forAll(projectPaths, datasets) { (projectPath, dataset1) =>
         val otherProject = projectPaths.generateOne
         val reusedDatasetUrl = (for {
@@ -81,13 +81,13 @@ class IODatasetFinderSpec
       }
     }
 
-    "return None if there's no datasets with the given id" in new InMemoryStoreTestCase {
+    "return None if there's no datasets with the given id" in new TestCase {
       val identifier = datasetIds.generateOne
       datasetFinder.findDataset(identifier).unsafeRunSync() shouldBe None
     }
   }
 
-  private trait InMemoryStoreTestCase {
+  private trait TestCase {
     private val logger = TestLogger[IO]()
     val datasetFinder = new IODatasetFinder(
       new BaseDetailsFinder(rdfStoreConfig, renkuBaseUrl, logger),
