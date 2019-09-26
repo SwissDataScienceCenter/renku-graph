@@ -58,6 +58,12 @@ package object triples {
         .getOrElse(Json.obj())
   }
 
+  implicit class IdOps[ID <: EntityId](id: ID) {
+
+    def toResource(property: String): Json =
+      Json.obj(property -> Json.obj("@id" -> id.asJson))
+  }
+
   implicit class OptionIdOps[V <: EntityId](maybeValue: Option[V]) {
 
     def toResource[ID <: EntityId](property: String): Json =

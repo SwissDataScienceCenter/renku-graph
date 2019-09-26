@@ -18,9 +18,11 @@
 
 package ch.datascience.graph.model
 
+import java.time.Instant
+
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.tinytypes.constraints._
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
 object projects {
 
@@ -52,6 +54,9 @@ object projects {
     }
   }
 
-  final class FilePath private (val value: String) extends AnyVal with StringTinyType
-  object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
+  final class Name private (val value: String) extends AnyVal with StringTinyType
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+
+  final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
 }

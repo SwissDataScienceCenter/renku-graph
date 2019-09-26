@@ -21,7 +21,6 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
@@ -84,6 +83,26 @@ class IODatasetFinderSpec
     "return None if there's no datasets with the given id" in new InMemoryStoreTestCase {
       val identifier = datasetIds.generateOne
       datasetFinder.findDataset(identifier).unsafeRunSync() shouldBe None
+    }
+
+    "throw an exception if there's more than one datasets with the given id" in new InMemoryStoreTestCase {
+      val identifier = datasetIds.generateOne
+      loadToStore(
+        triples(
+          singleFileAndCommitWithDataset(
+            projectPaths.generateOne,
+            datasetIdentifier = identifier
+          ),
+          singleFileAndCommitWithDataset(
+            projectPaths.generateOne,
+            datasetIdentifier = identifier
+          )
+        )
+      )
+
+      intercept[Exception] {
+        datasetFinder.findDataset(identifier).unsafeRunSync()
+      }.getMessage shouldBe s"More than one dataset with $identifier id"
     }
   }
 

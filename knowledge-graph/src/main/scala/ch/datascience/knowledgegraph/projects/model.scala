@@ -16,34 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.knowledgegraph.projects
 
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects._
-import io.circe.Json
-import io.circe.literal._
+import ch.datascience.graph.model.users
 
-object Project {
+object model {
 
-  def apply(id: Id, name: Name, dateCreated: DateCreated, creator: Person.Id): Json = json"""
-  {
-    "@id": $id,
-    "@type": [
-      "prov:Location",
-      "schema:Project"
-    ],
-    "schema:name": ${name.toString},
-    "schema:dateCreated": ${dateCreated.toString}
-  }""" deepMerge (creator toResource "schema:creator")
+  final case class Project(path: ProjectPath, name: Name, created: ProjectCreation)
 
-  final case class Id(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath) extends EntityId {
-    override val value: String = (renkuBaseUrl / projectPath).value
-  }
+  final case class ProjectCreation(date: DateCreated, creator: ProjectCreator)
 
-  def `schema:isPartOf`(projectId: Project.Id): Json = json"""{
-    "schema:isPartOf": {
-      "@id": ${projectId.toString}
-    }
-  }"""
+  final case class ProjectCreator(email: users.Email, name: users.Name)
 }

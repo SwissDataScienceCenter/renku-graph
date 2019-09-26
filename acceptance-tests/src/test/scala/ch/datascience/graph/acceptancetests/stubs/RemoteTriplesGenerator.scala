@@ -27,14 +27,15 @@ import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
 
 object RemoteTriplesGenerator {
 
-  def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project:  Project,
-                                                                                        commitId: CommitId,
-                                                                                        schemaVersion: SchemaVersion =
-                                                                                          currentSchemaVersion): Unit =
+  def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
+      project:       Project,
+      commitId:      CommitId,
+      schemaVersion: SchemaVersion = currentSchemaVersion
+  ): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,
       commitId,
-      triples(singleFileAndCommit(project.path, commitId, Some(schemaVersion))),
+      triples(singleFileAndCommit(project.path, commitId, maybeSchemaVersion = Some(schemaVersion))),
       schemaVersion)
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK`(

@@ -19,9 +19,21 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.events.EventsGenerators.projectIds
+import ch.datascience.graph.model.events.{ProjectId, Project => GitLabProject}
+import ch.datascience.knowledgegraph.projects.model.Project
 
 package object data {
   val currentSchemaVersion: SchemaVersion     = SchemaVersion("0.5.0")
   val renkuResourceUrl:     RenkuResourcesUrl = RenkuResourcesUrl("http://localhost:9004/knowledge-graph")
+
+  implicit class ProjectOps(project: Project) {
+
+    def toGitLabProject(id: ProjectId = projectIds.generateOne): GitLabProject = GitLabProject(
+      id,
+      project.path
+    )
+  }
 }

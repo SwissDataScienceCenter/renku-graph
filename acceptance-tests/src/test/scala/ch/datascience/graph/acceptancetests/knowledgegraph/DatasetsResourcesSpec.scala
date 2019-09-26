@@ -44,6 +44,8 @@ import scala.util.Random
 
 class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
+  import DatasetsResourcesSpec._
+
   private val project          = projects.generateOne
   private val dataset1CommitId = commitIds.generateOne
   private val dataset1 = datasets.generateOne.copy(
@@ -60,49 +62,49 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
   feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
-    scenario("As a user I would like to find project's datasets by calling a REST enpoint") {
+    scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
       val jsonLDTriples = triples(
         singleFileAndCommitWithDataset(
           project.path,
-          dataset1CommitId,
-          dataset1.created.agent.name,
-          dataset1.created.agent.email,
-          dataset1.id,
-          dataset1.name,
-          dataset1.maybeDescription,
-          dataset1.created.date,
-          dataset1.published.maybeDate,
-          dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-          schemaVersion = currentSchemaVersion
+          commitId                  = dataset1CommitId,
+          committerName             = dataset1.created.agent.name,
+          committerEmail            = dataset1.created.agent.email,
+          datasetIdentifier         = dataset1.id,
+          datasetName               = dataset1.name,
+          maybeDatasetDescription   = dataset1.maybeDescription,
+          datasetCreatedDate        = dataset1.created.date,
+          maybeDatasetPublishedDate = dataset1.published.maybeDate,
+          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          schemaVersion             = currentSchemaVersion
         ),
         singleFileAndCommitWithDataset(
           project.path,
-          dataset2CommitId,
-          dataset2.created.agent.name,
-          dataset2.created.agent.email,
-          dataset2.id,
-          dataset2.name,
-          dataset2.maybeDescription,
-          dataset2.created.date,
-          dataset2.published.maybeDate,
-          dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-          schemaVersion = currentSchemaVersion
+          commitId                  = dataset2CommitId,
+          committerName             = dataset2.created.agent.name,
+          committerEmail            = dataset2.created.agent.email,
+          datasetIdentifier         = dataset2.id,
+          datasetName               = dataset2.name,
+          maybeDatasetDescription   = dataset2.maybeDescription,
+          datasetCreatedDate        = dataset2.created.date,
+          maybeDatasetPublishedDate = dataset2.published.maybeDate,
+          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          schemaVersion             = currentSchemaVersion
         )
       )
 
       `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
 
-      When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
+      When("user fetches project's datasets with GET knowledge-graph/projects/<namespace>/<name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
 
       Then("he should get OK response with project's datasets")
       projectDatasetsResponse.status shouldBe Ok
       val Right(foundDatasets) = projectDatasetsResponse.bodyAsJson.as[List[Json]]
-      foundDatasets should contain theSameElementsAs List(shortJson(dataset1), shortJson(dataset2))
+      foundDatasets should contain theSameElementsAs List(briefDatasetJson(dataset1), briefDatasetJson(dataset2))
 
       When("user then fetches details of the chosen dataset with the link from the response")
       val someDatasetDetailsLink =
@@ -126,15 +128,17 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       )
     }
   }
+}
 
-  private def shortJson(dataset: Dataset) =
-    json"""
+object DatasetsResourcesSpec {
+
+  def briefDatasetJson(dataset: Dataset): Json = json"""
     {
       "identifier": ${dataset.id.value}, 
       "name": ${dataset.name.value}
     }""".deepMerge {
-      _links(
-        Link(Rel("details"), Href(renkuResourceUrl / "datasets" / dataset.id.value))
-      )
-    }
+    _links(
+      Link(Rel("details"), Href(renkuResourceUrl / "datasets" / dataset.id.value))
+    )
+  }
 }

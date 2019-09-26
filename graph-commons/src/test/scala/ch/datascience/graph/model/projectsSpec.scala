@@ -22,7 +22,7 @@ import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.projects.{FilePath, FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

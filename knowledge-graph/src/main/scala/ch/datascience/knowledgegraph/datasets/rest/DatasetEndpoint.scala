@@ -38,7 +38,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class DatasetsEndpoint[Interpretation[_]: Effect](
+class DatasetEndpoint[Interpretation[_]: Effect](
     datasetFinder:     DatasetFinder[Interpretation],
     renkuResourcesUrl: RenkuResourcesUrl,
     logger:            Logger[Interpretation]
@@ -121,16 +121,16 @@ class DatasetsEndpoint[Interpretation[_]: Effect](
   }
 }
 
-object IODatasetsEndpoint {
+object IODatasetEndpoint {
 
   def apply()(implicit executionContext: ExecutionContext,
               contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[DatasetsEndpoint[IO]] =
+              timer:                     Timer[IO]): IO[DatasetEndpoint[IO]] =
     for {
       datasetFinder    <- IODatasetFinder(logger = ApplicationLogger)
       renkuResourceUrl <- RenkuResourcesUrl[IO]()
     } yield
-      new DatasetsEndpoint[IO](
+      new DatasetEndpoint[IO](
         datasetFinder,
         renkuResourceUrl,
         ApplicationLogger

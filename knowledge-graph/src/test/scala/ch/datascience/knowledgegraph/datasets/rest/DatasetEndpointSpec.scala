@@ -30,7 +30,7 @@ import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.http.rest.Links
-import ch.datascience.http.rest.Links.{Href, Rel}
+import ch.datascience.http.rest.Links.{Href, Link}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
@@ -49,7 +49,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
 
   "getDataset" should {
 
@@ -67,7 +67,7 @@ class DatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCheckProp
 
         response.as[Dataset].unsafeRunSync shouldBe dataset
         response.as[Json].unsafeRunSync._links shouldBe Right(
-          Links(Rel.Self, Href(renkuResourcesUrl / "datasets" / dataset.id))
+          Links.of(Link self Href(renkuResourcesUrl / "datasets" / dataset.id))
         )
 
         logger.expectNoLogs()
@@ -120,7 +120,7 @@ class DatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCheckProp
     val datasetsFinder    = mock[DatasetFinder[IO]]
     val renkuResourcesUrl = renkuResourcesUrls.generateOne
     val logger            = TestLogger[IO]()
-    val getDataset        = new DatasetsEndpoint[IO](datasetsFinder, renkuResourcesUrl, logger).getDataset _
+    val getDataset        = new DatasetEndpoint[IO](datasetsFinder, renkuResourcesUrl, logger).getDataset _
   }
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]

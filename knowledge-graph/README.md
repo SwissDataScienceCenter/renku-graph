@@ -4,13 +4,14 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method  | Path                                                    | Description                                            |
-|---------|---------------------------------------------------------|--------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets/:id```                     | Returns details of the dataset with the given `id`     |
-|  GET    | ```/knowledge-graph/graphql```                          | Returns GraphQL endpoint schema                        |
-|  POST   | ```/knowledge-graph/graphql```                          | GraphQL query endpoint                                 |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```  | Returns datasets of the project with the given `path`      |
-|  GET    | ```/ping```                                             | To check if service is healthy                         |
+| Method  | Path                                                      | Description                                                     |
+|---------|-----------------------------------------------------------|-----------------------------------------------------------------|
+|  GET    | ```/knowledge-graph/datasets/:id```                       | Returns details of the dataset with the given `id`              |
+|  GET    | ```/knowledge-graph/graphql```                            | Returns GraphQL endpoint schema                                 |
+|  POST   | ```/knowledge-graph/graphql```                            | GraphQL query endpoint                                          |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name```          | Returns details of the project with the given `namespace/name`  |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets``` | Returns datasets of the project with the given `namespace/name` |
+|  GET    | ```/ping```                                               | To check if service is healthy                                  |
 
 #### GET /knowledge-graph/datasets/:id
 
@@ -286,6 +287,43 @@ In case there's no data found for a given query, the response `json` will contai
   "data": {
     "datasets": null
   }
+}
+```
+
+#### GET /knowledge-graph/projects/:namespace/:name
+
+Finds details of the project with the given `namespace/name`.
+
+**Response**
+
+| Status                     | Description                                             |
+|----------------------------|---------------------------------------------------------|
+| OK (200)                   | If project with the given `namespace/name` can be found |
+| NOT_FOUND (404)            | If there is no project with the given `namespace/name`  |
+| INTERNAL SERVER ERROR (500)| Otherwise                                               |
+
+Response body example:
+```
+{
+  "path": "namespace/project-name", 
+  "name": "Some project name",
+  "created": {
+    "dateCreated": "2001-09-05T10:48:29.457Z",
+    "creator": {
+      "name": "author name",
+      "email": "author@mail.org"
+    }
+  },
+  "_links":[  
+     {  
+        "rel":"self",
+        "href":"http://t:5511/projects/namespace/project-name"
+     },
+     {  
+        "rel":"datasets",
+        "href":"http://t:5511/projects/namespace/project-name/datasets"
+     }
+  ]
 }
 ```
 

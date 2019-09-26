@@ -18,6 +18,7 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
+import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
@@ -25,7 +26,6 @@ import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
-import io.circe.DecodingFailure
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -34,13 +34,16 @@ private class BaseDetailsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+)(implicit executionContext: ExecutionContext,
+  contextShift:              ContextShift[IO],
+  timer:                     Timer[IO],
+  ME:                        MonadError[IO, Throwable])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger) {
 
   import BaseDetailsFinder._
 
   def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
-    queryExpecting[Option[Dataset]](using = query(identifier))
+    queryExpecting[List[Dataset]](using = query(identifier)) flatMap toSingleDataset
 
   private def query(identifier: Identifier): String =
     s"""
@@ -63,12 +66,18 @@ private class BaseDetailsFinder(
        |  OPTIONAL { ?dataset schema:description ?description } .         
        |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .         
        |}""".stripMargin
+
+  private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
+    case Nil            => ME.pure(None)
+    case dataset +: Nil => ME.pure(Some(dataset))
+    case datasets       => ME.raiseError(new RuntimeException(s"More than one dataset with ${datasets.head.id} id"))
+  }
 }
 
 private object BaseDetailsFinder {
   import io.circe.Decoder
 
-  private[rest] implicit val maybeRecordDecoder: Decoder[Option[Dataset]] = {
+  private[rest] implicit val maybeRecordDecoder: Decoder[List[Dataset]] = {
     import Decoder._
     import ch.datascience.graph.model.datasets._
     import ch.datascience.graph.model.users.{Email, Name => UserName}
@@ -101,10 +110,6 @@ private object BaseDetailsFinder {
         )
     }
 
-    _.downField("results").downField("bindings").as(decodeList(dataset)).flatMap {
-      case Nil            => Right(None)
-      case dataset +: Nil => Right(Some(dataset))
-      case manyDatasets   => Left(DecodingFailure(s"More than one dataset with ${manyDatasets.head.id} id", Nil))
-    }
+    _.downField("results").downField("bindings").as(decodeList(dataset))
   }
 }

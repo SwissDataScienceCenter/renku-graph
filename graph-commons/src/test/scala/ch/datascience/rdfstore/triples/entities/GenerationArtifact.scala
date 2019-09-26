@@ -19,8 +19,8 @@
 package ch.datascience.rdfstore.triples
 package entities
 
+import ch.datascience.graph.model.FilePath
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import io.circe.Json
 import io.circe.literal._

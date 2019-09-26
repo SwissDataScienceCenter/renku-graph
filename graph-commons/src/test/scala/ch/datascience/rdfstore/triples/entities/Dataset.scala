@@ -19,9 +19,9 @@
 package ch.datascience.rdfstore.triples
 package entities
 
+import ch.datascience.graph.model.FilePath
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
@@ -36,7 +36,7 @@ private[triples] object Dataset {
       projectId:                 Project.Id,
       datasetName:               Name,
       maybeDatasetDescription:   Option[Description],
-      datasetCreatedDate:        DateCreated,
+      datasetDateCreated:        DateCreated,
       maybeDatasetPublishedDate: Option[PublishedDate],
       maybeDatasetCreators:      Set[(UserName, Option[Email])],
       maybeDatasetParts:         List[(PartName, PartLocation, PartDateCreated)],
@@ -59,7 +59,7 @@ private[triples] object Dataset {
     "rdfs:label": ${id.datasetId},
     "schema:identifier": ${id.datasetId},
     "schema:name": $datasetName,
-    "schema:dateCreated": $datasetCreatedDate
+    "schema:dateCreated": $datasetDateCreated
   }"""
     .deepMerge(`schema:isPartOf`(projectId))
     .deepMerge(maybeDatasetUrl to "schema:url")

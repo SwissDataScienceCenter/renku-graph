@@ -37,6 +37,7 @@ object Links {
 
   def apply(link: (Rel, Href)): Links = Links(NonEmptyList.of(Link(link)))
   def of(link:    Link, other: Link*): Links = Links(NonEmptyList.of(link, other: _*))
+  def of(link:    (Rel, Href), other: (Rel, Href)*): Links = Links(NonEmptyList.of(link, other: _*).map(Link.apply))
 
   def self(href: Href) = Links(NonEmptyList.of(Link.self(href)))
 

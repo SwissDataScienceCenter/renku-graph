@@ -70,8 +70,10 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
       loadToStore(
         triples(
           singleFileAndCommit(project1, project1Commit1NoAgent.toCommitId, maybeSchemaVersion = None),
-          singleFileAndCommit(project1, project1Commit2Outdated.toCommitId, Some(schemaVersions.generateOne)),
-          singleFileAndCommit(project1, project1Commit3UpToDate.toCommitId, Some(schemaVersion))
+          singleFileAndCommit(project1,
+                              project1Commit2Outdated.toCommitId,
+                              maybeSchemaVersion                                               = Some(schemaVersions.generateOne)),
+          singleFileAndCommit(project1, project1Commit3UpToDate.toCommitId, maybeSchemaVersion = Some(schemaVersion))
         )
       )
 
@@ -88,7 +90,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       loadToStore(
         triples(
-          singleFileAndCommit(project, projectCommitUpToDate.toCommitId, Some(schemaVersion))
+          singleFileAndCommit(project, projectCommitUpToDate.toCommitId, maybeSchemaVersion = Some(schemaVersion))
         )
       )
 

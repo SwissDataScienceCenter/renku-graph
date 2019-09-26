@@ -16,26 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.graph.model
 
-import ch.datascience.graph.model.FilePath
-import ch.datascience.graph.model.events.CommitId
-import io.circe.Json
-import io.circe.literal._
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.{RelativePath, RelativePathOps}
 
-private[triples] object CommitGeneration {
-
-  def apply(id: Id, commitActivityId: CommitActivity.Id): Json = json"""
-  {
-    "@id": $id,
-    "@type": "prov:Generation",
-    "prov:activity": {
-      "@id": $commitActivityId
-    }
-  }"""
-
-  final case class Id(commitId: CommitId, filePath: FilePath) extends EntityId {
-    override val value: String = s"file:///commit/$commitId/$filePath"
-  }
-}
+final class FilePath private (val value: String) extends AnyVal with StringTinyType
+object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]

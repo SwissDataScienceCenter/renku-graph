@@ -65,31 +65,31 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       val jsonLDTriples = triples(
         singleFileAndCommitWithDataset(
           project.path,
-          dataset1CommitId,
-          dataset1.created.agent.name,
-          dataset1.created.agent.email,
-          dataset1.id,
-          dataset1.name,
-          dataset1.maybeDescription,
-          dataset1.created.date,
-          dataset1.published.maybeDate,
-          dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-          schemaVersion = currentSchemaVersion
+          commitId                  = dataset1CommitId,
+          committerName             = dataset1.created.agent.name,
+          committerEmail            = dataset1.created.agent.email,
+          datasetIdentifier         = dataset1.id,
+          datasetName               = dataset1.name,
+          maybeDatasetDescription   = dataset1.maybeDescription,
+          datasetCreatedDate        = dataset1.created.date,
+          maybeDatasetPublishedDate = dataset1.published.maybeDate,
+          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          schemaVersion             = currentSchemaVersion
         ),
         singleFileAndCommitWithDataset(
           project.path,
-          dataset2CommitId,
-          dataset2.created.agent.name,
-          dataset2.created.agent.email,
-          dataset2.id,
-          dataset2.name,
-          dataset2.maybeDescription,
-          dataset2.created.date,
-          dataset2.published.maybeDate,
-          dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-          schemaVersion = currentSchemaVersion
+          commitId                  = dataset2CommitId,
+          committerName             = dataset2.created.agent.name,
+          committerEmail            = dataset2.created.agent.email,
+          datasetIdentifier         = dataset2.id,
+          datasetName               = dataset2.name,
+          maybeDatasetDescription   = dataset2.maybeDescription,
+          datasetCreatedDate        = dataset2.created.date,
+          maybeDatasetPublishedDate = dataset2.published.maybeDate,
+          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          schemaVersion             = currentSchemaVersion
         )
       )
 

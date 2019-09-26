@@ -18,26 +18,35 @@
 
 package ch.datascience.rdfstore.triples
 
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames}
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
+import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.triples.entities._
 import io.circe.Json
+import org.scalacheck.Gen
 
 object singleFileAndCommit {
 
   def apply(projectPath:        ProjectPath,
             commitId:           CommitId,
-            maybeSchemaVersion: Option[SchemaVersion],
-            renkuBaseUrl:       RenkuBaseUrl = renkuBaseUrl): List[Json] = {
-    val filePath           = FilePath("README.md")
-    val generationPath     = FilePath("tree") / filePath
-    val projectId          = Project.Id(renkuBaseUrl, projectPath)
-    val commitGenerationId = CommitGeneration.Id(commitId, generationPath)
-    val commitActivityId   = CommitActivity.Id(commitId)
+            projectName:        projects.Name = projectNames.generateOne,
+            projectDateCreated: projects.DateCreated = projectCreatedDates.generateOne,
+            projectCreator:     (users.Name, Email) = names.generateOne -> emails.generateOne,
+            maybeSchemaVersion: Option[SchemaVersion] = Gen.option(schemaVersions).generateOne): List[Json] = {
+    val filePath                                  = FilePath("README.md")
+    val generationPath                            = FilePath("tree") / filePath
+    val projectId                                 = Project.Id(renkuBaseUrl, projectPath)
+    val (projectCreatorName, projectCreatorEmail) = projectCreator
+    val projectCreatorId                          = Person.Id(projectCreatorName)
+    val commitGenerationId                        = CommitGeneration.Id(commitId, generationPath)
+    val commitActivityId                          = CommitActivity.Id(commitId)
     List(
-      Project(projectId),
+      Project(projectId, projectName, projectDateCreated, projectCreatorId),
+      Person(projectCreatorId, Some(projectCreatorEmail)),
       CommitEntity(CommitEntity.Id(commitId, filePath), projectId, commitGenerationId),
       CommitActivity(commitActivityId,
                      projectId,

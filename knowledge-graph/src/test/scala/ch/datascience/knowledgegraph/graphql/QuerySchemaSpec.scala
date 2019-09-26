@@ -20,8 +20,9 @@ package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.FilePath
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators
 import ch.datascience.knowledgegraph.datasets.graphql.ProjectDatasetsFinder
 import ch.datascience.knowledgegraph.datasets.model._

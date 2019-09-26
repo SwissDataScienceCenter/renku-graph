@@ -40,10 +40,12 @@ import org.scalatest.concurrent.Eventually
 object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
 
   def `data in the RDF store`(project: Project, commitId: CommitId, schemaVersion: SchemaVersion): Assertion =
-    `data in the RDF store`(project,
-                            commitId,
-                            triples(singleFileAndCommit(project.path, commitId, Some(schemaVersion))),
-                            schemaVersion)
+    `data in the RDF store`(
+      project,
+      commitId,
+      triples(singleFileAndCommit(project.path, commitId, maybeSchemaVersion = Some(schemaVersion))),
+      schemaVersion
+    )
 
   def `data in the RDF store`(project:       Project,
                               commitId:      CommitId,

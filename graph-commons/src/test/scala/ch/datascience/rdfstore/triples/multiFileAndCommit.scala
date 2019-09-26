@@ -18,16 +18,19 @@
 
 package ch.datascience.rdfstore.triples
 
-import ch.datascience.generators.CommonGraphGenerators.schemaVersions
+import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
+import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.triples.entities._
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
 import io.circe.Json
+import org.scalacheck.Gen
 
 object multiFileAndCommit {
 
@@ -75,13 +78,20 @@ object multiFileAndCommit {
   val `commit4-result-file2`: Resource      = resource(commit4File2GenerationId,        label = s"${commit4File2GenerationId.filePath}@$commit4Id")
   // format: on
 
-  def apply(projectPath: ProjectPath, schemaVersion: SchemaVersion = schemaVersions.generateOne): List[Json] = {
-    val projectId = Project.Id(renkuBaseUrl, projectPath)
-    val agentId   = Agent.Id(schemaVersion)
+  def apply(projectPath:        ProjectPath,
+            projectName:        projects.Name = projectNames.generateOne,
+            projectDateCreated: projects.DateCreated = projectCreatedDates.generateOne,
+            projectCreator:     (users.Name, Option[Email]) = names.generateOne -> Gen.option(emails).generateOne,
+            schemaVersion:      SchemaVersion = schemaVersions.generateOne): List[Json] = {
+    val agentId                                        = Agent.Id(schemaVersion)
+    val projectId                                      = Project.Id(renkuBaseUrl, projectPath)
+    val (projectCreatorName, maybeProjectCreatorEmail) = projectCreator
+    val projectCreatorId                               = Person.Id(projectCreatorName)
     // format: off
     List(
-      Project(projectId),
+      Project(projectId, projectName, projectDateCreated, projectCreatorId),
       Agent(schemaVersion),
+      Person(projectCreatorId, maybeProjectCreatorEmail),
       
       CommitActivity(commit1ActivityId, projectId, Some(agentId), comment = "renku dataset add zhbikes external.csv"),
       GenerationActivity(commit1Id, FilePath("tree/input-data/external.csv"), commit1ActivityId),

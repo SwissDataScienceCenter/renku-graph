@@ -47,10 +47,12 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
 
       loadToStore(
         triples(
-          singleFileAndCommit(project1, project1Commit1NoAgent.toCommitId, None),
-          singleFileAndCommit(project1, project1Commit2Outdated.toCommitId, None),
-          singleFileAndCommit(project1, project1Commit3UpToDate.toCommitId, Some(schemaVersions.generateOne)),
-          singleFileAndCommit(project2, project2OutdatedCommit.toCommitId, None)
+          singleFileAndCommit(project1, project1Commit1NoAgent.toCommitId, maybeSchemaVersion  = None),
+          singleFileAndCommit(project1, project1Commit2Outdated.toCommitId, maybeSchemaVersion = None),
+          singleFileAndCommit(project1,
+                              project1Commit3UpToDate.toCommitId,
+                              maybeSchemaVersion                                              = Some(schemaVersions.generateOne)),
+          singleFileAndCommit(project2, project2OutdatedCommit.toCommitId, maybeSchemaVersion = None)
         )
       )
 
@@ -77,10 +79,10 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
       loadToStore(
         triples(
           singleFileAndCommitWithDataset(project,
-                                         projectCommitOutdated.toCommitId,
+                                         commitId      = projectCommitOutdated.toCommitId,
                                          schemaVersion = schemaVersions.generateOne),
           singleFileAndCommitWithDataset(project,
-                                         projectCommitUpToDate.toCommitId,
+                                         commitId      = projectCommitUpToDate.toCommitId,
                                          schemaVersion = schemaVersions.generateOne)
         )
       )
@@ -108,7 +110,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
       loadToStore(
         triples(
           singleFileAndCommitWithDataset(project,
-                                         projectCommitOutdated.toCommitId,
+                                         commitId      = projectCommitOutdated.toCommitId,
                                          schemaVersion = outdatedSchemaVersion)
         )
       )
@@ -138,10 +140,10 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
       loadToStore(
         triples(
           singleFileAndCommitWithDataset(project1,
-                                         project1OutdatedCommit.toCommitId,
+                                         commitId      = project1OutdatedCommit.toCommitId,
                                          schemaVersion = outdatedSchemaVersion),
           singleFileAndCommitWithDataset(project2,
-                                         project2OutdatedCommit.toCommitId,
+                                         commitId      = project2OutdatedCommit.toCommitId,
                                          schemaVersion = outdatedSchemaVersion)
         )
       )
