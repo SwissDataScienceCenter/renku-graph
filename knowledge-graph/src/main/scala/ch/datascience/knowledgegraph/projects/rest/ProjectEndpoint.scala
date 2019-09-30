@@ -55,7 +55,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
   private def toHttpResult(
       path: ProjectPath
   ): Option[Project] => Interpretation[Response[Interpretation]] = {
-    case None          => NotFound(InfoMessage(s"No project with '$path' found"))
+    case None          => NotFound(InfoMessage(s"No '$path' project found"))
     case Some(project) => Ok(project.asJson)
   }
 
@@ -63,7 +63,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       path: ProjectPath
   ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding project with '$path' failed")
+      val errorMessage = ErrorMessage(s"Finding '$path' project failed")
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }

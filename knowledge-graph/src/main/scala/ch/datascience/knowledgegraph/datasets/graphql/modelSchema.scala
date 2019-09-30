@@ -96,6 +96,7 @@ object modelSchema {
     name        = "datasetProject",
     description = "A project where this dataset is used",
     fields = fields[Unit, DatasetProject](
+      Field("path", StringType, Some("Project path"), resolve = _.value.path.toString),
       Field("name", StringType, Some("Project name"), resolve = _.value.name.toString)
     )
   )

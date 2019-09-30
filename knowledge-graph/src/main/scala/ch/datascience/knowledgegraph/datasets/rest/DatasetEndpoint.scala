@@ -24,6 +24,7 @@ import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.ApplicationLogger
@@ -116,8 +117,11 @@ class DatasetEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
+      "path": ${project.path},
       "name": ${project.name}
-    }"""
+    }""" deepMerge _links(
+      Link(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / project.path))
+    )
   }
 }
 

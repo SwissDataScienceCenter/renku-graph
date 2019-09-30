@@ -70,10 +70,24 @@ Response body example:
   ],
   "isPartOf" : [
     {
-      "name" : "namespace1/project1-name"
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
+        }
+      ],
+      "path" : "namespace1/project1-name"
+      "name" : "project1 name"
     },
     {
-      "name" : "namespace2/project2-name"
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace2/project2-name"
+        }
+      ],
+      "path" : "namespace2/project2-name"
+      "name" : "project2 name"
     }
   ]
 }
@@ -181,6 +195,7 @@ Query example:
         dateCreated!
       }
       isPartOf {
+        path
         name
       }
     } 
@@ -210,7 +225,8 @@ Response body example:
         },
         "hasPart": [],
         "isPartOf": [{
-          "name": "namespace/project"
+          "path": "namespace/project",
+          "name": "project name"
         }]
       },
       {
@@ -237,7 +253,8 @@ Response body example:
           "dateCreated": "1991-09-05T10:38:29.457Z"
         }],
         "isPartOf": [{
-          "name": "namespace/project"
+          "path": "namespace/project",
+          "name": "project name"
         }]
       },
       {
@@ -271,9 +288,11 @@ Response body example:
           "dateCreated": "2001-09-05T10:48:29.457Z"
         }],
         "isPartOf": [{
-          "name": "namespace/project1"
+          "name": "namespace/project1",
+          "name": "project1 name"
         }, {
-          "name": "namespace/project2"
+          "name": "namespace/project2",
+          "name": "project2 name"
         }]
       }
     ]

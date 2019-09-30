@@ -43,6 +43,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import cats.MonadError
 import cats.data.Validated
 import cats.effect._
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
@@ -54,7 +55,6 @@ import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 import org.apache.jena.riot.{Lang, RDFDataMgr}
 import org.http4s.Uri
-import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
 
@@ -72,9 +72,10 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected implicit val timer: Timer[IO]                 = IO.timer(global)
   protected val context:        MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-  private val fusekiServerPort = Gen.oneOf(shuffle((3000 to 3200).toList)).retryUntil(portAvailable).generateOne
+  private val fusekiServerPort = (shuffle((3000 to 3500).toList) find notUsedPort)
+    .getOrElse(throw new Exception("Cannot find not used port for Fuseki"))
 
-  private lazy val portAvailable: Int => Boolean = { port =>
+  private lazy val notUsedPort: Int => Boolean = { port =>
     Validated
       .catchOnly[SocketException] { new ServerSocket(port).close() }
       .isValid
@@ -96,8 +97,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     .fromString(s"$fusekiBaseUrl/$datasetName/sparql")
     .fold(throw _, identity)
 
-  private val rdfConnectionResource: Resource[IO, RDFConnection] = Resource
-    .make(openConnection)(connection => IO(connection.close()))
+  private val rdfConnectionResource: Resource[IO, RDFConnection] =
+    Resource.make(openConnection)(connection => IO(connection.close()))
 
   private def openConnection: IO[RDFConnection] = IO {
     RDFConnectionFuseki
@@ -108,7 +109,12 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    rdfStoreServer.start()
+    IO(rdfStoreServer.start())
+      .recover {
+        case exception =>
+          throw new IllegalStateException(s"Cannot start fuseki on $fusekiBaseUrl", exception)
+      }
+      .unsafeRunSync()
     ()
   }
 

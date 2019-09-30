@@ -68,6 +68,7 @@ object DatasetsGenerators {
   } yield DatasetPart(name, location, dateCreated)
 
   implicit lazy val datasetProjects: Gen[DatasetProject] = for {
-    name <- projectPaths
-  } yield DatasetProject(name)
+    path <- projectPaths
+    name <- projectNames
+  } yield DatasetProject(path, name)
 }

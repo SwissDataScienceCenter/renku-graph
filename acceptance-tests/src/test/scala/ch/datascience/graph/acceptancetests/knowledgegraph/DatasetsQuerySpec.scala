@@ -43,18 +43,19 @@ import sangria.macros._
 
 class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
-  private val project          = projects.generateOne.copy(path = ProjectPath("namespace/project"))
+  private val project          = projects.generateOne.copy(path = ProjectPath("namespace/datasets-project"))
+  private val projectName      = projectNames.generateOne
   private val dataset1CommitId = commitIds.generateOne
   private val dataset1 = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-    project          = List(DatasetProject(project.path))
+    project          = List(DatasetProject(project.path, projectName))
   )
   private val dataset2CommitId = commitIds.generateOne
   private val dataset2 = datasets.generateOne.copy(
     maybeDescription = None,
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = None),
-    project          = List(DatasetProject(project.path))
+    project          = List(DatasetProject(project.path, projectName))
   )
 
   feature("GraphQL query to find project's datasets") {
@@ -65,6 +66,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       val jsonLDTriples = triples(
         singleFileAndCommitWithDataset(
           project.path,
+          projectName,
           commitId                  = dataset1CommitId,
           committerName             = dataset1.created.agent.name,
           committerEmail            = dataset1.created.agent.email,
@@ -79,6 +81,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         ),
         singleFileAndCommitWithDataset(
           project.path,
+          projectName,
           commitId                  = dataset2CommitId,
           committerName             = dataset2.created.agent.name,
           committerEmail            = dataset2.created.agent.email,
@@ -155,14 +158,14 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
 
   private val query: Document = graphql"""
     {
-      datasets(projectPath: "namespace/project") {
+      datasets(projectPath: "namespace/datasets-project") {
         identifier
         name
         description
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
         hasPart { name atLocation dateCreated }
-        isPartOf { name }
+        isPartOf { path name }
       }
     }"""
 
@@ -175,7 +178,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
         hasPart { name atLocation dateCreated }
-        isPartOf { name }
+        isPartOf { path name }
       }
     }"""
 
@@ -218,6 +221,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
 
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
+        "path": ${project.path},
         "name": ${project.name}
       }"""
   }

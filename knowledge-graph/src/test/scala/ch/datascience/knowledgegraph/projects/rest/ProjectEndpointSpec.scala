@@ -90,7 +90,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No project with '$path' found").asJson
+      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No '$path' project found").asJson
 
       logger.expectNoLogs()
     }
@@ -109,9 +109,9 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(s"Finding project with '$path' failed").asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(s"Finding '$path' project failed").asJson
 
-      logger.loggedOnly(Error(s"Finding project with '$path' failed", exception))
+      logger.loggedOnly(Error(s"Finding '$path' project failed", exception))
     }
   }
 
@@ -126,7 +126,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit val projectEntityDecoder: EntityDecoder[IO, Project] = jsonOf[IO, Project]
 
-  private implicit lazy val datasetDecoder: Decoder[Project] = (cursor: HCursor) =>
+  private implicit lazy val projectDecoder: Decoder[Project] = (cursor: HCursor) =>
     for {
       path    <- cursor.downField("path").as[ProjectPath]
       name    <- cursor.downField("name").as[Name]

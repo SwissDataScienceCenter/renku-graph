@@ -22,6 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -53,25 +54,34 @@ private class ProjectsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT DISTINCT ?isPartOf
+       |SELECT DISTINCT ?isPartOf ?name
        |WHERE {
        |  {
-       |    SELECT ?dataset
+       |    SELECT DISTINCT ?isPartOf
        |    WHERE {
-       |      ?dataset rdf:type <http://schema.org/Dataset> ;
-       |               rdfs:label "$identifier" .
+       |      {
+       |        SELECT ?dataset
+       |        WHERE {
+       |          ?dataset rdf:type <http://schema.org/Dataset> ;
+       |                   rdfs:label "$identifier" .
+       |        }
+       |      }
+       |      {
+       |        ?dataset dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |      } UNION {
+       |        ?dataset schema:url ?datasetUrl .
+       |        ?otherDataset rdf:type <http://schema.org/Dataset> ;
+       |                      schema:url ?datasetUrl ;
+       |                      dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |      }
        |    }
        |  }
        |  {
-       |    ?dataset dcterms:isPartOf|schema:isPartOf ?isPartOf .
-       |  } UNION {
-       |    ?dataset schema:url ?datasetUrl .
-       |    ?otherDataset rdf:type <http://schema.org/Dataset> ;
-       |                  schema:url ?datasetUrl ;
-       |                  dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |    ?isPartOf rdf:type <http://schema.org/Project> ;
+       |              schema:name ?name .
        |  }
        |}
-       |ORDER BY ASC(?isPartOf)
+       |ORDER BY ASC(?name)
        |""".stripMargin
 }
 
@@ -82,7 +92,7 @@ private object ProjectsFinder {
   private implicit val projectsDecoder: Decoder[List[DatasetProject]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    def toProjectName(projectPath: FullProjectPath) =
+    def toProjectPath(projectPath: FullProjectPath) =
       projectPath
         .to[Try, ProjectPath]
         .toEither
@@ -90,8 +100,9 @@ private object ProjectsFinder {
 
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
-        name <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectName)
-      } yield DatasetProject(name)
+        path <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectPath)
+        name <- cursor.downField("name").downField("value").as[projects.Name]
+      } yield DatasetProject(path, name)
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetProject])

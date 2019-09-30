@@ -20,6 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.IO
+import cats.implicits._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
@@ -27,10 +28,12 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.http.rest.Links
-import ch.datascience.http.rest.Links.{Href, Link}
+import ch.datascience.http.rest.Links.{Href, Rel}
+import ch.datascience.http.rest.Links.Rel.Self
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
@@ -39,7 +42,7 @@ import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder._
 import io.circe.syntax._
-import io.circe.{Decoder, HCursor, Json}
+import io.circe._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.circe.jsonOf
@@ -48,6 +51,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import scala.util.Try
 
 class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
 
@@ -67,8 +72,16 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
         response.as[Dataset].unsafeRunSync shouldBe dataset
         response.as[Json].unsafeRunSync._links shouldBe Right(
-          Links.of(Link self Href(renkuResourcesUrl / "datasets" / dataset.id))
+          Links.of(Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
         )
+        val Right(projectsLinks) = response.as[Json].unsafeRunSync.hcursor.downField("isPartOf").as[List[Json]]
+        projectsLinks should have size dataset.project.size
+        projectsLinks.foreach { json =>
+          (json.hcursor.downField("path").as[ProjectPath], json._links) mapN {
+            case (path, links) =>
+              links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
+          }
+        }
 
         logger.expectNoLogs()
       }
@@ -164,6 +177,7 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val datasetProjectDecoder: Decoder[DatasetProject] = (cursor: HCursor) =>
     for {
-      name <- cursor.downField("name").as[ProjectPath]
-    } yield DatasetProject(name)
+      path <- cursor.downField("path").as[ProjectPath]
+      name <- cursor.downField("name").as[projects.Name]
+    } yield DatasetProject(path, name)
 }

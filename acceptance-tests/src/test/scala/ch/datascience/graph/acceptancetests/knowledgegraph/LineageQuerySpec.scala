@@ -39,7 +39,7 @@ import sangria.macros._
 
 class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
-  private val project  = projects.generateOne.copy(path = ProjectPath("namespace/project"))
+  private val project  = projects.generateOne.copy(path = ProjectPath("namespace/lineage-project"))
   private val commitId = CommitId("0000001")
 
   feature("GraphQL query to find lineage") {
@@ -68,7 +68,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       val response = knowledgeGraphClient.POST(
         namedLineageQuery,
         variables = Map(
-          "projectPath" -> "namespace/project",
+          "projectPath" -> "namespace/lineage-project",
           "commitId"    -> "0000004",
           "filePath"    -> "result-file-1"
         )
@@ -85,7 +85,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private val lineageQuery: Document = graphql"""
     {
-      lineage(projectPath: "namespace/project", commitId: "0000004", filePath: "result-file-1") {
+      lineage(projectPath: "namespace/lineage-project", commitId: "0000004", filePath: "result-file-1") {
         nodes {
           id
           label

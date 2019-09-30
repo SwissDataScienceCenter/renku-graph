@@ -43,8 +43,8 @@ class IODatasetFinderSpec
   "findDataset" should {
 
     "return the details of the dataset with the given id" in new InMemoryStoreTestCase {
-      forAll(projectPaths, datasets) { (projectPath, dataset1) =>
-        val otherProject = projectPaths.generateOne
+      forAll(datasetProjects, datasets) { (project, dataset1) =>
+        val otherProject = datasetProjects.generateOne
         val reusedDatasetUrl = (for {
           url  <- httpUrls
           uuid <- Gen.uuid
@@ -52,12 +52,16 @@ class IODatasetFinderSpec
 
         loadToStore(
           triples(
-            singleFileAndCommitWithDataset(otherProject,
-                                           datasetIdentifier = datasetIds.generateOne,
-                                           datasetName       = datasetNames.generateOne,
-                                           maybeDatasetUrl   = Some(reusedDatasetUrl)),
             singleFileAndCommitWithDataset(
-              projectPath,
+              otherProject.path,
+              otherProject.name,
+              datasetIdentifier = datasetIds.generateOne,
+              datasetName       = datasetNames.generateOne,
+              maybeDatasetUrl   = Some(reusedDatasetUrl)
+            ),
+            singleFileAndCommitWithDataset(
+              project.path,
+              project.name,
               committerName             = dataset1.created.agent.name,
               committerEmail            = dataset1.created.agent.email,
               datasetIdentifier         = dataset1.id,
@@ -69,13 +73,15 @@ class IODatasetFinderSpec
               maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
               maybeDatasetUrl           = Some(reusedDatasetUrl)
             ),
-            singleFileAndCommitWithDataset(projectPath)
+            singleFileAndCommitWithDataset(project.path, project.name)
           )
         )
 
         datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
-          dataset1.copy(part    = dataset1.part.sorted,
-                        project = List(DatasetProject(projectPath), DatasetProject(otherProject)).sorted)
+          dataset1.copy(
+            part    = dataset1.part.sorted,
+            project = List(project, otherProject).sorted
+          )
         )
       }
     }

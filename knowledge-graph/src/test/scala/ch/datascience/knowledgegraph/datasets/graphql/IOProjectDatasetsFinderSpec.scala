@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasets
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{DatasetPart, DatasetProject}
 import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}
 import ch.datascience.rdfstore.InMemoryRdfStore
@@ -43,8 +43,8 @@ class IOProjectDatasetsFinderSpec
   "findDatasets" should {
 
     "return all datasets of the given project" in new InMemoryStoreTestCase {
-      forAll(projectPaths, datasets, datasets) { (projectPath, dataset1, dataset2) =>
-        val otherProject = projectPaths.generateOne
+      forAll(datasetProjects, datasets, datasets) { (project, dataset1, dataset2) =>
+        val otherProject = datasetProjects.generateOne
         val reusedDatasetUrl = (for {
           url  <- httpUrls
           uuid <- Gen.uuid
@@ -52,12 +52,16 @@ class IOProjectDatasetsFinderSpec
 
         loadToStore(
           triples(
-            singleFileAndCommitWithDataset(otherProject,
-                                           datasetIdentifier = datasetIds.generateOne,
-                                           datasetName       = datasetNames.generateOne,
-                                           maybeDatasetUrl   = Some(reusedDatasetUrl)),
             singleFileAndCommitWithDataset(
-              projectPath,
+              otherProject.path,
+              otherProject.name,
+              datasetIdentifier = datasetIds.generateOne,
+              datasetName       = datasetNames.generateOne,
+              maybeDatasetUrl   = Some(reusedDatasetUrl)
+            ),
+            singleFileAndCommitWithDataset(
+              project.path,
+              project.name,
               committerName             = dataset1.created.agent.name,
               committerEmail            = dataset1.created.agent.email,
               datasetIdentifier         = dataset1.id,
@@ -70,7 +74,8 @@ class IOProjectDatasetsFinderSpec
               maybeDatasetUrl           = Some(reusedDatasetUrl),
             ),
             singleFileAndCommitWithDataset(
-              projectPath,
+              project.path,
+              project.name,
               committerName             = dataset2.created.agent.name,
               committerEmail            = dataset2.created.agent.email,
               datasetIdentifier         = dataset2.id,
@@ -84,16 +89,16 @@ class IOProjectDatasetsFinderSpec
           )
         )
 
-        val foundDatasets = datasetsFinder.findDatasets(projectPath).unsafeRunSync()
+        val foundDatasets = datasetsFinder.findDatasets(project.path).unsafeRunSync()
 
         foundDatasets should contain theSameElementsAs List(
           dataset1.copy(
             part    = dataset1.part sorted byPartName,
-            project = List(DatasetProject(projectPath), DatasetProject(otherProject)) sorted byProjectName
+            project = List(project, otherProject) sorted byProjectName
           ),
           dataset2.copy(
             part    = dataset2.part sorted byPartName,
-            project = List(DatasetProject(projectPath)) sorted byProjectName
+            project = List(project) sorted byProjectName
           )
         )
       }

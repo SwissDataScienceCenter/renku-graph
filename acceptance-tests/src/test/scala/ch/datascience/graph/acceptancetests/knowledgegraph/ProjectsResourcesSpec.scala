@@ -21,7 +21,7 @@ package ch.datascience.graph.acceptancetests.knowledgegraph
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
-import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResourcesSpec.briefDatasetJson
+import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResources.briefJson
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
@@ -43,14 +43,14 @@ import org.scalatest.{FeatureSpec, GivenWhenThen}
 
 class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
-  import ProjectsResourcesSpec._
+  import ProjectsResources._
 
   private val project          = projectsGen.generateOne
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-    project          = List(DatasetProject(project.path))
+    project          = List(DatasetProject(project.path, project.name))
   )
 
   feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
@@ -81,19 +81,19 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       val Right(projectDetails) = projectDetailsResponse.bodyAsJson.as[Json]
       projectDetails shouldBe fullJson(project)
 
-      When("user then fetches project's datasets with the link from the response")
+      When("user then fetches project's datasets using the link from the response")
       val datasetsLink     = projectDetails._links.get(Rel("datasets")) getOrFail (message = "No link with rel 'datasets'")
       val datasetsResponse = restClient GET datasetsLink.toString
 
-      Then("he should get OK response with projects datasets")
+      Then("he should get OK response with the projects datasets")
       datasetsResponse.status shouldBe Ok
       val Right(foundDatasets) = datasetsResponse.bodyAsJson.as[List[Json]]
-      foundDatasets should contain theSameElementsAs List(briefDatasetJson(dataset))
+      foundDatasets should contain theSameElementsAs List(briefJson(dataset))
     }
   }
 }
 
-object ProjectsResourcesSpec {
+object ProjectsResources {
 
   def fullJson(project: Project): Json = json"""
     {
