@@ -43,7 +43,6 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
             DatasetPart(
               DatasetPart.Id(commitIds.generateOne, datasetPartLocations.generateOne),
               datasetPartNames.generateOne,
-              datasetPartCreatedDates.generateOne,
               Project.Id(renkuBaseUrl, projectPaths.generateOne)
             ) deepMerge `schema:creator`(`mailto:None`),
             Person(
@@ -70,7 +69,6 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
             DatasetPart(
               DatasetPart.Id(commitIds.generateOne, datasetPartLocations.generateOne),
               datasetPartNames.generateOne,
-              datasetPartCreatedDates.generateOne,
               Project.Id(renkuBaseUrl, projectPaths.generateOne)
             ) deepMerge `schema:creator`(personId.value),
             Person(

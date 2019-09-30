@@ -38,7 +38,7 @@ object model {
   final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])
   final case class DatasetCreator(maybeEmail:   Option[Email], name:             UserName)
 
-  final case class DatasetPart(name: PartName, atLocation: PartLocation, dateCreated: PartDateCreated)
+  final case class DatasetPart(name: PartName, atLocation: PartLocation)
 
   final case class DatasetProject(name: ProjectPath)
 }

@@ -47,9 +47,4 @@ object datasets {
 
   final class PartLocation private (val value: String) extends AnyVal with StringTinyType
   implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath
-
-  final class PartDateCreated private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object PartDateCreated
-      extends TinyTypeFactory[PartDateCreated](new PartDateCreated(_))
-      with InstantNotInTheFuture
 }

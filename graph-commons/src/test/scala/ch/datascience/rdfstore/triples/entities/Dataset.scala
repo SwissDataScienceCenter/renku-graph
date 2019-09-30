@@ -39,7 +39,7 @@ private[triples] object Dataset {
       datasetCreatedDate:        DateCreated,
       maybeDatasetPublishedDate: Option[PublishedDate],
       maybeDatasetCreators:      Set[(UserName, Option[Email])],
-      maybeDatasetParts:         List[(PartName, PartLocation, PartDateCreated)],
+      maybeDatasetParts:         List[(PartName, PartLocation)],
       commitId:                  CommitId,
       maybeDatasetUrl:           Option[String],
       generationPath:            FilePath,
@@ -69,7 +69,7 @@ private[triples] object Dataset {
     .deepMerge(maybeDatasetParts.map(_._2).map(DatasetPart.Id(commitId, _)) toResources "schema:hasPart")
   )
     .++(maybeDatasetCreators.toList.map { case (name, maybeEmail) => Person(Person.Id(name), maybeEmail) })
-    .++(maybeDatasetParts.map { case (name, location, dateCreated) => DatasetPart(DatasetPart.Id(commitId, location), name, dateCreated, projectId) })
+    .++(maybeDatasetParts.map { case (name, location) => DatasetPart(DatasetPart.Id(commitId, location), name, projectId) })
   // format: on
 
   final case class Id(datasetId: Identifier) extends EntityId {

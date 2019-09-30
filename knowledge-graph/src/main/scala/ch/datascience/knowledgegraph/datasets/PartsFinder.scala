@@ -49,15 +49,14 @@ private class PartsFinder(
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
        |
-       |SELECT DISTINCT ?partName ?partLocation ?dateCreated
+       |SELECT DISTINCT ?partName ?partLocation
        |WHERE {
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
        |           rdfs:label "$identifier" ;
        |           schema:hasPart ?partResource .
        |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
        |                schema:name ?partName ;         
-       |                prov:atLocation ?partLocation ;         
-       |                schema:dateCreated ?dateCreated .         
+       |                prov:atLocation ?partLocation .         
        |}
        |ORDER BY ASC(?partName)
        |""".stripMargin
@@ -74,8 +73,7 @@ private object PartsFinder {
       for {
         partName     <- cursor.downField("partName").downField("value").as[PartName]
         partLocation <- cursor.downField("partLocation").downField("value").as[PartLocation]
-        dateCreated  <- cursor.downField("dateCreated").downField("value").as[PartDateCreated]
-      } yield DatasetPart(partName, partLocation, dateCreated)
+      } yield DatasetPart(partName, partLocation)
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetPart])

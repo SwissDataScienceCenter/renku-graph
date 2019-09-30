@@ -43,5 +43,4 @@ object GraphModelGenerators {
     relativePaths(minSegments = 2, maxSegments = 2)
       .map(path => s"data/$path")
       .map(PartLocation.apply)
-  implicit val datasetPartCreatedDates: Gen[PartDateCreated] = timestampsNotInTheFuture map PartDateCreated.apply
 }

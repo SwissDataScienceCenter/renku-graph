@@ -21,7 +21,6 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
@@ -67,7 +66,7 @@ class IODatasetFinderSpec
               datasetCreatedDate        = dataset1.created.date,
               maybeDatasetPublishedDate = dataset1.published.maybeDate,
               maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-              maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+              maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
               maybeDatasetUrl           = Some(reusedDatasetUrl)
             ),
             singleFileAndCommitWithDataset(projectPath)

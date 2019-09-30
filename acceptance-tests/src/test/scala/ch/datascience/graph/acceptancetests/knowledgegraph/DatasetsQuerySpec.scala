@@ -74,7 +74,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
           dataset1.created.date,
           dataset1.published.maybeDate,
           dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          dataset1.part.map(part => (part.name, part.atLocation)),
           schemaVersion = currentSchemaVersion
         ),
         singleFileAndCommitWithDataset(
@@ -88,7 +88,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
           dataset2.created.date,
           dataset2.published.maybeDate,
           dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          dataset2.part.map(part => (part.name, part.atLocation)),
           schemaVersion = currentSchemaVersion
         )
       )
@@ -161,7 +161,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         description
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
-        hasPart { name atLocation dateCreated }
+        hasPart { name atLocation }
         isPartOf { name }
       }
     }"""
@@ -174,7 +174,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         description
         created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
-        hasPart { name atLocation dateCreated }
+        hasPart { name atLocation }
         isPartOf { name }
       }
     }"""
@@ -211,8 +211,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
   private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
     json"""{
         "name": ${part.name},
-        "atLocation": ${part.atLocation},
-        "dateCreated": ${part.dateCreated}
+        "atLocation": ${part.atLocation}
       }"""
   }
 

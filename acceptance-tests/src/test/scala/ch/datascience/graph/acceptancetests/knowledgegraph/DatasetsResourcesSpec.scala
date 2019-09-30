@@ -75,7 +75,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           dataset1.created.date,
           dataset1.published.maybeDate,
           dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          dataset1.part.map(part => (part.name, part.atLocation)),
           schemaVersion = currentSchemaVersion
         ),
         singleFileAndCommitWithDataset(
@@ -89,7 +89,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           dataset2.created.date,
           dataset2.published.maybeDate,
           dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
+          dataset2.part.map(part => (part.name, part.atLocation)),
           schemaVersion = currentSchemaVersion
         )
       )

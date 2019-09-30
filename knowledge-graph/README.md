@@ -58,13 +58,11 @@ Response body example:
   "hasPart" : [
     {
       "name" : "o",
-      "atLocation" : "data/dataset-name/file1",
-      "dateCreated" : "1970-05-11T09:08:19.742Z"
+      "atLocation" : "data/dataset-name/file1"
     },
     {
       "name" : "rldzpwo",
-      "atLocation" : "data/dataset-name/file2",
-      "dateCreated" : "1970-01-31T00:45:58.577Z"
+      "atLocation" : "data/dataset-name/file2"
     }
   ],
   "isPartOf" : [
@@ -177,7 +175,6 @@ Query example:
       hasPart {
         name!
         atLocation!
-        dateCreated!
       }
       isPartOf {
         name
@@ -232,8 +229,7 @@ Response body example:
         },
         "hasPart": [{
           "name": "file1",
-          "atLocation"": "data/dataset-name/file1",
-          "dateCreated": "1991-09-05T10:38:29.457Z"
+          "atLocation"": "data/dataset-name/file1"
         }],
         "isPartOf": [{
           "name": "namespace/project"
@@ -262,12 +258,10 @@ Response body example:
         },
         "hasPart": [{
           "name": "file1",  
-          "atLocation"": "data/chOorWhraw-name/file1",
-          "dateCreated": "2001-09-05T10:38:29.457Z"
+          "atLocation"": "data/chOorWhraw-name/file1"
         }, {
           "name": "file2"  
-          "atLocation"": "data/chOorWhraw-name/file2",
-          "dateCreated": "2001-09-05T10:48:29.457Z"
+          "atLocation"": "data/chOorWhraw-name/file2"
         }],
         "isPartOf": [{
           "name": "namespace/project1"

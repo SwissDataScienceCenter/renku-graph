@@ -86,9 +86,8 @@ object modelSchema {
     name        = "datasetPart",
     description = "The datasets files",
     fields = fields[Unit, DatasetPart](
-      Field("name", StringType, Some("Dataset part name"), resolve                 = _.value.name.toString),
-      Field("atLocation", StringType, Some("Dataset part location"), resolve       = _.value.atLocation.toString),
-      Field("dateCreated", StringType, Some("Dataset part creation date"), resolve = _.value.dateCreated.toString),
+      Field("name", StringType, Some("Dataset part name"), resolve           = _.value.name.toString),
+      Field("atLocation", StringType, Some("Dataset part location"), resolve = _.value.atLocation.toString)
     )
   )
 

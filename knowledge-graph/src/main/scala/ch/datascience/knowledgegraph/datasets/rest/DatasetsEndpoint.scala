@@ -109,8 +109,7 @@ class DatasetsEndpoint[Interpretation[_]: Effect](
   private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
     json"""{
       "name": ${part.name},
-      "atLocation": ${part.atLocation},
-      "dateCreated": ${part.dateCreated}
+      "atLocation": ${part.atLocation}
     }"""
   }
 

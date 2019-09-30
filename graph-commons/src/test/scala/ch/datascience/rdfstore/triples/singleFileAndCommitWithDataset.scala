@@ -45,7 +45,7 @@ object singleFileAndCommitWithDataset {
             datasetCreatedDate:        DateCreated = datasetCreatedDates.generateOne,
             maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
             maybeDatasetCreators:      Set[(UserName, Option[Email])] = setOf(datasetCreators).generateOne,
-            maybeDatasetParts:         List[(PartName, PartLocation, PartDateCreated)] = listOf(datasetParts).generateOne,
+            maybeDatasetParts:         List[(PartName, PartLocation)] = listOf(datasetParts).generateOne,
             maybeDatasetUrl:           Option[String] = Gen.option(datasetUrl).generateOne,
             schemaVersion:             SchemaVersion = schemaVersions.generateOne,
             renkuBaseUrl:              RenkuBaseUrl = renkuBaseUrl): List[Json] = {
@@ -100,11 +100,10 @@ object singleFileAndCommitWithDataset {
     maybeEmail <- Gen.option(emails)
   } yield (name, maybeEmail)
 
-  private val datasetParts: Gen[(PartName, PartLocation, PartDateCreated)] = for {
-    name        <- datasetPartNames
-    location    <- datasetPartLocations
-    dateCreated <- datasetPartCreatedDates
-  } yield (name, location, dateCreated)
+  private val datasetParts: Gen[(PartName, PartLocation)] = for {
+    name     <- datasetPartNames
+    location <- datasetPartLocations
+  } yield (name, location)
 
   private val datasetUrl: Gen[String] = for {
     url  <- httpUrls
