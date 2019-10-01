@@ -35,8 +35,12 @@ spec:
             - name: EVENT_LOG_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
+{{- if .Values.global.graph.dbEventLog.existingSecret }}
+                  name: {{ tpl .Values.global.graph.dbEventLog.existingSecret . }}
+{{- else }}
                   name: {{ template "triplesGenerator.fullname" . }}
-                  key: dbEventLog-postgresPassword
+{{- end }}
+                  key: graph-dbEventLog-postgresPassword
             - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
               value: "{{ .Values.triplesGenerator.dbEventLog.connectionPool }}"
             - name: GITLAB_BASE_URL
