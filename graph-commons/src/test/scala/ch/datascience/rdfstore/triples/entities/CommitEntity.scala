@@ -21,6 +21,7 @@ package entities
 
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import io.circe.Json
 import io.circe.literal._
@@ -45,7 +46,7 @@ private[triples] object CommitEntity {
     "rdfs:label": ${s"${id.filePath}@${id.commitId}"}
   }""".deepMerge(`schema:isPartOf`(projectId))
 
-  final case class Id(commitId: CommitId, filePath: FilePath) extends EntityId {
-    override val value: String = s"file:///blob/$commitId/$filePath"
+  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+    override val value: String = (fusekiBaseUrl / "blob" / commitId / filePath).toString
   }
 }

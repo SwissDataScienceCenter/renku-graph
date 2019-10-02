@@ -21,6 +21,7 @@ package entities
 
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
+import ch.datascience.rdfstore.FusekiBaseUrl
 import io.circe.Json
 import io.circe.literal._
 
@@ -35,7 +36,7 @@ private[triples] object UsageEntity {
     }
   }"""
 
-  final case class Id(commitId: CommitId, filePath: FilePath) extends EntityId {
-    override val value: String = s"file:///commit/$commitId/$filePath"
+  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+    override val value: String = (fusekiBaseUrl / "commit" / commitId / filePath).toString
   }
 }

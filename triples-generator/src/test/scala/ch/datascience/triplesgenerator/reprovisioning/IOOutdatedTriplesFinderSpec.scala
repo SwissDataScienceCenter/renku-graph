@@ -40,9 +40,9 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
       "if there are multiple projects with outdated triples" in new TestCase {
 
       val project1               = projectPaths.generateOne
-      val project1OutdatedCommit = commitIdResources.generateOne
+      val project1OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
       val project2               = projectPaths.generateOne
-      val project2OutdatedCommit = commitIdResources.generateOne
+      val project2OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
@@ -63,9 +63,9 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
     "return all project's commits having triples with no agent or agent with different version in one result" in new TestCase {
 
       val project1                = projectPaths.generateOne
-      val project1Commit1NoAgent  = commitIdResources.generateOne
-      val project1Commit2Outdated = commitIdResources.generateOne
-      val project1Commit3UpToDate = commitIdResources.generateOne
+      val project1Commit1NoAgent  = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val project1Commit2Outdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val project1Commit3UpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
@@ -84,7 +84,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
     "return no results if there's no project with outdated commits" in new TestCase {
 
       val project               = projectPaths.generateOne
-      val projectCommitUpToDate = commitIdResources.generateOne
+      val projectCommitUpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(

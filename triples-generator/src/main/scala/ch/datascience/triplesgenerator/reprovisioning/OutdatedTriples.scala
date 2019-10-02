@@ -31,7 +31,7 @@ final class CommitIdResource private (val value: String) extends AnyVal with Str
 object CommitIdResource extends TinyTypeFactory[CommitIdResource](new CommitIdResource(_)) {
   factory =>
 
-  private val validationRegex = "^file:\\/\\/\\/commit\\/([0-9a-f]{5,40})\\/?.*$".r
+  private val validationRegex = ".*\\/commit\\/([0-9a-f]{5,40})\\/?.*".r
 
   addConstraint(
     check   = validationRegex.findFirstMatchIn(_).isDefined,

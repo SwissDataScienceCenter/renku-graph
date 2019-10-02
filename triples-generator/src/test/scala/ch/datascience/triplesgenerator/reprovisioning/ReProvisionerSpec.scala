@@ -45,8 +45,8 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
   "run" should {
 
     s"recursively find all events having outdated version in the RDF Store and mark them in the Log with the $New status" in new TestCase {
-      val project1OutdatedTriples = outdatedTriplesSets.generateOne
-      val project2OutdatedTriples = outdatedTriplesSets.generateOne
+      val project1OutdatedTriples = outdatedTriplesSets().generateOne
+      val project2OutdatedTriples = outdatedTriplesSets().generateOne
 
       inSequence {
         (eventLogFetch.isEventToProcess _)
@@ -109,7 +109,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(context.pure(false))
 
-        val outdatedTriples = outdatedTriplesSets.generateOne
+        val outdatedTriples = outdatedTriplesSets().generateOne
         (triplesFinder.findOutdatedTriples _)
           .expects()
           .returning(OptionT.liftF(context.pure(outdatedTriples)))
@@ -224,7 +224,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
 
     "do not fail but simply retry if marking events to replay fails" in new TestCase {
       val exception       = exceptions.generateOne
-      val outdatedTriples = outdatedTriplesSets.generateOne
+      val outdatedTriples = outdatedTriplesSets().generateOne
 
       inSequence {
         (eventLogFetch.isEventToProcess _)
@@ -278,7 +278,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
     }
 
     "do not fail but simply retry if removing outdated triples fails" in new TestCase {
-      val outdatedTriples = outdatedTriplesSets.generateOne
+      val outdatedTriples = outdatedTriplesSets().generateOne
       val exception       = exceptions.generateOne
 
       inSequence {

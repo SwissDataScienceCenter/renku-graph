@@ -22,6 +22,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities._
 import io.circe.Json
 
@@ -30,7 +31,7 @@ object singleFileAndCommit {
   def apply(projectPath:        ProjectPath,
             commitId:           CommitId,
             maybeSchemaVersion: Option[SchemaVersion],
-            renkuBaseUrl:       RenkuBaseUrl = renkuBaseUrl): List[Json] = {
+            renkuBaseUrl:       RenkuBaseUrl = renkuBaseUrl)(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
     val filePath           = FilePath("README.md")
     val generationPath     = FilePath("tree") / filePath
     val projectId          = Project.Id(renkuBaseUrl, projectPath)

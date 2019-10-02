@@ -23,6 +23,7 @@ import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.Json
@@ -44,7 +45,7 @@ private[triples] object Dataset {
       maybeDatasetUrl:           Option[String],
       generationPath:            FilePath,
       commitGenerationId:        CommitGeneration.Id
-  ): List[Json] = List(json"""
+  )(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = List(json"""
   {
     "@id": $id,
     "@type": [
@@ -73,6 +74,6 @@ private[triples] object Dataset {
   // format: on
 
   final case class Id(datasetId: Identifier) extends EntityId {
-    override val value: String = s"file:///$datasetId"
+    override val value: String = (renkuBaseUrl / "datasets" / datasetId).toString
   }
 }

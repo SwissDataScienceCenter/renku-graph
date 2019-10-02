@@ -19,6 +19,7 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
+import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -30,10 +31,11 @@ import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
-import ch.datascience.rdfstore.triples.multiFileAndCommit._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+
+import scala.util.Try
 
 class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalServiceStubbing {
 
@@ -41,8 +43,9 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
 
     "return the lineage of the given project for a given commit id and file path" in new InMemoryStoreTestCase {
 
-      loadToStore(triples(multiFileAndCommit(projectPath)))
+      loadToStore(triples(multiFileAndCommit(projectPath, multiFileAndCommitData)))
 
+      import multiFileAndCommitData._
       lineageFinder
         .findLineage(projectPath, commit4Id, resultFile1)
         .unsafeRunSync() shouldBe Some(
@@ -77,15 +80,26 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
 
   private trait InMemoryStoreTestCase {
 
-    val projectPath = ProjectPath("kuba/zurich-bikes")
+    val projectPath            = ProjectPath("kuba/zurich-bikes")
+    val multiFileAndCommitData = multiFileAndCommit.MultiFileAndCommitData()
+    import multiFileAndCommit._
 
-    def sourceNode(node: Resource): SourceNode = SourceNode(NodeId(node.name.value), NodeLabel(node.label.value))
-    def targetNode(node: Resource): TargetNode = TargetNode(NodeId(node.name.value), NodeLabel(node.label.value))
-    def node(node:       Resource): Node       = sourceNode(node)
+    def sourceNode(node: Resource): SourceNode = SourceNode(
+      node.name.to[Try, NodeId].fold(throw _, identity),
+      NodeLabel(node.label.value)
+    )
+    def targetNode(node: Resource): TargetNode = TargetNode(
+      node.name.to[Try, NodeId].fold(throw _, identity),
+      NodeLabel(node.label.value)
+    )
+    def node(node: Resource): Node = sourceNode(node)
 
     val lineageFinder = new IOLineageFinder(rdfStoreConfig,
                                             renkuBaseUrl,
                                             TestExecutionTimeRecorder[IO](elapsedTimes.generateOne),
                                             TestLogger())
+
+    private implicit val resourceNameToNodeId: ResourceName => Either[Exception, NodeId] =
+      name => NodeId.from(name.value.replace(fusekiBaseUrl.value, ""))
   }
 }

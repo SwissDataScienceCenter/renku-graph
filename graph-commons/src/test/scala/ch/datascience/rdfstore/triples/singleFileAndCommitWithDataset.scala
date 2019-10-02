@@ -29,6 +29,7 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
 import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities._
 import io.circe.Json
 import org.scalacheck.Gen
@@ -48,7 +49,7 @@ object singleFileAndCommitWithDataset {
             maybeDatasetParts:         List[(PartName, PartLocation)] = listOf(datasetParts).generateOne,
             maybeDatasetUrl:           Option[String] = Gen.option(datasetUrl).generateOne,
             schemaVersion:             SchemaVersion = schemaVersions.generateOne,
-            renkuBaseUrl:              RenkuBaseUrl = renkuBaseUrl): List[Json] = {
+            renkuBaseUrl:              RenkuBaseUrl = renkuBaseUrl)(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
     val projectId                        = Project.Id(renkuBaseUrl, projectPath)
     val renkuPath                        = FilePath(".renku")
     val renkuCommitCollectionEntityId    = CommitCollectionEntity.Id(commitId, renkuPath)

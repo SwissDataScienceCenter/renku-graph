@@ -39,11 +39,11 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
     "remove all and only the triples from a given project related to the given commits" in new TestCase {
 
       val project1                = projectPaths.generateOne
-      val project1Commit1NoAgent  = commitIdResources.generateOne
-      val project1Commit2Outdated = commitIdResources.generateOne
-      val project1Commit3UpToDate = commitIdResources.generateOne
+      val project1Commit1NoAgent  = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val project1Commit2Outdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val project1Commit3UpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
       val project2                = projectPaths.generateOne
-      val project2OutdatedCommit  = commitIdResources.generateOne
+      val project2OutdatedCommit  = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
@@ -71,8 +71,8 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
     "remove all the triples related to the given commits together with eventual dataset triples" in new TestCase {
 
       val project               = projectPaths.generateOne
-      val projectCommitOutdated = commitIdResources.generateOne
-      val projectCommitUpToDate = commitIdResources.generateOne
+      val projectCommitOutdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val projectCommitUpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
@@ -102,8 +102,8 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
 
       val outdatedSchemaVersion = schemaVersions.generateOne
       val project               = projectPaths.generateOne
-      val projectCommitOutdated = commitIdResources.generateOne
-      val projectCommitUpToDate = commitIdResources.generateOne
+      val projectCommitOutdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val projectCommitUpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
@@ -131,9 +131,9 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
 
       val outdatedSchemaVersion  = schemaVersions.generateOne
       val project1               = projectPaths.generateOne
-      val project1OutdatedCommit = commitIdResources.generateOne
+      val project1OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
       val project2               = projectPaths.generateOne
-      val project2OutdatedCommit = commitIdResources.generateOne
+      val project2OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
