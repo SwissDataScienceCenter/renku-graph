@@ -25,9 +25,10 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreated, Identifier}
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
@@ -46,16 +47,18 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
   private val project          = projects.generateOne
   private val dataset1CommitId = commitIds.generateOne
+  private val dataset1Creation = datasetInProjectCreations.generateOne
   private val dataset1 = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-    project          = List(DatasetProject(project.path))
+    project          = List(DatasetProject(project.path, dataset1Creation))
   )
+  private val dataset2Creation = datasetInProjectCreations.generateOne
   private val dataset2CommitId = commitIds.generateOne
   private val dataset2 = datasets.generateOne.copy(
     maybeDescription = None,
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = None),
-    project          = List(DatasetProject(project.path))
+    project          = List(DatasetProject(project.path, dataset2Creation))
   )
 
   feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
@@ -67,12 +70,12 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         singleFileAndCommitWithDataset(
           project.path,
           dataset1CommitId,
-          dataset1.created.agent.name,
-          dataset1.created.agent.email,
+          dataset1Creation.agent.name,
+          dataset1Creation.agent.email,
+          dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           dataset1.id,
           dataset1.name,
           dataset1.maybeDescription,
-          dataset1.created.date,
           dataset1.published.maybeDate,
           dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
           dataset1.part.map(part => (part.name, part.atLocation)),
@@ -81,12 +84,12 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         singleFileAndCommitWithDataset(
           project.path,
           dataset2CommitId,
-          dataset2.created.agent.name,
-          dataset2.created.agent.email,
+          dataset2Creation.agent.name,
+          dataset2Creation.agent.email,
+          dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           dataset2.id,
           dataset2.name,
           dataset2.maybeDescription,
-          dataset2.created.date,
           dataset2.published.maybeDate,
           dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
           dataset2.part.map(part => (part.name, part.atLocation)),
@@ -121,9 +124,6 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
 
       foundDatasetDetails.hcursor.downField("identifier").as[Identifier] shouldBe Right(expectedDataset.id)
-      foundDatasetDetails.hcursor.downField("created").downField("dateCreated").as[DateCreated] shouldBe Right(
-        expectedDataset.created.date
-      )
     }
   }
 

@@ -36,13 +36,6 @@ Response body example:
   "identifier" : "6f622603-2129-4058-ad29-3ff927481461",
   "name" : "dataset name",
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
-  "created" : {
-    "dateCreated" : "1970-05-12T06:06:41.448Z",
-    "agent" : {
-      "email" : "n@ulQdsXl",
-      "name" : "v imzn"
-    }
-  },
   "published" : {
     "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
     "creator" : [
@@ -67,10 +60,24 @@ Response body example:
   ],
   "isPartOf" : [
     {
-      "name" : "namespace1/project1-name"
+      "name" : "namespace1/project1-name",
+      "created" : {
+        "dateCreated" : "1970-05-12T06:06:41.448Z",
+        "agent" : {
+          "email" : "n@ulQdsXl",
+          "name" : "v imzn"
+        }
+      }
     },
     {
-      "name" : "namespace2/project2-name"
+      "name" : "namespace2/project2-name",
+      "created" : {
+        "dateCreated" : "1970-06-12T06:06:41.448Z",
+        "agent" : {
+          "email" : "name@ulQdsXl",
+          "name" : "v imzn"
+        }
+      }
     }
   ]
 }
@@ -121,25 +128,25 @@ Response body example:
     "lineage": {
       "edges": [
         {
-          "source": "file:///blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
-          "target": "file:///commit/1aaf360c2267bedbedb81900a214e6f36be04e87"
+          "source": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+          "target": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87"
         },
         {
-          "source": "file:///commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "target": "file:///blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet"
+          "source": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "target": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet"
         }
       ],
       "nodes": [
         {
-          "id": "file:///blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+          "id": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
           "label": "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297"
         },
         {
-          "id": "file:///commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "id": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
           "label": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet"
         },
         {
-          "id": "file:///blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
+          "id": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
           "label": "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87"
         }
       ]
@@ -158,13 +165,6 @@ Query example:
       identifier!
       name!
       description
-      created! {
-        dateCreated! 
-        agent { 
-          email!
-          name!
-        }
-      }
       published {
         datePublished
         creator {
@@ -177,7 +177,14 @@ Query example:
         atLocation!
       }
       isPartOf {
-        name
+        name!
+        created! {
+          dateCreated! 
+          agent { 
+            email!
+            name!
+          }
+        }
       }
     } 
   }"
@@ -193,13 +200,6 @@ Response body example:
         "identifier": "e1fc7b62-e021-434b-9264-dda336bddd4f",
         "name": "dataset name",
         "description": "Data-set long description",
-        "created": {
-          "dateCreated": "1981-09-05T10:38:29.457Z",
-          "agent": {
-            "email": "user1@host",
-            "name": "user 1"
-          }
-        },
         "published": {
           "datePublished": "2019-07-30",
           "creator": []
@@ -232,7 +232,14 @@ Response body example:
           "atLocation"": "data/dataset-name/file1"
         }],
         "isPartOf": [{
-          "name": "namespace/project"
+          "name": "namespace/project",
+          "created" : {
+            "dateCreated" : "1970-05-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
         }]
       },
       {
@@ -264,9 +271,23 @@ Response body example:
           "atLocation"": "data/chOorWhraw-name/file2"
         }],
         "isPartOf": [{
-          "name": "namespace/project1"
+          "name": "namespace/project1",
+          "created" : {
+            "dateCreated" : "1970-10-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
         }, {
-          "name": "namespace/project2"
+          "name": "namespace/project2",
+          "created" : {
+            "dateCreated" : "1970-05-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
         }]
       }
     ]

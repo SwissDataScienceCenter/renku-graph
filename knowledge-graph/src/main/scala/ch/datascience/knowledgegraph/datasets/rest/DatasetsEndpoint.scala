@@ -76,14 +76,6 @@ class DatasetsEndpoint[Interpretation[_]: Effect](
         Some("identifier" -> dataset.id.asJson),
         Some("name" -> dataset.name.asJson),
         dataset.maybeDescription.map(description => "description" -> description.asJson),
-        Some("created" ->
-          json"""{
-          "dateCreated": ${dataset.created.date},
-          "agent": {
-            "email": ${dataset.created.agent.email},
-            "name": ${dataset.created.agent.name}
-          }
-        }"""),
         Some("published" -> Json.obj(List(
           dataset.published.maybeDate.map(date => "datePublished" -> date.asJson),
           Some("creator" -> dataset.published.creators.toList.asJson)
@@ -115,7 +107,14 @@ class DatasetsEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
-      "name": ${project.name}
+      "name": ${project.name},
+      "created": {
+        "dateCreated": ${project.created.date},
+        "agent": {
+          "email": ${project.created.agent.email},
+          "name": ${project.created.agent.name}
+        }
+      }
     }"""
   }
 }

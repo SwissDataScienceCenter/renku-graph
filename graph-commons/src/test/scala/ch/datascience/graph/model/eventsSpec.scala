@@ -16,12 +16,39 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.events
+package ch.datascience.graph.model
 
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonNegativeInts
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.events._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+class CommitEventSpec extends WordSpec {
+
+  "commitEventId" should {
+
+    "return CommitEventId comprised of id and project.id" in {
+      val commitEvent = commitEvents.generateOne
+
+      commitEvent.commitEventId shouldBe CommitEventId(commitEvent.id, commitEvent.project.id)
+    }
+  }
+}
+
+class CommitEventIdSpec extends WordSpec {
+
+  "toString" should {
+
+    "be of format 'id = <eventId>, projectId = <projectId>'" in {
+      val commitEventId = commitEventIds.generateOne
+
+      commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
+    }
+  }
+}
 
 class ProjectIdSpec extends WordSpec with ScalaCheckPropertyChecks {
 

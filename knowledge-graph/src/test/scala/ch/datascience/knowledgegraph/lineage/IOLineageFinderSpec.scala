@@ -22,8 +22,8 @@ import cats.effect.IO
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}

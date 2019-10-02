@@ -82,10 +82,9 @@ class QuerySchemaSpec
             identifier
             name
             description
-            created { dateCreated agent { email name } }
             published { datePublished creator { email name } }
             hasPart { name atLocation }
-            isPartOf { name }
+            isPartOf { name created { dateCreated agent { email name } } }
           }
         }"""
 
@@ -177,13 +176,6 @@ class QuerySchemaSpec
         "identifier": ${dataset.id.value},
         "name": ${dataset.name.value},
         "description": ${dataset.maybeDescription.map(_.value).map(Json.fromString).getOrElse(Json.Null)},
-        "created": {
-          "dateCreated": ${dataset.created.date.value},
-          "agent": {
-            "email": ${dataset.created.agent.email.value},
-            "name": ${dataset.created.agent.name.value}
-          }
-        },
         "published": {
           "datePublished": ${dataset.published.maybeDate.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
           "creator": ${dataset.published.creators.toList}
@@ -209,7 +201,14 @@ class QuerySchemaSpec
 
     private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
       json"""{
-        "name": ${project.name.value}
+        "name": ${project.name.value},
+        "created": {
+          "dateCreated": ${project.created.date.value},
+          "agent": {
+            "email": ${project.created.agent.email.value},
+            "name": ${project.created.agent.name.value}
+          }
+        }
       }"""
     }
   }

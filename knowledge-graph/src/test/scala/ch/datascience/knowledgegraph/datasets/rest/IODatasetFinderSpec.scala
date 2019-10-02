@@ -22,6 +22,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{DatasetPart, DatasetProject}
@@ -43,8 +44,9 @@ class IODatasetFinderSpec
   "findDataset" should {
 
     "return the details of the dataset with the given id" in new InMemoryStoreTestCase {
-      forAll(projectPaths, datasets) { (projectPath, dataset1) =>
-        val otherProject = projectPaths.generateOne
+      forAll(projectPaths, datasets, datasetInProjectCreations) { (projectPath, dataset1, dataset1Creation) =>
+        val otherProject         = projectPaths.generateOne
+        val otherProjectCreation = datasetInProjectCreations.generateOne
         val reusedDatasetUrl = (for {
           url  <- httpUrls
           uuid <- Gen.uuid
@@ -52,18 +54,23 @@ class IODatasetFinderSpec
 
         loadToStore(
           triples(
-            singleFileAndCommitWithDataset(otherProject,
-                                           datasetIdentifier = datasetIds.generateOne,
-                                           datasetName       = datasetNames.generateOne,
-                                           maybeDatasetUrl   = Some(reusedDatasetUrl)),
+            singleFileAndCommitWithDataset(
+              otherProject,
+              committerName     = otherProjectCreation.agent.name,
+              committerEmail    = otherProjectCreation.agent.email,
+              committedDate     = otherProjectCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
+              datasetIdentifier = datasetIds.generateOne,
+              datasetName       = datasetNames.generateOne,
+              maybeDatasetUrl   = Some(reusedDatasetUrl)
+            ),
             singleFileAndCommitWithDataset(
               projectPath,
-              committerName             = dataset1.created.agent.name,
-              committerEmail            = dataset1.created.agent.email,
+              committerName             = dataset1Creation.agent.name,
+              committerEmail            = dataset1Creation.agent.email,
+              committedDate             = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
               datasetIdentifier         = dataset1.id,
               datasetName               = dataset1.name,
               maybeDatasetDescription   = dataset1.maybeDescription,
-              datasetCreatedDate        = dataset1.created.date,
               maybeDatasetPublishedDate = dataset1.published.maybeDate,
               maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
               maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
@@ -74,8 +81,9 @@ class IODatasetFinderSpec
         )
 
         datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
-          dataset1.copy(part    = dataset1.part.sorted,
-                        project = List(DatasetProject(projectPath), DatasetProject(otherProject)).sorted)
+          dataset1.copy(part = dataset1.part.sorted,
+                        project = List(DatasetProject(projectPath, dataset1Creation),
+                                       DatasetProject(otherProject, otherProjectCreation)).sorted)
         )
       }
     }

@@ -32,21 +32,10 @@ object DatasetsGenerators {
     id               <- datasetIds
     name             <- datasetNames
     maybeDescription <- Gen.option(datasetDescriptions)
-    created          <- datasetCreations
     published        <- datasetPublishingInfos
     part             <- listOf(datasetPart)
     projects         <- nonEmptyList(datasetProjects)
-  } yield Dataset(id, name, maybeDescription, created, published, part, projects.toList)
-
-  private implicit lazy val datasetAgents: Gen[DatasetAgent] = for {
-    email <- emails
-    name  <- names
-  } yield DatasetAgent(email, name)
-
-  private implicit lazy val datasetCreations: Gen[DatasetCreation] = for {
-    createdDate <- datasetCreatedDates
-    agent       <- datasetAgents
-  } yield DatasetCreation(createdDate, agent)
+  } yield Dataset(id, name, maybeDescription, published, part, projects.toList)
 
   private implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
     maybeEmail <- Gen.option(emails)
@@ -67,6 +56,17 @@ object DatasetsGenerators {
   } yield DatasetPart(name, location)
 
   implicit lazy val datasetProjects: Gen[DatasetProject] = for {
-    name <- projectPaths
-  } yield DatasetProject(name)
+    name    <- projectPaths
+    created <- datasetInProjectCreations
+  } yield DatasetProject(name, created)
+
+  implicit lazy val datasetInProjectCreations: Gen[DatasetInProjectCreation] = for {
+    createdDate <- datasetInProjectCreationDates
+    agent       <- datasetAgents
+  } yield DatasetInProjectCreation(createdDate, agent)
+
+  private implicit lazy val datasetAgents: Gen[DatasetAgent] = for {
+    email <- emails
+    name  <- names
+  } yield DatasetAgent(email, name)
 }

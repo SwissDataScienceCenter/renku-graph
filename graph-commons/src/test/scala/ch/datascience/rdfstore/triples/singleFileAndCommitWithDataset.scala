@@ -22,11 +22,11 @@ import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVer
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls, listOf, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -40,10 +40,10 @@ object singleFileAndCommitWithDataset {
             commitId:                  CommitId = commitIds.generateOne,
             committerName:             UserName = names.generateOne,
             committerEmail:            Email = emails.generateOne,
+            committedDate:             CommittedDate = committedDates.generateOne,
             datasetIdentifier:         Identifier = datasetIds.generateOne,
             datasetName:               Name = datasetNames.generateOne,
             maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
-            datasetCreatedDate:        DateCreated = datasetCreatedDates.generateOne,
             maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
             maybeDatasetCreators:      Set[(UserName, Option[Email])] = setOf(datasetCreators).generateOne,
             maybeDatasetParts:         List[(PartName, PartLocation)] = listOf(datasetParts).generateOne,
@@ -66,6 +66,7 @@ object singleFileAndCommitWithDataset {
       CommitActivity(
         commitActivityId,
         projectId,
+        committedDate,
         Some(Agent.Id(schemaVersion)),
         Some(Person.Id(committerName)),
         maybeInfluencedBy = List(
@@ -85,7 +86,6 @@ object singleFileAndCommitWithDataset {
       projectId,
       datasetName,
       maybeDatasetDescription,
-      datasetCreatedDate,
       maybeDatasetPublishedDate,
       maybeDatasetCreators,
       maybeDatasetParts,

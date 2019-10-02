@@ -130,18 +130,10 @@ class DatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCheckProp
       id               <- cursor.downField("identifier").as[Identifier]
       name             <- cursor.downField("name").as[Name]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
-      created          <- cursor.downField("created").as[DatasetCreation]
       published        <- cursor.downField("published").as[DatasetPublishing]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
-    } yield Dataset(id, name, maybeDescription, created, published, parts, projects)
-
-  private implicit lazy val datasetCreationDecoder: Decoder[DatasetCreation] = (cursor: HCursor) =>
-    for {
-      date       <- cursor.downField("dateCreated").as[DateCreated]
-      agentEmail <- cursor.downField("agent").downField("email").as[Email]
-      agentName  <- cursor.downField("agent").downField("name").as[UserName]
-    } yield DatasetCreation(date, DatasetAgent(agentEmail, agentName))
+    } yield Dataset(id, name, maybeDescription, published, parts, projects)
 
   private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>
     for {
@@ -163,6 +155,14 @@ class DatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCheckProp
 
   private implicit lazy val datasetProjectDecoder: Decoder[DatasetProject] = (cursor: HCursor) =>
     for {
-      name <- cursor.downField("name").as[ProjectPath]
-    } yield DatasetProject(name)
+      name    <- cursor.downField("name").as[ProjectPath]
+      created <- cursor.downField("created").as[DatasetInProjectCreation]
+    } yield DatasetProject(name, created)
+
+  private implicit lazy val datasetInProjectCreationDecoder: Decoder[DatasetInProjectCreation] = (cursor: HCursor) =>
+    for {
+      date       <- cursor.downField("dateCreated").as[DateCreatedInProject]
+      agentEmail <- cursor.downField("agent").downField("email").as[Email]
+      agentName  <- cursor.downField("agent").downField("name").as[UserName]
+    } yield DatasetInProjectCreation(date, DatasetAgent(agentEmail, agentName))
 }

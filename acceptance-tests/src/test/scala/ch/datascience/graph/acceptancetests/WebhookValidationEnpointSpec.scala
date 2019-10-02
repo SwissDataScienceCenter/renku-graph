@@ -24,7 +24,7 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.webhookservice.project.ProjectVisibility.{Private, Public}
 import org.http4s.Status._
 import org.scalatest.Matchers._

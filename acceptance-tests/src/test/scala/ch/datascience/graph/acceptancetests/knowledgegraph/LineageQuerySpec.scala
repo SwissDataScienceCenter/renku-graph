@@ -24,8 +24,8 @@ import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in 
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
+import ch.datascience.graph.model.EventsGenerators.projects
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventsGenerators.projects
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.rdfstore.triples._
 import ch.datascience.rdfstore.triples.multiFileAndCommit.ResourceName

@@ -34,8 +34,10 @@ object datasets {
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
 
-  final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
+  final class DateCreatedInProject private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateCreatedInProject
+      extends TinyTypeFactory[DateCreatedInProject](new DateCreatedInProject(_))
+      with InstantNotInTheFuture
 
   final class PublishedDate private (val value: LocalDate) extends AnyVal with LocalDateTinyType
   implicit object PublishedDate

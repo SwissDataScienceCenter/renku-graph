@@ -20,6 +20,7 @@ package ch.datascience.rdfstore.triples
 
 import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators.committedDates
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
@@ -86,7 +87,7 @@ object multiFileAndCommit {
       Project(projectId),
       Agent(schemaVersion),
 
-      CommitActivity(commit1ActivityId, projectId, Some(agentId), comment = "renku dataset add zhbikes external.csv"),
+      CommitActivity(commit1ActivityId, projectId, committedDates.generateOne, Some(agentId), comment = "renku dataset add zhbikes external.csv"),
       GenerationActivity(commit1Id, FilePath("tree/input-data/external.csv"), commit1ActivityId),
       GenerationActivity(commit1DatasetGenerationId, commit1ActivityId),
       GenerationArtifact(commit1Id, FilePath(".renku/datasets/f0d5e338c7644f1995484ac00108d525/metadata.yml"), CommitGeneration.Id(commit1Id, FilePath("tree/.renku/datasets/f0d5e338c7644f1995484ac00108d525/metadata.yml")), projectId),
@@ -101,7 +102,7 @@ object multiFileAndCommit {
       GenerationArtifact(commit1Id, FilePath(".renku/refs/datasets/zhbikes"), commit1DatasetGenerationId, projectId),
       GenerationActivity(commit1Id, FilePath("tree/.renku/datasets/f0d5e338c7644f1995484ac00108d525/metadata.yml"), commit1ActivityId),
 
-      CommitActivity(commit2Id, projectId, Some(agentId), maybePersonId = None, maybeInfluencedBy = Nil, comment = "added refactored scripts"),
+      CommitActivity(commit2Id, projectId, committedDates.generateOne, Some(agentId), maybePersonId = None, maybeInfluencedBy = Nil, comment = "added refactored scripts"),
       CommitCollectionEntity(commit2Id, FilePath("src"), projectId),
       GenerationActivity(commit2Source2GenerationActivityId, commit2ActivityId),
       GenerationArtifact(commit2Source1GenerationId, commit2Source1GenerationActivityId, projectId),

@@ -21,7 +21,7 @@ package ch.datascience.graph.acceptancetests.data
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, Project, ProjectId}
 import io.circe.Json
 import io.circe.literal._

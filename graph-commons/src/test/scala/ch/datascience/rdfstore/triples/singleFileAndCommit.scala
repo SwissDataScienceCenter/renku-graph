@@ -18,7 +18,9 @@
 
 package ch.datascience.rdfstore.triples
 
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.EventsGenerators.committedDates
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
@@ -42,6 +44,7 @@ object singleFileAndCommit {
       CommitEntity(CommitEntity.Id(commitId, filePath), projectId, commitGenerationId),
       CommitActivity(commitActivityId,
                      projectId,
+                     committedDates.generateOne,
                      maybeSchemaVersion map Agent.Id,
                      maybePersonId     = None,
                      maybeInfluencedBy = Nil),

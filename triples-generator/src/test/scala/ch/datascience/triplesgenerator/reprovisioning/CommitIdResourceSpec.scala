@@ -18,15 +18,15 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
+import ReProvisioningGenerators._
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventsGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import ReProvisioningGenerators._
 
 import scala.util.{Success, Try}
 

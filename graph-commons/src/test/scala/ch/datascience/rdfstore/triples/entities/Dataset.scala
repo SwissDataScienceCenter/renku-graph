@@ -37,7 +37,6 @@ private[triples] object Dataset {
       projectId:                 Project.Id,
       datasetName:               Name,
       maybeDatasetDescription:   Option[Description],
-      datasetCreatedDate:        DateCreated,
       maybeDatasetPublishedDate: Option[PublishedDate],
       maybeDatasetCreators:      Set[(UserName, Option[Email])],
       maybeDatasetParts:         List[(PartName, PartLocation)],
@@ -59,8 +58,7 @@ private[triples] object Dataset {
     },
     "rdfs:label": ${id.datasetId},
     "schema:identifier": ${id.datasetId},
-    "schema:name": $datasetName,
-    "schema:dateCreated": $datasetCreatedDate
+    "schema:name": $datasetName
   }"""
     .deepMerge(`schema:isPartOf`(projectId))
     .deepMerge(maybeDatasetUrl to "schema:url")

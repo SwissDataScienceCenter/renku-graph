@@ -19,7 +19,7 @@
 package ch.datascience.rdfstore.triples
 package entities
 
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import eu.timepit.refined.api.Refined
@@ -32,15 +32,17 @@ private[triples] object CommitActivity {
 
   def apply(commitId:          CommitId,
             projectId:         Project.Id,
+            committedDate:     CommittedDate,
             maybeAgentId:      Option[Agent.Id],
             maybePersonId:     Option[Person.Id],
             maybeInfluencedBy: List[CommitCollectionEntity.Id],
             comment:           String Refined NonEmpty)(implicit fusekiBaseUrl: FusekiBaseUrl): Json =
-    apply(Id(commitId), projectId, maybeAgentId, maybePersonId, maybeInfluencedBy, comment)
+    apply(Id(commitId), projectId, committedDate, maybeAgentId, maybePersonId, maybeInfluencedBy, comment)
 
   // format: off
   def apply(id:                Id,
             projectId:         Project.Id,
+            committedDate:     CommittedDate,
             maybeAgentId:      Option[Agent.Id],
             maybePersonId:     Option[Person.Id] = None,
             maybeInfluencedBy: List[CommitCollectionEntity.Id] = Nil,
@@ -55,7 +57,7 @@ private[triples] object CommitActivity {
     },
     "prov:startedAtTime": {
       "@type": "xsd:dateTime",
-      "@value": "2018-12-06T11:26:33+01:00"
+      "@value": ${committedDate.value}
     },
     "prov:wasInformedBy": {
       "@id": $id

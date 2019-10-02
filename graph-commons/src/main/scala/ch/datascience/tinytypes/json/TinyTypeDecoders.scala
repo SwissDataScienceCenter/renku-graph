@@ -25,7 +25,7 @@ import cats.implicits._
 import ch.datascience.tinytypes._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.Decoder.decodeString
+import io.circe.Decoder._
 import io.circe.{Decoder, DecodingFailure}
 
 object TinyTypeDecoders {
@@ -50,6 +50,11 @@ object TinyTypeDecoders {
 
   implicit def stringDecoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     decodeString.emap { value =>
+      tinyTypeFactory.from(value).leftMap(_.getMessage)
+    }
+
+  implicit def intDecoder[TT <: IntTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    decodeInt.emap { value =>
       tinyTypeFactory.from(value).leftMap(_.getMessage)
     }
 

@@ -33,6 +33,9 @@ private object DecodingTestTypes {
     )
   }
 
+  class IntTestType private (val value: Int) extends AnyVal with IntTinyType
+  implicit object IntTestType extends TinyTypeFactory[IntTestType](new IntTestType(_))
+
   class LocalDateTestType private (val value: LocalDate) extends AnyVal with LocalDateTinyType
   implicit object LocalDateTestType extends TinyTypeFactory[LocalDateTestType](new LocalDateTestType(_))
 

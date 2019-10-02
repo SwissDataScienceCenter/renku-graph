@@ -81,6 +81,8 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
                                    ME:      MonadError[Interpretation, Throwable]): Interpretation[Out] =
       ME.fromEither(convert(tinyType))
 
+    def toUnsafe[Out](implicit convert: TT => Either[Exception, Out]): Out = convert(tinyType).fold(throw _, identity)
+
     def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
   }
 }

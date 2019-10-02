@@ -36,11 +36,12 @@ object GraphModelGenerators {
   implicit val datasetIds:            Gen[Identifier]    = uuid.map(_.toString) map Identifier.apply
   implicit val datasetNames:          Gen[Name]          = nonEmptyStrings() map Name.apply
   implicit val datasetDescriptions:   Gen[Description]   = nonEmptyStrings(maxLength = 1000) map Description.apply
-  implicit val datasetCreatedDates:   Gen[DateCreated]   = timestampsNotInTheFuture map DateCreated.apply
   implicit val datasetPublishedDates: Gen[PublishedDate] = localDatesNotInTheFuture map PublishedDate.apply
   implicit val datasetPartNames:      Gen[PartName]      = nonEmptyStrings() map PartName.apply
   implicit val datasetPartLocations: Gen[PartLocation] =
     relativePaths(minSegments = 2, maxSegments = 2)
       .map(path => s"data/$path")
       .map(PartLocation.apply)
+  implicit val datasetInProjectCreationDates: Gen[DateCreatedInProject] =
+    timestampsNotInTheFuture map DateCreatedInProject.apply
 }

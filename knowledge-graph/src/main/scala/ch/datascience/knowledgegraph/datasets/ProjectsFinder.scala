@@ -21,8 +21,9 @@ package ch.datascience.knowledgegraph.datasets
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
 import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -52,8 +53,9 @@ private class ProjectsFinder(
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
+       |PREFIX prov: <http://www.w3.org/ns/prov#>
        |
-       |SELECT DISTINCT ?isPartOf
+       |SELECT DISTINCT ?isPartOf ?dateCreated ?agentEmail ?agentName
        |WHERE {
        |  {
        |    SELECT ?dataset
@@ -63,12 +65,22 @@ private class ProjectsFinder(
        |    }
        |  }
        |  {
-       |    ?dataset dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |    ?dataset dcterms:isPartOf|schema:isPartOf ?isPartOf ;
+       |             (prov:qualifiedGeneration/prov:activity/prov:startedAtTime) ?dateCreated ;
+       |             (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
+       |    ?agentResource rdf:type <http://schema.org/Person> ;
+       |             schema:email ?agentEmail ;
+       |             schema:name ?agentName .
        |  } UNION {
        |    ?dataset schema:url ?datasetUrl .
        |    ?otherDataset rdf:type <http://schema.org/Dataset> ;
        |                  schema:url ?datasetUrl ;
-       |                  dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |                  dcterms:isPartOf|schema:isPartOf ?isPartOf ;
+       |                  (prov:qualifiedGeneration/prov:activity/prov:startedAtTime) ?dateCreated ;
+       |                  (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
+       |    ?agentResource rdf:type <http://schema.org/Person> ;
+       |                  schema:email ?agentEmail ;
+       |                  schema:name ?agentName .
        |  }
        |}
        |ORDER BY ASC(?isPartOf)
@@ -81,6 +93,7 @@ private object ProjectsFinder {
 
   private implicit val projectsDecoder: Decoder[List[DatasetProject]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import ch.datascience.graph.model.users.{Email, Name => UserName}
 
     def toProjectName(projectPath: FullProjectPath) =
       projectPath
@@ -90,8 +103,11 @@ private object ProjectsFinder {
 
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
-        name <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectName)
-      } yield DatasetProject(name)
+        name        <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectName)
+        dateCreated <- cursor.downField("dateCreated").downField("value").as[DateCreatedInProject]
+        agentEmail  <- cursor.downField("agentEmail").downField("value").as[Email]
+        agentName   <- cursor.downField("agentName").downField("value").as[UserName]
+      } yield DatasetProject(name, DatasetInProjectCreation(dateCreated, DatasetAgent(agentEmail, agentName)))
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetProject])
