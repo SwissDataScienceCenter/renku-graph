@@ -23,7 +23,8 @@ import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.FilePath
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
@@ -80,7 +81,7 @@ class IOLineageFinder(
       IO.pure(maybeLineage)
   }
 
-  private def query(projectPath: ProjectPath, commitId: CommitId, filePath: FilePath): String =
+  private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath): String =
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -97,7 +98,7 @@ class IOLineageFinder(
        |  {
        |    SELECT ?entity
        |    WHERE {
-       |      ?qentity dcterms:isPartOf|schema:isPartOf <${renkuBaseUrl / projectPath}> .
+       |      ?qentity dcterms:isPartOf|schema:isPartOf ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} .
        |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) <file:///commit/$commitId> .
        |      FILTER (?qentity = <file:///blob/$commitId/$filePath>)
        |      ?qentity (

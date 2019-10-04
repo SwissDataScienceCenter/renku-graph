@@ -27,6 +27,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import ReProvisioningGenerators._
+import ch.datascience.graph.model.views.RdfResource
 
 import scala.util.{Success, Try}
 

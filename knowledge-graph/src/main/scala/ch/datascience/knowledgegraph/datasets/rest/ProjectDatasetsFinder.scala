@@ -21,7 +21,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{Identifier, Name}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -47,7 +48,7 @@ private class IOProjectDatasetsFinder(
   def findProjectDatasets(projectPath: ProjectPath): IO[List[(Identifier, Name)]] =
     queryExpecting[List[(Identifier, Name)]](using = query(projectPath))
 
-  private def query(projectPath: ProjectPath): String =
+  private def query(path: ProjectPath): String =
     s"""
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -56,8 +57,7 @@ private class IOProjectDatasetsFinder(
        |
        |SELECT DISTINCT ?identifier ?name
        |WHERE {
-       |  ?dataset dcterms:isPartOf|schema:isPartOf ?project .
-       |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
+       |  ?dataset dcterms:isPartOf|schema:isPartOf ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} .
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
        |           rdfs:label ?identifier ;
        |           schema:name ?name .

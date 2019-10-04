@@ -53,9 +53,9 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       // format: off
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() should (
-        be(Some(OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1), Set(project1OutdatedCommit)))) 
+        be(Some(OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1OutdatedCommit)))) 
         or
-        be(Some(OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project2), Set(project2OutdatedCommit))))
+        be(Some(OutdatedTriples(FullProjectPath(renkuBaseUrl, project2), Set(project2OutdatedCommit))))
       )
       // format: on
     }
@@ -78,8 +78,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
       )
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe Some(
-        OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1),
-                        Set(project1Commit1NoAgent, project1Commit2Outdated))
+        OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1Commit1NoAgent, project1Commit2Outdated))
       )
     }
 

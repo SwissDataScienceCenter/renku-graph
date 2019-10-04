@@ -16,18 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.graph.model.views
 
-import ch.datascience.graph.model.projects.FullProjectPath
-import ch.datascience.tinytypes.Renderer
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
-trait RdfResource
+class RdfResourceSpec extends WordSpec {
 
-object RdfResource {
+  "fullProjectPathResourceRenderer" should {
 
-  implicit lazy val commitIdResourceRenderer: Renderer[RdfResource, CommitIdResource] =
-    value => s"<$value>"
-
-  implicit lazy val fullProjectPathResourceRenderer: Renderer[RdfResource, FullProjectPath] =
-    value => s"<$value>"
+    "wrap the value into <>" in {
+      val projectPath = fullProjectPaths.generateOne
+      projectPath.showAs[RdfResource] shouldBe s"<$projectPath>"
+    }
+  }
 }

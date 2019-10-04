@@ -85,7 +85,7 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
   }
 }
 
-trait Renderer[View, T] {
+trait Renderer[View, -T] {
   def render(value: T): String
 }
 

@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects._
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
@@ -62,10 +63,10 @@ private class IOProjectFinder(
        |
        |SELECT DISTINCT ?name ?dateCreated ?creatorName ?creatorEmail
        |WHERE {
-       |  <${renkuBaseUrl / path}> rdf:type <http://schema.org/Project> ;
-       |                           schema:name ?name ;
-       |                           schema:dateCreated ?dateCreated ;
-       |                           schema:creator ?creatorResource .
+       |  ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
+       |                                                             schema:name ?name ;
+       |                                                             schema:dateCreated ?dateCreated ;
+       |                                                             schema:creator ?creatorResource .
        |  ?creatorResource rdf:type <http://schema.org/Person> ;
        |                   schema:email ?creatorEmail ;
        |                   schema:name ?creatorName .         

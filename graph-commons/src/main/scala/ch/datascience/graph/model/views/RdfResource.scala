@@ -16,20 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.graph.model.views
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import ch.datascience.tinytypes.{Renderer, TinyType}
 
-class RdfResourceSpec extends WordSpec {
+/*
+ * This is a marker trait to be used with TinyTypes so they can be rendered as an RdfResource which is `<url>`
+ */
+trait RdfResource
 
-  "fullProjectPathResourceRenderer" should {
-
-    "wrap the value into <>" in {
-      val projectPath = fullProjectPaths.generateOne
-      projectPath.showAs[RdfResource] shouldBe s"<$projectPath>"
-    }
+object RdfResource {
+  implicit object RdfResourceRenderer extends Renderer[RdfResource, TinyType] {
+    override def render(value: TinyType): String = s"<$value>"
   }
 }

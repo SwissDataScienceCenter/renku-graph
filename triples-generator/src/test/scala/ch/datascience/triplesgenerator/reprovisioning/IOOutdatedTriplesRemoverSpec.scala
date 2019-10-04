@@ -56,8 +56,10 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         )
       )
 
-      val outdatedTriples = OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1),
-                                            Set(project1Commit1NoAgent, project1Commit2Outdated))
+      val outdatedTriples = OutdatedTriples(
+        FullProjectPath(renkuBaseUrl, project1),
+        Set(project1Commit1NoAgent, project1Commit2Outdated)
+      )
 
       triplesRemover
         .removeOutdatedTriples(outdatedTriples)
@@ -87,7 +89,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         )
       )
 
-      val outdatedTriples = OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project), Set(projectCommitOutdated))
+      val outdatedTriples = OutdatedTriples(FullProjectPath(renkuBaseUrl, project), Set(projectCommitOutdated))
 
       triplesRemover
         .removeOutdatedTriples(outdatedTriples)
@@ -115,7 +117,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         )
       )
 
-      val outdatedTriples = OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project), Set(projectCommitOutdated))
+      val outdatedTriples = OutdatedTriples(FullProjectPath(renkuBaseUrl, project), Set(projectCommitOutdated))
 
       triplesRemover
         .removeOutdatedTriples(outdatedTriples)
@@ -148,7 +150,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         )
       )
 
-      val outdatedTriples = OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1), Set(project1OutdatedCommit))
+      val outdatedTriples = OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1OutdatedCommit))
 
       triplesRemover
         .removeOutdatedTriples(outdatedTriples)

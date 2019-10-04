@@ -32,7 +32,7 @@ object GraphModelGenerators {
   implicit val fullProjectPaths: Gen[FullProjectPath] = for {
     url  <- httpUrls
     path <- projectPaths
-  } yield FullProjectPath.from(s"$url/$path").fold(throw _, identity)
+  } yield FullProjectPath.from(s"$url/projects/$path").fold(throw _, identity)
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIds:            Gen[Identifier]           = uuid.map(_.toString) map Identifier.apply

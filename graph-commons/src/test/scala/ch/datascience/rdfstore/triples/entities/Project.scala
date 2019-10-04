@@ -38,7 +38,7 @@ object Project {
   }""" deepMerge (creator toResource "schema:creator")
 
   final case class Id(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath) extends EntityId {
-    override val value: String = (renkuBaseUrl / projectPath).value
+    override val value: String = FullProjectPath(renkuBaseUrl, projectPath).value
   }
 
   def `schema:isPartOf`(projectId: Project.Id): Json = json"""{

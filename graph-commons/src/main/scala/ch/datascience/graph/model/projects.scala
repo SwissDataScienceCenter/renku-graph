@@ -40,12 +40,17 @@ object projects {
 
   class FullProjectPath private (val value: String) extends AnyVal with StringTinyType
   implicit object FullProjectPath extends TinyTypeFactory[FullProjectPath](new FullProjectPath(_)) with Url {
+    private val projectPathValidator = "^http[s]?:\\/\\/.*\\/projects\\/.*\\/.*$"
+    addConstraint(
+      _ matches projectPathValidator,
+      message = (value: String) => s"'$value' is not a valid $typeName"
+    )
 
-    def from(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath): FullProjectPath =
-      FullProjectPath((renkuBaseUrl / projectPath).value)
+    def apply(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath): FullProjectPath =
+      FullProjectPath((renkuBaseUrl / "projects" / projectPath).value)
 
     implicit lazy val projectPathConverter: FullProjectPath => Either[Exception, ProjectPath] = {
-      val projectPathExtractor = "^.*\\/(.*\\/.*)$".r
+      val projectPathExtractor = "^.*\\/projects\\/(.*\\/.*)$".r
 
       {
         case FullProjectPath(projectPathExtractor(path)) => ProjectPath.from(path)
