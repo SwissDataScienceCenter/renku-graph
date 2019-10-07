@@ -59,7 +59,7 @@ private class IOProjectDatasetsFinder(
        |  ?dataset dcterms:isPartOf|schema:isPartOf ?project .
        |  FILTER (?project = <${renkuBaseUrl / projectPath}>)
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label ?identifier ;
+       |           schema:identifier ?identifier ;
        |           schema:name ?name .
        |}""".stripMargin
 }

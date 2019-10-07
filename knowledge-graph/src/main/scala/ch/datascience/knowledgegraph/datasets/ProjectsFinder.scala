@@ -58,29 +58,22 @@ private class ProjectsFinder(
        |SELECT DISTINCT ?isPartOf ?dateCreated ?agentEmail ?agentName
        |WHERE {
        |  {
-       |    SELECT ?dataset
+       |    SELECT ?dataset ?isPartOf
        |    WHERE {
-       |      ?dataset rdf:type <http://schema.org/Dataset> ;
-       |               rdfs:label "$identifier" .
-       |    }
+       |      ?dataset schema:identifier "$identifier" ;
+       |               rdf:type <http://schema.org/Dataset> ;
+       |               dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |      }
        |  }
        |  {
-       |    ?dataset dcterms:isPartOf|schema:isPartOf ?isPartOf ;
-       |             (prov:qualifiedGeneration/prov:activity/prov:startedAtTime) ?dateCreated ;
-       |             (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
+       |    ?dataset rdf:type <http://schema.org/Dataset> ;
+       |             (prov:qualifiedGeneration/prov:activity) ?activity .
+       |    ?activity schema:isPartOf ?isPartOf ;
+       |				      prov:startedAtTime ?dateCreated ;
+       |			        prov:agent ?agentResource .
        |    ?agentResource rdf:type <http://schema.org/Person> ;
-       |             schema:email ?agentEmail ;
-       |             schema:name ?agentName .
-       |  } UNION {
-       |    ?dataset schema:url ?datasetUrl .
-       |    ?otherDataset rdf:type <http://schema.org/Dataset> ;
-       |                  schema:url ?datasetUrl ;
-       |                  dcterms:isPartOf|schema:isPartOf ?isPartOf ;
-       |                  (prov:qualifiedGeneration/prov:activity/prov:startedAtTime) ?dateCreated ;
-       |                  (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
-       |    ?agentResource rdf:type <http://schema.org/Person> ;
-       |                  schema:email ?agentEmail ;
-       |                  schema:name ?agentName .
+       |                   schema:email ?agentEmail ;
+       |                   schema:name ?agentName .
        |  }
        |}
        |ORDER BY ASC(?isPartOf)

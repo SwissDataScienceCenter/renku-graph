@@ -53,7 +53,7 @@ private class BaseDetailsFinder(
        |WHERE {
        |  ?dataset dcterms:isPartOf|schema:isPartOf <${renkuBaseUrl / projectPath}> .
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label ?identifier ;
+       |           schema:identifier ?identifier ;
        |           schema:name ?name .
        |  OPTIONAL { ?dataset schema:description ?description } .         
        |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .         

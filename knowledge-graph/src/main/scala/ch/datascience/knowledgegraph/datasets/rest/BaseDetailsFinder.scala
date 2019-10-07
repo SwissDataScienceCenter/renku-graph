@@ -50,8 +50,8 @@ private class BaseDetailsFinder(
        |
        |SELECT DISTINCT ?identifier ?name ?description ?publishedDate
        |WHERE {
-       |  ?dataset rdfs:label "$identifier" ;
-       |           rdfs:label ?identifier ;
+       |  ?dataset schema:identifier "$identifier" ;
+       |           schema:identifier ?identifier ;
        |           rdf:type <http://schema.org/Dataset> ;
        |           schema:name ?name .
        |  OPTIONAL { ?dataset schema:description ?description } .         

@@ -52,7 +52,7 @@ private class PartsFinder(
        |SELECT DISTINCT ?partName ?partLocation
        |WHERE {
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label "$identifier" ;
+       |           schema:identifier "$identifier" ;
        |           schema:hasPart ?partResource .
        |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
        |                schema:name ?partName ;         
