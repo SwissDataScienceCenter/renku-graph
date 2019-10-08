@@ -19,7 +19,7 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.httpUrls
+import ch.datascience.generators.Generators.{httpUrls, relativePaths}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -42,9 +42,20 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "/" should {
 
-    "allow to add next path part" in {
+    "allow to add next path segment" in {
       val url = (httpUrls map UrlType.apply).generateOne
       (url / "path") shouldBe UrlType(s"$url/path")
+    }
+
+    "url encode the path segment added to a url" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+      (url / "path to smth") shouldBe UrlType(s"$url/path+to+smth")
+    }
+
+    "use provided converted when adding the next path segment" in {
+      val url       = (httpUrls map UrlType.apply).generateOne
+      val otherPath = (relativePaths(minSegments = 2) map RelativePathString.apply).generateOne
+      (url / otherPath) shouldBe UrlType(s"$url/$otherPath")
     }
   }
 

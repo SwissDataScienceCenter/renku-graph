@@ -76,6 +76,14 @@ class TinyTypeDecodersSpec extends WordSpec {
     }
   }
 
+  "relativePathDecoder" should {
+
+    "decode JSON String value" in {
+      val value = relativePaths().generateOne
+      json"""$value""".as[RelativePathTestType] shouldBe Right(RelativePathTestType(value))
+    }
+  }
+
   "intDecoder" should {
 
     "decode JSON Int value" in {

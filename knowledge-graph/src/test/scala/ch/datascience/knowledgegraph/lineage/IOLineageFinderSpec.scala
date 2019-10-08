@@ -32,6 +32,7 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.tinytypes.TinyTypeConverter
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -85,11 +86,11 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
     import multiFileAndCommit._
 
     def sourceNode(node: Resource): SourceNode = SourceNode(
-      node.name.to[Try, NodeId].fold(throw _, identity),
+      node.name.as[Try, NodeId].fold(throw _, identity),
       NodeLabel(node.label.value)
     )
     def targetNode(node: Resource): TargetNode = TargetNode(
-      node.name.to[Try, NodeId].fold(throw _, identity),
+      node.name.as[Try, NodeId].fold(throw _, identity),
       NodeLabel(node.label.value)
     )
     def node(node: Resource): Node = sourceNode(node)
@@ -99,7 +100,8 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
                                             TestExecutionTimeRecorder[IO](elapsedTimes.generateOne),
                                             TestLogger())
 
-    private implicit val resourceNameToNodeId: ResourceName => Either[Exception, NodeId] =
-      name => NodeId.from(name.value.replace(fusekiBaseUrl.value, ""))
+    private implicit val resourceNameToNodeId: TinyTypeConverter[ResourceName, NodeId] = { name =>
+      NodeId.from(name.value.replace(fusekiBaseUrl.value, ""))
+    }
   }
 }

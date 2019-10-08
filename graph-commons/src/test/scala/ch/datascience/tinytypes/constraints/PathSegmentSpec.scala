@@ -16,24 +16,37 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.datasets.rest
+package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.generators.Generators._
+import ch.datascience.http.client.UrlEncoder.urlEncode
+import ch.datascience.tinytypes.RelativePathTinyType
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetIdSpec extends WordSpec {
+class PathSegmentSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  "unapply" should {
+  "PathSegment" should {
 
-    "convert valid dataset id as string to Identifier" in {
-      val id = datasetIds.generateOne
-      DatasetId.unapply(id.toString) shouldBe Some(id)
+    "be a RelativePath" in {
+      PathSegment shouldBe a[RelativePath]
     }
 
-    "return None if string value is blank" in {
-      DatasetId.unapply(" ") shouldBe None
+    "be a RelativePathTinyType" in {
+      PathSegment(nonEmptyStrings().generateOne) shouldBe a[RelativePathTinyType]
+    }
+  }
+
+  "apply" should {
+
+    "url encode the given value and successfully instantiate" in {
+      forAll(nonEmptyStrings(), Gen.oneOf("\\/", " "), nonEmptyStrings()) { (part1, part2, part3) =>
+        val raw = s"$part1$part2$part3"
+        PathSegment(raw).value shouldBe urlEncode(raw)
+      }
     }
   }
 }

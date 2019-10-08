@@ -33,6 +33,9 @@ private object DecodingTestTypes {
     )
   }
 
+  class RelativePathTestType private (val value: String) extends AnyVal with RelativePathTinyType
+  implicit object RelativePathTestType extends TinyTypeFactory[RelativePathTestType](new RelativePathTestType(_))
+
   class IntTestType private (val value: Int) extends AnyVal with IntTinyType
   implicit object IntTestType extends TinyTypeFactory[IntTestType](new IntTestType(_))
 

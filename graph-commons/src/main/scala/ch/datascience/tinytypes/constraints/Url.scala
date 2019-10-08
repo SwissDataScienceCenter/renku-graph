@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
-import java.net.{URL, URLEncoder}
+import java.net.URL
 
 import ch.datascience.tinytypes._
 
@@ -35,20 +35,25 @@ trait Url extends Constraints[String] {
 trait UrlOps[T <: StringTinyType] {
   self: TinyTypeFactory[T] with Url =>
 
+  import ch.datascience.http.client.UrlEncoder._
+
   case class UrlWithQueryParam(value: T) extends TinyType { type V = T }
 
-  import java.nio.charset.StandardCharsets.UTF_8
-
   implicit class UrlOps(url: T) {
-    def /(value:       Any): T = apply(s"$url/$value")
+
+    def /[TT <: TinyType](value: TT)(implicit converter: TT => List[PathSegment]): T =
+      apply(s"$url/${converter(value).mkString("/")}")
+
+    def /(value: String): T = apply(s"$url/${urlEncode(value)}")
+
     def ?(keyAndValue: (String, String)): UrlWithQueryParam = keyAndValue match {
-      case (key, value) => UrlWithQueryParam(apply(s"$url?$key=${URLEncoder.encode(value, UTF_8.name())}"))
+      case (key, value) => UrlWithQueryParam(apply(s"$url?$key=${urlEncode(value)}"))
     }
   }
 
   implicit class UrlWithQueryParamOps(url: UrlWithQueryParam) {
     def &(keyAndValue: (String, String)): UrlWithQueryParam = keyAndValue match {
-      case (key, value) => UrlWithQueryParam(apply(s"$url&$key=${URLEncoder.encode(value, UTF_8.name())}"))
+      case (key, value) => UrlWithQueryParam(apply(s"$url&$key=${urlEncode(value)}"))
     }
   }
 

@@ -16,27 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.http.client
 
-import ch.datascience.tinytypes._
-import ch.datascience.http.client.UrlEncoder._
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets.UTF_8
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
-
-trait RelativePathOps[T <: RelativePathTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
-
-  implicit class RelativePathOps(url: T) {
-
-    def /(value: String): T =
-      apply(s"$url/${urlEncode(value)}")
-
-    def /[TT <: TinyType](value: TT)(implicit converter: TT => List[PathSegment]): T =
-      apply(s"$url/${converter(value).mkString("/")}")
-  }
+object UrlEncoder {
+  val urlEncode: String => String = URLEncoder.encode(_, UTF_8.name())
 }

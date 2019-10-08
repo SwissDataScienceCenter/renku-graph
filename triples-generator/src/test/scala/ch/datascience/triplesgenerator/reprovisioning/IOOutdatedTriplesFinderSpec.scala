@@ -103,6 +103,6 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
   private implicit class CommitIdResouceOps(commitIdResource: CommitIdResource) {
     import cats.implicits._
-    lazy val toCommitId = commitIdResource.to[Try, CommitId].fold(throw _, identity)
+    lazy val toCommitId = commitIdResource.as[Try, CommitId].fold(throw _, identity)
   }
 }

@@ -40,6 +40,14 @@ class TinyTypeEncodersSpec extends WordSpec {
     }
   }
 
+  "relativePathEncoder" should {
+
+    "encode RelativePathTinyType to Json" in {
+      val value = nonEmptyStrings().generateOne
+      RelativePathTestType(value).asJson shouldBe Json.fromString(value)
+    }
+  }
+
   "localDateEncoder" should {
 
     "encode LocalDateTinyType to Json" in {

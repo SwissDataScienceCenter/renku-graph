@@ -23,7 +23,6 @@ import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
 import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
-import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -85,12 +84,12 @@ private object ProjectsFinder {
   import io.circe.Decoder
 
   private implicit val projectsDecoder: Decoder[List[DatasetProject]] = {
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
     import ch.datascience.graph.model.users.{Email, Name => UserName}
+    import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     def toProjectName(projectPath: FullProjectPath) =
       projectPath
-        .to[Try, ProjectPath]
+        .as[Try, ProjectPath]
         .toEither
         .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
 

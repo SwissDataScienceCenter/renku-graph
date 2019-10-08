@@ -44,7 +44,8 @@ class IODatasetFinderSpec
 
   "findDataset" should {
 
-    "return the details of the dataset with the given id" in new InMemoryStoreTestCase {
+    "return the details of the dataset with the given id " +
+      "- a case when unrelated projects are using the same dataset" in new InMemoryStoreTestCase {
       forAll(datasets, projectPaths, datasetInProjectCreations, projectPaths, datasetInProjectCreations) {
         (dataset, project1Path, project1DatasetCreation, project2Path, project2DatasetCreation) =>
           val reusedDatasetUrl = (for {
@@ -91,6 +92,59 @@ class IODatasetFinderSpec
               part = dataset.part.sorted,
               project = List(DatasetProject(project1Path, project1DatasetCreation),
                              DatasetProject(project2Path, project2DatasetCreation)).sorted
+            )
+          )
+      }
+    }
+
+    "return the details of the dataset with the given id " +
+      "- a case when a dataset is defined on a source project which has a fork" in new InMemoryStoreTestCase {
+      forAll(projectPaths, projectPaths, datasets, datasetInProjectCreations, commitIds) {
+        (sourceProjectPath, forkProjectPath, dataset, projectDatasetCreation, commitId) =>
+          val reusedDatasetUrl = (for {
+            url  <- httpUrls
+            uuid <- Gen.uuid
+          } yield s"$url/$uuid").generateOne
+
+          loadToStore(
+            triples(
+              singleFileAndCommitWithDataset(
+                sourceProjectPath,
+                commitId,
+                committerName             = projectDatasetCreation.agent.name,
+                committerEmail            = projectDatasetCreation.agent.email,
+                committedDate             = projectDatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
+                datasetIdentifier         = dataset.id,
+                datasetName               = dataset.name,
+                maybeDatasetDescription   = dataset.maybeDescription,
+                maybeDatasetPublishedDate = dataset.published.maybeDate,
+                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation)),
+                maybeDatasetUrl           = Some(reusedDatasetUrl)
+              ),
+              singleFileAndCommitWithDataset(
+                forkProjectPath,
+                commitId,
+                committerName             = projectDatasetCreation.agent.name,
+                committerEmail            = projectDatasetCreation.agent.email,
+                committedDate             = projectDatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
+                datasetIdentifier         = dataset.id,
+                datasetName               = dataset.name,
+                maybeDatasetDescription   = dataset.maybeDescription,
+                maybeDatasetPublishedDate = dataset.published.maybeDate,
+                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation)),
+                maybeDatasetUrl           = Some(reusedDatasetUrl)
+              ),
+              singleFileAndCommitWithDataset(projectPaths.generateOne)
+            )
+          )
+
+          datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+            dataset.copy(
+              part = dataset.part.sorted,
+              project = List(DatasetProject(sourceProjectPath, projectDatasetCreation),
+                             DatasetProject(forkProjectPath, projectDatasetCreation)).sorted
             )
           )
       }

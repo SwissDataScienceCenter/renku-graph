@@ -26,7 +26,7 @@ import ch.datascience.tinytypes._
 object datasets {
 
   final class Identifier private (val value: String) extends AnyVal with StringTinyType
-  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with UUID
+  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
@@ -47,6 +47,6 @@ object datasets {
   final class PartName private (val value: String) extends AnyVal with StringTinyType
   implicit object PartName extends TinyTypeFactory[PartName](new PartName(_)) with NonBlank
 
-  final class PartLocation private (val value: String) extends AnyVal with StringTinyType
+  final class PartLocation private (val value: String) extends AnyVal with RelativePathTinyType
   implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath
 }

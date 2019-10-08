@@ -422,10 +422,10 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
   }
 
   private implicit class CommitIdResourceOps(commitIdResources: Set[CommitIdResource]) {
-    lazy val toCommitIds = commitIdResources.map(_.to[Try, CommitId].fold(throw _, identity))
+    lazy val toCommitIds = commitIdResources.map(_.as[Try, CommitId].fold(throw _, identity))
   }
 
   private implicit class FullProjectPathOps(projectPath: FullProjectPath) {
-    lazy val toProjectPath = projectPath.to[Try, ProjectPath].fold(throw _, identity)
+    lazy val toProjectPath = projectPath.as[Try, ProjectPath].fold(throw _, identity)
   }
 }

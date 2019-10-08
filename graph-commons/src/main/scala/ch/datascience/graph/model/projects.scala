@@ -20,18 +20,14 @@ package ch.datascience.graph.model
 
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.tinytypes.constraints._
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes._
 
 object projects {
 
-  class ProjectPath private (val value: String) extends AnyVal with StringTinyType
-  implicit object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with NonBlank {
+  class ProjectPath private (val value: String) extends AnyVal with RelativePathTinyType
+  implicit object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with RelativePath {
     addConstraint(
-      check = value =>
-        value.contains("/") &&
-          (value.indexOf("/") == value.lastIndexOf("/")) &&
-          !value.startsWith("/") &&
-          !value.endsWith("/"),
+      check   = value => value.contains("/") && (value.indexOf("/") == value.lastIndexOf("/")),
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
   }
@@ -42,16 +38,13 @@ object projects {
     def from(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath): FullProjectPath =
       FullProjectPath((renkuBaseUrl / projectPath).value)
 
-    implicit lazy val projectPathConverter: FullProjectPath => Either[Exception, ProjectPath] = {
-      val projectPathExtractor = "^.*\\/(.*\\/.*)$".r
-
-      {
-        case FullProjectPath(projectPathExtractor(path)) => ProjectPath.from(path)
-        case illegalValue                                => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
-      }
+    private val pathExtractor = "^.*\\/(.*\\/.*)$".r
+    implicit lazy val projectPathConverter: TinyTypeConverter[FullProjectPath, ProjectPath] = {
+      case FullProjectPath(pathExtractor(path)) => ProjectPath.from(path)
+      case illegalValue                         => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
     }
   }
 
-  final class FilePath private (val value: String) extends AnyVal with StringTinyType
+  final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
   object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
 }

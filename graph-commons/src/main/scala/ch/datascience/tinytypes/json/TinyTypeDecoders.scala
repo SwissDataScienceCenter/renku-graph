@@ -53,6 +53,11 @@ object TinyTypeDecoders {
       tinyTypeFactory.from(value).leftMap(_.getMessage)
     }
 
+  implicit def relativePathDecoder[TT <: RelativePathTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    decodeString.emap { value =>
+      tinyTypeFactory.from(value).leftMap(_.getMessage)
+    }
+
   implicit def intDecoder[TT <: IntTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     decodeInt.emap { value =>
       tinyTypeFactory.from(value).leftMap(_.getMessage)

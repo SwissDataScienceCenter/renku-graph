@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FullProjectPath
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeConverter, TinyTypeFactory}
 import io.circe.Decoder
 
 import scala.language.higherKinds
@@ -40,7 +40,7 @@ object CommitIdResource extends TinyTypeFactory[CommitIdResource](new CommitIdRe
 
   implicit lazy val commitIdDecoder: Decoder[CommitIdResource] = Decoder.decodeString.map(CommitIdResource.apply)
 
-  implicit lazy val commitIdConverter: CommitIdResource => Either[IllegalArgumentException, CommitId] = {
+  implicit lazy val commitIdConverter: TinyTypeConverter[CommitIdResource, CommitId] = {
     case CommitIdResource(factory.validationRegex(commitId)) => CommitId.from(commitId)
     case illegalValue                                        => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to CommitId"))
   }

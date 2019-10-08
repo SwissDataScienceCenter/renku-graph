@@ -18,25 +18,12 @@
 
 package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes._
-import ch.datascience.http.client.UrlEncoder._
+import cats.implicits._
+import ch.datascience.http.client.UrlEncoder.urlEncode
+import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
-
-trait RelativePathOps[T <: RelativePathTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
-
-  implicit class RelativePathOps(url: T) {
-
-    def /(value: String): T =
-      apply(s"$url/${urlEncode(value)}")
-
-    def /[TT <: TinyType](value: TT)(implicit converter: TT => List[PathSegment]): T =
-      apply(s"$url/${converter(value).mkString("/")}")
-  }
+final class PathSegment private (val value: String) extends AnyVal with RelativePathTinyType
+object PathSegment extends TinyTypeFactory[PathSegment](new PathSegment(_)) with RelativePath {
+  override val transform: String => Either[Throwable, String] =
+    value => Either.catchNonFatal(urlEncode(value))
 }

@@ -23,7 +23,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects.{FilePath, FullProjectPath, ProjectPath}
-import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
+import ch.datascience.tinytypes.RelativePathTinyType
+import ch.datascience.tinytypes.constraints.RelativePath
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -34,8 +35,12 @@ class ProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "ProjectPath" should {
 
-    "be a NonBlank" in {
-      ProjectPath shouldBe a[NonBlank]
+    "be a RelativePath" in {
+      ProjectPath shouldBe a[RelativePath]
+    }
+
+    "be a RelativePathTinyType" in {
+      ProjectPath(relativePaths(minSegments = 2, maxSegments = 2).generateOne) shouldBe a[RelativePathTinyType]
     }
   }
 
@@ -91,7 +96,7 @@ class FullProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "return a valid ProjectPath" in {
       forAll(httpUrls, projectPaths) { (url, projectPath) =>
-        FullProjectPath(s"$url/$projectPath").to[Try, ProjectPath] shouldBe Success(projectPath)
+        FullProjectPath(s"$url/$projectPath").as[Try, ProjectPath] shouldBe Success(projectPath)
       }
     }
   }
