@@ -54,28 +54,39 @@ private class ProjectsFinder(
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |
-       |SELECT DISTINCT ?isPartOf ?dateCreated ?agentEmail ?agentName
+       |SELECT DISTINCT ?isPartOf ?minDateCreated ?agentEmail ?agentName
        |WHERE {
        |  {
-       |    SELECT ?dataset ?isPartOf
+       |    SELECT DISTINCT ?isPartOf (MIN(?dataset) as ?datasetResource) (MIN(?dateCreated) as ?minDateCreated)
        |    WHERE {
-       |      ?dataset schema:identifier "$identifier" ;
-       |               rdf:type <http://schema.org/Dataset> ;
-       |               dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |      ?dataset rdf:type <http://schema.org/Dataset> ;
+       |               (prov:qualifiedGeneration/prov:activity) ?activity .
+       |      ?activity schema:isPartOf ?isPartOf ;
+       |		            prov:startedAtTime ?dateCreated .
+       |      {
+       |        SELECT ?dataset ?isPartOf
+       |        WHERE {
+       |          ?dataset schema:identifier "$identifier" ;
+       |                   rdf:type <http://schema.org/Dataset> ;
+       |                   dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |        }
        |      }
+       |    }
+       |    GROUP BY ?isPartOf
        |  }
        |  {
-       |    ?dataset rdf:type <http://schema.org/Dataset> ;
-       |             (prov:qualifiedGeneration/prov:activity) ?activity .
+       |    ?datasetResource rdf:type <http://schema.org/Dataset> ;
+       |                     (prov:qualifiedGeneration/prov:activity) ?activity .
        |    ?activity schema:isPartOf ?isPartOf ;
-       |				      prov:startedAtTime ?dateCreated ;
-       |			        prov:agent ?agentResource .
+       |		          prov:startedAtTime ?minDateCreated ;
+       |		          prov:agent ?agentResource .
        |    ?agentResource rdf:type <http://schema.org/Person> ;
        |                   schema:email ?agentEmail ;
        |                   schema:name ?agentName .
        |  }
        |}
        |ORDER BY ASC(?isPartOf)
+       |
        |""".stripMargin
 }
 
@@ -96,7 +107,7 @@ private object ProjectsFinder {
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
         name        <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectName)
-        dateCreated <- cursor.downField("dateCreated").downField("value").as[DateCreatedInProject]
+        dateCreated <- cursor.downField("minDateCreated").downField("value").as[DateCreatedInProject]
         agentEmail  <- cursor.downField("agentEmail").downField("value").as[Email]
         agentName   <- cursor.downField("agentName").downField("value").as[UserName]
       } yield DatasetProject(name, DatasetInProjectCreation(dateCreated, DatasetAgent(agentEmail, agentName)))

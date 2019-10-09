@@ -19,9 +19,9 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
+import ch.datascience.generators.CommonGraphGenerators.{emails, names => usernames}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.httpUrls
-import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
@@ -31,7 +31,6 @@ import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, Proj
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.stubbing.ExternalServiceStubbing
-import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -48,10 +47,8 @@ class IODatasetFinderSpec
       "- a case when unrelated projects are using the same dataset" in new InMemoryStoreTestCase {
       forAll(datasets, projectPaths, datasetInProjectCreations, projectPaths, datasetInProjectCreations) {
         (dataset, project1Path, project1DatasetCreation, project2Path, project2DatasetCreation) =>
-          val reusedDatasetUrl = (for {
-            url  <- httpUrls
-            uuid <- Gen.uuid
-          } yield s"$url/$uuid").generateOne
+          val project1DatasetCreationDate = project1DatasetCreation.date
+            .toUnsafe(date => CommittedDate.from(date.value))
 
           loadToStore(
             triples(
@@ -60,14 +57,26 @@ class IODatasetFinderSpec
                 commitIds.generateOne,
                 committerName             = project1DatasetCreation.agent.name,
                 committerEmail            = project1DatasetCreation.agent.email,
-                committedDate             = project1DatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
+                committedDate             = project1DatasetCreationDate,
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation)),
-                maybeDatasetUrl           = Some(reusedDatasetUrl)
+                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
+              ),
+              singleFileAndCommitWithDataset( // to reflect a file added to the dataset in another commit
+                project1Path,
+                commitIds.generateOne,
+                committerName             = usernames.generateOne,
+                committerEmail            = emails.generateOne,
+                committedDate             = CommittedDate(project1DatasetCreationDate.value.plusSeconds(10)),
+                datasetIdentifier         = dataset.id,
+                datasetName               = dataset.name,
+                maybeDatasetDescription   = dataset.maybeDescription,
+                maybeDatasetPublishedDate = dataset.published.maybeDate,
+                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
                 project2Path,
@@ -80,8 +89,7 @@ class IODatasetFinderSpec
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation)),
-                maybeDatasetUrl           = Some(reusedDatasetUrl)
+                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(projectPaths.generateOne)
             )
@@ -101,11 +109,7 @@ class IODatasetFinderSpec
       "- a case when a dataset is defined on a source project which has a fork" in new InMemoryStoreTestCase {
       forAll(projectPaths, projectPaths, datasets, datasetInProjectCreations, commitIds) {
         (sourceProjectPath, forkProjectPath, dataset, projectDatasetCreation, commitId) =>
-          val reusedDatasetUrl = (for {
-            url  <- httpUrls
-            uuid <- Gen.uuid
-          } yield s"$url/$uuid").generateOne
-
+          val datasetCreationDate = projectDatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value))
           loadToStore(
             triples(
               singleFileAndCommitWithDataset(
@@ -113,30 +117,40 @@ class IODatasetFinderSpec
                 commitId,
                 committerName             = projectDatasetCreation.agent.name,
                 committerEmail            = projectDatasetCreation.agent.email,
-                committedDate             = projectDatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
+                committedDate             = datasetCreationDate,
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation)),
-                maybeDatasetUrl           = Some(reusedDatasetUrl)
+                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
+              ),
+              singleFileAndCommitWithDataset( // to reflect a file added later to the dataset in another commit
+                sourceProjectPath,
+                commitIds.generateOne,
+                committerName             = usernames.generateOne,
+                committerEmail            = emails.generateOne,
+                committedDate             = CommittedDate(datasetCreationDate.value.plusSeconds(10)),
+                datasetIdentifier         = dataset.id,
+                datasetName               = dataset.name,
+                maybeDatasetDescription   = dataset.maybeDescription,
+                maybeDatasetPublishedDate = dataset.published.maybeDate,
+                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
                 forkProjectPath,
                 commitId,
                 committerName             = projectDatasetCreation.agent.name,
                 committerEmail            = projectDatasetCreation.agent.email,
-                committedDate             = projectDatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
+                committedDate             = datasetCreationDate,
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation)),
-                maybeDatasetUrl           = Some(reusedDatasetUrl)
-              ),
-              singleFileAndCommitWithDataset(projectPaths.generateOne)
+                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
+              )
             )
           )
 
