@@ -19,7 +19,7 @@
 package ch.datascience.graph.http.server
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 

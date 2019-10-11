@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken

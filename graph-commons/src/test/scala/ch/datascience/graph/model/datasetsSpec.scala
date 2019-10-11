@@ -19,7 +19,7 @@
 package ch.datascience.graph.model
 
 import ch.datascience.graph.model.datasets.{Identifier, PartLocation}
-import ch.datascience.tinytypes.constraints.{RelativePath, UUID}
+import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -27,8 +27,8 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class datasetsSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "Identifier" should {
-    "be a UUID" in {
-      Identifier shouldBe a[UUID]
+    "be a NonBlank" in {
+      Identifier shouldBe a[NonBlank]
     }
   }
 

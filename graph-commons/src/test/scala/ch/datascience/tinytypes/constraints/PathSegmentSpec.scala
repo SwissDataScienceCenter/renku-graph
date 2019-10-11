@@ -16,26 +16,36 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.events
+package ch.datascience.tinytypes.constraints
 
-import ch.datascience.generators.Generators.nonNegativeInts
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.http.client.UrlEncoder.urlEncode
+import ch.datascience.tinytypes.RelativePathTinyType
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class PathSegmentSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  "instantiation" should {
+  "PathSegment" should {
 
-    "be successful for non-negative values" in {
-      forAll(nonNegativeInts()) { id =>
-        ProjectId(id).value shouldBe id
-      }
+    "be a RelativePath" in {
+      PathSegment shouldBe a[RelativePath]
     }
 
-    "fail for negative ids" in {
-      an[IllegalArgumentException] shouldBe thrownBy {
-        ProjectId(-1).value
+    "be a RelativePathTinyType" in {
+      PathSegment(nonEmptyStrings().generateOne) shouldBe a[RelativePathTinyType]
+    }
+  }
+
+  "apply" should {
+
+    "url encode the given value and successfully instantiate" in {
+      forAll(nonEmptyStrings(), Gen.oneOf("\\/", " "), nonEmptyStrings()) { (part1, part2, part3) =>
+        val raw = s"$part1$part2$part3"
+        PathSegment(raw).value shouldBe urlEncode(raw)
       }
     }
   }

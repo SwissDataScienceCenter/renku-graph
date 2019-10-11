@@ -32,10 +32,6 @@ class DatasetIdSpec extends WordSpec {
       DatasetId.unapply(id.toString) shouldBe Some(id)
     }
 
-    "return None if string value cannot be converted to in Identifier" in {
-      DatasetId.unapply("a") shouldBe None
-    }
-
     "return None if string value is blank" in {
       DatasetId.unapply(" ") shouldBe None
     }

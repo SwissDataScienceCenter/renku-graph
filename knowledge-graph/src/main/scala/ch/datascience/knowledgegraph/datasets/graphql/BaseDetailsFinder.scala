@@ -21,7 +21,6 @@ package ch.datascience.knowledgegraph.datasets.graphql
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
-import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -45,23 +44,17 @@ private class BaseDetailsFinder(
 
   private def query(projectPath: ProjectPath): String =
     s"""
-       |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT DISTINCT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
+       |SELECT DISTINCT ?identifier ?name ?description ?publishedDate
        |WHERE {
-       |  ?dataset dcterms:isPartOf|schema:isPartOf ${FullProjectPath(renkuBaseUrl, projectPath).showAs[RdfResource]} .
+       |  ?dataset dcterms:isPartOf|schema:isPartOf <${FullProjectPath(renkuBaseUrl, projectPath)}> .
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label ?identifier ;
-       |           schema:name ?name ;
-       |           schema:dateCreated ?dateCreated ;
-       |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
-       |  ?agentResource rdf:type <http://schema.org/Person> ;
-       |           schema:email ?agentEmail ;
-       |           schema:name ?agentName .
+       |           schema:identifier ?identifier ;
+       |           schema:name ?name .
        |  OPTIONAL { ?dataset schema:description ?description } .         
        |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .         
        |}""".stripMargin
@@ -73,7 +66,6 @@ private object BaseDetailsFinder {
 
   private implicit val baseDetailsDecoder: Decoder[List[Dataset]] = {
     import ch.datascience.graph.model.datasets._
-    import ch.datascience.graph.model.users.{Email, Name => UserName}
     import ch.datascience.knowledgegraph.datasets.model._
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
@@ -81,9 +73,6 @@ private object BaseDetailsFinder {
       for {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
-        dateCreated        <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-        agentEmail         <- cursor.downField("agentEmail").downField("value").as[Email]
-        agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
         maybeDescription <- cursor
                              .downField("description")
@@ -96,7 +85,6 @@ private object BaseDetailsFinder {
           id,
           name,
           maybeDescription,
-          DatasetCreation(dateCreated, DatasetAgent(agentEmail, agentName)),
           DatasetPublishing(maybePublishedDate, Set.empty),
           part    = List.empty,
           project = List.empty

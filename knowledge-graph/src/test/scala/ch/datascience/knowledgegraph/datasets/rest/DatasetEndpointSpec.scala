@@ -29,11 +29,11 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.http.rest.Links
-import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.rest.Links.Rel.Self
+import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
@@ -42,7 +42,7 @@ import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder._
 import io.circe.syntax._
-import io.circe._
+import io.circe.{Decoder, HCursor, Json}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.circe.jsonOf
@@ -51,8 +51,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-
-import scala.util.Try
 
 class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
 
@@ -74,13 +72,15 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
         response.as[Json].unsafeRunSync._links shouldBe Right(
           Links.of(Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
         )
-        val Right(projectsLinks) = response.as[Json].unsafeRunSync.hcursor.downField("isPartOf").as[List[Json]]
-        projectsLinks should have size dataset.project.size
-        projectsLinks.foreach { json =>
-          (json.hcursor.downField("path").as[ProjectPath], json._links) mapN {
-            case (path, links) =>
-              links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
-          }
+        val Right(projectsJsons) = response.as[Json].unsafeRunSync.hcursor.downField("isPartOf").as[List[Json]]
+        projectsJsons should have size dataset.project.size
+        projectsJsons.foreach { json =>
+          (json.hcursor.downField("path").as[ProjectPath], json._links)
+            .mapN {
+              case (path, links) =>
+                links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
+            }
+            .getOrElse(fail("No 'path' or 'project-details' links on the 'isPartOf' elements"))
         }
 
         logger.expectNoLogs()
@@ -143,18 +143,10 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       id               <- cursor.downField("identifier").as[Identifier]
       name             <- cursor.downField("name").as[Name]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
-      created          <- cursor.downField("created").as[DatasetCreation]
       published        <- cursor.downField("published").as[DatasetPublishing]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
-    } yield Dataset(id, name, maybeDescription, created, published, parts, projects)
-
-  private implicit lazy val datasetCreationDecoder: Decoder[DatasetCreation] = (cursor: HCursor) =>
-    for {
-      date       <- cursor.downField("dateCreated").as[DateCreated]
-      agentEmail <- cursor.downField("agent").downField("email").as[Email]
-      agentName  <- cursor.downField("agent").downField("name").as[UserName]
-    } yield DatasetCreation(date, DatasetAgent(agentEmail, agentName))
+    } yield Dataset(id, name, maybeDescription, published, parts, projects)
 
   private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>
     for {
@@ -170,14 +162,21 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val datasetPartDecoder: Decoder[DatasetPart] = (cursor: HCursor) =>
     for {
-      name        <- cursor.downField("name").as[PartName]
-      location    <- cursor.downField("atLocation").as[PartLocation]
-      dateCreated <- cursor.downField("dateCreated").as[PartDateCreated]
-    } yield DatasetPart(name, location, dateCreated)
+      name     <- cursor.downField("name").as[PartName]
+      location <- cursor.downField("atLocation").as[PartLocation]
+    } yield DatasetPart(name, location)
 
   private implicit lazy val datasetProjectDecoder: Decoder[DatasetProject] = (cursor: HCursor) =>
     for {
-      path <- cursor.downField("path").as[ProjectPath]
-      name <- cursor.downField("name").as[projects.Name]
-    } yield DatasetProject(path, name)
+      path    <- cursor.downField("path").as[ProjectPath]
+      name    <- cursor.downField("name").as[projects.Name]
+      created <- cursor.downField("created").as[DatasetInProjectCreation]
+    } yield DatasetProject(path, name, created)
+
+  private implicit lazy val datasetInProjectCreationDecoder: Decoder[DatasetInProjectCreation] = (cursor: HCursor) =>
+    for {
+      date       <- cursor.downField("dateCreated").as[DateCreatedInProject]
+      agentEmail <- cursor.downField("agent").downField("email").as[Email]
+      agentName  <- cursor.downField("agent").downField("name").as[UserName]
+    } yield DatasetInProjectCreation(date, DatasetAgent(agentEmail, agentName))
 }

@@ -22,7 +22,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import ch.datascience.webhookservice.project.ProjectVisibility
 import com.github.tomakehurst.wiremock.client.WireMock._

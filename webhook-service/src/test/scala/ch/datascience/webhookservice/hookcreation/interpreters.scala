@@ -19,8 +19,8 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
-import ch.datascience.webhookservice.eventprocessing.startcommit.CommitToEventLog
 import ch.datascience.webhookservice.commits.LatestCommitFinder
+import ch.datascience.webhookservice.eventprocessing.startcommit.CommitToEventLog
 import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try

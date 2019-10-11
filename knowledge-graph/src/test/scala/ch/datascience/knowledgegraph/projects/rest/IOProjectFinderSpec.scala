@@ -20,8 +20,8 @@ package ch.datascience.knowledgegraph.projects.rest
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventsGenerators.commitIds
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project

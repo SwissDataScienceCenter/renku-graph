@@ -24,7 +24,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.EventsGenerators.projectIds
+import ch.datascience.graph.model.EventsGenerators.projectIds
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger

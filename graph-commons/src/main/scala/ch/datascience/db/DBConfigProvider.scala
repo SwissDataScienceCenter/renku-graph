@@ -18,7 +18,6 @@
 
 package ch.datascience.db
 
-import eu.timepit.refined.pureconfig._
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.config.ConfigLoader
@@ -27,6 +26,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.pureconfig._
 import eu.timepit.refined.string.MatchesRegex
 
 import scala.concurrent.duration.FiniteDuration

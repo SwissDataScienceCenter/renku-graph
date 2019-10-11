@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository.association
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import org.scalatest.Matchers._

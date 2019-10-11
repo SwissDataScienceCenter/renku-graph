@@ -16,19 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.events
+package ch.datascience.tinytypes.constraints
 
-import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.tinytypes.constraints.NonNegative
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
-import io.circe.Decoder
+import cats.implicits._
+import ch.datascience.http.client.UrlEncoder.urlEncode
+import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 
-case class Project(
-    id:   ProjectId,
-    path: ProjectPath
-)
-
-class ProjectId private (val value: Int) extends AnyVal with IntTinyType
-object ProjectId extends TinyTypeFactory[ProjectId](new ProjectId(_)) with NonNegative {
-  implicit lazy val projectIdDecoder: Decoder[ProjectId] = Decoder.decodeInt.map(ProjectId.apply)
+final class PathSegment private (val value: String) extends AnyVal with RelativePathTinyType
+object PathSegment extends TinyTypeFactory[PathSegment](new PathSegment(_)) with RelativePath {
+  override val transform: String => Either[Throwable, String] =
+    value => Either.catchNonFatal(urlEncode(value))
 }

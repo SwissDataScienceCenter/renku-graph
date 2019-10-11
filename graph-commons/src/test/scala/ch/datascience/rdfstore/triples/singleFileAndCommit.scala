@@ -20,23 +20,27 @@ package ch.datascience.rdfstore.triples
 
 import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators.committedDates
 import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames}
-import ch.datascience.graph.model._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
 import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.{SchemaVersion, projects, users}
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities._
 import io.circe.Json
 import org.scalacheck.Gen
 
 object singleFileAndCommit {
 
-  def apply(projectPath:        ProjectPath,
-            commitId:           CommitId,
-            projectName:        projects.Name = projectNames.generateOne,
-            projectDateCreated: projects.DateCreated = projectCreatedDates.generateOne,
-            projectCreator:     (users.Name, Email) = names.generateOne -> emails.generateOne,
-            maybeSchemaVersion: Option[SchemaVersion] = Gen.option(schemaVersions).generateOne): List[Json] = {
+  def apply(
+      projectPath:          ProjectPath,
+      commitId:             CommitId,
+      projectName:          projects.Name = projectNames.generateOne,
+      projectDateCreated:   projects.DateCreated = projectCreatedDates.generateOne,
+      projectCreator:       (users.Name, Email) = names.generateOne -> emails.generateOne,
+      maybeSchemaVersion:   Option[SchemaVersion] = Gen.option(schemaVersions).generateOne
+  )(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
     val filePath                                  = FilePath("README.md")
     val generationPath                            = FilePath("tree") / filePath
     val projectId                                 = Project.Id(renkuBaseUrl, projectPath)
@@ -50,6 +54,7 @@ object singleFileAndCommit {
       CommitEntity(CommitEntity.Id(commitId, filePath), projectId, commitGenerationId),
       CommitActivity(commitActivityId,
                      projectId,
+                     committedDates.generateOne,
                      maybeSchemaVersion map Agent.Id,
                      maybePersonId     = None,
                      maybeInfluencedBy = Nil),

@@ -21,6 +21,7 @@ package ch.datascience.tinytypes
 import java.time.{Instant, LocalDate}
 
 import cats.MonadError
+import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
 
 import scala.language.higherKinds
@@ -34,12 +35,22 @@ trait TinyType extends Any {
   override def toString: String = value.toString
 }
 
-trait StringTinyType    extends Any with TinyType { type V = String }
-trait IntTinyType       extends Any with TinyType { type V = Int }
-trait LongTinyType      extends Any with TinyType { type V = Long }
-trait JsonTinyType      extends Any with TinyType { type V = Json }
-trait InstantTinyType   extends Any with TinyType { type V = Instant }
-trait LocalDateTinyType extends Any with TinyType { type V = LocalDate }
+trait StringTinyType       extends Any with TinyType { type V = String }
+trait RelativePathTinyType extends Any with TinyType { type V = String }
+trait IntTinyType          extends Any with TinyType { type V = Int }
+trait LongTinyType         extends Any with TinyType { type V = Long }
+trait JsonTinyType         extends Any with TinyType { type V = Json }
+trait InstantTinyType      extends Any with TinyType { type V = Instant }
+trait LocalDateTinyType    extends Any with TinyType { type V = LocalDate }
+
+object StringTinyType {
+  implicit val stringTinyTypeConverter: StringTinyType => List[PathSegment] =
+    tinyType => List(PathSegment(tinyType.value))
+}
+object RelativePathTinyType {
+  implicit val relativePathTinyTypeConverter: RelativePathTinyType => List[PathSegment] =
+    tinyType => tinyType.value.split("\\/").toList.map(PathSegment.apply)
+}
 
 trait Sensitive extends Any {
   self: TinyType =>
@@ -50,6 +61,7 @@ trait Sensitive extends Any {
 abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     extends From[TT]
     with Constraints[TT#V]
+    with ValueTransformation[TT#V]
     with TypeName {
 
   import cats.implicits._
@@ -63,7 +75,13 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
 
   final def unapply(tinyType: TT): Option[TT#V] = Some(tinyType.value)
 
-  final def from(value: TT#V): Either[IllegalArgumentException, TT] = {
+  final def from(value: TT#V): Either[IllegalArgumentException, TT] =
+    for {
+      transformed <- transform(value) leftMap flattenErrors
+      validated   <- validate(transformed)
+    } yield validated
+
+  private def validate(value: TT#V): Either[IllegalArgumentException, TT] = {
     val maybeErrors = validateConstraints(value)
     if (maybeErrors.isEmpty) Either.fromTry[TT](Try(instantiate(value))) leftMap flattenErrors
     else Left(new IllegalArgumentException(maybeErrors.mkString("; ")))
@@ -76,14 +94,18 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
 
   implicit class TinyTypeConverters(tinyType: TT) {
 
-    def to[Interpretation[_], Out](implicit
-                                   convert: TT => Either[Exception, Out],
-                                   ME:      MonadError[Interpretation, Throwable]): Interpretation[Out] =
-      ME.fromEither(convert(tinyType))
+    def as[Interpretation[_], OUT](
+        implicit converter: TinyTypeConverter[TT, OUT],
+        ME:                 MonadError[Interpretation, Throwable]
+    ): Interpretation[OUT] = ME.fromEither(converter convert tinyType)
+
+    def toUnsafe[Out](implicit convert: TT => Either[Exception, Out]): Out = convert(tinyType).fold(throw _, identity)
 
     def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
   }
 }
+
+trait TinyTypeConverter[TT <: TinyType, OUT] { def convert(value: TT): Either[Exception, OUT] }
 
 trait Renderer[View, -T] {
   def render(value: T): String
@@ -107,6 +129,10 @@ trait Constraints[V] extends TypeName {
       if (!constraint.check(value)) errors :+ constraint.message(value)
       else errors
   }
+}
+
+trait ValueTransformation[T] extends TypeName {
+  val transform: T => Either[Throwable, T] = value => Right(value)
 }
 
 trait TypeName {

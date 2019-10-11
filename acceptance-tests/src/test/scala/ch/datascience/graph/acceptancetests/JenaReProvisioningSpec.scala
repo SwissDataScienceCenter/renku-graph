@@ -23,8 +23,8 @@ import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
+import ch.datascience.graph.model.EventsGenerators.{commitIds, projects}
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
 import flows.RdfStoreProvisioning._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}

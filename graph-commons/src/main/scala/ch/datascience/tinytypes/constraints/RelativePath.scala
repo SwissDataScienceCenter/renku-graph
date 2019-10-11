@@ -18,7 +18,8 @@
 
 package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes.{Constraints, StringTinyType, TinyTypeFactory}
+import ch.datascience.http.client.UrlEncoder._
+import ch.datascience.tinytypes._
 
 trait RelativePath extends Constraints[String] with NonBlank {
   addConstraint(
@@ -27,10 +28,15 @@ trait RelativePath extends Constraints[String] with NonBlank {
   )
 }
 
-trait RelativePathOps[T <: StringTinyType] {
+trait RelativePathOps[T <: RelativePathTinyType] {
   self: TinyTypeFactory[T] with RelativePath =>
 
   implicit class RelativePathOps(url: T) {
-    def /(value: Any): T = apply(s"$url/$value")
+
+    def /(value: String): T =
+      apply(s"$url/${urlEncode(value)}")
+
+    def /[TT <: TinyType](value: TT)(implicit converter: TT => List[PathSegment]): T =
+      apply(s"$url/${converter(value).mkString("/")}")
   }
 }

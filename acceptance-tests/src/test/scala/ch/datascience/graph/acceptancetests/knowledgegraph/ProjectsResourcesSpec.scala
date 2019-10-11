@@ -26,8 +26,8 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventsGenerators.commitIds
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
@@ -50,7 +50,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   private val dataset = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-    project          = List(DatasetProject(project.path, project.name))
+    project          = List(DatasetProject(project.path, project.name, datasetInProjectCreations.generateOne))
   )
 
   feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
@@ -108,8 +108,8 @@ object ProjectsResources {
       }
     }""" deepMerge {
     _links(
-      Link(Rel.Self        -> Href(renkuResourceUrl / "projects" / project.path.value)),
-      Link(Rel("datasets") -> Href(renkuResourceUrl / "projects" / project.path.value / "datasets"))
+      Link(Rel.Self        -> Href(renkuResourceUrl / "projects" / project.path)),
+      Link(Rel("datasets") -> Href(renkuResourceUrl / "projects" / project.path / "datasets"))
     )
   }
 }

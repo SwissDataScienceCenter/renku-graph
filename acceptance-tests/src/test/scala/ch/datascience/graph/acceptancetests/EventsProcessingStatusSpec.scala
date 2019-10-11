@@ -25,7 +25,7 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project.ProjectVisibility.Public

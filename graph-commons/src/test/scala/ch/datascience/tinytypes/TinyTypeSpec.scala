@@ -18,10 +18,14 @@
 
 package ch.datascience.tinytypes
 
+import ch.datascience.generators.Generators._
+import ch.datascience.tinytypes.constraints.PathSegment
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class TinyTypeSpec extends WordSpec {
+class TinyTypeSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "toString" should {
 
@@ -33,6 +37,26 @@ class TinyTypeSpec extends WordSpec {
         }
 
         tinyType.toString shouldBe someValue.toString
+      }
+    }
+  }
+
+  "stringTinyTypeConverter" should {
+
+    "url encode the given value and convert it to a single element list of PathSegment" in {
+      forAll(nonEmptyStrings(), Gen.oneOf("\\", " "), nonEmptyStrings()) { (part1, part2, part3) =>
+        val tinyType = new StringTinyType { val value = s"$part1$part2$part3" }
+        StringTinyType.stringTinyTypeConverter(tinyType) shouldBe List(PathSegment(tinyType.value))
+      }
+    }
+  }
+
+  "relativePathTinyTypeConverter" should {
+
+    "do not url encode the given value and convert it to a multiple elements list of PathSegment" in {
+      forAll(nonEmptyList(nonEmptyStrings())) { segments =>
+        val tinyType = new RelativePathTinyType { val value = segments.toList.mkString("/") }
+        RelativePathTinyType.relativePathTinyTypeConverter(tinyType) shouldBe segments.toList.map(PathSegment.apply)
       }
     }
   }
@@ -57,6 +81,8 @@ class SensitiveSpec extends WordSpec {
 
 class TinyTypeFactorySpec extends WordSpec {
 
+  import TinyTypeTest._
+
   "apply" should {
 
     "instantiate object of the relevant type" in {
@@ -71,25 +97,37 @@ class TinyTypeFactorySpec extends WordSpec {
 
     "throw an IllegalArgument exception if one of defined type constraints is not met" in {
       intercept[IllegalArgumentException] {
-        TinyTypeTest("def!")
+        TinyTypeTest(s"def$invalidChar")
       }.getMessage shouldBe "! is not allowed"
     }
   }
 
   "from" should {
 
+    import TinyTypeTest._
+
     "return Right with instantiated object for valid values" in {
       TinyTypeTest.from("def").map(_.value) shouldBe Right("def")
     }
 
-    "return Left with the IllegalArgumentException containing errors if the type constraints are not met" in {
-      val result = TinyTypeTest.from("abc")
+    "return Left with the IllegalArgumentException containing errors if the raw value tranformation fails" in {
+      val result = TinyTypeTest.from(invalidForTransformation)
 
       result shouldBe a[Left[_, _]]
 
       val Left(exception) = result
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe "ch.datascience.tinytypes.TinyTypeTest cannot have 'abc' value"
+      exception.getMessage shouldBe invalidTransformationException.getMessage
+    }
+
+    "return Left with the IllegalArgumentException containing errors if the type constraints are not met" in {
+      val result = TinyTypeTest.from(invalidValue)
+
+      result shouldBe a[Left[_, _]]
+
+      val Left(exception) = result
+      exception            shouldBe an[IllegalArgumentException]
+      exception.getMessage shouldBe invalidValueMessage
     }
   }
 }
@@ -122,16 +160,27 @@ class TypeNameSpec extends WordSpec {
 }
 
 private class TinyTypeTest private (val value: String) extends AnyVal with StringTinyType
-
 private object TinyTypeTest extends TinyTypeFactory[TinyTypeTest](new TinyTypeTest(_)) {
 
+  val invalidValue                   = "abc"
+  val invalidValueMessage            = s"$typeName cannot have '$invalidValue' value"
+  val invalidChar                    = "!"
+  val invalidCharMessage             = s"$invalidChar is not allowed"
+  val invalidForTransformation       = "10"
+  val invalidTransformationException = new IllegalArgumentException("transformation error")
+
+  override val transform: String => Either[Throwable, String] = {
+    case `invalidForTransformation` => Left(invalidTransformationException)
+    case other                      => Right(other.toString)
+  }
+
   addConstraint(
-    check   = !_.contains("abc"),
-    message = (value: String) => s"$typeName cannot have '$value' value"
+    check   = _ != invalidValue,
+    message = _ => invalidValueMessage
   )
 
   addConstraint(
-    check   = !_.contains("!"),
-    message = (value: String) => "! is not allowed"
+    check   = !_.contains(invalidChar),
+    message = _ => invalidCharMessage
   )
 }

@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model
+package ch.datascience.http.client
 
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.tinytypes.constraints.{RelativePath, RelativePathOps}
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets.UTF_8
 
-final class FilePath private (val value: String) extends AnyVal with StringTinyType
-object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
+object UrlEncoder {
+  val urlEncode: String => String = URLEncoder.encode(_, UTF_8.name())
+}

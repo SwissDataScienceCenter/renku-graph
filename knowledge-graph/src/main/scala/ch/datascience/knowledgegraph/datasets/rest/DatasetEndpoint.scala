@@ -24,7 +24,6 @@ import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.datasets.Identifier
-import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.ApplicationLogger
@@ -77,14 +76,6 @@ class DatasetEndpoint[Interpretation[_]: Effect](
         Some("identifier" -> dataset.id.asJson),
         Some("name" -> dataset.name.asJson),
         dataset.maybeDescription.map(description => "description" -> description.asJson),
-        Some("created" ->
-          json"""{
-          "dateCreated": ${dataset.created.date},
-          "agent": {
-            "email": ${dataset.created.agent.email},
-            "name": ${dataset.created.agent.name}
-          }
-        }"""),
         Some("published" -> Json.obj(List(
           dataset.published.maybeDate.map(date => "datePublished" -> date.asJson),
           Some("creator" -> dataset.published.creators.toList.asJson)
@@ -110,15 +101,21 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
     json"""{
       "name": ${part.name},
-      "atLocation": ${part.atLocation},
-      "dateCreated": ${part.dateCreated}
+      "atLocation": ${part.atLocation}
     }"""
   }
 
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
       "path": ${project.path},
-      "name": ${project.name}
+      "name": ${project.name},
+      "created": {
+        "dateCreated": ${project.created.date},
+        "agent": {
+          "email": ${project.created.agent.email},
+          "name": ${project.created.agent.name}
+        }
+      }
     }""" deepMerge _links(
       Link(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / project.path))
     )

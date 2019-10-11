@@ -20,8 +20,8 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
@@ -43,7 +43,6 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
             DatasetPart(
               DatasetPart.Id(commitIds.generateOne, datasetPartLocations.generateOne),
               datasetPartNames.generateOne,
-              datasetPartCreatedDates.generateOne,
               Project.Id(renkuBaseUrl, projectPaths.generateOne)
             ) deepMerge `schema:creator`(`mailto:None`),
             Person(
@@ -70,7 +69,6 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
             DatasetPart(
               DatasetPart.Id(commitIds.generateOne, datasetPartLocations.generateOne),
               datasetPartNames.generateOne,
-              datasetPartCreatedDates.generateOne,
               Project.Id(renkuBaseUrl, projectPaths.generateOne)
             ) deepMerge `schema:creator`(personId.value),
             Person(

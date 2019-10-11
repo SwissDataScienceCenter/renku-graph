@@ -21,35 +21,37 @@ package ch.datascience.rdfstore.triples
 import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls, listOf, setOf}
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.events.{CommitId, CommittedDate}
+import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
 import ch.datascience.graph.model.users.{Email, Name => UserName}
-import ch.datascience.graph.model.{projects, users, _}
+import ch.datascience.graph.model.{SchemaVersion, projects, users}
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities._
 import io.circe.Json
 import org.scalacheck.Gen
 
 object singleFileAndCommitWithDataset {
 
-  def apply(projectPath:               ProjectPath,
-            projectName:               projects.Name = projectNames.generateOne,
-            projectDateCreated:        projects.DateCreated = projectCreatedDates.generateOne,
-            projectCreator:            (users.Name, Email) = names.generateOne -> emails.generateOne,
-            commitId:                  CommitId = commitIds.generateOne,
-            committerName:             UserName = names.generateOne,
-            committerEmail:            Email = emails.generateOne,
-            datasetIdentifier:         Identifier = datasetIds.generateOne,
-            datasetName:               Name = datasetNames.generateOne,
-            maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
-            datasetCreatedDate:        DateCreated = datasetCreatedDates.generateOne,
-            maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-            maybeDatasetCreators:      Set[(UserName, Option[Email])] = setOf(datasetCreators).generateOne,
-            maybeDatasetParts:         List[(PartName, PartLocation, PartDateCreated)] = listOf(datasetParts).generateOne,
-            maybeDatasetUrl:           Option[String] = Gen.option(datasetUrl).generateOne,
-            schemaVersion:             SchemaVersion = schemaVersions.generateOne): List[Json] = {
+  def apply(
+      projectPath:               ProjectPath,
+      projectName:               projects.Name = projectNames.generateOne,
+      projectDateCreated:        projects.DateCreated = projectCreatedDates.generateOne,
+      projectCreator:            (users.Name, Email) = names.generateOne -> emails.generateOne,
+      commitId:                  CommitId = commitIds.generateOne,
+      committerName:             UserName = names.generateOne,
+      committerEmail:            Email = emails.generateOne,
+      committedDate:             CommittedDate = committedDates.generateOne,
+      datasetIdentifier:         Identifier = datasetIds.generateOne,
+      datasetName:               Name = datasetNames.generateOne,
+      maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+      maybeDatasetCreators:      Set[(UserName, Option[Email])] = setOf(datasetCreators).generateOne,
+      maybeDatasetParts:         List[(PartName, PartLocation)] = listOf(datasetParts).generateOne,
+      maybeDatasetUrl:           Option[String] = Gen.option(datasetUrl).generateOne,
+      schemaVersion:             SchemaVersion = schemaVersions.generateOne)(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
     val projectId                                 = Project.Id(renkuBaseUrl, projectPath)
     val (projectCreatorName, projectCreatorEmail) = projectCreator
     val projectCreatorId                          = Person.Id(projectCreatorName)
@@ -69,6 +71,7 @@ object singleFileAndCommitWithDataset {
       CommitActivity(
         commitActivityId,
         projectId,
+        committedDate,
         Some(Agent.Id(schemaVersion)),
         Some(Person.Id(committerName)),
         maybeInfluencedBy = List(
@@ -88,7 +91,6 @@ object singleFileAndCommitWithDataset {
       projectId,
       datasetName,
       maybeDatasetDescription,
-      datasetCreatedDate,
       maybeDatasetPublishedDate,
       maybeDatasetCreators,
       maybeDatasetParts,
@@ -104,11 +106,10 @@ object singleFileAndCommitWithDataset {
     maybeEmail <- Gen.option(emails)
   } yield (name, maybeEmail)
 
-  private val datasetParts: Gen[(PartName, PartLocation, PartDateCreated)] = for {
-    name        <- datasetPartNames
-    location    <- datasetPartLocations
-    dateCreated <- datasetPartCreatedDates
-  } yield (name, location, dateCreated)
+  private val datasetParts: Gen[(PartName, PartLocation)] = for {
+    name     <- datasetPartNames
+    location <- datasetPartLocations
+  } yield (name, location)
 
   private val datasetUrl: Gen[String] = for {
     url  <- httpUrls

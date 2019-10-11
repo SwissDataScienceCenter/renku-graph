@@ -21,19 +21,15 @@ package ch.datascience.graph.model
 import java.time.Instant
 
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
-import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
 object projects {
 
-  class ProjectPath private (val value: String) extends AnyVal with StringTinyType
-  implicit object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with NonBlank {
+  class ProjectPath private (val value: String) extends AnyVal with RelativePathTinyType
+  implicit object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with RelativePath {
     addConstraint(
-      check = value =>
-        value.contains("/") &&
-          (value.indexOf("/") == value.lastIndexOf("/")) &&
-          !value.startsWith("/") &&
-          !value.endsWith("/"),
+      check   = value => value.contains("/") && (value.indexOf("/") == value.lastIndexOf("/")),
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
   }
@@ -49,13 +45,10 @@ object projects {
     def apply(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath): FullProjectPath =
       FullProjectPath((renkuBaseUrl / "projects" / projectPath).value)
 
-    implicit lazy val projectPathConverter: FullProjectPath => Either[Exception, ProjectPath] = {
-      val projectPathExtractor = "^.*\\/projects\\/(.*\\/.*)$".r
-
-      {
-        case FullProjectPath(projectPathExtractor(path)) => ProjectPath.from(path)
-        case illegalValue                                => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
-      }
+    private val pathExtractor = "^.*\\/projects\\/(.*\\/.*)$".r
+    implicit lazy val projectPathConverter: TinyTypeConverter[FullProjectPath, ProjectPath] = {
+      case FullProjectPath(pathExtractor(path)) => ProjectPath.from(path)
+      case illegalValue                         => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
     }
   }
 
@@ -64,4 +57,7 @@ object projects {
 
   final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
+
+  final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
+  object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
 }

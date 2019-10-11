@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, PublishedDate}
+import ch.datascience.graph.model.datasets.PublishedDate
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import io.circe.literal._
@@ -56,9 +56,6 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
         {
           "identifier": {"value": ${dataset.id.value}},
           "name": {"value": ${dataset.name.value}},
-          "dateCreated": {"value": ${dataset.created.date.value}},
-          "agentEmail": {"value": ${dataset.created.agent.email.value}},
-          "agentName": {"value": ${dataset.created.agent.name.value}},
           "publishedDate": {"value": ${publishedDate.value}},
           "description": {"value": $description}
         }

@@ -19,12 +19,12 @@
 package ch.datascience.rdfstore.triples
 package entities
 
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.{CommitId, CommittedDate}
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
-import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.string.MatchesRegex
+import eu.timepit.refined.collection.NonEmpty
 import io.circe.Json
 import io.circe.literal._
 
@@ -32,19 +32,21 @@ private[triples] object CommitActivity {
 
   def apply(commitId:          CommitId,
             projectId:         Project.Id,
+            committedDate:     CommittedDate,
             maybeAgentId:      Option[Agent.Id],
             maybePersonId:     Option[Person.Id],
             maybeInfluencedBy: List[CommitCollectionEntity.Id],
-            comment:           String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]): Json =
-    apply(Id(commitId), projectId, maybeAgentId, maybePersonId, maybeInfluencedBy, comment)
+            comment:           String Refined NonEmpty)(implicit fusekiBaseUrl: FusekiBaseUrl): Json =
+    apply(Id(commitId), projectId, committedDate, maybeAgentId, maybePersonId, maybeInfluencedBy, comment)
 
   // format: off
   def apply(id:                Id,
             projectId:         Project.Id,
+            committedDate:     CommittedDate,
             maybeAgentId:      Option[Agent.Id],
             maybePersonId:     Option[Person.Id] = None,
             maybeInfluencedBy: List[CommitCollectionEntity.Id] = Nil,
-            comment:           String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T] = "some change"
+            comment:           String Refined NonEmpty = "some change"
   ): Json = json"""
   {
     "@id": $id,
@@ -55,7 +57,7 @@ private[triples] object CommitActivity {
     },
     "prov:startedAtTime": {
       "@type": "xsd:dateTime",
-      "@value": "2018-12-06T11:26:33+01:00"
+      "@value": ${committedDate.value}
     },
     "prov:wasInformedBy": {
       "@id": $id
@@ -67,7 +69,7 @@ private[triples] object CommitActivity {
       .deepMerge(maybeInfluencedBy toResources "prov:influenced")
   // format: on
 
-  final case class Id(commitId: CommitId) extends EntityId {
-    override val value: String = s"file:///commit/$commitId"
+  final case class Id(commitId: CommitId)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+    override val value: String = (fusekiBaseUrl / "commit" / commitId).toString
   }
 }

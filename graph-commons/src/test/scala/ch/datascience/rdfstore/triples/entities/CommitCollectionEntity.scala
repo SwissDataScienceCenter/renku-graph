@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples.entities
+package ch.datascience.rdfstore.triples
+package entities
 
-import ch.datascience.graph.model.FilePath
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.rdfstore.triples.EntityId
+import ch.datascience.graph.model.projects.FilePath
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import io.circe.Json
 import io.circe.literal._
@@ -34,10 +35,10 @@ private[triples] object CommitCollectionEntity {
   ): Json = apply(id, projectId, Some(hadMember))
 
   def apply(
-      commitId:  CommitId,
-      filePath:  FilePath,
-      projectId: Project.Id
-  ): Json = apply(Id(commitId, filePath), projectId, hadMember = None)
+      commitId:             CommitId,
+      filePath:             FilePath,
+      projectId:            Project.Id
+  )(implicit fusekiBaseUrl: FusekiBaseUrl): Json = apply(Id(commitId, filePath), projectId, hadMember = None)
 
   // format: off
   def apply(
@@ -58,7 +59,7 @@ private[triples] object CommitCollectionEntity {
       .deepMerge(hadMember toResource "prov:hadMember")
   // format: on
 
-  final case class Id(commitId: CommitId, filePath: FilePath) extends EntityId {
-    override val value: String = s"file:///blob/$commitId/$filePath"
+  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+    override val value: String = (fusekiBaseUrl / "blob" / commitId / filePath).toString
   }
 }

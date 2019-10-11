@@ -26,6 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import eu.timepit.refined.api.Refined
 import io.circe.literal._
+import org.scalacheck.Arbitrary
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -72,6 +73,22 @@ class TinyTypeDecodersSpec extends WordSpec {
     "decode JSON String value" in {
       val value = nonEmptyStrings().generateOne
       json"""$value""".as[StringTestType] shouldBe Right(StringTestType(value))
+    }
+  }
+
+  "relativePathDecoder" should {
+
+    "decode JSON String value" in {
+      val value = relativePaths().generateOne
+      json"""$value""".as[RelativePathTestType] shouldBe Right(RelativePathTestType(value))
+    }
+  }
+
+  "intDecoder" should {
+
+    "decode JSON Int value" in {
+      val value = Arbitrary.arbInt.arbitrary.generateOne
+      json"""$value""".as[IntTestType] shouldBe Right(IntTestType(value))
     }
   }
 

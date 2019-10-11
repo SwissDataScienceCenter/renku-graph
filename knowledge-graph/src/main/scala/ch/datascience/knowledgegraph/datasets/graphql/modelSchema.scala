@@ -33,28 +33,9 @@ object modelSchema {
             OptionType(StringType),
             Some("Data-set description"),
             resolve                                                                                 = _.value.maybeDescription.map(_.toString)),
-      Field("created", createdType, Some("Data-set creation info"), resolve                         = _.value.created),
       Field("published", publishedType, Some("Data-set publishing info"), resolve                   = _.value.published),
       Field("hasPart", ListType(partType), Some("Data-set files"), resolve                          = _.value.part),
       Field("isPartOf", ListType(projectType), Some("Projects where this dataset is used"), resolve = _.value.project)
-    )
-  )
-
-  private lazy val createdType: ObjectType[Unit, DatasetCreation] = ObjectType[Unit, DatasetCreation](
-    name        = "datasetCreation",
-    description = "Data-set creation info",
-    fields = fields[Unit, DatasetCreation](
-      Field("dateCreated", StringType, Some("Data-set creation date"), resolve             = _.value.date.toString),
-      Field("agent", agentType, Some("A person who created the dataset in Renku"), resolve = _.value.agent)
-    )
-  )
-
-  private lazy val agentType: ObjectType[Unit, DatasetAgent] = ObjectType[Unit, DatasetAgent](
-    name        = "datasetAgent",
-    description = "A person who created the dataset in Renku",
-    fields = fields[Unit, DatasetAgent](
-      Field("email", StringType, Some("Dataset agent email"), resolve = _.value.email.toString),
-      Field("name", StringType, Some("Dataset agent name"), resolve   = _.value.name.toString)
     )
   )
 
@@ -86,9 +67,26 @@ object modelSchema {
     name        = "datasetPart",
     description = "The datasets files",
     fields = fields[Unit, DatasetPart](
-      Field("name", StringType, Some("Dataset part name"), resolve                 = _.value.name.toString),
-      Field("atLocation", StringType, Some("Dataset part location"), resolve       = _.value.atLocation.toString),
-      Field("dateCreated", StringType, Some("Dataset part creation date"), resolve = _.value.dateCreated.toString),
+      Field("name", StringType, Some("Dataset part name"), resolve           = _.value.name.toString),
+      Field("atLocation", StringType, Some("Dataset part location"), resolve = _.value.atLocation.toString)
+    )
+  )
+
+  private lazy val createdType: ObjectType[Unit, DatasetInProjectCreation] = ObjectType[Unit, DatasetInProjectCreation](
+    name        = "datasetCreation",
+    description = "Data-set creation info",
+    fields = fields[Unit, DatasetInProjectCreation](
+      Field("dateCreated", StringType, Some("Data-set creation date"), resolve             = _.value.date.toString),
+      Field("agent", agentType, Some("A person who created the dataset in Renku"), resolve = _.value.agent)
+    )
+  )
+
+  private lazy val agentType: ObjectType[Unit, DatasetAgent] = ObjectType[Unit, DatasetAgent](
+    name        = "datasetAgent",
+    description = "A person who created the dataset in Renku",
+    fields = fields[Unit, DatasetAgent](
+      Field("email", StringType, Some("Dataset agent email"), resolve = _.value.email.toString),
+      Field("name", StringType, Some("Dataset agent name"), resolve   = _.value.name.toString)
     )
   )
 
@@ -96,8 +94,9 @@ object modelSchema {
     name        = "datasetProject",
     description = "A project where this dataset is used",
     fields = fields[Unit, DatasetProject](
-      Field("path", StringType, Some("Project path"), resolve = _.value.path.toString),
-      Field("name", StringType, Some("Project name"), resolve = _.value.name.toString)
+      Field("path", StringType, Some("Project path"), resolve               = _.value.path.toString),
+      Field("name", StringType, Some("Project name"), resolve               = _.value.name.toString),
+      Field("created", createdType, Some("Data-set creation info"), resolve = _.value.created),
     )
   )
 }

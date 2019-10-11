@@ -23,6 +23,7 @@ import cats.implicits._
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.model.HookToken
 import com.typesafe.config.{Config, ConfigFactory}

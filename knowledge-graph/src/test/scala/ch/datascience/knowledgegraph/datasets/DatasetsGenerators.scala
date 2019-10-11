@@ -32,21 +32,10 @@ object DatasetsGenerators {
     id               <- datasetIds
     name             <- datasetNames
     maybeDescription <- Gen.option(datasetDescriptions)
-    created          <- datasetCreations
     published        <- datasetPublishingInfos
     part             <- listOf(datasetPart)
     projects         <- nonEmptyList(datasetProjects)
-  } yield Dataset(id, name, maybeDescription, created, published, part, projects.toList)
-
-  private implicit lazy val datasetAgents: Gen[DatasetAgent] = for {
-    email <- emails
-    name  <- names
-  } yield DatasetAgent(email, name)
-
-  private implicit lazy val datasetCreations: Gen[DatasetCreation] = for {
-    createdDate <- datasetCreatedDates
-    agent       <- datasetAgents
-  } yield DatasetCreation(createdDate, agent)
+  } yield Dataset(id, name, maybeDescription, published, part, projects.toList)
 
   private implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
     maybeEmail <- Gen.option(emails)
@@ -62,13 +51,23 @@ object DatasetsGenerators {
     (creator1: DatasetCreator, creator2: DatasetCreator) => creator1.name.value compareTo creator2.name.value
 
   private implicit lazy val datasetPart: Gen[DatasetPart] = for {
-    name        <- datasetPartNames
-    location    <- datasetPartLocations
-    dateCreated <- datasetPartCreatedDates
-  } yield DatasetPart(name, location, dateCreated)
+    name     <- datasetPartNames
+    location <- datasetPartLocations
+  } yield DatasetPart(name, location)
 
   implicit lazy val datasetProjects: Gen[DatasetProject] = for {
-    path <- projectPaths
-    name <- projectNames
-  } yield DatasetProject(path, name)
+    path    <- projectPaths
+    name    <- projectNames
+    created <- datasetInProjectCreations
+  } yield DatasetProject(path, name, created)
+
+  implicit lazy val datasetInProjectCreations: Gen[DatasetInProjectCreation] = for {
+    createdDate <- datasetInProjectCreationDates
+    agent       <- datasetAgents
+  } yield DatasetInProjectCreation(createdDate, agent)
+
+  private implicit lazy val datasetAgents: Gen[DatasetAgent] = for {
+    email <- emails
+    name  <- names
+  } yield DatasetAgent(email, name)
 }

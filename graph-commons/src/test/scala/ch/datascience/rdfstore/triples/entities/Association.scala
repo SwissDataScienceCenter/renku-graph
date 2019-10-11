@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples.entities
+package ch.datascience.rdfstore.triples
+package entities
 
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.rdfstore.triples.EntityId
+import ch.datascience.rdfstore.FusekiBaseUrl
 import io.circe.Json
 import io.circe.literal._
 
@@ -31,7 +32,7 @@ private[triples] object Association {
     "@type": "prov:Association"
   }"""
 
-  final case class Id(commitId: CommitId) extends EntityId {
-    override val value: String = s"file:///commit/$commitId/association"
+  final case class Id(commitId: CommitId)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+    override val value: String = (fusekiBaseUrl / "commit" / commitId / "association").toString
   }
 }

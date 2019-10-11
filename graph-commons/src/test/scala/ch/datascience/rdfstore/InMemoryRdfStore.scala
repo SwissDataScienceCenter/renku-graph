@@ -84,7 +84,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
     fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
   )
-  import rdfStoreConfig._
+  protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl
+  import rdfStoreConfig.datasetName
   private lazy val renkuDataset = DatasetFactory.createTxnMem()
   private lazy val rdfStoreServer: FusekiServer = FusekiServer
     .create()

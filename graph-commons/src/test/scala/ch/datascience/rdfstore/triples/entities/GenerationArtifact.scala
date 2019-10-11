@@ -19,8 +19,9 @@
 package ch.datascience.rdfstore.triples
 package entities
 
-import ch.datascience.graph.model.FilePath
 import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.FilePath
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import io.circe.Json
 import io.circe.literal._
@@ -28,11 +29,11 @@ import io.circe.literal._
 private[triples] object GenerationArtifact {
 
   def apply(
-      commitId:     CommitId,
-      filePath:     FilePath,
-      generationId: EntityId,
-      projectId:    Project.Id
-  ): Json = apply(Id(commitId, filePath), generationId, projectId)
+      commitId:             CommitId,
+      filePath:             FilePath,
+      generationId:         EntityId,
+      projectId:            Project.Id
+  )(implicit fusekiBaseUrl: FusekiBaseUrl): Json = apply(Id(commitId, filePath), generationId, projectId)
 
   def apply(
       id:           Id,
@@ -51,7 +52,7 @@ private[triples] object GenerationArtifact {
     }
   }""" deepMerge `schema:isPartOf`(projectId)
 
-  final case class Id(commitId: CommitId, filePath: FilePath) extends EntityId {
-    override val value: String = s"file:///blob/$commitId/$filePath"
+  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+    override val value: String = (fusekiBaseUrl / "blob" / commitId / filePath).toString
   }
 }

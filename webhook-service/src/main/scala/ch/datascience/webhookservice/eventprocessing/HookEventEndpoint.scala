@@ -105,6 +105,7 @@ class HookEventEndpoint[Interpretation[_]: Effect](
 }
 
 private object HookEventEndpoint {
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
   private implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) => {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._

@@ -20,9 +20,8 @@ package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.FilePath
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators
 import ch.datascience.knowledgegraph.datasets.graphql.ProjectDatasetsFinder
 import ch.datascience.knowledgegraph.datasets.model._
@@ -83,10 +82,9 @@ class QuerySchemaSpec
             identifier
             name
             description
-            created { dateCreated agent { email name } }
             published { datePublished creator { email name } }
-            hasPart { name atLocation dateCreated }
-            isPartOf { path name }
+            hasPart { name atLocation }
+            isPartOf { path name created { dateCreated agent { email name } } }
           }
         }"""
 
@@ -178,13 +176,6 @@ class QuerySchemaSpec
         "identifier": ${dataset.id.value},
         "name": ${dataset.name.value},
         "description": ${dataset.maybeDescription.map(_.value).map(Json.fromString).getOrElse(Json.Null)},
-        "created": {
-          "dateCreated": ${dataset.created.date.value},
-          "agent": {
-            "email": ${dataset.created.agent.email.value},
-            "name": ${dataset.created.agent.name.value}
-          }
-        },
         "published": {
           "datePublished": ${dataset.published.maybeDate.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
           "creator": ${dataset.published.creators.toList}
@@ -204,15 +195,21 @@ class QuerySchemaSpec
     private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
       json"""{
         "name": ${part.name.value},
-        "atLocation": ${part.atLocation.value},
-        "dateCreated": ${part.dateCreated.value}
+        "atLocation": ${part.atLocation.value}
       }"""
     }
 
     private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
       json"""{
         "path": ${project.path.value},
-        "name": ${project.name.value}
+        "name": ${project.name.value},
+        "created": {
+          "dateCreated": ${project.created.date.value},
+          "agent": {
+            "email": ${project.created.agent.email.value},
+            "name": ${project.created.agent.name.value}
+          }
+        }
       }"""
     }
   }

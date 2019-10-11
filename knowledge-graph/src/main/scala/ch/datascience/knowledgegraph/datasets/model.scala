@@ -28,18 +28,16 @@ object model {
   final case class Dataset(id:               Identifier,
                            name:             Name,
                            maybeDescription: Option[Description],
-                           created:          DatasetCreation,
                            published:        DatasetPublishing,
                            part:             List[DatasetPart],
                            project:          List[DatasetProject])
 
-  final case class DatasetCreation(date: DateCreated, agent: DatasetAgent)
-  final case class DatasetAgent(email:   Email, name:        UserName)
-
   final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])
   final case class DatasetCreator(maybeEmail:   Option[Email], name:             UserName)
 
-  final case class DatasetPart(name: PartName, atLocation: PartLocation, dateCreated: PartDateCreated)
+  final case class DatasetPart(name: PartName, atLocation: PartLocation)
 
-  final case class DatasetProject(path: ProjectPath, name: projects.Name)
+  final case class DatasetProject(path:           ProjectPath, name:           projects.Name, created: DatasetInProjectCreation)
+  final case class DatasetInProjectCreation(date: DateCreatedInProject, agent: DatasetAgent)
+  final case class DatasetAgent(email:            Email, name:                 UserName)
 }
