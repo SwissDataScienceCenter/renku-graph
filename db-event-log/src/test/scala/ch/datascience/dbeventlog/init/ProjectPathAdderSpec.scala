@@ -23,8 +23,9 @@ import cats.implicits._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.commands._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitEvent, ProjectPath}
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.events.CommitEvent
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._

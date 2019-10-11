@@ -24,7 +24,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators.{commitEventIds, committedDates}
+import ch.datascience.graph.model.EventsGenerators.{commitEventIds, committedDates}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

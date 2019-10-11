@@ -22,9 +22,10 @@ import java.nio.file.Paths
 
 import ammonite.ops.{Bytes, CommandResult, Path}
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Renku
@@ -32,8 +33,8 @@ import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent._
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -42,12 +43,15 @@ class RenkuSpec extends WordSpec {
   "log" should {
 
     "return the 'renku log' output if it executes quicker than the defined timeout" in new TestCase {
-      val commandBody   = nonEmptyStrings().generateOne
-      val commandResult = CommandResult(exitCode = 0, chunks = Seq(Left(new Bytes(commandBody.getBytes()))))
+      val commandBody = jsonLDTriples.generateOne
+      val commandResult = CommandResult(
+        exitCode = 0,
+        chunks   = Seq(Left(new Bytes(commandBody.value.noSpaces.getBytes())))
+      )
 
       val triples = renku().log(commit, path)(triplesGeneration(returning = commandResult)).unsafeRunSync()
 
-      triples.value shouldBe commandBody
+      triples shouldBe commandBody
     }
 
     "fail if calling 'renku log' results in a failure" in new TestCase {

@@ -18,7 +18,8 @@
 
 package ch.datascience.webhookservice.project
 
-import ch.datascience.graph.model.events.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.tinytypes.StringTinyType
 import io.circe.Decoder
 

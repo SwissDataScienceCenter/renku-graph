@@ -24,7 +24,7 @@ import ch.datascience.dbeventlog._
 import DbEventLogGenerators._
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import doobie.implicits._
 import org.scalamock.scalatest.MockFactory

@@ -28,6 +28,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.config.GitLab
@@ -104,8 +105,10 @@ class HookEventEndpoint[Interpretation[_]: Effect](
 }
 
 private object HookEventEndpoint {
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
   private implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) => {
+    import ch.datascience.tinytypes.json.TinyTypeDecoders._
     for {
       id   <- cursor.downField("id").as[ProjectId]
       path <- cursor.downField("path_with_namespace").as[ProjectPath]

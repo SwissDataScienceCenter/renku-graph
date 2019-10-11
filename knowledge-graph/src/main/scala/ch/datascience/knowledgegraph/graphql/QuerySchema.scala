@@ -25,11 +25,11 @@ import scala.language.higherKinds
 object QuerySchema {
 
   def apply[Interpretation[_]](
-      fields: List[Field[QueryContext[Interpretation], Unit]]
+      fields: List[Field[QueryContext[Interpretation], Unit]]*
   ): Schema[QueryContext[Interpretation], Unit] = Schema {
     ObjectType(
       name   = "Query",
-      fields = fields
+      fields = fields.flatten.toList
     )
   }
 }

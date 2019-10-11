@@ -18,8 +18,9 @@
 
 package ch.datascience.tinytypes.constraints
 
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -34,13 +35,13 @@ class RelativePathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "be instantiatable when values are not starting and ending with '/'" in {
       forAll(nonEmptyStrings()) { someValue =>
-        RelativePathString(someValue).toString shouldBe someValue.toString
+        RelativePathString(someValue).toString shouldBe someValue
       }
     }
 
     "be instantiatable when values are not starting and ending with '/' but have the '/' sign inside" in {
       forAll(relativePaths()) { someValue =>
-        RelativePathString(someValue).toString shouldBe someValue.toString
+        RelativePathString(someValue).toString shouldBe someValue
       }
     }
 
@@ -48,9 +49,24 @@ class RelativePathSpec extends WordSpec with ScalaCheckPropertyChecks {
       intercept[IllegalArgumentException](RelativePathString("")).getMessage shouldBe "ch.datascience.tinytypes.constraints.RelativePathString cannot be blank"
     }
   }
+
+  "/" should {
+
+    "allow to add next path segment which got url encoded" in {
+      val path = (relativePaths() map RelativePathString.apply).generateOne
+      (path / "path to smth") shouldBe RelativePathString(s"$path/path+to+smth")
+    }
+
+    "use provided converted when adding the next path segment" in {
+      val path      = (relativePaths() map RelativePathString.apply).generateOne
+      val otherPath = (relativePaths(minSegments = 2) map RelativePathString.apply).generateOne
+      (path / otherPath) shouldBe RelativePathString(s"$path/$otherPath")
+    }
+  }
 }
 
-private class RelativePathString private (val value: String) extends AnyVal with StringTinyType
+private class RelativePathString private (val value: String) extends AnyVal with RelativePathTinyType
 private object RelativePathString
     extends TinyTypeFactory[RelativePathString](new RelativePathString(_))
     with RelativePath
+    with RelativePathOps[RelativePathString]

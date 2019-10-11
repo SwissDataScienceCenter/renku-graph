@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository
 
 import cats.effect.ConcurrentEffect
-import ch.datascience.graph.http.server.ProjectIdPathBinder
+import ch.datascience.graph.http.server.binders.ProjectId
 import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint
@@ -33,16 +33,17 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     deleteTokenEndpoint:    DeleteTokenEndpoint[F]
 ) extends Http4sDsl[F] {
 
+  import associateTokenEndpoint._
+  import deleteTokenEndpoint._
+  import fetchTokenEndpoint._
   import org.http4s.HttpRoutes
 
-  lazy val routes: HttpRoutes[F] = HttpRoutes
-    .of[F] {
-      case GET -> Root / "ping" => Ok("pong")
-      case GET -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
-        fetchTokenEndpoint.fetchToken(projectId)
-      case request @ PUT -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
-        associateTokenEndpoint.associateToken(projectId, request)
-      case DELETE -> Root / "projects" / ProjectIdPathBinder(projectId) / "tokens" =>
-        deleteTokenEndpoint.deleteToken(projectId)
-    }
+  // format: off
+  lazy val routes: HttpRoutes[F] = HttpRoutes.of[F] {
+    case           GET    -> Root / "ping"                                       => Ok("pong")
+    case           GET    -> Root / "projects" / ProjectId(projectId) / "tokens" => fetchToken(projectId)
+    case request @ PUT    -> Root / "projects" / ProjectId(projectId) / "tokens" => associateToken(projectId, request)
+    case           DELETE -> Root / "projects" / ProjectId(projectId) / "tokens" => deleteToken(projectId)
+  }
+  // format: on
 }

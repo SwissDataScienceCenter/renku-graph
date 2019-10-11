@@ -24,7 +24,7 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.webhookservice.project.ProjectVisibility.{Private, Public}
 import org.http4s.Status._
 import org.scalatest.Matchers._
@@ -89,7 +89,7 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
 
       And("the Access Token used in the POST should be added to the token repository")
       tokenRepositoryClient
-        .GET(s"projects/$projectId/tokens", maybeAccessToken = None)
+        .GET(s"projects/$projectId/tokens")
         .bodyAsJson shouldBe accessToken.toJson
 
       And("when the hook get deleted from GitLab")
@@ -103,7 +103,7 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
       afterDeletionResponse.status shouldBe NotFound
 
       And("the Access Token should be removed from the token repository")
-      tokenRepositoryClient.GET(s"projects/$projectId/tokens", maybeAccessToken = None).status shouldBe NotFound
+      tokenRepositoryClient.GET(s"projects/$projectId/tokens").status shouldBe NotFound
     }
   }
 }

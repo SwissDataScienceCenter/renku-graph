@@ -27,7 +27,7 @@ import EventStatus._
 import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitEventId, ProjectId}
 import doobie.implicits._
 import eu.timepit.refined.auto._

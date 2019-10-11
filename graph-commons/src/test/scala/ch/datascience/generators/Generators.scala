@@ -18,10 +18,11 @@
 
 package ch.datascience.generators
 
-import java.time.Instant
+import java.time._
 import java.time.temporal.ChronoUnit.{DAYS, MINUTES => MINS}
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, NonEmptySet}
+import cats.kernel.Order
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import eu.timepit.refined.api.Refined
@@ -40,8 +41,12 @@ object Generators {
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
 
+    val lengths =
+      if (maxLength == 1) choose(1, maxLength)
+      else frequency(1 -> choose(1, maxLength), 9 -> choose(2, maxLength))
+
     for {
-      length <- choose(1, maxLength)
+      length <- lengths
       chars  <- listOfN(length, charsGenerator)
     } yield chars.mkString("")
   }
@@ -70,14 +75,24 @@ object Generators {
       list <- Gen.listOfN(size, generator)
     } yield NonEmptyList.fromListUnsafe(list)
 
+  def nonEmptySet[T](generator: Gen[T], minElements: Int Refined Positive = 1, maxElements: Int Refined Positive = 5)(
+      implicit T:               Order[T]): Gen[NonEmptySet[T]] =
+    for {
+      size <- choose(minElements.value, maxElements.value)
+      set  <- Gen.containerOfN[Set, T](size, generator)
+    } yield NonEmptySet.of(set.head, set.tail.toList: _*)
+
   def listOf[T](generator: Gen[T], maxElements: Int Refined Positive = 5): Gen[List[T]] =
     for {
       size <- choose(0, maxElements.value)
       list <- Gen.listOfN(size, generator)
     } yield list
 
-  def setOf[T](generator: Gen[T], size: Int Refined Positive = 5): Gen[Set[T]] =
-    Gen.containerOfN[Set, T](size.value, generator)
+  def setOf[T](generator: Gen[T], maxElements: Int Refined Positive = 5): Gen[Set[T]] =
+    for {
+      size <- choose(0, maxElements.value)
+      set  <- Gen.containerOfN[Set, T](size, generator)
+    } yield set
 
   def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
     choose(1, max) map Refined.unsafeApply
@@ -93,14 +108,18 @@ object Generators {
     choose(1, max.toMillis)
       .map(FiniteDuration(_, MILLISECONDS))
 
-  def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] =
+  def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] = {
+    require(minSegments <= maxSegments,
+            s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense")
+
     for {
       partsNumber <- Gen.choose(minSegments, maxSegments)
       partsGenerator = nonEmptyStrings(
-        charsGenerator = oneOf(frequency(9 -> alphaChar), frequency(1 -> oneOf('-', '_')))
+        charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
       )
       parts <- Gen.listOfN(partsNumber, partsGenerator)
     } yield parts.mkString("/")
+  }
 
   val httpPorts: Gen[Int Refined Positive] = choose(1000, 10000) map Refined.unsafeApply
 
@@ -142,6 +161,20 @@ object Generators {
     Gen
       .choose(Instant.now().plus(10, MINS).toEpochMilli, Instant.now().plus(2000, DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)
+
+  val zonedDateTimes: Gen[ZonedDateTime] =
+    timestamps
+      .map(ZonedDateTime.ofInstant(_, ZoneId.systemDefault))
+
+  val localDates: Gen[LocalDate] =
+    timestamps
+      .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
+      .map(_.toLocalDate)
+
+  val localDatesNotInTheFuture: Gen[LocalDate] =
+    timestampsNotInTheFuture
+      .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
+      .map(_.toLocalDate)
 
   implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls.map(ServiceUrl.apply)
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply

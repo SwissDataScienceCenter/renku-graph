@@ -18,9 +18,16 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.RdfStoreData.RDF
+import ch.datascience.rdfstore.triples._
+import ch.datascience.rdfstore.triples.entities.{DatasetPart, Person, Project}
+import io.circe.Json
+import io.circe.literal._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -31,20 +38,18 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
     "do nothing if the 'mailto:None' is used an object" in new TestCase {
 
       loadToStore {
-        RDF(
-          <rdf:Description rdf:about="file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/some-dataset/README.rst">
-            <rdf:type rdf:resource="http://schema.org/DigitalDocument"/>
-            <schema:creator rdf:resource="mailto:None"/>
-            <schema:isPartOf rdf:resource="https://renku.ch/testing/project"/>
-            <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-            <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-            <schema:dateCreated>2019-07-31 09:19:57.694772</schema:dateCreated>
-          </rdf:Description>
-          <rdf:Description rdf:about="mailto:None">
-            <rdf:type rdf:resource="http://schema.org/Person"/>
-            <schema:email>user@mail.org</schema:email>
-            <schema:name>User Name</schema:name>
-          </rdf:Description>
+        triples(
+          List(
+            DatasetPart(
+              DatasetPart.Id(commitIds.generateOne, datasetPartLocations.generateOne),
+              datasetPartNames.generateOne,
+              Project.Id(renkuBaseUrl, projectPaths.generateOne)
+            ) deepMerge `schema:creator`(`mailto:None`),
+            Person(
+              Person.Id(names.generateOne),
+              emails.map(Option.apply).generateOne
+            ) deepMerge `@id`(`mailto:None`)
+          )
         )
       }
 
@@ -57,26 +62,24 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
 
     "remove triples with the 'mailto:None' subject if such a resource is not used an object" in new TestCase {
 
+      val personId = Person.Id(names.generateOne)
       loadToStore {
-        RDF(
-          <rdf:Description rdf:about="file:///blob/4c0d6fc8b37c3b9a4dfeeee3c184fab018f9513b/data/some-dataset/README.rst">
-            <rdf:type rdf:resource="http://schema.org/DigitalDocument"/>
-            <schema:creator rdf:resource="mailto:user@mail.org"/>
-            <schema:isPartOf rdf:resource="https://renku.ch/testing/project"/>
-            <rdf:type rdf:resource="http://www.w3.org/ns/prov#Entity"/>
-            <rdf:type rdf:resource="http://purl.org/wf4ever/wfprov#Artifact"/>
-            <schema:dateCreated>2019-07-31 09:19:57.694772</schema:dateCreated>
-          </rdf:Description>
-          <rdf:Description rdf:about="mailto:None">
-            <rdf:type rdf:resource="http://schema.org/Person"/>
-            <schema:email>user@mail.org</schema:email>
-            <schema:name>User Name</schema:name>
-          </rdf:Description>
-          <rdf:Description rdf:about="mailto:user@mail.org">
-            <rdf:type rdf:resource="http://schema.org/Person"/>
-            <schema:email>user@mail.org</schema:email>
-            <schema:name>User Name</schema:name>
-          </rdf:Description>
+        triples(
+          List(
+            DatasetPart(
+              DatasetPart.Id(commitIds.generateOne, datasetPartLocations.generateOne),
+              datasetPartNames.generateOne,
+              Project.Id(renkuBaseUrl, projectPaths.generateOne)
+            ) deepMerge `schema:creator`(personId.value),
+            Person(
+              personId,
+              emails.map(Option.apply).generateOne
+            ),
+            Person(
+              Person.Id(names.generateOne),
+              emails.map(Option.apply).generateOne
+            ) deepMerge `@id`(`mailto:None`)
+          )
         )
       }
 
@@ -102,4 +105,16 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
       .headOption
       .map(_.toInt)
       .getOrElse(throw new Exception("Cannot find the count of the 'mailto:None' triples"))
+
+  private def `schema:creator`(id: String): Json = json"""{
+    "schema:creator": {
+        "@id": $id
+    }
+  }"""
+
+  private def `@id`(id: String): Json = json"""{
+    "@id": $id
+  }"""
+
+  private val `mailto:None`: String = "mailto:None"
 }

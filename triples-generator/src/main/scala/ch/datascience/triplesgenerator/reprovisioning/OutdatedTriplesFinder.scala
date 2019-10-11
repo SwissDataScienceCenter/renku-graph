@@ -21,8 +21,10 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.projects.FullProjectPath
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.{Decoder, HCursor}
 

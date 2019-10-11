@@ -19,7 +19,8 @@
 package ch.datascience.webhookservice.generators
 
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.webhookservice.commits.CommitInfo
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.eventprocessing.StartCommit

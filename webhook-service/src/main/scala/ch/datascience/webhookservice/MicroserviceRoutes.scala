@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice
 
 import cats.effect.ConcurrentEffect
-import ch.datascience.graph.http.server.ProjectIdPathBinder
+import ch.datascience.graph.http.server.binders.ProjectId
 import ch.datascience.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import ch.datascience.webhookservice.hookcreation.HookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint
@@ -34,18 +34,19 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     processingStatusEndpoint: ProcessingStatusEndpoint[F]
 ) extends Http4sDsl[F] {
 
+  import hookCreationEndpoint._
+  import hookEventEndpoint._
+  import hookValidationEndpoint._
   import org.http4s.HttpRoutes
+  import processingStatusEndpoint._
 
-  lazy val routes: HttpRoutes[F] = HttpRoutes
-    .of[F] {
-      case GET -> Root / "ping" => Ok("pong")
-      case request @ POST -> Root / "webhooks" / "events" =>
-        hookEventEndpoint.processPushEvent(request)
-      case request @ POST -> Root / "projects" / ProjectIdPathBinder(projectId) / "webhooks" =>
-        hookCreationEndpoint.createHook(projectId, request)
-      case request @ POST -> Root / "projects" / ProjectIdPathBinder(projectId) / "webhooks" / "validation" =>
-        hookValidationEndpoint.validateHook(projectId, request)
-      case GET -> Root / "projects" / ProjectIdPathBinder(projectId) / "events" / "status" =>
-        processingStatusEndpoint.fetchProcessingStatus(projectId)
-    }
+  // format: off
+  lazy val routes: HttpRoutes[F] = HttpRoutes.of[F] {
+    case           GET  -> Root / "ping"                                                        => Ok("pong")
+    case request @ POST -> Root / "webhooks" / "events"                                         => processPushEvent(request)
+    case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks"                => createHook(projectId, request)
+    case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" => validateHook(projectId, request)
+    case           GET  -> Root / "projects" / ProjectId(projectId) / "events" / "status"       => fetchProcessingStatus(projectId)
+  }
+  // format: on
 }

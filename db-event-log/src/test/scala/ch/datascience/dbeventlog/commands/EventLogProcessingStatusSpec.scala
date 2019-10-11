@@ -27,7 +27,7 @@ import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.{CreatedDate, EventStatus}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventsGenerators.{commitEventIds, committedDates, projectIds}
+import ch.datascience.graph.model.EventsGenerators.{commitEventIds, committedDates, projectIds}
 import ch.datascience.graph.model.events.ProjectId
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen

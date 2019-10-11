@@ -163,10 +163,17 @@ abstract class ServiceClient(implicit executionContext: ExecutionContext,
     } yield response
   }.unsafeRunSync()
 
-  def GET(url: String, maybeAccessToken: Option[AccessToken]): Response[IO] = {
+  def GET(url: String, accessToken: AccessToken): Response[IO] = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.GET, uri, maybeAccessToken))(mapResponse)
+      response <- send(request(Method.GET, uri, maybeAccessToken = Some(accessToken)))(mapResponse)
+    } yield response
+  }.unsafeRunSync()
+
+  def GET(url: String): Response[IO] = {
+    for {
+      uri      <- validateUri(s"$baseUrl/$url")
+      response <- send(request(Method.GET, uri))(mapResponse)
     } yield response
   }.unsafeRunSync()
 

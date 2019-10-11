@@ -26,11 +26,12 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.ProjectPath
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
+import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.Commit._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
-import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.ExecutionContext
@@ -54,15 +55,15 @@ class RenkuLogTriplesGenerator private[renkulog] (
   private val workDirectory: Path = root / "tmp"
   private val repositoryDirectoryFinder = ".*/(.*)$".r
 
-  def generateTriples(commit: Commit, maybeAccessToken: Option[AccessToken]): IO[RDFTriples] =
+  def generateTriples(commit: Commit, maybeAccessToken: Option[AccessToken]): IO[JsonLDTriples] =
     createRepositoryDirectory(commit.project.path)
       .bracket { repositoryDirectory =>
         for {
           gitRepositoryUrl <- findRepositoryUrl(commit.project.path, maybeAccessToken)
           _                <- git cloneRepo (gitRepositoryUrl, repositoryDirectory, workDirectory)
           _                <- git checkout (commit.id, repositoryDirectory)
-          rdfTriples       <- findTriples(commit, repositoryDirectory)
-        } yield rdfTriples
+          triples          <- findTriples(commit, repositoryDirectory)
+        } yield triples
       }(repositoryDirectory => delete(repositoryDirectory))
       .recoverWith(meaningfulError)
 
@@ -76,7 +77,7 @@ class RenkuLogTriplesGenerator private[renkulog] (
     case repositoryDirectoryFinder(folderName) => folderName
   }
 
-  private def findTriples(commit: Commit, repositoryDirectory: Path): IO[RDFTriples] = {
+  private def findTriples(commit: Commit, repositoryDirectory: Path): IO[JsonLDTriples] = {
     import renku._
 
     commit match {
@@ -85,7 +86,7 @@ class RenkuLogTriplesGenerator private[renkulog] (
     }
   }
 
-  private lazy val meaningfulError: PartialFunction[Throwable, IO[RDFTriples]] = {
+  private lazy val meaningfulError: PartialFunction[Throwable, IO[JsonLDTriples]] = {
     case NonFatal(exception) =>
       IO.raiseError(new RuntimeException("Triples generation failed", exception))
   }
