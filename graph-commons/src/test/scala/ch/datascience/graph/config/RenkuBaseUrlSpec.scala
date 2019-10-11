@@ -44,7 +44,8 @@ class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
             ).asJava
           ).asJava
         )
-        val Success(actual) = RenkuBaseUrl[Try](config)
+
+        RenkuBaseUrl[Try](config) shouldBe Success(RenkuBaseUrl(url))
       }
     }
 

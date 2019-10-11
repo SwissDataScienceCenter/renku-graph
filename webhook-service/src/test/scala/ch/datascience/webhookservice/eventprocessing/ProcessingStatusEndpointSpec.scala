@@ -27,7 +27,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators.processingStatuses
 import ch.datascience.dbeventlog.commands.{IOEventLogProcessingStatus, ProcessingStatus}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.events.EventsGenerators.projectIds
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._

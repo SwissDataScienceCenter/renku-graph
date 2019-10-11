@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import io.circe.Json
 import io.circe.parser._
 import org.scalamock.scalatest.MockFactory

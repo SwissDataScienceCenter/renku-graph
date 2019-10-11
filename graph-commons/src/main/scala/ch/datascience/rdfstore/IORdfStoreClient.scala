@@ -27,7 +27,7 @@ import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
-import org.http4s.Uri
+import org.http4s.{Header, Uri}
 
 import scala.concurrent.ExecutionContext
 
@@ -42,7 +42,6 @@ abstract class IORdfStoreClient[QT <: RdfQueryType](
     extends IORestClient(Throttler.noThrottling, logger) {
 
   import ch.datascience.rdfstore.IORdfStoreClient.{Query, RdfQuery}
-  import org.http4s.MediaType.application
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
   import org.http4s.Status._
@@ -67,7 +66,7 @@ abstract class IORdfStoreClient[QT <: RdfQueryType](
   private def uploadRequest(uri: Uri, query: Query): Request[IO] =
     request(POST, uri, rdfStoreConfig.authCredentials)
       .withEntity(toEntity(query))
-      .putHeaders(`Content-Type`(`x-www-form-urlencoded`), Accept(application.json))
+      .putHeaders(`Content-Type`(`x-www-form-urlencoded`), Header(Accept.name.value, "application/sparql-results+json"))
 
   private def toFullResponseMapper[ResultType](
       mapResponse: Response[IO] => IO[ResultType]

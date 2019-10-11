@@ -22,9 +22,10 @@ import java.time.Instant
 
 import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog._
-import ch.datascience.graph.model.events._
-import EventsGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects.ProjectPath
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 import org.scalatest.TestSuite

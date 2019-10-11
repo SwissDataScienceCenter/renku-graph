@@ -21,6 +21,7 @@ package ch.datascience.generators
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
+import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
@@ -28,14 +29,30 @@ import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.users.{Email, Name, Username}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
-import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl, RdfStoreConfig}
+import ch.datascience.http.rest.Links
+import ch.datascience.http.rest.Links.{Href, Link, Rel}
+import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import io.circe.literal._
 import org.scalacheck.Gen
 
 object CommonGraphGenerators {
+
+  implicit val emails: Gen[Email] = for {
+    beforeAt <- nonEmptyStrings()
+    afterAt  <- nonEmptyStrings()
+  } yield Email(s"$beforeAt@$afterAt")
+
+  implicit val usernames: Gen[Username] = nonEmptyStrings() map Username.apply
+
+  implicit val names: Gen[Name] = for {
+    first  <- nonEmptyStrings()
+    second <- nonEmptyStrings()
+  } yield Name(s"$first $second")
 
   implicit val aesCryptoSecrets: Gen[AesCrypto.Secret] =
     stringsOfLength(16)
@@ -83,7 +100,8 @@ object CommonGraphGenerators {
     .map(_.mkString("."))
     .map(SchemaVersion.apply)
 
-  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls map RenkuBaseUrl.apply
+  implicit val renkuBaseUrls:      Gen[RenkuBaseUrl]      = httpUrls map RenkuBaseUrl.apply
+  implicit val renkuResourcesUrls: Gen[RenkuResourcesUrl] = httpUrls map RenkuResourcesUrl.apply
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
     url         <- httpUrls
@@ -97,4 +115,31 @@ object CommonGraphGenerators {
     serviceName     <- serviceNames
     environmentName <- environmentNames
   } yield SentryConfig(url, environmentName, serviceName)
+
+  implicit val rels: Gen[Rel] = nonEmptyStrings() map Rel.apply
+  implicit val hrefs: Gen[Href] = for {
+    baseUrl <- httpUrls
+    path    <- relativePaths()
+  } yield Href(s"$baseUrl/$path")
+  implicit val linkObjects: Gen[Link] = for {
+    rel  <- rels
+    href <- hrefs
+  } yield Link(rel, href)
+  implicit val linksObjects: Gen[Links] = nonEmptyList(linkObjects) map Links.apply
+
+  implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
+    subject <- nonEmptyStrings()
+    obj     <- nonEmptyStrings()
+  } yield
+    JsonLDTriples {
+      json"""{
+        "@context": {
+          "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+          "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+          "xsd": "http://www.w3.org/2001/XMLSchema#"
+        },
+        "@id": $subject,
+        "rdfs:label": $obj
+      }"""
+    }
 }

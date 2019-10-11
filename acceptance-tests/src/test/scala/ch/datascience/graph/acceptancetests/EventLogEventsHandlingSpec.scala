@@ -25,7 +25,7 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
-import ch.datascience.graph.model.events.EventsGenerators.{commitIds, projects}
+import ch.datascience.graph.model.EventsGenerators.{commitIds, projects}
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.Matchers._

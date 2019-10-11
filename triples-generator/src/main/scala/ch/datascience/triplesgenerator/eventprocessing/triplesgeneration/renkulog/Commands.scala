@@ -22,11 +22,13 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.{CommitId, ProjectPath}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.triplesgenerator.eventprocessing.{Commit, RDFTriples}
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.Commit
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -103,33 +105,34 @@ private object Commands {
     executionContext:      ExecutionContext) {
 
     import scala.util.Try
+    import cats.implicits._
 
     def log[T <: Commit](
         commit:                 T,
         destinationDirectory:   Path
-    )(implicit generateTriples: (T, Path) => CommandResult): IO[RDFTriples] =
+    )(implicit generateTriples: (T, Path) => CommandResult): IO[JsonLDTriples] =
       IO.race(
           call(generateTriples(commit, destinationDirectory)),
           timer.sleep(timeout)
         )
         .flatMap {
-          case Left(rdfTriples) => IO.pure(rdfTriples)
-          case Right(_)         => timeoutExceededError(commit)
+          case Left(triples) => IO.pure(triples)
+          case Right(_)      => timeoutExceededError(commit)
         }
 
-    private def timeoutExceededError(commit: Commit): IO[RDFTriples] = ME.raiseError {
+    private def timeoutExceededError(commit: Commit): IO[JsonLDTriples] = ME.raiseError {
       new Exception(
         s"'renku log' execution for commit: ${commit.id}, project: ${commit.project.id} took longer than $timeout - terminating"
       )
     }
 
     private def call(generateTriples: => CommandResult) =
-      IO.cancelable[RDFTriples] { callback =>
+      IO.cancelable[JsonLDTriples] { callback =>
         executionContext.execute { () =>
           {
             for {
               triplesAsString <- Try(generateTriples.out.string.trim)
-              wrappedTriples  <- RDFTriples.from(triplesAsString).toTry
+              wrappedTriples  <- JsonLDTriples.parse[Try](triplesAsString)
             } yield callback(Right(wrappedTriples))
           }.recover { case NonFatal(exception) => callback(Left(exception)) }
             .fold(throw _, identity)
@@ -139,7 +142,7 @@ private object Commands {
 
     implicit val commitWithoutParentTriplesFinder: (CommitWithoutParent, Path) => CommandResult = {
       case (_, destinationDirectory) =>
-        %%('renku, 'log, "--format", "rdf")(destinationDirectory)
+        %%('renku, 'log, "--format", "json-ld")(destinationDirectory)
     }
 
     implicit val commitWithParentTriplesFinder: (CommitWithParent, Path) => CommandResult = {
@@ -155,7 +158,7 @@ private object Commands {
           'renku,
           'log,
           "--format",
-          "rdf",
+          "json-ld",
           "--revision",
           s"${commit.parentId}..${commit.id}",
           changedFiles
