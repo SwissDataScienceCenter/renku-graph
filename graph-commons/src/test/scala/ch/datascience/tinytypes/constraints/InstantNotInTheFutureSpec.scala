@@ -50,7 +50,7 @@ class InstantNotInTheFutureSpec extends WordSpec with ScalaCheckPropertyChecks {
     "throw an IllegalArgumentException for instants from the future" in {
       intercept[IllegalArgumentException] {
         InstantNotInTheFutureType(Instant.now().plusSeconds(10))
-      }.getMessage shouldBe "ch.datascience.tinytypes.constraints.InstantNotInTheFutureType has to be in the past"
+      }.getMessage shouldBe "ch.datascience.tinytypes.constraints.InstantNotInTheFutureType cannot be in the future"
     }
   }
 }

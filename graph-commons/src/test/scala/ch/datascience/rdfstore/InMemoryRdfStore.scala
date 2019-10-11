@@ -38,6 +38,7 @@ package ch.datascience.rdfstore
 
 import java.io.ByteArrayInputStream
 import java.net.{ServerSocket, SocketException}
+import java.nio.charset.StandardCharsets.UTF_8
 
 import cats.MonadError
 import cats.data.Validated
@@ -51,6 +52,7 @@ import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.query.DatasetFactory
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
+import org.apache.jena.riot.{Lang, RDFDataMgr}
 import org.http4s.Uri
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
@@ -59,6 +61,7 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 import scala.language.reflectiveCalls
+import scala.util.Random.shuffle
 import scala.xml.Elem
 
 trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
@@ -69,7 +72,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected implicit val timer: Timer[IO]                 = IO.timer(global)
   protected val context:        MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-  private val fusekiServerPort = Gen.choose(3000, 3100).retryUntil(portAvailable).generateOne
+  private val fusekiServerPort = Gen.oneOf(shuffle((3000 to 3200).toList)).retryUntil(portAvailable).generateOne
 
   private lazy val portAvailable: Int => Boolean = { port =>
     Validated
@@ -80,13 +83,14 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
     fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
   )
-  import rdfStoreConfig._
-  private lazy val renkuDataSet = DatasetFactory.createTxnMem()
+  protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl
+  import rdfStoreConfig.datasetName
+  private lazy val renkuDataset = DatasetFactory.createTxnMem()
   private lazy val rdfStoreServer: FusekiServer = FusekiServer
     .create()
     .loopback(true)
     .port(fusekiServerPort)
-    .add(s"/$datasetName", renkuDataSet)
+    .add(s"/$datasetName", renkuDataset)
     .build
 
   protected val sparqlEndpoint: Uri = Uri
@@ -110,8 +114,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   }
 
   before {
-    renkuDataSet.asDatasetGraph().clear()
-    renkuDataSet.asDatasetGraph().isEmpty shouldBe true
+    renkuDataset.asDatasetGraph().clear()
+    renkuDataset.asDatasetGraph().isEmpty shouldBe true
   }
 
   protected override def afterAll(): Unit = {
@@ -125,6 +129,19 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
         IO {
           connection.load {
             ModelFactory.createDefaultModel.read(new ByteArrayInputStream(triples.toString().getBytes), "")
+          }
+        }
+      }
+      .unsafeRunSync()
+
+  protected def loadToStore(triples: JsonLDTriples): Unit =
+    rdfConnectionResource
+      .use { connection =>
+        IO {
+          connection.load {
+            val model = ModelFactory.createDefaultModel()
+            RDFDataMgr.read(model, new ByteArrayInputStream(triples.value.noSpaces.getBytes(UTF_8)), null, Lang.JSONLD)
+            model
           }
         }
       }

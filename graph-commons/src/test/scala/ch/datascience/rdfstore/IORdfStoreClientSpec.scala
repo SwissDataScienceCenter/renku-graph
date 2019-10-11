@@ -56,6 +56,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
         post(s"/${rdfStoreConfig.datasetName}/sparql")
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
+          .withHeader("accept", equalTo("application/sparql-results+json"))
           .withRequestBody(equalTo(s"query=${client.query}"))
           .willReturn(okJson(responseBody.noSpaces))
       }

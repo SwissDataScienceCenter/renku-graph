@@ -21,21 +21,25 @@ package ch.datascience.graph.acceptancetests.tooling
 import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
 import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.query.{DatasetFactory, QuerySolution}
 import org.apache.jena.rdfconnection.RDFConnectionFactory
 
-import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext
 
 object RDFStore {
+
+  private val jenaPort: Int           = 3030
+  val fusekiBaseUrl:    FusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$jenaPort")
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   // There's a problem with restarting Jena so this whole weirdness comes due to that fact
   private class JenaInstance {
-    lazy val renkuDataSet = DatasetFactory.createTxnMem()
-    lazy val connection   = RDFConnectionFactory.connect(renkuDataSet)
+    lazy val renkuDataset = DatasetFactory.createTxnMem()
+    lazy val connection   = RDFConnectionFactory.connect(renkuDataset)
 
     private val jenaFiber = MVar.empty[IO, Fiber[IO, FusekiServer]].unsafeRunSync()
 
@@ -46,8 +50,8 @@ object RDFStore {
                   FusekiServer
                     .create()
                     .loopback(true)
-                    .port(3030)
-                    .add("/renku", renkuDataSet)
+                    .port(jenaPort)
+                    .add("/renku", renkuDataset)
                     .build
                     .start()
                 }.start
@@ -56,7 +60,7 @@ object RDFStore {
 
     def stop(): IO[Unit] = {
       connection.close()
-      renkuDataSet.close()
+      renkuDataset.close()
       jenaFiber.tryTake.flatMap {
         case None => IO.unit
         case Some(fiber) =>
@@ -106,19 +110,20 @@ object RDFStore {
 
     jenaReference.read
       .map { jena =>
-        jena.connection
+        val queryResults = jena.connection
           .query("""
-                   |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                   |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                   |
                    |SELECT ?s ?p ?o WHERE {
                    |  ?s ?p ?o .
                    |}
                    |""".stripMargin)
           .execSelect()
-          .asScala
-          .toSeq
-          .map(row => (row.read("s"), row.read("p"), row.read("o")))
+
+        val results = ArrayBuffer.empty[(String, String, String)]
+        while (queryResults.hasNext) {
+          val row = queryResults.next()
+          results += ((row.read("s"), row.read("p"), row.read("o")))
+        }
+        results.toList
       }
       .unsafeRunSync()
   }

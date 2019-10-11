@@ -21,11 +21,12 @@ package ch.datascience.triplesgenerator.reprovisioning
 import ReProvisioningGenerators._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.projects.FullProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.RdfStoreData._
+import ch.datascience.rdfstore.triples._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -39,15 +40,16 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
       "if there are multiple projects with outdated triples" in new TestCase {
 
       val project1               = projectPaths.generateOne
-      val project1OutdatedCommit = commitIdResources.generateOne
+      val project1OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
       val project2               = projectPaths.generateOne
-      val project2OutdatedCommit = commitIdResources.generateOne
-      val triples = RDF(
-        singleFileAndCommitTriples(project1, project1OutdatedCommit.toCommitId, None),
-        singleFileAndCommitTriples(project2, project2OutdatedCommit.toCommitId, None)
-      )
+      val project2OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
-      loadToStore(triples)
+      loadToStore(
+        triples(
+          singleFileAndCommit(project1, project1OutdatedCommit.toCommitId, maybeSchemaVersion = None),
+          singleFileAndCommit(project2, project2OutdatedCommit.toCommitId, maybeSchemaVersion = None)
+        )
+      )
 
       // format: off
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() should (
@@ -61,16 +63,17 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
     "return all project's commits having triples with no agent or agent with different version in one result" in new TestCase {
 
       val project1                = projectPaths.generateOne
-      val project1Commit1NoAgent  = commitIdResources.generateOne
-      val project1Commit2Outdated = commitIdResources.generateOne
-      val project1Commit3UpToDate = commitIdResources.generateOne
-      val triples = RDF(
-        singleFileAndCommitTriples(project1, project1Commit1NoAgent.toCommitId, None),
-        singleFileAndCommitTriples(project1, project1Commit2Outdated.toCommitId, Some(schemaVersions.generateOne)),
-        singleFileAndCommitTriples(project1, project1Commit3UpToDate.toCommitId, Some(schemaVersion))
-      )
+      val project1Commit1NoAgent  = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val project1Commit2Outdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val project1Commit3UpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
-      loadToStore(triples)
+      loadToStore(
+        triples(
+          singleFileAndCommit(project1, project1Commit1NoAgent.toCommitId, maybeSchemaVersion = None),
+          singleFileAndCommit(project1, project1Commit2Outdated.toCommitId, Some(schemaVersions.generateOne)),
+          singleFileAndCommit(project1, project1Commit3UpToDate.toCommitId, Some(schemaVersion))
+        )
+      )
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe Some(
         OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1),
@@ -81,12 +84,13 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
     "return no results if there's no project with outdated commits" in new TestCase {
 
       val project               = projectPaths.generateOne
-      val projectCommitUpToDate = commitIdResources.generateOne
-      val triples = RDF(
-        singleFileAndCommitTriples(project, projectCommitUpToDate.toCommitId, Some(schemaVersion))
-      )
+      val projectCommitUpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
-      loadToStore(triples)
+      loadToStore(
+        triples(
+          singleFileAndCommit(project, projectCommitUpToDate.toCommitId, Some(schemaVersion))
+        )
+      )
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe None
     }
@@ -99,6 +103,6 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
   private implicit class CommitIdResouceOps(commitIdResource: CommitIdResource) {
     import cats.implicits._
-    lazy val toCommitId = commitIdResource.to[Try, CommitId].fold(throw _, identity)
+    lazy val toCommitId = commitIdResource.as[Try, CommitId].fold(throw _, identity)
   }
 }

@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository.deletion
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec

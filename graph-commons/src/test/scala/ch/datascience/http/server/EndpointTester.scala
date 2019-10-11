@@ -22,6 +22,8 @@ import cats.data.Kleisli
 import cats.effect.{ContextShift, IO, Sync}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
+import ch.datascience.http.rest.Links
+import ch.datascience.http.rest.Links.{Href, Rel}
 import eu.timepit.refined.api.RefType
 import io.circe.{Decoder, DecodingFailure, Json}
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
@@ -34,8 +36,9 @@ object EndpointTester {
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
-  implicit val jsonEntityDecoder: EntityDecoder[IO, Json] = jsonOf[IO, Json]
-  implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
+  implicit val jsonEntityDecoder:     EntityDecoder[IO, Json]       = jsonOf[IO, Json]
+  implicit val jsonListEntityDecoder: EntityDecoder[IO, List[Json]] = jsonOf[IO, List[Json]]
+  implicit val jsonEntityEncoder:     EntityEncoder[IO, Json]       = jsonEncoderOf[IO, Json]
 
   implicit class EndpointOps(endpoint: Kleisli[IO, Request[IO], Response[IO]]) {
 
@@ -63,4 +66,20 @@ object EndpointTester {
   }
 
   implicit def errorMessageEntityDecoder[F[_]: Sync]: EntityDecoder[F, ErrorMessage] = jsonOf[F, ErrorMessage]
+
+  implicit class JsonOps(json: Json) {
+    import ch.datascience.http.rest.Links
+    import ch.datascience.http.rest.Links._
+    import io.circe.Decoder
+
+    lazy val _links: Decoder.Result[Links] = json.hcursor.downField("_links").as[Links]
+  }
+
+  implicit class LinksOps(maybeLinksJson: Decoder.Result[Links]) {
+    def get(rel: Rel): Option[Href] =
+      for {
+        linksJson <- maybeLinksJson.toOption
+        link      <- linksJson get rel
+      } yield link.href
+  }
 }

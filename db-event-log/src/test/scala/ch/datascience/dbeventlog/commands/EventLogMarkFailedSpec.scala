@@ -23,8 +23,8 @@ import ch.datascience.dbeventlog._
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators.{commitEventIds, committedDates}
 import ch.datascience.graph.model.events.CommitEventId
-import ch.datascience.graph.model.events.EventsGenerators.{commitEventIds, committedDates}
 import doobie.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory

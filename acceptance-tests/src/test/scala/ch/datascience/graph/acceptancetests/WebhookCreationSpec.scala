@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
-import ch.datascience.graph.model.events.EventsGenerators.projectIds
+import ch.datascience.graph.model.EventsGenerators.projectIds
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.webhookservice.project.ProjectVisibility.Public
 import io.circe.literal._
@@ -82,7 +82,7 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
         case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
       }
       tokenRepositoryClient
-        .GET(s"projects/$projectId/tokens", maybeAccessToken = None)
+        .GET(s"projects/$projectId/tokens")
         .bodyAsJson shouldBe expectedAccessTokenJson
     }
   }

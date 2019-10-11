@@ -18,15 +18,15 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
+import ReProvisioningGenerators._
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventsGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import ReProvisioningGenerators._
 
 import scala.util.{Success, Try}
 
@@ -35,7 +35,8 @@ class CommitIdResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
   "apply" should {
 
     "be instantiatable for a valid sha" in {
-      forAll(shas.map(sha => s"file:///commit/$sha")) { resource =>
+      forAll(httpUrls, shas) { (url, sha) =>
+        val resource = s"$url/commit/$sha"
         CommitIdResource(resource).toString shouldBe resource
       }
     }
@@ -63,14 +64,14 @@ class CommitIdResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
   "toCommitId" should {
 
     "return a valid CommitId - a case with no path after the commitId" in {
-      forAll(commitIds) { commitId =>
-        CommitIdResource(s"file:///commit/$commitId").to[Try, CommitId] shouldBe Success(commitId)
+      forAll(httpUrls, commitIds) { (url, commitId) =>
+        CommitIdResource(s"$url/commit/$commitId").as[Try, CommitId] shouldBe Success(commitId)
       }
     }
 
     "return a valid CommitId - case with some path after the commitId" in {
-      forAll(commitIds, relativePaths()) { (commitId, path) =>
-        CommitIdResource(s"file:///commit/$commitId/$path").to[Try, CommitId] shouldBe Success(commitId)
+      forAll(httpUrls, commitIds, relativePaths()) { (url, commitId, path) =>
+        CommitIdResource(s"$url/commit/$commitId/$path").as[Try, CommitId] shouldBe Success(commitId)
       }
     }
   }
@@ -78,7 +79,7 @@ class CommitIdResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
   "rdfResourceRenderer" should {
 
     "wrap the value into <>" in {
-      val commitIdResource = commitIdResources.generateOne
+      val commitIdResource = commitIdResources().generateOne
       commitIdResource.showAs[RdfResource] shouldBe s"<$commitIdResource>"
     }
   }

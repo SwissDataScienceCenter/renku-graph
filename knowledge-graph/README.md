@@ -4,22 +4,84 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method  | Path                               | Description                                  |
-|---------|------------------------------------|----------------------------------------------|
-|  GET    | ```/ping```                        | To check if service is healthy               |
-|  GET    | ```/knowledge-graph/graphql```     | Returns GraphQL endpoint schema              |
-|  POST   | ```/knowledge-graph/graphql```     | GraphQL query endpoint                       |
+| Method  | Path                                                    | Description                                            |
+|---------|---------------------------------------------------------|--------------------------------------------------------|
+|  GET    | ```/knowledge-graph/datasets/:id```                     | Returns details of the dataset with the given `id`     |
+|  GET    | ```/knowledge-graph/graphql```                          | Returns GraphQL endpoint schema                        |
+|  POST   | ```/knowledge-graph/graphql```                          | GraphQL query endpoint                                 |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```  | Returns datasets of the project with the given `path`      |
+|  GET    | ```/ping```                                             | To check if service is healthy                         |
 
-#### GET /ping
+#### GET /knowledge-graph/datasets/:id
 
-Verifies service's health.
+Finds details of the dataset with the given `id`.
 
 **Response**
 
-| Status                     | Description             |
-|----------------------------|-------------------------|
-| OK (200)                   | If service is healthy   |
-| INTERNAL SERVER ERROR (500)| Otherwise               |
+| Status                     | Description                   |
+|----------------------------|-------------------------------|
+| OK (200)                   | If dataset details are found  |
+| NOT_FOUND (404)            | If dataset is not found       |
+| INTERNAL SERVER ERROR (500)| Otherwise                     |
+
+Response body example:
+```
+{
+  "_links" : [
+    {
+      "rel" : "self",
+      "href" : "https://zemdgsw:9540/datasets/6f622603-2129-4058-ad29-3ff927481461"
+    }
+  ],
+  "identifier" : "6f622603-2129-4058-ad29-3ff927481461",
+  "name" : "dataset name",
+  "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
+  "published" : {
+    "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
+    "creator" : [
+      {
+        "name" : "e wmtnxmcguz"
+      },
+      {
+        "name" : "iilmadw vcxabmh",
+        "email" : "ticUnrW@cBmrdomoa"             // optional property
+      }
+    ]
+  },
+  "hasPart" : [
+    {
+      "name" : "o",
+      "atLocation" : "data/dataset-name/file1"
+    },
+    {
+      "name" : "rldzpwo",
+      "atLocation" : "data/dataset-name/file2"
+    }
+  ],
+  "isPartOf" : [
+    {
+      "name" : "namespace1/project1-name",
+      "created" : {
+        "dateCreated" : "1970-05-12T06:06:41.448Z",
+        "agent" : {
+          "email" : "n@ulQdsXl",
+          "name" : "v imzn"
+        }
+      }
+    },
+    {
+      "name" : "namespace2/project2-name",
+      "created" : {
+        "dateCreated" : "1970-06-12T06:06:41.448Z",
+        "agent" : {
+          "email" : "name@ulQdsXl",
+          "name" : "v imzn"
+        }
+      }
+    }
+  ]
+}
+```
 
 #### GET /knowledge-graph/graphql
 
@@ -43,11 +105,15 @@ Endpoint to perform GraphQL queries on the Knowledge Graph data.
 | OK (200)                   | Body containing queried data   |
 | INTERNAL SERVER ERROR (500)| Otherwise                      |
 
-Example of a query:
+**Available queries**
+
+* Lineage
+
+Query example:
 ```
 {
   "query": "{ 
-    lineage(projectPath: \"rokroskar/vom_natt\") {
+    lineage(projectPath: \"namespace/project\", commitId: \"6e4f4cc8d30886a9f17192c65db6c799602bcd7d\", filePath: \"zhbikes.parquet\") {
       nodes { id label } 
       edges { source target } 
     } 
@@ -55,32 +121,32 @@ Example of a query:
 }
 
 ```
-Example of a response body:
+Response body example:
 ```
 {
   "data": {
     "lineage": {
       "edges": [
         {
-          "source": "file:///blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
-          "target": "file:///commit/1aaf360c2267bedbedb81900a214e6f36be04e87"
+          "source": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+          "target": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87"
         },
         {
-          "source": "file:///commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "target": "file:///blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet"
+          "source": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "target": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet"
         }
       ],
       "nodes": [
         {
-          "id": "file:///blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+          "id": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
           "label": "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297"
         },
         {
-          "id": "file:///commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "id": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
           "label": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet"
         },
         {
-          "id": "file:///blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
+          "id": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
           "label": "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87"
         }
       ]
@@ -89,14 +155,203 @@ Example of a response body:
 }
 ```
 
+* Data-sets
+
+Query example:
+```
+{
+  "query": "{ 
+    datasets(projectPath: \"namespace/project\") {
+      identifier!
+      name!
+      description
+      published {
+        datePublished
+        creator {
+          name!
+          email
+        }
+      }
+      hasPart {
+        name!
+        atLocation!
+      }
+      isPartOf {
+        name!
+        created! {
+          dateCreated! 
+          agent { 
+            email!
+            name!
+          }
+        }
+      }
+    } 
+  }"
+}
+
+```
+Response body example:
+```
+{
+  "data": {
+    "datasets": [
+      {
+        "identifier": "e1fc7b62-e021-434b-9264-dda336bddd4f",
+        "name": "dataset name",
+        "description": "Data-set long description",
+        "published": {
+          "datePublished": "2019-07-30",
+          "creator": []
+        },
+        "hasPart": [],
+        "isPartOf": [{
+          "name": "namespace/project"
+        }]
+      },
+      {
+        "identifier": "5b7a1394-93b5-4e75-932d-e041cf46349d",
+        "name": "xr",
+        "description": null,
+        "created": {
+          "dateCreated": "1991-09-05T10:38:29.457Z",
+          "agent": {
+            "email": "user2@host",
+            "name": "user 2"
+          }
+        },
+        "published": {
+          "datePublished": null,
+          "creator": [{
+            "name": "author1 name",
+            "email": null
+          }]
+        },
+        "hasPart": [{
+          "name": "file1",
+          "atLocation"": "data/dataset-name/file1"
+        }],
+        "isPartOf": [{
+          "name": "namespace/project",
+          "created" : {
+            "dateCreated" : "1970-05-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
+        }]
+      },
+      {
+        "identifier": "b1aa58af-a488-4bae-97b4-d6d349f98412",
+        "name": "chOorWhraw",
+        "description": null,
+        "created": {
+          "dateCreated": "2001-09-05T10:38:29.457Z",
+          "agent": {
+            "email": "user3@host",
+            "name": "user 3"
+          }
+        },
+        "published": {
+          "datePublished": "2001-09-05T10:38:29.457Z",
+          "creator": [{
+            "name": "author1 name",
+            "email": "author1@mail.org"
+          }, {
+            "name": "author2 name",
+            "email": "author2@mail.org"
+          }]
+        },
+        "hasPart": [{
+          "name": "file1",  
+          "atLocation"": "data/chOorWhraw-name/file1"
+        }, {
+          "name": "file2"  
+          "atLocation"": "data/chOorWhraw-name/file2"
+        }],
+        "isPartOf": [{
+          "name": "namespace/project1",
+          "created" : {
+            "dateCreated" : "1970-10-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
+        }, {
+          "name": "namespace/project2",
+          "created" : {
+            "dateCreated" : "1970-05-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
+        }]
+      }
+    ]
+  }
+}
+```
+
 In case there's no data found for a given query, the response `json` will contain a property with the queried resource name and a `null` value. For instance if a user performs a lineage query and there's no lineage found, the response will look like below:
 ```
 {
   "data": {
-    "lineage": null
+    "datasets": null
   }
 }
 ```
+
+#### GET /knowledge-graph/projects/:namespace/:name/datasets
+
+Finds list of datasets of the project with the given `namespace/name`.
+
+**Response**
+
+| Status                     | Description                            |
+|----------------------------|----------------------------------------|
+| OK (200)                   | If there are datasets for the project  |
+| NOT_FOUND (404)            | If there are no datasets found         |
+| INTERNAL SERVER ERROR (500)| Otherwise                              |
+
+Response body example:
+```
+[  
+   {  
+      "identifier":"9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
+      "name":"rmDaYfpehl",
+      "_links":[  
+         {  
+            "rel":"details",
+            "href":"http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
+         }
+      ]
+   },
+   {  
+      "identifier":"a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
+      "name":"a",
+      "_links":[  
+         {  
+            "rel":"details",
+            "href":"http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+         }
+      ]
+   }
+]
+```
+
+#### GET /ping
+
+Verifies service health.
+
+**Response**
+
+| Status                     | Description             |
+|----------------------------|-------------------------|
+| OK (200)                   | If service is healthy   |
+| INTERNAL SERVER ERROR (500)| Otherwise               |
 
 **A curl command example**
 ```

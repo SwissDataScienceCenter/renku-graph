@@ -19,23 +19,22 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventsGenerators.projectPaths
+import ch.datascience.graph.model.GraphModelGenerators._
 import org.scalacheck.Gen
+import org.scalacheck.Gen._
 
 private object ReProvisioningGenerators {
 
-  implicit val fullProjectPaths: Gen[FullProjectPath] = for {
-    url  <- httpUrls
-    path <- projectPaths
-  } yield FullProjectPath.from(s"$url/$path").fold(throw _, identity)
+  def commitIdResources(maybeUrl: Option[String] = None): Gen[CommitIdResource] =
+    for {
+      url <- maybeUrl.map(const).getOrElse(httpUrls)
+      sha <- shas
+    } yield CommitIdResource.from(s"$url/commit/$sha").fold(throw _, identity)
 
-  implicit val commitIdResources: Gen[CommitIdResource] = for {
-    sha <- shas
-  } yield CommitIdResource.from(s"file:///commit/$sha").fold(throw _, identity)
-
-  implicit val outdatedTriplesSets: Gen[OutdatedTriples] = for {
-    projectPath          <- fullProjectPaths
-    removedCommitsNumber <- positiveInts(100)
-    removedCommits       <- setOf(commitIdResources, removedCommitsNumber)
-  } yield OutdatedTriples(projectPath, removedCommits)
+  def outdatedTriplesSets(maybeUrl: Option[String] = None): Gen[OutdatedTriples] =
+    for {
+      projectPath          <- fullProjectPaths
+      removedCommitsNumber <- positiveInts(100)
+      removedCommits       <- setOf(commitIdResources(maybeUrl), removedCommitsNumber)
+    } yield OutdatedTriples(projectPath, removedCommits)
 }

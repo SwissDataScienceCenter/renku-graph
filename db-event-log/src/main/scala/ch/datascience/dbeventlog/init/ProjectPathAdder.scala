@@ -22,7 +22,9 @@ import cats.effect.Bracket
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.model.events.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 import io.chrisdavenport.log4cats.Logger
@@ -40,7 +42,7 @@ private class ProjectPathAdder[Interpretation[_]](
   def run: Interpretation[Unit] =
     checkColumnExists flatMap {
       case true  => logger.info("'project_path' column exists")
-      case false => addColumn
+      case false => addColumn()
     }
 
   private def checkColumnExists: Interpretation[Boolean] =
@@ -51,7 +53,7 @@ private class ProjectPathAdder[Interpretation[_]](
       .map(_ => true)
       .recover { case _ => false }
 
-  private def addColumn = {
+  private def addColumn() = {
     for {
       _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS project_path VARCHAR", transactor)
       projectIdsAndPaths <- findDistinctProjects
