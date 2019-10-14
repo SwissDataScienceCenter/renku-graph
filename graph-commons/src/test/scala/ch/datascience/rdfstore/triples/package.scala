@@ -58,11 +58,16 @@ package object triples {
         .getOrElse(Json.obj())
   }
 
+  implicit class IdOps[ID <: EntityId](id: ID) {
+
+    lazy val toIdJson: Json = Json.obj("@id" -> id.asJson)
+  }
+
   implicit class OptionIdOps[V <: EntityId](maybeValue: Option[V]) {
 
     def toResource[ID <: EntityId](property: String): Json =
       maybeValue
-        .map(id => Json.obj(property -> Json.obj("@id" -> id.asJson)))
+        .map(id => Json.obj(property -> id.toIdJson))
         .getOrElse(Json.obj())
   }
 
@@ -70,7 +75,7 @@ package object triples {
     def toResources(property: String, toId: V => EntityId = identity): Json =
       Json.obj(
         property -> Json.arr(
-          values.map(toId).map(id => Json.obj("@id" -> id.asJson)): _*
+          values.map(toId).map(id => id.toIdJson): _*
         )
       )
   }

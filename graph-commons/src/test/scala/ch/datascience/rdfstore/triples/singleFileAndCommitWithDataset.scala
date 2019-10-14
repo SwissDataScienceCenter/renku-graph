@@ -61,14 +61,17 @@ object singleFileAndCommitWithDataset {
     val datasetGenerationPath            = FilePath("tree") / datasetPath
     val datasetId                        = Dataset.Id(datasetIdentifier)
     val commitGenerationId               = CommitGeneration.Id(commitId, datasetGenerationPath)
+    val committerPersonId                = Person.Id(committerName)
+    val agentId                          = Agent.Id(schemaVersion)
+
     List(
       Project(projectId),
       CommitActivity(
         commitActivityId,
         projectId,
         committedDate,
-        Some(Agent.Id(schemaVersion)),
-        Some(Person.Id(committerName)),
+        agentId,
+        committerPersonId,
         maybeInfluencedBy = List(
           renkuCommitCollectionEntityId,
           datasetsCommitCollectionEntityId,
@@ -79,8 +82,8 @@ object singleFileAndCommitWithDataset {
       CommitCollectionEntity(datasetsCommitCollectionEntityId, projectId, hadMember = datasetCommitCollectionEntityId),
       CommitCollectionEntity(datasetCommitCollectionEntityId, projectId, hadMember  = datasetId),
       CommitGeneration(commitGenerationId, commitActivityId),
-      Agent(schemaVersion),
-      Person(Person.Id(committerName), Some(committerEmail))
+      Agent(agentId),
+      Person(committerPersonId, Some(committerEmail))
     ) ++ Dataset(
       datasetId,
       projectId,

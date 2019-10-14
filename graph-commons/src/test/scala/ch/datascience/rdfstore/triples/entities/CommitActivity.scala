@@ -33,18 +33,18 @@ private[triples] object CommitActivity {
   def apply(commitId:          CommitId,
             projectId:         Project.Id,
             committedDate:     CommittedDate,
-            maybeAgentId:      Option[Agent.Id],
-            maybePersonId:     Option[Person.Id],
+            agentId:           Agent.Id,
+            personId:          Person.Id,
             maybeInfluencedBy: List[CommitCollectionEntity.Id],
             comment:           String Refined NonEmpty)(implicit fusekiBaseUrl: FusekiBaseUrl): Json =
-    apply(Id(commitId), projectId, committedDate, maybeAgentId, maybePersonId, maybeInfluencedBy, comment)
+    apply(Id(commitId), projectId, committedDate, agentId, personId, maybeInfluencedBy, comment)
 
   // format: off
   def apply(id:                Id,
             projectId:         Project.Id,
             committedDate:     CommittedDate,
-            maybeAgentId:      Option[Agent.Id],
-            maybePersonId:     Option[Person.Id] = None,
+            agentId:           Agent.Id,
+            personId:          Person.Id,
             maybeInfluencedBy: List[CommitCollectionEntity.Id] = Nil,
             comment:           String Refined NonEmpty = "some change"
   ): Json = json"""
@@ -63,9 +63,9 @@ private[triples] object CommitActivity {
       "@id": $id
     },
     "rdfs:comment": ${comment.value},
-    "rdfs:label": ${id.commitId.value}
+    "rdfs:label": ${id.commitId.value},
+    "prov:agent": [${agentId.toIdJson}, ${personId.toIdJson}]
   }""".deepMerge(`schema:isPartOf`(projectId))
-      .deepMerge(List(maybeAgentId, maybePersonId).flatten toResources "prov:agent")
       .deepMerge(maybeInfluencedBy toResources "prov:influenced")
   // format: on
 
