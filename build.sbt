@@ -6,7 +6,7 @@ scalaVersion := "2.12.8"
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
 
-releaseVersionBump := sbtrelease.Version.Bump.Minor
+releaseVersionBump := sbtrelease.Version.Bump.Bugfix
 releaseIgnoreUntrackedFiles := true
 releaseTagName := (version in ThisBuild).value.toString
 
