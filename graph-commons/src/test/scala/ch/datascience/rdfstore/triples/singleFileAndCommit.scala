@@ -18,38 +18,46 @@
 
 package ch.datascience.rdfstore.triples
 
+import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.committedDates
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
+import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities._
 import io.circe.Json
 
 object singleFileAndCommit {
 
-  def apply(projectPath:        ProjectPath,
-            commitId:           CommitId,
-            maybeSchemaVersion: Option[SchemaVersion],
-            renkuBaseUrl:       RenkuBaseUrl = renkuBaseUrl)(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
+  def apply(projectPath:    ProjectPath,
+            commitId:       CommitId,
+            committerName:  UserName = names.generateOne,
+            committerEmail: Email = emails.generateOne,
+            schemaVersion:  SchemaVersion = schemaVersions.generateOne,
+            renkuBaseUrl:   RenkuBaseUrl = renkuBaseUrl)(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
     val filePath           = FilePath("README.md")
     val generationPath     = FilePath("tree") / filePath
     val projectId          = Project.Id(renkuBaseUrl, projectPath)
     val commitGenerationId = CommitGeneration.Id(commitId, generationPath)
     val commitActivityId   = CommitActivity.Id(commitId)
+    val committerPersonId  = Person.Id(committerName)
+    val agentId            = Agent.Id(schemaVersion)
+
     List(
       Project(projectId),
       CommitEntity(CommitEntity.Id(commitId, filePath), projectId, commitGenerationId),
       CommitActivity(commitActivityId,
                      projectId,
                      committedDates.generateOne,
-                     maybeSchemaVersion map Agent.Id,
-                     maybePersonId     = None,
+                     agentId,
+                     committerPersonId,
                      maybeInfluencedBy = Nil),
+      Person(committerPersonId, Some(committerEmail)),
       CommitGeneration(commitGenerationId, commitActivityId),
-      maybeSchemaVersion.map(Agent.apply).getOrElse(Json.obj())
+      Agent(agentId)
     )
   }
 }

@@ -38,7 +38,7 @@ class EventLogMarkDone[Interpretation[_]](
   def markEventDone(commitEventId: CommitEventId): Interpretation[Unit] =
     for {
       updatedRecords <- update(commitEventId, newStatus = TriplesStore).transact(transactor.get)
-      _              <- failIfNoRecordsUpdated(commitEventId)(updatedRecords)
+      _              <- failIfMoreThanOneRecordUpdated(commitEventId)(updatedRecords)
     } yield ()
 
   private def update(commitEventId: CommitEventId, newStatus: EventStatus) =
@@ -47,12 +47,13 @@ class EventLogMarkDone[Interpretation[_]](
          |where event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus}
          |""".stripMargin.update.run
 
-  private def failIfNoRecordsUpdated(commitEventId: CommitEventId): Int => Interpretation[Unit] = {
+  private def failIfMoreThanOneRecordUpdated(commitEventId: CommitEventId): Int => Interpretation[Unit] = {
+    case 0 => ME.unit
     case 1 => ME.unit
     case _ =>
       ME.raiseError(
         new RuntimeException(
-          s"Event with id = ${commitEventId.id}, projectId = ${commitEventId.projectId} couldn't be updated; either no event or not with status $Processing"
+          s"An attempt to set status $Processing on multiple rows with eventId = ${commitEventId.id} and projectId = ${commitEventId.projectId}"
         )
       )
   }
