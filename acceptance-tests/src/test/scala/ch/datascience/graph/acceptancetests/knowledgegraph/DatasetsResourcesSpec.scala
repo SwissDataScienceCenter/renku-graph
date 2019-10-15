@@ -29,6 +29,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.graph.model.events.CommittedDate
+import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
@@ -120,7 +121,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       datasetDetailsResponse.status shouldBe Ok
       val Right(foundDatasetDetails) = datasetDetailsResponse.bodyAsJson.as[Json]
       val expectedDataset = List(dataset1, dataset2)
-        .find(dataset => someDatasetDetailsLink.value contains dataset.id.value)
+        .find(dataset => someDatasetDetailsLink.value contains urlEncode(dataset.id.value))
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
 
       foundDatasetDetails.hcursor.downField("identifier").as[Identifier] shouldBe Right(expectedDataset.id)
