@@ -2,4 +2,4 @@ apiVersion: v1
 appVersion: '1.0'
 description: A Helm chart for renku graph services
 name: renku-graph
-version: 0.19.0-16387d6
+version: 0.20.0-4763924

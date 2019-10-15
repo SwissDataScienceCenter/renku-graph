@@ -36,8 +36,8 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
   "findOutdatedTriples" should {
 
-    "return single project's commits having triples with either no agent or agent with version different that the current one " +
-      "if there are multiple projects with outdated triples" in new TestCase {
+    "return single project's commits if related to agent with version different than the current one - " +
+      "case with multiple projects with outdated triples" in new TestCase {
 
       val project1               = projectPaths.generateOne
       val project1OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
@@ -46,8 +46,12 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       loadToStore(
         triples(
-          singleFileAndCommit(project1, project1OutdatedCommit.toCommitId, maybeSchemaVersion = None),
-          singleFileAndCommit(project2, project2OutdatedCommit.toCommitId, maybeSchemaVersion = None)
+          singleFileAndCommit(project1,
+                              commitId      = project1OutdatedCommit.toCommitId,
+                              schemaVersion = schemaVersions.generateOne),
+          singleFileAndCommit(project2,
+                              commitId      = project2OutdatedCommit.toCommitId,
+                              schemaVersion = schemaVersions.generateOne)
         )
       )
 
@@ -60,7 +64,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
       // format: on
     }
 
-    "return all project's commits having triples with no agent or agent with different version in one result" in new TestCase {
+    "return all project's commits having triples related to agent version different than the current one" in new TestCase {
 
       val project1                = projectPaths.generateOne
       val project1Commit1NoAgent  = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
@@ -69,11 +73,13 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       loadToStore(
         triples(
-          singleFileAndCommit(project1, project1Commit1NoAgent.toCommitId, maybeSchemaVersion = None),
           singleFileAndCommit(project1,
-                              project1Commit2Outdated.toCommitId,
-                              maybeSchemaVersion                                               = Some(schemaVersions.generateOne)),
-          singleFileAndCommit(project1, project1Commit3UpToDate.toCommitId, maybeSchemaVersion = Some(schemaVersion))
+                              commitId      = project1Commit1NoAgent.toCommitId,
+                              schemaVersion = schemaVersions.generateOne),
+          singleFileAndCommit(project1,
+                              commitId           = project1Commit2Outdated.toCommitId,
+                              schemaVersion      = schemaVersions.generateOne),
+          singleFileAndCommit(project1, commitId = project1Commit3UpToDate.toCommitId, schemaVersion = schemaVersion)
         )
       )
 
@@ -89,7 +95,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       loadToStore(
         triples(
-          singleFileAndCommit(project, projectCommitUpToDate.toCommitId, maybeSchemaVersion = Some(schemaVersion))
+          singleFileAndCommit(project, commitId = projectCommitUpToDate.toCommitId, schemaVersion = schemaVersion)
         )
       )
 

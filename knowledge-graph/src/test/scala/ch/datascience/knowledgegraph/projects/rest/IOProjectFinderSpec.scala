@@ -44,12 +44,12 @@ class IOProjectFinderSpec
       forAll { project: Project =>
         loadToStore(
           triples(
-            singleFileAndCommit(projectPaths.generateOne, commitIds.generateOne),
+            singleFileAndCommit(projectPaths.generateOne, commitId = commitIds.generateOne),
             singleFileAndCommit(project.path,
-                                commitIds.generateOne,
                                 project.name,
                                 project.created.date,
-                                project.created.creator.name -> project.created.creator.email)
+                                project.created.creator.name -> project.created.creator.email,
+                                commitIds.generateOne)
           )
         )
 
@@ -66,8 +66,8 @@ class IOProjectFinderSpec
 
       loadToStore(
         triples(
-          singleFileAndCommit(projectPath, commitIds.generateOne),
-          singleFileAndCommit(projectPath, commitIds.generateOne)
+          singleFileAndCommit(projectPath, commitId = commitIds.generateOne),
+          singleFileAndCommit(projectPath, commitId = commitIds.generateOne)
         )
       )
 

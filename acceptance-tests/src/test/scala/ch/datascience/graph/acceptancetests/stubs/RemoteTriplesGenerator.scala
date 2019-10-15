@@ -35,7 +35,7 @@ object RemoteTriplesGenerator {
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,
       commitId,
-      triples(singleFileAndCommit(project.path, commitId, maybeSchemaVersion = Some(schemaVersion))),
+      triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion)),
       schemaVersion)
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK`(

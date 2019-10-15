@@ -61,18 +61,20 @@ private class IOOutdatedTriplesFinder(
                          |  SELECT ?project
                          |  WHERE {
                          |    {
-                         |        ?commit dcterms:isPartOf|schema:isPartOf ?project .
-                         |        ?commit rdf:type prov:Activity .
-                         |        ?commit prov:agent ?agent .
-                         |        ?agent  rdfs:label ?version
+                         |        ?commit dcterms:isPartOf|schema:isPartOf ?project ;
+                         |                rdf:type prov:Activity ;
+                         |                prov:agent ?agent .
+                         |        ?agent  rdf:type prov:SoftwareAgent ;
+                         |                rdfs:label ?version .
                          |        FILTER (?version != "renku $schemaVersion")
                          |    }
                          |    UNION
                          |    {
-                         |        ?commit dcterms:isPartOf|schema:isPartOf ?project .
-                         |        ?commit rdf:type prov:Activity .
+                         |        ?commit dcterms:isPartOf|schema:isPartOf ?project ;
+                         |                rdf:type prov:Activity .
                          |        FILTER NOT EXISTS {
                          |          ?commit prov:agent ?agent .
+                         |          ?agent  rdf:type prov:SoftwareAgent .
                          |        }
                          |    }
                          |  }
@@ -81,18 +83,20 @@ private class IOOutdatedTriplesFinder(
                          |  }
                          |  # finding all the commits for the found project with either no agent or agent with a different version
                          |  {
-                         |	  ?commit dcterms:isPartOf|schema:isPartOf ?project .
-                         |    ?commit rdf:type prov:Activity .
-                         |    ?commit prov:agent ?agent .
-                         |    ?agent  rdfs:label ?version
+                         |	  ?commit dcterms:isPartOf|schema:isPartOf ?project ;
+                         |            rdf:type prov:Activity ;
+                         |            prov:agent ?agent .
+                         |    ?agent  rdf:type prov:SoftwareAgent ;
+                         |            rdfs:label ?version .
                          |    FILTER (?version != "renku $schemaVersion")
                          |  }
                          |  UNION
                          |  {
-                         |	  ?commit dcterms:isPartOf|schema:isPartOf ?project .
-                         |    ?commit rdf:type prov:Activity .
+                         |	  ?commit dcterms:isPartOf|schema:isPartOf ?project ;
+                         |            rdf:type prov:Activity .
                          |    FILTER NOT EXISTS {
                          |      ?commit prov:agent ?agent .
+                         |      ?agent  rdf:type prov:SoftwareAgent .
                          |    }
                          |  }
                          |}

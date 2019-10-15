@@ -58,16 +58,14 @@ class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with Moc
       findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now)))
     }
 
-    s"fail when updating event with status different than $Processing" in new TestCase {
+    "do nothing when updating event did not change any row" in new TestCase {
 
       val eventId       = commitEventIds.generateOne
       val eventStatus   = eventStatuses generateDifferentThan Processing
       val executionDate = executionDates.generateOne
       storeEvent(eventId, eventStatus, executionDate, committedDates.generateOne, eventBodies.generateOne)
 
-      intercept[RuntimeException] {
-        eventLogMarkDone.markEventDone(eventId).unsafeRunSync()
-      }.getMessage shouldBe s"Event with $eventId couldn't be updated; either no event or not with status $Processing"
+      eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = eventStatus) shouldBe List((eventId, executionDate))
     }
