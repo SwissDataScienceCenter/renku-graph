@@ -84,7 +84,7 @@ class QuerySchemaSpec
             description
             published { datePublished creator { email name } }
             hasPart { name atLocation }
-            isPartOf { name created { dateCreated agent { email name } } }
+            isPartOf { path name created { dateCreated agent { email name } } }
           }
         }"""
 
@@ -201,6 +201,7 @@ class QuerySchemaSpec
 
     private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
       json"""{
+        "path": ${project.path.value},
         "name": ${project.name.value},
         "created": {
           "dateCreated": ${project.created.date.value},

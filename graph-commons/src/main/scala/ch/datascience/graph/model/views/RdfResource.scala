@@ -16,27 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.graph.model.views
 
-import ch.datascience.http.client.UrlEncoder._
-import ch.datascience.tinytypes._
+import ch.datascience.tinytypes.{Renderer, TinyType}
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
+/*
+ * This is a marker trait to be used with TinyTypes so they can be rendered as an RdfResource which is `<url>`
+ */
+trait RdfResource
 
-trait RelativePathOps[T <: RelativePathTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
-
-  implicit class RelativePathOps(url: T) {
-
-    def /(value: String): T =
-      apply(s"$url/${urlEncode(value)}")
-
-    def /[TT <: TinyType](value: TT)(implicit converter: TT => List[PathSegment]): T =
-      apply(s"$url/${converter(value).mkString("/")}")
+object RdfResource {
+  implicit object RdfResourceRenderer extends Renderer[RdfResource, TinyType] {
+    override def render(value: TinyType): String = s"<$value>"
   }
 }

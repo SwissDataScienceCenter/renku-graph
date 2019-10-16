@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.json
 
-import ch.datascience.tinytypes.{InstantTinyType, LocalDateTinyType, RelativePathTinyType, StringTinyType}
+import ch.datascience.tinytypes._
 import io.circe.{Encoder, Json}
 
 object TinyTypeEncoders {

@@ -74,6 +74,7 @@ class DbEventProcessorRunner private (
 
 object DbEventProcessorRunner extends ConfigLoader[IO] {
   import eu.timepit.refined.pureconfig._
+
   import scala.concurrent.duration._
   import scala.language.postfixOps
 

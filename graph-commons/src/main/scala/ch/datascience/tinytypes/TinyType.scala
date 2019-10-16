@@ -107,7 +107,7 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
 
 trait TinyTypeConverter[TT <: TinyType, OUT] { def convert(value: TT): Either[Exception, OUT] }
 
-trait Renderer[View, T] {
+trait Renderer[View, -T] {
   def render(value: T): String
 }
 

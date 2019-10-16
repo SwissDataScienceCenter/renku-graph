@@ -44,9 +44,9 @@ class IOProjectDatasetsFinderSpec
   "findDatasets" should {
 
     "return all datasets of the given project" in new InMemoryStoreTestCase {
-      forAll(projectPaths, datasets, datasetInProjectCreations, datasets, datasetInProjectCreations) {
-        (projectBPath, dataset1, projectBDataset1Creation, dataset2, projectBDataset2Creation) =>
-          val projectAPath     = projectPaths.generateOne
+      forAll(datasetProjects, datasets, datasetInProjectCreations, datasets, datasetInProjectCreations) {
+        (projectB, dataset1, projectBDataset1Creation, dataset2, projectBDataset2Creation) =>
+          val projectA         = datasetProjects.generateOne
           val projectACreation = datasetInProjectCreations.generateOne
           val reusedDatasetUrl = (for {
             url  <- httpUrls
@@ -56,7 +56,8 @@ class IOProjectDatasetsFinderSpec
           loadToStore(
             triples(
               singleFileAndCommitWithDataset(
-                projectAPath,
+                projectA.path,
+                projectA.name,
                 committerName             = projectACreation.agent.name,
                 committerEmail            = projectACreation.agent.email,
                 committedDate             = projectACreation.date.toUnsafe(date => CommittedDate.from(date.value)),
@@ -69,7 +70,8 @@ class IOProjectDatasetsFinderSpec
                 maybeDatasetUrl           = Some(reusedDatasetUrl)
               ),
               singleFileAndCommitWithDataset(
-                projectBPath,
+                projectB.path,
+                projectB.name,
                 committerName             = projectBDataset1Creation.agent.name,
                 committerEmail            = projectBDataset1Creation.agent.email,
                 committedDate             = projectBDataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
@@ -82,7 +84,8 @@ class IOProjectDatasetsFinderSpec
                 maybeDatasetUrl           = Some(reusedDatasetUrl),
               ),
               singleFileAndCommitWithDataset(
-                projectBPath,
+                projectB.path,
+                projectB.name,
                 committerName             = projectBDataset2Creation.agent.name,
                 committerEmail            = projectBDataset2Creation.agent.email,
                 committedDate             = projectBDataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
@@ -96,17 +99,17 @@ class IOProjectDatasetsFinderSpec
             )
           )
 
-          val foundDatasets = datasetsFinder.findDatasets(projectBPath).unsafeRunSync()
+          val foundDatasets = datasetsFinder.findDatasets(projectB.path).unsafeRunSync()
 
           foundDatasets should contain theSameElementsAs List(
             dataset1.copy(
               part = dataset1.part sorted byPartName,
-              project = List(DatasetProject(projectBPath, projectBDataset1Creation),
-                             DatasetProject(projectAPath, projectACreation)) sorted byProjectName
+              project = List(DatasetProject(projectB.path, projectB.name, projectBDataset1Creation),
+                             DatasetProject(projectA.path, projectA.name, projectACreation)) sorted byProjectName
             ),
             dataset2.copy(
               part    = dataset2.part sorted byPartName,
-              project = List(DatasetProject(projectBPath, projectBDataset2Creation)) sorted byProjectName
+              project = List(DatasetProject(projectB.path, projectB.name, projectBDataset2Creation)) sorted byProjectName
             )
           )
       }

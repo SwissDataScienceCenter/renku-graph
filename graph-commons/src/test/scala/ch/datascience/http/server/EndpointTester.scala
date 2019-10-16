@@ -25,7 +25,7 @@ import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Rel}
 import eu.timepit.refined.api.RefType
-import io.circe.{Decoder, DecodingFailure, Json}
+import io.circe._
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, Request, Response, Status}
 
@@ -73,6 +73,14 @@ object EndpointTester {
     import io.circe.Decoder
 
     lazy val _links: Decoder.Result[Links] = json.hcursor.downField("_links").as[Links]
+  }
+
+  implicit class HCursorOps(cursor: ACursor) {
+    import ch.datascience.http.rest.Links
+    import ch.datascience.http.rest.Links._
+    import io.circe.Decoder
+
+    lazy val _links: Decoder.Result[Links] = cursor.downField("_links").as[Links]
   }
 
   implicit class LinksOps(maybeLinksJson: Decoder.Result[Links]) {

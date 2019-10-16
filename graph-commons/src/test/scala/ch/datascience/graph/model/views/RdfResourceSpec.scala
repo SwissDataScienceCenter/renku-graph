@@ -16,27 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.graph.model.views
 
-import ch.datascience.http.client.UrlEncoder._
-import ch.datascience.tinytypes._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
-trait RelativePath extends Constraints[String] with NonBlank {
-  addConstraint(
-    check   = value => !value.startsWith("/") && !value.endsWith("/"),
-    message = value => s"'$value' is not a valid $typeName"
-  )
-}
+class RdfResourceSpec extends WordSpec {
 
-trait RelativePathOps[T <: RelativePathTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
+  "fullProjectPathResourceRenderer" should {
 
-  implicit class RelativePathOps(url: T) {
-
-    def /(value: String): T =
-      apply(s"$url/${urlEncode(value)}")
-
-    def /[TT <: TinyType](value: TT)(implicit converter: TT => List[PathSegment]): T =
-      apply(s"$url/${converter(value).mkString("/")}")
+    "wrap the value into <>" in {
+      val projectPath = fullProjectPaths.generateOne
+      projectPath.showAs[RdfResource] shouldBe s"<$projectPath>"
+    }
   }
 }

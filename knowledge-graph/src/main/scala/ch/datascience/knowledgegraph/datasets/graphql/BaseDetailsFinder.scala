@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.graphql
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -51,7 +51,7 @@ private class BaseDetailsFinder(
        |
        |SELECT DISTINCT ?identifier ?name ?description ?publishedDate
        |WHERE {
-       |  ?dataset dcterms:isPartOf|schema:isPartOf <${renkuBaseUrl / projectPath}> .
+       |  ?dataset dcterms:isPartOf|schema:isPartOf <${FullProjectPath(renkuBaseUrl, projectPath)}> .
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
        |           schema:identifier ?identifier ;
        |           schema:name ?name .

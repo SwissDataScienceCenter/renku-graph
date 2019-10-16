@@ -61,6 +61,8 @@ package object triples {
   implicit class IdOps[ID <: EntityId](id: ID) {
 
     lazy val toIdJson: Json = Json.obj("@id" -> id.asJson)
+
+    def toResource(property: String): Json = Json.obj(property -> toIdJson)
   }
 
   implicit class OptionIdOps[V <: EntityId](maybeValue: Option[V]) {

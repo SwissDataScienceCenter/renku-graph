@@ -19,8 +19,8 @@
 package ch.datascience.logging
 
 import cats.MonadError
-import cats.implicits._
 import cats.effect.Clock
+import cats.implicits._
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 
 import scala.concurrent.duration.TimeUnit

@@ -21,16 +21,18 @@ package ch.datascience.rdfstore.triples
 import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.committedDates
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
-import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.{SchemaVersion, projects, users}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities._
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
 import io.circe.Json
+import org.scalacheck.Gen
 
 object multiFileAndCommit {
 
@@ -76,19 +78,25 @@ object multiFileAndCommit {
 
   def apply(
       projectPath:          ProjectPath,
+      projectName:          projects.Name = projectNames.generateOne,
+      projectDateCreated:   projects.DateCreated = projectCreatedDates.generateOne,
+      projectCreator:       (users.Name, Option[Email]) = names.generateOne -> Gen.option(emails).generateOne,
       data:                 MultiFileAndCommitData,
       schemaVersion:        SchemaVersion = schemaVersions.generateOne
   )(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
-    val projectId = Project.Id(renkuBaseUrl, projectPath)
-    val agentId   = Agent.Id(schemaVersion)
-    val committerName:  UserName = names.generateOne
-    val committerEmail: Email    = emails.generateOne
-    val committerPersonId = Person.Id(committerName)
+    val committerName                                  = names.generateOne
+    val committerEmail                                 = emails.generateOne
+    val committerPersonId                              = Person.Id(committerName)
+    val agentId                                        = Agent.Id(schemaVersion)
+    val projectId                                      = Project.Id(renkuBaseUrl, projectPath)
+    val (projectCreatorName, maybeProjectCreatorEmail) = projectCreator
+    val projectCreatorId                               = Person.Id(projectCreatorName)
     import data._
 
     // format: off
     List(
-      Project(projectId),
+      Project(projectId, projectName, projectDateCreated, projectCreatorId),
+      Person(projectCreatorId, maybeProjectCreatorEmail),
       Agent(agentId),
       Person(committerPersonId, Some(committerEmail)),
 

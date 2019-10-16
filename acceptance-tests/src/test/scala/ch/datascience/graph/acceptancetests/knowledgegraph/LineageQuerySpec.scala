@@ -39,7 +39,7 @@ import sangria.macros._
 
 class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
-  private val project                = projects.generateOne.copy(path = ProjectPath("namespace/project"))
+  private val project                = projects.generateOne.copy(path = ProjectPath("namespace/lineage-project"))
   private val commitId               = CommitId("0000001")
   private val multiFileAndCommitData = multiFileAndCommit.MultiFileAndCommitData()
 
@@ -48,7 +48,9 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
     scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, commitId, triples(multiFileAndCommit(project.path, multiFileAndCommitData)))
+      `data in the RDF store`(project,
+                              commitId,
+                              triples(multiFileAndCommit(project.path, data = multiFileAndCommitData)))
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery
@@ -69,7 +71,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       val response = knowledgeGraphClient.POST(
         namedLineageQuery,
         variables = Map(
-          "projectPath" -> "namespace/project",
+          "projectPath" -> "namespace/lineage-project",
           "commitId"    -> "0000004",
           "filePath"    -> "result-file-1"
         )
@@ -86,7 +88,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private val lineageQuery: Document = graphql"""
     {
-      lineage(projectPath: "namespace/project", commitId: "0000004", filePath: "result-file-1") {
+      lineage(projectPath: "namespace/lineage-project", commitId: "0000004", filePath: "result-file-1") {
         nodes {
           id
           label

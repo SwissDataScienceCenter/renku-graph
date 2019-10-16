@@ -16,18 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.knowledgegraph.projects
 
-import ch.datascience.graph.model.projects.FullProjectPath
-import ch.datascience.tinytypes.Renderer
+import ch.datascience.graph.model.projects._
+import ch.datascience.graph.model.users
 
-trait RdfResource
+object model {
 
-object RdfResource {
+  final case class Project(path: ProjectPath, name: Name, created: ProjectCreation)
 
-  implicit lazy val commitIdResourceRenderer: Renderer[RdfResource, CommitIdResource] =
-    value => s"<$value>"
+  final case class ProjectCreation(date: DateCreated, creator: ProjectCreator)
 
-  implicit lazy val fullProjectPathResourceRenderer: Renderer[RdfResource, FullProjectPath] =
-    value => s"<$value>"
+  final case class ProjectCreator(email: users.Email, name: users.Name)
 }

@@ -55,8 +55,8 @@ private class PartsFinder(
        |           schema:identifier "$identifier" ;
        |           schema:hasPart ?partResource .
        |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
-       |                schema:name ?partName ;         
-       |                prov:atLocation ?partLocation .         
+       |                schema:name ?partName ;
+       |                prov:atLocation ?partLocation .
        |}
        |ORDER BY ASC(?partName)
        |""".stripMargin
