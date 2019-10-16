@@ -31,11 +31,11 @@ spec:
               protocol: TCP
           livenessProbe:
             httpGet:
-              path: /
+              path: /$/ping
               port: http
           readinessProbe:
             httpGet:
-              path: /
+              path: /$/ping
               port: http
           volumeMounts:
             - name: shiro-config
