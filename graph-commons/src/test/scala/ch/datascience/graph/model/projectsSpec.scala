@@ -74,11 +74,11 @@ class FullProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "be instantiatable for a valid project url" in {
       forAll(httpUrls, projectPaths) { (url, path) =>
-        FullProjectPath(s"$url/$path").toString shouldBe s"$url/$path"
+        FullProjectPath(s"$url/projects/$path").toString shouldBe s"$url/projects/$path"
       }
     }
 
-    "throw an IllegalArgumentException for paths" in {
+    "throw an IllegalArgumentException for relative project paths" in {
       val path = projectPaths.generateOne
       intercept[Exception] {
         FullProjectPath(path.value)
@@ -96,7 +96,7 @@ class FullProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "return a valid ProjectPath" in {
       forAll(httpUrls, projectPaths) { (url, projectPath) =>
-        FullProjectPath(s"$url/$projectPath").as[Try, ProjectPath] shouldBe Success(projectPath)
+        FullProjectPath(s"$url/projects/$projectPath").as[Try, ProjectPath] shouldBe Success(projectPath)
       }
     }
   }

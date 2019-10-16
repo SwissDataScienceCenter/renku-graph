@@ -45,16 +45,17 @@ class IODatasetFinderSpec
 
     "return the details of the dataset with the given id " +
       "- a case when unrelated projects are using the same dataset" in new InMemoryStoreTestCase {
-      forAll(datasets, projectPaths, datasetInProjectCreations, projectPaths, datasetInProjectCreations) {
-        (dataset, project1Path, project1DatasetCreation, project2Path, project2DatasetCreation) =>
+      forAll(datasets, datasetProjects, datasetInProjectCreations, datasetProjects, datasetInProjectCreations) {
+        (dataset, project1, project1DatasetCreation, project2, project2DatasetCreation) =>
           val project1DatasetCreationDate = project1DatasetCreation.date
             .toUnsafe(date => CommittedDate.from(date.value))
 
           loadToStore(
             triples(
               singleFileAndCommitWithDataset(
-                project1Path,
-                commitIds.generateOne,
+                project1.path,
+                project1.name,
+                commitId                  = commitIds.generateOne,
                 committerName             = project1DatasetCreation.agent.name,
                 committerEmail            = project1DatasetCreation.agent.email,
                 committedDate             = project1DatasetCreationDate,
@@ -66,8 +67,9 @@ class IODatasetFinderSpec
                 maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset( // to reflect a file added to the dataset in another commit
-                project1Path,
-                commitIds.generateOne,
+                project1.path,
+                project1.name,
+                commitId                  = commitIds.generateOne,
                 committerName             = usernames.generateOne,
                 committerEmail            = emails.generateOne,
                 committedDate             = CommittedDate(project1DatasetCreationDate.value.plusSeconds(10)),
@@ -79,8 +81,9 @@ class IODatasetFinderSpec
                 maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
-                project2Path,
-                commitIds.generateOne,
+                project2.path,
+                project2.name,
+                commitId                  = commitIds.generateOne,
                 committerName             = project2DatasetCreation.agent.name,
                 committerEmail            = project2DatasetCreation.agent.email,
                 committedDate             = project2DatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
@@ -91,15 +94,15 @@ class IODatasetFinderSpec
                 maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
                 maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
               ),
-              singleFileAndCommitWithDataset(projectPaths.generateOne)
+              singleFileAndCommitWithDataset(projectPaths.generateOne, projectNames.generateOne)
             )
           )
 
           datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
             dataset.copy(
               part = dataset.part.sorted,
-              project = List(DatasetProject(project1Path, project1DatasetCreation),
-                             DatasetProject(project2Path, project2DatasetCreation)).sorted
+              project = List(DatasetProject(project1.path, project1.name, project1DatasetCreation),
+                             DatasetProject(project2.path, project2.name, project2DatasetCreation)).sorted
             )
           )
       }
@@ -107,14 +110,15 @@ class IODatasetFinderSpec
 
     "return the details of the dataset with the given id " +
       "- a case when a dataset is defined on a source project which has a fork" in new InMemoryStoreTestCase {
-      forAll(projectPaths, projectPaths, datasets, datasetInProjectCreations, commitIds) {
-        (sourceProjectPath, forkProjectPath, dataset, projectDatasetCreation, commitId) =>
+      forAll(datasetProjects, datasetProjects, datasets, datasetInProjectCreations, commitIds) {
+        (sourceProject, forkProject, dataset, projectDatasetCreation, commitId) =>
           val datasetCreationDate = projectDatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value))
           loadToStore(
             triples(
               singleFileAndCommitWithDataset(
-                sourceProjectPath,
-                commitId,
+                sourceProject.path,
+                sourceProject.name,
+                commitId                  = commitId,
                 committerName             = projectDatasetCreation.agent.name,
                 committerEmail            = projectDatasetCreation.agent.email,
                 committedDate             = datasetCreationDate,
@@ -126,8 +130,9 @@ class IODatasetFinderSpec
                 maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset( // to reflect a file added later to the dataset in another commit
-                sourceProjectPath,
-                commitIds.generateOne,
+                sourceProject.path,
+                sourceProject.name,
+                commitId                  = commitIds.generateOne,
                 committerName             = usernames.generateOne,
                 committerEmail            = emails.generateOne,
                 committedDate             = CommittedDate(datasetCreationDate.value.plusSeconds(10)),
@@ -139,8 +144,9 @@ class IODatasetFinderSpec
                 maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
-                forkProjectPath,
-                commitId,
+                forkProject.path,
+                forkProject.name,
+                commitId                  = commitId,
                 committerName             = projectDatasetCreation.agent.name,
                 committerEmail            = projectDatasetCreation.agent.email,
                 committedDate             = datasetCreationDate,
@@ -157,8 +163,10 @@ class IODatasetFinderSpec
           datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
             dataset.copy(
               part = dataset.part.sorted,
-              project = List(DatasetProject(sourceProjectPath, projectDatasetCreation),
-                             DatasetProject(forkProjectPath, projectDatasetCreation)).sorted
+              project = List(
+                DatasetProject(sourceProject.path, sourceProject.name, projectDatasetCreation),
+                DatasetProject(forkProject.path, forkProject.name, projectDatasetCreation)
+              ).sorted
             )
           )
       }

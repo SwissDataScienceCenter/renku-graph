@@ -36,8 +36,8 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "decode result-set with a blank description to a Dataset object" in {
       forAll(datasets, datasetPublishedDates, blankStrings()) { (dataset, publishedDate, description) =>
-        resultSet(dataset, publishedDate, description).as[Option[Dataset]] shouldBe Right {
-          Some(
+        resultSet(dataset, publishedDate, description).as[List[Dataset]] shouldBe Right {
+          List(
             dataset
               .copy(published = dataset.published.copy(maybeDate = Some(publishedDate), creators = Set.empty))
               .copy(maybeDescription = None)

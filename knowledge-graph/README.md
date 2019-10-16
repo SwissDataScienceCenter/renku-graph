@@ -4,13 +4,14 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method  | Path                                                    | Description                                            |
-|---------|---------------------------------------------------------|--------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets/:id```                     | Returns details of the dataset with the given `id`     |
-|  GET    | ```/knowledge-graph/graphql```                          | Returns GraphQL endpoint schema                        |
-|  POST   | ```/knowledge-graph/graphql```                          | GraphQL query endpoint                                 |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```  | Returns datasets of the project with the given `path`      |
-|  GET    | ```/ping```                                             | To check if service is healthy                         |
+| Method  | Path                                                      | Description                                                    |
+|---------|-----------------------------------------------------------|----------------------------------------------------------------|
+|  GET    | ```/knowledge-graph/datasets/:id```                       | Returns details of the dataset with the given `id`             |
+|  GET    | ```/knowledge-graph/graphql```                            | Returns GraphQL endpoint schema                                |
+|  POST   | ```/knowledge-graph/graphql```                            | GraphQL query endpoint                                         |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name```          | Returns details of the project with the given `namespace/name` |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets``` | Returns datasets of the project with the given `path`          |
+|  GET    | ```/ping```                                               | To check if service is healthy                                 |
 
 #### GET /knowledge-graph/datasets/:id
 
@@ -60,7 +61,14 @@ Response body example:
   ],
   "isPartOf" : [
     {
-      "name" : "namespace1/project1-name",
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
+        }
+      ],
+      "path" : "namespace1/project1-name",
+      "name" : "project1 name",
       "created" : {
         "dateCreated" : "1970-05-12T06:06:41.448Z",
         "agent" : {
@@ -70,7 +78,14 @@ Response body example:
       }
     },
     {
-      "name" : "namespace2/project2-name",
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace2/project2-name"
+        }
+      ],
+      "path" : "namespace2/project2-name",
+      "name" : "project2 name",
       "created" : {
         "dateCreated" : "1970-06-12T06:06:41.448Z",
         "agent" : {
@@ -177,6 +192,7 @@ Query example:
         atLocation!
       }
       isPartOf {
+        path!
         name!
         created! {
           dateCreated! 
@@ -206,7 +222,15 @@ Response body example:
         },
         "hasPart": [],
         "isPartOf": [{
-          "name": "namespace/project"
+          "path": "namespace/project",
+          "name": "project name",
+          "created" : {
+            "dateCreated" : "1970-05-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
         }]
       },
       {
@@ -232,7 +256,8 @@ Response body example:
           "atLocation"": "data/dataset-name/file1"
         }],
         "isPartOf": [{
-          "name": "namespace/project",
+          "path": "namespace/project",
+          "name": "project name",
           "created" : {
             "dateCreated" : "1970-05-12T06:06:41.448Z",
             "agent" : {
@@ -271,7 +296,8 @@ Response body example:
           "atLocation"": "data/chOorWhraw-name/file2"
         }],
         "isPartOf": [{
-          "name": "namespace/project1",
+          "path": "namespace/project1",
+          "name": "project1 name",
           "created" : {
             "dateCreated" : "1970-10-12T06:06:41.448Z",
             "agent" : {
@@ -280,7 +306,8 @@ Response body example:
             }
           }
         }, {
-          "name": "namespace/project2",
+          "path": "namespace/project2",
+          "name": "project2 name",
           "created" : {
             "dateCreated" : "1970-05-12T06:06:41.448Z",
             "agent" : {
@@ -301,6 +328,43 @@ In case there's no data found for a given query, the response `json` will contai
   "data": {
     "datasets": null
   }
+}
+```
+
+#### GET /knowledge-graph/projects/:namespace/:name
+
+Finds details of the project with the given `namespace/name`.
+
+**Response**
+
+| Status                     | Description                                             |
+|----------------------------|---------------------------------------------------------|
+| OK (200)                   | If project with the given `namespace/name` can be found |
+| NOT_FOUND (404)            | If there is no project with the given `namespace/name`  |
+| INTERNAL SERVER ERROR (500)| Otherwise                                               |
+
+Response body example:
+```
+{
+  "path": "namespace/project-name", 
+  "name": "Some project name",
+  "created": {
+    "dateCreated": "2001-09-05T10:48:29.457Z",
+    "creator": {
+      "name": "author name",
+      "email": "author@mail.org"
+    }
+  },
+  "_links":[  
+     {  
+        "rel":"self",
+        "href":"http://t:5511/projects/namespace/project-name"
+     },
+     {  
+        "rel":"datasets",
+        "href":"http://t:5511/projects/namespace/project-name/datasets"
+     }
+  ]
 }
 ```
 

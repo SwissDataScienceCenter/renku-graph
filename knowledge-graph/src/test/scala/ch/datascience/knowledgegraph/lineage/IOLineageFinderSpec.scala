@@ -44,7 +44,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
 
     "return the lineage of the given project for a given commit id and file path" in new InMemoryStoreTestCase {
 
-      loadToStore(triples(multiFileAndCommit(projectPath, multiFileAndCommitData)))
+      loadToStore(triples(multiFileAndCommit(projectPath, data = multiFileAndCommitData)))
 
       import multiFileAndCommitData._
       lineageFinder
@@ -81,7 +81,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
 
   private trait InMemoryStoreTestCase {
 
-    val projectPath            = ProjectPath("kuba/zurich-bikes")
+    val projectPath            = ProjectPath("namespace/test-lineage")
     val multiFileAndCommitData = multiFileAndCommit.MultiFileAndCommitData()
     import multiFileAndCommit._
 

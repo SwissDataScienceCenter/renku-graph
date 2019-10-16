@@ -46,16 +46,20 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       loadToStore(
         triples(
-          singleFileAndCommit(project1, project1OutdatedCommit.toCommitId, schemaVersion = schemaVersions.generateOne),
-          singleFileAndCommit(project2, project2OutdatedCommit.toCommitId, schemaVersion = schemaVersions.generateOne)
+          singleFileAndCommit(project1,
+                              commitId      = project1OutdatedCommit.toCommitId,
+                              schemaVersion = schemaVersions.generateOne),
+          singleFileAndCommit(project2,
+                              commitId      = project2OutdatedCommit.toCommitId,
+                              schemaVersion = schemaVersions.generateOne)
         )
       )
 
       // format: off
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() should (
-        be(Some(OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1), Set(project1OutdatedCommit)))) 
+        be(Some(OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1OutdatedCommit))))
         or
-        be(Some(OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project2), Set(project2OutdatedCommit))))
+        be(Some(OutdatedTriples(FullProjectPath(renkuBaseUrl, project2), Set(project2OutdatedCommit))))
       )
       // format: on
     }
@@ -69,15 +73,18 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       loadToStore(
         triples(
-          singleFileAndCommit(project1, project1Commit1NoAgent.toCommitId, schemaVersion  = schemaVersions.generateOne),
-          singleFileAndCommit(project1, project1Commit2Outdated.toCommitId, schemaVersion = schemaVersions.generateOne),
-          singleFileAndCommit(project1, project1Commit3UpToDate.toCommitId, schemaVersion = schemaVersion)
+          singleFileAndCommit(project1,
+                              commitId      = project1Commit1NoAgent.toCommitId,
+                              schemaVersion = schemaVersions.generateOne),
+          singleFileAndCommit(project1,
+                              commitId           = project1Commit2Outdated.toCommitId,
+                              schemaVersion      = schemaVersions.generateOne),
+          singleFileAndCommit(project1, commitId = project1Commit3UpToDate.toCommitId, schemaVersion = schemaVersion)
         )
       )
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe Some(
-        OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1),
-                        Set(project1Commit1NoAgent, project1Commit2Outdated))
+        OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1Commit1NoAgent, project1Commit2Outdated))
       )
     }
 
@@ -88,7 +95,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       loadToStore(
         triples(
-          singleFileAndCommit(project, projectCommitUpToDate.toCommitId, schemaVersion = schemaVersion)
+          singleFileAndCommit(project, commitId = projectCommitUpToDate.toCommitId, schemaVersion = schemaVersion)
         )
       )
 

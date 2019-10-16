@@ -18,8 +18,8 @@
 
 package ch.datascience.dbeventlog
 
-import cats.implicits._
 import EventStatus._
+import cats.implicits._
 import ch.datascience.dbeventlog.commands.ProcessingStatus
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen

@@ -16,20 +16,28 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.knowledgegraph.projects
 
-import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.CommonGraphGenerators.{emails, names}
 import ch.datascience.graph.model.GraphModelGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import ch.datascience.knowledgegraph.projects.model._
+import org.scalacheck.Gen
 
-class RdfResourceSpec extends WordSpec {
+object ProjectsGenerators {
 
-  "fullProjectPathResourceRenderer" should {
+  implicit val projects: Gen[Project] = for {
+    id      <- projectPaths
+    name    <- projectNames
+    created <- projectCreations
+  } yield Project(id, name, created)
 
-    "wrap the value into <>" in {
-      val projectPath = fullProjectPaths.generateOne
-      projectPath.showAs[RdfResource] shouldBe s"<$projectPath>"
-    }
-  }
+  private implicit lazy val projectCreations: Gen[ProjectCreation] = for {
+    created <- projectCreatedDates
+    creator <- projectCreators
+  } yield ProjectCreation(created, creator)
+
+  private implicit lazy val projectCreators: Gen[ProjectCreator] = for {
+    email <- emails
+    name  <- names
+  } yield ProjectCreator(email, name)
 }

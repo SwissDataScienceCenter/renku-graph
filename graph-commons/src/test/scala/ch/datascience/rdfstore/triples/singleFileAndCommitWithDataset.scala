@@ -24,11 +24,11 @@ import ch.datascience.generators.Generators.{httpUrls, listOf, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
 import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.graph.model.{SchemaVersion, projects, users}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities._
 import io.circe.Json
@@ -37,6 +37,9 @@ import org.scalacheck.Gen
 object singleFileAndCommitWithDataset {
 
   def apply(projectPath:               ProjectPath,
+            projectName:               projects.Name = projectNames.generateOne,
+            projectDateCreated:        projects.DateCreated = projectCreatedDates.generateOne,
+            projectCreator:            (users.Name, Email) = names.generateOne -> emails.generateOne,
             commitId:                  CommitId = commitIds.generateOne,
             committerName:             UserName = names.generateOne,
             committerEmail:            Email = emails.generateOne,
@@ -50,22 +53,25 @@ object singleFileAndCommitWithDataset {
             maybeDatasetUrl:           Option[String] = Gen.option(datasetUrl).generateOne,
             schemaVersion:             SchemaVersion = schemaVersions.generateOne,
             renkuBaseUrl:              RenkuBaseUrl = renkuBaseUrl)(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
-    val projectId                        = Project.Id(renkuBaseUrl, projectPath)
-    val renkuPath                        = FilePath(".renku")
-    val renkuCommitCollectionEntityId    = CommitCollectionEntity.Id(commitId, renkuPath)
-    val datasetsPath                     = renkuPath / "datasets"
-    val datasetsCommitCollectionEntityId = CommitCollectionEntity.Id(commitId, datasetsPath)
-    val datasetPath                      = datasetsPath / datasetIdentifier
-    val datasetCommitCollectionEntityId  = CommitCollectionEntity.Id(commitId, datasetPath)
-    val commitActivityId                 = CommitActivity.Id(commitId)
-    val datasetGenerationPath            = FilePath("tree") / datasetPath
-    val datasetId                        = Dataset.Id(datasetIdentifier)
-    val commitGenerationId               = CommitGeneration.Id(commitId, datasetGenerationPath)
-    val committerPersonId                = Person.Id(committerName)
-    val agentId                          = Agent.Id(schemaVersion)
+    val projectId                                 = Project.Id(renkuBaseUrl, projectPath)
+    val (projectCreatorName, projectCreatorEmail) = projectCreator
+    val projectCreatorId                          = Person.Id(projectCreatorName)
+    val renkuPath                                 = FilePath(".renku")
+    val renkuCommitCollectionEntityId             = CommitCollectionEntity.Id(commitId, renkuPath)
+    val datasetsPath                              = renkuPath / "datasets"
+    val datasetsCommitCollectionEntityId          = CommitCollectionEntity.Id(commitId, datasetsPath)
+    val datasetPath                               = datasetsPath / datasetIdentifier
+    val datasetCommitCollectionEntityId           = CommitCollectionEntity.Id(commitId, datasetPath)
+    val commitActivityId                          = CommitActivity.Id(commitId)
+    val datasetGenerationPath                     = FilePath("tree") / datasetPath
+    val datasetId                                 = Dataset.Id(datasetIdentifier)
+    val commitGenerationId                        = CommitGeneration.Id(commitId, datasetGenerationPath)
+    val committerPersonId                         = Person.Id(committerName)
+    val agentId                                   = Agent.Id(schemaVersion)
 
     List(
-      Project(projectId),
+      Project(projectId, projectName, projectDateCreated, projectCreatorId),
+      Person(projectCreatorId, Some(projectCreatorEmail)),
       CommitActivity(
         commitActivityId,
         projectId,

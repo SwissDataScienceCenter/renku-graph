@@ -38,7 +38,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class DatasetsEndpoint[Interpretation[_]: Effect](
+class DatasetEndpoint[Interpretation[_]: Effect](
     datasetFinder:     DatasetFinder[Interpretation],
     renkuResourcesUrl: RenkuResourcesUrl,
     logger:            Logger[Interpretation]
@@ -107,6 +107,7 @@ class DatasetsEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
+      "path": ${project.path},
       "name": ${project.name},
       "created": {
         "dateCreated": ${project.created.date},
@@ -115,20 +116,22 @@ class DatasetsEndpoint[Interpretation[_]: Effect](
           "name": ${project.created.agent.name}
         }
       }
-    }"""
+    }""" deepMerge _links(
+      Link(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / project.path))
+    )
   }
 }
 
-object IODatasetsEndpoint {
+object IODatasetEndpoint {
 
   def apply()(implicit executionContext: ExecutionContext,
               contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[DatasetsEndpoint[IO]] =
+              timer:                     Timer[IO]): IO[DatasetEndpoint[IO]] =
     for {
       datasetFinder    <- IODatasetFinder(logger = ApplicationLogger)
       renkuResourceUrl <- RenkuResourcesUrl[IO]()
     } yield
-      new DatasetsEndpoint[IO](
+      new DatasetEndpoint[IO](
         datasetFinder,
         renkuResourceUrl,
         ApplicationLogger

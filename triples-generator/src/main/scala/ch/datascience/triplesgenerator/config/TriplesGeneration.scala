@@ -29,8 +29,8 @@ object TriplesGeneration {
   final case object RenkuLog                extends TriplesGeneration
   final case object RemoteTriplesGeneration extends TriplesGeneration
 
-  import ch.datascience.config.ConfigLoader._
   import cats.implicits._
+  import ch.datascience.config.ConfigLoader._
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load

@@ -22,6 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -54,7 +55,7 @@ private class ProjectsFinder(
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |
-       |SELECT DISTINCT ?isPartOf ?minDateCreated ?agentEmail ?agentName
+       |SELECT DISTINCT ?isPartOf ?name ?minDateCreated ?agentEmail ?agentName
        |WHERE {
        |  {
        |    SELECT DISTINCT ?isPartOf (MIN(?dataset) as ?datasetResource) (MIN(?dateCreated) as ?minDateCreated)
@@ -83,9 +84,11 @@ private class ProjectsFinder(
        |    ?agentResource rdf:type <http://schema.org/Person> ;
        |                   schema:email ?agentEmail ;
        |                   schema:name ?agentName .
+       |    ?isPartOf rdf:type <http://schema.org/Project> ;
+       |              schema:name ?name .
        |  }
        |}
-       |ORDER BY ASC(?isPartOf)
+       |ORDER BY ASC(?name)
        |
        |""".stripMargin
 }
@@ -98,7 +101,7 @@ private object ProjectsFinder {
     import ch.datascience.graph.model.users.{Email, Name => UserName}
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    def toProjectName(projectPath: FullProjectPath) =
+    def toProjectPath(projectPath: FullProjectPath) =
       projectPath
         .as[Try, ProjectPath]
         .toEither
@@ -106,11 +109,12 @@ private object ProjectsFinder {
 
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
-        name        <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectName)
+        path        <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectPath)
+        name        <- cursor.downField("name").downField("value").as[projects.Name]
         dateCreated <- cursor.downField("minDateCreated").downField("value").as[DateCreatedInProject]
         agentEmail  <- cursor.downField("agentEmail").downField("value").as[Email]
         agentName   <- cursor.downField("agentName").downField("value").as[UserName]
-      } yield DatasetProject(name, DatasetInProjectCreation(dateCreated, DatasetAgent(agentEmail, agentName)))
+      } yield DatasetProject(path, name, DatasetInProjectCreation(dateCreated, DatasetAgent(agentEmail, agentName)))
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetProject])

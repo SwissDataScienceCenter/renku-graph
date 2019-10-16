@@ -26,11 +26,13 @@ import org.scalacheck.Gen.uuid
 
 object GraphModelGenerators {
 
-  implicit val projectPaths: Gen[ProjectPath] = relativePaths(minSegments = 2, maxSegments = 2) map ProjectPath.apply
+  implicit val projectNames:        Gen[projects.Name]        = nonEmptyStrings() map projects.Name.apply
+  implicit val projectPaths:        Gen[ProjectPath]          = relativePaths(minSegments = 2, maxSegments = 2) map ProjectPath.apply
+  implicit val projectCreatedDates: Gen[projects.DateCreated] = timestampsNotInTheFuture map projects.DateCreated.apply
   implicit val fullProjectPaths: Gen[FullProjectPath] = for {
     url  <- httpUrls
     path <- projectPaths
-  } yield FullProjectPath.from(s"$url/$path").fold(throw _, identity)
+  } yield FullProjectPath.from(s"$url/projects/$path").fold(throw _, identity)
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIds: Gen[Identifier] = Gen
