@@ -21,10 +21,8 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.projects.FullProjectPath
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.{Decoder, HCursor}
 
@@ -106,24 +104,24 @@ private class IOOutdatedTriplesFinder(
   private implicit lazy val outdatedTriplesDecoder: Decoder[Option[OutdatedTriples]] =
     _.downField("results")
       .downField("bindings")
-      .as[List[(FullProjectPath, CommitIdResource)]]
+      .as[List[(ProjectResource, CommitIdResource)]]
       .map(toMaybeOutdatedTriples)
 
-  private implicit lazy val jsonDecoder: Decoder[(FullProjectPath, CommitIdResource)] = (cursor: HCursor) => {
+  private implicit lazy val jsonDecoder: Decoder[(ProjectResource, CommitIdResource)] = (cursor: HCursor) => {
     for {
-      maybeProjectPath <- cursor.downField("project").downField("value").as[FullProjectPath]
-      maybeCommitId    <- cursor.downField("commit").downField("value").as[CommitIdResource]
-    } yield maybeProjectPath -> maybeCommitId
+      maybeProjectResource <- cursor.downField("project").downField("value").as[ProjectResource]
+      maybeCommitId        <- cursor.downField("commit").downField("value").as[CommitIdResource]
+    } yield maybeProjectResource -> maybeCommitId
   }
 
-  private lazy val toMaybeOutdatedTriples: List[(FullProjectPath, CommitIdResource)] => Option[OutdatedTriples] = {
+  private lazy val toMaybeOutdatedTriples: List[(ProjectResource, CommitIdResource)] => Option[OutdatedTriples] = {
     case Nil => None
-    case (projectPath, commitId) +: tail =>
+    case (projectResource, commitId) +: tail =>
       Some {
         OutdatedTriples(
-          projectPath,
+          projectResource,
           commits = tail.foldLeft(Set(commitId)) {
-            case (allCommits, (`projectPath`, commit)) => allCommits + commit
+            case (allCommits, (projectResource, commit)) => allCommits + commit
           }
         )
       }

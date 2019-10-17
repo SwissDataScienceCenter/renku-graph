@@ -71,11 +71,11 @@ class ReProvisioner[Interpretation[_]](
 
   private def reProvisionNextProject(outdatedTriples: OutdatedTriples) =
     for {
-      projectPath <- outdatedTriples.projectPath.as[Interpretation, ProjectPath]
+      projectPath <- outdatedTriples.projectResource.as[Interpretation, ProjectPath]
       commitIds   <- outdatedTriples.commits.toList.map(_.as[Interpretation, CommitId]).sequence
       _           <- markEventsAsNew(projectPath, commitIds.toSet)
       _           <- removeOutdatedTriples(outdatedTriples)
-      _           <- logger.info(s"ReProvisioning '${outdatedTriples.projectPath}' project")
+      _           <- logger.info(s"ReProvisioning '${outdatedTriples.projectResource}' project")
       _           <- startReProvisioning
     } yield ()
 

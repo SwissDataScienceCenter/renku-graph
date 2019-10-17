@@ -58,7 +58,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.liftF(context.pure(project1OutdatedTriples)))
         (eventLogMarkNew
           .markEventsAsNew(_: ProjectPath, _: Set[CommitId]))
-          .expects(project1OutdatedTriples.projectPath.toProjectPath, project1OutdatedTriples.commits.toCommitIds)
+          .expects(project1OutdatedTriples.projectResource.toProjectPath, project1OutdatedTriples.commits.toCommitIds)
           .returning(context.unit)
         (triplesRemover
           .removeOutdatedTriples(_: OutdatedTriples))
@@ -74,7 +74,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.liftF(context.pure(project2OutdatedTriples)))
         (eventLogMarkNew
           .markEventsAsNew(_: ProjectPath, _: Set[CommitId]))
-          .expects(project2OutdatedTriples.projectPath.toProjectPath, project2OutdatedTriples.commits.toCommitIds)
+          .expects(project2OutdatedTriples.projectResource.toProjectPath, project2OutdatedTriples.commits.toCommitIds)
           .returning(context.unit)
         (triplesRemover
           .removeOutdatedTriples(_: OutdatedTriples))
@@ -97,8 +97,8 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
       reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info(s"ReProvisioning '${project1OutdatedTriples.projectPath}' project"),
-        Info(s"ReProvisioning '${project2OutdatedTriples.projectPath}' project"),
+        Info(s"ReProvisioning '${project1OutdatedTriples.projectResource}' project"),
+        Info(s"ReProvisioning '${project2OutdatedTriples.projectResource}' project"),
         Info("All projects' triples up to date")
       )
     }
@@ -115,7 +115,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.liftF(context.pure(outdatedTriples)))
         (eventLogMarkNew
           .markEventsAsNew(_: ProjectPath, _: Set[CommitId]))
-          .expects(outdatedTriples.projectPath.toProjectPath, outdatedTriples.commits.toCommitIds)
+          .expects(outdatedTriples.projectResource.toProjectPath, outdatedTriples.commits.toCommitIds)
           .returning(context.unit)
         (triplesRemover
           .removeOutdatedTriples(_: OutdatedTriples))
@@ -236,7 +236,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.liftF(context.pure(outdatedTriples)))
         (eventLogMarkNew
           .markEventsAsNew(_: ProjectPath, _: Set[CommitId]))
-          .expects(outdatedTriples.projectPath.toProjectPath, outdatedTriples.commits.toCommitIds)
+          .expects(outdatedTriples.projectResource.toProjectPath, outdatedTriples.commits.toCommitIds)
           .returning(context.raiseError(exception))
 
         (eventLogFetch.isEventToProcess _)
@@ -248,7 +248,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.liftF(context.pure(outdatedTriples)))
         (eventLogMarkNew
           .markEventsAsNew(_: ProjectPath, _: Set[CommitId]))
-          .expects(outdatedTriples.projectPath.toProjectPath, outdatedTriples.commits.toCommitIds)
+          .expects(outdatedTriples.projectResource.toProjectPath, outdatedTriples.commits.toCommitIds)
           .returning(context.unit)
         (triplesRemover
           .removeOutdatedTriples(_: OutdatedTriples))
@@ -272,7 +272,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Error("Re-provisioning failure", exception),
-        Info(s"ReProvisioning '${outdatedTriples.projectPath}' project"),
+        Info(s"ReProvisioning '${outdatedTriples.projectResource}' project"),
         Info("All projects' triples up to date")
       )
     }
@@ -291,7 +291,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.liftF(context.pure(outdatedTriples)))
         (eventLogMarkNew
           .markEventsAsNew(_: ProjectPath, _: Set[CommitId]))
-          .expects(outdatedTriples.projectPath.toProjectPath, outdatedTriples.commits.toCommitIds)
+          .expects(outdatedTriples.projectResource.toProjectPath, outdatedTriples.commits.toCommitIds)
           .returning(context.unit)
         (triplesRemover
           .removeOutdatedTriples(_: OutdatedTriples))
@@ -307,7 +307,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.liftF(context.pure(outdatedTriples)))
         (eventLogMarkNew
           .markEventsAsNew(_: ProjectPath, _: Set[CommitId]))
-          .expects(outdatedTriples.projectPath.toProjectPath, outdatedTriples.commits.toCommitIds)
+          .expects(outdatedTriples.projectResource.toProjectPath, outdatedTriples.commits.toCommitIds)
           .returning(context.unit)
         (triplesRemover
           .removeOutdatedTriples(_: OutdatedTriples))
@@ -331,7 +331,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Error("Re-provisioning failure", exception),
-        Info(s"ReProvisioning '${outdatedTriples.projectPath}' project"),
+        Info(s"ReProvisioning '${outdatedTriples.projectResource}' project"),
         Info("All projects' triples up to date")
       )
     }
@@ -425,7 +425,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
     lazy val toCommitIds = commitIdResources.map(_.as[Try, CommitId].fold(throw _, identity))
   }
 
-  private implicit class FullProjectPathOps(projectPath: FullProjectPath) {
-    lazy val toProjectPath = projectPath.as[Try, ProjectPath].fold(throw _, identity)
+  private implicit class ProjectResourceOps(projectResource: ProjectResource) {
+    lazy val toProjectPath = projectResource.as[Try, ProjectPath].fold(throw _, identity)
   }
 }

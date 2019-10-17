@@ -57,34 +57,62 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
       // format: off
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() should (
-        be(Some(OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1OutdatedCommit))))
+        be(Some(OutdatedTriples(ProjectResource(FullProjectPath(renkuBaseUrl, project1).toString), Set(project1OutdatedCommit))))
         or
-        be(Some(OutdatedTriples(FullProjectPath(renkuBaseUrl, project2), Set(project2OutdatedCommit))))
+        be(Some(OutdatedTriples(ProjectResource(FullProjectPath(renkuBaseUrl, project2).toString), Set(project2OutdatedCommit))))
       )
       // format: on
     }
 
-    "return all project's commits having triples related to agent version different than the current one" in new TestCase {
+    "return all project's commits having triples related to agent with version different than the current one" in new TestCase {
 
-      val project1                = projectPaths.generateOne
-      val project1Commit1NoAgent  = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
-      val project1Commit2Outdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
-      val project1Commit3UpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val project                = projectPaths.generateOne
+      val projectOutdatedCommit1 = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val projectOutdatedCommit2 = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val projectUpToDateCommit3 = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
-          singleFileAndCommit(project1,
-                              commitId      = project1Commit1NoAgent.toCommitId,
+          singleFileAndCommit(project,
+                              commitId      = projectOutdatedCommit1.toCommitId,
                               schemaVersion = schemaVersions.generateOne),
-          singleFileAndCommit(project1,
-                              commitId           = project1Commit2Outdated.toCommitId,
-                              schemaVersion      = schemaVersions.generateOne),
-          singleFileAndCommit(project1, commitId = project1Commit3UpToDate.toCommitId, schemaVersion = schemaVersion)
+          singleFileAndCommit(project,
+                              commitId          = projectOutdatedCommit2.toCommitId,
+                              schemaVersion     = schemaVersions.generateOne),
+          singleFileAndCommit(project, commitId = projectUpToDateCommit3.toCommitId, schemaVersion = schemaVersion)
         )
       )
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe Some(
-        OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1Commit1NoAgent, project1Commit2Outdated))
+        OutdatedTriples(ProjectResource(FullProjectPath(renkuBaseUrl, project).toString),
+                        Set(projectOutdatedCommit1, projectOutdatedCommit2))
+      )
+    }
+
+    "return project's commits having outdated triples if the project resource is in the old format" in new TestCase {
+
+      val project               = projectPaths.generateOne
+      val projectResource       = ProjectResource((renkuBaseUrl / project).toString)
+      val projectOutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val projectUpToDateCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+
+      loadToStore(
+        triples(
+          singleFileAndCommit(
+            project,
+            commitId      = projectOutdatedCommit.toCommitId,
+            schemaVersion = schemaVersions.generateOne
+          ) map projectIdsToOldFormat(projectResource),
+          singleFileAndCommit(
+            project,
+            commitId      = projectUpToDateCommit.toCommitId,
+            schemaVersion = schemaVersion
+          ) map projectIdsToOldFormat(projectResource)
+        )
+      )
+
+      triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe Some(
+        OutdatedTriples(projectResource, Set(projectOutdatedCommit))
       )
     }
 
