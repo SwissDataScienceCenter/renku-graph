@@ -24,6 +24,7 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.server.QueryParameterTools._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Phrase
@@ -89,6 +90,85 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       val response = routes
         .call(Request(Method.GET, uri"knowledge-graph/datasets"))
         .status shouldBe ServiceUnavailable
+    }
+
+    s"define a GET /knowledge-graph/datasets/:id endpoint returning $Ok when valid :id path parameter given" in new TestCase {
+      val id = datasetIds.generateOne
+
+      (datasetsEndpoint.getDataset _).expects(id).returning(IO.pure(Response[IO](Ok)))
+
+      val response = routes.call(
+        Request(Method.GET, uri"knowledge-graph/datasets" / id.value)
+      )
+
+      response.status shouldBe Ok
+    }
+
+    s"define a GET /knowledge-graph/datasets/:id endpoint returning $ServiceUnavailable when no :id path parameter given" in new TestCase {
+      val id = datasetIds.generateOne
+
+      val response = routes.call(
+        Request(Method.GET, uri"knowledge-graph/datasets/")
+      )
+
+      response.status shouldBe ServiceUnavailable
+    }
+
+    "define a GET /knowledge-graph/graphql endpoint" in new TestCase {
+      val id = datasetIds.generateOne
+
+      (queryEndpoint.schema _).expects().returning(IO.pure(Response[IO](Ok)))
+
+      val response = routes.call(
+        Request(Method.GET, uri"knowledge-graph/graphql")
+      )
+
+      response.status shouldBe Ok
+    }
+
+    "define a POST /knowledge-graph/graphql endpoint" in new TestCase {
+      val id = datasetIds.generateOne
+
+      val request: Request[IO] = Request(Method.POST, uri"knowledge-graph/graphql")
+      (queryEndpoint.handleQuery _).expects(request).returning(IO.pure(Response[IO](Ok)))
+
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
+    }
+
+    s"define a GET /knowledge-graph/projects/:namespace/:name endpoint returning $Ok for valid path parameters" in new TestCase {
+      val projectPath = projectPaths.generateOne
+
+      (projectEndpoint.getProject _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+
+      val response = routes.call(
+        Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+      )
+
+      response.status shouldBe Ok
+    }
+
+    s"define a GET /knowledge-graph/projects/:namespace/:name endpoint returning $ServiceUnavailable for missing :name" in new TestCase {
+      val namespace = nonBlankStrings().generateOne.value
+
+      val response = routes.call(
+        Request(Method.GET, uri"knowledge-graph/projects" / namespace)
+      )
+
+      response.status shouldBe ServiceUnavailable
+    }
+
+    s"define a GET /knowledge-graph/projects/:namespace/:name/datasets endpoint returning $Ok for valid path parameters" in new TestCase {
+      val projectPath = projectPaths.generateOne
+
+      (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+
+      val response = routes.call(
+        Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
+      )
+
+      response.status shouldBe Ok
     }
   }
 
