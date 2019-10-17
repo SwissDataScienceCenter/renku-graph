@@ -52,7 +52,43 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         )
       )
 
-      val outdatedTriples = OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1Commit1Outdated))
+      val outdatedTriples = OutdatedTriples(
+        projectResource = ProjectResource(FullProjectPath(renkuBaseUrl, project1).toString),
+        commits         = Set(project1Commit1Outdated)
+      )
+
+      triplesRemover
+        .removeOutdatedTriples(outdatedTriples)
+        .unsafeRunSync() shouldBe ((): Unit)
+
+      val leftTriples = runQuery("SELECT ?subject ?o ?p WHERE {?subject ?o ?p}").unsafeRunSync()
+      leftTriples
+        .map(row => row("subject"))
+        .toSet
+        .filter(triplesMatching(outdatedTriples.commits)) shouldBe empty
+    }
+
+    "remove all the triples for the given project and commits when project resource in the old format" in new TestCase {
+
+      val project                = projectPaths.generateOne
+      val projectResource        = ProjectResource((renkuBaseUrl / project).toString)
+      val projectCommit1Outdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val projectCommit2UpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+
+      loadToStore(
+        triples(
+          singleFileAndCommit(
+            project,
+            commitId = projectCommit1Outdated.toCommitId
+          ) map projectIdsToOldFormat(projectResource),
+          singleFileAndCommit(
+            project,
+            commitId = projectCommit2UpToDate.toCommitId
+          ) map projectIdsToOldFormat(projectResource)
+        )
+      )
+
+      val outdatedTriples = OutdatedTriples(projectResource, Set(projectCommit1Outdated))
 
       triplesRemover
         .removeOutdatedTriples(outdatedTriples)
@@ -82,7 +118,10 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         )
       )
 
-      val outdatedTriples = OutdatedTriples(FullProjectPath(renkuBaseUrl, project), Set(projectCommitOutdated))
+      val outdatedTriples = OutdatedTriples(
+        projectResource = ProjectResource(FullProjectPath(renkuBaseUrl, project).toString),
+        commits         = Set(projectCommitOutdated)
+      )
 
       triplesRemover
         .removeOutdatedTriples(outdatedTriples)
@@ -110,7 +149,10 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         )
       )
 
-      val outdatedTriples = OutdatedTriples(FullProjectPath(renkuBaseUrl, project), Set(projectCommitOutdated))
+      val outdatedTriples = OutdatedTriples(
+        projectResource = ProjectResource(FullProjectPath(renkuBaseUrl, project).toString),
+        commits         = Set(projectCommitOutdated)
+      )
 
       triplesRemover
         .removeOutdatedTriples(outdatedTriples)
@@ -143,7 +185,10 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         )
       )
 
-      val outdatedTriples = OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1OutdatedCommit))
+      val outdatedTriples = OutdatedTriples(
+        projectResource = ProjectResource(FullProjectPath(renkuBaseUrl, project1).toString),
+        commits         = Set(project1OutdatedCommit)
+      )
 
       triplesRemover
         .removeOutdatedTriples(outdatedTriples)
