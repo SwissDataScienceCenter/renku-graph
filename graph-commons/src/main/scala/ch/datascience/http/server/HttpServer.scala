@@ -23,8 +23,8 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.controllers.InfoMessage
 import ch.datascience.controllers.InfoMessage._
-import org.http4s.{HttpRoutes, Request, Response, Status}
 import org.http4s.server.blaze._
+import org.http4s.{HttpRoutes, Request, Response, Status}
 
 import scala.language.higherKinds
 

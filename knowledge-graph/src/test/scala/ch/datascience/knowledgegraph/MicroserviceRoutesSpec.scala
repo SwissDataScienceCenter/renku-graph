@@ -94,11 +94,13 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
   private trait TestCase {
     val queryEndpoint           = mock[IOQueryEndpoint]
+    val projectEndpoint         = mock[IOProjectEndpointStub]
     val projectDatasetsEndpoint = mock[IOProjectDatasetsEndpointStub]
-    val datasetsEndpoint        = mock[IODatasetsEndpointStub]
+    val datasetsEndpoint        = mock[IODatasetEndpointStub]
     val datasetsSearchEndpoint  = mock[IODatasetsSearchEndpointStub]
     val routes = new MicroserviceRoutes[IO](
       queryEndpoint,
+      projectEndpoint,
       projectDatasetsEndpoint,
       datasetsEndpoint,
       datasetsSearchEndpoint

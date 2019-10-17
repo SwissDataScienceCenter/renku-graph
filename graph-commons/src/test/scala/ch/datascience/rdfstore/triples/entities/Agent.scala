@@ -24,14 +24,14 @@ import io.circe.literal._
 
 private[triples] object Agent {
 
-  def apply(schemaVersion: SchemaVersion) = json"""
+  def apply(id: Id) = json"""
   {
-    "@id": ${Id(schemaVersion)},
+    "@id": $id,
     "@type": [
       "prov:SoftwareAgent",
       "http://purl.org/wf4ever/wfprov#WorkflowEngine"
     ],
-    "rdfs:label": ${s"renku $schemaVersion"}
+    "rdfs:label": ${s"renku ${id.schemaVersion}"}
   }"""
 
   final case class Id(schemaVersion: SchemaVersion) extends EntityId {

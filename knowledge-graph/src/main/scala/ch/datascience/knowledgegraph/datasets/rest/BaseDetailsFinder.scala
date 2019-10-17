@@ -18,6 +18,7 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
+import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
@@ -25,7 +26,6 @@ import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
-import io.circe.DecodingFailure
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -34,44 +34,46 @@ private class BaseDetailsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+)(implicit executionContext: ExecutionContext,
+  contextShift:              ContextShift[IO],
+  timer:                     Timer[IO],
+  ME:                        MonadError[IO, Throwable])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger) {
 
   import BaseDetailsFinder._
 
   def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
-    queryExpecting[Option[Dataset]](using = query(identifier))
+    queryExpecting[List[Dataset]](using = query(identifier)) flatMap toSingleDataset
 
   private def query(identifier: Identifier): String =
     s"""
-       |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
        |
-       |SELECT DISTINCT ?identifier ?name ?description ?dateCreated ?agentEmail ?agentName ?publishedDate
+       |SELECT DISTINCT ?identifier ?name ?description ?publishedDate
        |WHERE {
-       |  ?dataset rdfs:label "$identifier" ;
-       |           rdfs:label ?identifier ;
+       |  ?dataset schema:identifier "$identifier" ;
+       |           schema:identifier ?identifier ;
        |           rdf:type <http://schema.org/Dataset> ;
-       |           schema:name ?name ;
-       |           schema:dateCreated ?dateCreated ;
-       |           (prov:qualifiedGeneration/prov:activity/prov:agent) ?agentResource .
-       |  ?agentResource rdf:type <http://schema.org/Person> ;
-       |           schema:email ?agentEmail ;
-       |           schema:name ?agentName .
-       |  OPTIONAL { ?dataset schema:description ?description } .         
-       |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .         
+       |           schema:name ?name .
+       |  OPTIONAL { ?dataset schema:description ?description } .
+       |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .
        |}""".stripMargin
+
+  private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
+    case Nil            => ME.pure(None)
+    case dataset +: Nil => ME.pure(Some(dataset))
+    case datasets       => ME.raiseError(new RuntimeException(s"More than one dataset with ${datasets.head.id} id"))
+  }
 }
 
 private object BaseDetailsFinder {
   import io.circe.Decoder
 
-  private[rest] implicit val maybeRecordDecoder: Decoder[Option[Dataset]] = {
+  private[rest] implicit val maybeRecordDecoder: Decoder[List[Dataset]] = {
     import Decoder._
     import ch.datascience.graph.model.datasets._
-    import ch.datascience.graph.model.users.{Email, Name => UserName}
     import ch.datascience.knowledgegraph.datasets.model._
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
@@ -79,9 +81,6 @@ private object BaseDetailsFinder {
       for {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
-        dateCreated        <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-        agentEmail         <- cursor.downField("agentEmail").downField("value").as[Email]
-        agentName          <- cursor.downField("agentName").downField("value").as[UserName]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
         maybeDescription <- cursor
                              .downField("description")
@@ -94,17 +93,12 @@ private object BaseDetailsFinder {
           id,
           name,
           maybeDescription,
-          DatasetCreation(dateCreated, DatasetAgent(agentEmail, agentName)),
           DatasetPublishing(maybePublishedDate, Set.empty),
           part    = List.empty,
           project = List.empty
         )
     }
 
-    _.downField("results").downField("bindings").as(decodeList(dataset)).flatMap {
-      case Nil            => Right(None)
-      case dataset +: Nil => Right(Some(dataset))
-      case manyDatasets   => Left(DecodingFailure(s"More than one dataset with ${manyDatasets.head.id} id", Nil))
-    }
+    _.downField("results").downField("bindings").as(decodeList(dataset))
   }
 }

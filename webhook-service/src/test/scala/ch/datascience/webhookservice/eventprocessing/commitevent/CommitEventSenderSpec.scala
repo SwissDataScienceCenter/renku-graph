@@ -26,7 +26,7 @@ import ch.datascience.dbeventlog.commands.EventLogAdd
 import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

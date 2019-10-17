@@ -20,16 +20,20 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.knowledgegraph.projects.rest.{ProjectEndpoint, ProjectFinder}
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
+
+class IOProjectEndpointStub(projectFinder: ProjectFinder[IO], renkuResourcesUrl: RenkuResourcesUrl, logger: Logger[IO])
+    extends ProjectEndpoint[IO](projectFinder, renkuResourcesUrl, logger)
 
 class IOProjectDatasetsEndpointStub(projectDatasetsFinder: ProjectDatasetsFinder[IO],
                                     renkuResourcesUrl:     RenkuResourcesUrl,
                                     logger:                Logger[IO])
     extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder, renkuResourcesUrl, logger)
 
-class IODatasetsEndpointStub(datasetFinder: DatasetFinder[IO], renkuResourcesUrl: RenkuResourcesUrl, logger: Logger[IO])
-    extends DatasetsEndpoint[IO](datasetFinder, renkuResourcesUrl, logger)
+class IODatasetEndpointStub(datasetFinder: DatasetFinder[IO], renkuResourcesUrl: RenkuResourcesUrl, logger: Logger[IO])
+    extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, logger)
 
 class IODatasetsSearchEndpointStub(datasetsFinder:        DatasetsFinder[IO],
                                    renkuResourcesUrl:     RenkuResourcesUrl,

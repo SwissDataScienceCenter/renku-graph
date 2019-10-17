@@ -23,8 +23,8 @@ import java.time.temporal.ChronoUnit._
 
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CommittedDate
-import ch.datascience.graph.model.events.EventsGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 

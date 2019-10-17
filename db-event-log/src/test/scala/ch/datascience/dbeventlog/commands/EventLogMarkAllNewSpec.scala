@@ -25,9 +25,9 @@ import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitEventId
-import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.graph.model.projects.ProjectPath
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory

@@ -20,23 +20,25 @@ package ch.datascience.rdfstore.triples
 package entities
 
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects._
 import io.circe.Json
 import io.circe.literal._
 
 object Project {
 
-  def apply(id: Id): Json = json"""
+  def apply(id: Id, name: Name, dateCreated: DateCreated, creator: Person.Id): Json = json"""
   {
     "@id": $id,
     "@type": [
       "prov:Location",
-      "foaf:Project"
-    ]
-  }"""
+      "schema:Project"
+    ],
+    "schema:name": ${name.toString},
+    "schema:dateCreated": ${dateCreated.toString}
+  }""" deepMerge (creator toResource "schema:creator")
 
   final case class Id(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath) extends EntityId {
-    override val value: String = (renkuBaseUrl / projectPath).value
+    override val value: String = FullProjectPath(renkuBaseUrl, projectPath).value
   }
 
   def `schema:isPartOf`(projectId: Project.Id): Json = json"""{

@@ -16,12 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.tooling
+package ch.datascience.knowledgegraph.projects
 
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets.UTF_8
+import ch.datascience.graph.model.projects._
+import ch.datascience.graph.model.users
 
-object RequestTools {
+object model {
 
-  def urlEncode(value: String): String = URLEncoder.encode(value, UTF_8.name())
+  final case class Project(path: ProjectPath, name: Name, created: ProjectCreation)
+
+  final case class ProjectCreation(date: DateCreated, creator: ProjectCreator)
+
+  final case class ProjectCreator(email: users.Email, name: users.Name)
 }

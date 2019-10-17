@@ -19,15 +19,16 @@
 package ch.datascience.rdfstore.triples
 package entities
 
-import ch.datascience.graph.model.datasets.{PartDateCreated, PartLocation, PartName}
+import ch.datascience.graph.model.datasets.{PartLocation, PartName}
 import ch.datascience.graph.model.events.CommitId
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import io.circe.Json
 import io.circe.literal._
 
 object DatasetPart {
 
-  def apply(id: Id, name: PartName, dateCreated: PartDateCreated, projectId: Project.Id): Json = json"""
+  def apply(id: Id, name: PartName, projectId: Project.Id): Json = json"""
     {
       "@id": $id,
       "@type": [
@@ -37,12 +38,12 @@ object DatasetPart {
       ],
       "prov:atLocation": ${id.location.toString},
       "rdfs:label": ${s"${id.location}@${id.commitId}"},
-      "schema:dateCreated": ${dateCreated.toString},
       "schema:name": ${name.toString}
     }
   """.deepMerge(`schema:isPartOf`(projectId))
 
-  final case class Id(commitId: CommitId, location: PartLocation) extends EntityId {
-    override val value: String = s"file:///blob/$commitId/$location"
+  final case class Id(commitId: CommitId, location: PartLocation)(implicit fusekiBaseUrl: FusekiBaseUrl)
+      extends EntityId {
+    override val value: String = (fusekiBaseUrl / "blob" / commitId / location).toString
   }
 }

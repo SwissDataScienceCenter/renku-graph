@@ -20,25 +20,28 @@ package ch.datascience.knowledgegraph
 
 import cats.effect.ConcurrentEffect
 import ch.datascience.graph.http.server.binders.ProjectPath._
+import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.http.server.QueryParameterTools._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.QueryParameter
-import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.QueryEndpoint
+import ch.datascience.knowledgegraph.projects.rest.ProjectEndpoint
 import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     queryEndpoint:           QueryEndpoint[F],
+    projectEndpoint:         ProjectEndpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
-    datasetsEndpoint:        DatasetsEndpoint[F],
+    datasetEndpoint:         DatasetEndpoint[F],
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F]
 ) extends Http4sDsl[F] {
 
-  import datasetsEndpoint._
-  import datasetsSearchEndpoint._
+  import datasetEndpoint._
   import org.http4s.HttpRoutes
+  import datasetsSearchEndpoint._
   import projectDatasetsEndpoint._
+  import projectEndpoint._
   import queryEndpoint._
 
   // format: off
@@ -48,6 +51,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case           GET  -> Root / "knowledge-graph" / "datasets" / DatasetId(id)                                  => getDataset(id)
     case           GET  -> Root / "knowledge-graph" / "graphql"                                                   => schema
     case request @ POST -> Root / "knowledge-graph" / "graphql"                                                   => handleQuery(request)
+    case           GET  -> Root / "knowledge-graph" / "projects" / Namespace(namespace) / Name(name)              => getProject(namespace / name)
     case           GET  -> Root / "knowledge-graph" / "projects" / Namespace(namespace) / Name(name) / "datasets" => getProjectDatasets(namespace / name)
   }
   // format: on

@@ -21,10 +21,9 @@ package ch.datascience.knowledgegraph.graphql
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.string.MatchesRegex
+import eu.timepit.refined.collection.NonEmpty
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import sangria.ast.StringValue
@@ -77,7 +76,7 @@ class ArgumentsSpec extends WordSpec {
     }
   }
 
-  type NonBlank = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+  type NonBlank = String Refined NonEmpty
   case class TestTinyType(value: String) extends StringTinyType
   object TestTinyType extends TinyTypeFactory[TestTinyType](new TestTinyType(_))
 }

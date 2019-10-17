@@ -20,19 +20,24 @@ package ch.datascience.graph.model
 
 import java.time.{Instant, LocalDate}
 
-import ch.datascience.tinytypes.constraints._
 import ch.datascience.tinytypes._
+import ch.datascience.tinytypes.constraints._
 
 object datasets {
 
   final class Identifier private (val value: String) extends AnyVal with StringTinyType
-  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with UUID
+  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
+
+  final class DateCreatedInProject private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateCreatedInProject
+      extends TinyTypeFactory[DateCreatedInProject](new DateCreatedInProject(_))
+      with InstantNotInTheFuture
 
   final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
@@ -45,11 +50,6 @@ object datasets {
   final class PartName private (val value: String) extends AnyVal with StringTinyType
   implicit object PartName extends TinyTypeFactory[PartName](new PartName(_)) with NonBlank
 
-  final class PartLocation private (val value: String) extends AnyVal with StringTinyType
+  final class PartLocation private (val value: String) extends AnyVal with RelativePathTinyType
   implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath
-
-  final class PartDateCreated private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object PartDateCreated
-      extends TinyTypeFactory[PartDateCreated](new PartDateCreated(_))
-      with InstantNotInTheFuture
 }

@@ -26,22 +26,33 @@ import org.scalacheck.Gen.uuid
 
 object GraphModelGenerators {
 
-  implicit val projectPaths: Gen[ProjectPath] = relativePaths(minSegments = 2, maxSegments = 2) map ProjectPath.apply
+  implicit val projectNames:        Gen[projects.Name]        = nonEmptyStrings() map projects.Name.apply
+  implicit val projectPaths:        Gen[ProjectPath]          = relativePaths(minSegments = 2, maxSegments = 2) map ProjectPath.apply
+  implicit val projectCreatedDates: Gen[projects.DateCreated] = timestampsNotInTheFuture map projects.DateCreated.apply
   implicit val fullProjectPaths: Gen[FullProjectPath] = for {
     url  <- httpUrls
     path <- projectPaths
-  } yield FullProjectPath.from(s"$url/$path").fold(throw _, identity)
+  } yield FullProjectPath.from(s"$url/projects/$path").fold(throw _, identity)
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
-  implicit val datasetIds:            Gen[Identifier]    = uuid.map(_.toString) map Identifier.apply
+  implicit val datasetIds: Gen[Identifier] = Gen
+    .oneOf(
+      uuid.map(_.toString),
+      for {
+        first  <- Gen.choose(10, 99)
+        second <- Gen.choose(1000, 9999)
+        third  <- Gen.choose(1000000, 9999999)
+      } yield s"$first.$second/zenodo.$third"
+    )
+    .map(Identifier.apply)
   implicit val datasetNames:          Gen[Name]          = nonEmptyStrings() map Name.apply
   implicit val datasetDescriptions:   Gen[Description]   = nonEmptyStrings(maxLength = 1000) map Description.apply
-  implicit val datasetCreatedDates:   Gen[DateCreated]   = timestampsNotInTheFuture map DateCreated.apply
   implicit val datasetPublishedDates: Gen[PublishedDate] = localDatesNotInTheFuture map PublishedDate.apply
   implicit val datasetPartNames:      Gen[PartName]      = nonEmptyStrings() map PartName.apply
   implicit val datasetPartLocations: Gen[PartLocation] =
     relativePaths(minSegments = 2, maxSegments = 2)
       .map(path => s"data/$path")
       .map(PartLocation.apply)
-  implicit val datasetPartCreatedDates: Gen[PartDateCreated] = timestampsNotInTheFuture map PartDateCreated.apply
+  implicit val datasetInProjectCreationDates: Gen[DateCreatedInProject] =
+    timestampsNotInTheFuture map DateCreatedInProject.apply
 }

@@ -25,8 +25,9 @@ import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in 
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventsGenerators._
+import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
@@ -43,18 +44,21 @@ import sangria.macros._
 
 class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
-  private val project          = projects.generateOne.copy(path = ProjectPath("namespace/project"))
+  private val project          = projects.generateOne.copy(path = ProjectPath("namespace/datasets-project"))
+  private val projectName      = projectNames.generateOne
+  private val dataset1Creation = datasetInProjectCreations.generateOne
   private val dataset1CommitId = commitIds.generateOne
   private val dataset1 = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-    project          = List(DatasetProject(project.path))
+    project          = List(DatasetProject(project.path, projectName, dataset1Creation))
   )
+  private val dataset2Creation = datasetInProjectCreations.generateOne
   private val dataset2CommitId = commitIds.generateOne
   private val dataset2 = datasets.generateOne.copy(
     maybeDescription = None,
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = None),
-    project          = List(DatasetProject(project.path))
+    project          = List(DatasetProject(project.path, projectName, dataset2Creation))
   )
 
   feature("GraphQL query to find project's datasets") {
@@ -65,31 +69,33 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       val jsonLDTriples = triples(
         singleFileAndCommitWithDataset(
           project.path,
-          dataset1CommitId,
-          dataset1.created.agent.name,
-          dataset1.created.agent.email,
-          dataset1.id,
-          dataset1.name,
-          dataset1.maybeDescription,
-          dataset1.created.date,
-          dataset1.published.maybeDate,
-          dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset1.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-          schemaVersion = currentSchemaVersion
+          projectName,
+          commitId                  = dataset1CommitId,
+          committerName             = dataset1Creation.agent.name,
+          committerEmail            = dataset1Creation.agent.email,
+          committedDate             = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          datasetIdentifier         = dataset1.id,
+          datasetName               = dataset1.name,
+          maybeDatasetDescription   = dataset1.maybeDescription,
+          maybeDatasetPublishedDate = dataset1.published.maybeDate,
+          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
+          schemaVersion             = currentSchemaVersion
         ),
         singleFileAndCommitWithDataset(
           project.path,
-          dataset2CommitId,
-          dataset2.created.agent.name,
-          dataset2.created.agent.email,
-          dataset2.id,
-          dataset2.name,
-          dataset2.maybeDescription,
-          dataset2.created.date,
-          dataset2.published.maybeDate,
-          dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-          dataset2.part.map(part => (part.name, part.atLocation, part.dateCreated)),
-          schemaVersion = currentSchemaVersion
+          projectName,
+          commitId                  = dataset2CommitId,
+          committerName             = dataset2Creation.agent.name,
+          committerEmail            = dataset2Creation.agent.email,
+          committedDate             = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          datasetIdentifier         = dataset2.id,
+          datasetName               = dataset2.name,
+          maybeDatasetDescription   = dataset2.maybeDescription,
+          maybeDatasetPublishedDate = dataset2.published.maybeDate,
+          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation)),
+          schemaVersion             = currentSchemaVersion
         )
       )
 
@@ -155,14 +161,13 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
 
   private val query: Document = graphql"""
     {
-      datasets(projectPath: "namespace/project") {
+      datasets(projectPath: "namespace/datasets-project") {
         identifier
         name
         description
-        created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
-        hasPart { name atLocation dateCreated }
-        isPartOf { name }
+        hasPart { name atLocation }
+        isPartOf { path name created { dateCreated agent { email name } } }
       }
     }"""
 
@@ -172,10 +177,9 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         identifier
         name
         description
-        created { dateCreated agent { email name } }
         published { datePublished creator { name email } }
-        hasPart { name atLocation dateCreated }
-        isPartOf { name }
+        hasPart { name atLocation }
+        isPartOf { path name created { dateCreated agent { email name } } }
       }
     }"""
 
@@ -185,13 +189,6 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       "identifier": ${dataset.id}, 
       "name": ${dataset.name},
       "description": ${dataset.maybeDescription.map(_.asJson).getOrElse(Json.Null)},
-      "created": {
-        "dateCreated": ${dataset.created.date},
-        "agent": {
-          "email": ${dataset.created.agent.email},
-          "name": ${dataset.created.agent.name}
-        }
-      },
       "published": {
         "datePublished": ${dataset.published.maybeDate.map(_.asJson).getOrElse(Json.Null)},
         "creator": ${dataset.published.creators.toList}
@@ -211,14 +208,21 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
   private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
     json"""{
         "name": ${part.name},
-        "atLocation": ${part.atLocation},
-        "dateCreated": ${part.dateCreated}
+        "atLocation": ${part.atLocation}
       }"""
   }
 
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
-        "name": ${project.name}
+        "path": ${project.path},
+        "name": ${project.name},
+        "created": {
+          "dateCreated": ${project.created.date},
+          "agent": {
+            "email": ${project.created.agent.email},
+            "name": ${project.created.agent.name}
+          }
+        }
       }"""
   }
 }

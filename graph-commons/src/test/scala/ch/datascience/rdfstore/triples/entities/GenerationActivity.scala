@@ -21,12 +21,13 @@ package entities
 
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
+import ch.datascience.rdfstore.FusekiBaseUrl
 import io.circe.Json
 import io.circe.literal._
 
 private[triples] object GenerationActivity {
 
-  def apply(commitId: CommitId, filePath: FilePath, activityId: EntityId): Json =
+  def apply(commitId: CommitId, filePath: FilePath, activityId: EntityId)(implicit fusekiBaseUrl: FusekiBaseUrl): Json =
     apply(Id(commitId, filePath), activityId)
 
   def apply(id: Id, activityId: EntityId): Json = json"""
@@ -38,7 +39,7 @@ private[triples] object GenerationActivity {
     }
   }"""
 
-  final case class Id(commitId: CommitId, filePath: FilePath) extends EntityId {
-    override val value: String = s"file:///commit/$commitId/$filePath"
+  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+    override val value: String = (fusekiBaseUrl / "commit" / commitId / filePath).toString
   }
 }

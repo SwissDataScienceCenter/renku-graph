@@ -4,16 +4,17 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method  | Path                                                       | Description                                            |
-|---------|------------------------------------------------------------|--------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets?query=<phrase>```             | Returns datasets matching the given `phrase`.          |
-|  GET    | ```/knowledge-graph/datasets/:id```                        | Returns details of the dataset with the given `id`     |
-|  GET    | ```/knowledge-graph/graphql```                             | Returns GraphQL endpoint schema                        |
-|  POST   | ```/knowledge-graph/graphql```                             | GraphQL query endpoint                                 |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```  | Returns datasets of the project with the given `path`  |
-|  GET    | ```/ping```                                                | To check if service is healthy                         |
+| Method  | Path                                                      | Description                                                    |
+|---------|-----------------------------------------------------------|----------------------------------------------------------------|
+|  GET    | ```/knowledge-graph/datasets?query=<phrase>```            | Returns datasets matching the given `phrase`.                  |
+|  GET    | ```/knowledge-graph/datasets/:id```                       | Returns details of the dataset with the given `id`             |
+|  GET    | ```/knowledge-graph/graphql```                            | Returns GraphQL endpoint schema                                |
+|  POST   | ```/knowledge-graph/graphql```                            | GraphQL query endpoint                                         |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name```          | Returns details of the project with the given `namespace/name` |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets``` | Returns datasets of the project with the given `path`          |
+|  GET    | ```/ping```                                               | To check if service is healthy                                 |
 
-#### GET /knowledge-graph/datasets?query=<phrase>
+#### GET /knowledge-graph/datasets?query=\<phrase\>
 
 Finds datasets which `name`, `description` or creator `name` matches the given `phrase`.
 
@@ -78,13 +79,6 @@ Response body example:
   "identifier" : "6f622603-2129-4058-ad29-3ff927481461",
   "name" : "dataset name",
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
-  "created" : {
-    "dateCreated" : "1970-05-12T06:06:41.448Z",
-    "agent" : {
-      "email" : "n@ulQdsXl",
-      "name" : "v imzn"
-    }
-  },
   "published" : {
     "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
     "creator" : [
@@ -100,21 +94,47 @@ Response body example:
   "hasPart" : [
     {
       "name" : "o",
-      "atLocation" : "data/dataset-name/file1",
-      "dateCreated" : "1970-05-11T09:08:19.742Z"
+      "atLocation" : "data/dataset-name/file1"
     },
     {
       "name" : "rldzpwo",
-      "atLocation" : "data/dataset-name/file2",
-      "dateCreated" : "1970-01-31T00:45:58.577Z"
+      "atLocation" : "data/dataset-name/file2"
     }
   ],
   "isPartOf" : [
     {
-      "name" : "namespace1/project1-name"
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
+        }
+      ],
+      "path" : "namespace1/project1-name",
+      "name" : "project1 name",
+      "created" : {
+        "dateCreated" : "1970-05-12T06:06:41.448Z",
+        "agent" : {
+          "email" : "n@ulQdsXl",
+          "name" : "v imzn"
+        }
+      }
     },
     {
-      "name" : "namespace2/project2-name"
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace2/project2-name"
+        }
+      ],
+      "path" : "namespace2/project2-name",
+      "name" : "project2 name",
+      "created" : {
+        "dateCreated" : "1970-06-12T06:06:41.448Z",
+        "agent" : {
+          "email" : "name@ulQdsXl",
+          "name" : "v imzn"
+        }
+      }
     }
   ]
 }
@@ -165,25 +185,25 @@ Response body example:
     "lineage": {
       "edges": [
         {
-          "source": "file:///blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
-          "target": "file:///commit/1aaf360c2267bedbedb81900a214e6f36be04e87"
+          "source": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+          "target": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87"
         },
         {
-          "source": "file:///commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "target": "file:///blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet"
+          "source": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "target": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet"
         }
       ],
       "nodes": [
         {
-          "id": "file:///blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+          "id": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
           "label": "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297"
         },
         {
-          "id": "file:///commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "id": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
           "label": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet"
         },
         {
-          "id": "file:///blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
+          "id": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
           "label": "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87"
         }
       ]
@@ -202,13 +222,6 @@ Query example:
       identifier!
       name!
       description
-      created! {
-        dateCreated! 
-        agent { 
-          email!
-          name!
-        }
-      }
       published {
         datePublished
         creator {
@@ -219,10 +232,17 @@ Query example:
       hasPart {
         name!
         atLocation!
-        dateCreated!
       }
       isPartOf {
-        name
+        path!
+        name!
+        created! {
+          dateCreated! 
+          agent { 
+            email!
+            name!
+          }
+        }
       }
     } 
   }"
@@ -238,20 +258,21 @@ Response body example:
         "identifier": "e1fc7b62-e021-434b-9264-dda336bddd4f",
         "name": "dataset name",
         "description": "Data-set long description",
-        "created": {
-          "dateCreated": "1981-09-05T10:38:29.457Z",
-          "agent": {
-            "email": "user1@host",
-            "name": "user 1"
-          }
-        },
         "published": {
           "datePublished": "2019-07-30",
           "creator": []
         },
         "hasPart": [],
         "isPartOf": [{
-          "name": "namespace/project"
+          "path": "namespace/project",
+          "name": "project name",
+          "created" : {
+            "dateCreated" : "1970-05-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
         }]
       },
       {
@@ -274,11 +295,18 @@ Response body example:
         },
         "hasPart": [{
           "name": "file1",
-          "atLocation"": "data/dataset-name/file1",
-          "dateCreated": "1991-09-05T10:38:29.457Z"
+          "atLocation"": "data/dataset-name/file1"
         }],
         "isPartOf": [{
-          "name": "namespace/project"
+          "path": "namespace/project",
+          "name": "project name",
+          "created" : {
+            "dateCreated" : "1970-05-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
         }]
       },
       {
@@ -304,17 +332,31 @@ Response body example:
         },
         "hasPart": [{
           "name": "file1",  
-          "atLocation"": "data/chOorWhraw-name/file1",
-          "dateCreated": "2001-09-05T10:38:29.457Z"
+          "atLocation"": "data/chOorWhraw-name/file1"
         }, {
           "name": "file2"  
-          "atLocation"": "data/chOorWhraw-name/file2",
-          "dateCreated": "2001-09-05T10:48:29.457Z"
+          "atLocation"": "data/chOorWhraw-name/file2"
         }],
         "isPartOf": [{
-          "name": "namespace/project1"
+          "path": "namespace/project1",
+          "name": "project1 name",
+          "created" : {
+            "dateCreated" : "1970-10-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
         }, {
-          "name": "namespace/project2"
+          "path": "namespace/project2",
+          "name": "project2 name",
+          "created" : {
+            "dateCreated" : "1970-05-12T06:06:41.448Z",
+            "agent" : {
+              "email" : "n@ulQdsXl",
+              "name" : "v imzn"
+            }
+          }
         }]
       }
     ]
@@ -328,6 +370,43 @@ In case there's no data found for a given query, the response `json` will contai
   "data": {
     "datasets": null
   }
+}
+```
+
+#### GET /knowledge-graph/projects/:namespace/:name
+
+Finds details of the project with the given `namespace/name`.
+
+**Response**
+
+| Status                     | Description                                             |
+|----------------------------|---------------------------------------------------------|
+| OK (200)                   | If project with the given `namespace/name` can be found |
+| NOT_FOUND (404)            | If there is no project with the given `namespace/name`  |
+| INTERNAL SERVER ERROR (500)| Otherwise                                               |
+
+Response body example:
+```
+{
+  "path": "namespace/project-name", 
+  "name": "Some project name",
+  "created": {
+    "dateCreated": "2001-09-05T10:48:29.457Z",
+    "creator": {
+      "name": "author name",
+      "email": "author@mail.org"
+    }
+  },
+  "_links":[  
+     {  
+        "rel":"self",
+        "href":"http://t:5511/projects/namespace/project-name"
+     },
+     {  
+        "rel":"datasets",
+        "href":"http://t:5511/projects/namespace/project-name/datasets"
+     }
+  ]
 }
 ```
 

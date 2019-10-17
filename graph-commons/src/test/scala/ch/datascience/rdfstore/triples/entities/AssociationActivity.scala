@@ -20,6 +20,7 @@ package ch.datascience.rdfstore.triples
 package entities
 
 import ch.datascience.graph.model.events.CommitId
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import io.circe.Json
 import io.circe.literal._
@@ -47,7 +48,7 @@ private[triples] object AssociationActivity {
       .deepMerge(maybeAgentId toResource "prov:agent")
   // format: on
 
-  final case class Id(commitId: CommitId) extends EntityId {
-    override val value: String = s"file:///commit/$commitId"
+  final case class Id(commitId: CommitId)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+    override val value: String = (fusekiBaseUrl / "commit" / commitId).toString
   }
 }

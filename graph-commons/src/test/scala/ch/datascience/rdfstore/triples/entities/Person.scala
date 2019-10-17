@@ -33,10 +33,11 @@ object Person {
       "schema:Person",
       "prov:Person"
     ],
-    "schema:name": ${id.userName}
+    "schema:name": ${id.userName},
+    "rdfs:label": ${id.userName}
   }""" deepMerge (maybeEmail to "schema:email")
 
   final case class Id(userName: Name) extends EntityId {
-    override val value: String = s"file:///_${userName.value.hashCode()}"
+    override val value: String = s"file:///_${userName.value.replace(" ", "-")}"
   }
 }

@@ -21,6 +21,7 @@ package ch.datascience.graph.acceptancetests.tooling
 import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
 import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.query.QuerySolution
 import org.apache.jena.rdfconnection.RDFConnectionFactory
@@ -29,6 +30,9 @@ import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext
 
 object RDFStore {
+
+  private val jenaPort: Int           = 3030
+  val fusekiBaseUrl:    FusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$jenaPort")
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
@@ -66,7 +70,7 @@ object RDFStore {
                   FusekiServer
                     .create()
                     .loopback(true)
-                    .port(3030)
+                    .port(jenaPort)
                     .add("/renku", dataset)
                     .build
                     .start()

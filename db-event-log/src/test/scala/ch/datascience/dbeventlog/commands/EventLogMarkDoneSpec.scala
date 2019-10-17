@@ -24,7 +24,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventsGenerators.{commitEventIds, committedDates}
+import ch.datascience.graph.model.EventsGenerators.{commitEventIds, committedDates}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -58,16 +58,14 @@ class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with Moc
       findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now)))
     }
 
-    s"fail when updating event with status different than $Processing" in new TestCase {
+    "do nothing when updating event did not change any row" in new TestCase {
 
       val eventId       = commitEventIds.generateOne
       val eventStatus   = eventStatuses generateDifferentThan Processing
       val executionDate = executionDates.generateOne
       storeEvent(eventId, eventStatus, executionDate, committedDates.generateOne, eventBodies.generateOne)
 
-      intercept[RuntimeException] {
-        eventLogMarkDone.markEventDone(eventId).unsafeRunSync()
-      }.getMessage shouldBe s"Event with $eventId couldn't be updated; either no event or not with status $Processing"
+      eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = eventStatus) shouldBe List((eventId, executionDate))
     }

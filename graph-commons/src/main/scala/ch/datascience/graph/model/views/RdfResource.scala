@@ -16,19 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.events
+package ch.datascience.graph.model.views
 
-import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.tinytypes.constraints.NonNegative
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
-import io.circe.Decoder
+import ch.datascience.tinytypes.{Renderer, TinyType}
 
-case class Project(
-    id:   ProjectId,
-    path: ProjectPath
-)
+/*
+ * This is a marker trait to be used with TinyTypes so they can be rendered as an RdfResource which is `<url>`
+ */
+trait RdfResource
 
-class ProjectId private (val value: Int) extends AnyVal with IntTinyType
-object ProjectId extends TinyTypeFactory[ProjectId](new ProjectId(_)) with NonNegative {
-  implicit lazy val projectIdDecoder: Decoder[ProjectId] = Decoder.decodeInt.map(ProjectId.apply)
+object RdfResource {
+  implicit object RdfResourceRenderer extends Renderer[RdfResource, TinyType] {
+    override def render(value: TinyType): String = s"<$value>"
+  }
 }

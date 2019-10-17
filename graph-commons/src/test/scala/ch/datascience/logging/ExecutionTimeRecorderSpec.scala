@@ -18,19 +18,19 @@
 
 package ch.datascience.logging
 
-import cats.implicits._
 import cats.MonadError
 import cats.effect.Clock
+import cats.implicits._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.WordSpec
 import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
 import scala.concurrent.duration._
 import scala.util.Try
-import ch.datascience.generators.Generators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import org.scalacheck.Gen
 
 class ExecutionTimeRecorderSpec extends WordSpec with MockFactory {
 

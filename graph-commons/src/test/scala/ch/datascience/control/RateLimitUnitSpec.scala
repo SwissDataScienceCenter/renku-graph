@@ -19,8 +19,9 @@
 package ch.datascience.control
 
 import ch.datascience.control.RateLimitUnit._
-import org.scalatest.WordSpec
 import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+
 import scala.concurrent.duration._
 
 class RateLimitUnitSpec extends WordSpec {

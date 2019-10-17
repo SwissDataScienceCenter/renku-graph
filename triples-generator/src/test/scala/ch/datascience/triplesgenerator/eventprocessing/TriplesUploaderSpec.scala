@@ -26,7 +26,6 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.eventprocessing.TriplesUploadResult._
-import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import org.http4s.Status._

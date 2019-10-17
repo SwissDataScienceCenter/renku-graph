@@ -78,10 +78,9 @@ knowledgeGraph:
   threadsNumber: 3
   services:
     renku:
-      ## Renku UI base url e.g. https://dev.renku.ch
-      url:
-      ## Renku knowledge-graph resources base url e.g. https://dev.renku.ch/knowledge-graph
-      resourcesUrl:
+      ## Renku knowledge-graph resources path e.g. `knowledge-graph` would assume
+      ## Renku resource are available at: https://{global.renku.domain}/knowledge-graph
+      resourcesPath: "knowledge-graph"
 
 sentry:
   enabled: false

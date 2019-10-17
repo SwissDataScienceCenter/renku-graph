@@ -27,8 +27,8 @@ import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -104,8 +104,9 @@ private object Commands {
     ME:                    MonadError[IO, Throwable],
     executionContext:      ExecutionContext) {
 
-    import scala.util.Try
     import cats.implicits._
+
+    import scala.util.Try
 
     def log[T <: Commit](
         commit:                 T,

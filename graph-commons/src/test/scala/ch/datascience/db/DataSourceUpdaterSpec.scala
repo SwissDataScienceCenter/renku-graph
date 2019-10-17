@@ -21,11 +21,8 @@ package ch.datascience.db
 import DbConfigGenerator._
 import ch.datascience.db.DBConfigProvider.DBConfig._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import com.zaxxer.hikari.HikariDataSource
-import eu.timepit.refined.api.RefType
 import eu.timepit.refined.api.RefType.applyRef
-import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

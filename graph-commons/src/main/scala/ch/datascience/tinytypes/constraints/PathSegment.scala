@@ -16,11 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.events
+package ch.datascience.tinytypes.constraints
 
-import ch.datascience.graph.model.users.{Email, Username}
+import cats.implicits._
+import ch.datascience.http.client.UrlEncoder.urlEncode
+import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 
-case class User(
-    username: Username,
-    email:    Email
-)
+final class PathSegment private (val value: String) extends AnyVal with RelativePathTinyType
+object PathSegment extends TinyTypeFactory[PathSegment](new PathSegment(_)) with RelativePath {
+  override val transform: String => Either[Throwable, String] =
+    value => Either.catchNonFatal(urlEncode(value))
+}

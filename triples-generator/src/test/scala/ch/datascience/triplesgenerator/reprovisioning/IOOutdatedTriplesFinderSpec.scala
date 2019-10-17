@@ -36,59 +36,66 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
   "findOutdatedTriples" should {
 
-    "return single project's commits having triples with either no agent or agent with version different that the current one " +
-      "if there are multiple projects with outdated triples" in new TestCase {
+    "return single project's commits if related to agent with version different than the current one - " +
+      "case with multiple projects with outdated triples" in new TestCase {
 
       val project1               = projectPaths.generateOne
-      val project1OutdatedCommit = commitIdResources.generateOne
+      val project1OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
       val project2               = projectPaths.generateOne
-      val project2OutdatedCommit = commitIdResources.generateOne
+      val project2OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
-          singleFileAndCommit(project1, project1OutdatedCommit.toCommitId, maybeSchemaVersion = None),
-          singleFileAndCommit(project2, project2OutdatedCommit.toCommitId, maybeSchemaVersion = None)
+          singleFileAndCommit(project1,
+                              commitId      = project1OutdatedCommit.toCommitId,
+                              schemaVersion = schemaVersions.generateOne),
+          singleFileAndCommit(project2,
+                              commitId      = project2OutdatedCommit.toCommitId,
+                              schemaVersion = schemaVersions.generateOne)
         )
       )
 
       // format: off
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() should (
-        be(Some(OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1), Set(project1OutdatedCommit)))) 
+        be(Some(OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1OutdatedCommit))))
         or
-        be(Some(OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project2), Set(project2OutdatedCommit))))
+        be(Some(OutdatedTriples(FullProjectPath(renkuBaseUrl, project2), Set(project2OutdatedCommit))))
       )
       // format: on
     }
 
-    "return all project's commits having triples with no agent or agent with different version in one result" in new TestCase {
+    "return all project's commits having triples related to agent version different than the current one" in new TestCase {
 
       val project1                = projectPaths.generateOne
-      val project1Commit1NoAgent  = commitIdResources.generateOne
-      val project1Commit2Outdated = commitIdResources.generateOne
-      val project1Commit3UpToDate = commitIdResources.generateOne
+      val project1Commit1NoAgent  = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val project1Commit2Outdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
+      val project1Commit3UpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
-          singleFileAndCommit(project1, project1Commit1NoAgent.toCommitId, maybeSchemaVersion = None),
-          singleFileAndCommit(project1, project1Commit2Outdated.toCommitId, Some(schemaVersions.generateOne)),
-          singleFileAndCommit(project1, project1Commit3UpToDate.toCommitId, Some(schemaVersion))
+          singleFileAndCommit(project1,
+                              commitId      = project1Commit1NoAgent.toCommitId,
+                              schemaVersion = schemaVersions.generateOne),
+          singleFileAndCommit(project1,
+                              commitId           = project1Commit2Outdated.toCommitId,
+                              schemaVersion      = schemaVersions.generateOne),
+          singleFileAndCommit(project1, commitId = project1Commit3UpToDate.toCommitId, schemaVersion = schemaVersion)
         )
       )
 
       triplesFinder.findOutdatedTriples.value.unsafeRunSync() shouldBe Some(
-        OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project1),
-                        Set(project1Commit1NoAgent, project1Commit2Outdated))
+        OutdatedTriples(FullProjectPath(renkuBaseUrl, project1), Set(project1Commit1NoAgent, project1Commit2Outdated))
       )
     }
 
     "return no results if there's no project with outdated commits" in new TestCase {
 
       val project               = projectPaths.generateOne
-      val projectCommitUpToDate = commitIdResources.generateOne
+      val projectCommitUpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
 
       loadToStore(
         triples(
-          singleFileAndCommit(project, projectCommitUpToDate.toCommitId, Some(schemaVersion))
+          singleFileAndCommit(project, commitId = projectCommitUpToDate.toCommitId, schemaVersion = schemaVersion)
         )
       )
 
@@ -103,6 +110,6 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
 
   private implicit class CommitIdResouceOps(commitIdResource: CommitIdResource) {
     import cats.implicits._
-    lazy val toCommitId = commitIdResource.to[Try, CommitId].fold(throw _, identity)
+    lazy val toCommitId = commitIdResource.as[Try, CommitId].fold(throw _, identity)
   }
 }

@@ -18,12 +18,15 @@
 
 package ch.datascience.tinytypes.json
 
-import ch.datascience.tinytypes.{InstantTinyType, LocalDateTinyType, StringTinyType}
+import ch.datascience.tinytypes._
 import io.circe.{Encoder, Json}
 
 object TinyTypeEncoders {
 
   implicit def stringEncoder[TT <: StringTinyType]: Encoder[TT] =
+    Encoder.instance[TT](ttValue => Json.fromString(ttValue.value))
+
+  implicit def relativePathEncoder[TT <: RelativePathTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromString(ttValue.value))
 
   implicit def localDateEncoder[TT <: LocalDateTinyType]: Encoder[TT] =

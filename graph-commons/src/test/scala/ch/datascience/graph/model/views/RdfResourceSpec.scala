@@ -16,25 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.events
+package ch.datascience.graph.model.views
 
-import java.time.LocalDateTime
-import java.time.ZoneOffset.ofHours
-
-import io.circe._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class CommittedDateSpec extends WordSpec {
+class RdfResourceSpec extends WordSpec {
 
-  import CommittedDate.committedDateDecoder
+  "fullProjectPathResourceRenderer" should {
 
-  "apply" should {
-
-    "be able to instantiate from date time with zone json string" in {
-      val Right(decoded) = committedDateDecoder.decodeJson(Json.fromString("2012-09-20T09:06:12+03:00"))
-
-      decoded shouldBe CommittedDate(LocalDateTime.of(2012, 9, 20, 9, 6, 12).atOffset(ofHours(3)).toInstant)
+    "wrap the value into <>" in {
+      val projectPath = fullProjectPaths.generateOne
+      projectPath.showAs[RdfResource] shouldBe s"<$projectPath>"
     }
   }
 }

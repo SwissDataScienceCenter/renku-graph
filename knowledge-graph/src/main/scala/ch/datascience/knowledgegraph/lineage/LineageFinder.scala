@@ -22,12 +22,12 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
+import ch.datascience.graph.model.projects.{FilePath, FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
-import ch.datascience.tinytypes.{From, StringTinyType}
 import io.chrisdavenport.log4cats.Logger
 import model.Node.{SourceNode, TargetNode}
 import model._
@@ -48,8 +48,8 @@ class IOLineageFinder(
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
     with LineageFinder[IO] {
 
-  import IOLineageFinder._
   import executionTimeRecorder._
+  import rdfStoreConfig._
 
   override def findLineage(projectPath: ProjectPath, commitId: CommitId, filePath: FilePath): IO[Option[Lineage]] =
     measureExecutionTime {
@@ -79,7 +79,10 @@ class IOLineageFinder(
       IO.pure(maybeLineage)
   }
 
-  private def query(projectPath: ProjectPath, commitId: CommitId, filePath: FilePath): String =
+  private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath): String = {
+    val projectResource    = FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]
+    val commitResource     = (fusekiBaseUrl / "commit" / commitId).showAs[RdfResource]
+    val generationResource = (fusekiBaseUrl / "blob" / commitId / filePath).showAs[RdfResource]
     s"""
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -96,9 +99,9 @@ class IOLineageFinder(
        |  {
        |    SELECT ?entity
        |    WHERE {
-       |      ?qentity dcterms:isPartOf|schema:isPartOf <${renkuBaseUrl / projectPath}> .
-       |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) <file:///commit/$commitId> .
-       |      FILTER (?qentity = <file:///blob/$commitId/$filePath>)
+       |      ?qentity dcterms:isPartOf|schema:isPartOf $projectResource .
+       |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) $commitResource .
+       |      FILTER (?qentity = $generationResource)
        |      ?qentity (
        |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
        |      ) ?entity .
@@ -123,6 +126,38 @@ class IOLineageFinder(
        |    BIND (?entity AS ?source)
        |  }
        |}""".stripMargin
+  }
+
+  import io.circe.{Decoder, DecodingFailure, HCursor}
+
+  private implicit val edgesDecoder: Decoder[Set[Edge]] = {
+
+    def toNodeId(value: String): DecodingFailure Either NodeId =
+      NodeId
+        .from(value.replace(fusekiBaseUrl.toString, ""))
+        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+
+    def toNodeLabel(value: String): DecodingFailure Either NodeLabel =
+      NodeLabel
+        .from(value)
+        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+
+    def nodeIdAndLabel[N <: Node](parentField: String, apply: (NodeId, NodeLabel) => N)(
+        implicit cursor:                       HCursor): Decoder.Result[N] =
+      (
+        cursor.downField(parentField).downField("value").as[String].flatMap(toNodeId),
+        cursor.downField(s"${parentField}_label").downField("value").as[String].flatMap(toNodeLabel)
+      ) mapN apply
+
+    implicit lazy val edgeDecoder: Decoder[Edge] = { implicit cursor =>
+      for {
+        sourceNode <- nodeIdAndLabel("source", SourceNode.apply)
+        targetNode <- nodeIdAndLabel("target", TargetNode.apply)
+      } yield Edge(sourceNode, targetNode)
+    }
+
+    _.downField("results").downField("bindings").as[List[Edge]].map(_.toSet)
+  }
 }
 
 object IOLineageFinder {
@@ -144,30 +179,4 @@ object IOLineageFinder {
         new ExecutionTimeRecorder[IO],
         logger
       )
-
-  import io.circe.{Decoder, DecodingFailure, HCursor}
-
-  private implicit val edgesDecoder: Decoder[Set[Edge]] = {
-
-    def to[TT <: StringTinyType](tinyTypeFactory: From[TT])(value: String): DecodingFailure Either TT =
-      tinyTypeFactory
-        .from(value)
-        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
-
-    def nodeIdAndLabel[N <: Node](parentField: String, apply: (NodeId, NodeLabel) => N)(
-        implicit cursor:                       HCursor): Decoder.Result[N] =
-      (
-        cursor.downField(parentField).downField("value").as[String].flatMap(to(NodeId)),
-        cursor.downField(s"${parentField}_label").downField("value").as[String].flatMap(to(NodeLabel))
-      ) mapN apply
-
-    implicit lazy val edgeDecoder: Decoder[Edge] = { implicit cursor =>
-      for {
-        sourceNode <- nodeIdAndLabel("source", SourceNode.apply)
-        targetNode <- nodeIdAndLabel("target", TargetNode.apply)
-      } yield Edge(sourceNode, targetNode)
-    }
-
-    _.downField("results").downField("bindings").as[List[Edge]].map(_.toSet)
-  }
 }
