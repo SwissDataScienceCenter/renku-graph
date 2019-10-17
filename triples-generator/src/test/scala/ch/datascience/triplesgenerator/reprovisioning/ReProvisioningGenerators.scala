@@ -25,6 +25,13 @@ import org.scalacheck.Gen._
 
 private object ReProvisioningGenerators {
 
+  private def projectResources: Gen[ProjectResource] =
+    for {
+      url                  <- httpUrls
+      maybeProjectsSegment <- Gen.oneOf("/projects", "")
+      path                 <- projectPaths
+    } yield ProjectResource.from(s"$url$maybeProjectsSegment/$path").fold(throw _, identity)
+
   def commitIdResources(maybeUrl: Option[String] = None): Gen[CommitIdResource] =
     for {
       url <- maybeUrl.map(const).getOrElse(httpUrls)
@@ -33,8 +40,8 @@ private object ReProvisioningGenerators {
 
   def outdatedTriplesSets(maybeUrl: Option[String] = None): Gen[OutdatedTriples] =
     for {
-      projectPath          <- fullProjectPaths
+      projectResource      <- projectResources
       removedCommitsNumber <- positiveInts(100)
       removedCommits       <- setOf(commitIdResources(maybeUrl), removedCommitsNumber)
-    } yield OutdatedTriples(projectPath, removedCommits)
+    } yield OutdatedTriples(projectResource, removedCommits)
 }

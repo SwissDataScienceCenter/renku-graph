@@ -58,7 +58,7 @@ private class IOOutdatedTriplesRemover(
        |    SELECT ?subject
        |    WHERE {
        |      {
-       |        ?commit dcterms:isPartOf|schema:isPartOf ${triplesToRemove.projectPath.showAs[RdfResource]} .
+       |        ?commit dcterms:isPartOf|schema:isPartOf ${triplesToRemove.projectResource.showAs[RdfResource]} .
        |        FILTER (?commit IN (${triplesToRemove.commits.map(_.showAs[RdfResource]).mkString(",")}))
        |        ?commit ?predicate ?object
        |      }
