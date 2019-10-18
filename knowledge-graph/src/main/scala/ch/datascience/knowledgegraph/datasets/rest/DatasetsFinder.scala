@@ -20,6 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.datasets.{Identifier, Name}
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Phrase
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -30,7 +31,14 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait DatasetsFinder[Interpretation[_]] {
-  def findDatasets(phrase: Phrase): Interpretation[List[(Identifier, Name)]]
+  def findDatasets(phrase: Phrase): Interpretation[List[DatasetSearchResult]]
+}
+
+private object DatasetsFinder {
+  final case class DatasetSearchResult(
+      id:   Identifier,
+      name: Name
+  )
 }
 
 private class IODatasetsFinder(
@@ -42,8 +50,8 @@ private class IODatasetsFinder(
 
   import IODatasetsFinder._
 
-  override def findDatasets(phrase: Phrase): IO[List[(Identifier, Name)]] =
-    queryExpecting[List[(Identifier, Name)]](using = query(phrase))
+  override def findDatasets(phrase: Phrase): IO[List[DatasetSearchResult]] =
+    queryExpecting[List[DatasetSearchResult]](using = query(phrase))
 
   private def query(phrase: Phrase): String =
     s"""
@@ -78,16 +86,16 @@ private class IODatasetsFinder(
 private object IODatasetsFinder {
   import io.circe.Decoder
 
-  private implicit val recordsDecoder: Decoder[List[(Identifier, Name)]] = {
+  private implicit val recordsDecoder: Decoder[List[DatasetSearchResult]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val recordDecoder: Decoder[(Identifier, Name)] = { cursor =>
+    implicit val recordDecoder: Decoder[DatasetSearchResult] = { cursor =>
       for {
         id   <- cursor.downField("identifier").downField("value").as[Identifier]
         name <- cursor.downField("name").downField("value").as[Name]
-      } yield id -> name
+      } yield DatasetSearchResult(id, name)
     }
 
-    _.downField("results").downField("bindings").as(decodeList[(Identifier, Name)])
+    _.downField("results").downField("bindings").as(decodeList[DatasetSearchResult])
   }
 }

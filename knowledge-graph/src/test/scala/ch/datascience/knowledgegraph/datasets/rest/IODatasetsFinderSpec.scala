@@ -28,6 +28,7 @@ import ch.datascience.graph.model.datasets.{Description, Name}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasets
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples.{singleFileAndCommitWithDataset, triples}
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -84,9 +85,9 @@ class IODatasetsFinderSpec
         datasetsFinder
           .findDatasets(phrase)
           .unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.name),
-          (dataset2.id, dataset2.name),
-          (dataset3.id, dataset3.name)
+          DatasetSearchResult(dataset1.id, dataset1.name),
+          DatasetSearchResult(dataset2.id, dataset2.name),
+          DatasetSearchResult(dataset3.id, dataset3.name)
         )
       }
     }

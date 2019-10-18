@@ -24,7 +24,6 @@ import cats.implicits._
 import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
@@ -47,6 +46,7 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
 )(implicit ME:             MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
+  import DatasetsFinder.DatasetSearchResult
   import DatasetsSearchEndpoint._
   import executionTimeRecorder._
   import io.circe.Encoder
@@ -62,7 +62,7 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
         .recoverWith(httpResult(phrase))
     } map logExecutionTimeWhen(finishedSuccessfully(phrase))
 
-  private def toHttpResult(phrase: Phrase): List[(Identifier, Name)] => Interpretation[Response[Interpretation]] = {
+  private def toHttpResult(phrase: Phrase): List[DatasetSearchResult] => Interpretation[Response[Interpretation]] = {
     case Nil      => NotFound(InfoMessage(s"No datasets matching '$phrase'"))
     case datasets => Ok(datasets.asJson)
   }
@@ -79,8 +79,8 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
       s"Finding datasets containing '$phrase' phrase finished"
   }
 
-  private implicit val datasetEncoder: Encoder[(Identifier, Name)] = Encoder.instance[(Identifier, Name)] {
-    case (id, name) =>
+  private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
+    case DatasetSearchResult(id, name) =>
       json"""
       {
         "identifier": ${id.value},

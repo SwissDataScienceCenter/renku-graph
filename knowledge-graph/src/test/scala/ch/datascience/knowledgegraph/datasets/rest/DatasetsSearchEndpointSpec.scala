@@ -26,10 +26,10 @@ import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.{datasetIds, datasetNames}
-import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.Json
 import io.circe.literal._
@@ -48,17 +48,17 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
   "searchForDatasets" should {
 
     "respond with OK and the found datasets" in new TestCase {
-      forAll(nonEmptyList(datasetIdAndNameTuples)) { idAndNameTuples =>
+      forAll(nonEmptyList(datasetSearchResultItems)) { datasetSearchResults =>
         (datasetsFinder.findDatasets _)
           .expects(phrase)
-          .returning(context.pure(idAndNameTuples.toList))
+          .returning(context.pure(datasetSearchResults.toList))
 
         val response = searchForDatasets(phrase).unsafeRunSync()
 
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(application.json))
 
-        response.as[List[Json]].unsafeRunSync should contain theSameElementsAs (idAndNameTuples.toList map toJson)
+        response.as[List[Json]].unsafeRunSync should contain theSameElementsAs (datasetSearchResults.toList map toJson)
 
         logger.loggedOnly(
           Warn(s"Finding datasets containing '$phrase' phrase finished${executionTimeRecorder.executionTimeInfo}")
@@ -115,8 +115,8 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
       logger
     ).searchForDatasets _
 
-    lazy val toJson: ((Identifier, Name)) => Json = {
-      case (id, name) =>
+    lazy val toJson: DatasetSearchResult => Json = {
+      case DatasetSearchResult(id, name) =>
         json"""{
           "identifier": ${id.value},
           "name": ${name.value},
@@ -128,8 +128,8 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     }
   }
 
-  private implicit val datasetIdAndNameTuples: Gen[(Identifier, Name)] = for {
+  private implicit val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
     id   <- datasetIds
     name <- datasetNames
-  } yield (id, name)
+  } yield DatasetSearchResult(id, name)
 }
