@@ -35,6 +35,7 @@ Response body example:
    {  
       "identifier":"9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
       "name":"rmDaYfpehl",
+      "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
       "_links":[  
          {  
             "rel":"details",

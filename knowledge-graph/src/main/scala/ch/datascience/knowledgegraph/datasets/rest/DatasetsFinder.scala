@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{Identifier, Name}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Phrase
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
@@ -36,8 +36,9 @@ private trait DatasetsFinder[Interpretation[_]] {
 
 private object DatasetsFinder {
   final case class DatasetSearchResult(
-      id:   Identifier,
-      name: Name
+      id:               Identifier,
+      name:             Name,
+      maybeDescription: Option[Description]
   )
 }
 
@@ -60,25 +61,28 @@ private class IODatasetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX text: <http://jena.apache.org/text#>
        |
-       |SELECT DISTINCT ?identifier ?name ?dataset
+       |SELECT DISTINCT ?identifier ?name ?description
        |WHERE {
        |  {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             text:query (schema:name '$phrase') ;
        |             schema:name ?name ;
-       |             rdfs:label ?identifier
+       |             schema:identifier ?identifier .
+       |    OPTIONAL { ?dataset schema:description ?description } .
        |  } UNION {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             text:query (schema:description '$phrase') ;
        |             schema:name ?name ;
-       |             rdfs:label ?identifier
+       |             schema:identifier ?identifier .
+       |    OPTIONAL { ?dataset schema:description ?description } .
        |  } UNION {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             schema:creator ?creatorResource ;
-       |             rdfs:label ?identifier ;
+       |             schema:identifier ?identifier ;
        |             schema:name ?name .
        |    ?creatorResource rdf:type <http://schema.org/Person> ;
-       |             text:query (schema:name '$phrase')
+       |             text:query (schema:name '$phrase') .
+       |    OPTIONAL { ?dataset schema:description ?description } .
        |  }
        |}""".stripMargin
 }
@@ -91,9 +95,10 @@ private object IODatasetsFinder {
 
     implicit val recordDecoder: Decoder[DatasetSearchResult] = { cursor =>
       for {
-        id   <- cursor.downField("identifier").downField("value").as[Identifier]
-        name <- cursor.downField("name").downField("value").as[Name]
-      } yield DatasetSearchResult(id, name)
+        id               <- cursor.downField("identifier").downField("value").as[Identifier]
+        name             <- cursor.downField("name").downField("value").as[Name]
+        maybeDescription <- cursor.downField("description").downField("value").as[Option[Description]]
+      } yield DatasetSearchResult(id, name, maybeDescription)
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetSearchResult])

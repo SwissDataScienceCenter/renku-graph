@@ -25,7 +25,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators.{datasetIds, datasetNames}
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
@@ -116,7 +116,7 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, name) =>
+      case DatasetSearchResult(id, name, maybeDescription) =>
         json"""{
           "identifier": ${id.value},
           "name": ${name.value},
@@ -124,12 +124,19 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
             "rel": "details",
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
           }]
-        }"""
+        }""" deepMerge {
+          maybeDescription.fold(Json.obj()) { description =>
+            json"""{
+              "description": ${description.value}
+            }"""
+          }
+        }
     }
   }
 
   private implicit val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
-    id   <- datasetIds
-    name <- datasetNames
-  } yield DatasetSearchResult(id, name)
+    id               <- datasetIds
+    name             <- datasetNames
+    maybeDescription <- Gen.option(datasetDescriptions)
+  } yield DatasetSearchResult(id, name, maybeDescription)
 }

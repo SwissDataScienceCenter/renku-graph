@@ -30,6 +30,7 @@ import ch.datascience.rdfstore.RdfStoreConfig
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.ValidatingQueryParamDecoderMatcher
 import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
@@ -80,14 +81,18 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, name) =>
+    case DatasetSearchResult(id, name, maybeDescription) =>
       json"""
       {
         "identifier": ${id.value},
         "name": ${name.value}
-      }""" deepMerge _links(
-        Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
-      )
+      }"""
+        .deepMerge(maybeDescription.fold(Json.obj()) { description =>
+          json"""{
+            "description": ${description.value}
+          }"""
+        })
+        .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))
   }
 }
 

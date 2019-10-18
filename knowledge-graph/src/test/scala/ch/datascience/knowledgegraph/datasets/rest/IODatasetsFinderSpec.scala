@@ -47,31 +47,35 @@ class IODatasetsFinderSpec
   "findDatasets" should {
 
     "return datasets with name, description or creator matching the given phrase" in new TestCase {
-      forAll(datasets, datasets, datasets) { (dataset1Orig, dataset2, dataset3) =>
+      forAll(datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3) =>
         val phrase = phrases.generateOne
         val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
         val dataset1 = dataset1Orig.copy(
           name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
+        )
+        val dataset2 = dataset2Orig.copy(
+          maybeDescription = Some(sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateOne)
         )
 
         loadToStore(
           triples(
             singleFileAndCommitWithDataset(
               projectPaths.generateOne,
-              datasetIdentifier = dataset1.id,
-              datasetName       = dataset1.name
+              datasetIdentifier       = dataset1.id,
+              datasetName             = dataset1.name,
+              maybeDatasetDescription = dataset1.maybeDescription
             ),
             singleFileAndCommitWithDataset(
               projectPaths.generateOne,
-              datasetIdentifier = dataset2.id,
-              datasetName       = dataset2.name,
-              maybeDatasetDescription =
-                Some(sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateOne)
+              datasetIdentifier       = dataset2.id,
+              datasetName             = dataset2.name,
+              maybeDatasetDescription = dataset2.maybeDescription
             ),
             singleFileAndCommitWithDataset(
               projectPaths.generateOne,
-              datasetIdentifier = dataset3.id,
-              datasetName       = dataset3.name,
+              datasetIdentifier       = dataset3.id,
+              datasetName             = dataset3.name,
+              maybeDatasetDescription = dataset3.maybeDescription,
               maybeDatasetCreators = Set(
                 sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne -> Gen
                   .option(emails)
@@ -85,9 +89,9 @@ class IODatasetsFinderSpec
         datasetsFinder
           .findDatasets(phrase)
           .unsafeRunSync() should contain theSameElementsAs List(
-          DatasetSearchResult(dataset1.id, dataset1.name),
-          DatasetSearchResult(dataset2.id, dataset2.name),
-          DatasetSearchResult(dataset3.id, dataset3.name)
+          DatasetSearchResult(dataset1.id, dataset1.name, dataset1.maybeDescription),
+          DatasetSearchResult(dataset2.id, dataset2.name, dataset2.maybeDescription),
+          DatasetSearchResult(dataset3.id, dataset3.name, dataset3.maybeDescription)
         )
       }
     }

@@ -286,13 +286,22 @@ object DatasetsResources {
     )
   }
 
-  def searchResultJson(dataset: Dataset): Json = json"""
+  def searchResultJson(dataset: Dataset): Json =
+    json"""
     {
       "identifier": ${dataset.id.value}, 
       "name": ${dataset.name.value}
-    }""" deepMerge {
-    _links(
-      Link(Rel("details"), Href(renkuResourceUrl / "datasets" / dataset.id))
-    )
-  }
+    }"""
+      .deepMerge {
+        dataset.maybeDescription.fold(Json.obj()) { description =>
+          json"""{
+            "description": ${description.value}
+          }"""
+        }
+      }
+      .deepMerge {
+        _links(
+          Link(Rel("details"), Href(renkuResourceUrl / "datasets" / dataset.id))
+        )
+      }
 }
