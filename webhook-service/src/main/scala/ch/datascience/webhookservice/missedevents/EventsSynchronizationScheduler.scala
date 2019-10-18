@@ -76,7 +76,8 @@ class IOEventsSynchronizationScheduler(
     tokenRepositoryUrl:             TokenRepositoryUrl,
     gitLabUrl:                      GitLabUrl,
     gitLabThrottler:                Throttler[IO, GitLab],
-    eventsSynchronizationThrottler: Throttler[IO, EventsSynchronization]
+    eventsSynchronizationThrottler: Throttler[IO, EventsSynchronization],
+    executionTimeRecorder:          ExecutionTimeRecorder[IO]
 )(implicit timer:                   Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
     extends EventsSynchronizationScheduler[IO](
       new SchedulerConfigProvider[IO](),
@@ -85,9 +86,9 @@ class IOEventsSynchronizationScheduler(
         new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
         new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
         new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
-        new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler),
+        new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, executionTimeRecorder),
         eventsSynchronizationThrottler,
         ApplicationLogger,
-        new ExecutionTimeRecorder[IO]
+        executionTimeRecorder
       )
     )

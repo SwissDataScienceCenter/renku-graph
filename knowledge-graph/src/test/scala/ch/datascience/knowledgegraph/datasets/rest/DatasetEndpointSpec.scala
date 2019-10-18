@@ -36,9 +36,10 @@ import ch.datascience.http.rest.Links.Rel.Self
 import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
+import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder._
 import io.circe.syntax._
@@ -83,7 +84,8 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
             .getOrElse(fail("No 'path' or 'project-details' links on the 'isPartOf' elements"))
         }
 
-        logger.expectNoLogs()
+        logger.loggedOnly(Warn(s"Finding '${dataset.id}' dataset finished${executionTimeRecorder.executionTimeInfo}"))
+        logger.reset()
       }
     }
 
@@ -103,7 +105,7 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
       response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No dataset with '$identifier' id found").asJson
 
-      logger.expectNoLogs()
+      logger.loggedOnly(Warn(s"Finding '$identifier' dataset finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "respond with INTERNAL_SERVER_ERROR if finding the dataset fails" in new TestCase {
@@ -130,10 +132,16 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val datasetsFinder    = mock[DatasetFinder[IO]]
-    val renkuResourcesUrl = renkuResourcesUrls.generateOne
-    val logger            = TestLogger[IO]()
-    val getDataset        = new DatasetEndpoint[IO](datasetsFinder, renkuResourcesUrl, logger).getDataset _
+    val datasetsFinder        = mock[DatasetFinder[IO]]
+    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
+    val logger                = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    val getDataset = new DatasetEndpoint[IO](
+      datasetsFinder,
+      renkuResourcesUrl,
+      executionTimeRecorder,
+      logger
+    ).getDataset _
   }
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]

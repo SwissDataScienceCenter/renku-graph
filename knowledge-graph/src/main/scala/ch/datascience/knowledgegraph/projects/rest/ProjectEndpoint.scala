@@ -26,7 +26,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.projects.model.{Project, ProjectCreator}
-import ch.datascience.logging.ApplicationLogger
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Encoder
 import io.circe.literal._
@@ -39,18 +39,22 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class ProjectEndpoint[Interpretation[_]: Effect](
-    projectFinder:     ProjectFinder[Interpretation],
-    renkuResourcesUrl: RenkuResourcesUrl,
-    logger:            Logger[Interpretation]
+    projectFinder:         ProjectFinder[Interpretation],
+    renkuResourcesUrl:     RenkuResourcesUrl,
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+    logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
+  import executionTimeRecorder._
   import org.http4s.circe._
 
   def getProject(path: ProjectPath): Interpretation[Response[Interpretation]] =
-    projectFinder
-      .findProject(path)
-      .flatMap(toHttpResult(path))
-      .recoverWith(httpResult(path))
+    measureExecutionTime {
+      projectFinder
+        .findProject(path)
+        .flatMap(toHttpResult(path))
+        .recoverWith(httpResult(path))
+    } map logExecutionTimeWhen(finishedSuccessfully(path))
 
   private def toHttpResult(
       path: ProjectPath
@@ -67,6 +71,12 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
+
+  private def finishedSuccessfully(projectPath: ProjectPath): PartialFunction[Response[Interpretation], String] = {
+    case response if response.status == Ok || response.status == NotFound =>
+      s"Finding '$projectPath' details finished"
+  }
+
   private implicit lazy val projectEncoder: Encoder[Project] = Encoder.instance[Project] { project =>
     json"""{
         "path": ${project.path.toString},
@@ -95,12 +105,14 @@ object IOProjectEndpoint {
               contextShift:              ContextShift[IO],
               timer:                     Timer[IO]): IO[ProjectEndpoint[IO]] =
     for {
-      projectFinder    <- IOProjectFinder(logger = ApplicationLogger)
-      renkuResourceUrl <- RenkuResourcesUrl[IO]()
+      projectFinder         <- IOProjectFinder(logger = ApplicationLogger)
+      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield
       new ProjectEndpoint[IO](
         projectFinder,
         renkuResourceUrl,
+        executionTimeRecorder,
         ApplicationLogger
       )
 }

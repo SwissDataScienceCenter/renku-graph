@@ -53,6 +53,8 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
   def expectNoLogs(): Unit =
     if (invocations.nonEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")
 
+  def reset(): Unit = invocations.clear()
+
   override def error(t: Throwable)(message: => String): Interpretation[Unit] = {
     invocations += LogEntry(Error, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())

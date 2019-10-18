@@ -26,7 +26,6 @@ import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
 import ch.datascience.tinytypes.constraints.NonBlank
@@ -61,7 +60,7 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
         .findDatasets(phrase)
         .flatMap(toHttpResult(phrase))
         .recoverWith(httpResult(phrase))
-    } flatMap logExecutionTime(phrase)
+    } map logExecutionTimeWhen(finishedSuccessfully(phrase))
 
   private def toHttpResult(phrase: Phrase): List[(Identifier, Name)] => Interpretation[Response[Interpretation]] = {
     case Nil      => NotFound(InfoMessage(s"No datasets matching '$phrase'"))
@@ -75,6 +74,11 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
       InternalServerError(errorMessage)
   }
 
+  private def finishedSuccessfully(phrase: Phrase): PartialFunction[Response[Interpretation], String] = {
+    case response if response.status == Ok || response.status == NotFound =>
+      s"Finding datasets containing '$phrase' phrase finished"
+  }
+
   private implicit val datasetEncoder: Encoder[(Identifier, Name)] = Encoder.instance[(Identifier, Name)] {
     case (id, name) =>
       json"""
@@ -84,14 +88,6 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
       }""" deepMerge _links(
         Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
       )
-  }
-
-  private def logExecutionTime(
-      phrase: Phrase
-  ): ((ElapsedTime, Response[Interpretation])) => Interpretation[Response[Interpretation]] = {
-    case (elapsedTime, response) =>
-      if (response.status == Ok) logger.info(s"Found datasets containing '$phrase' phrase in ${elapsedTime}ms")
-      ME.pure(response)
   }
 }
 
@@ -115,13 +111,14 @@ object IODatasetsSearchEndpoint {
               contextShift:              ContextShift[IO],
               timer:                     Timer[IO]): IO[DatasetsSearchEndpoint[IO]] =
     for {
-      rdfStoreConfig   <- RdfStoreConfig[IO]()
-      renkuResourceUrl <- RenkuResourcesUrl[IO]()
+      rdfStoreConfig        <- RdfStoreConfig[IO]()
+      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield
       new DatasetsSearchEndpoint[IO](
         new IODatasetsFinder(rdfStoreConfig, ApplicationLogger),
         renkuResourceUrl,
-        new ExecutionTimeRecorder[IO],
+        executionTimeRecorder,
         ApplicationLogger
       )
 }

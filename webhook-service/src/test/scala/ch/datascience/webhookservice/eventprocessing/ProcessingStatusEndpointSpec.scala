@@ -31,6 +31,9 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Warn
+import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
 import ch.datascience.webhookservice.hookvalidation.IOHookValidator
@@ -70,6 +73,10 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
         "total": ${processingStatus.total.value},
         "progress": ${processingStatus.progress.value}
       }"""
+
+      logger.loggedOnly(
+        Warn(s"Finding progress status for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
+      )
     }
 
     "return OK the progress status with done = total = 0 if the webhook exists " +
@@ -166,9 +173,12 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
 
     val hookValidator          = mock[IOHookValidator]
     val eventsProcessingStatus = mock[IOEventLogProcessingStatus]
+    val logger                 = TestLogger[IO]()
+    val executionTimeRecorder  = TestExecutionTimeRecorder[IO](logger)
     val fetchProcessingStatus = new ProcessingStatusEndpoint[IO](
       hookValidator,
-      eventsProcessingStatus
+      eventsProcessingStatus,
+      executionTimeRecorder
     ).fetchProcessingStatus _
   }
 }

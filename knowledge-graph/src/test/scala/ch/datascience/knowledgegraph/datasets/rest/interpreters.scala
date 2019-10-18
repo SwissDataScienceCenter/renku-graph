@@ -24,16 +24,23 @@ import ch.datascience.knowledgegraph.projects.rest.{ProjectEndpoint, ProjectFind
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
-class IOProjectEndpointStub(projectFinder: ProjectFinder[IO], renkuResourcesUrl: RenkuResourcesUrl, logger: Logger[IO])
-    extends ProjectEndpoint[IO](projectFinder, renkuResourcesUrl, logger)
+class IOProjectEndpointStub(projectFinder:         ProjectFinder[IO],
+                            renkuResourcesUrl:     RenkuResourcesUrl,
+                            executionTimeRecorder: ExecutionTimeRecorder[IO],
+                            logger:                Logger[IO])
+    extends ProjectEndpoint[IO](projectFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
 class IOProjectDatasetsEndpointStub(projectDatasetsFinder: ProjectDatasetsFinder[IO],
                                     renkuResourcesUrl:     RenkuResourcesUrl,
+                                    executionTimeRecorder: ExecutionTimeRecorder[IO],
                                     logger:                Logger[IO])
-    extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder, renkuResourcesUrl, logger)
+    extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
-class IODatasetEndpointStub(datasetFinder: DatasetFinder[IO], renkuResourcesUrl: RenkuResourcesUrl, logger: Logger[IO])
-    extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, logger)
+class IODatasetEndpointStub(datasetFinder:         DatasetFinder[IO],
+                            renkuResourcesUrl:     RenkuResourcesUrl,
+                            executionTimeRecorder: ExecutionTimeRecorder[IO],
+                            logger:                Logger[IO])
+    extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
 class IODatasetsSearchEndpointStub(datasetsFinder:        DatasetsFinder[IO],
                                    renkuResourcesUrl:     RenkuResourcesUrl,

@@ -29,7 +29,7 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.ApplicationLogger
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
@@ -117,7 +117,8 @@ private class IOHookCreator(
     projectHookUrl:          ProjectHookUrl,
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
-    hookTokenCrypto:         HookTokenCrypto[IO]
+    hookTokenCrypto:         HookTokenCrypto[IO],
+    executionTimeRecorder:   ExecutionTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookCreator[IO](
       projectHookUrl,
@@ -126,6 +127,6 @@ private class IOHookCreator(
       hookTokenCrypto,
       new IOProjectHookCreator(gitLabUrl, gitLabThrottler, ApplicationLogger),
       new IOAccessTokenAssociator(tokenRepositoryUrl, ApplicationLogger),
-      new IOEventsHistoryLoader(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler),
+      new IOEventsHistoryLoader(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, executionTimeRecorder),
       ApplicationLogger
     )

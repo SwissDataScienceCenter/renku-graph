@@ -199,8 +199,9 @@ object IOCommitEventProcessor {
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      triplesUploader    <- IOTriplesUploader()
-      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
+      triplesUploader       <- IOTriplesUploader()
+      tokenRepositoryUrl    <- TokenRepositoryUrl[IO]()
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield
       new CommitEventProcessor[IO](
         new CommitEventsDeserialiser[IO](),
@@ -211,6 +212,6 @@ object IOCommitEventProcessor {
         new IOEventLogMarkNew(transactor),
         new IOEventLogMarkFailed(transactor),
         ApplicationLogger,
-        new ExecutionTimeRecorder[IO]
+        executionTimeRecorder
       )
 }

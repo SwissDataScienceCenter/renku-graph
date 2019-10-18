@@ -18,12 +18,15 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
+import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FullProjectPath
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Warn
+import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningGenerators.commitIdResources
@@ -63,6 +66,9 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         .map(row => row("subject"))
         .toSet
         .filter(triplesMatching(outdatedTriples.commits)) shouldBe empty
+
+      logger.loggedOnly(Warn(
+        s"Removing outdated triples for '${outdatedTriples.projectPath}' finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "remove all the triples related to the given commits together with eventual dataset triples" in new TestCase {
@@ -159,7 +165,9 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
   }
 
   private trait TestCase {
-    val triplesRemover = new IOOutdatedTriplesRemover(rdfStoreConfig, TestLogger())
+    val logger                = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    val triplesRemover        = new IOOutdatedTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger)
   }
 
   private def triplesMatching(commits: Set[CommitIdResource])(subject: String) =

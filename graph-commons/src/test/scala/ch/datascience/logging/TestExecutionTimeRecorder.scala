@@ -21,26 +21,41 @@ package ch.datascience.logging
 import cats.MonadError
 import cats.effect.Clock
 import cats.implicits._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.duration.TimeUnit
 import scala.language.higherKinds
 
 object TestExecutionTimeRecorder {
 
-  def apply[Interpretation[_]](expected: ElapsedTime)(
-      implicit ME:                       MonadError[Interpretation, Throwable]
-  ): ExecutionTimeRecorder[Interpretation] = {
+  def apply[Interpretation[_]](
+      logger:    Logger[Interpretation]
+  )(implicit ME: MonadError[Interpretation, Throwable]): TestExecutionTimeRecorder[Interpretation] =
+    new TestExecutionTimeRecorder[Interpretation](
+      threshold = elapsedTimes.generateOne,
+      logger    = logger
+    )
 
-    implicit val clock: Clock[Interpretation] = new Clock[Interpretation] {
-      override def realTime(unit:  TimeUnit) = ???
-      override def monotonic(unit: TimeUnit) = ???
-    }
-
-    new ExecutionTimeRecorder[Interpretation] {
-      override def measureExecutionTime[BlockOut](
-          block: => Interpretation[BlockOut]): Interpretation[(ElapsedTime, BlockOut)] =
-        block map (result => expected -> result)
-    }
+  private implicit def clock[Interpretation[_]]: Clock[Interpretation] = new Clock[Interpretation] {
+    override def realTime(unit:  TimeUnit) = ???
+    override def monotonic(unit: TimeUnit) = ???
   }
+}
+
+class TestExecutionTimeRecorder[Interpretation[_]](
+    threshold:    ElapsedTime,
+    logger:       Logger[Interpretation]
+)(implicit clock: Clock[Interpretation], ME: MonadError[Interpretation, Throwable])
+    extends ExecutionTimeRecorder[Interpretation](threshold, logger) {
+
+  val elapsedTime:            ElapsedTime = threshold
+  lazy val executionTimeInfo: String      = s" in ${threshold}ms"
+
+  override def measureExecutionTime[BlockOut](
+      block: => Interpretation[BlockOut]
+  ): Interpretation[(ElapsedTime, BlockOut)] =
+    block map (result => threshold -> result)
 }

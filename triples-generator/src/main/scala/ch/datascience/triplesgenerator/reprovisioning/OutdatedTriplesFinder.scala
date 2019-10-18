@@ -22,6 +22,7 @@ import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.projects.FullProjectPath
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -37,14 +38,19 @@ private trait OutdatedTriplesFinder[Interpretation[_]] {
 
 private class IOOutdatedTriplesFinder(
     rdfStoreConfig:          RdfStoreConfig,
+    executionTimeRecorder:   ExecutionTimeRecorder[IO],
     schemaVersion:           SchemaVersion,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
     with OutdatedTriplesFinder[IO] {
 
+  import executionTimeRecorder._
+
   override def findOutdatedTriples: OptionT[IO, OutdatedTriples] = OptionT {
-    queryExpecting[Option[OutdatedTriples]](using = query)
+    measureExecutionTime {
+      queryExpecting[Option[OutdatedTriples]](using = query)
+    } map logExecutionTime(withMessage = "Searching for outdated triples finished")
   }
 
   private val query = s"""

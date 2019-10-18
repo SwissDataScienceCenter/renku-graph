@@ -29,7 +29,7 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.Project
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.ApplicationLogger
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.commits._
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.eventprocessing.StartCommit
@@ -76,10 +76,11 @@ private class IOEventsHistoryLoader(
     transactor:              DbTransactor[IO, EventLogDB],
     tokenRepositoryUrl:      TokenRepositoryUrl,
     gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab]
+    gitLabThrottler:         Throttler[IO, GitLab],
+    executionTimeRecorder:   ExecutionTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends EventsHistoryLoader[IO](
       new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
-      new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler),
+      new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, executionTimeRecorder),
       ApplicationLogger
     )

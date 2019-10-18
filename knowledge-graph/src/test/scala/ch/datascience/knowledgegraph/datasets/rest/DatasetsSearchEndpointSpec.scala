@@ -29,7 +29,7 @@ import ch.datascience.graph.model.GraphModelGenerators.{datasetIds, datasetNames
 import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.Json
 import io.circe.literal._
@@ -48,7 +48,6 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
   "searchForDatasets" should {
 
     "respond with OK and the found datasets" in new TestCase {
-      var testNumber = 1
       forAll(nonEmptyList(datasetIdAndNameTuples)) { idAndNameTuples =>
         (datasetsFinder.findDatasets _)
           .expects(phrase)
@@ -61,8 +60,10 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
 
         response.as[List[Json]].unsafeRunSync should contain theSameElementsAs (idAndNameTuples.toList map toJson)
 
-        logger.loggedOnly(Info(s"Found datasets containing '$phrase' phrase in ${elapsedTime}ms"), times = testNumber)
-        testNumber += 1
+        logger.loggedOnly(
+          Warn(s"Finding datasets containing '$phrase' phrase finished${executionTimeRecorder.executionTimeInfo}")
+        )
+        logger.reset()
       }
     }
 
@@ -77,7 +78,9 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
       response.contentType            shouldBe Some(`Content-Type`(application.json))
       response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No datasets matching '$phrase'").asJson
 
-      logger.expectNoLogs()
+      logger.loggedOnly(
+        Warn(s"Finding datasets containing '$phrase' phrase finished${executionTimeRecorder.executionTimeInfo}")
+      )
     }
 
     "respond with INTERNAL_SERVER_ERROR when searching for datasets fails" in new TestCase {
@@ -99,16 +102,16 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val phrase      = phrases.generateOne
-    val elapsedTime = elapsedTimes.generateOne
+    val phrase = phrases.generateOne
 
-    val datasetsFinder    = mock[DatasetsFinder[IO]]
-    val renkuResourcesUrl = renkuResourcesUrls.generateOne
-    val logger            = TestLogger[IO]()
+    val datasetsFinder        = mock[DatasetsFinder[IO]]
+    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
+    val logger                = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val searchForDatasets = new DatasetsSearchEndpoint[IO](
       datasetsFinder,
       renkuResourcesUrl,
-      TestExecutionTimeRecorder[IO](elapsedTime),
+      executionTimeRecorder,
       logger
     ).searchForDatasets _
 

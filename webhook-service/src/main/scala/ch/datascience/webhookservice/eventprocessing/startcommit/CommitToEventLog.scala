@@ -126,12 +126,13 @@ class IOCommitToEventLog(
     transactor:              DbTransactor[IO, EventLogDB],
     tokenRepositoryUrl:      TokenRepositoryUrl,
     gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab]
+    gitLabThrottler:         Throttler[IO, GitLab],
+    executionTimeRecorder:   ExecutionTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends CommitToEventLog[IO](
       new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
       new IOCommitEventsSourceBuilder(transactor, gitLabUrl, gitLabThrottler),
       new IOCommitEventSender(transactor),
       ApplicationLogger,
-      new ExecutionTimeRecorder[IO]
+      executionTimeRecorder
     )

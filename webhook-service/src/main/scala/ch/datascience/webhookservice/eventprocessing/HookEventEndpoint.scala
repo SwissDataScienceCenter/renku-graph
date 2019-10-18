@@ -31,6 +31,7 @@ import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
@@ -127,7 +128,9 @@ class IOHookEventEndpoint(
     tokenRepositoryUrl:      TokenRepositoryUrl,
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
-    hookTokenCrypto:         HookTokenCrypto[IO]
+    hookTokenCrypto:         HookTokenCrypto[IO],
+    executionTimeRecorder:   ExecutionTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
-    extends HookEventEndpoint[IO](hookTokenCrypto,
-                                  new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler))
+    extends HookEventEndpoint[IO](
+      hookTokenCrypto,
+      new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, executionTimeRecorder))
