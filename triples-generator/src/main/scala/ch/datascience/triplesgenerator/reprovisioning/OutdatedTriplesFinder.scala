@@ -60,11 +60,11 @@ private class IOOutdatedTriplesFinder(
                          |PREFIX schema: <http://schema.org/>
                          |PREFIX dcterms: <http://purl.org/dc/terms/>
                          |
-                         |SELECT ?project ?commit
+                         |SELECT DISTINCT ?project ?commit
                          |WHERE {
                          |  # finding a project having an Activity triple with either no agent or agent with a different version
                          |  {
-                         |  SELECT ?project
+                         |  SELECT DISTINCT ?project
                          |  WHERE {
                          |    {
                          |        ?commit dcterms:isPartOf|schema:isPartOf ?project ;
@@ -84,7 +84,6 @@ private class IOOutdatedTriplesFinder(
                          |        }
                          |    }
                          |  }
-                         |  GROUP BY ?project
                          |  LIMIT 1
                          |  }
                          |  # finding all the commits for the found project with either no agent or agent with a different version
@@ -106,7 +105,6 @@ private class IOOutdatedTriplesFinder(
                          |    }
                          |  }
                          |}
-                         |GROUP BY ?project ?commit
                          |""".stripMargin
 
   private implicit lazy val outdatedTriplesDecoder: Decoder[Option[OutdatedTriples]] =
