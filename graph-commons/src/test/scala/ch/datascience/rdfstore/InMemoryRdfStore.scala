@@ -71,7 +71,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected implicit val timer: Timer[IO]                 = IO.timer(global)
   protected val context:        MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-  private val fusekiServerPort = (shuffle((3000 to 3500).toList) find notUsedPort)
+  private lazy val fusekiServerPort = (shuffle((3000 to 3500).toList) find notUsedPort)
     .getOrElse(throw new Exception("Cannot find not used port for Fuseki"))
 
   private lazy val notUsedPort: Int => Boolean = { port =>
@@ -80,11 +80,10 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       .isValid
   }
 
-  protected val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
+  protected lazy val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
     fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
   )
   protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl
-  import rdfStoreConfig._
 
   private lazy val dataset = {
     import org.apache.jena.graph.NodeFactory
@@ -110,11 +109,11 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     .create()
     .loopback(true)
     .port(fusekiServerPort)
-    .add(s"/$datasetName", dataset)
+    .add(s"/${rdfStoreConfig.datasetName}", dataset)
     .build
 
   protected val sparqlEndpoint: Uri = Uri
-    .fromString(s"$fusekiBaseUrl/$datasetName/sparql")
+    .fromString(s"$fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql")
     .fold(throw _, identity)
 
   private val rdfConnectionResource: Resource[IO, RDFConnection] =
@@ -123,7 +122,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   private def openConnection: IO[RDFConnection] = IO {
     RDFConnectionFuseki
       .create()
-      .destination((fusekiBaseUrl / datasetName).toString)
+      .destination((fusekiBaseUrl / rdfStoreConfig.datasetName).toString)
       .build()
   }
 
