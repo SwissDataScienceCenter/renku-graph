@@ -29,11 +29,13 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
+import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.logging.TestExecutionTimeRecorder
-import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
@@ -100,6 +102,9 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
   }
 
   private trait TestCase {
+    import ch.datascience.json.JsonOps._
+    import ch.datascience.tinytypes.json.TinyTypeEncoders._
+
     val context = MonadError[IO, Throwable]
 
     val phrase = phrases.generateOne
@@ -116,21 +121,30 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, name, maybeDescription) =>
+      case DatasetSearchResult(id, name, maybeDescription, published) =>
         json"""{
-          "identifier": ${id.value},
-          "name": ${name.value},
+          "identifier": $id,
+          "name": $name,
+          "published": $published,
           "_links": [{
             "rel": "details",
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
           }]
-        }""" deepMerge {
-          maybeDescription.fold(Json.obj()) { description =>
-            json"""{
-              "description": ${description.value}
-            }"""
-          }
-        }
+        }""" addIfDefined "description" -> maybeDescription
+    }
+
+    private implicit lazy val publishingEncoder: Encoder[DatasetPublishing] = Encoder.instance[DatasetPublishing] {
+      case DatasetPublishing(maybeDate, creators) =>
+        json"""{
+        "creator": $creators
+      }""" addIfDefined "datePublished" -> maybeDate
+    }
+
+    private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
+      case DatasetCreator(maybeEmail, name) =>
+        json"""{
+        "name": $name
+      }""" addIfDefined ("email" -> maybeEmail)
     }
   }
 
@@ -138,5 +152,6 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     id               <- datasetIds
     name             <- datasetNames
     maybeDescription <- Gen.option(datasetDescriptions)
-  } yield DatasetSearchResult(id, name, maybeDescription)
+    published        <- datasetPublishingInfos
+  } yield DatasetSearchResult(id, name, maybeDescription, published)
 }

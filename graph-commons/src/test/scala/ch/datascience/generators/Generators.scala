@@ -25,6 +25,7 @@ import cats.data.{NonEmptyList, NonEmptySet}
 import cats.kernel.Order
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import ch.datascience.tinytypes._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -239,6 +240,16 @@ object Generators {
 
     objects.map(_.asJson)
   }
+
+  implicit val tinyTypes: Gen[TinyType] = Gen.oneOf(
+    nonBlankStrings() map (_.value) map (v => new StringTinyType { override def value = v }),
+    relativePaths() map (v => new RelativePathTinyType { override def value           = v }),
+    Arbitrary.arbInt.arbitrary map (v => new IntTinyType { override def value         = v }),
+    Arbitrary.arbLong.arbitrary map (v => new LongTinyType { override def value       = v }),
+    jsons map (v => new JsonTinyType { override def value                             = v }),
+    timestamps map (v => new InstantTinyType { override def value                     = v }),
+    localDates map (v => new LocalDateTinyType { override def value                   = v })
+  )
 
   object Implicits {
 

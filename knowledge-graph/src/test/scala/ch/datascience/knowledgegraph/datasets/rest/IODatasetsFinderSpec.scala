@@ -27,12 +27,15 @@ import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.datasets.{Description, Name}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasets
+import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.triples.{singleFileAndCommitWithDataset, triples}
+import ch.datascience.rdfstore.triples._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import eu.timepit.refined.api.Refined
+import io.circe.Json
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -47,7 +50,7 @@ class IODatasetsFinderSpec
   "findDatasets" should {
 
     "return datasets with name, description or creator matching the given phrase" in new TestCase {
-      forAll(datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3) =>
+      forAll(datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig) =>
         val phrase = phrases.generateOne
         val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
         val dataset1 = dataset1Orig.copy(
@@ -56,32 +59,22 @@ class IODatasetsFinderSpec
         val dataset2 = dataset2Orig.copy(
           maybeDescription = Some(sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateOne)
         )
+        val dataset3 = dataset3Orig.copy(
+          published = dataset3Orig.published.copy(
+            creators = Set(
+              DatasetCreator(
+                Gen.option(emails).generateOne,
+                sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne
+              )
+            )
+          )
+        )
 
         loadToStore(
           triples(
-            singleFileAndCommitWithDataset(
-              projectPaths.generateOne,
-              datasetIdentifier       = dataset1.id,
-              datasetName             = dataset1.name,
-              maybeDatasetDescription = dataset1.maybeDescription
-            ),
-            singleFileAndCommitWithDataset(
-              projectPaths.generateOne,
-              datasetIdentifier       = dataset2.id,
-              datasetName             = dataset2.name,
-              maybeDatasetDescription = dataset2.maybeDescription
-            ),
-            singleFileAndCommitWithDataset(
-              projectPaths.generateOne,
-              datasetIdentifier       = dataset3.id,
-              datasetName             = dataset3.name,
-              maybeDatasetDescription = dataset3.maybeDescription,
-              maybeDatasetCreators = Set(
-                sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne -> Gen
-                  .option(emails)
-                  .generateOne
-              )
-            ),
+            toSingleFileAndCommitWithDataset(dataset1),
+            toSingleFileAndCommitWithDataset(dataset2),
+            toSingleFileAndCommitWithDataset(dataset3),
             singleFileAndCommitWithDataset(projectPaths.generateOne),
           )
         )
@@ -89,9 +82,9 @@ class IODatasetsFinderSpec
         datasetsFinder
           .findDatasets(phrase)
           .unsafeRunSync() should contain theSameElementsAs List(
-          DatasetSearchResult(dataset1.id, dataset1.name, dataset1.maybeDescription),
-          DatasetSearchResult(dataset2.id, dataset2.name, dataset2.maybeDescription),
-          DatasetSearchResult(dataset3.id, dataset3.name, dataset3.maybeDescription)
+          DatasetSearchResult(dataset1.id, dataset1.name, dataset1.maybeDescription, dataset1.published),
+          DatasetSearchResult(dataset2.id, dataset2.name, dataset2.maybeDescription, dataset2.published),
+          DatasetSearchResult(dataset3.id, dataset3.name, dataset3.maybeDescription, dataset3.published)
         )
       }
     }
@@ -111,6 +104,21 @@ class IODatasetsFinderSpec
   }
 
   private trait TestCase {
-    val datasetsFinder = new IODatasetsFinder(rdfStoreConfig, TestLogger[IO]())
+    private val logger = TestLogger[IO]()
+    val datasetsFinder = new IODatasetsFinder(
+      rdfStoreConfig,
+      new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger),
+      logger
+    )
   }
+
+  private def toSingleFileAndCommitWithDataset(dataset: Dataset): List[Json] =
+    singleFileAndCommitWithDataset(
+      projectPaths.generateOne,
+      datasetIdentifier         = dataset.id,
+      datasetName               = dataset.name,
+      maybeDatasetDescription   = dataset.maybeDescription,
+      maybeDatasetPublishedDate = dataset.published.maybeDate,
+      maybeDatasetCreators      = dataset.published.creators.map(creator => creator.name -> creator.maybeEmail)
+    )
 }

@@ -19,7 +19,9 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate}
+import ch.datascience.knowledgegraph.datasets.CreatorsFinder
+import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Phrase
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
@@ -38,21 +40,28 @@ private object DatasetsFinder {
   final case class DatasetSearchResult(
       id:               Identifier,
       name:             Name,
-      maybeDescription: Option[Description]
+      maybeDescription: Option[Description],
+      published:        DatasetPublishing
   )
 }
 
 private class IODatasetsFinder(
     rdfStoreConfig:          RdfStoreConfig,
+    creatorsFinder:          CreatorsFinder,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
     with DatasetsFinder[IO] {
 
   import IODatasetsFinder._
+  import cats.implicits._
+  import creatorsFinder._
 
   override def findDatasets(phrase: Phrase): IO[List[DatasetSearchResult]] =
-    queryExpecting[List[DatasetSearchResult]](using = query(phrase))
+    for {
+      datasets             <- queryExpecting[List[DatasetSearchResult]](using = query(phrase))
+      datasetsWithCreators <- (datasets map addCreators).parSequence
+    } yield datasetsWithCreators
 
   private def query(phrase: Phrase): String =
     s"""
@@ -61,20 +70,22 @@ private class IODatasetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX text: <http://jena.apache.org/text#>
        |
-       |SELECT DISTINCT ?identifier ?name ?description
+       |SELECT DISTINCT ?identifier ?name ?maybeDescription ?maybePublishedDate
        |WHERE {
        |  {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             text:query (schema:name '$phrase') ;
        |             schema:name ?name ;
        |             schema:identifier ?identifier .
-       |    OPTIONAL { ?dataset schema:description ?description } .
+       |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
+       |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  } UNION {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             text:query (schema:description '$phrase') ;
        |             schema:name ?name ;
        |             schema:identifier ?identifier .
-       |    OPTIONAL { ?dataset schema:description ?description } .
+       |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
+       |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  } UNION {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             schema:creator ?creatorResource ;
@@ -82,9 +93,15 @@ private class IODatasetsFinder(
        |             schema:name ?name .
        |    ?creatorResource rdf:type <http://schema.org/Person> ;
        |             text:query (schema:name '$phrase') .
-       |    OPTIONAL { ?dataset schema:description ?description } .
+       |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
+       |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  }
        |}""".stripMargin
+
+  private lazy val addCreators: DatasetSearchResult => IO[DatasetSearchResult] =
+    dataset =>
+      findCreators(dataset.id)
+        .map(creators => dataset.copy(published = dataset.published.copy(creators = creators)))
 }
 
 private object IODatasetsFinder {
@@ -95,10 +112,16 @@ private object IODatasetsFinder {
 
     implicit val recordDecoder: Decoder[DatasetSearchResult] = { cursor =>
       for {
-        id               <- cursor.downField("identifier").downField("value").as[Identifier]
-        name             <- cursor.downField("name").downField("value").as[Name]
-        maybeDescription <- cursor.downField("description").downField("value").as[Option[Description]]
-      } yield DatasetSearchResult(id, name, maybeDescription)
+        id                 <- cursor.downField("identifier").downField("value").as[Identifier]
+        name               <- cursor.downField("name").downField("value").as[Name]
+        maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
+        maybeDescription <- cursor
+                             .downField("maybeDescription")
+                             .downField("value")
+                             .as[Option[String]]
+                             .map(blankToNone)
+                             .flatMap(toOption[Description])
+      } yield DatasetSearchResult(id, name, maybeDescription, DatasetPublishing(maybePublishedDate, Set.empty))
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetSearchResult])

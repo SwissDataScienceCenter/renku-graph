@@ -24,13 +24,15 @@ import cats.implicits._
 import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
+import ch.datascience.knowledgegraph.datasets.CreatorsFinder
+import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Json
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.ValidatingQueryParamDecoderMatcher
 import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
@@ -49,6 +51,8 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
 
   import DatasetsFinder.DatasetSearchResult
   import DatasetsSearchEndpoint._
+  import ch.datascience.json.JsonOps._
+  import ch.datascience.tinytypes.json.TinyTypeEncoders._
   import executionTimeRecorder._
   import io.circe.Encoder
   import io.circe.literal._
@@ -81,18 +85,29 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, name, maybeDescription) =>
+    case DatasetSearchResult(id, name, maybeDescription, published) =>
       json"""
       {
-        "identifier": ${id.value},
-        "name": ${name.value}
+        "identifier": $id,
+        "name": $name,
+        "published": $published
       }"""
-        .deepMerge(maybeDescription.fold(Json.obj()) { description =>
-          json"""{
-            "description": ${description.value}
-          }"""
-        })
+        .addIfDefined("description"           -> maybeDescription)
         .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))
+  }
+
+  private implicit lazy val publishingEncoder: Encoder[DatasetPublishing] = Encoder.instance[DatasetPublishing] {
+    case DatasetPublishing(maybeDate, creators) =>
+      json"""{
+        "creator": $creators
+      }""" addIfDefined "datePublished" -> maybeDate
+  }
+
+  private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
+    case DatasetCreator(maybeEmail, name) =>
+      json"""{
+        "name": $name
+      }""" addIfDefined ("email" -> maybeEmail)
   }
 }
 
@@ -117,11 +132,14 @@ object IODatasetsSearchEndpoint {
               timer:                     Timer[IO]): IO[DatasetsSearchEndpoint[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
+      renkuBaseUrl          <- RenkuBaseUrl[IO]()
       renkuResourceUrl      <- RenkuResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield
       new DatasetsSearchEndpoint[IO](
-        new IODatasetsFinder(rdfStoreConfig, ApplicationLogger),
+        new IODatasetsFinder(rdfStoreConfig,
+                             new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
+                             ApplicationLogger),
         renkuResourceUrl,
         executionTimeRecorder,
         ApplicationLogger

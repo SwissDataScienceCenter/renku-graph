@@ -40,8 +40,8 @@ import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => pr
 import ch.datascience.rdfstore.triples.{singleFileAndCommitWithDataset, triples}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
-import io.circe.Json
 import io.circe.literal._
+import io.circe.{Encoder, Json}
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -261,7 +261,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
 
-      Then("he should get OK response with matching datasets")
+      Then("he should get OK response with some matching datasets")
       datasetsSearchResponse.status shouldBe Ok
 
       val Right(foundDatasets) = datasetsSearchResponse.bodyAsJson.as[List[Json]]
@@ -276,6 +276,9 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
 object DatasetsResources {
 
+  import ch.datascience.json.JsonOps._
+  import ch.datascience.tinytypes.json.TinyTypeEncoders._
+
   def briefJson(dataset: Dataset): Json = json"""
     {
       "identifier": ${dataset.id.value}, 
@@ -287,21 +290,29 @@ object DatasetsResources {
   }
 
   def searchResultJson(dataset: Dataset): Json =
-    json"""
-    {
+    json"""{
       "identifier": ${dataset.id.value}, 
-      "name": ${dataset.name.value}
+      "name": ${dataset.name.value},
+      "published": ${dataset.published}
     }"""
-      .deepMerge {
-        dataset.maybeDescription.fold(Json.obj()) { description =>
-          json"""{
-            "description": ${description.value}
-          }"""
-        }
-      }
+      .addIfDefined("description" -> dataset.maybeDescription)
       .deepMerge {
         _links(
           Link(Rel("details"), Href(renkuResourceUrl / "datasets" / dataset.id))
         )
       }
+
+  private implicit lazy val publishingEncoder: Encoder[DatasetPublishing] = Encoder.instance[DatasetPublishing] {
+    case DatasetPublishing(maybeDate, creators) =>
+      json"""{
+        "creator": $creators
+      }""" addIfDefined "datePublished" -> maybeDate
+  }
+
+  private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
+    case DatasetCreator(maybeEmail, name) =>
+      json"""{
+        "name": $name
+      }""" addIfDefined ("email" -> maybeEmail)
+  }
 }
