@@ -118,7 +118,7 @@ object Generators {
   def positiveLongs(max: Long = 1000): Gen[Long Refined Positive] =
     choose(1L, max) map Refined.unsafeApply
 
-  def nonNegativeInts(max: Int = 1000): Gen[Int] = choose(0, max)
+  def nonNegativeInts(max: Int = 1000): Gen[Int Refined NonNegative] = choose(0, max) map Refined.unsafeApply
 
   def negativeInts(min: Int = -1000): Gen[Int] = choose(min, 0)
 

@@ -31,7 +31,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
-import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.literal._
 import io.circe.syntax._
@@ -121,11 +121,12 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, name, maybeDescription, published) =>
+      case DatasetSearchResult(id, name, maybeDescription, published, projectsCount) =>
         json"""{
           "identifier": $id,
           "name": $name,
           "published": $published,
+          "projectsCount": ${projectsCount.value},
           "_links": [{
             "rel": "details",
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
@@ -153,5 +154,6 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     name             <- datasetNames
     maybeDescription <- Gen.option(datasetDescriptions)
     published        <- datasetPublishingInfos
-  } yield DatasetSearchResult(id, name, maybeDescription, published)
+    projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
+  } yield DatasetSearchResult(id, name, maybeDescription, published, projectsCount)
 }

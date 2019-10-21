@@ -85,12 +85,13 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, name, maybeDescription, published) =>
+    case DatasetSearchResult(id, name, maybeDescription, published, projectsCount) =>
       json"""
       {
         "identifier": $id,
         "name": $name,
-        "published": $published
+        "published": $published,
+        "projectsCount": $projectsCount
       }"""
         .addIfDefined("description"           -> maybeDescription)
         .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))

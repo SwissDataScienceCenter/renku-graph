@@ -60,7 +60,7 @@ class ProcessingStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
     "fail if done negative" in {
       forAll(negativeInts(min = Integer.MIN_VALUE), nonNegativeInts(max = Integer.MAX_VALUE)) {
         case (done, total) =>
-          val Failure(exception) = ProcessingStatus.from[Try](done, total)
+          val Failure(exception) = ProcessingStatus.from[Try](done, total.value)
           exception            shouldBe an[IllegalArgumentException]
           exception.getMessage shouldBe "ProcessingStatus's 'done' cannot be negative"
       }
@@ -69,7 +69,7 @@ class ProcessingStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
     "fail if total negative" in {
       forAll(nonNegativeInts(max = Integer.MAX_VALUE), negativeInts(min = Integer.MIN_VALUE)) {
         case (done, total) =>
-          val Failure(exception) = ProcessingStatus.from[Try](done, total)
+          val Failure(exception) = ProcessingStatus.from[Try](done.value, total)
           exception            shouldBe an[IllegalArgumentException]
           exception.getMessage shouldBe "ProcessingStatus's 'total' cannot be negative"
       }

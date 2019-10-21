@@ -26,6 +26,8 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchR
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Phrase
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.tinytypes.constraints.NonNegative
+import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
 
@@ -41,8 +43,12 @@ private object DatasetsFinder {
       id:               Identifier,
       name:             Name,
       maybeDescription: Option[Description],
-      published:        DatasetPublishing
+      published:        DatasetPublishing,
+      projectsCount:    ProjectsCount
   )
+
+  final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
+  implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegative
 }
 
 private class IODatasetsFinder(
@@ -70,33 +76,36 @@ private class IODatasetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX text: <http://jena.apache.org/text#>
        |
-       |SELECT DISTINCT ?identifier ?name ?maybeDescription ?maybePublishedDate
+       |SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(?project) AS ?projectsCount)
        |WHERE {
        |  {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             text:query (schema:name '$phrase') ;
        |             schema:name ?name ;
-       |             schema:identifier ?identifier .
+       |             schema:identifier ?identifier ;
+       |             schema:isPartOf ?project .
        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  } UNION {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             text:query (schema:description '$phrase') ;
        |             schema:name ?name ;
-       |             schema:identifier ?identifier .
+       |             schema:identifier ?identifier ;
+       |             schema:isPartOf ?project .
        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  } UNION {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             schema:creator ?creatorResource ;
        |             schema:identifier ?identifier ;
-       |             schema:name ?name .
+       |             schema:name ?name ;
+       |             schema:isPartOf ?project .
        |    ?creatorResource rdf:type <http://schema.org/Person> ;
        |             text:query (schema:name '$phrase') .
        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  }
-       |}""".stripMargin
+       |} GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate""".stripMargin
 
   private lazy val addCreators: DatasetSearchResult => IO[DatasetSearchResult] =
     dataset =>
@@ -105,6 +114,7 @@ private class IODatasetsFinder(
 }
 
 private object IODatasetsFinder {
+  import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.ProjectsCount
   import io.circe.Decoder
 
   private implicit val recordsDecoder: Decoder[List[DatasetSearchResult]] = {
@@ -115,13 +125,21 @@ private object IODatasetsFinder {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
         maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
+        projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
         maybeDescription <- cursor
                              .downField("maybeDescription")
                              .downField("value")
                              .as[Option[String]]
                              .map(blankToNone)
                              .flatMap(toOption[Description])
-      } yield DatasetSearchResult(id, name, maybeDescription, DatasetPublishing(maybePublishedDate, Set.empty))
+      } yield
+        DatasetSearchResult(
+          id,
+          name,
+          maybeDescription,
+          DatasetPublishing(maybePublishedDate, Set.empty),
+          projectsCount
+        )
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetSearchResult])

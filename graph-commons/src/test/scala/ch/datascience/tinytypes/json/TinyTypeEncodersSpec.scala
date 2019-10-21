@@ -25,6 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import io.circe.Json
 import io.circe.syntax._
+import org.scalacheck.Arbitrary
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -37,6 +38,14 @@ class TinyTypeEncodersSpec extends WordSpec {
     "encode StringTinyType to Json" in {
       val value = nonEmptyStrings().generateOne
       StringTestType(value).asJson shouldBe Json.fromString(value)
+    }
+  }
+
+  "intEncoder" should {
+
+    "encode IntTinyType to Json" in {
+      val value = Arbitrary.arbInt.arbitrary.generateOne
+      IntTestType(value).asJson shouldBe Json.fromInt(value)
     }
   }
 

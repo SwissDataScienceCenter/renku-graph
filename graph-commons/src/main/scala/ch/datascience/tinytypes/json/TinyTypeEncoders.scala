@@ -26,6 +26,9 @@ object TinyTypeEncoders {
   implicit def stringEncoder[TT <: StringTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromString(ttValue.value))
 
+  implicit def intEncoder[TT <: IntTinyType]: Encoder[TT] =
+    Encoder.instance[TT](ttValue => Json.fromInt(ttValue.value))
+
   implicit def relativePathEncoder[TT <: RelativePathTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromString(ttValue.value))
 

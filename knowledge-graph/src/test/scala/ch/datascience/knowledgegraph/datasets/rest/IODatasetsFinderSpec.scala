@@ -30,7 +30,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasets
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator}
-import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -82,9 +82,21 @@ class IODatasetsFinderSpec
         datasetsFinder
           .findDatasets(phrase)
           .unsafeRunSync() should contain theSameElementsAs List(
-          DatasetSearchResult(dataset1.id, dataset1.name, dataset1.maybeDescription, dataset1.published),
-          DatasetSearchResult(dataset2.id, dataset2.name, dataset2.maybeDescription, dataset2.published),
-          DatasetSearchResult(dataset3.id, dataset3.name, dataset3.maybeDescription, dataset3.published)
+          DatasetSearchResult(dataset1.id,
+                              dataset1.name,
+                              dataset1.maybeDescription,
+                              dataset1.published,
+                              ProjectsCount(dataset1.project.size)),
+          DatasetSearchResult(dataset2.id,
+                              dataset2.name,
+                              dataset2.maybeDescription,
+                              dataset2.published,
+                              ProjectsCount(dataset2.project.size)),
+          DatasetSearchResult(dataset3.id,
+                              dataset3.name,
+                              dataset3.maybeDescription,
+                              dataset3.published,
+                              ProjectsCount(dataset3.project.size))
         )
       }
     }
@@ -113,12 +125,14 @@ class IODatasetsFinderSpec
   }
 
   private def toSingleFileAndCommitWithDataset(dataset: Dataset): List[Json] =
-    singleFileAndCommitWithDataset(
-      projectPaths.generateOne,
-      datasetIdentifier         = dataset.id,
-      datasetName               = dataset.name,
-      maybeDatasetDescription   = dataset.maybeDescription,
-      maybeDatasetPublishedDate = dataset.published.maybeDate,
-      maybeDatasetCreators      = dataset.published.creators.map(creator => creator.name -> creator.maybeEmail)
-    )
+    dataset.project.flatMap { project =>
+      singleFileAndCommitWithDataset(
+        projectPath               = project.path,
+        datasetIdentifier         = dataset.id,
+        datasetName               = dataset.name,
+        maybeDatasetDescription   = dataset.maybeDescription,
+        maybeDatasetPublishedDate = dataset.published.maybeDate,
+        maybeDatasetCreators      = dataset.published.creators.map(creator => creator.name -> creator.maybeEmail)
+      )
+    }
 }
