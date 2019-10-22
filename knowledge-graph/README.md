@@ -33,9 +33,22 @@ Response body example:
 ```
 [  
    {  
-      "identifier":"9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
+      "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
       "name":"rmDaYfpehl",
-      "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
+      "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
+      "published": {
+        "datePublished": "2012-10-14T03:02:25.639Z", // optional property
+        "creator": [
+          {
+            "name": "e wmtnxmcguz"
+          },
+          {
+            "name": "iilmadw vcxabmh",
+            "email": "ticUnrW@cBmrdomoa"             // optional property
+          }
+        ]
+      },
+      "projectsCount": 2,
       "_links":[  
          {  
             "rel":"details",
@@ -44,8 +57,16 @@ Response body example:
       ]
    },
    {  
-      "identifier":"a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
-      "name":"a",
+      "identifier": "a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
+      "name": "a",
+      "published": {
+        "creator": [
+          {
+            "name": "e wmtnxmcguz"
+          }
+        ]
+      },
+      "projectsCount": 1,
       "_links":[  
          {  
             "rel":"details",
