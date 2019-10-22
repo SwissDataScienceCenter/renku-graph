@@ -82,10 +82,12 @@ class SortBySpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 
   object Sort extends SortBy {
-    case object Name  extends Property(name = "name")
-    case object Email extends Property(name = "email")
+    type PropertyType = TestProperty
+    sealed trait TestProperty extends Property
+    case object Name          extends Property(name = "name") with TestProperty
+    case object Email         extends Property(name = "email") with TestProperty
 
-    override val properties: Set[Property] = Set(Name, Email)
+    override val properties: Set[TestProperty] = Set(Name, Email)
   }
 
   private implicit lazy val sorts: Gen[Sort.By] = sortBys(Sort)

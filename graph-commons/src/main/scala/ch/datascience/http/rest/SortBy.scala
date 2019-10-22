@@ -26,12 +26,14 @@ trait SortBy {
 
   import SortBy.Direction
 
+  type PropertyType <: Property
+
   abstract class Property(val name: String) extends Product with Serializable {
     override lazy val toString: String = name
   }
 
   object Property {
-    def from(propertyName: String): Either[IllegalArgumentException, Property] =
+    def from(propertyName: String): Either[IllegalArgumentException, PropertyType] =
       Either.fromOption(
         properties.find(_.name.equalsIgnoreCase(propertyName)),
         new IllegalArgumentException(
@@ -40,9 +42,9 @@ trait SortBy {
       )
   }
 
-  case class By(property: Property, direction: Direction)
+  case class By(property: PropertyType, direction: Direction)
 
-  def properties: Set[Property]
+  def properties: Set[PropertyType]
 
   private val `property:direction` = "^(\\w+)\\:(\\w+)$".r
   def from(propertyAndDirection: String): Either[IllegalArgumentException, By] = propertyAndDirection match {

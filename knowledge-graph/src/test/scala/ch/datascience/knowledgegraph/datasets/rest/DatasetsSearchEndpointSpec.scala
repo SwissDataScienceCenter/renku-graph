@@ -101,6 +101,15 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     }
   }
 
+  "Sort.properties" should {
+
+    import DatasetsSearchEndpoint.Sort._
+
+    "list only name, description" in {
+      DatasetsSearchEndpoint.Sort.properties shouldBe Set(DatasetName, DatasetDatePublished)
+    }
+  }
+
   private trait TestCase {
     import ch.datascience.json.JsonOps._
     import ch.datascience.tinytypes.json.TinyTypeEncoders._

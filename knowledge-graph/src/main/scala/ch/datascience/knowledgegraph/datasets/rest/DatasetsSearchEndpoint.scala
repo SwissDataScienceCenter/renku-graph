@@ -133,9 +133,13 @@ object DatasetsSearchEndpoint {
 
   object Sort extends ch.datascience.http.rest.SortBy {
 
-    final case object DatasetName extends Property("name")
+    type PropertyType = SearchProperty
 
-    override val properties: Set[Property] = Set(DatasetName)
+    sealed trait SearchProperty            extends Property
+    final case object DatasetName          extends Property("name") with SearchProperty
+    final case object DatasetDatePublished extends Property("datePublished") with SearchProperty
+
+    override val properties: Set[SearchProperty] = Set(DatasetName, DatasetDatePublished)
   }
 }
 

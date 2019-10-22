@@ -18,13 +18,15 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
+import java.time.LocalDate
+
 import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.datasets.{Description, Name}
+import ch.datascience.graph.model.datasets.{Description, Name, PublishedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.interpreters.TestLogger
@@ -32,6 +34,7 @@ import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasets
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.rdfstore.InMemoryRdfStore
@@ -52,39 +55,14 @@ class IODatasetsFinderSpec
 
   "findDatasets" should {
 
-    "return datasets with name, description or creator matching the given phrase" in new TestCase {
+    "return datasets with name, description or creator matching the given phrase sorted by name" in new TestCase {
       forAll(datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig) =>
-        val phrase = phrases.generateOne
-        val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
-        val dataset1 = dataset1Orig.copy(
-          name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
-        )
-        val dataset2 = dataset2Orig.copy(
-          maybeDescription = Some(sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateOne)
-        )
-        val dataset3 = dataset3Orig.copy(
-          published = dataset3Orig.published.copy(
-            creators = Set(
-              DatasetCreator(
-                Gen.option(emails).generateOne,
-                sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne
-              )
-            )
-          )
-        )
-
-        loadToStore(
-          triples(
-            toSingleFileAndCommitWithDataset(dataset1),
-            toSingleFileAndCommitWithDataset(dataset2),
-            toSingleFileAndCommitWithDataset(dataset3),
-            singleFileAndCommitWithDataset(projectPaths.generateOne),
-          )
-        )
+        val phrase                         = phrases.generateOne
+        val (dataset1, dataset2, dataset3) = storeDatasets(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
 
         datasetsFinder
           .findDatasets(phrase, Sort.By(DatasetName, Direction.Asc))
-          .unsafeRunSync() should contain theSameElementsAs List(
+          .unsafeRunSync() shouldBe List(
           DatasetSearchResult(dataset1.id,
                               dataset1.name,
                               dataset1.maybeDescription,
@@ -102,6 +80,36 @@ class IODatasetsFinderSpec
                               ProjectsCount(dataset3.project.size))
         ).sortBy(_.name.value)
       }
+    }
+
+    "return datasets with name, description or creator matching the given phrase sorted by datePublished" in new TestCase {
+      val phrase = phrases.generateOne
+      val (dataset1, dataset2, dataset3) = storeDatasets(
+        phrase,
+        datasets.generateOne changePublishedDateTo Some(PublishedDate(LocalDate.now())),
+        datasets.generateOne changePublishedDateTo None,
+        datasets.generateOne changePublishedDateTo Some(PublishedDate(LocalDate.now() minusDays 1))
+      )
+
+      datasetsFinder
+        .findDatasets(phrase, Sort.By(DatasetDatePublished, Direction.Desc))
+        .unsafeRunSync() shouldBe List(
+        DatasetSearchResult(dataset2.id,
+                            dataset2.name,
+                            dataset2.maybeDescription,
+                            dataset2.published,
+                            ProjectsCount(dataset2.project.size)),
+        DatasetSearchResult(dataset3.id,
+                            dataset3.name,
+                            dataset3.maybeDescription,
+                            dataset3.published,
+                            ProjectsCount(dataset3.project.size)),
+        DatasetSearchResult(dataset1.id,
+                            dataset1.name,
+                            dataset1.maybeDescription,
+                            dataset1.published,
+                            ProjectsCount(dataset1.project.size))
+      ).sortBy(_.published.maybeDate.map(_.value).getOrElse(LocalDate.MIN)).reverse
     }
 
     "return no results if there's no datasets with name, description or creator matching the given phrase" in new TestCase {
@@ -127,6 +135,42 @@ class IODatasetsFinderSpec
     )
   }
 
+  private def storeDatasets(
+      containtingPhrase: Phrase,
+      dataset1Orig:      Dataset,
+      dataset2Orig:      Dataset,
+      dataset3Orig:      Dataset
+  ): (Dataset, Dataset, Dataset) = {
+    val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(containtingPhrase.toString)
+    val dataset1 = dataset1Orig.copy(
+      name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
+    )
+    val dataset2 = dataset2Orig.copy(
+      maybeDescription = Some(sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateOne)
+    )
+    val dataset3 = dataset3Orig.copy(
+      published = dataset3Orig.published.copy(
+        creators = Set(
+          DatasetCreator(
+            Gen.option(emails).generateOne,
+            sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne
+          )
+        )
+      )
+    )
+
+    loadToStore(
+      triples(
+        toSingleFileAndCommitWithDataset(dataset1),
+        toSingleFileAndCommitWithDataset(dataset2),
+        toSingleFileAndCommitWithDataset(dataset3),
+        singleFileAndCommitWithDataset(projectPaths.generateOne),
+      )
+    )
+
+    (dataset1, dataset2, dataset3)
+  }
+
   private def toSingleFileAndCommitWithDataset(dataset: Dataset): List[Json] =
     dataset.project.flatMap { project =>
       singleFileAndCommitWithDataset(
@@ -138,4 +182,11 @@ class IODatasetsFinderSpec
         maybeDatasetCreators      = dataset.published.creators.map(creator => creator.name -> creator.maybeEmail)
       )
     }
+
+  private implicit lazy val localDateOrdering: Ordering[LocalDate] = (x, y) => x compareTo y
+
+  private implicit class DatasetOps(dataset: Dataset) {
+    def changePublishedDateTo(maybeDate: Option[PublishedDate]): Dataset =
+      dataset.copy(published = dataset.published.copy(maybeDate = maybeDate))
+  }
 }

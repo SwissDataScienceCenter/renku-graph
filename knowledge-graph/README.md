@@ -20,7 +20,7 @@ Finds datasets which `name`, `description` or creator `name` matches the given `
 
 NOTES: 
 * the `phrase` query parameter has to be url encoded.
-* the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name`.
+* the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name` and `datePublished`.
 
 **Response**
 

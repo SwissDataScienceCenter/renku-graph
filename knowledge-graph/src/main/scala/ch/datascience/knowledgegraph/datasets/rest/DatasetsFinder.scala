@@ -108,7 +108,12 @@ private class IODatasetsFinder(
        |  }
        |}
        |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
-       |ORDER BY ${sort.direction}(?${sort.property})""".stripMargin
+       |${`ORDER BY`(sort)}""".stripMargin
+
+  private def `ORDER BY`(sort: Sort.By): String = sort.property match {
+    case Sort.DatasetName          => s"ORDER BY ${sort.direction}(?name)"
+    case Sort.DatasetDatePublished => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
+  }
 
   private lazy val addCreators: DatasetSearchResult => IO[DatasetSearchResult] =
     dataset =>
