@@ -26,11 +26,14 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.datasets.{Description, Name}
 import ch.datascience.graph.model.users.{Name => UserName}
+import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasets
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -80,7 +83,7 @@ class IODatasetsFinderSpec
         )
 
         datasetsFinder
-          .findDatasets(phrase)
+          .findDatasets(phrase, Sort.By(DatasetName, Direction.Asc))
           .unsafeRunSync() should contain theSameElementsAs List(
           DatasetSearchResult(dataset1.id,
                               dataset1.name,
@@ -97,7 +100,7 @@ class IODatasetsFinderSpec
                               dataset3.maybeDescription,
                               dataset3.published,
                               ProjectsCount(dataset3.project.size))
-        )
+        ).sortBy(_.name.value)
       }
     }
 
@@ -110,7 +113,7 @@ class IODatasetsFinderSpec
       )
 
       datasetsFinder
-        .findDatasets(phrases.generateOne)
+        .findDatasets(phrases.generateOne, searchEndpointSorts.generateOne)
         .unsafeRunSync() shouldBe empty
     }
   }

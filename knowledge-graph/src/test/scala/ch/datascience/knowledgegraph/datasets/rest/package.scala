@@ -18,10 +18,12 @@
 
 package ch.datascience.knowledgegraph.datasets
 
+import ch.datascience.generators.CommonGraphGenerators.sortBys
 import ch.datascience.generators.Generators.nonEmptyStrings
-import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Phrase
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import org.scalacheck.Gen
 
 package object rest {
-  val phrases: Gen[Phrase] = nonEmptyStrings() map Phrase.apply
+  val phrases:                      Gen[Phrase]                         = nonEmptyStrings() map Phrase.apply
+  implicit val searchEndpointSorts: Gen[DatasetsSearchEndpoint.Sort.By] = sortBys(DatasetsSearchEndpoint.Sort)
 }

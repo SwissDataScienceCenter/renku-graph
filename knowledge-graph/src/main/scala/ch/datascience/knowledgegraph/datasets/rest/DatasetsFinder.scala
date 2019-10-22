@@ -23,7 +23,8 @@ import ch.datascience.graph.model.datasets.{Description, Identifier, Name, Publi
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
-import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Phrase
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import ch.datascience.tinytypes.constraints.NonNegative
@@ -35,7 +36,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait DatasetsFinder[Interpretation[_]] {
-  def findDatasets(phrase: Phrase): Interpretation[List[DatasetSearchResult]]
+  def findDatasets(phrase: Phrase, sort: Sort.By): Interpretation[List[DatasetSearchResult]]
 }
 
 private object DatasetsFinder {
@@ -63,13 +64,13 @@ private class IODatasetsFinder(
   import cats.implicits._
   import creatorsFinder._
 
-  override def findDatasets(phrase: Phrase): IO[List[DatasetSearchResult]] =
+  override def findDatasets(phrase: Phrase, sort: Sort.By): IO[List[DatasetSearchResult]] =
     for {
-      datasets             <- queryExpecting[List[DatasetSearchResult]](using = query(phrase))
+      datasets             <- queryExpecting[List[DatasetSearchResult]](using = query(phrase, sort))
       datasetsWithCreators <- (datasets map addCreators).parSequence
     } yield datasetsWithCreators
 
-  private def query(phrase: Phrase): String =
+  private def query(phrase: Phrase, sort: Sort.By): String =
     s"""
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -105,7 +106,9 @@ private class IODatasetsFinder(
        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  }
-       |} GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate""".stripMargin
+       |}
+       |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
+       |ORDER BY ${sort.direction}(?${sort.property})""".stripMargin
 
   private lazy val addCreators: DatasetSearchResult => IO[DatasetSearchResult] =
     dataset =>

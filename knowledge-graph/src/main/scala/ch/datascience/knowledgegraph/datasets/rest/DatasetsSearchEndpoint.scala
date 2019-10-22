@@ -50,7 +50,8 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
     extends Http4sDsl[Interpretation] {
 
   import DatasetsFinder.DatasetSearchResult
-  import DatasetsSearchEndpoint._
+  import DatasetsSearchEndpoint.Query._
+  import DatasetsSearchEndpoint.Sort
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
   import executionTimeRecorder._
@@ -59,10 +60,10 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   import io.circe.syntax._
   import org.http4s.circe._
 
-  def searchForDatasets(phrase: Phrase): Interpretation[Response[Interpretation]] =
+  def searchForDatasets(phrase: Phrase, sort: Sort.By): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       datasetsFinder
-        .findDatasets(phrase)
+        .findDatasets(phrase, sort)
         .flatMap(toHttpResult(phrase))
         .recoverWith(httpResult(phrase))
     } map logExecutionTimeWhen(finishedSuccessfully(phrase))
@@ -114,15 +115,27 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
 
 object DatasetsSearchEndpoint {
 
-  final class Phrase private (val value: String) extends AnyVal with StringTinyType
-  implicit object Phrase extends TinyTypeFactory[Phrase](new Phrase(_)) with NonBlank
+  object Query {
+    final class Phrase private (val value: String) extends AnyVal with StringTinyType
+    implicit object Phrase extends TinyTypeFactory[Phrase](new Phrase(_)) with NonBlank
 
-  private implicit val queryParameterDecoder: QueryParamDecoder[Phrase] =
-    (value: QueryParameterValue) =>
-      Phrase.from(value.value).leftMap(_.getMessage).leftMap(ParseFailure(_, "")).toValidatedNel
+    private implicit val queryParameterDecoder: QueryParamDecoder[Phrase] =
+      (value: QueryParameterValue) =>
+        Phrase
+          .from(value.value)
+          .leftMap(_ => ParseFailure(s"'${query.parameterName}' parameter with invalid value", ""))
+          .toValidatedNel
 
-  object QueryParameter extends ValidatingQueryParamDecoderMatcher[Phrase]("query") {
-    val name: String = "query"
+    object query extends ValidatingQueryParamDecoderMatcher[Phrase]("query") {
+      val parameterName: String = "query"
+    }
+  }
+
+  object Sort extends ch.datascience.http.rest.SortBy {
+
+    final case object DatasetName extends Property("name")
+
+    override val properties: Set[Property] = Set(DatasetName)
   }
 }
 

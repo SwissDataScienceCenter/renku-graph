@@ -37,13 +37,14 @@ class QueryParameterToolsSpec extends WordSpec {
   "toBadRequest" should {
 
     "return a BAD_REQUEST response containing JSON body with information about the query parameter name and validation errors" in {
-      val parameterName     = nonEmptyStrings().generateOne
       val parseFailuresList = nonEmptyList(parseFailures).generateOne
 
-      val response = toBadRequest[IO](parameterName)(parseFailuresList).unsafeRunSync()
+      val response = toBadRequest[IO]()(parseFailuresList).unsafeRunSync()
 
-      response.status                           shouldBe BadRequest
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(s"'$parameterName' parameter with invalid value")
+      response.status shouldBe BadRequest
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
+        parseFailuresList.toList.map(_.message).mkString("; ")
+      )
     }
   }
 

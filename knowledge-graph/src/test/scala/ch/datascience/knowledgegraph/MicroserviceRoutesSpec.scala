@@ -18,16 +18,18 @@
 
 package ch.datascience.knowledgegraph
 
-import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.implicits._
+import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.server.QueryParameterTools._
-import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Phrase
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{QueryContext, QueryEndpoint, QueryRunner}
 import org.http4s.Status._
@@ -35,11 +37,12 @@ import org.http4s._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import sangria.schema.Schema
 
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends WordSpec with MockFactory {
+class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
 
   "routes" should {
 
@@ -52,13 +55,17 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       response.body[String] shouldBe "pong"
     }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok when valid query parameter given" in new TestCase {
+    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
+      "when a valid 'query' and no 'sort' parameter given" in new TestCase {
       val phrase = nonEmptyStrings().generateOne
 
-      (datasetsSearchEndpoint.searchForDatasets _).expects(Phrase(phrase)).returning(IO.pure(Response[IO](Ok)))
+      (datasetsSearchEndpoint
+        .searchForDatasets(_: Phrase, _: Sort.By))
+        .expects(Phrase(phrase), Sort.By(DatasetName, Direction.Asc))
+        .returning(IO.pure(Response[IO](Ok)))
 
       val response = routes.call(
-        Request(Method.GET, uri"knowledge-graph/datasets" withQueryParam ("query", phrase))
+        Request(Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
       )
 
       response.status shouldBe Ok
@@ -69,27 +76,55 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       val phrase = blankStrings().generateOne
 
       val response = routes.call(
-        Request(Method.GET, uri"knowledge-graph/datasets" withQueryParam ("query", phrase))
+        Request(Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
       )
 
-      val expectedResponse = toBadRequest[IO](DatasetsSearchEndpoint.QueryParameter.name)(
-        Phrase
-          .from(phrase)
-          .leftMap(_.getMessage)
-          .leftMap(ParseFailure(_, ""))
-          .leftMap(failure => NonEmptyList.of(failure))
-          .swap
-          .getOrElse(fail("Phrase instantiation error expected"))
-      ).unsafeRunSync()
-
-      response.status             shouldBe expectedResponse.status
-      response.body[ErrorMessage] shouldBe expectedResponse.as[ErrorMessage].unsafeRunSync()
+      response.status             shouldBe BadRequest
+      response.body[ErrorMessage] shouldBe ErrorMessage(s"'${query.parameterName}' parameter with invalid value")
     }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $ServiceUnavailable when no query parameter given" in new TestCase {
       val response = routes
         .call(Request(Method.GET, uri"knowledge-graph/datasets"))
         .status shouldBe ServiceUnavailable
+    }
+
+    s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $Ok when query and sort parameters given" in new TestCase {
+      forAll(nonEmptyStrings(), sortBys(Sort)) { (phrase, sortBy) =>
+        (datasetsSearchEndpoint
+          .searchForDatasets(_: Phrase, _: Sort.By))
+          .expects(Phrase(phrase), sortBy)
+          .returning(IO.pure(Response[IO](Ok)))
+
+        val response = routes.call {
+          Request(
+            Method.GET,
+            uri"knowledge-graph/datasets"
+              .withQueryParam(query.parameterName, phrase)
+              .withQueryParam(Sort.sort.parameterName, s"${sortBy.property}:${sortBy.direction}")
+          )
+        }
+
+        response.status shouldBe Ok
+      }
+    }
+
+    s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $BadRequest for invalid sort parameters" in new TestCase {
+      val property = "invalid"
+
+      val response = routes.call {
+        Request(
+          Method.GET,
+          uri"knowledge-graph/datasets"
+            .withQueryParam(query.parameterName, nonEmptyStrings().generateOne)
+            .withQueryParam(Sort.sort.parameterName, s"$property:${Direction.Asc}")
+        )
+      }
+
+      response.status shouldBe BadRequest
+      response.body[ErrorMessage] shouldBe ErrorMessage(
+        s"'$property' is not a valid sort property. Allowed properties: ${Sort.properties.mkString(", ")}"
+      )
     }
 
     s"define a GET /knowledge-graph/datasets/:id endpoint returning $Ok when valid :id path parameter given" in new TestCase {

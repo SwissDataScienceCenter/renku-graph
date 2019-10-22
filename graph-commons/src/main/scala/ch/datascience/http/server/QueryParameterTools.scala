@@ -31,10 +31,10 @@ import scala.language.higherKinds
 
 object QueryParameterTools {
 
-  def toBadRequest[F[_]: ConcurrentEffect](
-      parameterName: String
-  )(errors:          NonEmptyList[ParseFailure])(implicit ME: MonadError[F, Throwable]): F[Response[F]] = ME.pure {
+  def toBadRequest[F[_]: ConcurrentEffect]()(
+      errors:    NonEmptyList[ParseFailure]
+  )(implicit ME: MonadError[F, Throwable]): F[Response[F]] = ME.pure {
     Response[F](Status.BadRequest)
-      .withEntity(ErrorMessage(s"'$parameterName' parameter with invalid value").asJson)
+      .withEntity(ErrorMessage(errors.toList.map(_.message).mkString("; ")).asJson)
   }
 }

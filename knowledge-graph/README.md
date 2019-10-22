@@ -4,28 +4,30 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method  | Path                                                      | Description                                                    |
-|---------|-----------------------------------------------------------|----------------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets?query=<phrase>```            | Returns datasets matching the given `phrase`.                  |
-|  GET    | ```/knowledge-graph/datasets/:id```                       | Returns details of the dataset with the given `id`             |
-|  GET    | ```/knowledge-graph/graphql```                            | Returns GraphQL endpoint schema                                |
-|  POST   | ```/knowledge-graph/graphql```                            | GraphQL query endpoint                                         |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name```          | Returns details of the project with the given `namespace/name` |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets``` | Returns datasets of the project with the given `path`          |
-|  GET    | ```/ping```                                               | To check if service is healthy                                 |
+| Method  | Path                                                                    | Description                                                    |
+|---------|-------------------------------------------------------------------------|----------------------------------------------------------------|
+|  GET    | ```/knowledge-graph/datasets?query=<phrase>&sort=<property:asc\desc>``` | Returns datasets matching the given `phrase`.                  |
+|  GET    | ```/knowledge-graph/datasets/:id```                                     | Returns details of the dataset with the given `id`             |
+|  GET    | ```/knowledge-graph/graphql```                                          | Returns GraphQL endpoint schema                                |
+|  POST   | ```/knowledge-graph/graphql```                                          | GraphQL query endpoint                                         |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name```                        | Returns details of the project with the given `namespace/name` |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```               | Returns datasets of the project with the given `path`          |
+|  GET    | ```/ping```                                                             | To check if service is healthy                                 |
 
-#### GET /knowledge-graph/datasets?query=\<phrase\>
+#### GET /knowledge-graph/datasets?query=\<phrase\&sort=\<property\>:asc|desc
 
 Finds datasets which `name`, `description` or creator `name` matches the given `phrase`.
 
-NOTE: the `phrase` query parameter has to be url encoded.
+NOTES: 
+* the `phrase` query parameter has to be url encoded.
+* the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name`.
 
 **Response**
 
 | Status                     | Description                                            |
-|----------------------------|----------------------------------------                |
+|----------------------------|--------------------------------------------------------|
 | OK (200)                   | If there are datasets for the project                  |
-| BAD_REQUEST (400)          | If the `query` parameter is blank                      |
+| BAD_REQUEST (400)          | If the `query` parameter is blank or `sort` is invalid |
 | NOT_FOUND (404)            | If there are no datasets found or no `query` parameter |
 | INTERNAL SERVER ERROR (500)| Otherwise                                              |
 
