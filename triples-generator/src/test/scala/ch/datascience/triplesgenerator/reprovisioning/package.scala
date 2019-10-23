@@ -16,20 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.triplesgenerator
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import io.circe.Json
+import io.circe.literal._
 
-class RdfResourceSpec extends WordSpec {
+package object reprovisioning {
 
-  "fullProjectPathResourceRenderer" should {
-
-    "wrap the value into <>" in {
-      val projectPath = fullProjectPaths.generateOne
-      projectPath.showAs[RdfResource] shouldBe s"<$projectPath>"
+  def projectIdsToOldFormat(projectResource: ProjectResource): Json => Json = _ deepMerge json"""{
+    "schema:isPartOf": {
+      "@id": ${projectResource.toString}
     }
-  }
+  }"""
 }

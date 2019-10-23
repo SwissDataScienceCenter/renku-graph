@@ -38,8 +38,12 @@ spec:
             - name: TOKEN_REPOSITORY_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "tokenRepository.fullname" . }}
-                  key: tokenRepository-postgresPassword
+{{- if .Values.global.graph.tokenRepository.existingSecret }}
+                  name: {{ tpl .Values.global.graph.tokenRepository.existingSecret . }}
+{{- else }}
+                  name: {{ template "tokenRepository.fullname" . }}-postgres
+{{- end }}
+                  key: graph-tokenRepository-postgresPassword
             - name: TOKEN_REPOSITORY_POSTGRES_CONNECTION_POOL
               value: "{{ .Values.tokenRepository.connectionPool }}"
             - name: SENTRY_ENABLED

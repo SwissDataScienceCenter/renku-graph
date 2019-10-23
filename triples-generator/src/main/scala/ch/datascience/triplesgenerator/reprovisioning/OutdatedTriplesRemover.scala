@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -47,7 +48,7 @@ private class IOOutdatedTriplesRemover(
         _ <- remove(outdatedTriples)
         _ <- removeOrphanAgentTriples()
       } yield ()
-    } map logExecutionTime(withMessage = s"Removing outdated triples for '${outdatedTriples.projectPath}' finished")
+    } map logExecutionTime(withMessage = s"Removing outdated triples for '${outdatedTriples.projectResource}' finished")
 
   private def remove(triplesToRemove: OutdatedTriples): IO[Unit] = queryWitNoResult {
     s"""
@@ -63,7 +64,7 @@ private class IOOutdatedTriplesRemover(
        |    SELECT ?subject
        |    WHERE {
        |      {
-       |        ?commit dcterms:isPartOf|schema:isPartOf ${triplesToRemove.projectPath.showAs[RdfResource]} .
+       |        ?commit dcterms:isPartOf|schema:isPartOf ${triplesToRemove.projectResource.showAs[RdfResource]} .
        |        FILTER (?commit IN (${triplesToRemove.commits.map(_.showAs[RdfResource]).mkString(",")}))
        |        ?commit ?predicate ?object
        |      }

@@ -19,13 +19,24 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.FullProjectPath
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeConverter, TinyTypeFactory}
 import io.circe.Decoder
 
 import scala.language.higherKinds
 
-private final case class OutdatedTriples(projectPath: FullProjectPath, commits: Set[CommitIdResource])
+private final case class OutdatedTriples(projectResource: ProjectResource, commits: Set[CommitIdResource])
+
+final class ProjectResource private (val value: String) extends AnyVal with StringTinyType
+object ProjectResource extends TinyTypeFactory[ProjectResource](new ProjectResource(_)) {
+  implicit lazy val projectResourceDecoder: Decoder[ProjectResource] = Decoder.decodeString.map(ProjectResource.apply)
+
+  private val pathExtractor = "^.*\\/(.*\\/.*)$".r
+  implicit lazy val projectPathConverter: TinyTypeConverter[ProjectResource, ProjectPath] = {
+    case ProjectResource(pathExtractor(path)) => ProjectPath.from(path)
+    case illegalValue                         => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
+  }
+}
 
 final class CommitIdResource private (val value: String) extends AnyVal with StringTinyType
 object CommitIdResource extends TinyTypeFactory[CommitIdResource](new CommitIdResource(_)) {
