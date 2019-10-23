@@ -105,8 +105,8 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
 
     import DatasetsSearchEndpoint.Sort._
 
-    "list only name, description" in {
-      DatasetsSearchEndpoint.Sort.properties shouldBe Set(DatasetName, DatasetDatePublished)
+    "list only name, datePublished and projectsCount" in {
+      DatasetsSearchEndpoint.Sort.properties shouldBe Set(NameProperty, DatePublishedProperty, ProjectsCountProperty)
     }
   }
 

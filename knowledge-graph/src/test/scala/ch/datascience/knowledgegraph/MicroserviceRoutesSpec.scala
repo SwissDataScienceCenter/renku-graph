@@ -61,7 +61,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
 
       (datasetsSearchEndpoint
         .searchForDatasets(_: Phrase, _: Sort.By))
-        .expects(Phrase(phrase), Sort.By(DatasetName, Direction.Asc))
+        .expects(Phrase(phrase), Sort.By(NameProperty, Direction.Asc))
         .returning(IO.pure(Response[IO](Ok)))
 
       val response = routes.call(

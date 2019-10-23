@@ -31,7 +31,7 @@ import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasets
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
@@ -55,13 +55,13 @@ class IODatasetsFinderSpec
 
   "findDatasets" should {
 
-    "return datasets with name, description or creator matching the given phrase sorted by name" in new TestCase {
+    s"return datasets with name, description or creator matching the given phrase sorted by $NameProperty" in new TestCase {
       forAll(datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig) =>
         val phrase                         = phrases.generateOne
         val (dataset1, dataset2, dataset3) = storeDatasets(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
 
         datasetsFinder
-          .findDatasets(phrase, Sort.By(DatasetName, Direction.Asc))
+          .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc))
           .unsafeRunSync() shouldBe List(
           DatasetSearchResult(dataset1.id,
                               dataset1.name,
@@ -82,17 +82,47 @@ class IODatasetsFinderSpec
       }
     }
 
-    "return datasets with name, description or creator matching the given phrase sorted by datePublished" in new TestCase {
+    s"return datasets with name, description or creator matching the given phrase sorted by $DatePublishedProperty" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, dataset2, dataset3) = storeDatasets(
         phrase,
-        datasets.generateOne changePublishedDateTo Some(PublishedDate(LocalDate.now())),
+        datasets.generateOne changePublishedDateTo Some(PublishedDate(LocalDate.now() minusDays 1)),
         datasets.generateOne changePublishedDateTo None,
-        datasets.generateOne changePublishedDateTo Some(PublishedDate(LocalDate.now() minusDays 1))
+        datasets.generateOne changePublishedDateTo Some(PublishedDate(LocalDate.now()))
       )
 
       datasetsFinder
-        .findDatasets(phrase, Sort.By(DatasetDatePublished, Direction.Desc))
+        .findDatasets(phrase, Sort.By(DatePublishedProperty, Direction.Desc))
+        .unsafeRunSync() shouldBe List(
+        DatasetSearchResult(dataset3.id,
+                            dataset3.name,
+                            dataset3.maybeDescription,
+                            dataset3.published,
+                            ProjectsCount(dataset3.project.size)),
+        DatasetSearchResult(dataset1.id,
+                            dataset1.name,
+                            dataset1.maybeDescription,
+                            dataset1.published,
+                            ProjectsCount(dataset1.project.size)),
+        DatasetSearchResult(dataset2.id,
+                            dataset2.name,
+                            dataset2.maybeDescription,
+                            dataset2.published,
+                            ProjectsCount(dataset2.project.size))
+      )
+    }
+
+    s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
+      val phrase = phrases.generateOne
+      val (dataset1, dataset2, dataset3) = storeDatasets(
+        phrase,
+        datasets.generateOne changeProjectsCountTo ProjectsCount(5),
+        datasets.generateOne changeProjectsCountTo ProjectsCount(0),
+        datasets.generateOne changeProjectsCountTo ProjectsCount(2)
+      )
+
+      datasetsFinder
+        .findDatasets(phrase, Sort.By(ProjectsCountProperty, Direction.Asc))
         .unsafeRunSync() shouldBe List(
         DatasetSearchResult(dataset2.id,
                             dataset2.name,
@@ -109,7 +139,7 @@ class IODatasetsFinderSpec
                             dataset1.maybeDescription,
                             dataset1.published,
                             ProjectsCount(dataset1.project.size))
-      ).sortBy(_.published.maybeDate.map(_.value).getOrElse(LocalDate.MIN)).reverse
+      )
     }
 
     "return no results if there's no datasets with name, description or creator matching the given phrase" in new TestCase {
@@ -171,22 +201,40 @@ class IODatasetsFinderSpec
     (dataset1, dataset2, dataset3)
   }
 
-  private def toSingleFileAndCommitWithDataset(dataset: Dataset): List[Json] =
-    dataset.project.flatMap { project =>
+  private def toSingleFileAndCommitWithDataset(dataset: Dataset): List[Json] = dataset.project match {
+    case Nil =>
       singleFileAndCommitWithDataset(
-        projectPath               = project.path,
+        projectPath               = projectPaths.generateOne,
         datasetIdentifier         = dataset.id,
         datasetName               = dataset.name,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
         maybeDatasetCreators      = dataset.published.creators.map(creator => creator.name -> creator.maybeEmail)
-      )
-    }
+      ) flatMap unlinkDatasetFromProject
+    case projects =>
+      projects.flatMap { project =>
+        singleFileAndCommitWithDataset(
+          projectPath               = project.path,
+          datasetIdentifier         = dataset.id,
+          datasetName               = dataset.name,
+          maybeDatasetDescription   = dataset.maybeDescription,
+          maybeDatasetPublishedDate = dataset.published.maybeDate,
+          maybeDatasetCreators      = dataset.published.creators.map(creator => creator.name -> creator.maybeEmail)
+        )
+      }
+  }
 
-  private implicit lazy val localDateOrdering: Ordering[LocalDate] = (x, y) => x compareTo y
+  private def unlinkDatasetFromProject(json: Json) =
+    if (json.hcursor.downField("schema:identifier").as[Option[String]].exists(_.isDefined))
+      json.hcursor.downField("schema:isPartOf").delete.top
+    else Some(json)
 
   private implicit class DatasetOps(dataset: Dataset) {
+
     def changePublishedDateTo(maybeDate: Option[PublishedDate]): Dataset =
       dataset.copy(published = dataset.published.copy(maybeDate = maybeDate))
+
+    def changeProjectsCountTo(projectsCount: ProjectsCount): Dataset =
+      dataset.copy(project = Gen.listOfN(projectsCount.value, datasetProjects).generateOne)
   }
 }

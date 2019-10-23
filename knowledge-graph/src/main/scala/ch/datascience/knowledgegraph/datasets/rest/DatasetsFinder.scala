@@ -77,32 +77,32 @@ private class IODatasetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX text: <http://jena.apache.org/text#>
        |
-       |SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(?project) AS ?projectsCount)
+       |SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(?maybeProject) AS ?projectsCount)
        |WHERE {
        |  {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             text:query (schema:name '$phrase') ;
        |             schema:name ?name ;
-       |             schema:identifier ?identifier ;
-       |             schema:isPartOf ?project .
+       |             schema:identifier ?identifier .
+       |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  } UNION {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             text:query (schema:description '$phrase') ;
        |             schema:name ?name ;
-       |             schema:identifier ?identifier ;
-       |             schema:isPartOf ?project .
+       |             schema:identifier ?identifier .
+       |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  } UNION {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
        |             schema:creator ?creatorResource ;
        |             schema:identifier ?identifier ;
-       |             schema:name ?name ;
-       |             schema:isPartOf ?project .
+       |             schema:name ?name .
        |    ?creatorResource rdf:type <http://schema.org/Person> ;
        |             text:query (schema:name '$phrase') .
+       |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
        |  }
@@ -111,8 +111,9 @@ private class IODatasetsFinder(
        |${`ORDER BY`(sort)}""".stripMargin
 
   private def `ORDER BY`(sort: Sort.By): String = sort.property match {
-    case Sort.DatasetName          => s"ORDER BY ${sort.direction}(?name)"
-    case Sort.DatasetDatePublished => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
+    case Sort.NameProperty          => s"ORDER BY ${sort.direction}(?name)"
+    case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
+    case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
   }
 
   private lazy val addCreators: DatasetSearchResult => IO[DatasetSearchResult] =

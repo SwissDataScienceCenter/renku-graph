@@ -66,6 +66,8 @@ object Generators {
   def stringsOfLength(length: Int Refined Positive = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] =
     listOfN(length, charsGenerator).map(_.mkString(""))
 
+  val paragraphs: Gen[NonBlank] = nonEmptyStringsList(maxElements = 10) map (_.mkString(" ")) map Refined.unsafeApply
+
   def sentenceContaining(phrase: NonBlank): Gen[NonBlank] =
     for {
       prefix <- nonEmptyStrings()

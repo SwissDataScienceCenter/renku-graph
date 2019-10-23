@@ -65,7 +65,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       maybePhrase: ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase],
       maybeSort:   Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]]
   ): F[Response[F]] =
-    (maybePhrase, maybeSort getOrElse Validated.validNel(Sort.By(DatasetName, Direction.Asc)))
+    (maybePhrase, maybeSort getOrElse Validated.validNel(Sort.By(NameProperty, Direction.Asc)))
       .mapN {
         case (phrase, sort) =>
           datasetsSearchEndpoint.searchForDatasets(phrase, sort)
