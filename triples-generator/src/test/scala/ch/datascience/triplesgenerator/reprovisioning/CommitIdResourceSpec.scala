@@ -18,13 +18,11 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import ReProvisioningGenerators._
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.views.RdfResource
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -74,14 +72,6 @@ class CommitIdResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
       forAll(httpUrls, commitIds, relativePaths()) { (url, commitId, path) =>
         CommitIdResource(s"$url/commit/$commitId/$path").as[Try, CommitId] shouldBe Success(commitId)
       }
-    }
-  }
-
-  "rdfResourceRenderer" should {
-
-    "wrap the value into <>" in {
-      val commitIdResource = commitIdResources().generateOne
-      commitIdResource.showAs[RdfResource] shouldBe s"<$commitIdResource>"
     }
   }
 }

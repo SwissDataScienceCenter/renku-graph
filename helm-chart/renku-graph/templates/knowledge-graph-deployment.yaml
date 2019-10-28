@@ -29,7 +29,7 @@ spec:
             - name: RENKU_BASE_URL
               value: https://{{ .Values.global.renku.domain }}
             - name: RENKU_RESOURCES_URL
-              value: https://{{ .Values.global.renku.domain }}/{{ .Values.knowledgeGraph.services.renku.resourcesPath }}
+              value: https://{{ .Values.global.renku.domain }}{{ .Values.knowledgeGraph.services.renku.resourcesPath }}
             - name: JENA_DATASET_NAME
               {{- if .Values.global.graph.jena.dataset }}
               value: {{ .Values.global.graph.jena.dataset }}

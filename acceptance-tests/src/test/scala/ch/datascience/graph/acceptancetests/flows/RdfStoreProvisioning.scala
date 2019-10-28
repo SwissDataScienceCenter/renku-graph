@@ -39,22 +39,20 @@ import org.scalatest.concurrent.Eventually
 
 object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
 
-  def `data in the RDF store`(project: Project, commitId: CommitId, schemaVersion: SchemaVersion): Assertion =
+  def `data in the RDF store`(project:       Project,
+                              commitId:      CommitId,
+                              schemaVersion: SchemaVersion = currentSchemaVersion): Assertion =
     `data in the RDF store`(
       project,
       commitId,
-      triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion)),
-      schemaVersion)
+      triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion)))
 
-  def `data in the RDF store`(project:       Project,
-                              commitId:      CommitId,
-                              triples:       JsonLDTriples,
-                              schemaVersion: SchemaVersion = currentSchemaVersion): Assertion = {
+  def `data in the RDF store`(project: Project, commitId: CommitId, triples: JsonLDTriples): Assertion = {
     val projectId = project.id
 
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples, schemaVersion)
+    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 
     webhookServiceClient
       .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))

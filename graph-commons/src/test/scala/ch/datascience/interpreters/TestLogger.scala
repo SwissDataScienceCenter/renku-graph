@@ -44,11 +44,16 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
   def loggedOnly(expected: LogEntry*): Assertion =
     loggedOnly(expected.toList)
 
+  def loggedOnly(expected: LogEntry, times: Int): Assertion =
+    loggedOnly(List.fill(times)(expected))
+
   def loggedOnly(expected: List[LogEntry]): Assertion =
     invocations.to[List] should contain theSameElementsAs expected
 
   def expectNoLogs(): Unit =
     if (invocations.nonEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")
+
+  def reset(): Unit = invocations.clear()
 
   override def error(t: Throwable)(message: => String): Interpretation[Unit] = {
     invocations += LogEntry(Error, MessageAndThrowable(message, t))

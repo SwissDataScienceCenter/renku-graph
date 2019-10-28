@@ -32,7 +32,6 @@ import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info, Warn}
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.webhookservice.commits.{CommitInfo, LatestCommitFinder}
 import ch.datascience.webhookservice.eventprocessing.StartCommit
@@ -57,7 +56,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(Info("Synchronized Commits with GitLab in 10ms: 0 updates, 0 skipped, 0 failed"))
+      logger.logged(Info(
+        s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 0 skipped, 0 failed"))
     }
 
     "do nothing if the latest eventIds in the Event Log " +
@@ -74,7 +74,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(
-        Info(s"Synchronized Commits with GitLab in 10ms: 0 updates, ${latestEventsList.size} skipped, 0 failed")
+        Info(
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, ${latestEventsList.size} skipped, 0 failed")
       )
     }
 
@@ -105,7 +106,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(Info("Synchronized Commits with GitLab in 10ms: 1 updates, 2 skipped, 0 failed"))
+      logger.logged(Info(
+        s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 1 updates, 2 skipped, 0 failed"))
     }
 
     "do nothing if the latest PushEvent does not exists" in new TestCase {
@@ -125,7 +127,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(Info("Synchronized Commits with GitLab in 10ms: 0 updates, 2 skipped, 0 failed"))
+      logger.logged(Info(
+        s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 2 skipped, 0 failed"))
     }
 
     "not break processing if finding Access Token for one of the event(s) fails" in new TestCase {
@@ -152,7 +155,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         logger.logged(Warn(s"Synchronizing Commits for project ${event.projectId} failed", exception))
       }
       logger.logged(
-        Info(s"Synchronized Commits with GitLab in 10ms: 0 updates, ${latestEventsList.tail.size} skipped, 1 failed")
+        Info(
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, ${latestEventsList.tail.size} skipped, 1 failed")
       )
     }
 
@@ -177,7 +181,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Warn(s"Synchronizing Commits for project ${event1.projectId} failed", exception),
-        Info("Synchronized Commits with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
+        Info(
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -205,7 +210,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Warn(s"Synchronizing Commits for project ${event1.projectId} failed", exception),
-        Info("Synchronized Commits with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
+        Info(
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -237,7 +243,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Warn(s"Synchronizing Commits for project ${event1.projectId} failed", exception),
-        Info("Synchronized Commits with GitLab in 10ms: 0 updates, 1 skipped, 1 failed")
+        Info(
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed")
       )
     }
 
@@ -266,7 +273,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     val commitToEventLog      = mock[IOCommitToEventLog]
     val logger                = TestLogger[IO]()
     val throttler             = mock[Throttler[IO, EventsSynchronization]]
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](expected = ElapsedTime(10))
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val eventsLoader = new IOMissedEventsLoader(
       eventLogLatestEvents,
       accessTokenFinder,

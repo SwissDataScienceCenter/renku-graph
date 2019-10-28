@@ -32,8 +32,8 @@ import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.users.{Email, Name, Username}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
-import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
+import ch.datascience.http.rest.{Links, SortBy}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -126,6 +126,12 @@ object CommonGraphGenerators {
     href <- hrefs
   } yield Link(rel, href)
   implicit val linksObjects: Gen[Links] = nonEmptyList(linkObjects) map Links.apply
+
+  def sortBys[T <: SortBy](sortBy: T): Gen[T#By] =
+    for {
+      property  <- Gen.oneOf(sortBy.properties.to[List])
+      direction <- Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
+    } yield sortBy.By(property, direction)
 
   implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
     subject <- nonEmptyStrings()

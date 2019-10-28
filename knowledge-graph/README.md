@@ -4,14 +4,80 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method  | Path                                                      | Description                                                    |
-|---------|-----------------------------------------------------------|----------------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets/:id```                       | Returns details of the dataset with the given `id`             |
-|  GET    | ```/knowledge-graph/graphql```                            | Returns GraphQL endpoint schema                                |
-|  POST   | ```/knowledge-graph/graphql```                            | GraphQL query endpoint                                         |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name```          | Returns details of the project with the given `namespace/name` |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets``` | Returns datasets of the project with the given `path`          |
-|  GET    | ```/ping```                                               | To check if service is healthy                                 |
+| Method  | Path                                                                    | Description                                                    |
+|---------|-------------------------------------------------------------------------|----------------------------------------------------------------|
+|  GET    | ```/knowledge-graph/datasets?query=<phrase>&sort=<property:asc\desc>``` | Returns datasets matching the given `phrase`.                  |
+|  GET    | ```/knowledge-graph/datasets/:id```                                     | Returns details of the dataset with the given `id`             |
+|  GET    | ```/knowledge-graph/graphql```                                          | Returns GraphQL endpoint schema                                |
+|  POST   | ```/knowledge-graph/graphql```                                          | GraphQL query endpoint                                         |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name```                        | Returns details of the project with the given `namespace/name` |
+|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```               | Returns datasets of the project with the given `path`          |
+|  GET    | ```/ping```                                                             | To check if service is healthy                                 |
+
+#### GET /knowledge-graph/datasets?query=\<phrase\&sort=\<property\>:asc|desc
+
+Finds datasets which `name`, `description` or creator `name` matches the given `phrase`.
+
+NOTES: 
+* the `phrase` query parameter has to be url encoded.
+* the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name`, `datePublished` and `projectsCount`.
+
+**Response**
+
+| Status                     | Description                                            |
+|----------------------------|--------------------------------------------------------|
+| OK (200)                   | If there are datasets for the project                  |
+| BAD_REQUEST (400)          | If the `query` parameter is blank or `sort` is invalid |
+| NOT_FOUND (404)            | If there are no datasets found or no `query` parameter |
+| INTERNAL SERVER ERROR (500)| Otherwise                                              |
+
+Response body example:
+```
+[  
+   {  
+      "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
+      "name":"rmDaYfpehl",
+      "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
+      "published": {
+        "datePublished": "2012-10-14T03:02:25.639Z", // optional property
+        "creator": [
+          {
+            "name": "e wmtnxmcguz"
+          },
+          {
+            "name": "iilmadw vcxabmh",
+            "email": "ticUnrW@cBmrdomoa"             // optional property
+          }
+        ]
+      },
+      "projectsCount": 2,
+      "_links":[  
+         {  
+            "rel":"details",
+            "href":"http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
+         }
+      ]
+   },
+   {  
+      "identifier": "a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
+      "name": "a",
+      "published": {
+        "creator": [
+          {
+            "name": "e wmtnxmcguz"
+          }
+        ]
+      },
+      "projectsCount": 1,
+      "_links":[  
+         {  
+            "rel":"details",
+            "href":"http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+         }
+      ]
+   }
+]
+```
 
 #### GET /knowledge-graph/datasets/:id
 

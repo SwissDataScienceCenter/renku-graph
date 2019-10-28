@@ -32,9 +32,10 @@ import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model._
+import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.syntax._
 import io.circe.{Decoder, HCursor, Json}
@@ -72,7 +73,10 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
           )
         )
 
-        logger.expectNoLogs()
+        logger.loggedOnly(
+          Warn(s"Finding '${project.path}' details finished${executionTimeRecorder.executionTimeInfo}")
+        )
+        logger.reset()
       }
     }
 
@@ -92,7 +96,9 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
       response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No '$path' project found").asJson
 
-      logger.expectNoLogs()
+      logger.loggedOnly(
+        Warn(s"Finding '$path' details finished${executionTimeRecorder.executionTimeInfo}")
+      )
     }
 
     "respond with INTERNAL_SERVER_ERROR if finding project details fails" in new TestCase {
@@ -118,10 +124,16 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val projectFinder     = mock[ProjectFinder[IO]]
-    val renkuResourcesUrl = renkuResourcesUrls.generateOne
-    val logger            = TestLogger[IO]()
-    val getProject        = new ProjectEndpoint[IO](projectFinder, renkuResourcesUrl, logger).getProject _
+    val projectFinder         = mock[ProjectFinder[IO]]
+    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
+    val logger                = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    val getProject = new ProjectEndpoint[IO](
+      projectFinder,
+      renkuResourcesUrl,
+      executionTimeRecorder,
+      logger
+    ).getProject _
   }
 
   private implicit val projectEntityDecoder: EntityDecoder[IO, Project] = jsonOf[IO, Project]

@@ -29,6 +29,7 @@ import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.server.HttpServer
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
@@ -70,19 +71,31 @@ object Microservice extends IOMicroservice {
         gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
         eventsSynchronizationThrottler <- EventsSynchronizationThrottler[IO](gitLabRateLimit = gitLabRateLimit)
         hookTokenCrypto                <- HookTokenCrypto[IO]()
+        executionTimeRecorder          <- ExecutionTimeRecorder[IO](ApplicationLogger)
 
         httpServer = new HttpServer[IO](
           serverPort = 9001,
           serviceRoutes = new MicroserviceRoutes[IO](
-            new IOHookEventEndpoint(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, hookTokenCrypto),
+            new IOHookEventEndpoint(transactor,
+                                    tokenRepositoryUrl,
+                                    gitLabUrl,
+                                    gitLabThrottler,
+                                    hookTokenCrypto,
+                                    executionTimeRecorder),
             new IOHookCreationEndpoint(transactor,
                                        tokenRepositoryUrl,
                                        projectHookUrl,
                                        gitLabUrl,
                                        gitLabThrottler,
-                                       hookTokenCrypto),
+                                       hookTokenCrypto,
+                                       executionTimeRecorder),
             new IOHookValidationEndpoint(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
-            new IOProcessingStatusEndpoint(transactor, tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler)
+            new IOProcessingStatusEndpoint(transactor,
+                                           tokenRepositoryUrl,
+                                           projectHookUrl,
+                                           gitLabUrl,
+                                           gitLabThrottler,
+                                           executionTimeRecorder)
           ).routes
         )
 
@@ -93,7 +106,8 @@ object Microservice extends IOMicroservice {
                                                           tokenRepositoryUrl,
                                                           gitLabUrl,
                                                           gitLabThrottler,
-                                                          eventsSynchronizationThrottler),
+                                                          eventsSynchronizationThrottler,
+                                                          executionTimeRecorder),
                      httpServer
                    ) run args
       } yield exitCode

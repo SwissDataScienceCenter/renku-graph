@@ -21,11 +21,12 @@ package ch.datascience.knowledgegraph.lineage
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.{events, projects}
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
@@ -70,12 +71,27 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
           )
         )
       )
+
+      logger.loggedOnly(
+        Warn(
+          s"Searched for lineage for $projectPath commit: $commit4Id filePath: $resultFile1${executionTimeRecorder.executionTimeInfo}"
+        )
+      )
     }
 
     "return None if there's no lineage for the project" in new InMemoryStoreTestCase {
+      val commitId: events.CommitId   = commitIds.generateOne
+      val filePath: projects.FilePath = filePaths.generateOne
+
       lineageFinder
-        .findLineage(projectPath, commitIds.generateOne, filePaths.generateOne)
+        .findLineage(projectPath, commitId, filePath)
         .unsafeRunSync() shouldBe None
+
+      logger.loggedOnly(
+        Warn(
+          s"Searched for lineage for $projectPath commit: $commitId filePath: $filePath${executionTimeRecorder.executionTimeInfo}"
+        )
+      )
     }
   }
 
@@ -95,10 +111,14 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
     )
     def node(node: Resource): Node = sourceNode(node)
 
-    val lineageFinder = new IOLineageFinder(rdfStoreConfig,
-                                            renkuBaseUrl,
-                                            TestExecutionTimeRecorder[IO](elapsedTimes.generateOne),
-                                            TestLogger())
+    val logger                = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    val lineageFinder = new IOLineageFinder(
+      rdfStoreConfig,
+      renkuBaseUrl,
+      executionTimeRecorder,
+      logger
+    )
 
     private implicit val resourceNameToNodeId: TinyTypeConverter[ResourceName, NodeId] = { name =>
       NodeId.from(name.value.replace(fusekiBaseUrl.value, ""))

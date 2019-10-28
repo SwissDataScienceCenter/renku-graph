@@ -30,7 +30,8 @@ import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
+import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
@@ -62,7 +63,10 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
 
         response.as[List[Json]].unsafeRunSync should contain theSameElementsAs (datasetsList map toJson)
 
-        logger.expectNoLogs()
+        logger.loggedOnly(
+          Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}")
+        )
+        logger.reset()
       }
     }
 
@@ -80,7 +84,9 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
 
       response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No datasets found for '$projectPath'").asJson
 
-      logger.expectNoLogs()
+      logger.loggedOnly(
+        Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}")
+      )
     }
 
     "respond with INTERNAL_SERVER_ERROR if finding datasets fails" in new TestCase {
@@ -110,9 +116,11 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
     val projectDatasetsFinder = mock[ProjectDatasetsFinder[IO]]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val getProjectDatasets = new ProjectDatasetsEndpoint[IO](
       projectDatasetsFinder,
       renkuResourcesUrl,
+      executionTimeRecorder,
       logger
     ).getProjectDatasets _
 

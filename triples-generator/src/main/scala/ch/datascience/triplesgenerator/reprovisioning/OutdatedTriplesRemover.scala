@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -33,16 +34,23 @@ private trait OutdatedTriplesRemover[Interpretation[_]] {
 
 private class IOOutdatedTriplesRemover(
     rdfStoreConfig:          RdfStoreConfig,
+    executionTimeRecorder:   ExecutionTimeRecorder[IO],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfDelete](rdfStoreConfig, logger)
     with OutdatedTriplesRemover[IO] {
 
+  import executionTimeRecorder._
+
   override def removeOutdatedTriples(outdatedTriples: OutdatedTriples): IO[Unit] =
-    for {
-      _ <- remove(outdatedTriples)
-      _ <- removeOrphanAgentTriples()
-    } yield ()
+    measureExecutionTime {
+      for {
+        _ <- remove(outdatedTriples)
+        _ <- removeOrphanProjectTriples()
+        _ <- removeOrphanPersonTriples()
+        _ <- removeOrphanAgentTriples()
+      } yield ()
+    } map logExecutionTime(withMessage = s"Removing outdated triples for '${outdatedTriples.projectResource}' finished")
 
   private def remove(triplesToRemove: OutdatedTriples): IO[Unit] = queryWitNoResult {
     s"""
@@ -98,6 +106,48 @@ private class IOOutdatedTriplesRemover(
        |  } {
        |    ?subject ?p ?o 
        |    BIND (?subject as ?s)
+       |  }
+       |}""".stripMargin
+  }
+
+  private def removeOrphanProjectTriples(): IO[Unit] = queryWitNoResult {
+    s"""
+       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+       |PREFIX prov: <http://www.w3.org/ns/prov#>
+       |PREFIX dcterms: <http://purl.org/dc/terms/>
+       |PREFIX schema: <http://schema.org/>
+       |
+       |DELETE { ?s ?p ?o } 
+       |WHERE {
+       |  {
+       |    ?projectS rdf:type ?projectResource .
+       |    VALUES ?projectResource {schema:Project prov:Location}
+       |    FILTER NOT EXISTS { ?tripleS dcterms:isPartOf|schema:isPartOf ?projectS }
+       |  }
+       |  {
+       |    ?projectS ?p ?o .
+       |    BIND (?projectS as ?s)
+       |  }
+       |}""".stripMargin
+  }
+
+  private def removeOrphanPersonTriples(): IO[Unit] = queryWitNoResult {
+    s"""
+       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+       |PREFIX prov: <http://www.w3.org/ns/prov#>
+       |PREFIX dcterms: <http://purl.org/dc/terms/>
+       |PREFIX schema: <http://schema.org/>
+       |
+       |DELETE { ?s ?p ?o } 
+       |WHERE {
+       |  {
+       |    ?personS rdf:type ?personResource .
+       |    VALUES ?personResource {schema:Person prov:Person}
+       |    FILTER NOT EXISTS { ?tripleS schema:creator ?personS }
+       |  }
+       |  {
+       |    ?personS ?p ?o .
+       |    BIND (?personS as ?s)
        |  }
        |}""".stripMargin
   }

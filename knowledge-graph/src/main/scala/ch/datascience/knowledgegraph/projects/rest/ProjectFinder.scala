@@ -32,7 +32,7 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait ProjectFinder[Interpretation[_]] {
+trait ProjectFinder[Interpretation[_]] {
   def findProject(path: ProjectPath): Interpretation[Option[Project]]
 }
 

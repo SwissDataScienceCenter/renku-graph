@@ -26,7 +26,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.logging.ApplicationLogger
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.literal._
 import io.circe.syntax._
@@ -39,19 +39,23 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class DatasetEndpoint[Interpretation[_]: Effect](
-    datasetFinder:     DatasetFinder[Interpretation],
-    renkuResourcesUrl: RenkuResourcesUrl,
-    logger:            Logger[Interpretation]
+    datasetFinder:         DatasetFinder[Interpretation],
+    renkuResourcesUrl:     RenkuResourcesUrl,
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+    logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
+  import executionTimeRecorder._
   import org.http4s.circe._
 
   def getDataset(identifier: Identifier): Interpretation[Response[Interpretation]] =
-    datasetFinder
-      .findDataset(identifier)
-      .flatMap(toHttpResult(identifier))
-      .recoverWith(httpResult(identifier))
+    measureExecutionTime {
+      datasetFinder
+        .findDataset(identifier)
+        .flatMap(toHttpResult(identifier))
+        .recoverWith(httpResult(identifier))
+    } map logExecutionTimeWhen(finishedSuccessfully(identifier))
 
   private def toHttpResult(
       identifier: Identifier
@@ -67,6 +71,11 @@ class DatasetEndpoint[Interpretation[_]: Effect](
       val errorMessage = ErrorMessage(s"Finding dataset with '$identifier' id failed")
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
+  }
+
+  private def finishedSuccessfully(identifier: Identifier): PartialFunction[Response[Interpretation], String] = {
+    case response if response.status == Ok || response.status == NotFound =>
+      s"Finding '$identifier' dataset finished"
   }
 
   // format: off
@@ -128,12 +137,14 @@ object IODatasetEndpoint {
               contextShift:              ContextShift[IO],
               timer:                     Timer[IO]): IO[DatasetEndpoint[IO]] =
     for {
-      datasetFinder    <- IODatasetFinder(logger = ApplicationLogger)
-      renkuResourceUrl <- RenkuResourcesUrl[IO]()
+      datasetFinder         <- IODatasetFinder(logger = ApplicationLogger)
+      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield
       new DatasetEndpoint[IO](
         datasetFinder,
         renkuResourceUrl,
+        executionTimeRecorder,
         ApplicationLogger
       )
 }

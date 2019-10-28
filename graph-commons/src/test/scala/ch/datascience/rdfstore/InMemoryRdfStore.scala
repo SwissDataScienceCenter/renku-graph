@@ -50,7 +50,6 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import io.circe.{Decoder, HCursor, Json}
 import org.apache.jena.fuseki.main.FusekiServer
-import org.apache.jena.query.DatasetFactory
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 import org.apache.jena.riot.{Lang, RDFDataMgr}
@@ -72,7 +71,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected implicit val timer: Timer[IO]                 = IO.timer(global)
   protected val context:        MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-  private val fusekiServerPort = (shuffle((3000 to 3500).toList) find notUsedPort)
+  private lazy val fusekiServerPort = (shuffle((3000 to 3500).toList) find notUsedPort)
     .getOrElse(throw new Exception("Cannot find not used port for Fuseki"))
 
   private lazy val notUsedPort: Int => Boolean = { port =>
@@ -81,21 +80,40 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       .isValid
   }
 
-  protected val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
+  protected lazy val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
     fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
   )
   protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl
-  import rdfStoreConfig.datasetName
-  private lazy val renkuDataset = DatasetFactory.createTxnMem()
+
+  private lazy val dataset = {
+    import org.apache.jena.graph.NodeFactory
+    import org.apache.jena.query.DatasetFactory
+    import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
+    import org.apache.lucene.store.RAMDirectory
+
+    val entityDefinition: EntityDefinition = {
+      val definition = new EntityDefinition("uri", "name")
+      definition.setPrimaryPredicate(NodeFactory.createURI("http://schema.org/name"))
+      definition.set("description", NodeFactory.createURI("http://schema.org/description"))
+      definition
+    }
+
+    TextDatasetFactory.createLucene(
+      DatasetFactory.create(),
+      new RAMDirectory,
+      new TextIndexConfig(entityDefinition)
+    )
+  }
+
   private lazy val rdfStoreServer: FusekiServer = FusekiServer
     .create()
     .loopback(true)
     .port(fusekiServerPort)
-    .add(s"/$datasetName", renkuDataset)
+    .add(s"/${rdfStoreConfig.datasetName}", dataset)
     .build
 
   protected val sparqlEndpoint: Uri = Uri
-    .fromString(s"$fusekiBaseUrl/$datasetName/sparql")
+    .fromString(s"$fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql")
     .fold(throw _, identity)
 
   private val rdfConnectionResource: Resource[IO, RDFConnection] =
@@ -104,7 +122,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   private def openConnection: IO[RDFConnection] = IO {
     RDFConnectionFuseki
       .create()
-      .destination((fusekiBaseUrl / datasetName).toString)
+      .destination((fusekiBaseUrl / rdfStoreConfig.datasetName).toString)
       .build()
   }
 
@@ -120,8 +138,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   }
 
   before {
-    renkuDataset.asDatasetGraph().clear()
-    renkuDataset.asDatasetGraph().isEmpty shouldBe true
+    dataset.asDatasetGraph().clear()
+    dataset.asDatasetGraph().isEmpty shouldBe true
   }
 
   protected override def afterAll(): Unit = {

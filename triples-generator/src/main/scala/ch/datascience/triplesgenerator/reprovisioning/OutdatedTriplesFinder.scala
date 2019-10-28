@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -35,14 +36,19 @@ private trait OutdatedTriplesFinder[Interpretation[_]] {
 
 private class IOOutdatedTriplesFinder(
     rdfStoreConfig:          RdfStoreConfig,
+    executionTimeRecorder:   ExecutionTimeRecorder[IO],
     schemaVersion:           SchemaVersion,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
     with OutdatedTriplesFinder[IO] {
 
+  import executionTimeRecorder._
+
   override def findOutdatedTriples: OptionT[IO, OutdatedTriples] = OptionT {
-    queryExpecting[Option[OutdatedTriples]](using = query)
+    measureExecutionTime {
+      queryExpecting[Option[OutdatedTriples]](using = query)
+    } map logExecutionTime(withMessage = "Searching for outdated triples finished")
   }
 
   private val query = s"""
@@ -52,11 +58,11 @@ private class IOOutdatedTriplesFinder(
                          |PREFIX schema: <http://schema.org/>
                          |PREFIX dcterms: <http://purl.org/dc/terms/>
                          |
-                         |SELECT ?project ?commit
+                         |SELECT DISTINCT ?project ?commit
                          |WHERE {
                          |  # finding a project having an Activity triple with either no agent or agent with a different version
                          |  {
-                         |  SELECT ?project
+                         |  SELECT DISTINCT ?project
                          |  WHERE {
                          |    {
                          |        ?commit dcterms:isPartOf|schema:isPartOf ?project ;
@@ -76,7 +82,6 @@ private class IOOutdatedTriplesFinder(
                          |        }
                          |    }
                          |  }
-                         |  GROUP BY ?project
                          |  LIMIT 1
                          |  }
                          |  # finding all the commits for the found project with either no agent or agent with a different version
@@ -98,7 +103,6 @@ private class IOOutdatedTriplesFinder(
                          |    }
                          |  }
                          |}
-                         |GROUP BY ?project ?commit
                          |""".stripMargin
 
   private implicit lazy val outdatedTriplesDecoder: Decoder[Option[OutdatedTriples]] =

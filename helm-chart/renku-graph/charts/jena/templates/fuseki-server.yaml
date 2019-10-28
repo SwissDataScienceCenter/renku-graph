@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fuseki-server-sh
+  labels:
+    app: {{ template "jena.name" . }}
+    chart: {{ template "jena.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+type: Opaque
+data:
+  fuseki-server.sh: |-
+    #!/bin/sh
+
+    JAVA=$JAVA_HOME/bin/java
+    JVM_ARGS=${JVM_ARGS:--Xmx1200M}
+    JAR=$FUSEKI_HOME/fuseki-server.jar
+    DATASET_CONFIG=$FUSEKI_BASE/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
+
+    echo Rebuilding Lucene indices...
+    $JAVA -Xmx2G -cp $JAR jena.textindexer --desc=$DATASET_CONFIG
+
+    echo Starting Fuseki...
+    $JAVA $JVM_ARGS -jar $JAR "$@"

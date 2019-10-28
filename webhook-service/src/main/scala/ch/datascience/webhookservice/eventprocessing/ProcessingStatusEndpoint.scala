@@ -31,6 +31,7 @@ import ch.datascience.dbeventlog.commands.{EventLogProcessingStatus, IOEventLogP
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
 import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
@@ -48,20 +49,25 @@ import scala.util.control.NonFatal
 
 class ProcessingStatusEndpoint[Interpretation[_]: Effect](
     hookValidator:          HookValidator[Interpretation],
-    eventsProcessingStatus: EventLogProcessingStatus[Interpretation]
+    eventsProcessingStatus: EventLogProcessingStatus[Interpretation],
+    executionTimeRecorder:  ExecutionTimeRecorder[Interpretation],
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
   import HookValidationResult._
   import ProcessingStatusEndpoint._
   import eventsProcessingStatus._
+  import executionTimeRecorder._
 
-  def fetchProcessingStatus(projectId: ProjectId): Interpretation[Response[Interpretation]] = {
-    for {
-      _        <- validateHook(projectId)
-      response <- findStatus(projectId)
-    } yield response
-  } getOrElseF NotFound(InfoMessage(s"Progress status for project '$projectId' not found")) recoverWith httpResponse
+  def fetchProcessingStatus(projectId: ProjectId): Interpretation[Response[Interpretation]] =
+    measureExecutionTime(
+      {
+        for {
+          _        <- validateHook(projectId)
+          response <- findStatus(projectId)
+        } yield response
+      } getOrElseF NotFound(InfoMessage(s"Progress status for project '$projectId' not found")) recoverWith httpResponse
+    ) map logExecutionTime(withMessage = s"Finding progress status for project '$projectId' finished")
 
   private def validateHook(projectId: ProjectId): OptionT[Interpretation, Unit] = OptionT {
     hookValidator.validateHook(projectId, maybeAccessToken = None) map hookMissingToNone recover noAccessTokenToNone
@@ -110,8 +116,10 @@ class IOProcessingStatusEndpoint(
     tokenRepositoryUrl:      TokenRepositoryUrl,
     projectHookUrl:          ProjectHookUrl,
     gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab]
+    gitLabThrottler:         Throttler[IO, GitLab],
+    executionTimeRecorder:   ExecutionTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends ProcessingStatusEndpoint[IO](
       new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
-      new IOEventLogProcessingStatus(transactor))
+      new IOEventLogProcessingStatus(transactor),
+      executionTimeRecorder)

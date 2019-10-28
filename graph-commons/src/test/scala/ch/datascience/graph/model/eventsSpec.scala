@@ -56,7 +56,7 @@ class ProjectIdSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "be successful for non-negative values" in {
       forAll(nonNegativeInts()) { id =>
-        ProjectId(id).value shouldBe id
+        ProjectId(id.value).value shouldBe id.value
       }
     }
 

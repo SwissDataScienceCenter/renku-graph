@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, Fiber, IO}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
-import org.apache.jena.query.{DatasetFactory, QuerySolution}
+import org.apache.jena.query.QuerySolution
 import org.apache.jena.rdfconnection.RDFConnectionFactory
 
 import scala.collection.mutable.ArrayBuffer
@@ -38,8 +38,28 @@ object RDFStore {
 
   // There's a problem with restarting Jena so this whole weirdness comes due to that fact
   private class JenaInstance {
-    lazy val renkuDataset = DatasetFactory.createTxnMem()
-    lazy val connection   = RDFConnectionFactory.connect(renkuDataset)
+
+    private lazy val dataset = {
+      import org.apache.jena.graph.NodeFactory
+      import org.apache.jena.query.DatasetFactory
+      import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
+      import org.apache.lucene.store.RAMDirectory
+
+      val entityDefinition: EntityDefinition = {
+        val definition = new EntityDefinition("uri", "name")
+        definition.setPrimaryPredicate(NodeFactory.createURI("http://schema.org/name"))
+        definition.set("description", NodeFactory.createURI("http://schema.org/description"))
+        definition
+      }
+
+      TextDatasetFactory.createLucene(
+        DatasetFactory.create(),
+        new RAMDirectory,
+        new TextIndexConfig(entityDefinition)
+      )
+    }
+
+    lazy val connection = RDFConnectionFactory.connect(dataset)
 
     private val jenaFiber = MVar.empty[IO, Fiber[IO, FusekiServer]].unsafeRunSync()
 
@@ -51,7 +71,7 @@ object RDFStore {
                     .create()
                     .loopback(true)
                     .port(jenaPort)
-                    .add("/renku", renkuDataset)
+                    .add("/renku", dataset)
                     .build
                     .start()
                 }.start
@@ -60,7 +80,7 @@ object RDFStore {
 
     def stop(): IO[Unit] = {
       connection.close()
-      renkuDataset.close()
+      dataset.close()
       jenaFiber.tryTake.flatMap {
         case None => IO.unit
         case Some(fiber) =>

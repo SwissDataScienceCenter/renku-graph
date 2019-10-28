@@ -80,7 +80,7 @@ knowledgeGraph:
     renku:
       ## Renku knowledge-graph resources path e.g. `knowledge-graph` would assume
       ## Renku resource are available at: https://{global.renku.domain}/knowledge-graph
-      resourcesPath: "knowledge-graph"
+      resourcesPath: "/knowledge-graph"
 
 sentry:
   enabled: false

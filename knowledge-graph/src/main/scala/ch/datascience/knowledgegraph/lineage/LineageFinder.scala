@@ -24,7 +24,6 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, FullProjectPath, ProjectPath}
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -57,7 +56,7 @@ class IOLineageFinder(
         edges        <- queryExpecting[Set[Edge]](using = query(projectPath, commitId, filePath))
         maybeLineage <- toLineage(edges)
       } yield maybeLineage
-    } flatMap logExecutionTime(projectPath, commitId, filePath)
+    } map logExecutionTimeWhen(lineageFound(projectPath, commitId, filePath))
 
   private lazy val toLineage: Set[Edge] => IO[Option[Lineage]] = {
     case edges if edges.isEmpty => IO.pure(Option.empty)
@@ -69,14 +68,12 @@ class IOLineageFinder(
       (nodes, edge) => nodes + edge.source + edge.target
     )
 
-  private def logExecutionTime(
+  private def lineageFound(
       projectPath: ProjectPath,
       commitId:    CommitId,
       filePath:    FilePath
-  ): ((ElapsedTime, Option[Lineage])) => IO[Option[Lineage]] = {
-    case (elapsedTime, maybeLineage) =>
-      logger.info(s"Found lineage for $projectPath commit: $commitId filePath: $filePath in ${elapsedTime}ms")
-      IO.pure(maybeLineage)
+  ): PartialFunction[Option[Lineage], String] = {
+    case _ => s"Searched for lineage for $projectPath commit: $commitId filePath: $filePath"
   }
 
   private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath): String = {
@@ -170,13 +167,14 @@ object IOLineageFinder {
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[LineageFinder[IO]] =
     for {
-      config       <- rdfStoreConfig
-      renkuBaseUrl <- renkuBaseUrl
+      config                <- rdfStoreConfig
+      renkuBaseUrl          <- renkuBaseUrl
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](logger)
     } yield
       new IOLineageFinder(
         config,
         renkuBaseUrl,
-        new ExecutionTimeRecorder[IO],
+        executionTimeRecorder,
         logger
       )
 }

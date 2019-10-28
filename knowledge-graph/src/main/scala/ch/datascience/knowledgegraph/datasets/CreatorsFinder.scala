@@ -53,7 +53,7 @@ private class CreatorsFinder(
        |SELECT DISTINCT ?creatorEmail ?creatorName 
        |WHERE {
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
-       |           rdfs:label "$identifier" ;
+       |           schema:identifier "$identifier" ;
        |           schema:creator ?creatorResource .
        |  OPTIONAL { ?creatorResource rdf:type <http://schema.org/Person> ;
        |                              schema:email ?creatorEmail . } .         

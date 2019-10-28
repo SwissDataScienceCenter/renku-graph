@@ -19,12 +19,15 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import ReProvisioningGenerators._
+import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FullProjectPath
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Warn
+import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import org.scalatest.Matchers._
@@ -62,6 +65,8 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
         be(Some(OutdatedTriples(ProjectResource(FullProjectPath(renkuBaseUrl, project2).toString), Set(project2OutdatedCommit))))
       )
       // format: on
+
+      logger.loggedOnly(Warn(s"Searching for outdated triples finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "return all project's commits having triples related to agent with version different than the current one" in new TestCase {
@@ -132,8 +137,10 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
   }
 
   private trait TestCase {
-    val schemaVersion = schemaVersions.generateOne
-    val triplesFinder = new IOOutdatedTriplesFinder(rdfStoreConfig, schemaVersion, TestLogger())
+    val schemaVersion         = schemaVersions.generateOne
+    val logger                = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    val triplesFinder         = new IOOutdatedTriplesFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger)
   }
 
   private implicit class CommitIdResouceOps(commitIdResource: CommitIdResource) {

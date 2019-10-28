@@ -28,7 +28,7 @@ import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.Links
 import Links._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.logging.ApplicationLogger
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Encoder
@@ -44,16 +44,20 @@ import scala.util.control.NonFatal
 class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     projectDatasetsFinder: ProjectDatasetsFinder[Interpretation],
     renkuResourcesUrl:     RenkuResourcesUrl,
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
+  import executionTimeRecorder._
   import org.http4s.circe._
 
   def getProjectDatasets(projectPath: ProjectPath): Interpretation[Response[Interpretation]] =
-    projectDatasetsFinder
-      .findProjectDatasets(projectPath)
-      .flatMap(toHttpResult(projectPath))
-      .recoverWith(httpResult(projectPath))
+    measureExecutionTime {
+      projectDatasetsFinder
+        .findProjectDatasets(projectPath)
+        .flatMap(toHttpResult(projectPath))
+        .recoverWith(httpResult(projectPath))
+    } map logExecutionTimeWhen(finishedSuccessfully(projectPath))
 
   private def toHttpResult(
       projectPath: ProjectPath
@@ -69,6 +73,11 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
       val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
+  }
+
+  private def finishedSuccessfully(projectPath: ProjectPath): PartialFunction[Response[Interpretation], String] = {
+    case response if response.status == Ok || response.status == NotFound =>
+      s"Finding '$projectPath' datasets finished"
   }
 
   private implicit val datasetEncoder: Encoder[(Identifier, Name)] = Encoder.instance[(Identifier, Name)] {
@@ -89,13 +98,15 @@ object IOProjectDatasetsEndpoint {
               contextShift:              ContextShift[IO],
               timer:                     Timer[IO]): IO[ProjectDatasetsEndpoint[IO]] =
     for {
-      rdfStoreConfig   <- RdfStoreConfig[IO]()
-      renkuBaseUrl     <- RenkuBaseUrl[IO]()
-      renkuResourceUrl <- RenkuResourcesUrl[IO]()
+      rdfStoreConfig        <- RdfStoreConfig[IO]()
+      renkuBaseUrl          <- RenkuBaseUrl[IO]()
+      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield
       new ProjectDatasetsEndpoint[IO](
         new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
         renkuResourceUrl,
+        executionTimeRecorder,
         ApplicationLogger
       )
 }

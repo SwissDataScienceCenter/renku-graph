@@ -293,7 +293,6 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     val context = MonadError[Try, Throwable]
 
     val eventBody        = eventBodies.generateOne
-    val elapsedTime      = elapsedTimes.generateOne
     val maybeAccessToken = Gen.option(accessTokens).generateOne
 
     val eventsDeserialiser    = mock[TryCommitEventsDeserialiser]
@@ -304,7 +303,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     val eventLogMarkNew       = mock[TryEventLogMarkNew]
     val eventLogMarkFailed    = mock[TryEventLogMarkFailed]
     val logger                = TestLogger[Try]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[Try](expected = elapsedTime)
+    val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger)
     val eventProcessor = new CommitEventProcessor[Try](
       eventsDeserialiser,
       accessTokenFinder,
@@ -353,7 +352,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     def logSummary(commits: NonEmptyList[Commit], uploaded: Int, failed: Int): Assertion =
       logger.logged(
         Info(
-          s"${commonLogMessage(commits.head)} processed in ${elapsedTime}ms: " +
+          s"${commonLogMessage(commits.head)} processed in ${executionTimeRecorder.elapsedTime}ms: " +
             s"${commits.size} commits, $uploaded commits uploaded, $failed commits failed"
         )
       )

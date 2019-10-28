@@ -18,12 +18,20 @@
 
 package ch.datascience.knowledgegraph
 
+import cats.data.{Validated, ValidatedNel}
 import cats.effect.ConcurrentEffect
+import cats.implicits._
 import ch.datascience.graph.http.server.binders.ProjectPath._
-import ch.datascience.knowledgegraph.datasets.rest.{DatasetEndpoint, DatasetId, ProjectDatasetsEndpoint}
+import ch.datascience.http.rest.SortBy.Direction
+import ch.datascience.http.server.QueryParameterTools._
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.query
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
+import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.QueryEndpoint
 import ch.datascience.knowledgegraph.projects.rest.ProjectEndpoint
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{ParseFailure, Response}
 
 import scala.language.higherKinds
 
@@ -31,7 +39,8 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     queryEndpoint:           QueryEndpoint[F],
     projectEndpoint:         ProjectEndpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
-    datasetEndpoint:         DatasetEndpoint[F]
+    datasetEndpoint:         DatasetEndpoint[F],
+    datasetsSearchEndpoint:  DatasetsSearchEndpoint[F]
 ) extends Http4sDsl[F] {
 
   import datasetEndpoint._
@@ -43,6 +52,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   // format: off
   lazy val routes: HttpRoutes[F] = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"                                                                          => Ok("pong")
+    case           GET  -> Root / "knowledge-graph" / "datasets" :? query(maybePhrase) +& sort(maybeSortBy)       => searchForDatasets(maybePhrase, maybeSortBy)
     case           GET  -> Root / "knowledge-graph" / "datasets" / DatasetId(id)                                  => getDataset(id)
     case           GET  -> Root / "knowledge-graph" / "graphql"                                                   => schema
     case request @ POST -> Root / "knowledge-graph" / "graphql"                                                   => handleQuery(request)
@@ -50,4 +60,15 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case           GET  -> Root / "knowledge-graph" / "projects" / Namespace(namespace) / Name(name) / "datasets" => getProjectDatasets(namespace / name)
   }
   // format: on
+
+  private def searchForDatasets(
+      maybePhrase: ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase],
+      maybeSort:   Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]]
+  ): F[Response[F]] =
+    (maybePhrase, maybeSort getOrElse Validated.validNel(Sort.By(NameProperty, Direction.Asc)))
+      .mapN {
+        case (phrase, sort) =>
+          datasetsSearchEndpoint.searchForDatasets(phrase, sort)
+      }
+      .fold(toBadRequest(), identity)
 }

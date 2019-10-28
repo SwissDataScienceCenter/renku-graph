@@ -21,12 +21,13 @@ package ch.datascience.knowledgegraph.lineage
 import ch.datascience.generators.Generators._
 import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.lineage.model._
+import eu.timepit.refined.auto._
 import org.scalacheck.{Arbitrary, Gen}
 
 object LineageGenerators {
 
-  implicit val nodeIds:    Gen[NodeId]    = nonEmptyStrings() map NodeId.apply
-  implicit val nodeLabels: Gen[NodeLabel] = nonEmptyStrings() map NodeLabel.apply
+  implicit val nodeIds:    Gen[NodeId]    = nonBlankStrings(minLength = 3) map (_.value) map NodeId.apply
+  implicit val nodeLabels: Gen[NodeLabel] = nonBlankStrings(minLength = 3) map (_.value) map NodeLabel.apply
 
   implicit val sourceNodes: Gen[SourceNode] = for {
     id    <- nodeIds

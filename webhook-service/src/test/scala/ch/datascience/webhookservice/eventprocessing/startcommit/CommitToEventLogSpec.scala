@@ -210,14 +210,13 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
     val startCommit = startCommits.generateOne
     val projectId   = startCommit.project.id
-    val elapsedTime = elapsedTimes.generateOne
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val commitEventSender     = mock[TryCommitEventSender]
     val commitEventsSource    = mock[TryCommitEventsSourceBuilder]
     val eventsFlowBuilder     = mock[CommitEventsSourceBuilder.EventsFlowBuilder[Try]]
     val logger                = TestLogger[Try]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[Try](expected = elapsedTime)
+    val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger)
     val commitToEventLog = new CommitToEventLog[Try](
       accessTokenFinder,
       commitEventsSource,
@@ -228,7 +227,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
     def successfulStoring(startCommit: StartCommit, commitEvents: Int, stored: Int, failed: Int): String =
       s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}: " +
-        s"$commitEvents Commit Events generated, $stored stored in the Event Log, $failed failed in ${elapsedTime}ms"
+        s"$commitEvents Commit Events generated, $stored stored in the Event Log, $failed failed in ${executionTimeRecorder.elapsedTime}ms"
 
     def failedFinding(startCommit: StartCommit): String =
       s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}: " +

@@ -26,7 +26,7 @@ import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogMarkAllNew}
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.logging.ApplicationLogger
+import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.config.TriplesGeneration
@@ -127,10 +127,11 @@ object IOReProvisioner {
       schemaVersion  <- SchemaVersionFinder[IO](triplesGeneration)
       initialDelay <- find[IO, FiniteDuration]("re-provisioning-initial-delay", configuration).flatMap(delay =>
                        ME.fromEither(ReProvisioningDelay.from(delay)))
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield
       new ReProvisioner[IO](
-        new IOOutdatedTriplesFinder(rdfStoreConfig, schemaVersion, logger),
-        new IOOutdatedTriplesRemover(rdfStoreConfig, logger),
+        new IOOutdatedTriplesFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger),
+        new IOOutdatedTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger),
         new IOOrphanMailtoNoneRemover(rdfStoreConfig, logger),
         new EventLogMarkAllNew[IO](dbTransactor),
         new EventLogFetch[IO](dbTransactor),

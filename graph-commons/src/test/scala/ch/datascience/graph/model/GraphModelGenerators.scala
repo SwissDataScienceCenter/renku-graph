@@ -46,7 +46,7 @@ object GraphModelGenerators {
     )
     .map(Identifier.apply)
   implicit val datasetNames:          Gen[Name]          = nonEmptyStrings() map Name.apply
-  implicit val datasetDescriptions:   Gen[Description]   = nonEmptyStrings(maxLength = 1000) map Description.apply
+  implicit val datasetDescriptions:   Gen[Description]   = paragraphs map (_.value) map Description.apply
   implicit val datasetPublishedDates: Gen[PublishedDate] = localDatesNotInTheFuture map PublishedDate.apply
   implicit val datasetPartNames:      Gen[PartName]      = nonEmptyStrings() map PartName.apply
   implicit val datasetPartLocations: Gen[PartLocation] =
