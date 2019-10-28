@@ -39,7 +39,7 @@ before_install:
   - sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.6 2
 install:
   - travis_retry sudo pip3 install -U pip
-  - travis_retry sudo pip3 install "chartpress>=0.2.1" "ruamel.yaml==0.15.54"
+  - travis_retry sudo pip3 install "chartpress==0.3.2" "ruamel.yaml==0.15.54"
   # Installing Helm
   - wget -q ${HELM_URL}/${HELM_TGZ}
   - tar xzfv ${HELM_TGZ}
