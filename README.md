@@ -20,11 +20,12 @@ sbt clean test && sbt "project acceptance-tests" test
 
 #### Releasing
 
-- create a release branch,
-- set the upstream on the branch with ```git push --set-upstream origin <release-branch-name>```,
-- create a release with ```sbt release```; enter relevant versions for the release and the snapshot; do not choose to push the new commits,
-- create a new branch for the new snapshot,
-- checkout the release branch and hard reset to the pre-new-snapshot commit with ```git reset --hard HEAD~1```,
-- push the release branch with ```git push --follow-tags origin <release-branch-name>```,
-- checkout the new snapshot branch and push it,
-- create PRs for both branches; remember to merge the release PR first.
+The standard release process is done by Travis and it happens automatically on a Pull Request merge to master.
+
+#### Hotfixes
+
+In a case of hoftixes, changes to a relevant commit/tag needs to be done and pushed to a special branch with name following the `hotfix-<major>.<minor>` pattern. Once the fix is pushed, Travis will automatically release a new hotfix version according to the versions set in `version.sbt` and `helm-chart/renku-graph/Chart.yaml`. Both mentioned files needs to be updated manually so 
+- version in the `version.sbt` has to follow `0.10.1-SNAPSHOT`
+- version in the `helm-chart/renku-graph/Chart.yaml` has to follow `0.10.1-706fb4d`
+
+Additionally, a change to the version bump scheme needs to be done in the `build.sbt` and the default `releaseVersionBump := sbtrelease.Version.Bump.Minor` has to become `releaseVersionBump := sbtrelease.Version.Bump.Bugfix`.
