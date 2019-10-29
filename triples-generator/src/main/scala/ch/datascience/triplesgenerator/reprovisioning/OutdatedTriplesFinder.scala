@@ -120,7 +120,7 @@ private class IOOutdatedTriplesFinder(
          |WHERE {
          |  VALUES ?p { dcterms:isPartOf schema:isPartOf }
          |  {
-         |	  ?commit ?p ${projectResource.showAs[RdfResource]} ;
+         |    ?commit ?p ${projectResource.showAs[RdfResource]} ;
          |            rdf:type prov:Activity ;
          |            prov:agent ?agent .
          |    ?agent  rdf:type prov:SoftwareAgent ;
@@ -129,7 +129,7 @@ private class IOOutdatedTriplesFinder(
          |  }
          |  UNION
          |  {
-         |	  ?commit ?p ${projectResource.showAs[RdfResource]} ;
+         |    ?commit ?p ${projectResource.showAs[RdfResource]} ;
          |            rdf:type prov:Activity .
          |    FILTER NOT EXISTS {
          |      ?commit prov:agent ?agent .
