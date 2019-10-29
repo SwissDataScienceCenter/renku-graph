@@ -65,5 +65,4 @@ deploy:
     script: bash ./.travis/travis-hotfix.sh
     on:
       all_branches: true
-      condition: $TRAVIS_BRANCH =~ ^(hotfix-\\d+\\.\\d+(\\.\\d+)?)$
       repo: SwissDataScienceCenter/renku-graph
