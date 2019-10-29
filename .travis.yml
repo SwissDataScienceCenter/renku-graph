@@ -2,7 +2,7 @@ dist: xenial
 branches:
   only:
     - master
-    - "(^hotfix-\\d+\\.\\d+(\\.\\d+)?$)|(^\\d+\\.\\d+\\.\\d+$)"
+    - "/(^hotfix-\\d+\\.\\d+(\\.\\d+)?$)|(^\\d+\\.\\d+\\.\\d+$)/"
 language: scala
 jdk: openjdk8
 scala:
@@ -65,5 +65,5 @@ deploy:
     script: bash ./.travis/travis-hotfix.sh
     on:
       all_branches: true
-      condition: $TRAVIS_BRANCH =~ "/^hotfix-\\d+\\.\\d+(\\.\\d+)?$/"
+      condition: $TRAVIS_BRANCH =~ ^(hotfix-\\d+\\.\\d+(\\.\\d+)?)$
       repo: SwissDataScienceCenter/renku-graph
