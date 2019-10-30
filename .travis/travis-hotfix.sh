@@ -20,7 +20,8 @@ set -e
 
 # if this build is not trigger by a tag
 COMMIT_MESSAGE_PATTERN="Setting version to .*"
-if [[ -z $TRAVIS_TAG ]] && [[ ! $TRAVIS_COMMIT_MESSAGE =~ $COMMIT_MESSAGE_PATTERN ]]; then
+BRANCH_PATTERN="^hotfix-[0-9]+\.[0-9]+(\.[0-9]+)?$"
+if [[ -z $TRAVIS_TAG ]] && [[ ! $TRAVIS_COMMIT_MESSAGE =~ $COMMIT_MESSAGE_PATTERN ]] && [[ $TRAVIS_BRANCH =~ $BRANCH_PATTERN ]]; then
   # fixing git setup
   echo "Fixing git setup for $TRAVIS_BRANCH"
   git checkout ${TRAVIS_BRANCH}
@@ -34,20 +35,4 @@ if [[ -z $TRAVIS_TAG ]] && [[ ! $TRAVIS_COMMIT_MESSAGE =~ $COMMIT_MESSAGE_PATTER
 
   # releasing graph-services
   sbt "release skip-tests default-tag-exists-answer k  with-defaults"
-
-  # push the charts and images
-  make login
-
-  # decrypt ssh key to use for docker hub login
-  openssl aes-256-cbc -K $encrypted_b7eb5d86688a_key -iv $encrypted_b7eb5d86688a_iv -in deploy_rsa.enc -out deploy_rsa -d
-  chmod 600 deploy_rsa
-  eval $(ssh-agent -s)
-  ssh-add deploy_rsa
-
-  # build charts/images and push
-  cd helm-chart
-  chartpress --push --publish-chart
-  git diff
-  # push also images tagged with "latest"
-  chartpress --tag latest --push
 fi

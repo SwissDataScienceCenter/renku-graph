@@ -25,7 +25,6 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
-import io.circe.{Decoder, HCursor}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -43,91 +42,127 @@ private class IOOutdatedTriplesFinder(
     extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
     with OutdatedTriplesFinder[IO] {
 
+  import ch.datascience.graph.model.views.RdfResource
   import executionTimeRecorder._
+  import io.circe.Decoder
+  import io.circe.Decoder._
 
   override def findOutdatedTriples: OptionT[IO, OutdatedTriples] = OptionT {
     measureExecutionTime {
-      queryExpecting[Option[OutdatedTriples]](using = query)
+      {
+        for {
+          projectPath     <- maybeProjectWithOutdatedAgent orElse maybeProjectWithNoAgent
+          outdatedTriples <- findOutdatedTriples(projectPath)
+        } yield outdatedTriples
+      }.value
     } map logExecutionTime(withMessage = "Searching for outdated triples finished")
   }
 
-  private val query = s"""
-                         |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                         |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                         |PREFIX prov: <http://www.w3.org/ns/prov#>
-                         |PREFIX schema: <http://schema.org/>
-                         |PREFIX dcterms: <http://purl.org/dc/terms/>
-                         |
-                         |SELECT DISTINCT ?project ?commit
-                         |WHERE {
-                         |  # finding a project having an Activity triple with either no agent or agent with a different version
-                         |  {
-                         |  SELECT DISTINCT ?project
-                         |  WHERE {
-                         |    {
-                         |        ?commit dcterms:isPartOf|schema:isPartOf ?project ;
-                         |                rdf:type prov:Activity ;
-                         |                prov:agent ?agent .
-                         |        ?agent  rdf:type prov:SoftwareAgent ;
-                         |                rdfs:label ?version .
-                         |        FILTER (?version != "renku $schemaVersion")
-                         |    }
-                         |    UNION
-                         |    {
-                         |        ?commit dcterms:isPartOf|schema:isPartOf ?project ;
-                         |                rdf:type prov:Activity .
-                         |        FILTER NOT EXISTS {
-                         |          ?commit prov:agent ?agent .
-                         |          ?agent  rdf:type prov:SoftwareAgent .
-                         |        }
-                         |    }
-                         |  }
-                         |  LIMIT 1
-                         |  }
-                         |  # finding all the commits for the found project with either no agent or agent with a different version
-                         |  {
-                         |	  ?commit dcterms:isPartOf|schema:isPartOf ?project ;
-                         |            rdf:type prov:Activity ;
-                         |            prov:agent ?agent .
-                         |    ?agent  rdf:type prov:SoftwareAgent ;
-                         |            rdfs:label ?version .
-                         |    FILTER (?version != "renku $schemaVersion")
-                         |  }
-                         |  UNION
-                         |  {
-                         |	  ?commit dcterms:isPartOf|schema:isPartOf ?project ;
-                         |            rdf:type prov:Activity .
-                         |    FILTER NOT EXISTS {
-                         |      ?commit prov:agent ?agent .
-                         |      ?agent  rdf:type prov:SoftwareAgent .
-                         |    }
-                         |  }
-                         |}
-                         |""".stripMargin
-
-  private implicit lazy val outdatedTriplesDecoder: Decoder[Option[OutdatedTriples]] =
-    _.downField("results")
-      .downField("bindings")
-      .as[List[(ProjectResource, CommitIdResource)]]
-      .map(toMaybeOutdatedTriples)
-
-  private implicit lazy val jsonDecoder: Decoder[(ProjectResource, CommitIdResource)] = (cursor: HCursor) => {
-    for {
-      maybeProjectResource <- cursor.downField("project").downField("value").as[ProjectResource]
-      maybeCommitId        <- cursor.downField("commit").downField("value").as[CommitIdResource]
-    } yield maybeProjectResource -> maybeCommitId
+  private def maybeProjectWithOutdatedAgent = OptionT {
+    queryExpecting[Option[ProjectResource]] {
+      s"""
+         |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+         |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+         |PREFIX prov: <http://www.w3.org/ns/prov#>
+         |PREFIX schema: <http://schema.org/>
+         |PREFIX dcterms: <http://purl.org/dc/terms/>
+         |
+         |SELECT ?project
+         |WHERE {
+         |  ?agent rdf:type prov:SoftwareAgent ;
+         |         rdfs:label ?version .
+         |  FILTER (?version != "renku $schemaVersion")
+         |  VALUES ?p { dcterms:isPartOf schema:isPartOf }
+         |  ?commit prov:agent ?agent ;
+         |	        rdf:type prov:Activity ;
+         |	        ?p ?project .
+         |}
+         |LIMIT 1
+         |""".stripMargin
+    }
   }
 
-  private lazy val toMaybeOutdatedTriples: List[(ProjectResource, CommitIdResource)] => Option[OutdatedTriples] = {
-    case Nil => None
-    case (projectResource, commitId) +: tail =>
-      Some {
-        OutdatedTriples(
-          projectResource,
-          commits = tail.foldLeft(Set(commitId)) {
-            case (allCommits, (projectResource, commit)) => allCommits + commit
-          }
-        )
+  private def maybeProjectWithNoAgent = OptionT {
+    queryExpecting[Option[ProjectResource]] {
+      """
+        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        |PREFIX prov: <http://www.w3.org/ns/prov#>
+        |PREFIX schema: <http://schema.org/>
+        |PREFIX dcterms: <http://purl.org/dc/terms/>
+        |
+        |SELECT ?project
+        |WHERE {
+        |  VALUES ?p { dcterms:isPartOf schema:isPartOf }
+        |  {
+        |    ?commit ?p ?project ;
+        |            rdf:type prov:Activity .
+        |    FILTER NOT EXISTS {
+        |      ?commit prov:agent ?agent .
+        |      ?agent rdf:type prov:SoftwareAgent .
+        |    }
+        |  }
+        |}
+        |LIMIT 1
+        |""".stripMargin
+    }
+  }
+
+  private def findOutdatedTriples(projectResource: ProjectResource) = OptionT {
+    queryExpecting[List[CommitIdResource]] {
+      s"""
+         |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+         |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+         |PREFIX prov: <http://www.w3.org/ns/prov#>
+         |PREFIX schema: <http://schema.org/>
+         |PREFIX dcterms: <http://purl.org/dc/terms/>
+         |
+         |SELECT ?commit
+         |WHERE {
+         |  VALUES ?p { dcterms:isPartOf schema:isPartOf }
+         |  {
+         |    ?commit ?p ${projectResource.showAs[RdfResource]} ;
+         |            rdf:type prov:Activity ;
+         |            prov:agent ?agent .
+         |    ?agent  rdf:type prov:SoftwareAgent ;
+         |            rdfs:label ?version .
+         |    FILTER (?version != "renku $schemaVersion")
+         |  }
+         |  UNION
+         |  {
+         |    ?commit ?p ${projectResource.showAs[RdfResource]} ;
+         |            rdf:type prov:Activity .
+         |    FILTER NOT EXISTS {
+         |      ?commit prov:agent ?agent .
+         |      ?agent rdf:type prov:SoftwareAgent .
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    } map toMaybeOutdatedTriples(projectResource)
+  }
+
+  private implicit lazy val maybeProjectResourceDecoder: Decoder[Option[ProjectResource]] =
+    _.downField("results")
+      .downField("bindings")
+      .as(decodeList(projectResources))
+      .map {
+        case Nil                  => None
+        case projectResource +: _ => Some(projectResource)
       }
+
+  private lazy val projectResources: Decoder[ProjectResource] =
+    _.downField("project").downField("value").as[ProjectResource]
+
+  private implicit lazy val outdatedCommitIdResources: Decoder[List[CommitIdResource]] =
+    _.downField("results")
+      .downField("bindings")
+      .as(decodeList(commitIdResources))
+
+  private lazy val commitIdResources: Decoder[CommitIdResource] =
+    _.downField("commit").downField("value").as[CommitIdResource]
+
+  private def toMaybeOutdatedTriples(projectPath: ProjectResource): List[CommitIdResource] => Option[OutdatedTriples] = {
+    case Nil             => None
+    case commitResources => Some(OutdatedTriples(projectPath, commitResources.toSet))
   }
 }
