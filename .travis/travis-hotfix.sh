@@ -18,21 +18,12 @@
 
 set -e
 
-# if this build is not trigger by a tag
+source $(dirname "$0")/travis-functions.sh
+
 COMMIT_MESSAGE_PATTERN="Setting version to .*"
 BRANCH_PATTERN="^hotfix-[0-9]+\.[0-9]+(\.[0-9]+)?$"
-if [[ -z $TRAVIS_TAG ]] && [[ ! $TRAVIS_COMMIT_MESSAGE =~ $COMMIT_MESSAGE_PATTERN ]] && [[ $TRAVIS_BRANCH =~ $BRANCH_PATTERN ]]; then
-  # fixing git setup
-  echo "Fixing git setup for $TRAVIS_BRANCH"
-  git checkout ${TRAVIS_BRANCH}
-  git branch -u origin/${TRAVIS_BRANCH}
-  git config branch.${TRAVIS_BRANCH}.remote origin
-  git config branch.${TRAVIS_BRANCH}.merge refs/heads/${TRAVIS_BRANCH}
-  git config --global user.name "RenkuGraphBot"
-  git config --global user.email "jakub.chrobasik@eplf.ch"
-  git config credential.helper "store --file=.git/credentials"
-  echo "https://${GITHUB_TOKEN}:@github.com" >.git/credentials
 
-  # releasing graph-services
-  sbt "release skip-tests default-tag-exists-answer k  with-defaults"
+# create a release if this build is not triggered by a tag but from a push to the hotfix branch
+if [[ -z $TRAVIS_TAG ]] && [[ ! $TRAVIS_COMMIT_MESSAGE =~ $COMMIT_MESSAGE_PATTERN ]] && [[ $TRAVIS_BRANCH =~ $BRANCH_PATTERN ]]; then
+  createRelease
 fi
