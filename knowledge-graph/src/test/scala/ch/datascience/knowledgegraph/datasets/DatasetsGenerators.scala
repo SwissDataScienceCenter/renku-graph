@@ -45,7 +45,7 @@ object DatasetsGenerators {
   implicit lazy val datasetPublishingInfos: Gen[DatasetPublishing] = for {
     maybePublishedDate <- Gen.option(datasetPublishedDates)
     creators           <- nonEmptySet(datasetCreators, maxElements = 4)
-  } yield DatasetPublishing(maybePublishedDate, creators.toSortedSet)
+  } yield DatasetPublishing(maybePublishedDate, creators)
 
   private implicit lazy val datasetCreatorsOrdering: Order[DatasetCreator] =
     (creator1: DatasetCreator, creator2: DatasetCreator) => creator1.name.value compareTo creator2.name.value

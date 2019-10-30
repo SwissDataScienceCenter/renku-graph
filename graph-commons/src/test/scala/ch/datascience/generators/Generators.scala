@@ -95,12 +95,15 @@ object Generators {
       list <- Gen.listOfN(size, generator)
     } yield NonEmptyList.fromListUnsafe(list)
 
-  def nonEmptySet[T](generator: Gen[T], minElements: Int Refined Positive = 1, maxElements: Int Refined Positive = 5)(
-      implicit T:               Order[T]): Gen[NonEmptySet[T]] =
+  def nonEmptySet[T](
+      generator:   Gen[T],
+      minElements: Int Refined Positive = 1,
+      maxElements: Int Refined Positive = 5
+  ): Gen[Set[T]] =
     for {
       size <- choose(minElements.value, maxElements.value)
       set  <- Gen.containerOfN[Set, T](size, generator)
-    } yield NonEmptySet.of(set.head, set.tail.toList: _*)
+    } yield set
 
   def listOf[T](generator: Gen[T], maxElements: Int Refined Positive = 5): Gen[List[T]] =
     for {

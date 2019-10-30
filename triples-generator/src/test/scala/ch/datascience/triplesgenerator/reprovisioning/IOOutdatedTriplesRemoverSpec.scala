@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.setOf
+import ch.datascience.generators.Generators.nonEmptySet
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FullProjectPath
@@ -116,10 +116,10 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
       val project                 = projectPaths.generateOne
       val outdatedProjectCommit   = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
       val outdatedCommitDatasetId = datasetIds.generateOne
-      val outdatedDatasetCreators = setOf(datasetCreators).generateOne
+      val outdatedDatasetCreators = nonEmptySet(datasetCreators).generateOne
       val upToDateProjectCommit   = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
       val upToDateCommitDatasetId = datasetIds.generateOne
-      val upToDateDatasetCreators = setOf(datasetCreators).generateOne
+      val upToDateDatasetCreators = nonEmptySet(datasetCreators).generateOne
 
       loadToStore(
         triples(
