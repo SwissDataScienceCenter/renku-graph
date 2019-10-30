@@ -18,24 +18,11 @@
 
 set -e
 
-# if this build is trigger by a tag
+source $(dirname "$0")/travis-functions.sh
+
+# publish charts and tag them if this build is triggered by a tag
 if [[ -n $TRAVIS_TAG ]]; then
-  make login
-
-  # decrypt ssh key to use for docker hub login
-  openssl aes-256-cbc -K $encrypted_b7eb5d86688a_key -iv $encrypted_b7eb5d86688a_iv -in deploy_rsa.enc -out deploy_rsa -d
-  chmod 600 deploy_rsa
-  eval $(ssh-agent -s)
-  ssh-add deploy_rsa
-
-  # build charts/images and push
-  cd helm-chart
-  chartpress --push --publish-chart
-  git diff
-  # push also images tagged with "latest"
-  chartpress --tag latest --push
+  publishCharts
   git clean -dffx
   chartpress --tag $TRAVIS_TAG --push --publish-chart
-
-  cd ..
 fi
