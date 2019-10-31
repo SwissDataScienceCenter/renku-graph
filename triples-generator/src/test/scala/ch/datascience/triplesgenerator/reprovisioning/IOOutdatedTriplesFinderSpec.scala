@@ -30,6 +30,7 @@ import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -67,6 +68,27 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
       // format: on
 
       logger.loggedOnly(Warn(s"Searching for outdated triples finished${executionTimeRecorder.executionTimeInfo}"))
+    }
+
+    "return single project's chunk of 10 commits having outdated triples in one go" in new TestCase {
+
+      val project                  = projectPaths.generateOne
+      val outdatedCommitsResources = Gen.listOfN(12, commitIdResources(Some(fusekiBaseUrl.toString))).generateOne
+
+      loadToStore(
+        triples(
+          outdatedCommitsResources map (
+              commitResource =>
+                singleFileAndCommit(project,
+                                    commitId      = commitResource.toCommitId,
+                                    schemaVersion = schemaVersions.generateOne)): _*
+        )
+      )
+
+      val Some(outdatedTriples) = triplesFinder.findOutdatedTriples.value.unsafeRunSync()
+
+      outdatedTriples.projectResource shouldBe ProjectResource(FullProjectPath(renkuBaseUrl, project).toString)
+      outdatedTriples.commits         should have size 10
     }
 
     "return all project's commits having triples related to agent with version different than the current one" in new TestCase {

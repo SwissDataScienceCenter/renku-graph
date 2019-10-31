@@ -137,6 +137,7 @@ private class IOOutdatedTriplesFinder(
          |    }
          |  }
          |}
+         |LIMIT 10
          |""".stripMargin
     } map toMaybeOutdatedTriples(projectResource)
   }
