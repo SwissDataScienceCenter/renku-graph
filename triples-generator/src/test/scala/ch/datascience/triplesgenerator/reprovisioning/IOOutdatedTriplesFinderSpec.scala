@@ -20,12 +20,14 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import ReProvisioningGenerators._
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.setOf
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.events.EventsGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.RdfStoreData._
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -56,6 +58,24 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
         be(Some(OutdatedTriples(FullProjectPath.from(renkuBaseUrl, project2), Set(project2OutdatedCommit))))
       )
       // format: on
+    }
+
+    "return single project's chunk of 10 commits having outdated triples in one go" in new TestCase {
+
+      val project                  = projectPaths.generateOne
+      val outdatedCommitsNumber    = 12
+      val outdatedCommitsResources = Gen.listOfN(outdatedCommitsNumber, commitIdResources).generateOne
+      val triples = RDF(
+        outdatedCommitsResources map (commitId =>
+          singleFileAndCommitTriples(project, commitId.toCommitId, Some(schemaVersions.generateOne))): _*
+      )
+
+      loadToStore(triples)
+
+      val Some(outdatedTriples) = triplesFinder.findOutdatedTriples.value.unsafeRunSync()
+
+      outdatedTriples.projectPath shouldBe FullProjectPath.from(renkuBaseUrl, project)
+      outdatedTriples.commits     should have size 10
     }
 
     "return all project's commits having triples with no agent or agent with different version in one result" in new TestCase {
