@@ -89,7 +89,6 @@ class ExecutionDateCalculator(now: () => Instant = () => Instant.now) {
 
 object ExecutionDateCalculator {
 
-  import Math._
   import java.time._
   import java.time.temporal.ChronoUnit._
 
@@ -99,12 +98,7 @@ object ExecutionDateCalculator {
     (_, _, now) => ExecutionDate(now)
 
   implicit val triplesStoreFailureCalculator: StatusBasedCalculator[TriplesStoreFailure] =
-    (createdDate, executionDate, now) => {
-      val datesDifference = Duration.between(createdDate.value, executionDate.value).getSeconds
-
-      if (!((executionDate.value plus (datesDifference, SECONDS)) isAfter now)) ExecutionDate(now plus (10, SECONDS))
-      else ExecutionDate(executionDate.value plus (datesDifference * log(datesDifference).toLong, SECONDS))
-    }
+    (_, _, now) => ExecutionDate(now plus (1, MINUTES))
 }
 
 class IOEventLogMarkFailed(
