@@ -51,7 +51,7 @@ private class IOOutdatedTriplesFinder(
     measureExecutionTime {
       {
         for {
-          projectPath     <- maybeProjectWithOutdatedAgent orElse maybeProjectWithNoAgent
+          projectPath     <- maybeProjectWithOutdatedAgent orElse maybeProjectOnEntityWithOutdatedAgent orElse maybeProjectWithNoAgent
           outdatedTriples <- findOutdatedTriples(projectPath)
         } yield outdatedTriples
       }.value
@@ -72,11 +72,37 @@ private class IOOutdatedTriplesFinder(
          |  ?agent rdf:type prov:SoftwareAgent ;
          |         rdfs:label ?version .
          |  FILTER (?version != "renku $schemaVersion")
-         |  VALUES ?p { dcterms:isPartOf schema:isPartOf }
+         |  VALUES ?p { dcterms:isPartOf schema:isPartOf <schema:isPartOf> }
          |  ?commit prov:agent ?agent ;
          |	        rdf:type prov:Activity ;
          |	        ?p ?project .
          |}
+         |LIMIT 1
+         |""".stripMargin
+    }
+  }
+
+  private def maybeProjectOnEntityWithOutdatedAgent = OptionT {
+    queryExpecting[Option[ProjectResource]] {
+      s"""
+         |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+         |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+         |PREFIX prov: <http://www.w3.org/ns/prov#>
+         |PREFIX schema: <http://schema.org/>
+         |PREFIX dcterms: <http://purl.org/dc/terms/>
+         |
+         |SELECT ?project
+         |WHERE {
+         |  ?agent rdf:type prov:SoftwareAgent ;
+         |         rdfs:label ?version .
+         |  FILTER (?version != "renku $schemaVersion")
+         |  ?commit prov:agent ?agent ;
+         |	        rdf:type prov:Activity ;
+         |	        prov:influenced ?entity .
+         |  VALUES ?p { dcterms:isPartOf schema:isPartOf <schema:isPartOf> }
+         |  ?entity ?p ?project .
+         |}
+         |GROUP BY ?project
          |LIMIT 1
          |""".stripMargin
     }
@@ -92,7 +118,7 @@ private class IOOutdatedTriplesFinder(
         |
         |SELECT ?project
         |WHERE {
-        |  VALUES ?p { dcterms:isPartOf schema:isPartOf }
+        |  VALUES ?p { dcterms:isPartOf schema:isPartOf <schema:isPartOf> }
         |  {
         |    ?commit ?p ?project ;
         |            rdf:type prov:Activity .
@@ -118,11 +144,21 @@ private class IOOutdatedTriplesFinder(
          |
          |SELECT ?commit
          |WHERE {
-         |  VALUES ?p { dcterms:isPartOf schema:isPartOf }
+         |  VALUES ?p { dcterms:isPartOf schema:isPartOf <schema:isPartOf> }
          |  {
          |    ?commit ?p ${projectResource.showAs[RdfResource]} ;
          |            rdf:type prov:Activity ;
          |            prov:agent ?agent .
+         |    ?agent  rdf:type prov:SoftwareAgent ;
+         |            rdfs:label ?version .
+         |    FILTER (?version != "renku $schemaVersion")
+         |  }
+         |  UNION
+         |  {
+         |    ?commit rdf:type prov:Activity ;
+         |            prov:influenced ?entity ;
+         |            prov:agent ?agent .
+         |    ?entity ?p ${projectResource.showAs[RdfResource]} .
          |    ?agent  rdf:type prov:SoftwareAgent ;
          |            rdfs:label ?version .
          |    FILTER (?version != "renku $schemaVersion")

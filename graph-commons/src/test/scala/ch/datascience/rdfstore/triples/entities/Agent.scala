@@ -22,7 +22,7 @@ package entities
 import ch.datascience.graph.model.SchemaVersion
 import io.circe.literal._
 
-private[triples] object Agent {
+object Agent {
 
   def apply(id: Id) = json"""
   {

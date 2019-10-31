@@ -28,7 +28,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.Json
 import io.circe.literal._
 
-private[triples] object CommitActivity {
+object CommitActivity {
 
   def apply(commitId:          CommitId,
             projectId:         Project.Id,
@@ -45,7 +45,7 @@ private[triples] object CommitActivity {
             committedDate:     CommittedDate,
             agentId:           Agent.Id,
             personId:          Person.Id,
-            maybeInfluencedBy: List[CommitCollectionEntity.Id] = Nil,
+            maybeInfluencedBy: List[CommitEntityId] = Nil,
             comment:           String Refined NonEmpty = "some change"
   ): Json = json"""
   {

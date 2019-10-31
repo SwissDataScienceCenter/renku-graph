@@ -26,7 +26,7 @@ import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import io.circe.Json
 import io.circe.literal._
 
-private[triples] object CommitEntity {
+object CommitEntity {
 
   def apply(
       id:                 Id,
@@ -46,7 +46,8 @@ private[triples] object CommitEntity {
     "rdfs:label": ${s"${id.filePath}@${id.commitId}"}
   }""".deepMerge(`schema:isPartOf`(projectId))
 
-  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl)
+      extends CommitEntityId {
     override val value: String = (fusekiBaseUrl / "blob" / commitId / filePath).toString
   }
 }
