@@ -18,9 +18,8 @@
 
 package ch.datascience.dbeventlog.commands
 
-import java.lang.Math.log
+import java.time.Instant
 import java.time.temporal.ChronoUnit._
-import java.time.{Duration, Instant}
 
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.EventStatus.{NonRecoverableFailure, TriplesStoreFailure}
@@ -46,37 +45,13 @@ class ExecutionDateCalculatorSpec extends WordSpec with MockFactory with ScalaCh
 
   s"newExecutionDate for $TriplesStoreFailure" should {
 
-    s"return current time + 10s if Execution Date == Created Date" in new TestCase {
-      forAll(timestampsNotInTheFuture) { timestamp =>
+    "return current time + 1 min" in new TestCase {
+      forAll(timestampsNotInTheFuture, nonNegativeInts()) { (timestamp, createdDateOffset) =>
         executionDateCalculator.newExecutionDate[TriplesStoreFailure](
-          CreatedDate(timestamp),
+          CreatedDate(timestamp minus (createdDateOffset, SECONDS)),
           ExecutionDate(timestamp)
-        ) shouldBe ExecutionDate(now plus (10, SECONDS))
+        ) shouldBe ExecutionDate(now plus (1, MINUTES))
       }
-    }
-
-    "return current time + 10s " +
-      "if Execution Date != Created Date " +
-      "and Execution Date + (Execution Date - Created Date) * log(Execution Date - Created Date) <= now" in new TestCase {
-
-      executionDateCalculator.newExecutionDate[TriplesStoreFailure](
-        CreatedDate(now minus (1000, SECONDS)),
-        ExecutionDate(now minus (1000 - 10, SECONDS))
-      ) shouldBe ExecutionDate(now plus (10, SECONDS))
-    }
-
-    "return Execution Date + (Execution Date - Created Date) * log(Execution Date - Created Date) " +
-      "if Execution Date + (Execution Date - Created Date) * log(Execution Date - Created Date) > now" in new TestCase {
-      val createdDate   = CreatedDate(now minus (1000, SECONDS))
-      val executionDate = ExecutionDate(now minus (1, SECONDS))
-
-      val diffInSeconds = Duration.between(createdDate.value, executionDate.value).getSeconds
-      val addend        = diffInSeconds * log(diffInSeconds).toLong
-
-      executionDateCalculator.newExecutionDate[TriplesStoreFailure](
-        createdDate,
-        executionDate
-      ) shouldBe ExecutionDate(executionDate.value plus (addend, SECONDS))
     }
   }
 
