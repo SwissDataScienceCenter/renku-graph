@@ -41,6 +41,7 @@ class ReProvisioner[Interpretation[_]](
     triplesFinder:           OutdatedTriplesFinder[Interpretation],
     triplesRemover:          OutdatedTriplesRemover[Interpretation],
     orphanMailtoNoneRemover: OrphanMailtoNoneRemover[Interpretation],
+    mailtoEmailRemover:      MailtoEmailRemover[Interpretation],
     eventLogMarkAllNew:      EventLogMarkAllNew[Interpretation],
     eventLogFetch:           EventLogFetch[Interpretation],
     reProvisioningDelay:     ReProvisioningDelay,
@@ -50,7 +51,6 @@ class ReProvisioner[Interpretation[_]](
 
   import eventLogFetch._
   import eventLogMarkAllNew._
-  import orphanMailtoNoneRemover._
   import triplesFinder._
   import triplesRemover._
 
@@ -81,13 +81,20 @@ class ReProvisioner[Interpretation[_]](
     } yield ()
   }
 
-  private def postReProvisioningSteps() =
+  private def postReProvisioningSteps() = {
+    import mailtoEmailRemover._
+    import orphanMailtoNoneRemover._
+
     for {
       _ <- logger.info("All projects' triples up to date")
-      _ <- removeOrphanMailtoNoneTriples() recoverWith {
-            case NonFatal(exception) => logger.error(exception)("Removing orphan 'mailto:None' triples failed")
-          }
+      _ <- removeOrphanMailtoNoneTriples() recoverWith errorMessage("Removing orphan 'mailto:None' triples failed")
+      _ <- removeMailtoEmailTriples() recoverWith errorMessage("Removing schema:email starting with 'mailto' failed")
     } yield ()
+  }
+
+  private def errorMessage(message: String): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) => logger.error(exception)(message)
+  }
 
   private lazy val tryAgain: PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -135,6 +142,7 @@ object IOReProvisioner {
         new IOOutdatedTriplesFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger),
         new IOOutdatedTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger),
         new IOOrphanMailtoNoneRemover(rdfStoreConfig, logger),
+        new IOMailtoEmailRemover(rdfStoreConfig, logger),
         new EventLogMarkAllNew[IO](dbTransactor),
         new EventLogFetch[IO](dbTransactor),
         initialDelay,

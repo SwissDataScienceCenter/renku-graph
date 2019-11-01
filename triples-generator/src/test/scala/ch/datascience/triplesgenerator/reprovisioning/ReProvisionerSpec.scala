@@ -92,6 +92,9 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
         (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
           .expects()
           .returning(context.unit)
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
+          .expects()
+          .returning(context.unit)
       }
 
       reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
@@ -141,6 +144,9 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
         (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
           .expects()
           .returning(context.unit)
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
+          .expects()
+          .returning(context.unit)
       }
 
       reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
@@ -157,6 +163,9 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.none)
 
         (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+          .expects()
+          .returning(context.unit)
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
           .expects()
           .returning(context.unit)
       }
@@ -181,6 +190,9 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.none[IO, OutdatedTriples])
 
         (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+          .expects()
+          .returning(context.unit)
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
           .expects()
           .returning(context.unit)
       }
@@ -214,6 +226,9 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.none[IO, OutdatedTriples])
 
         (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+          .expects()
+          .returning(context.unit)
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
           .expects()
           .returning(context.unit)
       }
@@ -268,6 +283,9 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .returning(OptionT.none[IO, OutdatedTriples])
 
         (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+          .expects()
+          .returning(context.unit)
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
           .expects()
           .returning(context.unit)
       }
@@ -329,6 +347,9 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
         (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
           .expects()
           .returning(context.unit)
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
+          .expects()
+          .returning(context.unit)
       }
 
       reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
@@ -355,6 +376,9 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
         (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
           .expects()
           .returning(context.raiseError(exception))
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
+          .expects()
+          .returning(context.unit)
       }
 
       reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
@@ -362,6 +386,34 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
       logger.loggedOnly(
         Info("All projects' triples up to date"),
         Error("Removing orphan 'mailto:None' triples failed", exception)
+      )
+    }
+
+    "do not fail but log an error if removing emails starting with 'mailto' fails" in new TestCase {
+      val exception = exceptions.generateOne
+
+      inSequence {
+        (eventLogFetch.isEventToProcess _)
+          .expects()
+          .returning(context.pure(false))
+
+        (triplesFinder.findOutdatedTriples _)
+          .expects()
+          .returning(OptionT.none[IO, OutdatedTriples])
+
+        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+          .expects()
+          .returning(context.unit)
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
+          .expects()
+          .returning(context.raiseError(exception))
+      }
+
+      reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(
+        Info("All projects' triples up to date"),
+        Error("Removing schema:email starting with 'mailto' failed", exception)
       )
     }
 
@@ -378,6 +430,9 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
         (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
           .expects()
           .returning(context.unit)
+        (mailtoEmailRemover.removeMailtoEmailTriples _)
+          .expects()
+          .returning(context.unit)
       }
 
       val someInitialDelay: ReProvisioningDelay = ReProvisioningDelay(500 millis)
@@ -388,6 +443,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
         triplesFinder,
         triplesRemover,
         orphanMailtoTriplesRemover,
+        mailtoEmailRemover,
         eventLogMarkNew,
         eventLogFetch,
         someInitialDelay,
@@ -409,6 +465,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
     val triplesFinder              = mock[OutdatedTriplesFinder[IO]]
     val triplesRemover             = mock[OutdatedTriplesRemover[IO]]
     val orphanMailtoTriplesRemover = mock[OrphanMailtoNoneRemover[IO]]
+    val mailtoEmailRemover         = mock[MailtoEmailRemover[IO]]
     val eventLogMarkNew            = mock[IOEventLogMarkAllNew]
     val eventLogFetch              = mock[IOEventLogFetch]
     val initialDelay               = ReProvisioningDelay(durations(100 millis).generateOne)
@@ -417,6 +474,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
       triplesFinder,
       triplesRemover,
       orphanMailtoTriplesRemover,
+      mailtoEmailRemover,
       eventLogMarkNew,
       eventLogFetch,
       initialDelay,

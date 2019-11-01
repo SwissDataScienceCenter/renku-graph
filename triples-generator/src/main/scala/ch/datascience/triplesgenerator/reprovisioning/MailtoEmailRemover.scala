@@ -26,24 +26,28 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait OrphanMailtoNoneRemover[Interpretation[_]] {
-  def removeOrphanMailtoNoneTriples(): Interpretation[Unit]
+private trait MailtoEmailRemover[Interpretation[_]] {
+  def removeMailtoEmailTriples(): Interpretation[Unit]
 }
 
-private class IOOrphanMailtoNoneRemover(
+private class IOMailtoEmailRemover(
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient[RdfDelete](rdfStoreConfig, logger)
-    with OrphanMailtoNoneRemover[IO] {
+    with MailtoEmailRemover[IO] {
 
-  override def removeOrphanMailtoNoneTriples(): IO[Unit] = queryWitNoResult {
+  override def removeMailtoEmailTriples(): IO[Unit] = queryWitNoResult {
     s"""
-       |DELETE { ?s ?p ?o } 
+       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+       |PREFIX schema: <http://schema.org/> 
+       |
+       |DELETE { ?person schema:email ?email }
        |WHERE {
-       |  ?s ?p ?o .
-       |  VALUES ?s { <mailto:None> }
-       |  FILTER NOT EXISTS { ?someSubject ?somePredicate <mailto:None> }
-       |}""".stripMargin
+       |  ?person rdf:type schema:Person ;
+       |          schema:email ?email .
+       |  FILTER regex(str(?email),"mailto")
+       |}
+       |""".stripMargin
   }
 }
