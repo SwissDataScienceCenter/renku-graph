@@ -65,19 +65,21 @@ class ReProvisioner[Interpretation[_]](
 
   private def maybeReProvisionNextProject: Interpretation[Unit] =
     findOutdatedTriples.value.flatMap {
-      case Some(outdatedTriples) => reProvisionNextProject(outdatedTriples)
+      case Some(outdatedTriples) => reProvisionNextProjectOrChunk(outdatedTriples)
       case None                  => postReProvisioningSteps()
     }
 
-  private def reProvisionNextProject(outdatedTriples: OutdatedTriples) =
+  private def reProvisionNextProjectOrChunk(outdatedTriples: OutdatedTriples) = {
+    import outdatedTriples._
     for {
       projectPath <- outdatedTriples.projectResource.as[Interpretation, ProjectPath]
       commitIds   <- outdatedTriples.commits.toList.map(_.as[Interpretation, CommitId]).sequence
       _           <- markEventsAsNew(projectPath, commitIds.toSet)
       _           <- removeOutdatedTriples(outdatedTriples)
-      _           <- logger.info(s"ReProvisioning '${outdatedTriples.projectResource}' project")
+      _           <- logger.info(s"ReProvisioning ${commits.size} commits of '$projectResource' project")
       _           <- startReProvisioning
     } yield ()
+  }
 
   private def postReProvisioningSteps() =
     for {

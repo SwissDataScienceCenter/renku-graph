@@ -28,7 +28,7 @@ import ch.datascience.dbeventlog.commands.{IOEventLogFetch, IOEventLogMarkAllNew
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import org.scalamock.scalatest.MockFactory
@@ -97,8 +97,12 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
       reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info(s"ReProvisioning '${project1OutdatedTriples.projectResource}' project"),
-        Info(s"ReProvisioning '${project2OutdatedTriples.projectResource}' project"),
+        Info(
+          s"ReProvisioning ${project1OutdatedTriples.commits.size} commits of '${project1OutdatedTriples.projectResource}' project"
+        ),
+        Info(
+          s"ReProvisioning ${project2OutdatedTriples.commits.size} commits of '${project2OutdatedTriples.projectResource}' project"
+        ),
         Info("All projects' triples up to date")
       )
     }
@@ -272,7 +276,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Error("Re-provisioning failure", exception),
-        Info(s"ReProvisioning '${outdatedTriples.projectResource}' project"),
+        Info(s"ReProvisioning ${outdatedTriples.commits.size} commits of '${outdatedTriples.projectResource}' project"),
         Info("All projects' triples up to date")
       )
     }
@@ -331,7 +335,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
 
       logger.loggedOnly(
         Error("Re-provisioning failure", exception),
-        Info(s"ReProvisioning '${outdatedTriples.projectResource}' project"),
+        Info(s"ReProvisioning ${outdatedTriples.commits.size} commits of '${outdatedTriples.projectResource}' project"),
         Info("All projects' triples up to date")
       )
     }
