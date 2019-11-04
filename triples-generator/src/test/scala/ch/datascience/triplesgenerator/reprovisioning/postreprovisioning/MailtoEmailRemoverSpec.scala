@@ -56,7 +56,7 @@ class MailtoEmailRemoverSpec extends WordSpec with InMemoryRdfStore {
       leftSchemaEmails shouldBe List(email.toString)
     }
 
-    "remove triples with the 'mailto:None' subject if such a resource is not used an object" in new TestCase {
+    "remove Person triples where schema:email is a IRI starting with 'mailto:'" in new TestCase {
 
       val personId = Person.Id(names.generateOne)
       val email    = emails.generateOne
@@ -66,7 +66,7 @@ class MailtoEmailRemoverSpec extends WordSpec with InMemoryRdfStore {
           List(
             Person(personId, None) deepMerge {
               json"""{
-                "schema:email": [${email.value}, ${s"<mailto:$email>"}]
+                "schema:email": [${email.value}, { "@id": ${s"<mailto:$email>"} }]
               }"""
             }
           )

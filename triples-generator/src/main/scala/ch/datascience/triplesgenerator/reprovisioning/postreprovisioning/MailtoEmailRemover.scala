@@ -34,7 +34,7 @@ private trait MailtoEmailRemover[Interpretation[_]] extends RdfStoreUpdater[Inte
                            |WHERE {
                            |  ?person rdf:type schema:Person ;
                            |          schema:email ?email .
-                           |  FILTER regex(str(?email),"mailto")
+                           |  FILTER isIRI(?email)
                            |}
                            |""".stripMargin
 }
