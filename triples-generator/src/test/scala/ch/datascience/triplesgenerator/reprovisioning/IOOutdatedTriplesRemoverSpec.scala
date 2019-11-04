@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
+import ch.datascience.generators.CommonGraphGenerators.{emails, names}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptySet
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -31,7 +31,6 @@ import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
-import ch.datascience.rdfstore.triples.entities.Person
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningGenerators.commitIdResources
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
@@ -111,7 +110,7 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         s"Removing outdated triples for '${outdatedTriples.projectResource}' finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
-    "remove all the triples related to the given commits together with eventual dataset and authors triples" in new TestCase {
+    "remove all the triples related to the given commits together with eventual dataset" in new TestCase {
 
       val project                 = projectPaths.generateOne
       val outdatedProjectCommit   = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
@@ -153,110 +152,8 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         .toSet
       leftTriples.filter(triplesMatchingCommits(outdatedTriples.commits))    shouldBe empty
       leftTriples.filter(_ contains outdatedCommitDatasetId.value)           shouldBe empty
-      leftTriples.filter(triplesMatchingCreators(outdatedDatasetCreators))   shouldBe empty
       leftTriples.filter(triplesMatchingCommits(Set(upToDateProjectCommit))) should not be empty
       leftTriples.filter(_ contains upToDateProjectCommit.value)             should not be empty
-      leftTriples.filter(triplesMatchingCreators(upToDateDatasetCreators))   should not be empty
-    }
-
-    "remove all the triples related to the given commits together with orphan agent triples" in new TestCase {
-
-      val outdatedSchemaVersion = schemaVersions.generateOne
-      val project               = projectPaths.generateOne
-      val projectCommitOutdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
-      val projectCommitUpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
-
-      loadToStore(
-        triples(
-          singleFileAndCommitWithDataset(project,
-                                         commitId      = projectCommitOutdated.toCommitId,
-                                         schemaVersion = outdatedSchemaVersion)
-        )
-      )
-
-      val outdatedTriples = OutdatedTriples(
-        projectResource = ProjectResource(FullProjectPath(renkuBaseUrl, project).toString),
-        commits         = Set(projectCommitOutdated)
-      )
-
-      triplesRemover
-        .removeOutdatedTriples(outdatedTriples)
-        .unsafeRunSync() shouldBe ((): Unit)
-
-      val leftTriples = runQuery("SELECT ?subject ?o ?p WHERE {?subject ?o ?p}")
-        .unsafeRunSync()
-        .map(row => row("subject"))
-        .toSet
-      leftTriples.filter(triplesMatchingCommits(outdatedTriples.commits)) shouldBe empty
-      leftTriples.filter(_ contains outdatedSchemaVersion.value)          shouldBe empty
-    }
-
-    "remove all the triples related to the given commits together with orphan project triples" in new TestCase {
-
-      val outdatedSchemaVersion = schemaVersions.generateOne
-      val project               = projectPaths.generateOne
-      val projectCommitOutdated = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
-      val projectCommitUpToDate = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
-
-      loadToStore(
-        triples(
-          singleFileAndCommitWithDataset(project,
-                                         commitId      = projectCommitOutdated.toCommitId,
-                                         schemaVersion = outdatedSchemaVersion)
-        )
-      )
-
-      val outdatedTriples = OutdatedTriples(
-        projectResource = ProjectResource(FullProjectPath(renkuBaseUrl, project).toString),
-        commits         = Set(projectCommitOutdated)
-      )
-
-      triplesRemover
-        .removeOutdatedTriples(outdatedTriples)
-        .unsafeRunSync() shouldBe ((): Unit)
-
-      val leftTriples = runQuery("SELECT ?subject ?o ?p WHERE {?subject ?o ?p}")
-        .unsafeRunSync()
-        .map(row => row("subject"))
-        .toSet
-      leftTriples.filter(triplesMatchingCommits(outdatedTriples.commits)) shouldBe empty
-      leftTriples.filter(_ contains project.value)                        shouldBe empty
-    }
-
-    "do not remove agent triples if they are still referenced to another project" in new TestCase {
-
-      val outdatedSchemaVersion  = schemaVersions.generateOne
-      val project1               = projectPaths.generateOne
-      val project1OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
-      val project2               = projectPaths.generateOne
-      val project2OutdatedCommit = commitIdResources(Some(fusekiBaseUrl.toString)).generateOne
-
-      loadToStore(
-        triples(
-          singleFileAndCommitWithDataset(project1,
-                                         commitId      = project1OutdatedCommit.toCommitId,
-                                         schemaVersion = outdatedSchemaVersion),
-          singleFileAndCommitWithDataset(project2,
-                                         commitId      = project2OutdatedCommit.toCommitId,
-                                         schemaVersion = outdatedSchemaVersion)
-        )
-      )
-
-      val outdatedTriples = OutdatedTriples(
-        projectResource = ProjectResource(FullProjectPath(renkuBaseUrl, project1).toString),
-        commits         = Set(project1OutdatedCommit)
-      )
-
-      triplesRemover
-        .removeOutdatedTriples(outdatedTriples)
-        .unsafeRunSync() shouldBe ((): Unit)
-
-      val leftTriples = runQuery("SELECT ?subject ?o ?p WHERE {?subject ?o ?p}")
-        .unsafeRunSync()
-        .map(row => row("subject"))
-        .toSet
-      leftTriples.filter(triplesMatchingCommits(outdatedTriples.commits)) shouldBe empty
-      leftTriples.filter(_ contains outdatedSchemaVersion.value)          should not be empty
     }
   }
 
@@ -268,9 +165,6 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
 
   private def triplesMatchingCommits(commits: Set[CommitIdResource])(subject: String) =
     commits.map(_.toCommitId.value) exists subject.contains
-
-  private def triplesMatchingCreators(creators: Set[(UserName, Option[Email])])(subject: String) =
-    creators.map { case (userName, _) => Person.Id(userName).value } exists subject.contains
 
   private implicit class CommitIdResouceOps(commitIdResource: CommitIdResource) {
     import cats.implicits._

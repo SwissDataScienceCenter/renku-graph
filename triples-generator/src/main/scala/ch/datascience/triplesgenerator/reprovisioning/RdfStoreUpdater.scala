@@ -19,31 +19,30 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
+import ch.datascience.rdfstore.IORdfStoreClient.RdfQueryType
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait OrphanMailtoNoneRemover[Interpretation[_]] {
-  def removeOrphanMailtoNoneTriples(): Interpretation[Unit]
+private trait RdfStoreUpdater[Interpretation[_]] {
+
+  val description: String Refined NonEmpty
+
+  protected val query: String
+
+  def run: Interpretation[Unit]
 }
 
-private class IOOrphanMailtoNoneRemover(
+private abstract class IORdfStoreUpdater[QT <: RdfQueryType](
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient[RdfDelete](rdfStoreConfig, logger)
-    with OrphanMailtoNoneRemover[IO] {
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO], queryType: QT)
+    extends IORdfStoreClient[QT](rdfStoreConfig, logger)
+    with RdfStoreUpdater[IO] {
 
-  override def removeOrphanMailtoNoneTriples(): IO[Unit] = queryWitNoResult {
-    s"""
-       |DELETE { ?s ?p ?o } 
-       |WHERE {
-       |  ?s ?p ?o .
-       |  VALUES ?s { <mailto:None> }
-       |  FILTER NOT EXISTS { ?someSubject ?somePredicate <mailto:None> }
-       |}""".stripMargin
-  }
+  final override def run: IO[Unit] = queryWitNoResult(query)
 }

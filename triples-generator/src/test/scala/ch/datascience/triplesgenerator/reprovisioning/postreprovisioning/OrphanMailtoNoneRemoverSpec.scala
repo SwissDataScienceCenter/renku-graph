@@ -16,24 +16,27 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.triplesgenerator.reprovisioning.postreprovisioning
 
+import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.rdfstore.triples.entities.{DatasetPart, Person, Project}
+import ch.datascience.triplesgenerator.reprovisioning.IORdfStoreUpdater
 import io.circe.Json
 import io.circe.literal._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
+class OrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
 
-  "removeOrphanMailtoNoneTriples" should {
+  "run" should {
 
     "do nothing if the 'mailto:None' is used an object" in new TestCase {
 
@@ -55,7 +58,7 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
 
       val initialStoreSize = rdfStoreSize
 
-      triplesRemover.removeOrphanMailtoNoneTriples().unsafeRunSync() shouldBe ((): Unit)
+      triplesRemover.run.unsafeRunSync() shouldBe ((): Unit)
 
       rdfStoreSize shouldBe initialStoreSize
     }
@@ -87,7 +90,7 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
 
       val initialStoreSize = rdfStoreSize
 
-      triplesRemover.removeOrphanMailtoNoneTriples().unsafeRunSync() shouldBe ((): Unit)
+      triplesRemover.run.unsafeRunSync() shouldBe ((): Unit)
 
       rdfStoreSize      should not be initialStoreSize
       mailToNoneTriples shouldBe 0
@@ -95,7 +98,7 @@ class IOOrphanMailtoNoneRemoverSpec extends WordSpec with InMemoryRdfStore {
   }
 
   private trait TestCase {
-    val triplesRemover = new IOOrphanMailtoNoneRemover(rdfStoreConfig, TestLogger())
+    val triplesRemover = new IORdfStoreUpdater[RdfDelete](rdfStoreConfig, TestLogger()) with OrphanMailtoNoneRemover[IO]
   }
 
   private def mailToNoneTriples =

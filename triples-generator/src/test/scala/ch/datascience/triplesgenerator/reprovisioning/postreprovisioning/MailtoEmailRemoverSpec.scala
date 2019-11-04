@@ -16,21 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.triplesgenerator.reprovisioning.postreprovisioning
 
+import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.rdfstore.triples.entities.Person
+import ch.datascience.triplesgenerator.reprovisioning.IORdfStoreUpdater
 import io.circe.literal._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class IOMailtoEmailRemoverSpec extends WordSpec with InMemoryRdfStore {
+class MailtoEmailRemoverSpec extends WordSpec with InMemoryRdfStore {
 
-  "removeMailtoEmailTriples" should {
+  "run" should {
 
     "do nothing if there's only valid email literals on Person entities" in new TestCase {
 
@@ -46,7 +49,7 @@ class IOMailtoEmailRemoverSpec extends WordSpec with InMemoryRdfStore {
 
       val initialStoreSize = rdfStoreSize
 
-      triplesRemover.removeMailtoEmailTriples().unsafeRunSync() shouldBe ((): Unit)
+      triplesRemover.run.unsafeRunSync() shouldBe ((): Unit)
 
       rdfStoreSize shouldBe initialStoreSize
 
@@ -72,14 +75,14 @@ class IOMailtoEmailRemoverSpec extends WordSpec with InMemoryRdfStore {
 
       leftSchemaEmails should contain theSameElementsAs List(email.toString, s"<mailto:$email>")
 
-      triplesRemover.removeMailtoEmailTriples().unsafeRunSync() shouldBe ((): Unit)
+      triplesRemover.run.unsafeRunSync() shouldBe ((): Unit)
 
       leftSchemaEmails shouldBe List(email.toString)
     }
   }
 
   private trait TestCase {
-    val triplesRemover = new IOMailtoEmailRemover(rdfStoreConfig, TestLogger())
+    val triplesRemover = new IORdfStoreUpdater[RdfDelete](rdfStoreConfig, TestLogger()) with MailtoEmailRemover[IO]
   }
 
   private def leftSchemaEmails =
