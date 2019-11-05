@@ -77,7 +77,7 @@ private class IODatasetsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX text: <http://jena.apache.org/text#>
        |
-       |SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(?maybeProject) AS ?projectsCount)
+       |SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?maybeProject) AS ?projectsCount)
        |WHERE {
        |  {
        |    ?dataset rdf:type <http://schema.org/Dataset> ;
