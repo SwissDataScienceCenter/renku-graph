@@ -94,7 +94,7 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
       val Some(outdatedTriples) = triplesFinder.findOutdatedTriples.value.unsafeRunSync()
 
       outdatedTriples.projectResource shouldBe ProjectResource(FullProjectPath(renkuBaseUrl, project).toString)
-      outdatedTriples.commits         should have size 10
+      outdatedTriples.commits         should have size 5
     }
 
     "return all project's commits having triples related to agent with version different than the current one" in new TestCase {

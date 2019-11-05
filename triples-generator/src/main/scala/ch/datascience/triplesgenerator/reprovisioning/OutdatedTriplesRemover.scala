@@ -40,14 +40,16 @@ private class IOOutdatedTriplesRemover(
     extends IORdfStoreClient[RdfDelete](rdfStoreConfig, logger)
     with OutdatedTriplesRemover[IO] {
 
+  import cats.implicits._
   import executionTimeRecorder._
 
   override def removeOutdatedTriples(outdatedTriples: OutdatedTriples): IO[Unit] =
     measureExecutionTime {
-      remove(outdatedTriples)
+      outdatedTriples.commits.toList.map(remove).sequence.map(_ => ())
     } map logExecutionTime(withMessage = s"Removing outdated triples for '${outdatedTriples.projectResource}' finished")
 
-  private def remove(triplesToRemove: OutdatedTriples): IO[Unit] = queryWitNoResult {
+  private def remove(commitIdResource: CommitIdResource): IO[Unit] = queryWitNoResult {
+    val commitResource = commitIdResource.showAs[RdfResource]
     s"""
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -61,15 +63,14 @@ private class IOOutdatedTriplesRemover(
        |    SELECT ?subject
        |    WHERE {
        |      {
-       |        ?commit rdf:type prov:Activity .
-       |        FILTER (?commit IN (${triplesToRemove.commits.map(_.showAs[RdfResource]).mkString(",")}))
-       |        ?commit ?predicate ?object
+       |        $commitResource rdf:type prov:Activity ;
+       |                        ?predicate ?object .
        |      }
        |      {
-       |        ?commit ?p ?o .
-       |        BIND (?commit as ?subject)
+       |        $commitResource ?p ?o .
+       |        BIND ($commitResource as ?subject)
        |      } UNION {
-       |        ?commit prov:influenced ?influencedObject .
+       |        $commitResource prov:influenced ?influencedObject .
        |        BIND (?influencedObject as ?subject)
        |      } UNION {
        |        ?activitySubject prov:activity ?object .
@@ -78,19 +79,19 @@ private class IOOutdatedTriplesRemover(
        |        ?memberSubject prov:hadMember ?object .
        |        BIND (?memberSubject as ?subject)
        |      } UNION {
-       |        ?commit prov:influenced/prov:hadMember ?memberObject .
+       |        $commitResource prov:influenced/prov:hadMember ?memberObject .
        |        BIND (?memberObject as ?subject)
        |      } UNION {
-       |        ?commit prov:influenced/prov:hadMember/schema:hasPart ?partObject .
+       |        $commitResource prov:influenced/prov:hadMember/schema:hasPart ?partObject .
        |        BIND (?partObject as ?subject)
        |      } UNION {
-       |        ?commit prov:influenced/prov:hadMember/prov:qualifiedGeneration ?generationObject .
+       |        $commitResource prov:influenced/prov:hadMember/prov:qualifiedGeneration ?generationObject .
        |        BIND (?generationObject as ?subject)
        |      } UNION {
-       |        ?activitySubject prov:activity ?commit .
+       |        ?activitySubject prov:activity $commitResource .
        |        BIND (?activitySubject as ?subject)
        |      } UNION {
-       |        ?generationSubject prov:qualifiedGeneration/prov:activity ?commit .
+       |        ?generationSubject prov:qualifiedGeneration/prov:activity $commitResource .
        |        BIND (?generationSubject as ?subject)
        |      } UNION {
        |        ?memberSubject prov:hadMember/prov:qualifiedGeneration/prov:activity ?object .
