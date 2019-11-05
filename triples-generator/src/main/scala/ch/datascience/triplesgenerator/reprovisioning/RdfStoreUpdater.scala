@@ -19,7 +19,6 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.rdfstore.IORdfStoreClient.RdfQueryType
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -32,17 +31,19 @@ private trait RdfStoreUpdater[Interpretation[_]] {
 
   val description: String Refined NonEmpty
 
-  protected val query: String
-
   def run: Interpretation[Unit]
 }
 
-private abstract class IORdfStoreUpdater[QT <: RdfQueryType](
+private trait SingleQueryUpdater[Interpretation[_]] extends RdfStoreUpdater[Interpretation] {
+  protected val query: String
+}
+
+private abstract class IORdfStoreUpdater(
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO], queryType: QT)
-    extends IORdfStoreClient[QT](rdfStoreConfig, logger)
-    with RdfStoreUpdater[IO] {
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORdfStoreClient(rdfStoreConfig, logger)
+    with SingleQueryUpdater[IO] {
 
   final override def run: IO[Unit] = queryWitNoResult(query)
 }

@@ -47,7 +47,6 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import io.circe.{Decoder, HCursor, Json}
 import org.apache.jena.fuseki.FusekiException
 import org.apache.jena.fuseki.main.FusekiServer
@@ -182,7 +181,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
       .unsafeRunSync()
 
-  private val queryRunner = new IORdfStoreClient[RdfQuery](rdfStoreConfig, TestLogger()) {
+  private val queryRunner = new IORdfStoreClient(rdfStoreConfig, TestLogger()) {
 
     import cats.implicits._
     import io.circe.Decoder._

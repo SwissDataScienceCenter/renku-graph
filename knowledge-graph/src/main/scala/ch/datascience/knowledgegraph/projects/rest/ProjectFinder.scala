@@ -25,7 +25,6 @@ import ch.datascience.graph.model.projects._
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 
@@ -44,7 +43,7 @@ private class IOProjectFinder(
   contextShift:              ContextShift[IO],
   timer:                     Timer[IO],
   ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger)
     with ProjectFinder[IO] {
 
   import io.circe.Decoder

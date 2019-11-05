@@ -21,7 +21,6 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 
@@ -37,7 +36,7 @@ private class IOOutdatedTriplesRemover(
     executionTimeRecorder:   ExecutionTimeRecorder[IO],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient[RdfDelete](rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger)
     with OutdatedTriplesRemover[IO] {
 
   import cats.implicits._

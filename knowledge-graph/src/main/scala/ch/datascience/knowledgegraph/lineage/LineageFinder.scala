@@ -25,7 +25,6 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, FullProjectPath, ProjectPath}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 import model.Node.{SourceNode, TargetNode}
@@ -44,7 +43,7 @@ class IOLineageFinder(
     executionTimeRecorder:   ExecutionTimeRecorder[IO],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger)
     with LineageFinder[IO] {
 
   import executionTimeRecorder._

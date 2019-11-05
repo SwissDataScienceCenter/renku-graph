@@ -22,7 +22,6 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
 import ch.datascience.rdfstore.RdfStoreConfig
 import ch.datascience.triplesgenerator.reprovisioning.{IORdfStoreUpdater, RdfStoreUpdater}
 import io.chrisdavenport.log4cats.Logger
@@ -32,14 +31,15 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private[reprovisioning] class PostReProvisioning[Interpretation[_]](
-    orphanProjectsRemover:   OrphanProjectsRemover[Interpretation],
-    orphanPersonsRemover:    OrphanPersonsRemover[Interpretation],
-    orphanMailtoNoneRemover: OrphanMailtoNoneRemover[Interpretation],
-    mailtoEmailRemover:      MailtoEmailRemover[Interpretation],
-    orphanAgentsRemover:     OrphanAgentsRemover[Interpretation],
-    executionTimeRecorder:   ExecutionTimeRecorder[Interpretation],
-    logger:                  Logger[Interpretation]
-)(implicit ME:               MonadError[Interpretation, Throwable]) {
+    orphanProjectsRemover:      OrphanProjectsRemover[Interpretation],
+    orphanPersonsRemover:       OrphanPersonsRemover[Interpretation],
+    orphanMailtoNoneRemover:    OrphanMailtoNoneRemover[Interpretation],
+    mailtoEmailRemover:         MailtoEmailRemover[Interpretation],
+    duplicatePersonNameRemover: DuplicatePersonNameRemover[Interpretation],
+    orphanAgentsRemover:        OrphanAgentsRemover[Interpretation],
+    executionTimeRecorder:      ExecutionTimeRecorder[Interpretation],
+    logger:                     Logger[Interpretation]
+)(implicit ME:                  MonadError[Interpretation, Throwable]) {
 
   import executionTimeRecorder._
 
@@ -48,6 +48,7 @@ private[reprovisioning] class PostReProvisioning[Interpretation[_]](
     orphanPersonsRemover,
     orphanMailtoNoneRemover,
     mailtoEmailRemover,
+    duplicatePersonNameRemover,
     orphanAgentsRemover
   )
 
@@ -76,11 +77,12 @@ private[reprovisioning] object IOPostReProvisioning {
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): PostReProvisioning[IO] = new PostReProvisioning[IO](
-    new IORdfStoreUpdater[RdfDelete](rdfStoreConfig, logger) with OrphanProjectsRemover[IO],
-    new IORdfStoreUpdater[RdfDelete](rdfStoreConfig, logger) with OrphanPersonsRemover[IO],
-    new IORdfStoreUpdater[RdfDelete](rdfStoreConfig, logger) with OrphanMailtoNoneRemover[IO],
-    new IORdfStoreUpdater[RdfDelete](rdfStoreConfig, logger) with MailtoEmailRemover[IO],
-    new IORdfStoreUpdater[RdfDelete](rdfStoreConfig, logger) with OrphanAgentsRemover[IO],
+    new IORdfStoreUpdater(rdfStoreConfig, logger) with OrphanProjectsRemover[IO],
+    new IORdfStoreUpdater(rdfStoreConfig, logger) with OrphanPersonsRemover[IO],
+    new IORdfStoreUpdater(rdfStoreConfig, logger) with OrphanMailtoNoneRemover[IO],
+    new IORdfStoreUpdater(rdfStoreConfig, logger) with MailtoEmailRemover[IO],
+    new IODuplicatePersonNameRemover(rdfStoreConfig, logger),
+    new IORdfStoreUpdater(rdfStoreConfig, logger) with OrphanAgentsRemover[IO],
     executionTimeRecorder,
     logger
   )

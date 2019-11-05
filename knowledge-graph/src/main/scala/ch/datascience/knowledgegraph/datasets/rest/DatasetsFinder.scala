@@ -25,7 +25,6 @@ import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import ch.datascience.tinytypes.constraints.NonNegative
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
@@ -57,7 +56,7 @@ private class IODatasetsFinder(
     creatorsFinder:          CreatorsFinder,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger)
     with DatasetsFinder[IO] {
 
   import IODatasetsFinder._

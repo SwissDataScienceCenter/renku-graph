@@ -82,18 +82,20 @@ class PostReProvisioningSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
-    val orphanProjectsRemover   = mock[OrphanProjectsRemover[Try]]
-    val orphanPersonsRemover    = mock[OrphanPersonsRemover[Try]]
-    val orphanMailtoNoneRemover = mock[OrphanMailtoNoneRemover[Try]]
-    val mailtoEmailRemover      = mock[MailtoEmailRemover[Try]]
-    val orphanAgentsRemover     = mock[OrphanAgentsRemover[Try]]
-    val logger                  = TestLogger[Try]()
-    val executionTimeRecorder   = TestExecutionTimeRecorder(logger)
+    val orphanProjectsRemover      = mock[OrphanProjectsRemover[Try]]
+    val orphanPersonsRemover       = mock[OrphanPersonsRemover[Try]]
+    val orphanMailtoNoneRemover    = mock[OrphanMailtoNoneRemover[Try]]
+    val mailtoEmailRemover         = mock[MailtoEmailRemover[Try]]
+    val duplicatePersonNameRemover = mock[DuplicatePersonNameRemover[Try]]
+    val orphanAgentsRemover        = mock[OrphanAgentsRemover[Try]]
+    val logger                     = TestLogger[Try]()
+    val executionTimeRecorder      = TestExecutionTimeRecorder(logger)
     val postReProvisioning = new PostReProvisioning[Try](
       orphanProjectsRemover,
       orphanPersonsRemover,
       orphanMailtoNoneRemover,
       mailtoEmailRemover,
+      duplicatePersonNameRemover,
       orphanAgentsRemover,
       executionTimeRecorder,
       logger
@@ -104,6 +106,7 @@ class PostReProvisioningSpec extends WordSpec with MockFactory {
       orphanPersonsRemover,
       orphanMailtoNoneRemover,
       mailtoEmailRemover,
+      duplicatePersonNameRemover,
       orphanAgentsRemover
     )
 

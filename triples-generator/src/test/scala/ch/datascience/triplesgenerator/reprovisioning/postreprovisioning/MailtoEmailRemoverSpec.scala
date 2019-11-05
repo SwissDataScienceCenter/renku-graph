@@ -22,7 +22,6 @@ import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.rdfstore.triples.entities.Person
@@ -82,7 +81,7 @@ class MailtoEmailRemoverSpec extends WordSpec with InMemoryRdfStore {
   }
 
   private trait TestCase {
-    val triplesRemover = new IORdfStoreUpdater[RdfDelete](rdfStoreConfig, TestLogger()) with MailtoEmailRemover[IO]
+    val triplesRemover = new IORdfStoreUpdater(rdfStoreConfig, TestLogger()) with MailtoEmailRemover[IO]
   }
 
   private def leftSchemaEmails =

@@ -23,17 +23,21 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
 private[reprovisioning] class IOPostReProvisioning(
-    orphanProjectsRemover:   OrphanProjectsRemover[IO],
-    orphanPersonsRemover:    OrphanPersonsRemover[IO],
-    orphanMailtoNoneRemover: OrphanMailtoNoneRemover[IO],
-    mailtoEmailRemover:      MailtoEmailRemover[IO],
-    orphanAgentsRemover:     OrphanAgentsRemover[IO],
-    executionTimeRecorder:   ExecutionTimeRecorder[IO],
-    logger:                  Logger[IO]
-) extends PostReProvisioning[IO](orphanProjectsRemover,
-                                   orphanPersonsRemover,
-                                   orphanMailtoNoneRemover,
-                                   mailtoEmailRemover,
-                                   orphanAgentsRemover,
-                                   executionTimeRecorder,
-                                   logger)
+    orphanProjectsRemover:      OrphanProjectsRemover[IO],
+    orphanPersonsRemover:       OrphanPersonsRemover[IO],
+    orphanMailtoNoneRemover:    OrphanMailtoNoneRemover[IO],
+    mailtoEmailRemover:         MailtoEmailRemover[IO],
+    duplicatePersonNameRemover: DuplicatePersonNameRemover[IO],
+    orphanAgentsRemover:        OrphanAgentsRemover[IO],
+    executionTimeRecorder:      ExecutionTimeRecorder[IO],
+    logger:                     Logger[IO]
+) extends PostReProvisioning[IO](
+      orphanProjectsRemover,
+      orphanPersonsRemover,
+      orphanMailtoNoneRemover,
+      mailtoEmailRemover,
+      duplicatePersonNameRemover,
+      orphanAgentsRemover,
+      executionTimeRecorder,
+      logger
+    )

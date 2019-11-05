@@ -25,7 +25,6 @@ import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.rdfstore.IORdfStoreClient.RdfDelete
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.rdfstore.triples.entities.Agent
@@ -74,7 +73,7 @@ class OrphanAgentsRemoverSpec extends WordSpec with InMemoryRdfStore {
   }
 
   private trait TestCase {
-    val triplesRemover = new IORdfStoreUpdater[RdfDelete](rdfStoreConfig, TestLogger()) with OrphanAgentsRemover[IO]
+    val triplesRemover = new IORdfStoreUpdater(rdfStoreConfig, TestLogger()) with OrphanAgentsRemover[IO]
   }
 
   private def triplesFor(schemaVersion: SchemaVersion) =

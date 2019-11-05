@@ -18,12 +18,12 @@
 
 package ch.datascience.triplesgenerator.reprovisioning.postreprovisioning
 
-import ch.datascience.triplesgenerator.reprovisioning.RdfStoreUpdater
+import ch.datascience.triplesgenerator.reprovisioning.SingleQueryUpdater
 import eu.timepit.refined.auto._
 
 import scala.language.higherKinds
 
-private trait OrphanProjectsRemover[Interpretation[_]] extends RdfStoreUpdater[Interpretation] {
+private trait OrphanProjectsRemover[Interpretation[_]] extends SingleQueryUpdater[Interpretation] {
 
   override val description = "Removing orphan Project entities"
 

@@ -31,17 +31,16 @@ import org.http4s.{Header, Uri}
 
 import scala.concurrent.ExecutionContext
 
-abstract class IORdfStoreClient[QT <: RdfQueryType](
+abstract class IORdfStoreClient(
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext,
   contextShift:              ContextShift[IO],
   timer:                     Timer[IO],
-  ME:                        MonadError[IO, Throwable],
-  queryType:                 QT)
+  ME:                        MonadError[IO, Throwable])
     extends IORestClient(Throttler.noThrottling, logger) {
 
-  import ch.datascience.rdfstore.IORdfStoreClient.{Query, RdfQuery}
+  import ch.datascience.rdfstore.IORdfStoreClient.{Query, RdfQuery, RdfUpdate}
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
   import org.http4s.Status._
@@ -51,21 +50,25 @@ abstract class IORdfStoreClient[QT <: RdfQueryType](
   import rdfStoreConfig._
 
   protected def queryWitNoResult(using: String): IO[Unit] =
-    runQuery(using, (_: Response[IO]) => IO.unit)
+    runQuery(using, (_: Response[IO]) => IO.unit, RdfUpdate)
 
   protected def queryExpecting[ResultType](using: String)(implicit decoder: Decoder[ResultType]): IO[ResultType] =
-    runQuery(using, responseMapperFor[ResultType])
+    runQuery(using, responseMapperFor[ResultType], RdfQuery)
 
-  protected def runQuery[ResultType](using: String, mapResponse: Response[IO] => IO[ResultType]): IO[ResultType] =
+  private def runQuery[ResultType](
+      using:       String,
+      mapResponse: Response[IO] => IO[ResultType],
+      queryType:   RdfQueryType
+  ): IO[ResultType] =
     for {
-      uri    <- validateUri((fusekiBaseUrl / datasetName / path).toString)
+      uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
       query  <- ME.fromEither(Query.from(using))
-      result <- send(uploadRequest(uri, query))(toFullResponseMapper(mapResponse))
+      result <- send(uploadRequest(uri, queryType, query))(toFullResponseMapper(mapResponse))
     } yield result
 
-  private def uploadRequest(uri: Uri, query: Query): Request[IO] =
+  private def uploadRequest(uri: Uri, queryType: RdfQueryType, query: Query): Request[IO] =
     request(POST, uri, rdfStoreConfig.authCredentials)
-      .withEntity(toEntity(query))
+      .withEntity(toEntity(queryType, query))
       .putHeaders(`Content-Type`(`x-www-form-urlencoded`), Header(Accept.name.value, "application/sparql-results+json"))
 
   private def toFullResponseMapper[ResultType](
@@ -77,12 +80,12 @@ abstract class IORdfStoreClient[QT <: RdfQueryType](
   private def responseMapperFor[ResultType](implicit decoder: Decoder[ResultType]): Response[IO] => IO[ResultType] =
     _.as[ResultType](implicitly[MonadError[IO, Throwable]], jsonOf[IO, ResultType])
 
-  private def toEntity(query: Query): String = queryType match {
+  private def toEntity(queryType: RdfQueryType, query: Query): String = queryType match {
     case _: RdfQuery => s"query=$query"
     case _ => s"update=$query"
   }
 
-  private lazy val path: String = queryType match {
+  private def path(queryType: RdfQueryType): String = queryType match {
     case _: RdfQuery => "sparql"
     case _ => "update"
   }
@@ -93,11 +96,9 @@ object IORdfStoreClient {
   class Query private (val value: String) extends AnyVal with StringTinyType
   object Query extends TinyTypeFactory[Query](new Query(_)) with NonBlank
 
-  trait RdfQueryType
-  final implicit case object RdfQuery extends RdfQueryType
-  type RdfQuery = RdfQuery.type
-  final implicit case object RdfUpdate extends RdfQueryType
-  type RdfUpdate = RdfUpdate.type
-  final implicit case object RdfDelete extends RdfQueryType
-  type RdfDelete = RdfDelete.type
+  private trait RdfQueryType
+  private final implicit case object RdfQuery extends RdfQueryType
+  private type RdfQuery = RdfQuery.type
+  private final implicit case object RdfUpdate extends RdfQueryType
+  private type RdfUpdate = RdfUpdate.type
 }
