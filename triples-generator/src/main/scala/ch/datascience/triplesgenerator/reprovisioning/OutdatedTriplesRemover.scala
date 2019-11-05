@@ -45,7 +45,7 @@ private class IOOutdatedTriplesRemover(
 
   override def removeOutdatedTriples(outdatedTriples: OutdatedTriples): IO[Unit] =
     measureExecutionTime {
-      outdatedTriples.commits.toList.map(remove).sequence.map(_ => ())
+      outdatedTriples.commits.toList.map(remove).parSequence.map(_ => ())
     } map logExecutionTime(withMessage = s"Removing outdated triples for '${outdatedTriples.projectResource}' finished")
 
   private def remove(commitIdResource: CommitIdResource): IO[Unit] = queryWitNoResult {
