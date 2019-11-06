@@ -28,7 +28,7 @@ import ch.datascience.dbeventlog.commands.{IOEventLogFetch, IOEventLogMarkAllNew
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import org.scalamock.scalatest.MockFactory
@@ -40,7 +40,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Try
 
-class ReProvisionerSpec extends WordSpec with MockFactory {
+class ReProvisioningSpec extends WordSpec with MockFactory {
 
   "run" should {
 
@@ -89,16 +89,20 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(OptionT.none[IO, OutdatedTriples])
 
-        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+        (postReProvisioning.run _)
           .expects()
           .returning(context.unit)
       }
 
-      reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info(s"ReProvisioning '${project1OutdatedTriples.projectResource}' project"),
-        Info(s"ReProvisioning '${project2OutdatedTriples.projectResource}' project"),
+        Info(
+          s"ReProvisioning ${project1OutdatedTriples.commits.size} commits of '${project1OutdatedTriples.projectResource}' project"
+        ),
+        Info(
+          s"ReProvisioning ${project2OutdatedTriples.commits.size} commits of '${project2OutdatedTriples.projectResource}' project"
+        ),
         Info("All projects' triples up to date")
       )
     }
@@ -134,15 +138,15 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(OptionT.none[IO, OutdatedTriples])
 
-        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+        (postReProvisioning.run _)
           .expects()
           .returning(context.unit)
       }
 
-      reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
     }
 
-    "try to remove orphan mailto:None triples when there are no more triples to re-provision" in new TestCase {
+    "run post re-provisioning steps when there are no more project triples to re-provision" in new TestCase {
       inSequence {
         (eventLogFetch.isEventToProcess _)
           .expects()
@@ -152,12 +156,12 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(OptionT.none)
 
-        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+        (postReProvisioning.run _)
           .expects()
           .returning(context.unit)
       }
 
-      reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
     }
 
     "do not fail but simply retry if checking if there are no events to process fails" in new TestCase {
@@ -176,12 +180,12 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(OptionT.none[IO, OutdatedTriples])
 
-        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+        (postReProvisioning.run _)
           .expects()
           .returning(context.unit)
       }
 
-      reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Error("Re-provisioning failure", exception),
@@ -209,12 +213,12 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(OptionT.none[IO, OutdatedTriples])
 
-        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+        (postReProvisioning.run _)
           .expects()
           .returning(context.unit)
       }
 
-      reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Error("Re-provisioning failure", exception),
@@ -263,16 +267,16 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(OptionT.none[IO, OutdatedTriples])
 
-        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+        (postReProvisioning.run _)
           .expects()
           .returning(context.unit)
       }
 
-      reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Error("Re-provisioning failure", exception),
-        Info(s"ReProvisioning '${outdatedTriples.projectResource}' project"),
+        Info(s"ReProvisioning ${outdatedTriples.commits.size} commits of '${outdatedTriples.projectResource}' project"),
         Info("All projects' triples up to date")
       )
     }
@@ -322,21 +326,21 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(OptionT.none[IO, OutdatedTriples])
 
-        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+        (postReProvisioning.run _)
           .expects()
           .returning(context.unit)
       }
 
-      reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Error("Re-provisioning failure", exception),
-        Info(s"ReProvisioning '${outdatedTriples.projectResource}' project"),
+        Info(s"ReProvisioning ${outdatedTriples.commits.size} commits of '${outdatedTriples.projectResource}' project"),
         Info("All projects' triples up to date")
       )
     }
 
-    "do not fail but log an error if removing orphan mailto:None triples fails" in new TestCase {
+    "do not fail but log an error if post re-provisioning fails" in new TestCase {
       val exception = exceptions.generateOne
 
       inSequence {
@@ -348,16 +352,16 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(OptionT.none[IO, OutdatedTriples])
 
-        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+        (postReProvisioning.run _)
           .expects()
           .returning(context.raiseError(exception))
       }
 
-      reProvisioner.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Info("All projects' triples up to date"),
-        Error("Removing orphan 'mailto:None' triples failed", exception)
+        Error("Post re-provisioning failed", exception)
       )
     }
 
@@ -371,7 +375,7 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
           .expects()
           .returning(OptionT.none[IO, OutdatedTriples])
 
-        (orphanMailtoTriplesRemover.removeOrphanMailtoNoneTriples _)
+        (postReProvisioning.run _)
           .expects()
           .returning(context.unit)
       }
@@ -380,10 +384,10 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
 
       val startTime = System.currentTimeMillis()
 
-      new ReProvisioner[IO](
+      new ReProvisioning[IO](
         triplesFinder,
         triplesRemover,
-        orphanMailtoTriplesRemover,
+        postReProvisioning,
         eventLogMarkNew,
         eventLogFetch,
         someInitialDelay,
@@ -402,17 +406,17 @@ class ReProvisionerSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val triplesFinder              = mock[OutdatedTriplesFinder[IO]]
-    val triplesRemover             = mock[OutdatedTriplesRemover[IO]]
-    val orphanMailtoTriplesRemover = mock[OrphanMailtoNoneRemover[IO]]
-    val eventLogMarkNew            = mock[IOEventLogMarkAllNew]
-    val eventLogFetch              = mock[IOEventLogFetch]
-    val initialDelay               = ReProvisioningDelay(durations(100 millis).generateOne)
-    val logger                     = TestLogger[IO]()
-    val reProvisioner = new ReProvisioner[IO](
+    val triplesFinder      = mock[OutdatedTriplesFinder[IO]]
+    val triplesRemover     = mock[OutdatedTriplesRemover[IO]]
+    val postReProvisioning = mock[postreprovisioning.IOPostReProvisioning]
+    val eventLogMarkNew    = mock[IOEventLogMarkAllNew]
+    val eventLogFetch      = mock[IOEventLogFetch]
+    val initialDelay       = ReProvisioningDelay(durations(100 millis).generateOne)
+    val logger             = TestLogger[IO]()
+    val reProvisioning = new ReProvisioning[IO](
       triplesFinder,
       triplesRemover,
-      orphanMailtoTriplesRemover,
+      postReProvisioning,
       eventLogMarkNew,
       eventLogFetch,
       initialDelay,

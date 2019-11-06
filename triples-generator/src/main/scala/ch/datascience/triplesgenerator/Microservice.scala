@@ -33,7 +33,7 @@ import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.init._
-import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioner, ReProvisioner}
+import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning}
 import pureconfig._
 
 import scala.concurrent.ExecutionContext
@@ -61,7 +61,7 @@ object Microservice extends IOMicroservice {
         sentryInitializer        <- SentryInitializer[IO]
         fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
         triplesGeneration        <- TriplesGeneration[IO]()
-        reProvisioner            <- IOReProvisioner(triplesGeneration, transactor)
+        reProvisioning           <- IOReProvisioning(triplesGeneration, transactor)
         triplesGenerator         <- TriplesGenerator(triplesGeneration)
         commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator)
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
@@ -70,7 +70,7 @@ object Microservice extends IOMicroservice {
                      sentryInitializer,
                      new IOEventLogDbInitializer(transactor),
                      fusekiDatasetInitializer,
-                     reProvisioner,
+                     reProvisioning,
                      eventProcessorRunner,
                      new HttpServer[IO](serverPort = 9002, serviceRoutes = new MicroserviceRoutes[IO]().routes),
                      subProcessesCancelTokens
@@ -83,7 +83,7 @@ private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
     eventLogDbInitializer:    IOEventLogDbInitializer,
     datasetInitializer:       FusekiDatasetInitializer[IO],
-    reProvisioner:            ReProvisioner[IO],
+    reProvisioning:           ReProvisioning[IO],
     eventProcessorRunner:     EventProcessorRunner[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
@@ -94,7 +94,7 @@ private class MicroserviceRunner(
       _        <- sentryInitializer.run
       _        <- eventLogDbInitializer.run
       _        <- datasetInitializer.run
-      _        <- reProvisioner.run.start.map(gatherCancelToken)
+      _        <- reProvisioning.run.start.map(gatherCancelToken)
       _        <- eventProcessorRunner.run.start.map(gatherCancelToken)
       exitCode <- httpServer.run
     } yield exitCode

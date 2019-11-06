@@ -23,7 +23,6 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
@@ -40,7 +39,7 @@ private class IOProjectDatasetsFinder(
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger)
     with ProjectDatasetsFinder[IO] {
 
   import IOProjectDatasetsFinder._

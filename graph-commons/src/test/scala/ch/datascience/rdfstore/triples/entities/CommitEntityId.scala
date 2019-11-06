@@ -16,27 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.rdfstore.triples.entities
 
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.FilePath
-import ch.datascience.rdfstore.FusekiBaseUrl
-import io.circe.Json
-import io.circe.literal._
+import ch.datascience.rdfstore.triples.EntityId
 
-object CommitGeneration {
-
-  def apply(id: Id, commitActivityId: CommitActivity.Id): Json = json"""
-  {
-    "@id": $id,
-    "@type": "prov:Generation",
-    "prov:activity": {
-      "@id": $commitActivityId
-    }
-  }"""
-
-  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
-    override val value: String = (fusekiBaseUrl / "commit" / commitId / filePath).toString
-  }
-}
+trait CommitEntityId extends EntityId

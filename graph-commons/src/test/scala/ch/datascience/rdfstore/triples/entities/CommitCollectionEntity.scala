@@ -59,7 +59,8 @@ private[triples] object CommitCollectionEntity {
       .deepMerge(hadMember toResource "prov:hadMember")
   // format: on
 
-  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
+  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl)
+      extends CommitEntityId {
     override val value: String = (fusekiBaseUrl / "blob" / commitId / filePath).toString
   }
 }

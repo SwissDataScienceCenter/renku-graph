@@ -37,7 +37,7 @@ package ch.datascience.rdfstore
  */
 
 import java.io.ByteArrayInputStream
-import java.net.{ServerSocket, SocketException}
+import java.net.{BindException, ServerSocket, SocketException}
 import java.nio.charset.StandardCharsets.UTF_8
 
 import cats.MonadError
@@ -47,8 +47,8 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import io.circe.{Decoder, HCursor, Json}
+import org.apache.jena.fuseki.FusekiException
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
@@ -59,7 +59,8 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
-import scala.language.reflectiveCalls
+import scala.concurrent.duration._
+import scala.language.{postfixOps, reflectiveCalls}
 import scala.util.Random.shuffle
 import scala.xml.Elem
 
@@ -128,14 +129,23 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    IO(rdfStoreServer.start())
-      .recover {
-        case exception =>
-          throw new IllegalStateException(s"Cannot start fuseki on $fusekiBaseUrl", exception)
-      }
-      .unsafeRunSync()
-    ()
+    startServer.unsafeRunSync()
   }
+
+  private def startServer: IO[Unit] =
+    IO(rdfStoreServer.start())
+      .map(_ => ())
+      .recoverWith {
+        case exception: FusekiException =>
+          exception.getCause match {
+            case _: BindException =>
+              timer.sleep(1 second) *> startServer
+            case other =>
+              IO.raiseError(new IllegalStateException(s"Cannot start fuseki on $fusekiBaseUrl", other))
+          }
+        case other: Exception =>
+          IO.raiseError(new IllegalStateException(s"Cannot start fuseki on $fusekiBaseUrl", other))
+      }
 
   before {
     dataset.asDatasetGraph().clear()
@@ -171,7 +181,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
       .unsafeRunSync()
 
-  private val queryRunner = new IORdfStoreClient[RdfQuery](rdfStoreConfig, TestLogger()) {
+  private val queryRunner = new IORdfStoreClient(rdfStoreConfig, TestLogger()) {
 
     import cats.implicits._
     import io.circe.Decoder._

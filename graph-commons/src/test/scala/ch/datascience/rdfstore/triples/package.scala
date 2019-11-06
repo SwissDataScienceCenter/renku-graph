@@ -19,8 +19,9 @@
 package ch.datascience.rdfstore
 
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.tinytypes.StringTinyType
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes.json.TinyTypeEncoders
+import ch.datascience.tinytypes.{Renderer, StringTinyType}
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -82,7 +83,15 @@ package object triples {
       )
   }
 
-  trait EntityId extends StringTinyType
+  trait EntityId extends StringTinyType with RdfResource
+
+  implicit class EntityIdOps(entityId: EntityId) {
+    def showAs[View](implicit renderer: Renderer[View, EntityId]): String = renderer.render(entityId)
+  }
+
+  implicit object EntityIdRdfResourceRenderer extends Renderer[RdfResource, EntityId] {
+    override def render(value: EntityId): String = s"<$value>"
+  }
 
   implicit def entityIdEncoder[TT <: EntityId]: Encoder[TT] = TinyTypeEncoders.stringEncoder
 }

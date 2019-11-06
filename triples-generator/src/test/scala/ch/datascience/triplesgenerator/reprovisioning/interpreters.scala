@@ -22,27 +22,28 @@ import cats.effect._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogMarkAllNew}
+import ch.datascience.triplesgenerator.reprovisioning.postreprovisioning.PostReProvisioning
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 
-class IOReProvisioner(triplesFinder:              OutdatedTriplesFinder[IO],
-                      triplesRemover:             OutdatedTriplesRemover[IO],
-                      orphanMailtoTriplesRemover: OrphanMailtoNoneRemover[IO],
-                      eventLogMarkAllNew:         EventLogMarkAllNew[IO],
-                      eventLogFetch:              EventLogFetch[IO],
-                      reProvisioningDelay:        ReProvisioningDelay,
-                      logger:                     Logger[IO],
-                      sleepWhenBusy:              FiniteDuration)(implicit timer: Timer[IO])
-    extends ReProvisioner[IO](triplesFinder,
-                              triplesRemover,
-                              orphanMailtoTriplesRemover,
-                              eventLogMarkAllNew,
-                              eventLogFetch,
-                              reProvisioningDelay,
-                              logger,
-                              sleepWhenBusy)
+class IOReProvisioning(triplesFinder:       OutdatedTriplesFinder[IO],
+                       triplesRemover:      OutdatedTriplesRemover[IO],
+                       rostReProvisioning:  PostReProvisioning[IO],
+                       eventLogMarkAllNew:  EventLogMarkAllNew[IO],
+                       eventLogFetch:       EventLogFetch[IO],
+                       reProvisioningDelay: ReProvisioningDelay,
+                       logger:              Logger[IO],
+                       sleepWhenBusy:       FiniteDuration)(implicit timer: Timer[IO])
+    extends ReProvisioning[IO](triplesFinder,
+                               triplesRemover,
+                               rostReProvisioning,
+                               eventLogMarkAllNew,
+                               eventLogFetch,
+                               reProvisioningDelay,
+                               logger,
+                               sleepWhenBusy)
 
 class TryEventLogMarkAllNew(transactor: DbTransactor[Try, EventLogDB])(implicit ME: Bracket[Try, Throwable])
     extends EventLogMarkAllNew[Try](transactor)

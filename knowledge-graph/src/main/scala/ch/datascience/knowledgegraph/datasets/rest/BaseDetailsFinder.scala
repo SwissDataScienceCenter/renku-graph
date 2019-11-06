@@ -23,7 +23,6 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.knowledgegraph.datasets.model.Dataset
-import ch.datascience.rdfstore.IORdfStoreClient.RdfQuery
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 
@@ -38,7 +37,7 @@ private class BaseDetailsFinder(
   contextShift:              ContextShift[IO],
   timer:                     Timer[IO],
   ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient[RdfQuery](rdfStoreConfig, logger) {
+    extends IORdfStoreClient(rdfStoreConfig, logger) {
 
   import BaseDetailsFinder._
 

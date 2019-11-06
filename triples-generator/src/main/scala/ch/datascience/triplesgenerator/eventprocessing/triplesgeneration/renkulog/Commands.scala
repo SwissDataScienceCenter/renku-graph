@@ -152,6 +152,7 @@ private object Commands {
           'git,
           'diff,
           "--name-only",
+          "--diff-filter=d",
           s"${commit.parentId}..${commit.id}"
         )(destinationDirectory).out.lines
 

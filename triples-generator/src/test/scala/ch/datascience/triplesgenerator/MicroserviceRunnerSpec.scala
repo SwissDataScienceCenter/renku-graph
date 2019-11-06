@@ -28,7 +28,7 @@ import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessorRunner
 import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
-import ch.datascience.triplesgenerator.reprovisioning.IOReProvisioner
+import ch.datascience.triplesgenerator.reprovisioning.IOReProvisioning
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -54,7 +54,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (reProvisioner.run _)
+      (reProvisioning.run _)
         .expects()
         .returning(IO.unit)
 
@@ -131,7 +131,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (reProvisioner.run _)
+      (reProvisioning.run _)
         .expects()
         .returning(IO.unit)
 
@@ -163,7 +163,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.raiseError(exception))
 
-      (reProvisioner.run _)
+      (reProvisioning.run _)
         .expects()
         .returning(IO.unit)
 
@@ -196,7 +196,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .returning(IO.pure(ExitCode.Success))
 
       val exception = exceptions.generateOne
-      (reProvisioner.run _)
+      (reProvisioning.run _)
         .expects()
         .returning(IO.raiseError(exception))
 
@@ -208,14 +208,14 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
     val sentryInitializer     = mock[IOSentryInitializer]
     val eventLogDbInitializer = mock[IOEventLogDbInitializer]
     val datasetInitializer    = mock[IOFusekiDatasetInitializer]
-    val reProvisioner         = mock[IOReProvisioner]
+    val reProvisioning        = mock[IOReProvisioning]
     val eventProcessorRunner  = mock[IOEventProcessorRunner]
     val httpServer            = mock[IOHttpServer]
     val microserviceRunner = new MicroserviceRunner(
       sentryInitializer,
       eventLogDbInitializer,
       datasetInitializer,
-      reProvisioner,
+      reProvisioning,
       eventProcessorRunner,
       httpServer,
       new ConcurrentHashMap[CancelToken[IO], Unit]()

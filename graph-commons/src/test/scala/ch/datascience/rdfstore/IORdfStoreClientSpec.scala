@@ -24,7 +24,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.client.IORestClient
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.rdfstore.IORdfStoreClient.{RdfDelete, RdfQuery, RdfQueryType, RdfUpdate}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
@@ -41,7 +40,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
   "IORdfStoreClient" should {
 
     "be a IORestClient" in new QueryClientTestCase {
-      client shouldBe a[IORdfStoreClient[_]]
+      client shouldBe a[IORdfStoreClient]
       client shouldBe a[IORestClient[_]]
     }
   }
@@ -127,38 +126,6 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
     }
   }
 
-  "send sparql delete" should {
-
-    "succeed returning unit if the delete query succeeds" in new DeleteClientTestCase {
-
-      stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/update")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
-          .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
-          .withRequestBody(equalTo(s"update=${client.query}"))
-          .willReturn(ok())
-      }
-
-      client.callRemote.unsafeRunSync() shouldBe ((): Unit)
-    }
-
-    "fail if remote responds with non-OK status" in new DeleteClientTestCase {
-
-      stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/update")
-          .willReturn(
-            aResponse
-              .withStatus(Status.BadRequest.code)
-              .withBody("some message")
-          )
-      }
-
-      intercept[Exception] {
-        client.callRemote.unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/update returned ${Status.BadRequest}; body: some message"
-    }
-  }
-
   private trait TestCase {
     val fusekiBaseUrl  = FusekiBaseUrl(externalServiceBaseUrl)
     val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
@@ -172,14 +139,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
   }
 
   private trait UpdateClientTestCase extends TestCase {
-    val client = new TestRdfClient[RdfUpdate](
-      query = """INSERT { "o" "p" "s"} {}""",
-      rdfStoreConfig
-    )
-  }
-
-  private trait DeleteClientTestCase extends TestCase {
-    val client = new TestRdfClient[RdfDelete](
+    val client = new TestRdfClient(
       query = """INSERT { "o" "p" "s"} {}""",
       rdfStoreConfig
     )
@@ -188,16 +148,15 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
-  private class TestRdfClient[QT <: RdfQueryType](
-      val query:        String,
-      rdfStoreConfig:   RdfStoreConfig
-  )(implicit queryType: QT)
-      extends IORdfStoreClient[QT](rdfStoreConfig, TestLogger[IO]()) {
+  private class TestRdfClient(
+      val query:      String,
+      rdfStoreConfig: RdfStoreConfig
+  ) extends IORdfStoreClient(rdfStoreConfig, TestLogger[IO]()) {
     def callRemote: IO[Unit] = queryWitNoResult(query)
   }
 
   private class TestRdfQueryClient(val query: String, rdfStoreConfig: RdfStoreConfig)
-      extends IORdfStoreClient[RdfQuery](rdfStoreConfig, TestLogger[IO]()) {
+      extends IORdfStoreClient(rdfStoreConfig, TestLogger[IO]()) {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)
   }

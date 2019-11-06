@@ -30,6 +30,7 @@ import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.config.TriplesGeneration
+import ch.datascience.triplesgenerator.reprovisioning.postreprovisioning.{IOPostReProvisioning, PostReProvisioning}
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
 
@@ -37,20 +38,19 @@ import scala.concurrent.duration.FiniteDuration
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
-class ReProvisioner[Interpretation[_]](
-    triplesFinder:           OutdatedTriplesFinder[Interpretation],
-    triplesRemover:          OutdatedTriplesRemover[Interpretation],
-    orphanMailtoNoneRemover: OrphanMailtoNoneRemover[Interpretation],
-    eventLogMarkAllNew:      EventLogMarkAllNew[Interpretation],
-    eventLogFetch:           EventLogFetch[Interpretation],
-    reProvisioningDelay:     ReProvisioningDelay,
-    logger:                  Logger[Interpretation],
-    sleepWhenBusy:           FiniteDuration
-)(implicit ME:               MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
+class ReProvisioning[Interpretation[_]](
+    triplesFinder:       OutdatedTriplesFinder[Interpretation],
+    triplesRemover:      OutdatedTriplesRemover[Interpretation],
+    postReProvisioning:  PostReProvisioning[Interpretation],
+    eventLogMarkAllNew:  EventLogMarkAllNew[Interpretation],
+    eventLogFetch:       EventLogFetch[Interpretation],
+    reProvisioningDelay: ReProvisioningDelay,
+    logger:              Logger[Interpretation],
+    sleepWhenBusy:       FiniteDuration
+)(implicit ME:           MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
 
   import eventLogFetch._
   import eventLogMarkAllNew._
-  import orphanMailtoNoneRemover._
   import triplesFinder._
   import triplesRemover._
 
@@ -65,27 +65,30 @@ class ReProvisioner[Interpretation[_]](
 
   private def maybeReProvisionNextProject: Interpretation[Unit] =
     findOutdatedTriples.value.flatMap {
-      case Some(outdatedTriples) => reProvisionNextProject(outdatedTriples)
-      case None                  => postReProvisioningSteps()
+      case Some(outdatedTriples) =>
+        reProvisionNextProjectOrChunk(outdatedTriples)
+      case None =>
+        for {
+          _ <- logger.info("All projects' triples up to date")
+          _ <- postReProvisioning.run recoverWith errorMessage("Post re-provisioning failed")
+        } yield ()
     }
 
-  private def reProvisionNextProject(outdatedTriples: OutdatedTriples) =
+  private def reProvisionNextProjectOrChunk(outdatedTriples: OutdatedTriples) = {
+    import outdatedTriples._
     for {
       projectPath <- outdatedTriples.projectResource.as[Interpretation, ProjectPath]
       commitIds   <- outdatedTriples.commits.toList.map(_.as[Interpretation, CommitId]).sequence
       _           <- markEventsAsNew(projectPath, commitIds.toSet)
       _           <- removeOutdatedTriples(outdatedTriples)
-      _           <- logger.info(s"ReProvisioning '${outdatedTriples.projectResource}' project")
+      _           <- logger.info(s"ReProvisioning ${commits.size} commits of '$projectResource' project")
       _           <- startReProvisioning
     } yield ()
+  }
 
-  private def postReProvisioningSteps() =
-    for {
-      _ <- logger.info("All projects' triples up to date")
-      _ <- removeOrphanMailtoNoneTriples() recoverWith {
-            case NonFatal(exception) => logger.error(exception)("Removing orphan 'mailto:None' triples failed")
-          }
-    } yield ()
+  private def errorMessage(message: String): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) => logger.error(exception)(message)
+  }
 
   private lazy val tryAgain: PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -102,7 +105,7 @@ class ReProvisioningDelay private (val value: FiniteDuration) extends TinyType {
 }
 object ReProvisioningDelay extends TinyTypeFactory[ReProvisioningDelay](new ReProvisioningDelay(_))
 
-object IOReProvisioner {
+object IOReProvisioning {
 
   import cats.MonadError
   import cats.effect.{ContextShift, IO, Timer}
@@ -121,7 +124,7 @@ object IOReProvisioner {
   )(implicit ME:         MonadError[IO, Throwable],
     executionContext:    ExecutionContext,
     contextShift:        ContextShift[IO],
-    timer:               Timer[IO]): IO[ReProvisioner[IO]] =
+    timer:               Timer[IO]): IO[ReProvisioning[IO]] =
     for {
       rdfStoreConfig <- RdfStoreConfig[IO](configuration)
       schemaVersion  <- SchemaVersionFinder[IO](triplesGeneration)
@@ -129,10 +132,10 @@ object IOReProvisioner {
                        ME.fromEither(ReProvisioningDelay.from(delay)))
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield
-      new ReProvisioner[IO](
+      new ReProvisioning[IO](
         new IOOutdatedTriplesFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger),
         new IOOutdatedTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger),
-        new IOOrphanMailtoNoneRemover(rdfStoreConfig, logger),
+        IOPostReProvisioning(rdfStoreConfig, executionTimeRecorder, logger),
         new EventLogMarkAllNew[IO](dbTransactor),
         new EventLogFetch[IO](dbTransactor),
         initialDelay,

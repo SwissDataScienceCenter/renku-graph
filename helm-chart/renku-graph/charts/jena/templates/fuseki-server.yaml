@@ -13,13 +13,16 @@ data:
   fuseki-server.sh: |-
     #!/bin/sh
 
+    # killing Jena if already started as Lucene indexing cannot happen on started Jena
+    killall -9 java
+
     JAVA=$JAVA_HOME/bin/java
-    JVM_ARGS=${JVM_ARGS:--Xmx1200M}
     JAR=$FUSEKI_HOME/fuseki-server.jar
-    DATASET_CONFIG=$FUSEKI_BASE/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
 
     echo Rebuilding Lucene indices...
+    DATASET_CONFIG=$FUSEKI_BASE/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
     $JAVA -Xmx2G -cp $JAR jena.textindexer --desc=$DATASET_CONFIG
 
     echo Starting Fuseki...
+    JVM_ARGS=${JVM_ARGS:--Xmx2G}
     $JAVA $JVM_ARGS -jar $JAR "$@"

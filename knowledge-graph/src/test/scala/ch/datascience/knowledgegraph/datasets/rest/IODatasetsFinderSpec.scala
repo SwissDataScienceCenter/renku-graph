@@ -176,6 +176,7 @@ class IODatasetsFinderSpec
       name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
     )
     val dataset2 = dataset2Orig.copy(
+      name             = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne,
       maybeDescription = Some(sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateOne)
     )
     val dataset3 = dataset3Orig.copy(

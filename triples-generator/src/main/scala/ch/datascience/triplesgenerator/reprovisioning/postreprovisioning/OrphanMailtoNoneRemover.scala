@@ -16,27 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.triplesgenerator.reprovisioning.postreprovisioning
 
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.FilePath
-import ch.datascience.rdfstore.FusekiBaseUrl
-import io.circe.Json
-import io.circe.literal._
+import ch.datascience.triplesgenerator.reprovisioning.SingleQueryUpdater
+import eu.timepit.refined.auto._
 
-object CommitGeneration {
+import scala.language.higherKinds
 
-  def apply(id: Id, commitActivityId: CommitActivity.Id): Json = json"""
-  {
-    "@id": $id,
-    "@type": "prov:Generation",
-    "prov:activity": {
-      "@id": $commitActivityId
-    }
-  }"""
+private trait OrphanMailtoNoneRemover[Interpretation[_]] extends SingleQueryUpdater[Interpretation] {
 
-  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
-    override val value: String = (fusekiBaseUrl / "commit" / commitId / filePath).toString
-  }
+  override val description = "Removing orphan 'mailto:None' triples"
+
+  override val query = s"""|DELETE { ?s ?p ?o } 
+                           |WHERE {
+                           |  ?s ?p ?o .
+                           |  VALUES ?s { <mailto:None> }
+                           |  FILTER NOT EXISTS { ?someSubject ?somePredicate <mailto:None> }
+                           |}
+                           |""".stripMargin
 }
