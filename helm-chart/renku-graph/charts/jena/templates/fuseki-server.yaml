@@ -15,7 +15,6 @@ data:
 
     # killing Jena if already started as Lucene indexing cannot happen on started Jena
     killall -9 java
-
     rm $FUSEKI_BASE/databases/{{ .Values.global.graph.jena.dataset }}/tdb.lock
 
     JAVA=$JAVA_HOME/bin/java
@@ -24,6 +23,7 @@ data:
     echo Rebuilding Lucene indices...
     DATASET_CONFIG=$FUSEKI_BASE/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
     $JAVA -Xmx2G -cp $JAR jena.textindexer --desc=$DATASET_CONFIG
+    rm $FUSEKI_BASE/databases/{{ .Values.global.graph.jena.dataset }}/tdb.lock
 
     echo Starting Fuseki...
     JVM_ARGS=${JVM_ARGS:--Xmx2G}
