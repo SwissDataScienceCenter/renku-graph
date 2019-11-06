@@ -16,6 +16,8 @@ data:
     # killing Jena if already started as Lucene indexing cannot happen on started Jena
     killall -9 java
 
+    rm $FUSEKI_BASE/databases/{{ .Values.global.graph.jena.dataset }}/tdb.lock
+
     JAVA=$JAVA_HOME/bin/java
     JAR=$FUSEKI_HOME/fuseki-server.jar
 
