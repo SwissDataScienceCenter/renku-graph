@@ -19,14 +19,15 @@
 package ch.datascience.triplesgenerator.reprovisioning.postreprovisioning
 
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators.{emails, names}
+import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
-import ch.datascience.rdfstore.triples.entities.{Person, Project}
+import ch.datascience.rdfstore.triples.entities._
 import ch.datascience.triplesgenerator.reprovisioning.IORdfStoreUpdater
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -61,7 +62,7 @@ class OrphanPersonsRemoverSpec extends WordSpec with InMemoryRdfStore {
       triplesFor(orphanProjectCreatorId) shouldBe empty
     }
 
-    "do nothing if the person is used in some other entity" in new TestCase {
+    "do nothing if the person is used in as 'schema:creator'" in new TestCase {
 
       val project             = projectPaths.generateOne
       val projectCreatorName  = names.generateOne
@@ -86,6 +87,32 @@ class OrphanPersonsRemoverSpec extends WordSpec with InMemoryRdfStore {
       triplesRemover.run.unsafeRunSync() shouldBe ((): Unit)
 
       triplesFor(projectCreatorId) should have size personTriples.size
+    }
+
+    "do nothing if the person is used in as 'prov:agent'" in new TestCase {
+
+      val project     = projectPaths.generateOne
+      val committerId = Person.Id(names.generateOne)
+
+      loadToStore(
+        triples(
+          List(
+            CommitActivity(CommitActivity.Id(commitIds.generateOne),
+                           Project.Id(renkuBaseUrl, project),
+                           committedDates.generateOne,
+                           Agent.Id(schemaVersions.generateOne),
+                           committerId),
+            Person(committerId, maybeEmail = None)
+          )
+        )
+      )
+
+      val personTriples = triplesFor(committerId)
+      personTriples.size should be > 0
+
+      triplesRemover.run.unsafeRunSync() shouldBe ((): Unit)
+
+      triplesFor(committerId) should have size personTriples.size
     }
   }
 

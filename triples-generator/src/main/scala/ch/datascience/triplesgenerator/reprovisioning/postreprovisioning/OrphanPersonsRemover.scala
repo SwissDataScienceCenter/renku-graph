@@ -37,7 +37,8 @@ private trait OrphanPersonsRemover[Interpretation[_]] extends SingleQueryUpdater
                            |  {
                            |    ?personResource rdf:type ?personType .
                            |    VALUES ?personType {schema:Person prov:Person}
-                           |    FILTER NOT EXISTS { ?tripleS schema:creator ?personResource } 
+                           |    FILTER NOT EXISTS { ?resource1 schema:creator ?personResource } 
+                           |    FILTER NOT EXISTS { ?resource2 prov:agent ?personResource } 
                            |  }
                            |  { 
                            |    ?personResource ?p ?o .
