@@ -102,11 +102,10 @@ class RenkuSpec extends WordSpec {
     commitId      <- commitIds
     project       <- projects
     maybeParentId <- Gen.option(commitIds)
-  } yield
-    maybeParentId match {
-      case None           => CommitWithoutParent(commitId, project)
-      case Some(parentId) => CommitWithParent(commitId, parentId, project)
-    }
+  } yield maybeParentId match {
+    case None           => CommitWithoutParent(commitId, project)
+    case Some(parentId) => CommitWithParent(commitId, parentId, project)
+  }
 
   private val paths: Gen[os.Path] = for {
     path <- relativePaths()

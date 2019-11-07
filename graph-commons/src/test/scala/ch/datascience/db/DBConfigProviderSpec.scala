@@ -235,9 +235,8 @@ class DBConfigProviderSpec extends WordSpec {
     val hosts: Gen[Host] = for {
       hostname <- nonEmptyStrings()
       port     <- positiveInts()
-    } yield
-      RefType
-        .applyRef[Host](s"$hostname:$port")
-        .getOrElse(throw new IllegalArgumentException("Invalid host` value"))
+    } yield RefType
+      .applyRef[Host](s"$hostname:$port")
+      .getOrElse(throw new IllegalArgumentException("Invalid host` value"))
   }
 }

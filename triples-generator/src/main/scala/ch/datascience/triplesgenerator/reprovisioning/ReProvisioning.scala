@@ -128,18 +128,17 @@ object IOReProvisioning {
     for {
       rdfStoreConfig <- RdfStoreConfig[IO](configuration)
       schemaVersion  <- SchemaVersionFinder[IO](triplesGeneration)
-      initialDelay <- find[IO, FiniteDuration]("re-provisioning-initial-delay", configuration).flatMap(delay =>
-                       ME.fromEither(ReProvisioningDelay.from(delay)))
+      initialDelay <- find[IO, FiniteDuration]("re-provisioning-initial-delay", configuration)
+                       .flatMap(delay => ME.fromEither(ReProvisioningDelay.from(delay)))
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield
-      new ReProvisioning[IO](
-        new IOOutdatedTriplesFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger),
-        new IOOutdatedTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger),
-        IOPostReProvisioning(rdfStoreConfig, executionTimeRecorder, logger),
-        new EventLogMarkAllNew[IO](dbTransactor),
-        new EventLogFetch[IO](dbTransactor),
-        initialDelay,
-        logger,
-        SleepWhenBusy
-      )
+    } yield new ReProvisioning[IO](
+      new IOOutdatedTriplesFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger),
+      new IOOutdatedTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger),
+      IOPostReProvisioning(rdfStoreConfig, executionTimeRecorder, logger),
+      new EventLogMarkAllNew[IO](dbTransactor),
+      new EventLogFetch[IO](dbTransactor),
+      initialDelay,
+      logger,
+      SleepWhenBusy
+    )
 }

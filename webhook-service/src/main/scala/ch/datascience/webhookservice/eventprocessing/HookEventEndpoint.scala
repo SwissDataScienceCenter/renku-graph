@@ -133,4 +133,5 @@ class IOHookEventEndpoint(
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
     extends HookEventEndpoint[IO](
       hookTokenCrypto,
-      new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, executionTimeRecorder))
+      new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, executionTimeRecorder)
+    )

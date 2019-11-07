@@ -29,17 +29,17 @@ class RateLimitUnitSpec extends WordSpec {
   "multiplierFor" should {
 
     "return valid NANOS multiplier for all units" in {
-      Second.multiplierFor(NANOSECONDS) shouldBe 1E9
-      Minute.multiplierFor(NANOSECONDS) shouldBe 6E10
-      Hour.multiplierFor(NANOSECONDS)   shouldBe 3.6E12
-      Day.multiplierFor(NANOSECONDS)    shouldBe 8.64E13
+      Second.multiplierFor(NANOSECONDS) shouldBe 1e9
+      Minute.multiplierFor(NANOSECONDS) shouldBe 6e10
+      Hour.multiplierFor(NANOSECONDS)   shouldBe 3.6e12
+      Day.multiplierFor(NANOSECONDS)    shouldBe 8.64e13
     }
 
     "return valid MILLIS multiplier for all units" in {
-      Second.multiplierFor(MILLISECONDS) shouldBe 1000D
-      Minute.multiplierFor(MILLISECONDS) shouldBe 1000 * 60D
-      Hour.multiplierFor(MILLISECONDS)   shouldBe 1000 * 60 * 60D
-      Day.multiplierFor(MILLISECONDS)    shouldBe 1000 * 60 * 60 * 24D
+      Second.multiplierFor(MILLISECONDS) shouldBe 1000d
+      Minute.multiplierFor(MILLISECONDS) shouldBe 1000 * 60d
+      Hour.multiplierFor(MILLISECONDS)   shouldBe 1000 * 60 * 60d
+      Day.multiplierFor(MILLISECONDS)    shouldBe 1000 * 60 * 60 * 24d
     }
   }
 }

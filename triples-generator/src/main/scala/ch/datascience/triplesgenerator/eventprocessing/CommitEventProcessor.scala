@@ -73,7 +73,8 @@ class CommitEventProcessor[Interpretation[_]](
 
   private def allToTriplesAndUpload(
       commits:          NonEmptyList[Commit],
-      maybeAccessToken: Option[AccessToken]): Interpretation[NonEmptyList[UploadingResult]] =
+      maybeAccessToken: Option[AccessToken]
+  ): Interpretation[NonEmptyList[UploadingResult]] =
     commits
       .map(toTriplesAndUpload(_, maybeAccessToken))
       .sequence
@@ -194,7 +195,7 @@ object IOCommitEventProcessor {
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
-      triplesGenerator:    TriplesGenerator[IO],
+      triplesGenerator:    TriplesGenerator[IO]
   )(implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
@@ -202,16 +203,15 @@ object IOCommitEventProcessor {
       triplesUploader       <- IOTriplesUploader()
       tokenRepositoryUrl    <- TokenRepositoryUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield
-      new CommitEventProcessor[IO](
-        new CommitEventsDeserialiser[IO](),
-        new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
-        triplesGenerator,
-        triplesUploader,
-        new IOEventLogMarkDone(transactor),
-        new IOEventLogMarkNew(transactor),
-        new IOEventLogMarkFailed(transactor),
-        ApplicationLogger,
-        executionTimeRecorder
-      )
+    } yield new CommitEventProcessor[IO](
+      new CommitEventsDeserialiser[IO](),
+      new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
+      triplesGenerator,
+      triplesUploader,
+      new IOEventLogMarkDone(transactor),
+      new IOEventLogMarkNew(transactor),
+      new IOEventLogMarkFailed(transactor),
+      ApplicationLogger,
+      executionTimeRecorder
+    )
 }

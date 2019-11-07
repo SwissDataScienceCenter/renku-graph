@@ -122,13 +122,9 @@ class EventLogAddSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
              |from event_log  
              |where event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId}
          """.stripMargin
-          .query[(CommitEventId,
-                  EventStatus,
-                  CreatedDate,
-                  ExecutionDate,
-                  CommittedDate,
-                  EventBody,
-                  Option[EventMessage])]
+          .query[
+            (CommitEventId, EventStatus, CreatedDate, ExecutionDate, CommittedDate, EventBody, Option[EventMessage])
+          ]
           .unique
       }
   }

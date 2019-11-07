@@ -51,7 +51,7 @@ class IOProjectDatasetsFinderSpec
             singleFileAndCommitWithDataset(
               projectPath,
               datasetIdentifier = dataset2.id,
-              datasetName       = dataset2.name,
+              datasetName       = dataset2.name
             )
           )
         )

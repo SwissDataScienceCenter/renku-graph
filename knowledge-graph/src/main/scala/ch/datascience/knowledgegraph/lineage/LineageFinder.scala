@@ -138,8 +138,8 @@ class IOLineageFinder(
         .from(value)
         .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
 
-    def nodeIdAndLabel[N <: Node](parentField: String, apply: (NodeId, NodeLabel) => N)(
-        implicit cursor:                       HCursor): Decoder.Result[N] =
+    def nodeIdAndLabel[N <: Node](parentField: String,
+                                  apply:       (NodeId, NodeLabel) => N)(implicit cursor: HCursor): Decoder.Result[N] =
       (
         cursor.downField(parentField).downField("value").as[String].flatMap(toNodeId),
         cursor.downField(s"${parentField}_label").downField("value").as[String].flatMap(toNodeLabel)
@@ -169,11 +169,10 @@ object IOLineageFinder {
       config                <- rdfStoreConfig
       renkuBaseUrl          <- renkuBaseUrl
       executionTimeRecorder <- ExecutionTimeRecorder[IO](logger)
-    } yield
-      new IOLineageFinder(
-        config,
-        renkuBaseUrl,
-        executionTimeRecorder,
-        logger
-      )
+    } yield new IOLineageFinder(
+      config,
+      renkuBaseUrl,
+      executionTimeRecorder,
+      logger
+    )
 }

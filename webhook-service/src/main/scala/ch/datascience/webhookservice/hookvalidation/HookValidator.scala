@@ -82,7 +82,8 @@ class HookValidator[Interpretation[_]](
 
   private def findVisibilityAndToken(
       projectId:        ProjectId,
-      maybeAccessToken: Option[AccessToken]): Interpretation[(ProjectVisibility, Token)] =
+      maybeAccessToken: Option[AccessToken]
+  ): Interpretation[(ProjectVisibility, Token)] =
     maybeAccessToken match {
       case None =>
         findVisibilityAndStoredToken(projectId)

@@ -87,7 +87,8 @@ class IOOutdatedTriplesFinderSpec extends WordSpec with InMemoryRdfStore {
               commitResource =>
                 singleFileAndCommit(project,
                                     commitId      = commitResource.toCommitId,
-                                    schemaVersion = schemaVersions.generateOne)): _*
+                                    schemaVersion = schemaVersions.generateOne)
+            ): _*
         )
       )
 

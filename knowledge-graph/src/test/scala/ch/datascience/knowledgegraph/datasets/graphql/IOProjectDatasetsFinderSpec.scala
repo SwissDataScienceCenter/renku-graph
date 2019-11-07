@@ -81,7 +81,7 @@ class IOProjectDatasetsFinderSpec
                 maybeDatasetPublishedDate = dataset1.published.maybeDate,
                 maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
                 maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
-                maybeDatasetUrl           = Some(reusedDatasetUrl),
+                maybeDatasetUrl           = Some(reusedDatasetUrl)
               ),
               singleFileAndCommitWithDataset(
                 projectB.path,
@@ -94,7 +94,7 @@ class IOProjectDatasetsFinderSpec
                 maybeDatasetDescription   = dataset2.maybeDescription,
                 maybeDatasetPublishedDate = dataset2.published.maybeDate,
                 maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation)),
+                maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation))
               )
             )
           )

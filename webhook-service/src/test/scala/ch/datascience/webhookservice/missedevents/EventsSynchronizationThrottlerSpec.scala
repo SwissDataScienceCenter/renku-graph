@@ -54,9 +54,8 @@ class EventsSynchronizationThrottlerSpec extends WordSpec with MockFactory {
   private implicit val context:      MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
   private trait TestCase {
-    val newThrottler = mockFunction[RateLimit[EventsSynchronization],
-                                    Concurrent[IO],
-                                    Timer[IO],
-                                    IO[Throttler[IO, EventsSynchronization]]]
+    val newThrottler = mockFunction[RateLimit[EventsSynchronization], Concurrent[IO], Timer[IO], IO[
+      Throttler[IO, EventsSynchronization]
+    ]]
   }
 }

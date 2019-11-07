@@ -155,7 +155,7 @@ object ProcessingStatus {
       total:     Total
   )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Progress] = {
     val progress =
-      if (total.value == 0) 100D
+      if (total.value == 0) 100d
       else BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
     applyRef[Progress](progress) getOrError [Interpretation] s"ProcessingStatus with 'progress' $progress makes no sense"
   }

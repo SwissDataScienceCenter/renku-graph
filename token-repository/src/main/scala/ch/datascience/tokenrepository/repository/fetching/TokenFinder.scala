@@ -48,9 +48,8 @@ private object IOTokenFinder {
   )(implicit contextShift: ContextShift[IO]): IO[TokenFinder[IO]] =
     for {
       accessTokenCrypto <- AccessTokenCrypto[IO]()
-    } yield
-      new TokenFinder[IO](
-        new IOPersistedTokensFinder(transactor),
-        accessTokenCrypto
-      )
+    } yield new TokenFinder[IO](
+      new IOPersistedTokensFinder(transactor),
+      accessTokenCrypto
+    )
 }

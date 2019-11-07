@@ -140,11 +140,10 @@ object IODatasetEndpoint {
       datasetFinder         <- IODatasetFinder(logger = ApplicationLogger)
       renkuResourceUrl      <- RenkuResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield
-      new DatasetEndpoint[IO](
-        datasetFinder,
-        renkuResourceUrl,
-        executionTimeRecorder,
-        ApplicationLogger
-      )
+    } yield new DatasetEndpoint[IO](
+      datasetFinder,
+      renkuResourceUrl,
+      executionTimeRecorder,
+      ApplicationLogger
+    )
 }

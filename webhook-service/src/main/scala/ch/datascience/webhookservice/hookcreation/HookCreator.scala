@@ -81,7 +81,8 @@ private class HookCreator[Interpretation[_]](
   private def leftIfProjectHookExists(
       hookValidation: HookValidationResult,
       projectId:      ProjectId,
-      projectHookUrl: ProjectHookUrl): EitherT[Interpretation, HookAlreadyCreated, Unit] = EitherT.cond[Interpretation](
+      projectHookUrl: ProjectHookUrl
+  ): EitherT[Interpretation, HookAlreadyCreated, Unit] = EitherT.cond[Interpretation](
     test  = hookValidation == HookMissing,
     left  = HookAlreadyCreated(projectId, projectHookUrl),
     right = ()

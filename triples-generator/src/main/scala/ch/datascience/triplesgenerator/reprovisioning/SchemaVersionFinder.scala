@@ -50,7 +50,8 @@ private object SchemaVersionFinder {
   }
 
   private def findRenkuVersion[Interpretation[_]](
-      implicit ME: MonadError[Interpretation, Throwable]): Interpretation[SchemaVersion] = {
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): Interpretation[SchemaVersion] = {
     import ammonite.ops._
     import cats.implicits._
 

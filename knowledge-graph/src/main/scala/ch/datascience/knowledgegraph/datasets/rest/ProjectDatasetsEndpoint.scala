@@ -102,11 +102,10 @@ object IOProjectDatasetsEndpoint {
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
       renkuResourceUrl      <- RenkuResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield
-      new ProjectDatasetsEndpoint[IO](
-        new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
-        renkuResourceUrl,
-        executionTimeRecorder,
-        ApplicationLogger
-      )
+    } yield new ProjectDatasetsEndpoint[IO](
+      new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
+      renkuResourceUrl,
+      executionTimeRecorder,
+      ApplicationLogger
+    )
 }

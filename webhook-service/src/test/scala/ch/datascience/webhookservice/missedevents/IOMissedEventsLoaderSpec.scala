@@ -56,8 +56,11 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(Info(
-        s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 0 skipped, 0 failed"))
+      logger.logged(
+        Info(
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 0 skipped, 0 failed"
+        )
+      )
     }
 
     "do nothing if the latest eventIds in the Event Log " +
@@ -75,7 +78,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       logger.logged(
         Info(
-          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, ${latestEventsList.size} skipped, 0 failed")
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, ${latestEventsList.size} skipped, 0 failed"
+        )
       )
     }
 
@@ -106,8 +110,11 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(Info(
-        s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 1 updates, 2 skipped, 0 failed"))
+      logger.logged(
+        Info(
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 1 updates, 2 skipped, 0 failed"
+        )
+      )
     }
 
     "do nothing if the latest PushEvent does not exists" in new TestCase {
@@ -127,8 +134,11 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(Info(
-        s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 2 skipped, 0 failed"))
+      logger.logged(
+        Info(
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 2 skipped, 0 failed"
+        )
+      )
     }
 
     "not break processing if finding Access Token for one of the event(s) fails" in new TestCase {
@@ -156,7 +166,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       }
       logger.logged(
         Info(
-          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, ${latestEventsList.tail.size} skipped, 1 failed")
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, ${latestEventsList.tail.size} skipped, 1 failed"
+        )
       )
     }
 
@@ -182,7 +193,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       logger.loggedOnly(
         Warn(s"Synchronizing Commits for project ${event1.projectId} failed", exception),
         Info(
-          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed")
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed"
+        )
       )
     }
 
@@ -211,7 +223,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       logger.loggedOnly(
         Warn(s"Synchronizing Commits for project ${event1.projectId} failed", exception),
         Info(
-          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed")
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed"
+        )
       )
     }
 
@@ -244,7 +257,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       logger.loggedOnly(
         Warn(s"Synchronizing Commits for project ${event1.projectId} failed", exception),
         Info(
-          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed")
+          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed"
+        )
       )
     }
 

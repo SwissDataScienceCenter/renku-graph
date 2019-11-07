@@ -146,7 +146,7 @@ class IODatasetsFinderSpec
 
       loadToStore(
         triples(
-          singleFileAndCommitWithDataset(projectPaths.generateOne),
+          singleFileAndCommitWithDataset(projectPaths.generateOne)
         )
       )
 
@@ -195,7 +195,7 @@ class IODatasetsFinderSpec
         toSingleFileAndCommitWithDataset(dataset1),
         toSingleFileAndCommitWithDataset(dataset2),
         toSingleFileAndCommitWithDataset(dataset3),
-        singleFileAndCommitWithDataset(projectPaths.generateOne),
+        singleFileAndCommitWithDataset(projectPaths.generateOne)
       )
     )
 
