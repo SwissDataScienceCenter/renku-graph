@@ -32,7 +32,8 @@ object model {
   object Lineage {
 
     def from[Interpretation[_]](edges: Set[Edge], nodes: Set[Node])(
-        implicit ME:                   MonadError[Interpretation, Throwable]): Interpretation[Lineage] = {
+        implicit ME:                   MonadError[Interpretation, Throwable]
+    ): Interpretation[Lineage] = {
       val edgesNodes = collectNodes(edges)
       if (edgesNodes == nodes) ME.pure(Lineage(edges, nodes))
       else if ((nodes diff edgesNodes).nonEmpty) ME.raiseError(new IllegalArgumentException("There are orphan nodes"))

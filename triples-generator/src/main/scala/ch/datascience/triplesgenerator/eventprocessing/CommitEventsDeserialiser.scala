@@ -54,7 +54,7 @@ private class CommitEventsDeserialiser[Interpretation[_]](
         case parentIds =>
           NonEmptyList.fromListUnsafe(parentIds map (CommitWithParent(commitId, _, project)))
       }
-  }
+    }
 
   private def toMeaningfulError(eventBody: EventBody): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"CommitEvent cannot be deserialised: '$eventBody'")

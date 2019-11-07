@@ -108,11 +108,10 @@ object IOProjectEndpoint {
       projectFinder         <- IOProjectFinder(logger = ApplicationLogger)
       renkuResourceUrl      <- RenkuResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield
-      new ProjectEndpoint[IO](
-        projectFinder,
-        renkuResourceUrl,
-        executionTimeRecorder,
-        ApplicationLogger
-      )
+    } yield new ProjectEndpoint[IO](
+      projectFinder,
+      renkuResourceUrl,
+      executionTimeRecorder,
+      ApplicationLogger
+    )
 }

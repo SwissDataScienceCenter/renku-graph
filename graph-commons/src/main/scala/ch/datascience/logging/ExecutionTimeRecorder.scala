@@ -32,7 +32,7 @@ import scala.language.higherKinds
 
 class ExecutionTimeRecorder[Interpretation[_]](
     threshold:    ElapsedTime,
-    logger:       Logger[Interpretation],
+    logger:       Logger[Interpretation]
 )(implicit clock: Clock[Interpretation], ME: MonadError[Interpretation, Throwable]) {
 
   def measureExecutionTime[BlockOut](block: => Interpretation[BlockOut]): Interpretation[(ElapsedTime, BlockOut)] =

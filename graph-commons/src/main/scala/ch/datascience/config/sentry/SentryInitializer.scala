@@ -47,12 +47,12 @@ object SentryInitializer {
   import io.sentry.Sentry
 
   def apply[Interpretation[_]]()(
-      implicit ME: MonadError[Interpretation, Throwable]): Interpretation[SentryInitializer[Interpretation]] =
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): Interpretation[SentryInitializer[Interpretation]] =
     for {
       maybeSentryConfig <- SentryConfig[Interpretation]()
-    } yield
-      new SentryInitializer(
-        maybeSentryConfig,
-        dns => { Sentry.init(dns); () }
-      )
+    } yield new SentryInitializer(
+      maybeSentryConfig,
+      dns => { Sentry.init(dns); () }
+    )
 }

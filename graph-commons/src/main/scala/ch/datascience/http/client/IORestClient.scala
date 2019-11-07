@@ -100,8 +100,8 @@ abstract class IORestClient[ThrottlingTarget](
       .fetch[ResultType](request)(processResponse(request, mapResponse))
       .recoverWith(connectionError(httpClient, request, mapResponse, attempt))
 
-  private def processResponse[ResultType](request: Request[IO], mapResponse: ResponseMapping[ResultType])(
-      response:                                    Response[IO]) =
+  private def processResponse[ResultType](request:     Request[IO],
+                                          mapResponse: ResponseMapping[ResultType])(response: Response[IO]) =
     (mapResponse orElse raiseUnexpectedResponseError)(response.status, request, response)
       .recoverWith(mappingError(request, response))
 

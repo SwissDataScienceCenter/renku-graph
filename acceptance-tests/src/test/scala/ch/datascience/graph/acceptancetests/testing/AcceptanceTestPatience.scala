@@ -24,7 +24,7 @@ import org.scalatest.time.{Millis, Seconds, Span}
 trait AcceptanceTestPatience extends AbstractPatienceConfiguration {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout  = scaled(Span(30, Seconds)),
-    interval = scaled(Span(150, Millis))
+    timeout  = scaled(Span(50, Seconds)),
+    interval = scaled(Span(300, Millis))
   )
 }

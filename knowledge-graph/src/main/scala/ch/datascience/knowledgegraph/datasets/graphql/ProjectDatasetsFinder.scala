@@ -84,11 +84,10 @@ object IOProjectDatasetsFinder {
     for {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
-    } yield
-      new IOProjectDatasetsFinder(
-        new BaseDetailsFinder(config, renkuBaseUrl, logger),
-        new CreatorsFinder(config, renkuBaseUrl, logger),
-        new PartsFinder(config, renkuBaseUrl, logger),
-        new ProjectsFinder(config, renkuBaseUrl, logger)
-      )
+    } yield new IOProjectDatasetsFinder(
+      new BaseDetailsFinder(config, renkuBaseUrl, logger),
+      new CreatorsFinder(config, renkuBaseUrl, logger),
+      new PartsFinder(config, renkuBaseUrl, logger),
+      new ProjectsFinder(config, renkuBaseUrl, logger)
+    )
 }

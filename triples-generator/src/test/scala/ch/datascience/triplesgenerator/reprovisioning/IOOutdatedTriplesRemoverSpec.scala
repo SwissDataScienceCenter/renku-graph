@@ -106,8 +106,11 @@ class IOOutdatedTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
         .toSet
         .filter(triplesMatchingCommits(outdatedTriples.commits)) shouldBe empty
 
-      logger.loggedOnly(Warn(
-        s"Removing outdated triples for '${outdatedTriples.projectResource}' finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(
+        Warn(
+          s"Removing outdated triples for '${outdatedTriples.projectResource}' finished${executionTimeRecorder.executionTimeInfo}"
+        )
+      )
     }
 
     "remove all the triples related to the given commits together with eventual dataset" in new TestCase {

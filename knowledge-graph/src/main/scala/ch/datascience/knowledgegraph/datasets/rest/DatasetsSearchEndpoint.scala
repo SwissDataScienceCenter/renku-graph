@@ -154,13 +154,12 @@ object IODatasetsSearchEndpoint {
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
       renkuResourceUrl      <- RenkuResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield
-      new DatasetsSearchEndpoint[IO](
-        new IODatasetsFinder(rdfStoreConfig,
-                             new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
-                             ApplicationLogger),
-        renkuResourceUrl,
-        executionTimeRecorder,
-        ApplicationLogger
-      )
+    } yield new DatasetsSearchEndpoint[IO](
+      new IODatasetsFinder(rdfStoreConfig,
+                           new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
+                           ApplicationLogger),
+      renkuResourceUrl,
+      executionTimeRecorder,
+      ApplicationLogger
+    )
 }

@@ -244,9 +244,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
     def commitEventsFrom(startCommit: StartCommit): Gen[List[CommitEvent]] =
       for {
         commitEvent <- commitEventFrom(startCommit)
-      } yield
-        commitEvent +: commitEvent.parents
-          .map(commitEventFrom(_, startCommit.project).generateOne)
+      } yield commitEvent +: commitEvent.parents
+        .map(commitEventFrom(_, startCommit.project).generateOne)
 
     def commitEventFrom(startCommit: StartCommit): Gen[CommitEvent] = commitEventFrom(
       startCommit.id,
@@ -260,15 +259,14 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
         author        <- users
         committer     <- users
         parentsIds    <- parentsIdsLists()
-      } yield
-        CommitEvent(
-          id            = commitId,
-          message       = message,
-          committedDate = committedDate,
-          author        = author,
-          committer     = committer,
-          parents       = parentsIds,
-          project       = project
-        )
+      } yield CommitEvent(
+        id            = commitId,
+        message       = message,
+        committedDate = committedDate,
+        author        = author,
+        committer     = committer,
+        parents       = parentsIds,
+        project       = project
+      )
   }
 }

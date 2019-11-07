@@ -79,8 +79,11 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
       stubFor {
         get(s"/api/v4/projects/$projectId/hooks")
           .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(okJson(
-            withHooks(projectId, oneHookUrl = projectHookUrls generateDifferentThan projectHookId.projectHookUrl)))
+          .willReturn(
+            okJson(
+              withHooks(projectId, oneHookUrl = projectHookUrls generateDifferentThan projectHookId.projectHookUrl)
+            )
+          )
       }
 
       verifier.checkHookPresence(projectHookId, oauthAccessToken).unsafeRunSync() shouldBe false

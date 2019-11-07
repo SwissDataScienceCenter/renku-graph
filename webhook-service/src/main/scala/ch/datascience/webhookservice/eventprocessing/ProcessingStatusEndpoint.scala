@@ -50,7 +50,7 @@ import scala.util.control.NonFatal
 class ProcessingStatusEndpoint[Interpretation[_]: Effect](
     hookValidator:          HookValidator[Interpretation],
     eventsProcessingStatus: EventLogProcessingStatus[Interpretation],
-    executionTimeRecorder:  ExecutionTimeRecorder[Interpretation],
+    executionTimeRecorder:  ExecutionTimeRecorder[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
@@ -122,4 +122,5 @@ class IOProcessingStatusEndpoint(
     extends ProcessingStatusEndpoint[IO](
       new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
       new IOEventLogProcessingStatus(transactor),
-      executionTimeRecorder)
+      executionTimeRecorder
+    )

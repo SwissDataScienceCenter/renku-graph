@@ -140,14 +140,13 @@ private object IODatasetsFinder {
                              .as[Option[String]]
                              .map(blankToNone)
                              .flatMap(toOption[Description])
-      } yield
-        DatasetSearchResult(
-          id,
-          name,
-          maybeDescription,
-          DatasetPublishing(maybePublishedDate, Set.empty),
-          projectsCount
-        )
+      } yield DatasetSearchResult(
+        id,
+        name,
+        maybeDescription,
+        DatasetPublishing(maybePublishedDate, Set.empty),
+        projectsCount
+      )
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetSearchResult])

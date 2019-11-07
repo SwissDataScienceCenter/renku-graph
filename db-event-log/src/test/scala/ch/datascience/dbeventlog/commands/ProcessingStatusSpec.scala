@@ -36,7 +36,7 @@ class ProcessingStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
 
       processingStatus.done.value     shouldBe 0
       processingStatus.total.value    shouldBe 0
-      processingStatus.progress.value shouldBe 100D
+      processingStatus.progress.value shouldBe 100d
     }
 
     "return ProcessingStatus with progress calculated as (done / total) * 100" in {

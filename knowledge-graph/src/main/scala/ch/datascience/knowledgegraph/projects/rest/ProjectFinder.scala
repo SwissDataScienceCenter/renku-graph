@@ -84,12 +84,11 @@ private class IOProjectFinder(
         dateCreated  <- cursor.downField("dateCreated").downField("value").as[DateCreated]
         creatorName  <- cursor.downField("creatorName").downField("value").as[UserName]
         creatorEmail <- cursor.downField("creatorEmail").downField("value").as[Email]
-      } yield
-        Project(
-          path,
-          name,
-          ProjectCreation(dateCreated, ProjectCreator(creatorEmail, creatorName))
-        )
+      } yield Project(
+        path,
+        name,
+        ProjectCreation(dateCreated, ProjectCreator(creatorEmail, creatorName))
+      )
     }
 
     _.downField("results").downField("bindings").as(decodeList(project))

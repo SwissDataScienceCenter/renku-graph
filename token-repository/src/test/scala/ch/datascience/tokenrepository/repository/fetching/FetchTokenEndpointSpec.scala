@@ -96,7 +96,8 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
       response.status      shouldBe Status.NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync shouldBe Json.obj(
-        "message" -> Json.fromString(s"Token for projectId: $projectId not found"))
+        "message" -> Json.fromString(s"Token for projectId: $projectId not found")
+      )
 
       logger.expectNoLogs()
     }

@@ -44,14 +44,15 @@ object RemoteTriplesGenerator extends ConfigLoader[IO] {
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[TriplesGenerator[IO]] =
     for {
-      serviceUrl <- find[String]("services.triples-generator.url", configuration) flatMap (url =>
-                     IO.fromEither(TriplesGenerationServiceUrl from url))
+      serviceUrl <- find[String]("services.triples-generator.url", configuration) flatMap (
+                       url => IO.fromEither(TriplesGenerationServiceUrl from url)
+                   )
     } yield new RemoteTriplesGenerator(serviceUrl, ApplicationLogger)
 }
 
 class RemoteTriplesGenerator(
     serviceUrl:              TriplesGenerationServiceUrl,
-    logger:                  Logger[IO],
+    logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient[RemoteTriplesGenerator](Throttler.noThrottling, logger)
     with TriplesGenerator[IO] {

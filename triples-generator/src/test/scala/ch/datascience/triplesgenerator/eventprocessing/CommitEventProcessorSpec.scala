@@ -374,11 +374,10 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
   private def commits(commitId: CommitId, project: Project): Gen[Commit] =
     for {
       maybeParentId <- Gen.option(commitIds)
-    } yield
-      maybeParentId match {
-        case None           => CommitWithoutParent(commitId, project)
-        case Some(parentId) => CommitWithParent(commitId, parentId, project)
-      }
+    } yield maybeParentId match {
+      case None           => CommitWithoutParent(commitId, project)
+      case Some(parentId) => CommitWithParent(commitId, parentId, project)
+    }
 
   private def commitsLists(size: Gen[Int Refined Positive] = positiveInts(max = 5)): Gen[NonEmptyList[Commit]] =
     for {

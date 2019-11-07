@@ -45,11 +45,10 @@ object CommitInfo {
       message        <- cursor.downField("message").as[CommitMessage]
       committedDate  <- cursor.downField("committed_date").as[CommittedDate]
       parents        <- cursor.downField("parent_ids").as[List[CommitId]]
-    } yield
-      CommitInfo(id,
-                 message,
-                 committedDate,
-                 author    = User(authorName, authorEmail),
-                 committer = User(committerName, committerEmail),
-                 parents)
+    } yield CommitInfo(id,
+                       message,
+                       committedDate,
+                       author    = User(authorName, authorEmail),
+                       committer = User(committerName, committerEmail),
+                       parents)
 }

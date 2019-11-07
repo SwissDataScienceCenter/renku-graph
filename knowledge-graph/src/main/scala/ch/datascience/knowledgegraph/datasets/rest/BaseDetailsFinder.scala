@@ -87,15 +87,14 @@ private object BaseDetailsFinder {
                              .as[Option[String]]
                              .map(blankToNone)
                              .flatMap(toOption[Description])
-      } yield
-        Dataset(
-          id,
-          name,
-          maybeDescription,
-          DatasetPublishing(maybePublishedDate, Set.empty),
-          part    = List.empty,
-          project = List.empty
-        )
+      } yield Dataset(
+        id,
+        name,
+        maybeDescription,
+        DatasetPublishing(maybePublishedDate, Set.empty),
+        part    = List.empty,
+        project = List.empty
+      )
     }
 
     _.downField("results").downField("bindings").as(decodeList(dataset))

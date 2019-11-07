@@ -100,14 +100,13 @@ object RenkuLogTriplesGenerator {
     for {
       renkuLogTimeout <- new RenkuLogTimeoutConfigProvider[IO].get
       gitLabUrl       <- GitLabUrl[IO]()
-    } yield
-      new RenkuLogTriplesGenerator(
-        new GitLabRepoUrlFinder[IO](gitLabUrl),
-        new Commands.Renku(renkuLogTimeout),
-        new Commands.File,
-        new Commands.Git,
-        randomLong = new SecureRandom().nextLong _
-      )
+    } yield new RenkuLogTriplesGenerator(
+      new GitLabRepoUrlFinder[IO](gitLabUrl),
+      new Commands.Renku(renkuLogTimeout),
+      new Commands.File,
+      new Commands.Git,
+      randomLong = new SecureRandom().nextLong _
+    )
 }
 
 private class RenkuLogTimeoutConfigProvider[Interpretation[_]](
