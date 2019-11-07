@@ -18,8 +18,8 @@
 
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.2.1")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.3.12")
+addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.4.1")
 
-addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.0.0")
+addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.2.0")
 
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.11")
+addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.12")
