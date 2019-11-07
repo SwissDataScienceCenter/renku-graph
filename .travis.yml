@@ -43,7 +43,7 @@ install:
   - PATH=`pwd`/linux-amd64/:$PATH
   - helm init --client-only
 script:
-  - sbt ++$TRAVIS_SCALA_VERSION clean test && sbt ++$TRAVIS_SCALA_VERSION "project acceptance-tests" clean test && bash ./.travis/check-code-formatting.sh
+  - sbt ++$TRAVIS_SCALA_VERSION -Dsbt.color=always -Dsbt.supershell=false clean test && sbt ++$TRAVIS_SCALA_VERSION  -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test && bash ./.travis/check-code-formatting.sh
 deploy:
   - provider: script
     skip_cleanup: true
