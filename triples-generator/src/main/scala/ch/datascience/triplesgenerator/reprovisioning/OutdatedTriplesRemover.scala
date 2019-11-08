@@ -56,10 +56,10 @@ private class IOOutdatedTriplesRemover(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |DELETE { ?s ?p ?o } 
+       |DELETE { ?s ?p ?o }
        |WHERE {
        |  {
-       |    SELECT ?subject
+       |    SELECT DISTINCT ?subject
        |    WHERE {
        |      {
        |        $commitResource rdf:type prov:Activity ;
@@ -79,29 +79,66 @@ private class IOOutdatedTriplesRemover(
        |        BIND (?memberSubject as ?subject)
        |      } UNION {
        |        $commitResource prov:influenced/prov:hadMember ?memberObject .
+       |        FILTER (
+       |          !EXISTS { ?memberObject rdf:type <http://schema.org/Dataset> }
+       |        )
        |        BIND (?memberObject as ?subject)
        |      } UNION {
        |        $commitResource prov:influenced/prov:hadMember/schema:hasPart ?partObject .
+       |        FILTER (
+       |          !EXISTS { ?memberObject rdf:type <http://schema.org/DigitalDocument> }
+       |        )
        |        BIND (?partObject as ?subject)
        |      } UNION {
        |        $commitResource prov:influenced/prov:hadMember/prov:qualifiedGeneration ?generationObject .
        |        BIND (?generationObject as ?subject)
        |      } UNION {
-       |        ?activitySubject prov:activity $commitResource .
-       |        BIND (?activitySubject as ?subject)
-       |      } UNION {
-       |        ?generationSubject prov:qualifiedGeneration/prov:activity $commitResource .
-       |        BIND (?generationSubject as ?subject)
-       |      } UNION {
        |        ?memberSubject prov:hadMember/prov:qualifiedGeneration/prov:activity ?object .
        |        BIND (?memberSubject as ?subject)
        |      }
        |    }
-       |    GROUP BY ?subject
        |  } {
-       |    ?subject ?p ?o 
+       |    ?subject ?p ?o
        |    BIND (?subject as ?s)
+       |  } UNION {
+       |    # selecting isPartOf dataset triples if there are no other commits linked to that dataset project
+       |    $commitResource rdf:type prov:Activity ;
+       |                    schema:isPartOf ?commitProject ;
+       |                    prov:influenced/prov:hadMember ?dataset .
+       |    ?dataset rdf:type <http://schema.org/Dataset> ;
+       |             schema:isPartOf ?commitProject .
+       |    FILTER (
+       |      !EXISTS {
+       |        ?otherCommit rdf:type prov:Activity ;
+       |                     schema:isPartOf ?commitProject .
+       |        FILTER (?otherCommit != $commitResource)
+       |      }
+       |    )
+       |    BIND (?dataset as ?s)
+       |    BIND (schema:isPartOf as ?p)
+       |    BIND (?commitProject as ?o)
+       |  } UNION {
+       |    # selecting isPartOf dataset part triples for the datasets for which isPartOf triples are selected
+       |    $commitResource rdf:type prov:Activity ;
+       |                    schema:isPartOf ?commitProject ;
+       |                    prov:influenced/prov:hadMember ?dataset .
+       |    ?dataset rdf:type <http://schema.org/Dataset> ;
+       |             schema:isPartOf ?commitProject .
+       |    FILTER (
+       |      !EXISTS {
+       |        ?otherCommit rdf:type prov:Activity ;
+       |                     schema:isPartOf ?commitProject .
+       |        FILTER (?otherCommit != $commitResource)
+       |      }
+       |    )
+       |    ?dataset schema:hasPart ?part .
+       |    ?part rdf:type <http://schema.org/DigitalDocument> ;
+       |          schema:isPartOf ?commitProject .
+       |    BIND (?part as ?s)
+       |    BIND (schema:isPartOf as ?p)
+       |    BIND (?commitProject as ?o)
        |  }
-       |}""".stripMargin
+       |}
+       |""".stripMargin
   }
 }

@@ -110,7 +110,7 @@ object singleFileAndCommitWithDataset {
     maybeEmail <- Gen.option(emails)
   } yield (name, maybeEmail)
 
-  private val datasetParts: Gen[(PartName, PartLocation)] = for {
+  val datasetParts: Gen[(PartName, PartLocation)] = for {
     name     <- datasetPartNames
     location <- datasetPartLocations
   } yield (name, location)

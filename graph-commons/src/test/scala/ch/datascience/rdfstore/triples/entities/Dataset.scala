@@ -29,7 +29,7 @@ import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.Json
 import io.circe.literal._
 
-private[triples] object Dataset {
+object Dataset {
 
   // format: off
   def apply(
