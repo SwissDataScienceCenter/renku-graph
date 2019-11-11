@@ -23,6 +23,8 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
 private[reprovisioning] class IOPostReProvisioning(
+    orphanPartsRemover:         OrphanPartsRemover[IO],
+    orphanDatasetsRemover:      OrphanDatasetsRemover[IO],
     orphanProjectsRemover:      OrphanProjectsRemover[IO],
     orphanPersonsRemover:       OrphanPersonsRemover[IO],
     orphanMailtoNoneRemover:    OrphanMailtoNoneRemover[IO],
@@ -32,6 +34,8 @@ private[reprovisioning] class IOPostReProvisioning(
     executionTimeRecorder:      ExecutionTimeRecorder[IO],
     logger:                     Logger[IO]
 ) extends PostReProvisioning[IO](
+      orphanPartsRemover,
+      orphanDatasetsRemover,
       orphanProjectsRemover,
       orphanPersonsRemover,
       orphanMailtoNoneRemover,

@@ -31,6 +31,8 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private[reprovisioning] class PostReProvisioning[Interpretation[_]](
+    orphanPartsRemover:         OrphanPartsRemover[Interpretation],
+    orphanDatasetsRemover:      OrphanDatasetsRemover[Interpretation],
     orphanProjectsRemover:      OrphanProjectsRemover[Interpretation],
     orphanPersonsRemover:       OrphanPersonsRemover[Interpretation],
     orphanMailtoNoneRemover:    OrphanMailtoNoneRemover[Interpretation],
@@ -44,6 +46,8 @@ private[reprovisioning] class PostReProvisioning[Interpretation[_]](
   import executionTimeRecorder._
 
   private def steps: List[RdfStoreUpdater[Interpretation]] = List(
+    orphanPartsRemover,
+    orphanDatasetsRemover,
     orphanProjectsRemover,
     orphanPersonsRemover,
     orphanMailtoNoneRemover,
@@ -77,6 +81,8 @@ private[reprovisioning] object IOPostReProvisioning {
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): PostReProvisioning[IO] = new PostReProvisioning[IO](
+    new IORdfStoreUpdater(rdfStoreConfig, logger) with OrphanPartsRemover[IO],
+    new IORdfStoreUpdater(rdfStoreConfig, logger) with OrphanDatasetsRemover[IO],
     new IORdfStoreUpdater(rdfStoreConfig, logger) with OrphanProjectsRemover[IO],
     new IORdfStoreUpdater(rdfStoreConfig, logger) with OrphanPersonsRemover[IO],
     new IORdfStoreUpdater(rdfStoreConfig, logger) with OrphanMailtoNoneRemover[IO],

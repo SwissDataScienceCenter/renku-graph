@@ -262,6 +262,8 @@ object Generators {
 
       def generateOne: T = generator.sample getOrElse generateOne
 
+      def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
+
       def generateDifferentThan(value: T): T = {
         val generated = generator.sample.getOrElse(generateDifferentThan(value))
         if (generated == value) generateDifferentThan(value)

@@ -82,6 +82,8 @@ class PostReProvisioningSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
+    val orphanPartsRemover         = mock[OrphanPartsRemover[Try]]
+    val orphanDatasetsRemover      = mock[OrphanDatasetsRemover[Try]]
     val orphanProjectsRemover      = mock[OrphanProjectsRemover[Try]]
     val orphanPersonsRemover       = mock[OrphanPersonsRemover[Try]]
     val orphanMailtoNoneRemover    = mock[OrphanMailtoNoneRemover[Try]]
@@ -91,6 +93,8 @@ class PostReProvisioningSpec extends WordSpec with MockFactory {
     val logger                     = TestLogger[Try]()
     val executionTimeRecorder      = TestExecutionTimeRecorder(logger)
     val postReProvisioning = new PostReProvisioning[Try](
+      orphanPartsRemover,
+      orphanDatasetsRemover,
       orphanProjectsRemover,
       orphanPersonsRemover,
       orphanMailtoNoneRemover,
@@ -102,6 +106,8 @@ class PostReProvisioningSpec extends WordSpec with MockFactory {
     )
 
     val steps: List[RdfStoreUpdater[Try]] = List(
+      orphanPartsRemover,
+      orphanDatasetsRemover,
       orphanProjectsRemover,
       orphanPersonsRemover,
       orphanMailtoNoneRemover,
