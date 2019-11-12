@@ -23,14 +23,12 @@ import cats.effect.Timer
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogMarkAllNew}
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogReScheduler}
+import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.config.TriplesGeneration
-import ch.datascience.triplesgenerator.reprovisioning.postreprovisioning.{IOPostReProvisioning, PostReProvisioning}
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
 
@@ -39,55 +37,47 @@ import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
 class ReProvisioning[Interpretation[_]](
-    triplesFinder:       OutdatedTriplesFinder[Interpretation],
-    triplesRemover:      OutdatedTriplesRemover[Interpretation],
-    postReProvisioning:  PostReProvisioning[Interpretation],
-    eventLogMarkAllNew:  EventLogMarkAllNew[Interpretation],
-    eventLogFetch:       EventLogFetch[Interpretation],
-    reProvisioningDelay: ReProvisioningDelay,
-    logger:              Logger[Interpretation],
-    sleepWhenBusy:       FiniteDuration
-)(implicit ME:           MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
+    triplesVersionFinder:  TriplesVersionFinder[Interpretation],
+    triplesRemover:        TriplesRemover[Interpretation],
+    eventLogReScheduler:   EventLogReScheduler[Interpretation],
+    eventLogFetch:         EventLogFetch[Interpretation],
+    reProvisioningDelay:   ReProvisioningDelay,
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+    logger:                Logger[Interpretation],
+    sleepWhenBusy:         FiniteDuration
+)(implicit ME:             MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
 
   import eventLogFetch._
-  import eventLogMarkAllNew._
-  import triplesFinder._
+  import eventLogReScheduler._
+  import executionTimeRecorder._
   import triplesRemover._
+  import triplesVersionFinder._
 
   def run: Interpretation[Unit] =
     timer.sleep(reProvisioningDelay.value) *> startReProvisioning
 
   private def startReProvisioning: Interpretation[Unit] =
     isEventToProcess flatMap {
-      case false => maybeReProvisionNextProject
+      case false => reProvisionIfNeeded
       case true  => (timer sleep sleepWhenBusy) *> startReProvisioning
     } recoverWith tryAgain
 
-  private def maybeReProvisionNextProject: Interpretation[Unit] =
-    findOutdatedTriples.value.flatMap {
-      case Some(outdatedTriples) =>
-        reProvisionNextProjectOrChunk(outdatedTriples)
-      case None =>
-        for {
-          _ <- logger.info("All projects' triples up to date")
-          _ <- postReProvisioning.run recoverWith errorMessage("Post re-provisioning failed")
-        } yield ()
+  private def reProvisionIfNeeded: Interpretation[Unit] =
+    triplesUpToDate.flatMap {
+      case false => triggerReProvisioning
+      case true  => logger.info("All projects' triples up to date")
     }
 
-  private def reProvisionNextProjectOrChunk(outdatedTriples: OutdatedTriples) = {
-    import outdatedTriples._
-    for {
-      projectPath <- outdatedTriples.projectResource.as[Interpretation, ProjectPath]
-      commitIds   <- outdatedTriples.commits.toList.map(_.as[Interpretation, CommitId]).sequence
-      _           <- markEventsAsNew(projectPath, commitIds.toSet)
-      _           <- removeOutdatedTriples(outdatedTriples)
-      _           <- logger.info(s"ReProvisioning ${commits.size} commits of '$projectResource' project")
-      _           <- startReProvisioning
-    } yield ()
-  }
+  private def triggerReProvisioning =
+    measureExecutionTime {
+      for {
+        _ <- removeAllTriples()
+        _ <- scheduleEventsForProcessing()
+      } yield ()
+    } flatMap logSummary
 
-  private def errorMessage(message: String): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) => logger.error(exception)(message)
+  private def logSummary: ((ElapsedTime, Unit)) => Interpretation[Unit] = {
+    case (elapsedTime, _) => logger.info(s"ReProvisioning triggered in ${elapsedTime}ms")
   }
 
   private lazy val tryAgain: PartialFunction[Throwable, Interpretation[Unit]] = {
@@ -114,7 +104,7 @@ object IOReProvisioning {
   import scala.concurrent.ExecutionContext
   import scala.concurrent.duration._
 
-  private val SleepWhenBusy = 10 second
+  private val SleepWhenBusy = 1 minute
 
   def apply(
       triplesGeneration: TriplesGeneration,
@@ -132,12 +122,12 @@ object IOReProvisioning {
                        .flatMap(delay => ME.fromEither(ReProvisioningDelay.from(delay)))
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ReProvisioning[IO](
-      new IOOutdatedTriplesFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger),
-      new IOOutdatedTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger),
-      IOPostReProvisioning(rdfStoreConfig, executionTimeRecorder, logger),
-      new EventLogMarkAllNew[IO](dbTransactor),
+      new IOTriplesVersionFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger),
+      new IOTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger),
+      new EventLogReScheduler[IO](dbTransactor),
       new EventLogFetch[IO](dbTransactor),
       initialDelay,
+      executionTimeRecorder,
       logger,
       SleepWhenBusy
     )

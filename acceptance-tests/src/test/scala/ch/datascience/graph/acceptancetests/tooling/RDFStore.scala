@@ -20,7 +20,6 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.query.QuerySolution
@@ -147,23 +146,4 @@ object RDFStore {
       }
       .unsafeRunSync()
   }
-
-  def doesVersionTripleExist(schemaVersion: SchemaVersion): Boolean =
-    jenaReference.read
-      .map { jena =>
-        jena.connection
-          .query(s"""
-                    |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                    |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                    |
-                    |SELECT (COUNT(*) as ?Triples) WHERE { 
-                    |  ?agentS rdfs:label "renku $schemaVersion" .
-                    |}""".stripMargin)
-          .execSelect()
-          .next()
-          .get("Triples")
-          .asLiteral()
-          .getInt != 0
-      }
-      .unsafeRunSync()
 }

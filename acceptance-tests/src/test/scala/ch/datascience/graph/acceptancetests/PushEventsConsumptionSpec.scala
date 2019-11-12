@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
-import ch.datascience.graph.acceptancetests.tooling.GraphServices
+import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.webhookservice.model.HookToken
@@ -43,8 +43,6 @@ class PushEventsConsumptionSpec
   feature("A Push Event sent to the services generates Commit Events in the Event Log") {
 
     scenario("Push Event not being processed yet gets translated into Commit Events in the Event Log") {
-
-      GraphServices.restart(triplesGenerator)
 
       val projectId = projectIds.generateOne
       val commitId  = commitIds.generateOne
