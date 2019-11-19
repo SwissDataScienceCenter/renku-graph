@@ -36,7 +36,11 @@ import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
-import ch.datascience.triplesgenerator.eventprocessing.TriplesUploadResult.{MalformedTriples, TriplesUploaded, UploadingError}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.interpreters.TryTriplesCurator
+import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult.{DeliveryFailure, DeliverySuccess, InvalidTriplesFailure, InvalidUpdatesFailure}
+import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TryUploader
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -132,8 +136,41 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       logSummary(commits, uploaded = 0, failed = 1)
     }
 
+    s"succeed and mark event with $NonRecoverableFailure if curating triples fails" in new TestCase {
+
+      val commits       = commitsLists(size = Gen.const(1)).generateOne
+      val commit +: Nil = commits.toList
+
+      (eventsDeserialiser
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
+        .returning(context.pure(commits))
+
+      givenFetchingAccessToken(forProjectId = commits.head.project.id)
+        .returning(context.pure(maybeAccessToken))
+
+      val rawTriples = jsonLDTriples.generateOne
+      (triplesFinder
+        .generateTriples(_: Commit, _: Option[AccessToken]))
+        .expects(commit, maybeAccessToken)
+        .returning(context.pure(rawTriples))
+
+      val exception = exceptions.generateOne
+      (triplesCurator
+        .curate(_: JsonLDTriples))
+        .expects(rawTriples)
+        .returning(context.raiseError(exception))
+
+      expectEventMarkedFailed(commit.commitEventId, NonRecoverableFailure, exception)
+
+      eventProcessor(eventBody) shouldBe context.unit
+
+      logError(commits.head, exception)
+      logSummary(commits, uploaded = 0, failed = 1)
+    }
+
     s"succeed and mark event with $TriplesStoreFailure " +
-      s"if uploading triples to the dataset fails with $UploadingError for at least one event" in new TestCase {
+      s"if uploading triples to the dataset fails with $DeliveryFailure for at least one event" in new TestCase {
 
       val commits                   = commitsLists(size = Gen.const(2)).generateOne
       val commit1 +: commit2 +: Nil = commits.toList
@@ -146,16 +183,22 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       givenFetchingAccessToken(forProjectId = commits.head.project.id)
         .returning(context.pure(maybeAccessToken))
 
-      val triples1 = jsonLDTriples.generateOne
+      val rawTriples = jsonLDTriples.generateOne
       (triplesFinder
         .generateTriples(_: Commit, _: Option[AccessToken]))
         .expects(commit1, maybeAccessToken)
-        .returning(context.pure(triples1))
+        .returning(context.pure(rawTriples))
 
-      val uploadingError = nonEmptyStrings().map(UploadingError.apply).generateOne
-      (triplesUploader
-        .upload(_: JsonLDTriples))
-        .expects(triples1)
+      val curatedTriples = curatedTriplesObjects().generateOne
+      (triplesCurator
+        .curate(_: JsonLDTriples))
+        .expects(rawTriples)
+        .returning(context.pure(curatedTriples))
+
+      val uploadingError = nonEmptyStrings().map(DeliveryFailure.apply).generateOne
+      (uploader
+        .upload(_: CuratedTriples))
+        .expects(curatedTriples)
         .returning(context.pure(uploadingError))
 
       val exception2 = exceptions.generateOne
@@ -173,43 +216,51 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     }
 
     s"succeed and mark event with $NonRecoverableFailure " +
-      "if uploading triples to the dataset fails with MalformedTriples for at least one event" in new TestCase {
+      s"if uploading triples to the store fails with either $InvalidTriplesFailure or $InvalidUpdatesFailure for at least one event" in new TestCase {
 
-      val commits                   = commitsLists(size = Gen.const(2)).generateOne
-      val commit1 +: commit2 +: Nil = commits.toList
+      (InvalidTriplesFailure("error") +: InvalidUpdatesFailure("error") +: Nil) foreach { failure =>
+        val commits                   = commitsLists(size = Gen.const(2)).generateOne
+        val commit1 +: commit2 +: Nil = commits.toList
 
-      (eventsDeserialiser
-        .deserialiseToCommitEvents(_: EventBody))
-        .expects(eventBody)
-        .returning(context.pure(commits))
+        (eventsDeserialiser
+          .deserialiseToCommitEvents(_: EventBody))
+          .expects(eventBody)
+          .returning(context.pure(commits))
 
-      givenFetchingAccessToken(forProjectId = commits.head.project.id)
-        .returning(context.pure(maybeAccessToken))
+        givenFetchingAccessToken(forProjectId = commits.head.project.id)
+          .returning(context.pure(maybeAccessToken))
 
-      val triples1 = jsonLDTriples.generateOne
-      (triplesFinder
-        .generateTriples(_: Commit, _: Option[AccessToken]))
-        .expects(commit1, maybeAccessToken)
-        .returning(context.pure(triples1))
+        val rawTriples = jsonLDTriples.generateOne
+        (triplesFinder
+          .generateTriples(_: Commit, _: Option[AccessToken]))
+          .expects(commit1, maybeAccessToken)
+          .returning(context.pure(rawTriples))
 
-      val malformedTriples = nonEmptyStrings().map(MalformedTriples.apply).generateOne
-      (triplesUploader
-        .upload(_: JsonLDTriples))
-        .expects(triples1)
-        .returning(context.pure(malformedTriples))
+        val curatedTriples = curatedTriplesObjects().generateOne
+        (triplesCurator
+          .curate(_: JsonLDTriples))
+          .expects(rawTriples)
+          .returning(context.pure(curatedTriples))
 
-      val exception2 = exceptions.generateOne
-      (triplesFinder
-        .generateTriples(_: Commit, _: Option[AccessToken]))
-        .expects(commit2, maybeAccessToken)
-        .returning(context.raiseError(exception2))
+        (uploader
+          .upload(_: CuratedTriples))
+          .expects(curatedTriples)
+          .returning(context.pure(failure))
 
-      expectEventMarkedFailed(commit1.commitEventId, NonRecoverableFailure, malformedTriples)
+        val exception2 = exceptions.generateOne
+        (triplesFinder
+          .generateTriples(_: Commit, _: Option[AccessToken]))
+          .expects(commit2, maybeAccessToken)
+          .returning(context.raiseError(exception2))
 
-      eventProcessor(eventBody) shouldBe context.unit
+        expectEventMarkedFailed(commit1.commitEventId, NonRecoverableFailure, failure)
 
-      logError(commits.head, malformedTriples.message)
-      logSummary(commits, uploaded = 0, failed = 2)
+        eventProcessor(eventBody) shouldBe context.unit
+
+        logError(commits.head, failure.getMessage)
+        logSummary(commits, uploaded = 0, failed = 2)
+        logger.reset()
+      }
     }
 
     s"succeed and log an error if marking event as $TriplesStore fails" in new TestCase {
@@ -225,16 +276,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       givenFetchingAccessToken(forProjectId = commits.head.project.id)
         .returning(context.pure(maybeAccessToken))
 
-      val triples = jsonLDTriples.generateOne
-      (triplesFinder
-        .generateTriples(_: Commit, _: Option[AccessToken]))
-        .expects(commit, maybeAccessToken)
-        .returning(context.pure(triples))
-
-      (triplesUploader
-        .upload(_: JsonLDTriples))
-        .expects(triples)
-        .returning(context.pure(TriplesUploaded))
+      successfulTriplesGenerationAndUpload(commit -> jsonLDTriples.generateOne)
 
       val exception = exceptions.generateOne
       (eventLogMarkDone
@@ -298,7 +340,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     val eventsDeserialiser    = mock[TryCommitEventsDeserialiser]
     val accessTokenFinder     = mock[TryAccessTokenFinder]
     val triplesFinder         = mock[TryTriplesGenerator]
-    val triplesUploader       = mock[TryTriplesUploader]
+    val triplesCurator        = mock[TryTriplesCurator]
+    val uploader              = mock[TryUploader]
     val eventLogMarkDone      = mock[TryEventLogMarkDone]
     val eventLogMarkNew       = mock[TryEventLogMarkNew]
     val eventLogMarkFailed    = mock[TryEventLogMarkFailed]
@@ -308,7 +351,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       eventsDeserialiser,
       accessTokenFinder,
       triplesFinder,
-      triplesUploader,
+      triplesCurator,
+      uploader,
       eventLogMarkDone,
       eventLogMarkNew,
       eventLogMarkFailed,
@@ -331,10 +375,16 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         .expects(commit, maybeAccessToken)
         .returning(context.pure(triples))
 
-      (triplesUploader
-        .upload(_: JsonLDTriples))
+      val curatedTriples = curatedTriplesObjects().generateOne
+      (triplesCurator
+        .curate(_: JsonLDTriples))
         .expects(triples)
-        .returning(context.pure(TriplesUploaded))
+        .returning(context.pure(curatedTriples))
+
+      (uploader
+        .upload(_: CuratedTriples))
+        .expects(curatedTriples)
+        .returning(context.pure(DeliverySuccess))
     }
 
     def expectEventMarkedDone(commitEventId: CommitEventId) =

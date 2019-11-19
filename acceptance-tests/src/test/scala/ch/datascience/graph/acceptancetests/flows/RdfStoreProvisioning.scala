@@ -45,7 +45,8 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
     `data in the RDF store`(
       project,
       commitId,
-      triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion)))
+      triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion))
+    )
 
   def `data in the RDF store`(project: Project, commitId: CommitId, triples: JsonLDTriples): Assertion = {
     val projectId = project.id
@@ -64,10 +65,12 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
 
     eventually {
       RDFStore.getAllTriples
-        .map {
-          case (s, p, o) => s"$s $p $o"
-        }
+        .map { case (s, p, o) => s"$s $p $o" }
         .exists(_.contains(commitId.value)) shouldBe true
     }
+  }
+
+  def `triples updates run`(values: Set[String]): Assertion = eventually {
+    (values diff RDFStore.getAllTriples.map { case (_, _, o) => o }.toSet) shouldBe empty
   }
 }

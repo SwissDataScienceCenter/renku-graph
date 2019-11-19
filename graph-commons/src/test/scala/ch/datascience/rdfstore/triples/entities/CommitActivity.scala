@@ -50,23 +50,23 @@ object CommitActivity {
   ): Json = json"""
   {
     "@id": $id,
-    "@type": "prov:Activity",
-    "prov:endedAtTime": {
+    "@type": "http://www.w3.org/ns/prov#Activity",
+    "http://www.w3.org/ns/prov#endedAtTime": {
       "@type": "xsd:dateTime",
       "@value": "2018-12-06T11:26:33+01:00"
     },
-    "prov:startedAtTime": {
+    "http://www.w3.org/ns/prov#startedAtTime": {
       "@type": "xsd:dateTime",
       "@value": ${committedDate.value}
     },
-    "prov:wasInformedBy": {
+    "http://www.w3.org/ns/prov#wasInformedBy": {
       "@id": $id
     },
-    "rdfs:comment": ${comment.value},
-    "rdfs:label": ${id.commitId.value},
-    "prov:agent": [${agentId.toIdJson}, ${personId.toIdJson}]
+    "http://www.w3.org/2000/01/rdf-schema#comment": ${comment.value},
+    "http://www.w3.org/2000/01/rdf-schema#label": ${id.commitId.value},
+    "http://www.w3.org/ns/prov#agent": [${agentId.toIdJson}, ${personId.toIdJson}]
   }""".deepMerge(`schema:isPartOf`(projectId))
-      .deepMerge(maybeInfluencedBy toResources "prov:influenced")
+      .deepMerge(maybeInfluencedBy toResources "http://www.w3.org/ns/prov#influenced")
   // format: on
 
   final case class Id(commitId: CommitId)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {

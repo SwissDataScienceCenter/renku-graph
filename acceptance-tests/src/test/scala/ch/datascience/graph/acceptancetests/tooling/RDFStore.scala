@@ -130,11 +130,9 @@ object RDFStore {
     jenaReference.read
       .map { jena =>
         val queryResults = jena.connection
-          .query("""
-                   |SELECT ?s ?p ?o WHERE {
-                   |  ?s ?p ?o .
-                   |}
-                   |""".stripMargin)
+          .query("""|SELECT ?s ?p ?o 
+                    |WHERE { ?s ?p ?o }
+                    |""".stripMargin)
           .execSelect()
 
         val results = ArrayBuffer.empty[(String, String, String)]

@@ -22,7 +22,7 @@ package entities
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
-import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.triples.entities.Project.`schema:isPartOf`
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
@@ -31,45 +31,44 @@ import io.circe.literal._
 
 object Dataset {
 
-  // format: off
-  def apply(
-      id:                        Id,
-      projectId:                 Project.Id,
-      datasetName:               Name,
-      maybeDatasetDescription:   Option[Description],
-      maybeDatasetPublishedDate: Option[PublishedDate],
-      maybeDatasetCreators:      Set[(UserName, Option[Email])],
-      maybeDatasetParts:         List[(PartName, PartLocation)],
-      commitId:                  CommitId,
-      maybeDatasetUrl:           Option[String],
-      generationPath:            FilePath,
-      commitGenerationId:        CommitGeneration.Id
-  )(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = List(json"""
-  {
-    "@id": $id,
-    "@type": [
-      "prov:Entity",
-      "http://purl.org/wf4ever/wfprov#Artifact",
-      "schema:Dataset"
-    ],
-    "prov:atLocation": $generationPath,
-    "prov:qualifiedGeneration": {
-      "@id": $commitGenerationId
-    },
-    "rdfs:label": ${id.datasetId},
-    "schema:identifier": ${id.datasetId},
-    "schema:name": $datasetName
-  }"""
-    .deepMerge(`schema:isPartOf`(projectId))
-    .deepMerge(maybeDatasetUrl to "schema:url")
-    .deepMerge(maybeDatasetDescription to "schema:description")
-    .deepMerge(maybeDatasetPublishedDate to ("schema:datePublished", "schema:Date"))
-    .deepMerge(maybeDatasetCreators.map(_._1).map(Person.Id).toList toResources "schema:creator")
-    .deepMerge(maybeDatasetParts.map(_._2).map(DatasetPart.Id(commitId, _)) toResources "schema:hasPart")
-  )
-    .++(maybeDatasetCreators.toList.map { case (name, maybeEmail) => Person(Person.Id(name), maybeEmail) })
-    .++(maybeDatasetParts.map { case (name, location) => DatasetPart(DatasetPart.Id(commitId, location), name, projectId) })
-  // format: on
+  def apply(id:                        Id,
+            projectId:                 Project.Id,
+            datasetName:               Name,
+            maybeDatasetDescription:   Option[Description],
+            maybeDatasetPublishedDate: Option[PublishedDate],
+            maybeDatasetCreators:      Set[(UserName, Option[Email], Option[Affiliation])],
+            maybeDatasetParts:         List[(PartName, PartLocation)],
+            commitId:                  CommitId,
+            maybeDatasetUrl:           Option[String],
+            generationPath:            FilePath,
+            commitGenerationId:        CommitGeneration.Id)(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
+    val creators = maybeDatasetCreators.toList.map(creator => Person.Id(creator._2) -> creator)
+    // format: off
+    List(json"""
+      {
+        "@id": $id,
+        "@type": [
+          "http://www.w3.org/ns/prov#Entity",
+          "http://purl.org/wf4ever/wfprov#Artifact",
+          "http://schema.org/Dataset"
+        ],
+        "http://www.w3.org/ns/prov#atLocation": $generationPath,
+        "http://www.w3.org/ns/prov#qualifiedGeneration": {
+          "@id": $commitGenerationId
+        },
+        "http://www.w3.org/2000/01/rdf-schema#label": ${id.datasetId},
+        "http://schema.org/identifier": ${id.datasetId},
+        "http://schema.org/name": $datasetName
+      }""".deepMerge(`schema:isPartOf`(projectId))
+          .deepMerge(maybeDatasetUrl toValue "http://schema.org/url")
+          .deepMerge(maybeDatasetDescription toValue "http://schema.org/description")
+          .deepMerge(maybeDatasetPublishedDate toValue ("http://schema.org/datePublished", "http://schema.org/Date"))
+          .deepMerge(creators.map(_._1) toResources "http://schema.org/creator")
+          .deepMerge(maybeDatasetParts.map(_._2).map(DatasetPart.Id(commitId, _)) toResources "http://schema.org/hasPart"))
+          .++(creators.map { case (id, (name, maybeEmail, maybeAffiliations)) => Person(id, name, maybeEmail, maybeAffiliations) })
+          .++(maybeDatasetParts.map { case (name, location) => DatasetPart(DatasetPart.Id(commitId, location), name, projectId) })
+    // format: on
+  }
 
   final case class Id(datasetId: Identifier) extends EntityId {
     override val value: String = (renkuBaseUrl / "datasets" / datasetId).toString

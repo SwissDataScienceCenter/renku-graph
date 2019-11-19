@@ -46,15 +46,15 @@ object singleFileAndCommit {
     val generationPath                            = FilePath("tree") / filePath
     val projectId                                 = Project.Id(renkuBaseUrl, projectPath)
     val (projectCreatorName, projectCreatorEmail) = projectCreator
-    val projectCreatorId                          = Person.Id(projectCreatorName)
+    val projectCreatorId                          = Person.Id(Some(projectCreatorEmail))
     val commitGenerationId                        = CommitGeneration.Id(commitId, generationPath)
     val commitActivityId                          = CommitActivity.Id(commitId)
-    val committerPersonId                         = Person.Id(committerName)
+    val committerPersonId                         = Person.Id(Some(committerEmail))
     val agentId                                   = Agent.Id(schemaVersion)
 
     List(
       Project(projectId, projectName, projectDateCreated, projectCreatorId),
-      Person(projectCreatorId, Some(projectCreatorEmail)),
+      Person(projectCreatorId, projectCreatorName),
       CommitEntity(CommitEntity.Id(commitId, filePath), projectId, commitGenerationId),
       CommitActivity(commitActivityId,
                      projectId,
@@ -62,7 +62,7 @@ object singleFileAndCommit {
                      agentId,
                      committerPersonId,
                      maybeInfluencedBy = Nil),
-      Person(committerPersonId, Some(committerEmail)),
+      Person(committerPersonId, committerName),
       CommitGeneration(commitGenerationId, commitActivityId),
       Agent(agentId)
     )

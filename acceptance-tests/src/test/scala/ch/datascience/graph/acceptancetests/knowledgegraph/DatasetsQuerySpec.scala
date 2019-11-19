@@ -21,7 +21,7 @@ package ch.datascience.graph.acceptancetests.knowledgegraph
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
-import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
+import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
@@ -78,7 +78,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
           datasetName               = dataset1.name,
           maybeDatasetDescription   = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
-          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
           maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
           schemaVersion             = currentSchemaVersion
         ),
@@ -93,13 +93,17 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
           datasetName               = dataset2.name,
           maybeDatasetDescription   = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
-          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
           maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation)),
           schemaVersion             = currentSchemaVersion
         )
       )
 
       `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
+
+      `triples updates run`(
+        List(dataset1, dataset2).flatMap(_.published.creators.flatMap(_.maybeEmail.map(_.value))).toSet
+      )
 
       When("user posts a graphql query to fetch datasets")
       val response = knowledgeGraphClient POST query

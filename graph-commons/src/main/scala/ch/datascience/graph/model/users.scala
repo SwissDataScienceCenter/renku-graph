@@ -23,6 +23,9 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object users {
 
+  final class Id private (val value: String) extends AnyVal with StringTinyType
+  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonBlank
+
   final class Email private (val value: String) extends AnyVal with StringTinyType
   implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank
 
@@ -31,4 +34,7 @@ object users {
 
   final class Username private (val value: String) extends AnyVal with StringTinyType
   implicit object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank
+
+  final class Affiliation private (val value: String) extends AnyVal with StringTinyType
+  implicit object Affiliation extends TinyTypeFactory[Affiliation](new Affiliation(_)) with NonBlank
 }

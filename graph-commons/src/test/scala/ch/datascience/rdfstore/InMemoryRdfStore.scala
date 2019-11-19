@@ -186,8 +186,24 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     import cats.implicits._
     import io.circe.Decoder._
 
-    def run(query: String): IO[List[Map[String, String]]] =
+    def runQuery(query: String): IO[List[Map[String, String]]] =
       queryExpecting[List[Map[String, String]]] {
+        s"""
+           |PREFIX prov: <http://www.w3.org/ns/prov#>
+           |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+           |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+           |PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>
+           |PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>
+           |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
+           |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+           |PREFIX schema: <http://schema.org/>
+           |PREFIX dcterms: <http://purl.org/dc/terms/>
+           |
+           |$query""".stripMargin
+      }
+
+    def runUpdate(query: String): IO[Unit] =
+      updateWitNoResult {
         s"""
            |PREFIX prov: <http://www.w3.org/ns/prov#>
            |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -231,7 +247,9 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
         .map(maybeValue => maybeValue map (varName -> _))
   }
 
-  protected def runQuery(query: String): IO[List[Map[String, String]]] = queryRunner.run(query)
+  protected def runQuery(query: String): IO[List[Map[String, String]]] = queryRunner.runQuery(query)
+
+  protected def runUpdate(query: String): IO[Unit] = queryRunner.runUpdate(query)
 
   protected def rdfStoreSize: Int =
     runQuery("SELECT (COUNT(*) as ?triples) WHERE { ?s ?p ?o }")

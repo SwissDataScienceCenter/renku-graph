@@ -30,16 +30,11 @@ import ch.datascience.knowledgegraph.datasets.model.{DatasetPart, DatasetProject
 import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
-import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IODatasetFinderSpec
-    extends WordSpec
-    with InMemoryRdfStore
-    with ExternalServiceStubbing
-    with ScalaCheckPropertyChecks {
+class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
   "findDataset" should {
 
@@ -63,8 +58,9 @@ class IODatasetFinderSpec
                 datasetName               = dataset.name,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
+                maybeDatasetCreators =
+                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset( // to reflect a file added to the dataset in another commit
                 project1.path,
@@ -77,8 +73,9 @@ class IODatasetFinderSpec
                 datasetName               = dataset.name,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
+                maybeDatasetCreators =
+                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
                 project2.path,
@@ -91,8 +88,9 @@ class IODatasetFinderSpec
                 datasetName               = dataset.name,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
+                maybeDatasetCreators =
+                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(projectPaths.generateOne, projectNames.generateOne)
             )
@@ -126,8 +124,9 @@ class IODatasetFinderSpec
                 datasetName               = dataset.name,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
+                maybeDatasetCreators =
+                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset( // to reflect a file added later to the dataset in another commit
                 sourceProject.path,
@@ -140,8 +139,9 @@ class IODatasetFinderSpec
                 datasetName               = dataset.name,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
+                maybeDatasetCreators =
+                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
                 forkProject.path,
@@ -154,8 +154,9 @@ class IODatasetFinderSpec
                 datasetName               = dataset.name,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset.part.map(part => (part.name, part.atLocation))
+                maybeDatasetCreators =
+                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               )
             )
           )

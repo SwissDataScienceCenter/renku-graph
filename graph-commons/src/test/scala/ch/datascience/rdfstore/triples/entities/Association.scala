@@ -29,7 +29,7 @@ private[triples] object Association {
   def apply(id: Id): Json = json"""
   {
     "@id": $id,
-    "@type": "prov:Association"
+    "@type": "http://www.w3.org/ns/prov#Association"
   }"""
 
   final case class Id(commitId: CommitId)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {

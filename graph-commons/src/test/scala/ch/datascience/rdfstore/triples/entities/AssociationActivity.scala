@@ -36,16 +36,16 @@ private[triples] object AssociationActivity {
   {
     "@id": $id,
     "@type": [
-      "prov:Activity",
+      "http://www.w3.org/ns/prov#Activity",
       "http://purl.org/wf4ever/wfprov#ProcessRun"
     ],
-    "prov:qualifiedAssociation": {
+    "http://www.w3.org/ns/prov#qualifiedAssociation": {
         "@id": ${s"${id.commitId}/association"}
     },
-    "rdfs:comment": $comment
+    "http://www.w3.org/2000/01/rdf-schema#comment": $comment
   }""".deepMerge(`schema:isPartOf`(projectId))
-      .deepMerge(qualifiedUsages toResources "prov:qualifiedUsage")
-      .deepMerge(maybeAgentId toResource "prov:agent")
+      .deepMerge(qualifiedUsages toResources "http://www.w3.org/ns/prov#qualifiedUsage")
+      .deepMerge(maybeAgentId toResource "http://www.w3.org/ns/prov#agent")
   // format: on
 
   final case class Id(commitId: CommitId)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {

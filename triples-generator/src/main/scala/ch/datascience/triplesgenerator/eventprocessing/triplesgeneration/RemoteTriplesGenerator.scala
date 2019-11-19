@@ -67,9 +67,9 @@ class RemoteTriplesGenerator(
 
   override def generateTriples(commit: Commit, maybeAccessToken: Option[AccessToken]): IO[JsonLDTriples] =
     for {
-      uri             <- validateUri(s"$serviceUrl/projects/${commit.project.id}/commits/${commit.id}")
-      triplesAsString <- send(request(GET, uri))(mapResponse)
-      triples         <- IO.fromEither(JsonLDTriples.from(triplesAsString))
+      uri           <- validateUri(s"$serviceUrl/projects/${commit.project.id}/commits/${commit.id}")
+      triplesInJson <- send(request(GET, uri))(mapResponse)
+      triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
     } yield triples
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {

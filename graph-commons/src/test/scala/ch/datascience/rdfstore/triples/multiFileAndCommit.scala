@@ -86,19 +86,19 @@ object multiFileAndCommit {
   )(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
     val committerName                                  = names.generateOne
     val committerEmail                                 = emails.generateOne
-    val committerPersonId                              = Person.Id(committerName)
+    val committerPersonId                              = Person.Id(Some(committerEmail))
     val agentId                                        = Agent.Id(schemaVersion)
     val projectId                                      = Project.Id(renkuBaseUrl, projectPath)
     val (projectCreatorName, maybeProjectCreatorEmail) = projectCreator
-    val projectCreatorId                               = Person.Id(projectCreatorName)
+    val projectCreatorId                               = Person.Id(maybeProjectCreatorEmail)
     import data._
 
     // format: off
     List(
       Project(projectId, projectName, projectDateCreated, projectCreatorId),
-      Person(projectCreatorId, maybeProjectCreatorEmail),
+      Person(projectCreatorId, projectCreatorName),
       Agent(agentId),
-      Person(committerPersonId, Some(committerEmail)),
+      Person(committerPersonId, committerName),
 
       CommitActivity(commit1ActivityId, projectId, committedDates.generateOne, agentId, committerPersonId, comment = "renku dataset add zhbikes external.csv"),
       GenerationActivity(commit1Id, FilePath("tree/input-data/external.csv"), commit1ActivityId),

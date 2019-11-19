@@ -17,26 +17,18 @@
  */
 
 package ch.datascience.rdfstore.triples
-package entities
 
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.FilePath
-import ch.datascience.rdfstore.FusekiBaseUrl
-import io.circe.Json
-import io.circe.literal._
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
+import org.scalacheck.Gen
 
-private[triples] object UsageEntity {
+object TriplesGenerators extends TriplesGenerators
 
-  def apply(id: Id, entityId: EntityId): Json = json"""
-  {
-    "@id": $id,
-    "@type": "http://www.w3.org/ns/prov#Usage",
-    "http://www.w3.org/ns/prov#entity": {
-      "@id": $entityId
-    }
-  }"""
+trait TriplesGenerators {
 
-  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
-    override val value: String = (fusekiBaseUrl / "commit" / commitId / filePath).toString
-  }
+  val datasetCreators: Gen[(UserName, Option[Email], Option[Affiliation])] = for {
+    name             <- names
+    maybeEmail       <- Gen.option(emails)
+    maybeAffiliation <- Gen.option(affiliations)
+  } yield (name, maybeEmail, maybeAffiliation)
 }

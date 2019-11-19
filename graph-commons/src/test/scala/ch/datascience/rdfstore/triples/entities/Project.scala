@@ -30,19 +30,19 @@ object Project {
   {
     "@id": $id,
     "@type": [
-      "prov:Location",
-      "schema:Project"
+      "http://www.w3.org/ns/prov#Location",
+      "http://schema.org/Project"
     ],
-    "schema:name": ${name.toString},
-    "schema:dateCreated": ${dateCreated.toString}
-  }""" deepMerge (creator toResource "schema:creator")
+    "http://schema.org/name": ${name.toString},
+    "http://schema.org/dateCreated": ${dateCreated.toString}
+  }""" deepMerge (creator toResource "http://schema.org/creator")
 
   final case class Id(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath) extends EntityId {
     override val value: String = FullProjectPath(renkuBaseUrl, projectPath).value
   }
 
   def `schema:isPartOf`(projectId: Project.Id): Json = json"""{
-    "schema:isPartOf": {
+    "http://schema.org/isPartOf": {
       "@id": ${projectId.toString}
     }
   }"""

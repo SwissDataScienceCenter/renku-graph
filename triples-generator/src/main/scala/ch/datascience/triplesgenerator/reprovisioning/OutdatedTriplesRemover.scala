@@ -45,7 +45,7 @@ private class IOTriplesRemover(
       removeEverything()
     } map logExecutionTime(withMessage = "Removing outdated triples done")
 
-  private def removeEverything(): IO[Unit] = queryWitNoResult {
+  private def removeEverything(): IO[Unit] = updateWitNoResult {
     "DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }"
   }
 }

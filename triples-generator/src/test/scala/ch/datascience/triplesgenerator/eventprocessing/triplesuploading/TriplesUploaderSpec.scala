@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.CommonGraphGenerators._
@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator.eventprocessing.TriplesUploadResult._
+import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import org.http4s.Status._
@@ -41,63 +41,60 @@ class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalService
 
   "upload" should {
 
-    "return success if upload to the Triples Store was successful" in new TestCase {
+    s"return $DeliverySuccess if uploading triples to the Store was successful" in new TestCase {
 
       stubFor {
-        post(s"/${fusekiUserConfig.datasetName}/data")
-          .withBasicAuth(fusekiUserConfig.authCredentials.username.value,
-                         fusekiUserConfig.authCredentials.password.value)
+        post(s"/${rdfStoreConfig.datasetName}/data")
+          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/ld+json"))
           .withRequestBody(equalToJson(triples.value.toString()))
           .willReturn(ok())
       }
 
-      triplesUploader.upload(triples).unsafeRunSync() shouldBe TriplesUploaded
+      triplesUploader.upload(triples).unsafeRunSync() shouldBe DeliverySuccess
     }
 
-    "return MalformedTriples if remote client responds with BAD_REQUEST" in new TestCase {
+    s"return $InvalidTriplesFailure if remote client responds with a BAD_REQUEST 400" in new TestCase {
 
       val errorMessage = nonEmptyStrings().generateOne
 
       stubFor {
-        post(s"/${fusekiUserConfig.datasetName}/data")
-          .withBasicAuth(fusekiUserConfig.authCredentials.username.value,
-                         fusekiUserConfig.authCredentials.password.value)
+        post(s"/${rdfStoreConfig.datasetName}/data")
+          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/ld+json"))
           .withRequestBody(equalToJson(triples.value.toString()))
           .willReturn(badRequest().withBody(errorMessage))
       }
 
-      triplesUploader.upload(triples).unsafeRunSync() shouldBe MalformedTriples(errorMessage)
+      triplesUploader.upload(triples).unsafeRunSync() shouldBe InvalidTriplesFailure(errorMessage)
     }
 
-    "return UploadingError if remote client responds with status different than OK or BAD_REQUEST" in new TestCase {
+    s"return $DeliveryFailure if remote responds with status different than OK or BAD_REQUEST" in new TestCase {
 
       val errorMessage = nonEmptyStrings().generateOne
 
       stubFor {
-        post(s"/${fusekiUserConfig.datasetName}/data")
-          .withBasicAuth(fusekiUserConfig.authCredentials.username.value,
-                         fusekiUserConfig.authCredentials.password.value)
+        post(s"/${rdfStoreConfig.datasetName}/data")
+          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/ld+json"))
           .withRequestBody(equalToJson(triples.value.toString()))
           .willReturn(unauthorized().withBody(errorMessage))
       }
 
-      triplesUploader.upload(triples).unsafeRunSync() shouldBe UploadingError(s"$Unauthorized: $errorMessage")
+      triplesUploader.upload(triples).unsafeRunSync() shouldBe DeliveryFailure(s"$Unauthorized: $errorMessage")
     }
 
-    "return UploadingError for connectivity issues" in new TestCase {
+    s"return $DeliveryFailure for connectivity issues" in new TestCase {
 
       val fusekiBaseUrl = localHttpUrls.map(FusekiBaseUrl.apply).generateOne
-      override val fusekiUserConfig = rdfStoreConfigs.generateOne.copy(
+      override val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
         fusekiBaseUrl = fusekiBaseUrl
       )
 
       triplesUploader
         .upload(triples)
-        .unsafeRunSync() shouldBe UploadingError(
-        s"POST $fusekiBaseUrl/${fusekiUserConfig.datasetName}/data error: Connection refused"
+        .unsafeRunSync() shouldBe DeliveryFailure(
+        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/data error: Connection refused"
       )
     }
   }
@@ -109,11 +106,11 @@ class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalService
 
     val triples = jsonLDTriples.generateOne
 
-    val fusekiUserConfig = rdfStoreConfigs.generateOne.copy(
+    val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
       fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     )
     lazy val triplesUploader = new IOTriplesUploader(
-      fusekiUserConfig,
+      rdfStoreConfig,
       TestLogger(),
       retryInterval = 100 millis,
       maxRetries    = 1

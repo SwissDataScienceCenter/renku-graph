@@ -44,10 +44,10 @@ private[triples] object GenerationArtifact {
     "@id": $id,
     "@type": [
       "http://purl.org/wf4ever/wfprov#Artifact",
-      "prov:Entity"
+      "http://www.w3.org/ns/prov#Entity"
     ],
-    "rdfs:label": ${s"${id.filePath}@${id.commitId}"},
-    "prov:qualifiedGeneration": {
+    "http://www.w3.org/2000/01/rdf-schema#label": ${s"${id.filePath}@${id.commitId}"},
+    "http://www.w3.org/ns/prov#qualifiedGeneration": {
       "@id": $generationId
     }
   }""" deepMerge `schema:isPartOf`(projectId)

@@ -21,42 +21,32 @@ package ch.datascience.rdfstore
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes.json.TinyTypeEncoders
-import ch.datascience.tinytypes.{Renderer, StringTinyType}
+import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyType}
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 
-package object triples {
+package object triples extends TriplesGenerators {
 
   val renkuBaseUrl: RenkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
 
-  // format: off
-  def triples(parts: List[Json]*): JsonLDTriples = JsonLDTriples { json"""
-    {
-      "@context": {
-        "dcterms": "http://purl.org/dc/terms/",
-        "foaf": "http://xmlns.com/foaf/0.1/",
-        "prov": "http://www.w3.org/ns/prov#",
-        "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-        "schema": "http://schema.org/",
-        "xsd": "http://www.w3.org/2001/XMLSchema#"
-      },
-      "@graph": ${Json.arr(parts.flatten: _*)}
-    }"""
-  }
-  // format: on
+  def triples(parts: List[Json]*): JsonLDTriples = JsonLDTriples(parts.flatten.toList)
 
   implicit class OptionOps[V](maybeValue: Option[V]) {
-    def to(property: String)(implicit encoder: Encoder[V]): Json =
+
+    def toValue(property: String)(implicit encoder: Encoder[V]): Json =
       maybeValue
-        .map(value => Json.obj(property -> value.asJson))
+        .map(value => Json.obj(property -> Json.arr(Json.obj("@value" -> value.asJson))))
         .getOrElse(Json.obj())
 
-    def to(property: String, valueType: String)(implicit encoder: Encoder[V]): Json =
+    def toValue(property: String, valueType: String)(implicit encoder: Encoder[V]): Json =
       maybeValue
-        .map(value => Json.obj(property -> Json.obj(("@type" -> valueType.asJson), "@value" -> value.asJson)))
+        .map(value => Json.obj(property -> Json.arr(Json.obj("@type" -> valueType.asJson, "@value" -> value.asJson))))
         .getOrElse(Json.obj())
+  }
+
+  implicit class ValueOps[V <: TinyType](value: V) {
+    def toValue(implicit encoder: Encoder[V]): Json = Json.arr(Json.obj("@value" -> value.asJson))
   }
 
   implicit class IdOps[ID <: EntityId](id: ID) {
@@ -87,10 +77,6 @@ package object triples {
 
   implicit class EntityIdOps(entityId: EntityId) {
     def showAs[View](implicit renderer: Renderer[View, EntityId]): String = renderer.render(entityId)
-  }
-
-  implicit object EntityIdRdfResourceRenderer extends Renderer[RdfResource, EntityId] {
-    override def render(value: EntityId): String = s"<$value>"
   }
 
   implicit def entityIdEncoder[TT <: EntityId]: Encoder[TT] = TinyTypeEncoders.stringEncoder

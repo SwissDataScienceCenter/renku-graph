@@ -88,7 +88,6 @@ private class ProjectsFinder(
        |  }
        |}
        |ORDER BY ASC(?name)
-       |
        |""".stripMargin
 }
 

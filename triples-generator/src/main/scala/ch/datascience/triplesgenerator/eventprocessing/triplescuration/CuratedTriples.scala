@@ -16,27 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.FilePath
-import ch.datascience.rdfstore.FusekiBaseUrl
-import io.circe.Json
-import io.circe.literal._
+import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
 
-private[triples] object UsageEntity {
+final case class CuratedTriples(triples: JsonLDTriples, updates: List[Update])
 
-  def apply(id: Id, entityId: EntityId): Json = json"""
-  {
-    "@id": $id,
-    "@type": "http://www.w3.org/ns/prov#Usage",
-    "http://www.w3.org/ns/prov#entity": {
-      "@id": $entityId
-    }
-  }"""
-
-  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
-    override val value: String = (fusekiBaseUrl / "commit" / commitId / filePath).toString
-  }
+object CuratedTriples {
+  final case class Update(name: String, query: String)
 }

@@ -27,7 +27,8 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
-import org.http4s.Status
+import org.http4s.Status.{BadRequest, Ok}
+import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -69,14 +70,14 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
         post(s"/${rdfStoreConfig.datasetName}/sparql")
           .willReturn(
             aResponse
-              .withStatus(Status.BadRequest.code)
+              .withStatus(BadRequest.code)
               .withBody("some message")
           )
       }
 
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql returned ${Status.BadRequest}; body: some message"
+      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql returned $BadRequest; body: some message"
     }
 
     "fail if remote responds with OK status but non-expected body" in new QueryClientTestCase {
@@ -106,7 +107,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
           .willReturn(ok())
       }
 
-      client.callRemote.unsafeRunSync() shouldBe ((): Unit)
+      client.sendUpdate.unsafeRunSync() shouldBe ((): Unit)
     }
 
     "fail if remote responds with non-OK status" in new UpdateClientTestCase {
@@ -115,14 +116,40 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
         post(s"/${rdfStoreConfig.datasetName}/update")
           .willReturn(
             aResponse
-              .withStatus(Status.BadRequest.code)
+              .withStatus(BadRequest.code)
               .withBody("some message")
           )
       }
 
       intercept[Exception] {
-        client.callRemote.unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/update returned ${Status.BadRequest}; body: some message"
+        client.sendUpdate.unsafeRunSync()
+      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/update returned $BadRequest; body: some message"
+    }
+
+    "use the given response mapping for calculating the result" in new UpdateClientTestCase {
+
+      val responseMapper: PartialFunction[(Status, Request[IO], Response[IO]), IO[Any]] = {
+        case (Ok, _, _)         => IO.unit
+        case (BadRequest, _, _) => IO.pure("error")
+      }
+
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/update")
+          .willReturn(
+            aResponse.withStatus(Ok.code)
+          )
+      }
+
+      client.sendUpdate(responseMapper).unsafeRunSync() shouldBe ((): Unit)
+
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/update")
+          .willReturn(
+            aResponse.withStatus(BadRequest.code)
+          )
+      }
+
+      client.sendUpdate(responseMapper).unsafeRunSync() shouldBe "error"
     }
   }
 
@@ -152,7 +179,12 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
       val query:      String,
       rdfStoreConfig: RdfStoreConfig
   ) extends IORdfStoreClient(rdfStoreConfig, TestLogger[IO]()) {
-    def callRemote: IO[Unit] = queryWitNoResult(query)
+
+    def sendUpdate: IO[Unit] = updateWitNoResult(query)
+
+    def sendUpdate[ResultType](
+        mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
+    ): IO[ResultType] = updateWitMapping(query, mapResponse)
   }
 
   private class TestRdfQueryClient(val query: String, rdfStoreConfig: RdfStoreConfig)

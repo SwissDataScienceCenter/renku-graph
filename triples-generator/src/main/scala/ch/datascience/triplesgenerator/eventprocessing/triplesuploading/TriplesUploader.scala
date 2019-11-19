@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.{JsonLDTriples, RdfStoreConfig}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -37,13 +36,6 @@ import scala.util.control.NonFatal
 
 private trait TriplesUploader[Interpretation[_]] {
   def upload(triples: JsonLDTriples): Interpretation[TriplesUploadResult]
-}
-
-private sealed trait TriplesUploadResult
-private object TriplesUploadResult {
-  final case object TriplesUploaded extends TriplesUploadResult
-  final case class MalformedTriples(message: String) extends Exception(message) with TriplesUploadResult
-  final case class UploadingError(message:   String) extends Exception(message) with TriplesUploadResult
 }
 
 private class IOTriplesUploader(
@@ -78,22 +70,15 @@ private class IOTriplesUploader(
       .putHeaders(`Content-Type`(`ld+json`))
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
-    case (Ok, _, _)                => IO.pure(TriplesUploaded)
-    case (BadRequest, _, response) => singleLineBody(response).map(MalformedTriples.apply)
-    case (other, _, response)      => singleLineBody(response).map(message => s"$other: $message").map(UploadingError.apply)
+    case (Ok, _, _)                => IO.pure(DeliverySuccess)
+    case (BadRequest, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
+    case (other, _, response)      => singleLineBody(response).map(message => s"$other: $message").map(DeliveryFailure.apply)
   }
 
   private def singleLineBody(response: Response[IO]): IO[String] =
     response.as[String].map(ExceptionMessage.toSingleLine)
 
   private lazy val withUploadingError: PartialFunction[Throwable, TriplesUploadResult] = {
-    case NonFatal(exception) => UploadingError(exception.getMessage)
+    case NonFatal(exception) => DeliveryFailure(exception.getMessage)
   }
-}
-
-private object IOTriplesUploader {
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[IOTriplesUploader] =
-    RdfStoreConfig[IO]() map (new IOTriplesUploader(_, ApplicationLogger))
 }

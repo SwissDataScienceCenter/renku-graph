@@ -16,27 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.FilePath
-import ch.datascience.rdfstore.FusekiBaseUrl
-import io.circe.Json
-import io.circe.literal._
+import cats.implicits._
 
-private[triples] object UsageEntity {
+import scala.util.Try
 
-  def apply(id: Id, entityId: EntityId): Json = json"""
-  {
-    "@id": $id,
-    "@type": "http://www.w3.org/ns/prov#Usage",
-    "http://www.w3.org/ns/prov#entity": {
-      "@id": $entityId
-    }
-  }"""
-
-  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
-    override val value: String = (fusekiBaseUrl / "commit" / commitId / filePath).toString
-  }
-}
+abstract class TryUploader(triplesUploader: TriplesUploader[Try], updatesUploader: UpdatesUploader[Try])
+    extends Uploader[Try](triplesUploader, updatesUploader)

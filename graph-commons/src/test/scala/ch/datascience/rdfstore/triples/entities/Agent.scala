@@ -28,10 +28,10 @@ object Agent {
   {
     "@id": $id,
     "@type": [
-      "prov:SoftwareAgent",
+      "http://www.w3.org/ns/prov#SoftwareAgent",
       "http://purl.org/wf4ever/wfprov#WorkflowEngine"
     ],
-    "rdfs:label": ${s"renku ${id.schemaVersion}"}
+    "http://www.w3.org/2000/01/rdf-schema#label": ${s"renku ${id.schemaVersion}"}
   }"""
 
   final case class Id(schemaVersion: SchemaVersion) extends EntityId {

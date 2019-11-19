@@ -65,9 +65,10 @@ class IOProjectDatasetsFinderSpec
                 datasetName               = dataset1.name,
                 maybeDatasetDescription   = dataset1.maybeDescription,
                 maybeDatasetPublishedDate = dataset1.published.maybeDate,
-                maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
-                maybeDatasetUrl           = Some(reusedDatasetUrl)
+                maybeDatasetCreators =
+                  dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetParts = dataset1.part.map(part => (part.name, part.atLocation)),
+                maybeDatasetUrl   = Some(reusedDatasetUrl)
               ),
               singleFileAndCommitWithDataset(
                 projectB.path,
@@ -79,9 +80,10 @@ class IOProjectDatasetsFinderSpec
                 datasetName               = dataset1.name,
                 maybeDatasetDescription   = dataset1.maybeDescription,
                 maybeDatasetPublishedDate = dataset1.published.maybeDate,
-                maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
-                maybeDatasetUrl           = Some(reusedDatasetUrl)
+                maybeDatasetCreators =
+                  dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetParts = dataset1.part.map(part => (part.name, part.atLocation)),
+                maybeDatasetUrl   = Some(reusedDatasetUrl)
               ),
               singleFileAndCommitWithDataset(
                 projectB.path,
@@ -93,8 +95,9 @@ class IOProjectDatasetsFinderSpec
                 datasetName               = dataset2.name,
                 maybeDatasetDescription   = dataset2.maybeDescription,
                 maybeDatasetPublishedDate = dataset2.published.maybeDate,
-                maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
-                maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation))
+                maybeDatasetCreators =
+                  dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetParts = dataset2.part.map(part => (part.name, part.atLocation))
               )
             )
           )
