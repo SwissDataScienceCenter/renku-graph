@@ -48,3 +48,26 @@ function createRelease() {
   # releasing graph-services
   sbt "release skip-tests default-tag-exists-answer k with-defaults"
 }
+
+function updateVersionInRenku() {
+  echo "Updating renku-graph version in Renku's requirements.yaml"
+
+  # cloning the renku repo
+  cd || exit
+  git clone https://github.com/SwissDataScienceCenter/renku.git
+  cd renku || exit
+
+  # changing the version
+  sed -i "/- name: renku-graph/{n;n;n;s/.*/  version: $TRAVIS_TAG/}" charts/renku/requirements.yaml
+
+  # preparing git config
+  git config --global user.name "RenkuBot"
+  git config --global user.email "jakub.chrobasik@epfl.ch"
+  git config credential.helper "store --file=.git/credentials"
+  echo "https://${GITHUB_TOKEN}:@github.com" >.git/credentials
+
+  # pushing to the remote
+  git add charts/renku/requirements.yaml
+  git commit -m "chore: updating renku-graph version to $TRAVIS_TAG"
+  git push origin master
+}
