@@ -22,10 +22,9 @@ import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
-import org.apache.jena.query.QuerySolution
 import org.apache.jena.rdfconnection.RDFConnectionFactory
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
 object RDFStore {
@@ -111,37 +110,24 @@ object RDFStore {
     jenaReference.read
       .map { jena =>
         jena.connection
-          .query("SELECT (COUNT(*) as ?Triples) WHERE { ?s ?p ?o }")
+          .query("SELECT (COUNT(*) as ?count) WHERE { ?s ?p ?o }")
           .execSelect()
           .next()
-          .get("Triples")
+          .get("count")
           .asLiteral()
           .getInt
       }
       .unsafeRunSync()
 
-  def getAllTriples: Seq[(String, String, String)] = {
-
-    implicit class RowOps(row: QuerySolution) {
-      def read(variableName: String): String =
-        row.get(variableName).toString
-    }
-
+  def run(query: String): Seq[Map[String, String]] =
     jenaReference.read
-      .map { jena =>
-        val queryResults = jena.connection
-          .query("""|SELECT ?s ?p ?o 
-                    |WHERE { ?s ?p ?o }
-                    |""".stripMargin)
+      .map {
+        _.connection
+          .query(query)
           .execSelect()
-
-        val results = ArrayBuffer.empty[(String, String, String)]
-        while (queryResults.hasNext) {
-          val row = queryResults.next()
-          results += ((row.read("s"), row.read("p"), row.read("o")))
-        }
-        results.toList
+          .asScala
+          .map(row => row.varNames().asScala.map(name => name -> row.get(name).toString).toMap)
+          .toList
       }
       .unsafeRunSync()
-  }
 }

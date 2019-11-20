@@ -115,7 +115,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
 
       `triples updates run`(
-        List(dataset1, dataset2).flatMap(_.published.creators.flatMap(_.maybeEmail.map(_.value))).toSet
+        List(dataset1, dataset2).flatMap(_.published.creators.flatMap(_.maybeEmail)).toSet
       )
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
@@ -230,7 +230,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         `data in the RDF store`(project.toGitLabProject(),
                                 commitId,
                                 triples(toSingleFileAndCommitWithDataset(project.path, commitId, dataset)))
-        `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail.map(_.value)))
+        `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
       }
 
     def toSingleFileAndCommitWithDataset(projectPath: ProjectPath, commitId: CommitId, dataset: Dataset): List[Json] =

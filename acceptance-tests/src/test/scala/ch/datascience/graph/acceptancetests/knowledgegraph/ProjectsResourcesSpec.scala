@@ -73,7 +73,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
       `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
 
-      `triples updates run`(Set(project.created.creator.email.value))
+      `triples updates run`(Set(project.created.creator.email))
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}"
