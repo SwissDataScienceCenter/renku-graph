@@ -16,22 +16,26 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning.postreprovisioning
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import ch.datascience.triplesgenerator.reprovisioning.SingleQueryUpdater
+import org.scalacheck.Gen
+import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
+import ch.datascience.generators.Generators._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
 import eu.timepit.refined.auto._
 
-import scala.language.higherKinds
+object CurationGenerators {
 
-private trait OrphanMailtoNoneRemover[Interpretation[_]] extends SingleQueryUpdater[Interpretation] {
+  def curatedTriplesObjects(
+      updatesGenerator: Gen[List[Update]] = nonEmptyList(curationUpdates).map(_.toList)
+  ): Gen[CuratedTriples] =
+    for {
+      triples <- jsonLDTriples
+      updates <- updatesGenerator
+    } yield CuratedTriples(triples, updates)
 
-  override val description = "Removing orphan 'mailto:None' triples"
-
-  override val query = s"""|DELETE { ?s ?p ?o } 
-                           |WHERE {
-                           |  ?s ?p ?o .
-                           |  VALUES ?s { <mailto:None> }
-                           |  FILTER NOT EXISTS { ?someSubject ?somePredicate <mailto:None> }
-                           |}
-                           |""".stripMargin
+  implicit lazy val curationUpdates: Gen[Update] = for {
+    name    <- nonBlankStrings(minLength = 5)
+    message <- sentences()
+  } yield Update(name, message)
 }

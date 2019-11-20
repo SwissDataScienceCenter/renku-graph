@@ -50,13 +50,13 @@ private[triples] object CommitCollectionEntity {
     "@id": $id,
     "@type": [
       "http://purl.org/wf4ever/wfprov#Artifact",
-      "prov:Entity",
-      "prov:Collection"
+      "http://www.w3.org/ns/prov#Entity",
+      "http://www.w3.org/ns/prov#Collection"
     ],
-    "prov:atLocation": ${id.filePath.toString},
-    "rdfs:label": ${s"${id.filePath}@${id.commitId}"}
+    "http://www.w3.org/ns/prov#atLocation": ${id.filePath.toString},
+    "http://www.w3.org/2000/01/rdf-schema#label": ${s"${id.filePath}@${id.commitId}"}
   }""".deepMerge(`schema:isPartOf`(projectId))
-      .deepMerge(hadMember toResource "prov:hadMember")
+      .deepMerge(hadMember toResource "http://www.w3.org/ns/prov#hadMember")
   // format: on
 
   final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl)

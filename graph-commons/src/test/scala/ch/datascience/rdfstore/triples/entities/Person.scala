@@ -19,25 +19,44 @@
 package ch.datascience.rdfstore.triples
 package entities
 
-import ch.datascience.graph.model.users.{Email, Name}
+import java.util.UUID
+
+import ch.datascience.graph.model.users.{Affiliation, Email, Name}
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.Json
 import io.circe.literal._
 
 object Person {
 
-  def apply(id: Id, maybeEmail: Option[Email]): Json = json"""
+  def apply(
+      id:               Id,
+      userName:         Name,
+      maybeAffiliation: Option[Affiliation] = None
+  ): Json = apply(id, userName, id.maybeEmail, maybeAffiliation)
+
+  // format: off
+  def apply(
+      id:               Id,
+      userName:         Name,
+      maybeEmail:       Option[Email],
+      maybeAffiliation: Option[Affiliation]
+  ): Json = json"""
   {
     "@id": $id,
     "@type": [
-      "schema:Person",
-      "prov:Person"
+      "http://schema.org/Person",
+      "http://www.w3.org/ns/prov#Person"
     ],
-    "schema:name": ${id.userName},
-    "rdfs:label": ${id.userName}
-  }""" deepMerge (maybeEmail to "schema:email")
+    "http://schema.org/name": ${userName.toValue},
+    "http://www.w3.org/2000/01/rdf-schema#label": ${userName.toValue}
+  }""".deepMerge(maybeEmail toValue "http://schema.org/email")
+      .deepMerge(maybeAffiliation toValue "http://schema.org/affiliation")
+  // format: on
 
-  final case class Id(userName: Name) extends EntityId {
-    override val value: String = s"file:///_${userName.value.replace(" ", "-")}"
+  final case class Id(maybeEmail: Option[Email]) extends EntityId {
+    override val value: String = maybeEmail match {
+      case Some(email) => s"mailto:$email"
+      case None        => s"_:${UUID.randomUUID()}"
+    }
   }
 }

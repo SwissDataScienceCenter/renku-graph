@@ -32,13 +32,13 @@ object DatasetPart {
     {
       "@id": $id,
       "@type": [
-        "prov:Entity",
-        "schema:DigitalDocument",
+        "http://www.w3.org/ns/prov#Entity",
+        "http://schema.org/DigitalDocument",
         "http://purl.org/wf4ever/wfprov#Artifact"
       ],
-      "prov:atLocation": ${id.location.toString},
-      "rdfs:label": ${s"${id.location}@${id.commitId}"},
-      "schema:name": ${name.toString}
+      "http://www.w3.org/ns/prov#atLocation": ${id.location.toString},
+      "http://www.w3.org/2000/01/rdf-schema#label": ${s"${id.location}@${id.commitId}"},
+      "http://schema.org/name": ${name.toString}
     }
   """.deepMerge(`schema:isPartOf`(projectId))
 

@@ -51,7 +51,8 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       `data in the RDF store`(
         project,
         commitId,
-        triples(multiFileAndCommit(project.path, data = multiFileAndCommitData, schemaVersion = currentSchemaVersion)))
+        triples(multiFileAndCommit(project.path, data = multiFileAndCommitData, schemaVersion = currentSchemaVersion))
+      )
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery

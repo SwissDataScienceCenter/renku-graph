@@ -31,8 +31,10 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
-import ch.datascience.triplesgenerator.eventprocessing.TriplesUploadResult._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
+import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
+import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -43,7 +45,8 @@ class CommitEventProcessor[Interpretation[_]](
     commitEventsDeserialiser: CommitEventsDeserialiser[Interpretation],
     accessTokenFinder:        AccessTokenFinder[Interpretation],
     triplesGenerator:         TriplesGenerator[Interpretation],
-    triplesUploader:          TriplesUploader[Interpretation],
+    triplesCurator:           TriplesCurator[Interpretation],
+    uploader:                 Uploader[Interpretation],
     eventLogMarkDone:         EventLogMarkDone[Interpretation],
     eventLogMarkNew:          EventLogMarkNew[Interpretation],
     eventLogMarkFailed:       EventLogMarkFailed[Interpretation],
@@ -59,8 +62,9 @@ class CommitEventProcessor[Interpretation[_]](
   import eventLogMarkFailed._
   import eventLogMarkNew._
   import executionTimeRecorder._
+  import triplesCurator._
   import triplesGenerator._
-  import triplesUploader._
+  import uploader._
 
   def apply(eventBody: EventBody): Interpretation[Unit] =
     measureExecutionTime {
@@ -83,19 +87,23 @@ class CommitEventProcessor[Interpretation[_]](
   private def toTriplesAndUpload(commit:           Commit,
                                  maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
-      triples <- generateTriples(commit, maybeAccessToken)
-      result  <- upload(triples) map toUploadingResult(commit)
+      rawTriples     <- generateTriples(commit, maybeAccessToken)
+      curatedTriples <- curate(rawTriples)
+      result         <- upload(curatedTriples) map toUploadingResult(commit)
     } yield result
   } recoverWith nonRecoverableFailure(commit)
 
   private def toUploadingResult(commit: Commit): TriplesUploadResult => UploadingResult = {
-    case TriplesUploaded => Uploaded(commit)
-    case error @ UploadingError(message) =>
+    case DeliverySuccess => Uploaded(commit)
+    case error @ DeliveryFailure(message) =>
       logger.error(s"${logMessageCommon(commit)} $message")
       RecoverableError(commit, error)
-    case error @ MalformedTriples(message) =>
+    case error @ InvalidTriplesFailure(message) =>
       logger.error(s"${logMessageCommon(commit)} $message")
-      NonRecoverableError(commit, error)
+      NonRecoverableError(commit, error: Throwable)
+    case error @ InvalidUpdatesFailure(message) =>
+      logger.error(s"${logMessageCommon(commit)} $message")
+      NonRecoverableError(commit, error: Throwable)
   }
 
   private def nonRecoverableFailure(commit: Commit): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
@@ -200,14 +208,15 @@ object IOCommitEventProcessor {
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      triplesUploader       <- IOTriplesUploader()
+      uploader              <- IOUploader(ApplicationLogger)
       tokenRepositoryUrl    <- TokenRepositoryUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new CommitEventProcessor[IO](
       new CommitEventsDeserialiser[IO](),
       new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
       triplesGenerator,
-      triplesUploader,
+      IOTriplesCurator(),
+      uploader,
       new IOEventLogMarkDone(transactor),
       new IOEventLogMarkNew(transactor),
       new IOEventLogMarkFailed(transactor),

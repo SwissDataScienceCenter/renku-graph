@@ -33,8 +33,8 @@ private[triples] object GenerationActivity {
   def apply(id: Id, activityId: EntityId): Json = json"""
   {
     "@id": $id,
-    "@type": "prov:Generation",
-    "prov:activity": {
+    "@type": "http://www.w3.org/ns/prov#Generation",
+    "http://www.w3.org/ns/prov#activity": {
       "@id": $activityId
     }
   }"""

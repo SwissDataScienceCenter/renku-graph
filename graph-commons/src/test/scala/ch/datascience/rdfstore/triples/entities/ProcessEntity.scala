@@ -40,10 +40,10 @@ private[triples] object ProcessEntity {
     "@id": $id,
     "@type": [
       "http://purl.org/wf4ever/wfdesc#Process",
-      "prov:Plan",
-      "prov:Entity"
+      "http://www.w3.org/ns/prov#Plan",
+      "http://www.w3.org/ns/prov#Entity"
     ],
-    "rdfs:label": ${s"${id.filePath}@${id.commitId}"}
+    "http://www.w3.org/2000/01/rdf-schema#label": ${s"${id.filePath}@${id.commitId}"}
   }""".deepMerge(`schema:isPartOf`(projectId))
 
   final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {

@@ -29,6 +29,7 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.triples.{singleFileAndCommit, triples}
 import ch.datascience.webhookservice.model.HookToken
@@ -45,7 +46,8 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
     `data in the RDF store`(
       project,
       commitId,
-      triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion)))
+      triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion))
+    )
 
   def `data in the RDF store`(project: Project, commitId: CommitId, triples: JsonLDTriples): Assertion = {
     val projectId = project.id
@@ -63,11 +65,34 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
     }
 
     eventually {
-      RDFStore.getAllTriples
-        .map {
-          case (s, p, o) => s"$s $p $o"
-        }
-        .exists(_.contains(commitId.value)) shouldBe true
+      RDFStore
+        .run(
+          """|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+             |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+             |
+             |SELECT ?commit
+             |WHERE {
+             |  ?resource rdf:type <http://www.w3.org/ns/prov#Activity> ;
+             |            rdfs:label ?commit .
+             |}
+             |""".stripMargin
+        )
+        .exists(_.get("commit").contains(commitId.value)) shouldBe true
     }
+  }
+
+  def `triples updates run`(emails: Set[Email]): Assertion = eventually {
+
+    val emailsInStore = RDFStore.run("""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                                        |PREFIX schema: <http://schema.org/>
+                                        |
+                                        |SELECT ?email
+                                        |WHERE {
+                                        |  ?resource rdf:type <http://schema.org/Person> ;
+                                        |            schema:email ?email .
+                                        |}
+                                        |""".stripMargin).flatMap(_.get("email")).toSet
+
+    (emails.map(_.value) diff emailsInStore) shouldBe empty
   }
 }

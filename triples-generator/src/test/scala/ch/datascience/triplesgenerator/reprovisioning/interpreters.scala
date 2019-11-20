@@ -21,29 +21,29 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogMarkAllNew}
-import ch.datascience.triplesgenerator.reprovisioning.postreprovisioning.PostReProvisioning
+import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogReScheduler}
+import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 
-class IOReProvisioning(triplesFinder:       OutdatedTriplesFinder[IO],
-                       triplesRemover:      OutdatedTriplesRemover[IO],
-                       rostReProvisioning:  PostReProvisioning[IO],
-                       eventLogMarkAllNew:  EventLogMarkAllNew[IO],
-                       eventLogFetch:       EventLogFetch[IO],
-                       reProvisioningDelay: ReProvisioningDelay,
-                       logger:              Logger[IO],
-                       sleepWhenBusy:       FiniteDuration)(implicit timer: Timer[IO])
+class IOReProvisioning(triplesFinder:         TriplesVersionFinder[IO],
+                       triplesRemover:        TriplesRemover[IO],
+                       eventLogReScheduler:   EventLogReScheduler[IO],
+                       eventLogFetch:         EventLogFetch[IO],
+                       reProvisioningDelay:   ReProvisioningDelay,
+                       executionTimeRecorder: ExecutionTimeRecorder[IO],
+                       logger:                Logger[IO],
+                       sleepWhenBusy:         FiniteDuration)(implicit timer: Timer[IO])
     extends ReProvisioning[IO](triplesFinder,
                                triplesRemover,
-                               rostReProvisioning,
-                               eventLogMarkAllNew,
+                               eventLogReScheduler,
                                eventLogFetch,
                                reProvisioningDelay,
+                               executionTimeRecorder,
                                logger,
                                sleepWhenBusy)
 
-class TryEventLogMarkAllNew(transactor: DbTransactor[Try, EventLogDB])(implicit ME: Bracket[Try, Throwable])
-    extends EventLogMarkAllNew[Try](transactor)
+class TryEventLogReScheduler(transactor: DbTransactor[Try, EventLogDB])(implicit ME: Bracket[Try, Throwable])
+    extends EventLogReScheduler[Try](transactor)

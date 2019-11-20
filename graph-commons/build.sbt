@@ -32,6 +32,7 @@ val circeVersion = "0.11.1"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
+libraryDependencies += "io.circe" %% "circe-optics"  % "0.11.0"
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "1.7.27"
 

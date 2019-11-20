@@ -16,16 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import io.circe.Json
-import io.circe.literal._
+import ch.datascience.rdfstore.JsonLDTriples
 
-package object reprovisioning {
+import scala.language.higherKinds
 
-  def projectIdsToOldFormat(projectResource: ProjectResource): Json => Json = _ deepMerge json"""{
-    "schema:isPartOf": {
-      "@id": ${projectResource.toString}
-    }
-  }"""
+class TriplesCurator[Interpretation[_]](
+    personDetailsUpdater: PersonDetailsUpdater[Interpretation]
+) {
+
+  def curate(triples: JsonLDTriples): Interpretation[CuratedTriples] =
+    personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil))
+}
+
+object IOTriplesCurator {
+
+  import cats.effect.IO
+
+  def apply(): TriplesCurator[IO] = new TriplesCurator[IO](new PersonDetailsUpdater[IO]())
 }

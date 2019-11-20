@@ -21,7 +21,7 @@ package ch.datascience.graph.acceptancetests.knowledgegraph
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.data._
-import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
+import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
@@ -89,7 +89,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           datasetName               = dataset1.name,
           maybeDatasetDescription   = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
-          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
           maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
           schemaVersion             = currentSchemaVersion
         ),
@@ -106,13 +106,17 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           datasetName               = dataset2.name,
           maybeDatasetDescription   = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
-          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
           maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation)),
           schemaVersion             = currentSchemaVersion
         )
       )
 
       `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
+
+      `triples updates run`(
+        List(dataset1, dataset2).flatMap(_.published.creators.flatMap(_.maybeEmail)).toSet
+      )
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
@@ -175,8 +179,9 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         dataset.copy(
           published = dataset.published.copy(
             creators = Set(
-              datasetCreators.generateOne.copy(
-                name = sentenceContaining(text).map(_.value).map(UserName.apply).generateOne))
+              datasetCreators.generateOne
+                .copy(name = sentenceContaining(text).map(_.value).map(UserName.apply).generateOne)
+            )
           ),
           project = dataset3Projects map toDatasetProject
         )
@@ -225,6 +230,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         `data in the RDF store`(project.toGitLabProject(),
                                 commitId,
                                 triples(toSingleFileAndCommitWithDataset(project.path, commitId, dataset)))
+        `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
       }
 
     def toSingleFileAndCommitWithDataset(projectPath: ProjectPath, commitId: CommitId, dataset: Dataset): List[Json] =
@@ -235,7 +241,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         datasetName               = dataset.name,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
-        maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail)),
+        maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
         schemaVersion             = currentSchemaVersion
       )
 
@@ -276,7 +282,7 @@ object DatasetsResources {
   private implicit lazy val publishingEncoder: Encoder[DatasetPublishing] = Encoder.instance[DatasetPublishing] {
     case DatasetPublishing(maybeDate, creators) =>
       json"""{
-        "creator": $creators
+        "creator": ${creators.toList}
       }""" addIfDefined "datePublished" -> maybeDate
   }
 

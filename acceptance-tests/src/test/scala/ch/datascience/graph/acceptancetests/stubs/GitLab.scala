@@ -90,7 +90,8 @@ object GitLab {
 
   def `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(
       projectId: ProjectId,
-      commitId:  CommitId): Unit = {
+      commitId:  CommitId
+  ): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
         .willReturn(okJson(json"""

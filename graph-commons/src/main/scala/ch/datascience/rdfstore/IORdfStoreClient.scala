@@ -22,23 +22,29 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import ch.datascience.rdfstore.IORdfStoreClient.RdfQueryType
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
 import org.http4s.{Header, Uri}
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 
 abstract class IORdfStoreClient(
     rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO]
+    logger:                  Logger[IO],
+    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
 )(implicit executionContext: ExecutionContext,
   contextShift:              ContextShift[IO],
   timer:                     Timer[IO],
   ME:                        MonadError[IO, Throwable])
-    extends IORestClient(Throttler.noThrottling, logger) {
+    extends IORestClient(Throttler.noThrottling, logger, retryInterval, maxRetries) {
 
   import ch.datascience.rdfstore.IORdfStoreClient.{Query, RdfQuery, RdfUpdate}
   import org.http4s.MediaType.application._
@@ -49,21 +55,30 @@ abstract class IORdfStoreClient(
   import org.http4s.{Request, Response, Status}
   import rdfStoreConfig._
 
-  protected def queryWitNoResult(using: String): IO[Unit] =
-    runQuery(using, (_: Response[IO]) => IO.unit, RdfUpdate)
+  protected def updateWitNoResult(using: String): IO[Unit] =
+    updateWitMapping[Unit](using, toFullResponseMapper(_ => IO.unit))
+
+  protected def updateWitMapping[ResultType](
+      using:       String,
+      mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
+  ): IO[ResultType] = runQuery(using, mapResponse, RdfUpdate)
 
   protected def queryExpecting[ResultType](using: String)(implicit decoder: Decoder[ResultType]): IO[ResultType] =
-    runQuery(using, responseMapperFor[ResultType], RdfQuery)
+    runQuery(
+      using,
+      toFullResponseMapper(responseMapperFor[ResultType]),
+      RdfQuery
+    )
 
   private def runQuery[ResultType](
       using:       String,
-      mapResponse: Response[IO] => IO[ResultType],
+      mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]],
       queryType:   RdfQueryType
   ): IO[ResultType] =
     for {
       uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
       query  <- ME.fromEither(Query.from(using))
-      result <- send(uploadRequest(uri, queryType, query))(toFullResponseMapper(mapResponse))
+      result <- send(uploadRequest(uri, queryType, query))(mapResponse)
     } yield result
 
   private def uploadRequest(uri: Uri, queryType: RdfQueryType, query: Query): Request[IO] =

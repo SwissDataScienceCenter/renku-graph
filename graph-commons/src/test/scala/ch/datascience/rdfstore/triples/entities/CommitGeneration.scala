@@ -30,8 +30,8 @@ object CommitGeneration {
   def apply(id: Id, commitActivityId: CommitActivity.Id): Json = json"""
   {
     "@id": $id,
-    "@type": "prov:Generation",
-    "prov:activity": {
+    "@type": "http://www.w3.org/ns/prov#Generation",
+    "http://www.w3.org/ns/prov#activity": {
       "@id": $commitActivityId
     }
   }"""

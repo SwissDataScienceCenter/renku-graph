@@ -21,8 +21,7 @@ package ch.datascience.generators
 import java.time._
 import java.time.temporal.ChronoUnit.{DAYS, MINUTES => MINS}
 
-import cats.data.{NonEmptyList, NonEmptySet}
-import cats.kernel.Order
+import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.tinytypes._
@@ -66,7 +65,11 @@ object Generators {
   def stringsOfLength(length: Int Refined Positive = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] =
     listOfN(length, charsGenerator).map(_.mkString(""))
 
-  val paragraphs: Gen[NonBlank] = nonEmptyStringsList(maxElements = 10) map (_.mkString(" ")) map Refined.unsafeApply
+  def paragraphs(minElements: Int Refined Positive = 5, maxElements: Int Refined Positive = 10): Gen[NonBlank] =
+    nonEmptyStringsList(minElements, maxElements) map (_.mkString(" ")) map Refined.unsafeApply
+
+  def sentences(minWords: Int Refined Positive = 1, maxWords: Int Refined Positive = 10): Gen[NonBlank] =
+    nonEmptyStringsList(minWords, maxWords) map (_.mkString(" ")) map Refined.unsafeApply
 
   def sentenceContaining(phrase: NonBlank): Gen[NonBlank] =
     for {
@@ -261,6 +264,8 @@ object Generators {
     implicit class GenOps[T](generator: Gen[T]) {
 
       def generateOne: T = generator.sample getOrElse generateOne
+
+      def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
 
       def generateDifferentThan(value: T): T = {
         val generated = generator.sample.getOrElse(generateDifferentThan(value))

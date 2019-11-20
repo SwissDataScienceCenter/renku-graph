@@ -19,7 +19,6 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -27,81 +26,26 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait OutdatedTriplesRemover[Interpretation[_]] {
-  def removeOutdatedTriples(outdatedTriples: OutdatedTriples): Interpretation[Unit]
+private trait TriplesRemover[Interpretation[_]] {
+  def removeAllTriples(): Interpretation[Unit]
 }
 
-private class IOOutdatedTriplesRemover(
+private class IOTriplesRemover(
     rdfStoreConfig:          RdfStoreConfig,
     executionTimeRecorder:   ExecutionTimeRecorder[IO],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient(rdfStoreConfig, logger)
-    with OutdatedTriplesRemover[IO] {
+    with TriplesRemover[IO] {
 
-  import cats.implicits._
   import executionTimeRecorder._
 
-  override def removeOutdatedTriples(outdatedTriples: OutdatedTriples): IO[Unit] =
+  override def removeAllTriples(): IO[Unit] =
     measureExecutionTime {
-      outdatedTriples.commits.toList.map(remove).parSequence.map(_ => ())
-    } map logExecutionTime(withMessage = s"Removing outdated triples for '${outdatedTriples.projectResource}' finished")
+      removeEverything()
+    } map logExecutionTime(withMessage = "Removing outdated triples done")
 
-  private def remove(commitIdResource: CommitIdResource): IO[Unit] = queryWitNoResult {
-    val commitResource = commitIdResource.showAs[RdfResource]
-    s"""
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       |PREFIX prov: <http://www.w3.org/ns/prov#>
-       |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
-       |
-       |DELETE { ?s ?p ?o } 
-       |WHERE {
-       |  {
-       |    SELECT ?subject
-       |    WHERE {
-       |      {
-       |        $commitResource rdf:type prov:Activity ;
-       |                        ?predicate ?object .
-       |      }
-       |      {
-       |        $commitResource ?p ?o .
-       |        BIND ($commitResource as ?subject)
-       |      } UNION {
-       |        $commitResource prov:influenced ?influencedObject .
-       |        BIND (?influencedObject as ?subject)
-       |      } UNION {
-       |        ?activitySubject prov:activity ?object .
-       |        BIND (?activitySubject as ?subject)
-       |      } UNION {
-       |        ?memberSubject prov:hadMember ?object .
-       |        BIND (?memberSubject as ?subject)
-       |      } UNION {
-       |        $commitResource prov:influenced/prov:hadMember ?memberObject .
-       |        BIND (?memberObject as ?subject)
-       |      } UNION {
-       |        $commitResource prov:influenced/prov:hadMember/schema:hasPart ?partObject .
-       |        BIND (?partObject as ?subject)
-       |      } UNION {
-       |        $commitResource prov:influenced/prov:hadMember/prov:qualifiedGeneration ?generationObject .
-       |        BIND (?generationObject as ?subject)
-       |      } UNION {
-       |        ?activitySubject prov:activity $commitResource .
-       |        BIND (?activitySubject as ?subject)
-       |      } UNION {
-       |        ?generationSubject prov:qualifiedGeneration/prov:activity $commitResource .
-       |        BIND (?generationSubject as ?subject)
-       |      } UNION {
-       |        ?memberSubject prov:hadMember/prov:qualifiedGeneration/prov:activity ?object .
-       |        BIND (?memberSubject as ?subject)
-       |      }
-       |    }
-       |    GROUP BY ?subject
-       |  } {
-       |    ?subject ?p ?o 
-       |    BIND (?subject as ?s)
-       |  }
-       |}""".stripMargin
+  private def removeEverything(): IO[Unit] = updateWitNoResult {
+    "DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }"
   }
 }

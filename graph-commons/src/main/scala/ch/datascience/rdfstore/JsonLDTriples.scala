@@ -23,11 +23,13 @@ import io.circe.Json
 
 import scala.language.higherKinds
 
-class JsonLDTriples private (val value: Json) extends AnyVal with JsonTinyType
+final class JsonLDTriples private (val value: Json) extends AnyVal with JsonTinyType
 
 object JsonLDTriples extends TinyTypeFactory[JsonLDTriples](new JsonLDTriples(_)) {
   import cats.MonadError
   import io.circe.parser
+
+  def apply(jsons: List[Json]): JsonLDTriples = JsonLDTriples(Json.arr(jsons: _*))
 
   def parse[Interpretation[_]](
       string:    String

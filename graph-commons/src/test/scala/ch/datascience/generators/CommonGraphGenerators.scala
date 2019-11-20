@@ -29,7 +29,7 @@ import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.users.{Email, Name, Username}
+import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
@@ -42,12 +42,13 @@ import org.scalacheck.Gen
 
 object CommonGraphGenerators {
 
+  implicit val usernames:    Gen[Username]    = nonEmptyStrings() map Username.apply
+  implicit val affiliations: Gen[Affiliation] = nonEmptyStrings() map Affiliation.apply
+
   implicit val emails: Gen[Email] = for {
     beforeAt <- nonEmptyStrings()
     afterAt  <- nonEmptyStrings()
   } yield Email(s"$beforeAt@$afterAt")
-
-  implicit val usernames: Gen[Username] = nonEmptyStrings() map Username.apply
 
   implicit val names: Gen[Name] = for {
     first  <- nonEmptyStrings()
@@ -132,6 +133,8 @@ object CommonGraphGenerators {
       property  <- Gen.oneOf(sortBy.properties.to[List])
       direction <- Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
     } yield sortBy.By(property, direction)
+
+  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls map FusekiBaseUrl.apply
 
   implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
     subject <- nonEmptyStrings()

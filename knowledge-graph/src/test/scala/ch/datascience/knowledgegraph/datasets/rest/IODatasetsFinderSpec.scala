@@ -210,7 +210,7 @@ class IODatasetsFinderSpec
         datasetName               = dataset.name,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
-        maybeDatasetCreators      = dataset.published.creators.map(creator => creator.name -> creator.maybeEmail)
+        maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None))
       ) flatMap unlinkDatasetFromProject
     case projects =>
       projects.flatMap { project =>
@@ -220,14 +220,14 @@ class IODatasetsFinderSpec
           datasetName               = dataset.name,
           maybeDatasetDescription   = dataset.maybeDescription,
           maybeDatasetPublishedDate = dataset.published.maybeDate,
-          maybeDatasetCreators      = dataset.published.creators.map(creator => creator.name -> creator.maybeEmail)
+          maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None))
         )
       }
   }
 
   private def unlinkDatasetFromProject(json: Json) =
-    if (json.hcursor.downField("schema:identifier").as[Option[String]].exists(_.isDefined))
-      json.hcursor.downField("schema:isPartOf").delete.top
+    if (json.hcursor.downField("http://schema.org/identifier").as[Option[String]].exists(_.isDefined))
+      json.hcursor.downField("http://schema.org/isPartOf").delete.top
     else Some(json)
 
   private implicit class DatasetOps(dataset: Dataset) {

@@ -84,7 +84,7 @@ class EventsProcessingStatusSpec
         val Right(total) = responseJson.downField("total").as[Int]
         total shouldBe numberOfEvents.value
         val Right(progress) = responseJson.downField("progress").as[Double]
-        progress should be <= 100D
+        progress should be <= 100d
       }
     }
   }

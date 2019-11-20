@@ -20,7 +20,7 @@ package ch.datascience.graph.acceptancetests.knowledgegraph
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
-import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
+import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
 import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResources.briefJson
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
@@ -72,6 +72,8 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       )
 
       `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
+
+      `triples updates run`(Set(project.created.creator.email))
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}"

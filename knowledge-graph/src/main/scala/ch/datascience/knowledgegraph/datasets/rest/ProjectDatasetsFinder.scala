@@ -48,19 +48,19 @@ private class IOProjectDatasetsFinder(
     queryExpecting[List[(Identifier, Name)]](using = query(projectPath))
 
   private def query(path: ProjectPath): String =
-    s"""
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
-       |
-       |SELECT DISTINCT ?identifier ?name
-       |WHERE {
-       |  ?dataset dcterms:isPartOf|schema:isPartOf ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} .
-       |  ?dataset rdf:type <http://schema.org/Dataset> ;
-       |           schema:identifier ?identifier ;
-       |           schema:name ?name .
-       |}""".stripMargin
+    s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        |PREFIX schema: <http://schema.org/>
+        |PREFIX dcterms: <http://purl.org/dc/terms/>
+        |
+        |SELECT DISTINCT ?identifier ?name
+        |WHERE {
+        |  ?dataset dcterms:isPartOf|schema:isPartOf ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} .
+        |  ?dataset rdf:type <http://schema.org/Dataset> ;
+        |           schema:identifier ?identifier ;
+        |           schema:name ?name .
+        |}
+        |""".stripMargin
 }
 
 private object IOProjectDatasetsFinder {

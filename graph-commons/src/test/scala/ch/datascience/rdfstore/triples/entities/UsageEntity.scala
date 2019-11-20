@@ -30,8 +30,8 @@ private[triples] object UsageEntity {
   def apply(id: Id, entityId: EntityId): Json = json"""
   {
     "@id": $id,
-    "@type": "prov:Usage",
-    "prov:entity": {
+    "@type": "http://www.w3.org/ns/prov#Usage",
+    "http://www.w3.org/ns/prov#entity": {
       "@id": $entityId
     }
   }"""
