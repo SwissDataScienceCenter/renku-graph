@@ -21,7 +21,6 @@ package ch.datascience.webhookservice.missedevents
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
-import ch.datascience.control.Throttler
 import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -72,8 +71,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenLatestCommitsAndLogEventsMatch(latestEventsList: _*)
 
-      givenThrottlerAccessed(latestEventsList.size)
-
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(
@@ -106,8 +103,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         StartCommit(id = commitInfo2.id, project = Project(projectInfo2.id, projectInfo2.path))
       ).returning(IO.unit)
 
-      givenThrottlerAccessed(latestEventsList.size)
-
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(
@@ -129,8 +124,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         .returning(OptionT.none[IO, CommitInfo])
 
       givenLatestCommitsAndLogEventsMatch(event2)
-
-      givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
@@ -156,8 +149,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       }
 
       givenLatestCommitsAndLogEventsMatch(latestEventsList.tail: _*)
-
-      givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
@@ -186,8 +177,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
       givenLatestCommitsAndLogEventsMatch(event2)
 
-      givenThrottlerAccessed(latestEventsList.size)
-
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
@@ -215,8 +204,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
         .returning(context.raiseError(exception))
 
       givenLatestCommitsAndLogEventsMatch(event2)
-
-      givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
@@ -249,8 +236,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       ).returning(IO.raiseError(exception))
 
       givenLatestCommitsAndLogEventsMatch(event2)
-
-      givenThrottlerAccessed(latestEventsList.size)
 
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
@@ -286,7 +271,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
     val projectInfoFinder     = mock[ProjectInfoFinder[IO]]
     val commitToEventLog      = mock[IOCommitToEventLog]
     val logger                = TestLogger[IO]()
-    val throttler             = mock[Throttler[IO, EventsSynchronization]]
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val eventsLoader = new IOMissedEventsLoader(
       eventLogLatestEvents,
@@ -294,7 +278,6 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       latestCommitFinder,
       projectInfoFinder,
       commitToEventLog,
-      throttler,
       logger,
       executionTimeRecorder
     )
@@ -333,10 +316,5 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       (commitToEventLog
         .storeCommitsInEventLog(_: StartCommit))
         .expects(pushEvent)
-
-    def givenThrottlerAccessed(times: Int) = {
-      (throttler.acquire _).expects().returning(IO.unit).repeat(times to times)
-      (throttler.release _).expects().returning(IO.unit).repeat(times to times)
-    }
   }
 }
