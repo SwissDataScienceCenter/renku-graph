@@ -36,7 +36,7 @@ import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing.{IOHookEventEndpoint, IOProcessingStatusEndpoint}
 import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
-import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, EventsSynchronizationThrottler, IOEventsSynchronizationScheduler}
+import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, IOEventsSynchronizationScheduler}
 import ch.datascience.webhookservice.project.ProjectHookUrl
 import pureconfig.loadConfigOrThrow
 
@@ -63,15 +63,14 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
-        sentryInitializer              <- SentryInitializer[IO]
-        tokenRepositoryUrl             <- TokenRepositoryUrl[IO]()
-        projectHookUrl                 <- ProjectHookUrl.fromConfig[IO]()
-        gitLabUrl                      <- GitLabUrl[IO]()
-        gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-        gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
-        eventsSynchronizationThrottler <- EventsSynchronizationThrottler[IO](gitLabRateLimit = gitLabRateLimit)
-        hookTokenCrypto                <- HookTokenCrypto[IO]()
-        executionTimeRecorder          <- ExecutionTimeRecorder[IO](ApplicationLogger)
+        sentryInitializer     <- SentryInitializer[IO]
+        tokenRepositoryUrl    <- TokenRepositoryUrl[IO]()
+        projectHookUrl        <- ProjectHookUrl.fromConfig[IO]()
+        gitLabUrl             <- GitLabUrl[IO]()
+        gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+        gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+        hookTokenCrypto       <- HookTokenCrypto[IO]()
+        executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
 
         httpServer = new HttpServer[IO](
           serverPort = 9001,
@@ -106,7 +105,6 @@ object Microservice extends IOMicroservice {
                                                           tokenRepositoryUrl,
                                                           gitLabUrl,
                                                           gitLabThrottler,
-                                                          eventsSynchronizationThrottler,
                                                           executionTimeRecorder),
                      httpServer
                    ) run args

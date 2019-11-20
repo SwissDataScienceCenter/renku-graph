@@ -102,7 +102,9 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
       `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
 
       `triples updates run`(
-        List(dataset1, dataset2).flatMap(_.published.creators.flatMap(_.maybeEmail)).toSet
+        List(dataset1, dataset2)
+          .flatMap(_.published.creators.flatMap(_.maybeEmail))
+          .toSet + dataset2Creation.agent.email + dataset1Creation.agent.email
       )
 
       When("user posts a graphql query to fetch datasets")
