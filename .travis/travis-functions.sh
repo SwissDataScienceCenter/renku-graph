@@ -41,7 +41,7 @@ function createRelease() {
   git config branch.${TRAVIS_BRANCH}.remote origin
   git config branch.${TRAVIS_BRANCH}.merge refs/heads/${TRAVIS_BRANCH}
   git config --global user.name "RenkuBot"
-  git config --global user.email "jakub.chrobasik@epfl.ch"
+  git config --global user.email "renku@datascience.ch"
   git config credential.helper "store --file=.git/credentials"
   echo "https://${GITHUB_TOKEN}:@github.com" >.git/credentials
 
@@ -62,7 +62,7 @@ function updateVersionInRenku() {
 
   # preparing git config
   git config --global user.name "RenkuBot"
-  git config --global user.email "jakub.chrobasik@epfl.ch"
+  git config --global user.email "renku@datascience.ch"
   git config credential.helper "store --file=.git/credentials"
   echo "https://${GITHUB_TOKEN}:@github.com" >.git/credentials
 
