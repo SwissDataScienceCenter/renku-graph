@@ -34,6 +34,12 @@ object datasets {
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
 
+  final class Url private (val value: String) extends AnyVal with StringTinyType
+  implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
+
+  final class SameAs private (val value: String) extends AnyVal with StringTinyType
+  implicit object SameAs extends TinyTypeFactory[SameAs](new SameAs(_)) with constraints.Url
+
   final class DateCreatedInProject private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DateCreatedInProject
       extends TinyTypeFactory[DateCreatedInProject](new DateCreatedInProject(_))

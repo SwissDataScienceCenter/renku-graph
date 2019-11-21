@@ -25,6 +25,7 @@ import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
+import io.circe.HCursor
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -50,12 +51,14 @@ private class BaseDetailsFinder(
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
        |
-       |SELECT DISTINCT ?identifier ?name ?description ?publishedDate
+       |SELECT DISTINCT ?identifier ?name ?url ?sameAs ?description ?publishedDate
        |WHERE {
        |  ?dataset schema:identifier "$identifier" ;
        |           schema:identifier ?identifier ;
        |           rdf:type <http://schema.org/Dataset> ;
        |           schema:name ?name .
+       |  OPTIONAL { ?dataset schema:url ?url } .         
+       |  OPTIONAL { ?dataset schema:sameAs ?sameAs } .         
        |  OPTIONAL { ?dataset schema:description ?description } .
        |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .
        |}""".stripMargin
@@ -76,20 +79,24 @@ private object BaseDetailsFinder {
     import ch.datascience.knowledgegraph.datasets.model._
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
+    def extract[T](property: String, from: HCursor)(implicit decoder: Decoder[T]): Result[T] =
+      from.downField(property).downField("value").as[T]
+
     val dataset: Decoder[Dataset] = { cursor =>
       for {
-        id                 <- cursor.downField("identifier").downField("value").as[Identifier]
-        name               <- cursor.downField("name").downField("value").as[Name]
-        maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
-        maybeDescription <- cursor
-                             .downField("description")
-                             .downField("value")
-                             .as[Option[String]]
+        id                 <- extract[Identifier]("identifier", from = cursor)
+        name               <- extract[Name]("name", from = cursor)
+        maybeUrl           <- extract[Option[String]]("url", from = cursor).map(blankToNone).flatMap(toOption[Url])
+        maybeSameAs        <- extract[Option[String]]("sameAs", from = cursor).map(blankToNone).flatMap(toOption[SameAs])
+        maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate", from = cursor)
+        maybeDescription <- extract[Option[String]]("description", from = cursor)
                              .map(blankToNone)
                              .flatMap(toOption[Description])
       } yield Dataset(
         id,
         name,
+        maybeUrl,
+        maybeSameAs,
         maybeDescription,
         DatasetPublishing(maybePublishedDate, Set.empty),
         part    = List.empty,

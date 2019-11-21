@@ -48,12 +48,14 @@ private class BaseDetailsFinder(
        |PREFIX schema: <http://schema.org/>
        |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
-       |SELECT DISTINCT ?identifier ?name ?description ?publishedDate
+       |SELECT DISTINCT ?identifier ?name ?url ?sameAs ?description ?publishedDate
        |WHERE {
        |  ?dataset dcterms:isPartOf|schema:isPartOf <${FullProjectPath(renkuBaseUrl, projectPath)}> .
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
        |           schema:identifier ?identifier ;
        |           schema:name ?name .
+       |  OPTIONAL { ?dataset schema:url ?url } .         
+       |  OPTIONAL { ?dataset schema:sameAs ?sameAs } .         
        |  OPTIONAL { ?dataset schema:description ?description } .         
        |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .         
        |}""".stripMargin
@@ -72,6 +74,8 @@ private object BaseDetailsFinder {
       for {
         id                 <- cursor.downField("identifier").downField("value").as[Identifier]
         name               <- cursor.downField("name").downField("value").as[Name]
+        maybeUrl           <- cursor.downField("url").downField("value").as[Option[Url]]
+        maybeSameAs        <- cursor.downField("sameAs").downField("value").as[Option[SameAs]]
         maybePublishedDate <- cursor.downField("publishedDate").downField("value").as[Option[PublishedDate]]
         maybeDescription <- cursor
                              .downField("description")
@@ -82,6 +86,8 @@ private object BaseDetailsFinder {
       } yield Dataset(
         id,
         name,
+        maybeUrl,
+        maybeSameAs,
         maybeDescription,
         DatasetPublishing(maybePublishedDate, Set.empty),
         part    = List.empty,

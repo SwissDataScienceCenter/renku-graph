@@ -34,12 +34,13 @@ object Dataset {
   def apply(id:                        Id,
             projectId:                 Project.Id,
             datasetName:               Name,
+            maybeDatasetUrl:           Option[Url],
+            maybeDatasetSameAs:        Option[SameAs],
             maybeDatasetDescription:   Option[Description],
             maybeDatasetPublishedDate: Option[PublishedDate],
             maybeDatasetCreators:      Set[(UserName, Option[Email], Option[Affiliation])],
             maybeDatasetParts:         List[(PartName, PartLocation)],
             commitId:                  CommitId,
-            maybeDatasetUrl:           Option[String],
             generationPath:            FilePath,
             commitGenerationId:        CommitGeneration.Id)(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
     val creators = maybeDatasetCreators.toList.map(creator => Person.Id(creator._2) -> creator)
@@ -61,6 +62,7 @@ object Dataset {
         "http://schema.org/name": $datasetName
       }""".deepMerge(`schema:isPartOf`(projectId))
           .deepMerge(maybeDatasetUrl toValue "http://schema.org/url")
+          .deepMerge(maybeDatasetSameAs toValue "http://schema.org/sameAs")
           .deepMerge(maybeDatasetDescription toValue "http://schema.org/description")
           .deepMerge(maybeDatasetPublishedDate toValue ("http://schema.org/datePublished", "http://schema.org/Date"))
           .deepMerge(creators.map(_._1) toResources "http://schema.org/creator")

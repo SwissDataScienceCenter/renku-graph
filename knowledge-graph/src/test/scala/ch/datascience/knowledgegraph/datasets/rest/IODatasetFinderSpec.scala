@@ -56,6 +56,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = project1DatasetCreationDate,
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators =
@@ -71,6 +73,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = CommittedDate(project1DatasetCreationDate.value.plusSeconds(10)),
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators =
@@ -86,6 +90,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = project2DatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators =
@@ -122,6 +128,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = datasetCreationDate,
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators =
@@ -137,6 +145,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = CommittedDate(datasetCreationDate.value.plusSeconds(10)),
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators =
@@ -152,6 +162,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = datasetCreationDate,
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
                 maybeDatasetCreators =
