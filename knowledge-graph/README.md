@@ -110,6 +110,7 @@ Response body example:
     "creator" : [
       {
         "name" : "e wmtnxmcguz"
+        "affiliation" : "SDSC"                    // optional property
       },
       {
         "name" : "iilmadw vcxabmh",

@@ -61,8 +61,8 @@ class IOProjectDatasetsFinderSpec
                 maybeDatasetSameAs        = dataset1.maybeSameAs,
                 maybeDatasetDescription   = dataset1.maybeDescription,
                 maybeDatasetPublishedDate = dataset1.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset1.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset1.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
@@ -77,8 +77,8 @@ class IOProjectDatasetsFinderSpec
                 maybeDatasetSameAs        = dataset1.maybeSameAs,
                 maybeDatasetDescription   = dataset1.maybeDescription,
                 maybeDatasetPublishedDate = dataset1.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset1.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset1.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
@@ -93,8 +93,8 @@ class IOProjectDatasetsFinderSpec
                 maybeDatasetSameAs        = dataset2.maybeSameAs,
                 maybeDatasetDescription   = dataset2.maybeDescription,
                 maybeDatasetPublishedDate = dataset2.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset2.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset2.part.map(part => (part.name, part.atLocation))
               )
             )

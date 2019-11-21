@@ -40,9 +40,10 @@ object DatasetsGenerators {
   } yield Dataset(id, name, maybeUrl, maybeSameAs, maybeDescription, published, part, projects.toList)
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
-    maybeEmail <- Gen.option(emails)
-    name       <- names
-  } yield DatasetCreator(maybeEmail, name)
+    maybeEmail       <- Gen.option(emails)
+    name             <- names
+    maybeAffiliation <- Gen.option(affiliations)
+  } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
 
   implicit lazy val datasetPublishingInfos: Gen[DatasetPublishing] = for {
     maybePublishedDate <- Gen.option(datasetPublishedDates)

@@ -104,7 +104,8 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] { creator =>
     Json.obj(List(
       Some("name" -> creator.name.asJson),
-      creator.maybeEmail.map(email => "email" -> email.asJson)
+      creator.maybeEmail.map(email => "email" -> email.asJson),
+      creator.maybeAffiliation.map(affiliation => "affiliation" -> affiliation.asJson)
     ).flatten: _*)
   }
   // format: on

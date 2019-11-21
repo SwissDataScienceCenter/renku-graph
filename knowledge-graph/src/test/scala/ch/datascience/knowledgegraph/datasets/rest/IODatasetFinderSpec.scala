@@ -60,8 +60,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset( // to reflect a file added to the dataset in another commit
@@ -77,8 +77,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
@@ -94,8 +94,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(projectPaths.generateOne, projectNames.generateOne)
@@ -132,8 +132,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset( // to reflect a file added later to the dataset in another commit
@@ -149,8 +149,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
@@ -166,8 +166,8 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               )
             )

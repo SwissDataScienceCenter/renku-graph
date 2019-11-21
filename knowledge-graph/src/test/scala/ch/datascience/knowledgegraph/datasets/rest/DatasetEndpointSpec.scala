@@ -30,7 +30,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.Rel.Self
 import ch.datascience.http.rest.Links.{Href, Rel}
@@ -166,9 +166,10 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val datasetCreatorDecoder: Decoder[DatasetCreator] = (cursor: HCursor) =>
     for {
-      name       <- cursor.downField("name").as[UserName]
-      maybeEmail <- cursor.downField("email").as[Option[Email]]
-    } yield DatasetCreator(maybeEmail, name)
+      name             <- cursor.downField("name").as[UserName]
+      maybeEmail       <- cursor.downField("email").as[Option[Email]]
+      maybeAffiliation <- cursor.downField("affiliation").as[Option[Affiliation]]
+    } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
 
   private implicit lazy val datasetPartDecoder: Decoder[DatasetPart] = (cursor: HCursor) =>
     for {

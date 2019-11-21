@@ -152,7 +152,7 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     }
 
     private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
-      case DatasetCreator(maybeEmail, name) =>
+      case DatasetCreator(maybeEmail, name, _) =>
         json"""{
         "name": $name
       }""" addIfDefined ("email" -> maybeEmail)
