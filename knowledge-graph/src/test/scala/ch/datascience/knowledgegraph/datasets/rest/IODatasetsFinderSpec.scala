@@ -184,7 +184,8 @@ class IODatasetsFinderSpec
         creators = Set(
           DatasetCreator(
             Gen.option(emails).generateOne,
-            sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne
+            sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne,
+            Gen.option(affiliations).generateOne
           )
         )
       )
@@ -210,7 +211,8 @@ class IODatasetsFinderSpec
         datasetName               = dataset.name,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
-        maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None))
+        maybeDatasetCreators =
+          dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation))
       ) flatMap unlinkDatasetFromProject
     case projects =>
       projects.flatMap { project =>
@@ -220,7 +222,8 @@ class IODatasetsFinderSpec
           datasetName               = dataset.name,
           maybeDatasetDescription   = dataset.maybeDescription,
           maybeDatasetPublishedDate = dataset.published.maybeDate,
-          maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None))
+          maybeDatasetCreators =
+            dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation))
         )
       }
   }

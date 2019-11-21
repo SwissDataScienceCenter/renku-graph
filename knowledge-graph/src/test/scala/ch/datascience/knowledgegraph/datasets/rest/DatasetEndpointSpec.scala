@@ -30,7 +30,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.Rel.Self
 import ch.datascience.http.rest.Links.{Href, Rel}
@@ -150,11 +150,13 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
     for {
       id               <- cursor.downField("identifier").as[Identifier]
       name             <- cursor.downField("name").as[Name]
+      maybeUrl         <- cursor.downField("url").as[Option[Url]]
+      maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       published        <- cursor.downField("published").as[DatasetPublishing]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
-    } yield Dataset(id, name, maybeDescription, published, parts, projects)
+    } yield Dataset(id, name, maybeUrl, maybeSameAs, maybeDescription, published, parts, projects)
 
   private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>
     for {
@@ -164,9 +166,10 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val datasetCreatorDecoder: Decoder[DatasetCreator] = (cursor: HCursor) =>
     for {
-      name       <- cursor.downField("name").as[UserName]
-      maybeEmail <- cursor.downField("email").as[Option[Email]]
-    } yield DatasetCreator(maybeEmail, name)
+      name             <- cursor.downField("name").as[UserName]
+      maybeEmail       <- cursor.downField("email").as[Option[Email]]
+      maybeAffiliation <- cursor.downField("affiliation").as[Option[Affiliation]]
+    } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
 
   private implicit lazy val datasetPartDecoder: Decoder[DatasetPart] = (cursor: HCursor) =>
     for {

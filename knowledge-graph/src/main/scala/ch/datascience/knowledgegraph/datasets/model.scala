@@ -21,19 +21,21 @@ package ch.datascience.knowledgegraph.datasets
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 
 object model {
 
   final case class Dataset(id:               Identifier,
                            name:             Name,
+                           maybeUrl:         Option[Url],
+                           maybeSameAs:      Option[SameAs],
                            maybeDescription: Option[Description],
                            published:        DatasetPublishing,
                            part:             List[DatasetPart],
                            project:          List[DatasetProject])
 
   final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])
-  final case class DatasetCreator(maybeEmail:   Option[Email], name:             UserName)
+  final case class DatasetCreator(maybeEmail:   Option[Email], name:             UserName, maybeAffiliation: Option[Affiliation])
 
   final case class DatasetPart(name: PartName, atLocation: PartLocation)
 

@@ -56,10 +56,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = project1DatasetCreationDate,
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset( // to reflect a file added to the dataset in another commit
@@ -71,10 +73,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = CommittedDate(project1DatasetCreationDate.value.plusSeconds(10)),
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
@@ -86,10 +90,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = project2DatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(projectPaths.generateOne, projectNames.generateOne)
@@ -122,10 +128,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = datasetCreationDate,
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset( // to reflect a file added later to the dataset in another commit
@@ -137,10 +145,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = CommittedDate(datasetCreationDate.value.plusSeconds(10)),
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
@@ -152,10 +162,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                 committedDate             = datasetCreationDate,
                 datasetIdentifier         = dataset.id,
                 datasetName               = dataset.name,
+                maybeDatasetUrl           = dataset.maybeUrl,
+                maybeDatasetSameAs        = dataset.maybeSameAs,
                 maybeDatasetDescription   = dataset.maybeDescription,
                 maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
               )
             )

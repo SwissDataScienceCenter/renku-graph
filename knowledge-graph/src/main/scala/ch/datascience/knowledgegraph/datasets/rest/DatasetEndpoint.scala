@@ -84,6 +84,8 @@ class DatasetEndpoint[Interpretation[_]: Effect](
       List(
         Some("identifier" -> dataset.id.asJson),
         Some("name" -> dataset.name.asJson),
+        dataset.maybeUrl.map(url => "url" -> url.asJson),
+        dataset.maybeSameAs.map(sameAs => "sameAs" -> sameAs.asJson),
         dataset.maybeDescription.map(description => "description" -> description.asJson),
         Some("published" -> Json.obj(List(
           dataset.published.maybeDate.map(date => "datePublished" -> date.asJson),
@@ -102,7 +104,8 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] { creator =>
     Json.obj(List(
       Some("name" -> creator.name.asJson),
-      creator.maybeEmail.map(email => "email" -> email.asJson)
+      creator.maybeEmail.map(email => "email" -> email.asJson),
+      creator.maybeAffiliation.map(affiliation => "affiliation" -> affiliation.asJson)
     ).flatten: _*)
   }
   // format: on

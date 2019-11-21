@@ -20,7 +20,6 @@ package ch.datascience.knowledgegraph.datasets.graphql
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.httpUrls
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
@@ -30,7 +29,6 @@ import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, Proj
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
 import ch.datascience.stubbing.ExternalServiceStubbing
-import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -48,10 +46,6 @@ class IOProjectDatasetsFinderSpec
         (projectB, dataset1, projectBDataset1Creation, dataset2, projectBDataset2Creation) =>
           val projectA         = datasetProjects.generateOne
           val projectACreation = datasetInProjectCreations.generateOne
-          val reusedDatasetUrl = (for {
-            url  <- httpUrls
-            uuid <- Gen.uuid
-          } yield s"$url/$uuid").generateOne
 
           loadToStore(
             triples(
@@ -63,12 +57,13 @@ class IOProjectDatasetsFinderSpec
                 committedDate             = projectACreation.date.toUnsafe(date => CommittedDate.from(date.value)),
                 datasetIdentifier         = dataset1.id,
                 datasetName               = dataset1.name,
+                maybeDatasetUrl           = dataset1.maybeUrl,
+                maybeDatasetSameAs        = dataset1.maybeSameAs,
                 maybeDatasetDescription   = dataset1.maybeDescription,
                 maybeDatasetPublishedDate = dataset1.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-                maybeDatasetParts = dataset1.part.map(part => (part.name, part.atLocation)),
-                maybeDatasetUrl   = Some(reusedDatasetUrl)
+                maybeDatasetCreators = dataset1.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
+                maybeDatasetParts = dataset1.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
                 projectB.path,
@@ -78,12 +73,13 @@ class IOProjectDatasetsFinderSpec
                 committedDate             = projectBDataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
                 datasetIdentifier         = dataset1.id,
                 datasetName               = dataset1.name,
+                maybeDatasetUrl           = dataset1.maybeUrl,
+                maybeDatasetSameAs        = dataset1.maybeSameAs,
                 maybeDatasetDescription   = dataset1.maybeDescription,
                 maybeDatasetPublishedDate = dataset1.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-                maybeDatasetParts = dataset1.part.map(part => (part.name, part.atLocation)),
-                maybeDatasetUrl   = Some(reusedDatasetUrl)
+                maybeDatasetCreators = dataset1.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
+                maybeDatasetParts = dataset1.part.map(part => (part.name, part.atLocation))
               ),
               singleFileAndCommitWithDataset(
                 projectB.path,
@@ -93,10 +89,12 @@ class IOProjectDatasetsFinderSpec
                 committedDate             = projectBDataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
                 datasetIdentifier         = dataset2.id,
                 datasetName               = dataset2.name,
+                maybeDatasetUrl           = dataset2.maybeUrl,
+                maybeDatasetSameAs        = dataset2.maybeSameAs,
                 maybeDatasetDescription   = dataset2.maybeDescription,
                 maybeDatasetPublishedDate = dataset2.published.maybeDate,
-                maybeDatasetCreators =
-                  dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
+                maybeDatasetCreators = dataset2.published.creators
+                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
                 maybeDatasetParts = dataset2.part.map(part => (part.name, part.atLocation))
               )
             )

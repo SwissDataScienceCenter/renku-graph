@@ -34,12 +34,14 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "dataset decoder" should {
 
-    "decode result-set with a blank description to a Dataset object" in {
+    "decode result-set with a blank description, url, and sameAs to a Dataset object" in {
       forAll(datasets, datasetPublishedDates, blankStrings()) { (dataset, publishedDate, description) =>
         resultSet(dataset, publishedDate, description).as[List[Dataset]] shouldBe Right {
           List(
             dataset
               .copy(published = dataset.published.copy(maybeDate = Some(publishedDate), creators = Set.empty))
+              .copy(maybeUrl = None)
+              .copy(maybeSameAs = None)
               .copy(maybeDescription = None)
               .copy(part = Nil)
               .copy(project = Nil)
@@ -49,7 +51,7 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
-  private def resultSet(dataset: Dataset, publishedDate: PublishedDate, description: String) = json"""
+  private def resultSet(dataset: Dataset, publishedDate: PublishedDate, blank: String) = json"""
   {
     "results": {
       "bindings": [
@@ -57,7 +59,9 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
           "identifier": {"value": ${dataset.id.value}},
           "name": {"value": ${dataset.name.value}},
           "publishedDate": {"value": ${publishedDate.value}},
-          "description": {"value": $description}
+          "description": {"value": $blank},
+          "url": {"value": $blank},
+          "sameAs": {"value": $blank}
         }
       ]
     }

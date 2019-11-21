@@ -20,7 +20,7 @@ package ch.datascience.rdfstore.triples
 
 import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{httpUrls, listOf, setOf}
+import ch.datascience.generators.Generators.{listOf, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -47,11 +47,12 @@ object singleFileAndCommitWithDataset {
       committedDate:             CommittedDate = committedDates.generateOne,
       datasetIdentifier:         Identifier = datasetIds.generateOne,
       datasetName:               Name = datasetNames.generateOne,
+      maybeDatasetUrl:           Option[Url] = Gen.option(datasetUrls).generateOne,
+      maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
       maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
       maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
       maybeDatasetCreators:      Set[(UserName, Option[Email], Option[Affiliation])] = setOf(datasetCreators).generateOne,
       maybeDatasetParts:         List[(PartName, PartLocation)] = listOf(datasetParts).generateOne,
-      maybeDatasetUrl:           Option[String] = Gen.option(datasetUrl).generateOne,
       schemaVersion:             SchemaVersion = schemaVersions.generateOne,
       renkuBaseUrl:              RenkuBaseUrl = renkuBaseUrl
   )(implicit fusekiBaseUrl:      FusekiBaseUrl): List[Json] = {
@@ -96,12 +97,13 @@ object singleFileAndCommitWithDataset {
       datasetId,
       projectId,
       datasetName,
+      maybeDatasetUrl,
+      maybeDatasetSameAs,
       maybeDatasetDescription,
       maybeDatasetPublishedDate,
       maybeDatasetCreators,
       maybeDatasetParts,
       commitId,
-      maybeDatasetUrl,
       datasetGenerationPath,
       commitGenerationId
     )
@@ -111,9 +113,4 @@ object singleFileAndCommitWithDataset {
     name     <- datasetPartNames
     location <- datasetPartLocations
   } yield (name, location)
-
-  private val datasetUrl: Gen[String] = for {
-    url  <- httpUrls
-    uuid <- Gen.uuid.map(_.toString)
-  } yield s"$url/$uuid"
 }
