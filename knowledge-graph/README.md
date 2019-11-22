@@ -442,11 +442,10 @@ Finds list of datasets of the project with the given `namespace/name`.
 
 **Response**
 
-| Status                     | Description                            |
-|----------------------------|----------------------------------------|
-| OK (200)                   | If there are datasets for the project  |
-| NOT_FOUND (404)            | If there are no datasets found         |
-| INTERNAL SERVER ERROR (500)| Otherwise                              |
+| Status                     | Description                                                       |
+|----------------------------|-------------------------------------------------------------------|
+| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
 
 Response body example:
 ```
