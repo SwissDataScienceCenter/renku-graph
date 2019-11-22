@@ -63,7 +63,7 @@ class SortBySpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "sort" should {
 
-    "decode a valid query sort parameter" in {
+    "decode a valid sort query parameter" in {
       forAll(sorts) { sort =>
         Map("sort" -> Seq(serialize(sort))) match {
           case Sort.sort(actual) => actual shouldBe Some(Validated.validNel(sort))
@@ -71,12 +71,18 @@ class SortBySpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
 
-    "fail to decode an invalid query sort parameter" in {
+    "fail to decode an invalid sort query parameter" in {
       Map("sort" -> Seq(s"invalid:$Desc")) match {
         case Sort.sort(actual) =>
           actual shouldBe Some(Validated.invalidNel {
             ParseFailure(Sort.Property.from("invalid").left.get.getMessage, "")
           })
+      }
+    }
+
+    "return None when no sort query parameter" in {
+      Map.empty[String, List[String]] match {
+        case Sort.sort(actual) => actual shouldBe None
       }
     }
   }

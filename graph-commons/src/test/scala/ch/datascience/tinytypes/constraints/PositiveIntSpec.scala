@@ -24,28 +24,26 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class GreaterThanZeroSpec extends WordSpec with ScalaCheckPropertyChecks {
+class PositiveIntSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  "GreaterThanZero" should {
+  "PositiveInt" should {
 
     "be instantiatable when values are greater than zero" in {
       forAll(Gen.choose(1, 100000)) { someValue =>
-        GreaterThanZeroInt(someValue).value shouldBe someValue
+        PositiveIntTest(someValue).value shouldBe someValue
       }
     }
 
     "throw an IllegalArgumentException for 0" in {
-      intercept[IllegalArgumentException](GreaterThanZeroInt(0)).getMessage shouldBe "ch.datascience.tinytypes.constraints.GreaterThanZeroInt cannot be <= 0"
+      intercept[IllegalArgumentException](PositiveIntTest(0)).getMessage shouldBe "ch.datascience.tinytypes.constraints.PositiveIntTest cannot be <= 0"
     }
 
     "throw an IllegalArgumentException for negative value" in {
-      intercept[IllegalArgumentException](GreaterThanZeroInt(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.GreaterThanZeroInt cannot be <= 0"
+      intercept[IllegalArgumentException](PositiveIntTest(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.PositiveIntTest cannot be <= 0"
     }
   }
 }
 
-private class GreaterThanZeroInt private (val value: Int) extends AnyVal with IntTinyType
+private class PositiveIntTest private (val value: Int) extends AnyVal with IntTinyType
 
-private object GreaterThanZeroInt
-    extends TinyTypeFactory[GreaterThanZeroInt](new GreaterThanZeroInt(_))
-    with GreaterThanZero
+private object PositiveIntTest extends TinyTypeFactory[PositiveIntTest](new PositiveIntTest(_)) with PositiveInt

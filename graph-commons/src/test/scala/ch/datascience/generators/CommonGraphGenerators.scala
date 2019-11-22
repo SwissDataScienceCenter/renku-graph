@@ -33,6 +33,7 @@ import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
+import ch.datascience.http.rest.Paging.PagingRequest
 import ch.datascience.http.rest.{Links, SortBy}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
@@ -133,6 +134,9 @@ object CommonGraphGenerators {
       property  <- Gen.oneOf(sortBy.properties.to[List])
       direction <- Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
     } yield sortBy.By(property, direction)
+
+  implicit val pages:    Gen[PagingRequest.Page]    = positiveInts() map (_.value) map PagingRequest.Page.apply
+  implicit val perPages: Gen[PagingRequest.PerPage] = positiveInts() map (_.value) map PagingRequest.PerPage.apply
 
   implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls map FusekiBaseUrl.apply
 
