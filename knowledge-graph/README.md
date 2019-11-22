@@ -24,12 +24,11 @@ NOTES:
 
 **Response**
 
-| Status                     | Description                                            |
-|----------------------------|--------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project                  |
-| BAD_REQUEST (400)          | If the `query` parameter is blank or `sort` is invalid |
-| NOT_FOUND (404)            | If there are no datasets found or no `query` parameter |
-| INTERNAL SERVER ERROR (500)| Otherwise                                              |
+| Status                     | Description                                                       |
+|----------------------------|-------------------------------------------------------------------|
+| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
+| BAD_REQUEST (400)          | If the `query` parameter is blank or `sort` is invalid            |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
 
 Response body example:
 ```
