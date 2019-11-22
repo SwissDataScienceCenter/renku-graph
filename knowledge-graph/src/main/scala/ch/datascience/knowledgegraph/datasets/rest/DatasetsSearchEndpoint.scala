@@ -22,8 +22,8 @@ import cats.MonadError
 import cats.effect._
 import cats.implicits._
 import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
@@ -64,14 +64,9 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
     measureExecutionTime {
       datasetsFinder
         .findDatasets(phrase, sort)
-        .flatMap(toHttpResult(phrase))
+        .flatMap(datasets => Ok(datasets.asJson))
         .recoverWith(httpResult(phrase))
     } map logExecutionTimeWhen(finishedSuccessfully(phrase))
-
-  private def toHttpResult(phrase: Phrase): List[DatasetSearchResult] => Interpretation[Response[Interpretation]] = {
-    case Nil      => NotFound(InfoMessage(s"No datasets matching '$phrase'"))
-    case datasets => Ok(datasets.asJson)
-  }
 
   private def httpResult(phrase: Phrase): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>

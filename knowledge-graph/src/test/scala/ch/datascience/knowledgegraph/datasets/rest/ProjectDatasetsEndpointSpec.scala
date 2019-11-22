@@ -20,8 +20,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.IO
+import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -70,7 +70,7 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
       }
     }
 
-    "respond with NOT_FOUND if no datasets found" in new TestCase {
+    "respond with OK an empty JSON array if no datasets found" in new TestCase {
 
       (projectDatasetsFinder
         .findProjectDatasets(_: ProjectPath))
@@ -79,10 +79,9 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
 
       val response = getProjectDatasets(projectPath).unsafeRunSync()
 
-      response.status      shouldBe NotFound
-      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No datasets found for '$projectPath'").asJson
+      response.status                       shouldBe Ok
+      response.contentType                  shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[List[Json]].unsafeRunSync shouldBe empty
 
       logger.loggedOnly(
         Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}")

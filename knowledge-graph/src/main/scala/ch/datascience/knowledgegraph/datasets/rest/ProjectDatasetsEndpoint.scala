@@ -21,8 +21,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect._
 import cats.implicits._
 import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.Links
@@ -55,16 +55,9 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     measureExecutionTime {
       projectDatasetsFinder
         .findProjectDatasets(projectPath)
-        .flatMap(toHttpResult(projectPath))
+        .flatMap(datasets => Ok(datasets.asJson))
         .recoverWith(httpResult(projectPath))
     } map logExecutionTimeWhen(finishedSuccessfully(projectPath))
-
-  private def toHttpResult(
-      projectPath: ProjectPath
-  ): List[(Identifier, Name)] => Interpretation[Response[Interpretation]] = {
-    case Nil      => NotFound(InfoMessage(s"No datasets found for '$projectPath'"))
-    case datasets => Ok(datasets.asJson)
-  }
 
   private def httpResult(
       projectPath: ProjectPath

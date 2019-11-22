@@ -20,8 +20,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.IO
+import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -69,16 +69,16 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
       }
     }
 
-    "respond with NOT_FOUND when no matching datasets found" in new TestCase {
+    "respond with OK and an empty JSON array when no matching datasets found" in new TestCase {
       (datasetsFinder.findDatasets _)
         .expects(phrase, sort)
         .returning(context.pure(Nil))
 
       val response = searchForDatasets(phrase, sort).unsafeRunSync()
 
-      response.status                 shouldBe NotFound
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No datasets matching '$phrase'").asJson
+      response.status                       shouldBe Ok
+      response.contentType                  shouldBe Some(`Content-Type`(application.json))
+      response.as[List[Json]].unsafeRunSync shouldBe empty
 
       logger.loggedOnly(
         Warn(s"Finding datasets containing '$phrase' phrase finished${executionTimeRecorder.executionTimeInfo}")
