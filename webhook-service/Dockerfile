@@ -20,8 +20,9 @@ WORKDIR /opt/webhook-service
 COPY --from=builder /work/webhook-service/target/universal/stage .
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV TZ UTC
 
-RUN apk add --no-cache curl bash && \
+RUN apk add --no-cache tzdata curl bash && \
     chown -R daemon:daemon .
 
 ENTRYPOINT ["bin/webhook-service"]
