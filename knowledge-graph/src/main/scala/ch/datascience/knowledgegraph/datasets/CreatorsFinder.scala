@@ -24,7 +24,8 @@ import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Decoder.decodeList
+import io.circe.Decoder.{Result, decodeList}
+import io.circe.HCursor
 import model._
 
 import scala.concurrent.ExecutionContext
@@ -67,14 +68,17 @@ private object CreatorsFinder {
 
   import io.circe.Decoder
 
-  private implicit val creatorsDecoder: Decoder[List[DatasetCreator]] = {
+  private[datasets] implicit val creatorsDecoder: Decoder[List[DatasetCreator]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
+
+    def extract(property: String, from: HCursor): Result[Option[String]] =
+      from.downField(property).downField("value").as[Option[String]]
 
     val creator: Decoder[DatasetCreator] = { cursor =>
       for {
         maybeEmail       <- cursor.downField("email").downField("value").as[Option[Email]]
         name             <- cursor.downField("name").downField("value").as[UserName]
-        maybeAffiliation <- cursor.downField("affiliation").downField("value").as[Option[Affiliation]]
+        maybeAffiliation <- extract("affiliation", from = cursor).map(blankToNone).flatMap(toOption[Affiliation])
       } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
     }
 
