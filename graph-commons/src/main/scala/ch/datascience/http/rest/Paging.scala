@@ -2,7 +2,9 @@ package ch.datascience.http.rest
 
 object Paging {
 
-  case class PagingRequest()
+  import ch.datascience.http.rest.Paging.PagingRequest._
+
+  case class PagingRequest(page: Page, perPage: PerPage)
 
   object PagingRequest {
     import cats.implicits._
@@ -11,11 +13,18 @@ object Paging {
     import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
     import org.http4s.{ParseFailure, QueryParamDecoder}
 
+    def apply(maybePage: Option[Page], maybePerPage: Option[PerPage]): PagingRequest =
+      PagingRequest(maybePage getOrElse Page.first, maybePerPage getOrElse PerPage.default)
+
     final class Page private (val value: Int) extends AnyVal with IntTinyType
-    implicit object Page extends TinyTypeFactory[Page](new Page(_)) with PositiveInt
+    implicit object Page extends TinyTypeFactory[Page](new Page(_)) with PositiveInt {
+      val first: Page = Page(1)
+    }
 
     final class PerPage private (val value: Int) extends AnyVal with IntTinyType
-    implicit object PerPage extends TinyTypeFactory[PerPage](new PerPage(_)) with PositiveInt
+    implicit object PerPage extends TinyTypeFactory[PerPage](new PerPage(_)) with PositiveInt {
+      val default: PerPage = PerPage(20)
+    }
 
     object Decoders {
       private implicit val pageParameterDecoder: QueryParamDecoder[Page] =

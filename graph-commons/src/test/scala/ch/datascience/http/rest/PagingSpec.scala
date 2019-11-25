@@ -84,16 +84,33 @@ class PagingSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 
   "Page" should {
-
-    "be PositiveInt constrained" in {
+    "be a PositiveInt constrained" in {
       Page shouldBe a[PositiveInt]
     }
   }
 
   "PerPage" should {
-
-    "be PositiveInt constrained" in {
+    "be a PositiveInt constrained" in {
       PerPage shouldBe a[PositiveInt]
+    }
+  }
+
+  "PagingRequest.apply" should {
+
+    "instantiate with the given page and perPage" in {
+      val page    = pages.generateOne
+      val perPage = perPages.generateOne
+      PagingRequest(Some(page), Some(perPage)) shouldBe PagingRequest(page, perPage)
+    }
+
+    s"default page to ${Page.first} if instantiated with None" in {
+      val perPage = perPages.generateOne
+      PagingRequest(None, Some(perPage)) shouldBe PagingRequest(Page.first, perPage)
+    }
+
+    s"default perPage to ${PerPage.default} if instantiated with None" in {
+      val page = pages.generateOne
+      PagingRequest(Some(page), None) shouldBe PagingRequest(page, PerPage.default)
     }
   }
 }
