@@ -20,8 +20,9 @@ WORKDIR /opt/token-repository
 COPY --from=builder /work/token-repository/target/universal/stage .
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV TZ UTC
 
-RUN apk add --no-cache curl bash && \
+RUN apk add --no-cache tzdata curl bash && \
     chown -R daemon:daemon .
 
 ENTRYPOINT ["bin/token-repository"]
