@@ -1,12 +1,33 @@
+/*
+ * Copyright 2019 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.datascience.http.rest
 
-import cats.data.Validated
+import cats.data.{NonEmptyList, Validated}
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.http.rest.Paging.PagingRequest
 import ch.datascience.http.rest.Paging.PagingRequest.{Page, PerPage}
 import ch.datascience.tinytypes.constraints.PositiveInt
 import org.http4s.ParseFailure
+import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -100,17 +121,37 @@ class PagingSpec extends WordSpec with ScalaCheckPropertyChecks {
     "instantiate with the given page and perPage" in {
       val page    = pages.generateOne
       val perPage = perPages.generateOne
-      PagingRequest(Some(page), Some(perPage)) shouldBe PagingRequest(page, perPage)
+      PagingRequest(Some(page.validNel), Some(perPage.validNel)) shouldBe PagingRequest(page, perPage).validNel
     }
 
     s"default page to ${Page.first} if instantiated with None" in {
       val perPage = perPages.generateOne
-      PagingRequest(None, Some(perPage)) shouldBe PagingRequest(Page.first, perPage)
+      PagingRequest(None, Some(perPage.validNel)) shouldBe PagingRequest(Page.first, perPage).validNel
     }
 
     s"default perPage to ${PerPage.default} if instantiated with None" in {
       val page = pages.generateOne
-      PagingRequest(Some(page), None) shouldBe PagingRequest(page, PerPage.default)
+      PagingRequest(Some(page.validNel), None) shouldBe PagingRequest(page, PerPage.default).validNel
+    }
+
+    "return the failure if exists for the page" in {
+      val pageParsingError = parseFailures.generateOne.invalidNel[Page]
+      PagingRequest(Some(pageParsingError), None) shouldBe pageParsingError
+    }
+
+    "return the failure if exists for the perPage" in {
+      val perPageParsingError = parseFailures.generateOne.invalidNel[PerPage]
+      PagingRequest(None, Some(perPageParsingError)) shouldBe perPageParsingError
+    }
+
+    "return merged failures if exists for the page and perPage" in {
+      val pageParsingError    = parseFailures.generateOne
+      val perPageParsingError = parseFailures.generateOne
+
+      PagingRequest(Some(pageParsingError.invalidNel[Page]), Some(perPageParsingError.invalidNel[PerPage])) shouldBe Validated
+        .Invalid(NonEmptyList.of(pageParsingError, perPageParsingError))
     }
   }
+
+  private val parseFailures: Gen[ParseFailure] = sentences() map (v => ParseFailure(v.value, ""))
 }

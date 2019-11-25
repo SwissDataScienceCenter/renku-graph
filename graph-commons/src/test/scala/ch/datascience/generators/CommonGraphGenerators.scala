@@ -137,6 +137,10 @@ object CommonGraphGenerators {
 
   implicit val pages:    Gen[PagingRequest.Page]    = positiveInts() map (_.value) map PagingRequest.Page.apply
   implicit val perPages: Gen[PagingRequest.PerPage] = positiveInts() map (_.value) map PagingRequest.PerPage.apply
+  implicit val pagingRequests: Gen[PagingRequest] = for {
+    page    <- pages
+    perPage <- perPages
+  } yield PagingRequest(page, perPage)
 
   implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls map FusekiBaseUrl.apply
 

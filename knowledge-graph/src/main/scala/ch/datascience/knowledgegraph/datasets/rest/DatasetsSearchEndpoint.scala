@@ -26,6 +26,7 @@ import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
+import ch.datascience.http.rest.Paging.PagingRequest
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -60,10 +61,12 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   import io.circe.syntax._
   import org.http4s.circe._
 
-  def searchForDatasets(phrase: Phrase, sort: Sort.By): Interpretation[Response[Interpretation]] =
+  def searchForDatasets(phrase: Phrase,
+                        sort:   Sort.By,
+                        paging: PagingRequest): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       datasetsFinder
-        .findDatasets(phrase, sort)
+        .findDatasets(phrase, sort, paging)
         .flatMap(datasets => Ok(datasets.asJson))
         .recoverWith(httpResult(phrase))
     } map logExecutionTimeWhen(finishedSuccessfully(phrase))

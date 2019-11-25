@@ -28,6 +28,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.datasets.{Description, Name, PublishedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
+import ch.datascience.http.rest.Paging.PagingRequest
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
@@ -61,7 +62,7 @@ class IODatasetsFinderSpec
         val (dataset1, dataset2, dataset3) = storeDatasets(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
 
         datasetsFinder
-          .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc))
+          .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync() shouldBe List(
           DatasetSearchResult(dataset1.id,
                               dataset1.name,
@@ -92,7 +93,7 @@ class IODatasetsFinderSpec
       )
 
       datasetsFinder
-        .findDatasets(phrase, Sort.By(DatePublishedProperty, Direction.Desc))
+        .findDatasets(phrase, Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default)
         .unsafeRunSync() shouldBe List(
         DatasetSearchResult(dataset3.id,
                             dataset3.name,
@@ -122,7 +123,7 @@ class IODatasetsFinderSpec
       )
 
       datasetsFinder
-        .findDatasets(phrase, Sort.By(ProjectsCountProperty, Direction.Asc))
+        .findDatasets(phrase, Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync() shouldBe List(
         DatasetSearchResult(dataset2.id,
                             dataset2.name,
@@ -151,7 +152,7 @@ class IODatasetsFinderSpec
       )
 
       datasetsFinder
-        .findDatasets(phrases.generateOne, searchEndpointSorts.generateOne)
+        .findDatasets(phrases.generateOne, searchEndpointSorts.generateOne, PagingRequest.default)
         .unsafeRunSync() shouldBe empty
     }
   }

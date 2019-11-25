@@ -36,9 +36,7 @@ trait SortBy {
     def from(propertyName: String): Either[IllegalArgumentException, PropertyType] =
       Either.fromOption(
         properties.find(_.name.equalsIgnoreCase(propertyName)),
-        new IllegalArgumentException(
-          s"'$propertyName' is not a valid sort property. Allowed properties: ${properties.mkString(", ")}"
-        )
+        new IllegalArgumentException(sort.errorMessage(propertyName))
       )
   }
 
@@ -58,6 +56,8 @@ trait SortBy {
 
   object sort extends OptionalValidatingQueryParamDecoderMatcher[By]("sort") {
     val parameterName: String = "sort"
+    def errorMessage(propertyName: String): String =
+      s"'$propertyName' is not a valid $parameterName property. Allowed properties: ${properties.mkString(", ")}"
   }
 }
 

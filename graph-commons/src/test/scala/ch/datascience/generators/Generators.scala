@@ -28,7 +28,7 @@ import ch.datascience.tinytypes._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import eu.timepit.refined.numeric.{NonNegative, Positive}
+import eu.timepit.refined.numeric.{NonNegative, NonPositive, Positive}
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
@@ -127,6 +127,8 @@ object Generators {
     choose(1L, max) map Refined.unsafeApply
 
   def nonNegativeInts(max: Int = 1000): Gen[Int Refined NonNegative] = choose(0, max) map Refined.unsafeApply
+
+  def nonPositiveInts(min: Int = -1000): Gen[Int Refined NonPositive] = choose(min, 0) map Refined.unsafeApply
 
   def negativeInts(min: Int = -1000): Gen[Int] = choose(min, 0)
 

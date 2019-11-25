@@ -20,6 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate}
+import ch.datascience.http.rest.Paging.PagingRequest
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
@@ -35,7 +36,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait DatasetsFinder[Interpretation[_]] {
-  def findDatasets(phrase: Phrase, sort: Sort.By): Interpretation[List[DatasetSearchResult]]
+  def findDatasets(phrase: Phrase, sort: Sort.By, paging: PagingRequest): Interpretation[List[DatasetSearchResult]]
 }
 
 private object DatasetsFinder {
@@ -63,7 +64,7 @@ private class IODatasetsFinder(
   import cats.implicits._
   import creatorsFinder._
 
-  override def findDatasets(phrase: Phrase, sort: Sort.By): IO[List[DatasetSearchResult]] =
+  override def findDatasets(phrase: Phrase, sort: Sort.By, paging: PagingRequest): IO[List[DatasetSearchResult]] =
     for {
       datasets             <- queryExpecting[List[DatasetSearchResult]](using = query(phrase, sort))
       datasetsWithCreators <- (datasets map addCreators).parSequence

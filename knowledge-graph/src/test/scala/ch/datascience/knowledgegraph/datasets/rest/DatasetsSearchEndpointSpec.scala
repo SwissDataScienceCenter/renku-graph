@@ -52,10 +52,10 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     "respond with OK and the found datasets" in new TestCase {
       forAll(nonEmptyList(datasetSearchResultItems)) { datasetSearchResults =>
         (datasetsFinder.findDatasets _)
-          .expects(phrase, sort)
+          .expects(phrase, sort, pagingRequest)
           .returning(context.pure(datasetSearchResults.toList))
 
-        val response = searchForDatasets(phrase, sort).unsafeRunSync()
+        val response = searchForDatasets(phrase, sort, pagingRequest).unsafeRunSync()
 
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -71,10 +71,10 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
 
     "respond with OK and an empty JSON array when no matching datasets found" in new TestCase {
       (datasetsFinder.findDatasets _)
-        .expects(phrase, sort)
+        .expects(phrase, sort, pagingRequest)
         .returning(context.pure(Nil))
 
-      val response = searchForDatasets(phrase, sort).unsafeRunSync()
+      val response = searchForDatasets(phrase, sort, pagingRequest).unsafeRunSync()
 
       response.status                       shouldBe Ok
       response.contentType                  shouldBe Some(`Content-Type`(application.json))
@@ -88,10 +88,10 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     "respond with INTERNAL_SERVER_ERROR when searching for datasets fails" in new TestCase {
       val exception = exceptions.generateOne
       (datasetsFinder.findDatasets _)
-        .expects(phrase, sort)
+        .expects(phrase, sort, pagingRequest)
         .returning(context.raiseError(exception))
 
-      val response = searchForDatasets(phrase, sort).unsafeRunSync()
+      val response = searchForDatasets(phrase, sort, pagingRequest).unsafeRunSync()
 
       response.status                 shouldBe InternalServerError
       response.contentType            shouldBe Some(`Content-Type`(application.json))
@@ -116,8 +116,9 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
 
     val context = MonadError[IO, Throwable]
 
-    val phrase = phrases.generateOne
-    val sort   = searchEndpointSorts.generateOne
+    val phrase        = phrases.generateOne
+    val sort          = searchEndpointSorts.generateOne
+    val pagingRequest = pagingRequests.generateOne
 
     val datasetsFinder        = mock[DatasetsFinder[IO]]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
