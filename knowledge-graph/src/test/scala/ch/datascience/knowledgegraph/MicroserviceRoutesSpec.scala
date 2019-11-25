@@ -25,9 +25,9 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.http.rest.Paging.PagingRequest
-import ch.datascience.http.rest.Paging.PagingRequest.{Page, PerPage}
 import ch.datascience.http.rest.SortBy.Direction
+import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort

@@ -33,8 +33,8 @@ import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
-import ch.datascience.http.rest.Paging.PagingRequest
-import ch.datascience.http.rest.{Links, SortBy}
+import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.{Links, SortBy, paging}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -135,8 +135,8 @@ object CommonGraphGenerators {
       direction <- Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
     } yield sortBy.By(property, direction)
 
-  implicit val pages:    Gen[PagingRequest.Page]    = positiveInts() map (_.value) map PagingRequest.Page.apply
-  implicit val perPages: Gen[PagingRequest.PerPage] = positiveInts() map (_.value) map PagingRequest.PerPage.apply
+  implicit val pages:    Gen[paging.model.Page]    = positiveInts() map (_.value) map paging.model.Page.apply
+  implicit val perPages: Gen[paging.model.PerPage] = positiveInts() map (_.value) map paging.model.PerPage.apply
   implicit val pagingRequests: Gen[PagingRequest] = for {
     page    <- pages
     perPage <- perPages

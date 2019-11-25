@@ -22,9 +22,10 @@ import cats.data.{Validated, ValidatedNel}
 import cats.effect.ConcurrentEffect
 import cats.implicits._
 import ch.datascience.graph.http.server.binders.ProjectPath._
-import ch.datascience.http.rest.Paging.PagingRequest
-import ch.datascience.http.rest.Paging.PagingRequest.Decoders._
 import ch.datascience.http.rest.SortBy.Direction
+import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.paging.PagingRequest.Decoders._
+import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.QueryParameterTools._
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.QueryEndpoint
@@ -66,8 +67,8 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   private def searchForDatasets(
       maybePhrase:  ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase],
       maybeSort:    Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
-      maybePage:    Option[ValidatedNel[ParseFailure, PagingRequest.Page]],
-      maybePerPage: Option[ValidatedNel[ParseFailure, PagingRequest.PerPage]]
+      maybePage:    Option[ValidatedNel[ParseFailure, Page]],
+      maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]
   ): F[Response[F]] =
     (maybePhrase,
      maybeSort getOrElse Validated.validNel(Sort.By(NameProperty, Direction.Asc)),

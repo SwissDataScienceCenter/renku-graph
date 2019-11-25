@@ -28,8 +28,8 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.datasets.{Description, Name, PublishedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
-import ch.datascience.http.rest.Paging.PagingRequest
 import ch.datascience.http.rest.SortBy.Direction
+import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
