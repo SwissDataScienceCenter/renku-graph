@@ -24,7 +24,7 @@ ENV TZ UTC
 
 # Installing Renku
 RUN apk add --no-cache tzdata git git-lfs curl bash python3-dev openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev && \
-    python3 -m pip install 'renku==0.8.1' sentry-sdk && \
+    python3 -m pip install 'renku==0.8.2' sentry-sdk && \
     chown -R daemon:daemon . && \
     git config --global filter.lfs.smudge "git-lfs smudge --skip %f"  && \
     git config --global filter.lfs.process "git-lfs filter-process --skip"
