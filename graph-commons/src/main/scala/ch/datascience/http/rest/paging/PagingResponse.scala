@@ -18,21 +18,17 @@
 
 package ch.datascience.http.rest.paging
 
-import ch.datascience.tinytypes.constraints.{NonNegativeLong, PositiveInt}
-import ch.datascience.tinytypes.{IntTinyType, LongTinyType, TinyTypeFactory}
+import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 
-object model {
+final case class PagingResponse[R](results: List[R], pagingInfo: PagingInfo)
 
-  final class Page private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Page extends TinyTypeFactory[Page](new Page(_)) with PositiveInt {
-    val first: Page = Page(1)
-  }
+final case class PagingInfo(page: Page, perPage: PerPage, total: Total)
 
-  final class PerPage private (val value: Int) extends AnyVal with IntTinyType
-  implicit object PerPage extends TinyTypeFactory[PerPage](new PerPage(_)) with PositiveInt {
-    val default: PerPage = PerPage(20)
-  }
+object PagingInfo {
 
-  final class Total private (val value: Long) extends AnyVal with LongTinyType
-  implicit object Total extends TinyTypeFactory[Total](new Total(_)) with NonNegativeLong
+  def apply(pagingRequest: PagingRequest, total: Total): PagingInfo = PagingInfo(
+    pagingRequest.page,
+    pagingRequest.perPage,
+    total
+  )
 }

@@ -67,7 +67,7 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
     measureExecutionTime {
       datasetsFinder
         .findDatasets(phrase, sort, paging)
-        .flatMap(datasets => Ok(datasets.asJson))
+        .flatMap(pagingResponse => Ok(pagingResponse.results.asJson))
         .recoverWith(httpResult(phrase))
     } map logExecutionTimeWhen(finishedSuccessfully(phrase))
 

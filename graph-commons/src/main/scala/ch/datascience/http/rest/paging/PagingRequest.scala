@@ -20,7 +20,7 @@ package ch.datascience.http.rest.paging
 
 import model._
 
-case class PagingRequest(page: Page, perPage: PerPage)
+final case class PagingRequest(page: Page, perPage: PerPage)
 
 object PagingRequest {
   import cats.data._

@@ -29,18 +29,18 @@ import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.datasets.{Description, Name, PublishedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
-import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.paging.{PagingInfo, PagingRequest}
+import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator}
+import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator, DatasetPart}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples._
-import ch.datascience.stubbing.ExternalServiceStubbing
 import eu.timepit.refined.api.Refined
 import io.circe.Json
 import org.scalacheck.Gen
@@ -48,11 +48,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IODatasetsFinderSpec
-    extends WordSpec
-    with InMemoryRdfStore
-    with ExternalServiceStubbing
-    with ScalaCheckPropertyChecks {
+class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
   "findDatasets" should {
 
@@ -63,7 +59,8 @@ class IODatasetsFinderSpec
 
         datasetsFinder
           .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync() shouldBe List(
+          .unsafeRunSync()
+          .results shouldBe List(
           DatasetSearchResult(dataset1.id,
                               dataset1.name,
                               dataset1.maybeDescription,
@@ -94,7 +91,8 @@ class IODatasetsFinderSpec
 
       datasetsFinder
         .findDatasets(phrase, Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default)
-        .unsafeRunSync() shouldBe List(
+        .unsafeRunSync()
+        .results shouldBe List(
         DatasetSearchResult(dataset3.id,
                             dataset3.name,
                             dataset3.maybeDescription,
@@ -124,7 +122,8 @@ class IODatasetsFinderSpec
 
       datasetsFinder
         .findDatasets(phrase, Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default)
-        .unsafeRunSync() shouldBe List(
+        .unsafeRunSync()
+        .results shouldBe List(
         DatasetSearchResult(dataset2.id,
                             dataset2.name,
                             dataset2.maybeDescription,
@@ -143,6 +142,44 @@ class IODatasetsFinderSpec
       )
     }
 
+    "return the requested page of datasets matching the given phrase" in new TestCase {
+      val phrase = phrases.generateOne
+      val (dataset1, dataset2, dataset3) =
+        storeDatasets(phrase, datasets.generateOne, datasets.generateOne, datasets.generateOne)
+
+      val pagingRequest = PagingRequest(Page(2), PerPage(1))
+
+      val result = datasetsFinder
+        .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .unsafeRunSync()
+
+      val expectedDataset = List(dataset1, dataset2, dataset3).sorted(byName)(1)
+      result.results shouldBe List(
+        DatasetSearchResult(expectedDataset.id,
+                            expectedDataset.name,
+                            expectedDataset.maybeDescription,
+                            expectedDataset.published,
+                            ProjectsCount(expectedDataset.project.size))
+      )
+
+      result.pagingInfo shouldBe PagingInfo(pagingRequest, Total(3))
+    }
+
+    "return no results if the requested page does not exist" in new TestCase {
+      val phrase = phrases.generateOne
+      val (dataset1, dataset2, dataset3) =
+        storeDatasets(phrase, datasets.generateOne, datasets.generateOne, datasets.generateOne)
+
+      val pagingRequest = PagingRequest(Page(2), PerPage(3))
+
+      val result = datasetsFinder
+        .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .unsafeRunSync()
+
+      result.results    shouldBe Nil
+      result.pagingInfo shouldBe PagingInfo(pagingRequest, Total(3))
+    }
+
     "return no results if there's no datasets with name, description or creator matching the given phrase" in new TestCase {
 
       loadToStore(
@@ -153,7 +190,8 @@ class IODatasetsFinderSpec
 
       datasetsFinder
         .findDatasets(phrases.generateOne, searchEndpointSorts.generateOne, PagingRequest.default)
-        .unsafeRunSync() shouldBe empty
+        .unsafeRunSync()
+        .results shouldBe empty
     }
   }
 
@@ -242,4 +280,7 @@ class IODatasetsFinderSpec
     def changeProjectsCountTo(projectsCount: ProjectsCount): Dataset =
       dataset.copy(project = Gen.listOfN(projectsCount.value, datasetProjects).generateOne)
   }
+
+  private lazy val byName: Ordering[Dataset] =
+    (ds1: Dataset, ds2: Dataset) => ds1.name.value compareTo ds2.name.value
 }

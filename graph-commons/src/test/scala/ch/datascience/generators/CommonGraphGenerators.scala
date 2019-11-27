@@ -135,6 +135,17 @@ object CommonGraphGenerators {
       direction <- Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
     } yield sortBy.By(property, direction)
 
+  object TestSort extends SortBy {
+    type PropertyType = TestProperty
+    sealed trait TestProperty extends Property
+    case object Name          extends Property(name = "name") with TestProperty
+    case object Email         extends Property(name = "email") with TestProperty
+
+    override val properties: Set[TestProperty] = Set(Name, Email)
+  }
+
+  def testSortBys: Gen[TestSort.By] = sortBys(TestSort)
+
   implicit val pages:    Gen[paging.model.Page]    = positiveInts() map (_.value) map paging.model.Page.apply
   implicit val perPages: Gen[paging.model.PerPage] = positiveInts() map (_.value) map paging.model.PerPage.apply
   implicit val pagingRequests: Gen[PagingRequest] = for {

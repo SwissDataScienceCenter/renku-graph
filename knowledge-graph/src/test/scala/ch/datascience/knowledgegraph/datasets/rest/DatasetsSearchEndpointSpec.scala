@@ -26,6 +26,8 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.rest.paging.model.Total
+import ch.datascience.http.rest.paging.{PagingInfo, PagingResponse}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
@@ -53,7 +55,11 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
       forAll(nonEmptyList(datasetSearchResultItems)) { datasetSearchResults =>
         (datasetsFinder.findDatasets _)
           .expects(phrase, sort, pagingRequest)
-          .returning(context.pure(datasetSearchResults.toList))
+          .returning(
+            context.pure(
+              PagingResponse(datasetSearchResults.toList, PagingInfo(pagingRequest, Total(datasetSearchResults.size)))
+            )
+          )
 
         val response = searchForDatasets(phrase, sort, pagingRequest).unsafeRunSync()
 
@@ -72,7 +78,7 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     "respond with OK and an empty JSON array when no matching datasets found" in new TestCase {
       (datasetsFinder.findDatasets _)
         .expects(phrase, sort, pagingRequest)
-        .returning(context.pure(Nil))
+        .returning(context.pure(PagingResponse(Nil, PagingInfo(pagingRequest, Total(0)))))
 
       val response = searchForDatasets(phrase, sort, pagingRequest).unsafeRunSync()
 

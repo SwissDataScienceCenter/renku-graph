@@ -20,23 +20,26 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate}
-import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
+import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
-import ch.datascience.tinytypes.constraints.NonNegative
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery}
+import ch.datascience.tinytypes.constraints.NonNegativeInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Decoder.decodeList
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait DatasetsFinder[Interpretation[_]] {
-  def findDatasets(phrase: Phrase, sort: Sort.By, paging: PagingRequest): Interpretation[List[DatasetSearchResult]]
+  def findDatasets(phrase: Phrase,
+                   sort:   Sort.By,
+                   paging: PagingRequest): Interpretation[PagingResponse[DatasetSearchResult]]
 }
 
 private object DatasetsFinder {
@@ -49,7 +52,7 @@ private object DatasetsFinder {
   )
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
-  implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegative
+  implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegativeInt
 }
 
 private class IODatasetsFinder(
@@ -58,57 +61,66 @@ private class IODatasetsFinder(
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient(rdfStoreConfig, logger)
-    with DatasetsFinder[IO] {
+    with DatasetsFinder[IO]
+    with Paging[IO, DatasetSearchResult] {
 
   import IODatasetsFinder._
   import cats.implicits._
   import creatorsFinder._
 
-  override def findDatasets(phrase: Phrase, sort: Sort.By, paging: PagingRequest): IO[List[DatasetSearchResult]] =
+  override def findDatasets(phrase:        Phrase,
+                            sort:          Sort.By,
+                            pagingRequest: PagingRequest): IO[PagingResponse[DatasetSearchResult]] = {
+    implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
+      sparqlQuery(phrase, sort)
+    )
     for {
-      datasets             <- queryExpecting[List[DatasetSearchResult]](using = query(phrase, sort))
-      datasetsWithCreators <- (datasets map addCreators).parSequence
-    } yield datasetsWithCreators
+      page                 <- findPage(pagingRequest)
+      datasetsWithCreators <- (page.results map addCreators).parSequence
+    } yield page.copy(results = datasetsWithCreators)
+  }
 
-  private def query(phrase: Phrase, sort: Sort.By): String =
-    s"""
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       |PREFIX schema: <http://schema.org/>
-       |PREFIX text: <http://jena.apache.org/text#>
-       |
-       |SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?maybeProject) AS ?projectsCount)
-       |WHERE {
-       |  {
-       |    ?dataset rdf:type <http://schema.org/Dataset> ;
-       |             text:query (schema:name '$phrase') ;
-       |             schema:name ?name ;
-       |             schema:identifier ?identifier .
-       |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-       |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
-       |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
-       |  } UNION {
-       |    ?dataset rdf:type <http://schema.org/Dataset> ;
-       |             text:query (schema:description '$phrase') ;
-       |             schema:name ?name ;
-       |             schema:identifier ?identifier .
-       |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-       |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
-       |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
-       |  } UNION {
-       |    ?dataset rdf:type <http://schema.org/Dataset> ;
-       |             schema:creator ?creatorResource ;
-       |             schema:identifier ?identifier ;
-       |             schema:name ?name .
-       |    ?creatorResource rdf:type <http://schema.org/Person> ;
-       |             text:query (schema:name '$phrase') .
-       |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-       |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
-       |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
-       |  }
-       |}
-       |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
-       |${`ORDER BY`(sort)}""".stripMargin
+  private def sparqlQuery(phrase: Phrase, sort: Sort.By): SparqlQuery = SparqlQuery(
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+      "PREFIX schema: <http://schema.org/>",
+      "PREFIX text: <http://jena.apache.org/text#>"
+    ),
+    s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?maybeProject) AS ?projectsCount)
+        |WHERE {
+        |  {
+        |    ?dataset rdf:type <http://schema.org/Dataset> ;
+        |             text:query (schema:name '$phrase') ;
+        |             schema:name ?name ;
+        |             schema:identifier ?identifier .
+        |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
+        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
+        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+        |  } UNION {
+        |    ?dataset rdf:type <http://schema.org/Dataset> ;
+        |             text:query (schema:description '$phrase') ;
+        |             schema:name ?name ;
+        |             schema:identifier ?identifier .
+        |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
+        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
+        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+        |  } UNION {
+        |    ?dataset rdf:type <http://schema.org/Dataset> ;
+        |             schema:creator ?creatorResource ;
+        |             schema:identifier ?identifier ;
+        |             schema:name ?name .
+        |    ?creatorResource rdf:type <http://schema.org/Person> ;
+        |             text:query (schema:name '$phrase') .
+        |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
+        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
+        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+        |  }
+        |}
+        |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
+        |${`ORDER BY`(sort)}
+        |""".stripMargin
+  )
 
   private def `ORDER BY`(sort: Sort.By): String = sort.property match {
     case Sort.NameProperty          => s"ORDER BY ${sort.direction}(?name)"
@@ -126,30 +138,26 @@ private object IODatasetsFinder {
   import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.ProjectsCount
   import io.circe.Decoder
 
-  private implicit val recordsDecoder: Decoder[List[DatasetSearchResult]] = {
+  implicit val recordDecoder: Decoder[DatasetSearchResult] = { cursor =>
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val recordDecoder: Decoder[DatasetSearchResult] = { cursor =>
-      for {
-        id                 <- cursor.downField("identifier").downField("value").as[Identifier]
-        name               <- cursor.downField("name").downField("value").as[Name]
-        maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
-        projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
-        maybeDescription <- cursor
-                             .downField("maybeDescription")
-                             .downField("value")
-                             .as[Option[String]]
-                             .map(blankToNone)
-                             .flatMap(toOption[Description])
-      } yield DatasetSearchResult(
-        id,
-        name,
-        maybeDescription,
-        DatasetPublishing(maybePublishedDate, Set.empty),
-        projectsCount
-      )
-    }
-
-    _.downField("results").downField("bindings").as(decodeList[DatasetSearchResult])
+    for {
+      id                 <- cursor.downField("identifier").downField("value").as[Identifier]
+      name               <- cursor.downField("name").downField("value").as[Name]
+      maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
+      projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
+      maybeDescription <- cursor
+                           .downField("maybeDescription")
+                           .downField("value")
+                           .as[Option[String]]
+                           .map(blankToNone)
+                           .flatMap(toOption[Description])
+    } yield DatasetSearchResult(
+      id,
+      name,
+      maybeDescription,
+      DatasetPublishing(maybePublishedDate, Set.empty),
+      projectsCount
+    )
   }
 }

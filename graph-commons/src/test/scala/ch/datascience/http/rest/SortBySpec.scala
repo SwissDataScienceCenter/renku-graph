@@ -22,7 +22,6 @@ import cats.data.Validated
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.http.rest.SortBy.Direction.Desc
 import org.http4s.ParseFailure
-import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -32,29 +31,29 @@ class SortBySpec extends WordSpec with ScalaCheckPropertyChecks {
   "from" should {
 
     "return the valid Sort.By instance for a valid name and direction" in {
-      forAll(sorts) { sort =>
-        Sort.from(serialize(sort)) shouldBe Right(sort)
+      forAll(testSortBys) { sort =>
+        TestSort.from(serialize(sort)) shouldBe Right(sort)
       }
     }
 
     "return Left for a invalid name" in {
-      val Left(exception) = Sort.from(s"invalid:$Desc")
+      val Left(exception) = TestSort.from(s"invalid:$Desc")
 
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"'invalid' is not a valid sort property. Allowed properties: ${Sort.properties.mkString(", ")}"
+      exception.getMessage shouldBe s"'invalid' is not a valid sort property. Allowed properties: ${TestSort.properties.mkString(", ")}"
     }
 
     "return Left for a invalid direction" in {
-      val Left(exception) = Sort.from(s"${Sort.Name}:invalid")
+      val Left(exception) = TestSort.from(s"${TestSort.Name}:invalid")
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe s"'invalid' is neither 'asc' nor 'desc'"
     }
 
     "return Left for a invalid sort" in {
-      val sortAsString = s"${Sort.Name}$Desc"
+      val sortAsString = s"${TestSort.Name}$Desc"
 
-      val Left(exception) = Sort.from(sortAsString)
+      val Left(exception) = TestSort.from(sortAsString)
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe s"'$sortAsString' is not a valid sort"
@@ -64,39 +63,28 @@ class SortBySpec extends WordSpec with ScalaCheckPropertyChecks {
   "sort" should {
 
     "decode a valid sort query parameter" in {
-      forAll(sorts) { sort =>
+      forAll(testSortBys) { sort =>
         Map("sort" -> Seq(serialize(sort))) match {
-          case Sort.sort(actual) => actual shouldBe Some(Validated.validNel(sort))
+          case TestSort.sort(actual) => actual shouldBe Some(Validated.validNel(sort))
         }
       }
     }
 
     "fail to decode an invalid sort query parameter" in {
       Map("sort" -> Seq(s"invalid:$Desc")) match {
-        case Sort.sort(actual) =>
+        case TestSort.sort(actual) =>
           actual shouldBe Some(Validated.invalidNel {
-            ParseFailure(Sort.Property.from("invalid").left.get.getMessage, "")
+            ParseFailure(TestSort.Property.from("invalid").left.get.getMessage, "")
           })
       }
     }
 
     "return None when no sort query parameter" in {
       Map.empty[String, List[String]] match {
-        case Sort.sort(actual) => actual shouldBe None
+        case TestSort.sort(actual) => actual shouldBe None
       }
     }
   }
 
-  object Sort extends SortBy {
-    type PropertyType = TestProperty
-    sealed trait TestProperty extends Property
-    case object Name          extends Property(name = "name") with TestProperty
-    case object Email         extends Property(name = "email") with TestProperty
-
-    override val properties: Set[TestProperty] = Set(Name, Email)
-  }
-
-  private implicit lazy val sorts: Gen[Sort.By] = sortBys(Sort)
-
-  private def serialize(sort: Sort.By): String = s"${sort.property}:${sort.direction}"
+  private def serialize(sort: TestSort.By): String = s"${sort.property}:${sort.direction}"
 }
