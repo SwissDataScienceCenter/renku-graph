@@ -6,7 +6,7 @@ This is a microservice which provides API for the Graph DB.
 
 | Method  | Path                                                                    | Description                                                    |
 |---------|-------------------------------------------------------------------------|----------------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets?query=<phrase>&sort=<property:asc\desc>``` | Returns datasets matching the given `phrase`.                  |
+|  GET    | ```/knowledge-graph/datasets```                                         | Returns datasets.                                              |
 |  GET    | ```/knowledge-graph/datasets/:id```                                     | Returns details of the dataset with the given `id`             |
 |  GET    | ```/knowledge-graph/graphql```                                          | Returns GraphQL endpoint schema                                |
 |  POST   | ```/knowledge-graph/graphql```                                          | GraphQL query endpoint                                         |
@@ -14,21 +14,35 @@ This is a microservice which provides API for the Graph DB.
 |  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```               | Returns datasets of the project with the given `path`          |
 |  GET    | ```/ping```                                                             | To check if service is healthy                                 |
 
-#### GET /knowledge-graph/datasets?query=\<phrase\&sort=\<property\>:asc|desc
+#### GET /knowledge-graph/datasets?query=\<phrase\>&sort=\<property\>:asc|desc&page=\<page\>&per_page=\<per_page\>
 
 Finds datasets which `name`, `description` or creator `name` matches the given `phrase`.
 
 NOTES: 
 * the `phrase` query parameter has to be url encoded.
 * the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name`, `datePublished` and `projectsCount`.
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`.
 
 **Response**
 
-| Status                     | Description                                                       |
-|----------------------------|-------------------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
-| BAD_REQUEST (400)          | If the `query` parameter is blank or `sort` is invalid            |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
+| Status                     | Description                                                                                    |
+|----------------------------|------------------------------------------------------------------------------------------------|
+| OK (200)                   | If there are datasets for the project or `[]` if nothing is found                              |
+| BAD_REQUEST (400)          | If the `query` parameter is blank or `sort` is invalid or `page` or `per_page` is not positive |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                                                      |
+
+Response headers:
+
+| Header        | Description                                   |
+|---------------|-----------------------------------------------|
+| `Total`       | The total number of items                     |
+| `Total-Pages` | The total number of pages                     |
+| `Per-Page`    | The number of items per page                  |
+| `Page`        | The index of the current page (starting at 1) |
+| `Next-Page`   | The index of the next page (optional)         |
+| `Prev-Page`   | The index of the previous page (optional)     |
+
 
 Response body example:
 ```

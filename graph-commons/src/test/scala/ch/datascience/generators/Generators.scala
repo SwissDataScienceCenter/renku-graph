@@ -132,6 +132,8 @@ object Generators {
 
   def negativeInts(min: Int = -1000): Gen[Int] = choose(min, 0)
 
+  def nonNegativeLongs(max: Long = 1000): Gen[Long Refined NonNegative] = choose(0L, max) map Refined.unsafeApply
+
   def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
     choose(1, max.toMillis)
       .map(FiniteDuration(_, MILLISECONDS))

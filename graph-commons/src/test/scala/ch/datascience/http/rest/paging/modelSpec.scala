@@ -19,7 +19,7 @@
 package ch.datascience.http.rest.paging
 
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
-import ch.datascience.tinytypes.constraints.{NonNegativeLong, PositiveInt}
+import ch.datascience.tinytypes.constraints.{NonNegativeInt, PositiveInt}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -27,8 +27,18 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class modelSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "Page" should {
+
     "be a PositiveInt constrained" in {
       Page shouldBe a[PositiveInt]
+    }
+
+  }
+
+  "Page.first" should {
+
+    "be Page(1)" in {
+      (Page.first == Page(1)) shouldBe true
+      Page.first              shouldBe Page(1)
     }
   }
 
@@ -38,9 +48,16 @@ class modelSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
+  "PerPage.default" should {
+
+    "be PerPage(20)" in {
+      PerPage.default shouldBe PerPage(20)
+    }
+  }
+
   "Total" should {
     "be a NonNegative constrained" in {
-      Total shouldBe a[NonNegativeLong]
+      Total shouldBe a[NonNegativeInt]
     }
   }
 }

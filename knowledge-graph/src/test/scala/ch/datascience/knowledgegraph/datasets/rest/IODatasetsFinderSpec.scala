@@ -29,12 +29,12 @@ import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.datasets.{Description, Name, PublishedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
-import ch.datascience.http.rest.paging.{PagingInfo, PagingRequest}
+import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator, DatasetPart}
+import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
@@ -162,7 +162,8 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
                             ProjectsCount(expectedDataset.project.size))
       )
 
-      result.pagingInfo shouldBe PagingInfo(pagingRequest, Total(3))
+      result.pagingInfo.pagingRequest shouldBe pagingRequest
+      result.pagingInfo.total         shouldBe Total(3)
     }
 
     "return no results if the requested page does not exist" in new TestCase {
@@ -176,8 +177,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
-      result.results    shouldBe Nil
-      result.pagingInfo shouldBe PagingInfo(pagingRequest, Total(3))
+      result.results                  shouldBe Nil
+      result.pagingInfo.pagingRequest shouldBe pagingRequest
+      result.pagingInfo.total         shouldBe Total(3)
     }
 
     "return no results if there's no datasets with name, description or creator matching the given phrase" in new TestCase {

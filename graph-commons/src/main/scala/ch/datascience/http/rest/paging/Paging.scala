@@ -39,17 +39,15 @@ trait Paging[Interpretation[_], Result] {
 
   private def prepareResponse(
       results:              List[Result],
-      paging:               PagingRequest
+      pagingRequest:        PagingRequest
   )(implicit resultsFinder: PagedResultsFinder[Interpretation, Result], ME: MonadError[Interpretation, Throwable]) =
-    if (results.nonEmpty && results.size < paging.perPage.value)
-      PagingResponse(
-        results,
-        PagingInfo(paging.page, paging.perPage, Total((paging.page.value - 1) * paging.perPage.value + results.size))
-      ).pure[Interpretation]
-    else
-      resultsFinder.findTotal() map (
-          total => PagingResponse(results, PagingInfo(paging.page, paging.perPage, total))
-      )
+    for {
+      total <- if (results.nonEmpty && results.size < pagingRequest.perPage.value)
+                Total((pagingRequest.page.value - 1) * pagingRequest.perPage.value + results.size).pure[Interpretation]
+              else
+                resultsFinder.findTotal()
+      response <- PagingResponse.from[Interpretation, Result](results, pagingRequest, total)
+    } yield response
 }
 
 object Paging {

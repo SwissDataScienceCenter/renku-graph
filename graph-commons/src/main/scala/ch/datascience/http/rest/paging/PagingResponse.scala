@@ -18,17 +18,71 @@
 
 package ch.datascience.http.rest.paging
 
-import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
+import cats.MonadError
+import cats.implicits._
+import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
+import ch.datascience.http.rest.paging.model.Total
 
-final case class PagingResponse[R](results: List[R], pagingInfo: PagingInfo)
+import scala.language.higherKinds
 
-final case class PagingInfo(page: Page, perPage: PerPage, total: Total)
+final class PagingResponse[Result] private (val results: List[Result], val pagingInfo: PagingInfo) {
+  override lazy val toString: String = s"PagingResponse(pagingInfo: $pagingInfo, results: $results)"
+}
 
-object PagingInfo {
+object PagingResponse {
 
-  def apply(pagingRequest: PagingRequest, total: Total): PagingInfo = PagingInfo(
-    pagingRequest.page,
-    pagingRequest.perPage,
-    total
-  )
+  final class PagingInfo private[PagingResponse] (val pagingRequest: PagingRequest, val total: Total) {
+    override lazy val toString: String = s"PagingInfo(request: $pagingRequest, total: $total)"
+  }
+
+  def from[Interpretation[_], Result](
+      results:       List[Result],
+      pagingRequest: PagingRequest,
+      total:         Total
+  )(implicit ME:     MonadError[Interpretation, Throwable]): Interpretation[PagingResponse[Result]] = {
+
+    val pagingInfo = new PagingInfo(pagingRequest, total)
+
+    import pagingRequest._
+
+    if (results.isEmpty && (page.value - 1) * perPage.value >= total.value) {
+      new PagingResponse[Result](results, pagingInfo).pure[Interpretation]
+    } else if (results.nonEmpty && ((page.value - 1) * perPage.value + results.size) == total.value) {
+      new PagingResponse[Result](results, pagingInfo).pure[Interpretation]
+    } else if (results.nonEmpty && (results.size == perPage.value) && (page.value * perPage.value) <= total.value) {
+      new PagingResponse[Result](results, pagingInfo).pure[Interpretation]
+    } else
+      new IllegalArgumentException(
+        s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: ${pagingRequest.page} and perPage: ${pagingRequest.perPage}"
+      ).raiseError[Interpretation, PagingResponse[Result]]
+  }
+
+  implicit class ResponseOps[Result](response: PagingResponse[Result]) {
+
+    import cats.effect.Effect
+    import io.circe.syntax._
+    import io.circe.{Encoder, Json}
+    import org.http4s.circe.jsonEncoderOf
+    import org.http4s.{EntityEncoder, Response, Status}
+
+    def updateResults[Interpretation[_]](
+        newResults: List[Result]
+    )(implicit ME:  MonadError[Interpretation, Throwable]): Interpretation[PagingResponse[Result]] =
+      if (response.results.size == newResults.size)
+        new PagingResponse[Result](newResults, response.pagingInfo).pure[Interpretation]
+      else
+        new IllegalArgumentException("Cannot update Paging Results as there's different number of results")
+          .raiseError[Interpretation, PagingResponse[Result]]
+
+    def toHttpResponse[Interpretation[_]: Effect](
+        implicit encoder: Encoder[Result]
+    ): Response[Interpretation] =
+      Response(Status.Ok)
+        .withEntity(response.results.asJson)
+        .putHeaders(PagingHeaders.from(response).toSeq: _*)
+
+    private implicit def resultsEntityEncoder[Interpretation[_]: Effect](
+        implicit encoder: Encoder[Result]
+    ): EntityEncoder[Interpretation, Json] = jsonEncoderOf[Interpretation, Json]
+  }
 }

@@ -18,8 +18,8 @@
 
 package ch.datascience.http.rest.paging
 
-import ch.datascience.tinytypes.constraints.{NonNegativeLong, PositiveInt}
-import ch.datascience.tinytypes.{IntTinyType, LongTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.{NonNegativeInt, PositiveInt}
+import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 
 object model {
 
@@ -33,6 +33,6 @@ object model {
     val default: PerPage = PerPage(20)
   }
 
-  final class Total private (val value: Long) extends AnyVal with LongTinyType
-  implicit object Total extends TinyTypeFactory[Total](new Total(_)) with NonNegativeLong
+  final class Total private (val value: Int) extends AnyVal with IntTinyType
+  implicit object Total extends TinyTypeFactory[Total](new Total(_)) with NonNegativeInt
 }

@@ -127,8 +127,9 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
 
       val results = client.callWith(pagingRequest).unsafeRunSync()
 
-      results.results    shouldBe items
-      results.pagingInfo shouldBe PagingInfo(pagingRequest, Total(items.size))
+      results.results                  shouldBe items
+      results.pagingInfo.pagingRequest shouldBe pagingRequest
+      results.pagingInfo.total         shouldBe Total(items.size)
     }
 
     "do an additional call to fetch the total if a full page is returned" in new QueryClientTestCase {
@@ -173,8 +174,9 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
 
       val results = client.callWith(pagingRequest).unsafeRunSync()
 
-      results.results    shouldBe pageItems
-      results.pagingInfo shouldBe PagingInfo(pagingRequest, Total(allItems.size))
+      results.results                  shouldBe pageItems
+      results.pagingInfo.pagingRequest shouldBe pagingRequest
+      results.pagingInfo.total         shouldBe Total(allItems.size)
     }
 
     "fail if sparql body does not end with the ORDER BY clause" in new TestCase {

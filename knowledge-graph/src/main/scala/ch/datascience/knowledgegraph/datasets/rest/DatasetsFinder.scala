@@ -77,7 +77,8 @@ private class IODatasetsFinder(
     for {
       page                 <- findPage(pagingRequest)
       datasetsWithCreators <- (page.results map addCreators).parSequence
-    } yield page.copy(results = datasetsWithCreators)
+      updatedPage          <- page.updateResults[IO](datasetsWithCreators)
+    } yield updatedPage
   }
 
   private def sparqlQuery(phrase: Phrase, sort: Sort.By): SparqlQuery = SparqlQuery(

@@ -58,8 +58,6 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   import executionTimeRecorder._
   import io.circe.Encoder
   import io.circe.literal._
-  import io.circe.syntax._
-  import org.http4s.circe._
 
   def searchForDatasets(phrase: Phrase,
                         sort:   Sort.By,
@@ -67,7 +65,7 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
     measureExecutionTime {
       datasetsFinder
         .findDatasets(phrase, sort, paging)
-        .flatMap(pagingResponse => Ok(pagingResponse.results.asJson))
+        .map(_.toHttpResponse)
         .recoverWith(httpResult(phrase))
     } map logExecutionTimeWhen(finishedSuccessfully(phrase))
 

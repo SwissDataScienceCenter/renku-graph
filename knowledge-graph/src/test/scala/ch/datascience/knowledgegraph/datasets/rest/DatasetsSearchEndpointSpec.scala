@@ -20,14 +20,15 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.IO
+import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.rest.paging.{PagingHeaders, PagingResponse}
 import ch.datascience.http.rest.paging.model.Total
-import ch.datascience.http.rest.paging.{PagingInfo, PagingResponse}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
@@ -52,21 +53,19 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
   "searchForDatasets" should {
 
     "respond with OK and the found datasets" in new TestCase {
-      forAll(nonEmptyList(datasetSearchResultItems)) { datasetSearchResults =>
+      forAll(pagingResponses(datasetSearchResultItems)) { pagingResponse =>
         (datasetsFinder.findDatasets _)
           .expects(phrase, sort, pagingRequest)
-          .returning(
-            context.pure(
-              PagingResponse(datasetSearchResults.toList, PagingInfo(pagingRequest, Total(datasetSearchResults.size)))
-            )
-          )
+          .returning(pagingResponse.pure[IO])
 
         val response = searchForDatasets(phrase, sort, pagingRequest).unsafeRunSync()
 
-        response.status      shouldBe Ok
-        response.contentType shouldBe Some(`Content-Type`(application.json))
-
-        response.as[List[Json]].unsafeRunSync should contain theSameElementsAs (datasetSearchResults.toList map toJson)
+        response.status         shouldBe Ok
+        response.contentType    shouldBe Some(`Content-Type`(application.json))
+        response.headers.toList should contain allElementsOf PagingHeaders.from(pagingResponse)
+        response
+          .as[List[Json]]
+          .unsafeRunSync should contain theSameElementsAs (pagingResponse.results map toJson)
 
         logger.loggedOnly(
           Warn(s"Finding datasets containing '$phrase' phrase finished${executionTimeRecorder.executionTimeInfo}")
@@ -76,15 +75,19 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     }
 
     "respond with OK and an empty JSON array when no matching datasets found" in new TestCase {
+      val pagingResponse = PagingResponse
+        .from[IO, DatasetSearchResult](Nil, pagingRequest, Total(0))
+        .unsafeRunSync()
       (datasetsFinder.findDatasets _)
         .expects(phrase, sort, pagingRequest)
-        .returning(context.pure(PagingResponse(Nil, PagingInfo(pagingRequest, Total(0)))))
+        .returning(pagingResponse.pure[IO])
 
       val response = searchForDatasets(phrase, sort, pagingRequest).unsafeRunSync()
 
       response.status                       shouldBe Ok
       response.contentType                  shouldBe Some(`Content-Type`(application.json))
       response.as[List[Json]].unsafeRunSync shouldBe empty
+      response.headers.toList               should contain allElementsOf PagingHeaders.from(pagingResponse)
 
       logger.loggedOnly(
         Warn(s"Finding datasets containing '$phrase' phrase finished${executionTimeRecorder.executionTimeInfo}")
