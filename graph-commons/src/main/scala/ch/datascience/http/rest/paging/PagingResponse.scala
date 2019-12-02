@@ -63,6 +63,7 @@ object PagingResponse {
     import io.circe.syntax._
     import io.circe.{Encoder, Json}
     import org.http4s.circe.jsonEncoderOf
+    import org.http4s.Request
     import org.http4s.{EntityEncoder, Response, Status}
 
     def updateResults[Interpretation[_]](
@@ -75,7 +76,8 @@ object PagingResponse {
           .raiseError[Interpretation, PagingResponse[Result]]
 
     def toHttpResponse[Interpretation[_]: Effect](
-        implicit encoder: Encoder[Result]
+        implicit request: Request[Interpretation],
+        encoder:          Encoder[Result]
     ): Response[Interpretation] =
       Response(Status.Ok)
         .withEntity(response.results.asJson)

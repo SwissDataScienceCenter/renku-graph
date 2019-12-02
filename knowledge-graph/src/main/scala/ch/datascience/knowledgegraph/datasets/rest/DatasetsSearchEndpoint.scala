@@ -36,7 +36,7 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.ValidatingQueryParamDecoderMatcher
-import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
+import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -59,9 +59,9 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   import io.circe.Encoder
   import io.circe.literal._
 
-  def searchForDatasets(phrase: Phrase,
-                        sort:   Sort.By,
-                        paging: PagingRequest): Interpretation[Response[Interpretation]] =
+  def searchForDatasets(phrase: Phrase, sort: Sort.By, paging: PagingRequest)(
+      implicit request:         Request[Interpretation]
+  ): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       datasetsFinder
         .findDatasets(phrase, sort, paging)

@@ -34,15 +34,26 @@ NOTES:
 
 Response headers:
 
-| Header        | Description                                   |
-|---------------|-----------------------------------------------|
-| `Total`       | The total number of items                     |
-| `Total-Pages` | The total number of pages                     |
-| `Per-Page`    | The number of items per page                  |
-| `Page`        | The index of the current page (starting at 1) |
-| `Next-Page`   | The index of the next page (optional)         |
-| `Prev-Page`   | The index of the previous page (optional)     |
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
+Link response header example:
+
+Assuming the total is `30` and the URL `https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
+
+```
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
+```
 
 Response body example:
 ```

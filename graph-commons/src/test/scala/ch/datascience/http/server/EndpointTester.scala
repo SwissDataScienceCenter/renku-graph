@@ -42,7 +42,7 @@ object EndpointTester {
 
   implicit class EndpointOps(endpoint: Kleisli[IO, Request[IO], Response[IO]]) {
 
-    def call(request: Request[IO]) = new {
+    def test(request: Request[IO]) = new {
       private val runResponse: Response[IO] = endpoint.run(request).unsafeRunSync()
 
       lazy val status: Status = runResponse.status

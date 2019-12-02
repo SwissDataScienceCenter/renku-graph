@@ -40,6 +40,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.http4s.MediaType.application
+import org.http4s.Request
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
@@ -125,6 +126,7 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
 
     val context = MonadError[IO, Throwable]
 
+    implicit val request: Request[IO] = Request[IO]()
     val phrase        = phrases.generateOne
     val sort          = searchEndpointSorts.generateOne
     val pagingRequest = pagingRequests.generateOne

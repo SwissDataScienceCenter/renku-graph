@@ -18,9 +18,12 @@
 
 package ch.datascience.http.rest.paging
 
+import PagingRequest.Decoders.page.{parameterName => pageParamName}
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Page.first
-import org.http4s.Header
+import org.http4s.{Header, Request}
+
+import scala.language.higherKinds
 
 object PagingHeaders {
 
@@ -30,15 +33,20 @@ object PagingHeaders {
   val Page:       String = "Page"
   val NextPage:   String = "Next-Page"
   val PrevPage:   String = "Prev-Page"
+  val Link:       String = "Link"
 
-  def from(response: PagingResponse[_]): Set[Header] =
+  def from[F[_]](response: PagingResponse[_])(implicit request: Request[F]): Set[Header] =
     Set(
       Some(Header(Total, response.pagingInfo.total.toString)),
       Some(Header(TotalPages, totalPages(response.pagingInfo).toString)),
       Some(Header(PerPage, response.pagingInfo.pagingRequest.perPage.toString)),
       Some(Header(Page, response.pagingInfo.pagingRequest.page.toString)),
       nextPage(response.pagingInfo),
-      prevPage(response.pagingInfo)
+      prevPage(response.pagingInfo.pagingRequest),
+      nextLink(response.pagingInfo),
+      prevLink(response.pagingInfo.pagingRequest),
+      firstLink,
+      lastLink(response.pagingInfo)
     ).flatten
 
   private def totalPages(pagingInfo: PagingInfo): Int = {
@@ -50,7 +58,25 @@ object PagingHeaders {
     if (pagingInfo.pagingRequest.page.value == totalPages(pagingInfo)) None
     else Some(Header(NextPage, (pagingInfo.pagingRequest.page.value + 1).toString))
 
-  private def prevPage(pagingInfo: PagingInfo): Option[Header] =
-    if (pagingInfo.pagingRequest.page == first) None
-    else Some(Header(PrevPage, (pagingInfo.pagingRequest.page.value - 1).toString))
+  private def prevPage(pagingRequest: PagingRequest): Option[Header] =
+    if (pagingRequest.page == first) None
+    else Some(Header(PrevPage, (pagingRequest.page.value - 1).toString))
+
+  private def prevLink[F[_]](pagingRequest: PagingRequest)(implicit request: Request[F]): Option[Header] = {
+    val page = pagingRequest.page
+    if (page == first) None
+    else Some(Header(Link, s"""<${request.uri.withQueryParam(pageParamName, page.value - 1)}>; rel="prev""""))
+  }
+
+  private def nextLink[F[_]](pagingInfo: PagingInfo)(implicit request: Request[F]): Option[Header] = {
+    val page = pagingInfo.pagingRequest.page
+    if (page.value == totalPages(pagingInfo)) None
+    else Some(Header(Link, s"""<${request.uri.withQueryParam(pageParamName, page.value + 1)}>; rel="next""""))
+  }
+
+  private def firstLink[F[_]](implicit request: Request[F]): Option[Header] =
+    Some(Header(Link, s"""<${request.uri.withQueryParam(pageParamName, 1)}>; rel="first""""))
+
+  private def lastLink[F[_]](pagingInfo: PagingInfo)(implicit request: Request[F]): Option[Header] =
+    Some(Header(Link, s"""<${request.uri.withQueryParam(pageParamName, totalPages(pagingInfo))}>; rel="last""""))
 }

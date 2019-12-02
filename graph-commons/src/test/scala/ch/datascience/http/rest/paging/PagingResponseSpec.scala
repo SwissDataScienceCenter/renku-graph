@@ -26,6 +26,7 @@ import ch.datascience.http.rest.paging.model.{PerPage, Total}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
+import org.http4s.Request
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -166,6 +167,7 @@ class PagingResponseSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "return Ok with response results in Json body and paging headers" in {
 
+      implicit val request: Request[IO] = Request[IO]()
       val response = pagingResponses(nonBlankStrings().map(_.value)).generateOne
 
       val httpResponse = response.toHttpResponse[IO]

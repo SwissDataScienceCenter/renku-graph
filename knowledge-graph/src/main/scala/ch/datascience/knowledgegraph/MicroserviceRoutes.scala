@@ -31,7 +31,7 @@ import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.QueryEndpoint
 import ch.datascience.knowledgegraph.projects.rest.ProjectEndpoint
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{ParseFailure, Response}
+import org.http4s.{ParseFailure, Request, Response}
 
 import scala.language.higherKinds
 
@@ -55,7 +55,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   // format: off
   lazy val routes: HttpRoutes[F] = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"                                                                                                      => Ok("pong")
-    case           GET  -> Root / "knowledge-graph" / "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) => searchForDatasets(maybePhrase, maybeSortBy,page, perPage)
+    case request @ GET  -> Root / "knowledge-graph" / "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) => searchForDatasets(maybePhrase, maybeSortBy,page, perPage)(request)
     case           GET  -> Root / "knowledge-graph" / "datasets" / DatasetId(id)                                                              => getDataset(id)
     case           GET  -> Root / "knowledge-graph" / "graphql"                                                                               => schema
     case request @ POST -> Root / "knowledge-graph" / "graphql"                                                                               => handleQuery(request)
@@ -65,11 +65,11 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   // format: on
 
   private def searchForDatasets(
-      maybePhrase:  ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase],
-      maybeSort:    Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
-      maybePage:    Option[ValidatedNel[ParseFailure, Page]],
-      maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]
-  ): F[Response[F]] =
+      maybePhrase:    ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase],
+      maybeSort:      Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
+      maybePage:      Option[ValidatedNel[ParseFailure, Page]],
+      maybePerPage:   Option[ValidatedNel[ParseFailure, PerPage]]
+  )(implicit request: Request[F]): F[Response[F]] =
     (maybePhrase,
      maybeSort getOrElse Validated.validNel(Sort.By(NameProperty, Direction.Asc)),
      PagingRequest(maybePage, maybePerPage))

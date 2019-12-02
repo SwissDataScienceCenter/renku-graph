@@ -18,13 +18,15 @@
 
 package ch.datascience.http.rest.paging
 
+import PagingRequest.Decoders.page.{parameterName => pageParamName}
+import PagingRequest.Decoders.perPage.{parameterName => perPageParamName}
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Page.first
 import eu.timepit.refined.api.Refined
-import org.http4s.Header
+import org.http4s._
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -38,7 +40,7 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "from" should {
 
-    s"generate $Total, $TotalPages, $PerPage, $Page, $NextPage and $PrevPage headers " +
+    s"generate $Total, $TotalPages, $PerPage, $Page, $NextPage, $PrevPage and $Link headers " +
       "if current page is neither the first nor the last page" in {
 
       forAll(currentPageNeitherFirstNorLast) { response =>
@@ -46,18 +48,25 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
         import response.pagingInfo._
         import response.pagingInfo.pagingRequest._
 
+        implicit val request: Request[Try] = requestFor(page, perPage)
+
+        val totalPages = findTotalPages(pagingInfo)
         PagingHeaders.from(response) should contain theSameElementsAs Set(
           Header("Total", total.toString),
-          Header("Total-Pages", totalPages(pagingInfo).toString),
+          Header("Total-Pages", totalPages.toString),
           Header("Per-Page", perPage.toString),
           Header("Page", page.toString),
           Header("Next-Page", (page.value + 1).toString),
-          Header("Prev-Page", (page.value - 1).toString)
+          Header("Prev-Page", (page.value - 1).toString),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, page.value + 1)}>; rel="next""""),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, page.value - 1)}>; rel="prev""""),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, first.value)}>; rel="first""""),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, totalPages)}>; rel="last"""")
         )
       }
     }
 
-    s"generate $Total, $TotalPages, $PerPage, $Page and $PrevPage headers " +
+    s"generate $Total, $TotalPages, $PerPage, $Page, $PrevPage and $Link headers " +
       "if current page is the last page" in {
 
       forAll(currentPageLast) { response =>
@@ -65,17 +74,23 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
         import response.pagingInfo._
         import response.pagingInfo.pagingRequest._
 
+        implicit val request: Request[Try] = requestFor(page, perPage)
+
+        val totalPages = findTotalPages(pagingInfo)
         PagingHeaders.from(response) should contain theSameElementsAs Set(
           Header("Total", total.toString),
-          Header("Total-Pages", totalPages(pagingInfo).toString),
+          Header("Total-Pages", totalPages.toString),
           Header("Per-Page", perPage.toString),
           Header("Page", page.toString),
-          Header("Prev-Page", (page.value - 1).toString)
+          Header("Prev-Page", (page.value - 1).toString),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, page.value - 1)}>; rel="prev""""),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, first.value)}>; rel="first""""),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, totalPages)}>; rel="last"""")
         )
       }
     }
 
-    s"generate $Total, $TotalPages, $PerPage, $Page and $NextPage headers " +
+    s"generate $Total, $TotalPages, $PerPage, $Page, $NextPage and $Link headers " +
       "if current page is the first page" in {
 
       forAll(currentPageFirst) { response =>
@@ -83,35 +98,50 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
         import response.pagingInfo._
         import response.pagingInfo.pagingRequest._
 
+        implicit val request: Request[Try] = requestFor(page, perPage)
+
+        val totalPages = findTotalPages(pagingInfo)
         PagingHeaders.from(response) should contain theSameElementsAs Set(
           Header("Total", total.toString),
-          Header("Total-Pages", totalPages(pagingInfo).toString),
+          Header("Total-Pages", totalPages.toString),
           Header("Per-Page", perPage.toString),
           Header("Page", page.toString),
-          Header("Next-Page", (page.value + 1).toString)
+          Header("Next-Page", (page.value + 1).toString),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, page.value + 1)}>; rel="next""""),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, first.value)}>; rel="first""""),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, totalPages)}>; rel="last"""")
         )
       }
     }
 
-    s"generate $Total, $TotalPages, $PerPage and $Page headers " +
+    s"generate $Total, $TotalPages, $PerPage, $Page and $Link headers " +
       "if there's one page only" in {
 
       forAll(onePageOnly) { response =>
-        import response._
         import response.pagingInfo._
         import response.pagingInfo.pagingRequest._
 
+        implicit val request: Request[Try] = requestFor(page, perPage)
+
         PagingHeaders.from(response) should contain theSameElementsAs Set(
           Header("Total", total.toString),
-          Header("Total-Pages", totalPages(pagingInfo).toString),
+          Header("Total-Pages", "1"),
           Header("Per-Page", perPage.toString),
-          Header("Page", page.toString)
+          Header("Page", page.toString),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, first.value)}>; rel="first""""),
+          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, 1)}>; rel="last"""")
         )
       }
     }
   }
 
-  private def totalPages(pagingInfo: PagingInfo): Int = {
+  private def requestFor(page: model.Page, perPage: model.PerPage): Request[Try] = Request[Try](
+    uri = uri"http://host/path?param1=value1"
+      .withQueryParam(pageParamName, page.toString)
+      .withQueryParam(perPageParamName, perPage.toString)
+  )
+
+  private def findTotalPages(pagingInfo: PagingInfo): Int = {
     import pagingInfo._
     import pagingInfo.pagingRequest._
 
@@ -121,7 +151,7 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   private lazy val currentPageNeitherFirstNorLast: Gen[PagingResponse[NonBlank]] =
     for {
-      page    <- pages.retryUntil(_.value > 1)
+      page    <- pages.retryUntil(_.value > 2)
       perPage <- perPages
       results <- nonEmptyList(nonBlankStrings(),
                               minElements = Refined.unsafeApply(perPage.value),
