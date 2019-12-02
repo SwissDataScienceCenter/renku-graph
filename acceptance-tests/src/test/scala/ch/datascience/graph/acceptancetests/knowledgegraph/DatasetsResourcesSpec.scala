@@ -219,11 +219,19 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       searchSortedByName.status shouldBe Ok
 
       val Right(foundDatasetsSortedByName) = searchSortedByName.bodyAsJson.as[List[Json]]
-      foundDatasetsSortedByName.flatMap(sortCreators) shouldBe List(
+      val datasetsSortedByName = List(
         searchResultJson(dataset1),
         searchResultJson(dataset2),
         searchResultJson(dataset3)
       ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
+      foundDatasetsSortedByName.flatMap(sortCreators) shouldBe datasetsSortedByName
+
+      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc&page=2&per_page=1")
+      val searchForPage = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc&page=2&per_page=1"
+
+      Then("he should get OK response with the dataset from the requested page")
+      val Right(foundDatasetsPage) = searchForPage.bodyAsJson.as[List[Json]]
+      foundDatasetsPage should contain only datasetsSortedByName(1)
     }
 
     def pushToStore(dataset: Dataset, projects: List[Project]): Unit =
