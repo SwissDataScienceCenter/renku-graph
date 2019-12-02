@@ -19,6 +19,7 @@
 package ch.datascience.knowledgegraph
 
 import cats.effect.IO
+import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.generators.CommonGraphGenerators._
@@ -63,8 +64,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       val phrase  = nonEmptyStrings().generateOne
       val request = Request[IO](Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
       (datasetsSearchEndpoint
-        .searchForDatasets(_: Phrase, _: Sort.By, _: PagingRequest)(_: Request[IO]))
-        .expects(Phrase(phrase),
+        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest)(_: Request[IO]))
+        .expects(Phrase(phrase).some,
                  Sort.By(NameProperty, Direction.Asc),
                  PagingRequest(Page.first, PerPage.default),
                  request)
@@ -75,10 +76,22 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       response.status shouldBe Ok
     }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $ServiceUnavailable when no ${query.parameterName} parameter given" in new TestCase {
-      val response = routes
-        .test(Request(Method.GET, uri"knowledge-graph/datasets"))
-        .status shouldBe ServiceUnavailable
+    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
+      s"when no ${query.parameterName} parameter given" in new TestCase {
+
+      val request = Request[IO](Method.GET, uri"knowledge-graph/datasets")
+
+      (datasetsSearchEndpoint
+        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest)(_: Request[IO]))
+        .expects(Option.empty[Phrase],
+                 Sort.By(NameProperty, Direction.Asc),
+                 PagingRequest(Page.first, PerPage.default),
+                 request)
+        .returning(IO.pure(Response[IO](Ok)))
+
+      val response = routes.test(request)
+
+      response.status shouldBe Ok
     }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $Ok when ${query.parameterName} and ${Sort.sort.parameterName} parameters given" in new TestCase {
@@ -90,8 +103,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
             .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
         )
         (datasetsSearchEndpoint
-          .searchForDatasets(_: Phrase, _: Sort.By, _: PagingRequest)(_: Request[IO]))
-          .expects(Phrase(phrase), sortBy, PagingRequest.default, request)
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest)(_: Request[IO]))
+          .expects(Phrase(phrase).some, sortBy, PagingRequest.default, request)
           .returning(IO.pure(Response[IO](Ok)))
 
         val response = routes.test(request)
@@ -110,8 +123,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
             .withQueryParam("per_page", perPage.value)
         )
         (datasetsSearchEndpoint
-          .searchForDatasets(_: Phrase, _: Sort.By, _: PagingRequest)(_: Request[IO]))
-          .expects(Phrase(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest(page, perPage), request)
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest)(_: Request[IO]))
+          .expects(Phrase(phrase).some, Sort.By(NameProperty, Direction.Asc), PagingRequest(page, perPage), request)
           .returning(IO.pure(Response[IO](Ok)))
 
         val response = routes.test(request)

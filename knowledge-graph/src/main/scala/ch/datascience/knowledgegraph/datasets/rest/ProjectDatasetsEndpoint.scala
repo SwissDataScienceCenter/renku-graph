@@ -69,8 +69,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
   }
 
   private def finishedSuccessfully(projectPath: ProjectPath): PartialFunction[Response[Interpretation], String] = {
-    case response if response.status == Ok || response.status == NotFound =>
-      s"Finding '$projectPath' datasets finished"
+    case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
   }
 
   private implicit val datasetEncoder: Encoder[(Identifier, Name)] = Encoder.instance[(Identifier, Name)] {

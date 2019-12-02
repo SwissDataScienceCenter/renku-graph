@@ -27,6 +27,7 @@ import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.PagingRequest.Decoders._
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.QueryParameterTools._
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.QueryEndpoint
 import ch.datascience.knowledgegraph.projects.rest.ProjectEndpoint
@@ -65,12 +66,12 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   // format: on
 
   private def searchForDatasets(
-      maybePhrase:    ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase],
+      maybePhrase:    Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
       maybeSort:      Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
       maybePage:      Option[ValidatedNel[ParseFailure, Page]],
       maybePerPage:   Option[ValidatedNel[ParseFailure, PerPage]]
   )(implicit request: Request[F]): F[Response[F]] =
-    (maybePhrase,
+    (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
      maybeSort getOrElse Validated.validNel(Sort.By(NameProperty, Direction.Asc)),
      PagingRequest(maybePage, maybePerPage))
       .mapN(datasetsSearchEndpoint.searchForDatasets)

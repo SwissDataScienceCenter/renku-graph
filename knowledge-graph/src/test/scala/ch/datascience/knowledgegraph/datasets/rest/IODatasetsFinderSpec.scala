@@ -52,31 +52,33 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
   "findDatasets" should {
 
+    "return all datasets when no search phrase given" in new TestCase {
+      val datasetsList = nonEmptyList(datasets).generateOne.toList
+      loadToStore(
+        triples(
+          datasetsList.map(toSingleFileAndCommitWithDataset): _*
+        )
+      )
+
+      datasetsFinder
+        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+        .results shouldBe datasetsList
+        .map(_.toDatasetSearchResult)
+        .sortBy(_.name.value)
+    }
+
     s"return datasets with name, description or creator matching the given phrase sorted by $NameProperty" in new TestCase {
       forAll(datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig) =>
         val phrase                         = phrases.generateOne
         val (dataset1, dataset2, dataset3) = storeDatasets(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
 
         datasetsFinder
-          .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
-          .results shouldBe List(
-          DatasetSearchResult(dataset1.id,
-                              dataset1.name,
-                              dataset1.maybeDescription,
-                              dataset1.published,
-                              ProjectsCount(dataset1.project.size)),
-          DatasetSearchResult(dataset2.id,
-                              dataset2.name,
-                              dataset2.maybeDescription,
-                              dataset2.published,
-                              ProjectsCount(dataset2.project.size)),
-          DatasetSearchResult(dataset3.id,
-                              dataset3.name,
-                              dataset3.maybeDescription,
-                              dataset3.published,
-                              ProjectsCount(dataset3.project.size))
-        ).sortBy(_.name.value)
+          .results shouldBe List(dataset1.toDatasetSearchResult,
+                                 dataset2.toDatasetSearchResult,
+                                 dataset3.toDatasetSearchResult).sortBy(_.name.value)
       }
     }
 
@@ -90,25 +92,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       datasetsFinder
-        .findDatasets(phrase, Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(
-        DatasetSearchResult(dataset3.id,
-                            dataset3.name,
-                            dataset3.maybeDescription,
-                            dataset3.published,
-                            ProjectsCount(dataset3.project.size)),
-        DatasetSearchResult(dataset1.id,
-                            dataset1.name,
-                            dataset1.maybeDescription,
-                            dataset1.published,
-                            ProjectsCount(dataset1.project.size)),
-        DatasetSearchResult(dataset2.id,
-                            dataset2.name,
-                            dataset2.maybeDescription,
-                            dataset2.published,
-                            ProjectsCount(dataset2.project.size))
-      )
+        .results shouldBe List(dataset3.toDatasetSearchResult,
+                               dataset1.toDatasetSearchResult,
+                               dataset2.toDatasetSearchResult)
     }
 
     s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
@@ -121,25 +109,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       datasetsFinder
-        .findDatasets(phrase, Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(
-        DatasetSearchResult(dataset2.id,
-                            dataset2.name,
-                            dataset2.maybeDescription,
-                            dataset2.published,
-                            ProjectsCount(dataset2.project.size)),
-        DatasetSearchResult(dataset3.id,
-                            dataset3.name,
-                            dataset3.maybeDescription,
-                            dataset3.published,
-                            ProjectsCount(dataset3.project.size)),
-        DatasetSearchResult(dataset1.id,
-                            dataset1.name,
-                            dataset1.maybeDescription,
-                            dataset1.published,
-                            ProjectsCount(dataset1.project.size))
-      )
+        .results shouldBe List(dataset2.toDatasetSearchResult,
+                               dataset3.toDatasetSearchResult,
+                               dataset1.toDatasetSearchResult)
     }
 
     "return the requested page of datasets matching the given phrase" in new TestCase {
@@ -150,17 +124,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val expectedDataset = List(dataset1, dataset2, dataset3).sorted(byName)(1)
-      result.results shouldBe List(
-        DatasetSearchResult(expectedDataset.id,
-                            expectedDataset.name,
-                            expectedDataset.maybeDescription,
-                            expectedDataset.published,
-                            ProjectsCount(expectedDataset.project.size))
-      )
+      result.results shouldBe List(expectedDataset.toDatasetSearchResult)
 
       result.pagingInfo.pagingRequest shouldBe pagingRequest
       result.pagingInfo.total         shouldBe Total(3)
@@ -174,7 +142,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
 
       val result = datasetsFinder
-        .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       result.results                  shouldBe Nil
@@ -191,7 +159,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       datasetsFinder
-        .findDatasets(phrases.generateOne, searchEndpointSorts.generateOne, PagingRequest.default)
+        .findDatasets(Some(phrases.generateOne), searchEndpointSorts.generateOne, PagingRequest.default)
         .unsafeRunSync()
         .results shouldBe empty
     }
@@ -281,6 +249,14 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
     def changeProjectsCountTo(projectsCount: ProjectsCount): Dataset =
       dataset.copy(project = Gen.listOfN(projectsCount.value, datasetProjects).generateOne)
+
+    lazy val toDatasetSearchResult: DatasetSearchResult = DatasetSearchResult(
+      dataset.id,
+      dataset.name,
+      dataset.maybeDescription,
+      dataset.published,
+      ProjectsCount(dataset.project.size)
+    )
   }
 
   private lazy val byName: Ordering[Dataset] =

@@ -232,6 +232,17 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       Then("he should get OK response with the dataset from the requested page")
       val Right(foundDatasetsPage) = searchForPage.bodyAsJson.as[List[Json]]
       foundDatasetsPage should contain only datasetsSortedByName(1)
+
+      When("user calls the GET knowledge-graph/datasets?sort=name:asc")
+      val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=name:asc"
+
+      Then("he should get OK response with all the datasets")
+      val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.bodyAsJson.as[List[Json]]
+      foundDatasetsWithoutPhrase should contain allElementsOf List(
+        searchResultJson(dataset1),
+        searchResultJson(dataset2),
+        searchResultJson(dataset3)
+      ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
     }
 
     def pushToStore(dataset: Dataset, projects: List[Project]): Unit =

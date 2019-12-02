@@ -35,7 +35,7 @@ import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
-import org.http4s.dsl.impl.ValidatingQueryParamDecoderMatcher
+import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
 import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response}
 
 import scala.concurrent.ExecutionContext
@@ -59,26 +59,34 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   import io.circe.Encoder
   import io.circe.literal._
 
-  def searchForDatasets(phrase: Phrase, sort: Sort.By, paging: PagingRequest)(
-      implicit request:         Request[Interpretation]
+  def searchForDatasets(maybePhrase: Option[Phrase], sort: Sort.By, paging: PagingRequest)(
+      implicit request:              Request[Interpretation]
   ): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       datasetsFinder
-        .findDatasets(phrase, sort, paging)
+        .findDatasets(maybePhrase, sort, paging)
         .map(_.toHttpResponse)
-        .recoverWith(httpResult(phrase))
-    } map logExecutionTimeWhen(finishedSuccessfully(phrase))
+        .recoverWith(httpResult(maybePhrase))
+    } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))
 
-  private def httpResult(phrase: Phrase): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private def httpResult(
+      maybePhrase: Option[Phrase]
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding datasets matching $phrase' failed")
+      val errorMessage = ErrorMessage(
+        maybePhrase
+          .map(phrase => s"Finding datasets matching '$phrase' failed")
+          .getOrElse("Finding all datasets failed")
+      )
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(phrase: Phrase): PartialFunction[Response[Interpretation], String] = {
-    case response if response.status == Ok || response.status == NotFound =>
-      s"Finding datasets containing '$phrase' phrase finished"
+  private def finishedSuccessfully(maybePhrase: Option[Phrase]): PartialFunction[Response[Interpretation], String] = {
+    case response if response.status == Ok =>
+      maybePhrase
+        .map(phrase => s"Finding datasets containing '$phrase' phrase finished")
+        .getOrElse("Finding all datasets finished")
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
@@ -122,7 +130,7 @@ object DatasetsSearchEndpoint {
           .leftMap(_ => ParseFailure(s"'${query.parameterName}' parameter with invalid value", ""))
           .toValidatedNel
 
-    object query extends ValidatingQueryParamDecoderMatcher[Phrase]("query") {
+    object query extends OptionalValidatingQueryParamDecoderMatcher[Phrase]("query") {
       val parameterName: String = "query"
     }
   }

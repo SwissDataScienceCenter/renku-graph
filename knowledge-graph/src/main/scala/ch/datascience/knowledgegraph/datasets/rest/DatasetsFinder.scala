@@ -37,9 +37,9 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait DatasetsFinder[Interpretation[_]] {
-  def findDatasets(phrase: Phrase,
-                   sort:   Sort.By,
-                   paging: PagingRequest): Interpretation[PagingResponse[DatasetSearchResult]]
+  def findDatasets(maybePhrase: Option[Phrase],
+                   sort:        Sort.By,
+                   paging:      PagingRequest): Interpretation[PagingResponse[DatasetSearchResult]]
 }
 
 private object DatasetsFinder {
@@ -68,11 +68,11 @@ private class IODatasetsFinder(
   import cats.implicits._
   import creatorsFinder._
 
-  override def findDatasets(phrase:        Phrase,
+  override def findDatasets(maybePhrase:   Option[Phrase],
                             sort:          Sort.By,
                             pagingRequest: PagingRequest): IO[PagingResponse[DatasetSearchResult]] = {
     implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
-      sparqlQuery(phrase, sort)
+      sparqlQuery(maybePhrase, sort)
     )
     for {
       page                 <- findPage(pagingRequest)
@@ -81,46 +81,62 @@ private class IODatasetsFinder(
     } yield updatedPage
   }
 
-  private def sparqlQuery(phrase: Phrase, sort: Sort.By): SparqlQuery = SparqlQuery(
+  private def sparqlQuery(maybePhrase: Option[Phrase], sort: Sort.By): SparqlQuery = SparqlQuery(
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
       "PREFIX schema: <http://schema.org/>",
       "PREFIX text: <http://jena.apache.org/text#>"
     ),
-    s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?maybeProject) AS ?projectsCount)
-        |WHERE {
-        |  {
-        |    ?dataset rdf:type <http://schema.org/Dataset> ;
-        |             text:query (schema:name '$phrase') ;
-        |             schema:name ?name ;
-        |             schema:identifier ?identifier .
-        |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
-        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
-        |  } UNION {
-        |    ?dataset rdf:type <http://schema.org/Dataset> ;
-        |             text:query (schema:description '$phrase') ;
-        |             schema:name ?name ;
-        |             schema:identifier ?identifier .
-        |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
-        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
-        |  } UNION {
-        |    ?dataset rdf:type <http://schema.org/Dataset> ;
-        |             schema:creator ?creatorResource ;
-        |             schema:identifier ?identifier ;
-        |             schema:name ?name .
-        |    ?creatorResource rdf:type <http://schema.org/Person> ;
-        |             text:query (schema:name '$phrase') .
-        |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-        |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
-        |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
-        |  }
-        |}
-        |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
-        |${`ORDER BY`(sort)}
-        |""".stripMargin
+    maybePhrase match {
+      case None =>
+        s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?maybeProject) AS ?projectsCount)
+            |WHERE {
+            |  ?dataset rdf:type <http://schema.org/Dataset> ;
+            |           schema:name ?name ;
+            |           schema:identifier ?identifier .
+            |  OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
+            |  OPTIONAL { ?dataset schema:description ?maybeDescription } .
+            |  OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+            |}
+            |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
+            |${`ORDER BY`(sort)}
+            |""".stripMargin
+      case Some(phrase) =>
+        s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?maybeProject) AS ?projectsCount)
+            |WHERE {
+            |  {
+            |    ?dataset rdf:type <http://schema.org/Dataset> ;
+            |             text:query (schema:name '$phrase') ;
+            |             schema:name ?name ;
+            |             schema:identifier ?identifier .
+            |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
+            |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
+            |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+            |  } UNION {
+            |    ?dataset rdf:type <http://schema.org/Dataset> ;
+            |             text:query (schema:description '$phrase') ;
+            |             schema:name ?name ;
+            |             schema:identifier ?identifier .
+            |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
+            |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
+            |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+            |  } UNION {
+            |    ?dataset rdf:type <http://schema.org/Dataset> ;
+            |             schema:creator ?creatorResource ;
+            |             schema:identifier ?identifier ;
+            |             schema:name ?name .
+            |    ?creatorResource rdf:type <http://schema.org/Person> ;
+            |             text:query (schema:name '$phrase') .
+            |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
+            |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
+            |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+            |  }
+            |}
+            |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
+            |${`ORDER BY`(sort)}
+            |""".stripMargin
+    }
   )
 
   private def `ORDER BY`(sort: Sort.By): String = sort.property match {

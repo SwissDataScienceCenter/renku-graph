@@ -16,10 +16,10 @@ This is a microservice which provides API for the Graph DB.
 
 #### GET /knowledge-graph/datasets?query=\<phrase\>&sort=\<property\>:asc|desc&page=\<page\>&per_page=\<per_page\>
 
-Finds datasets which `name`, `description` or creator `name` matches the given `phrase`.
+Finds datasets which `name`, `description` or creator `name` matches the given `phrase` or returns all the datasets if no `query` parameter is given.
 
 NOTES: 
-* the `phrase` query parameter has to be url encoded.
+* the `phrase` query parameter has to be url encoded and it cannot be blank.
 * the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name`, `datePublished` and `projectsCount`.
 * the `page` query parameter is optional and defaults to `1`.
 * the `per_page` query parameter is optional and defaults to `20`.
