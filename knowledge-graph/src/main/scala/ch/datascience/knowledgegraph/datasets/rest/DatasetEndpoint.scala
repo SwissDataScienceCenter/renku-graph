@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect._
 import cats.implicits._
-import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.config.renku
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.datasets.Identifier
@@ -40,7 +40,7 @@ import scala.util.control.NonFatal
 
 class DatasetEndpoint[Interpretation[_]: Effect](
     datasetFinder:         DatasetFinder[Interpretation],
-    renkuResourcesUrl:     RenkuResourcesUrl,
+    renkuResourcesUrl:     renku.ResourcesUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
@@ -141,7 +141,7 @@ object IODatasetEndpoint {
               timer:                     Timer[IO]): IO[DatasetEndpoint[IO]] =
     for {
       datasetFinder         <- IODatasetFinder(logger = ApplicationLogger)
-      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetEndpoint[IO](
       datasetFinder,

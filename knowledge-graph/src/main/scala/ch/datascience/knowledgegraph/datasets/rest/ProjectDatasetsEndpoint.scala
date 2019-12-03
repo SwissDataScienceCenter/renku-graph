@@ -20,13 +20,13 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect._
 import cats.implicits._
-import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.Links
 import Links._
+import ch.datascience.config.renku
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
@@ -43,7 +43,7 @@ import scala.util.control.NonFatal
 
 class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     projectDatasetsFinder: ProjectDatasetsFinder[Interpretation],
-    renkuResourcesUrl:     RenkuResourcesUrl,
+    renkuResourcesUrl:     renku.ResourcesUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
@@ -92,7 +92,7 @@ object IOProjectDatasetsEndpoint {
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
-      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ProjectDatasetsEndpoint[IO](
       new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),

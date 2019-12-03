@@ -19,6 +19,7 @@
 package ch.datascience.http.rest
 
 import cats.implicits._
+import ch.datascience.config.renku.ResourceUrl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
 import org.http4s.{ParseFailure, QueryParamDecoder}
 
@@ -41,6 +42,12 @@ trait SortBy {
   }
 
   case class By(property: PropertyType, direction: Direction)
+
+  import ch.datascience.http.client.UrlEncoder.urlEncode
+  import ch.datascience.config.renku.ResourceUrl._
+
+  implicit val queryParamConverter: By => QueryParamValue =
+    v => QueryParamValue(urlEncode(s"${v.property}:${v.direction}"))
 
   def properties: Set[PropertyType]
 

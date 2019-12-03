@@ -20,6 +20,7 @@ package ch.datascience.http.rest.paging
 
 import cats.MonadError
 import cats.implicits._
+import ch.datascience.config.renku
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Total
 
@@ -63,7 +64,6 @@ object PagingResponse {
     import io.circe.syntax._
     import io.circe.{Encoder, Json}
     import org.http4s.circe.jsonEncoderOf
-    import org.http4s.Request
     import org.http4s.{EntityEncoder, Response, Status}
 
     def updateResults[Interpretation[_]](
@@ -76,8 +76,8 @@ object PagingResponse {
           .raiseError[Interpretation, PagingResponse[Result]]
 
     def toHttpResponse[Interpretation[_]: Effect](
-        implicit request: Request[Interpretation],
-        encoder:          Encoder[Result]
+        implicit renkuResourceUrl: renku.ResourceUrl,
+        encoder:                   Encoder[Result]
     ): Response[Interpretation] =
       Response(Status.Ok)
         .withEntity(response.results.asJson)

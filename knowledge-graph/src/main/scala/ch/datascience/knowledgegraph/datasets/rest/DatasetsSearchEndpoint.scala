@@ -21,7 +21,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.MonadError
 import cats.effect._
 import cats.implicits._
-import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.config._
+import ch.datascience.config.renku.ResourceUrl
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.graph.config.RenkuBaseUrl
@@ -44,7 +45,7 @@ import scala.util.control.NonFatal
 
 class DatasetsSearchEndpoint[Interpretation[_]: Effect](
     datasetsFinder:        DatasetsFinder[Interpretation],
-    renkuResourcesUrl:     RenkuResourcesUrl,
+    renkuResourcesUrl:     renku.ResourcesUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable])
@@ -53,21 +54,27 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   import DatasetsFinder.DatasetSearchResult
   import DatasetsSearchEndpoint.Query._
   import DatasetsSearchEndpoint.Sort
+  import PagingRequest.Decoders._
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
   import executionTimeRecorder._
   import io.circe.Encoder
   import io.circe.literal._
 
-  def searchForDatasets(maybePhrase: Option[Phrase], sort: Sort.By, paging: PagingRequest)(
-      implicit request:              Request[Interpretation]
-  ): Interpretation[Response[Interpretation]] =
+  def searchForDatasets(maybePhrase: Option[Phrase],
+                        sort:        Sort.By,
+                        paging:      PagingRequest): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
+      implicit val datasetsUrl: renku.ResourceUrl = requestedUrl(maybePhrase, sort, paging)
+
       datasetsFinder
         .findDatasets(maybePhrase, sort, paging)
         .map(_.toHttpResponse)
         .recoverWith(httpResult(maybePhrase))
     } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))
+
+  private def requestedUrl(maybePhrase: Option[Phrase], sort: Sort.By, paging: PagingRequest): renku.ResourceUrl =
+    (renkuResourcesUrl / "datasets") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
 
   private def httpResult(
       maybePhrase: Option[Phrase]
@@ -156,7 +163,7 @@ object IODatasetsSearchEndpoint {
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
-      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetsSearchEndpoint[IO](
       new IODatasetsFinder(rdfStoreConfig,

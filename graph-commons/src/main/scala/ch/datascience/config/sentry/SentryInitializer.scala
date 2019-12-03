@@ -37,7 +37,7 @@ class SentryInitializer[Interpretation[_]](
 
   private lazy val toDsn: SentryConfig => SentryBaseUrl = {
     case SentryConfig(baseUrl, environmentName, serviceName) =>
-      baseUrl ? ("stacktrace.app.packages" -> "") & ("servername" -> serviceName.value) & ("environment" -> environmentName.value)
+      baseUrl ? ("stacktrace.app.packages" -> "") & ("servername" -> serviceName) & ("environment" -> environmentName)
   }
 }
 

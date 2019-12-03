@@ -11,11 +11,11 @@
         <appender-ref ref="STDOUT"/>
     </appender>
 
-    <logger name="application" level="OFF" additivity="false">
+    <logger name="application" level="ERROR" additivity="false">
         <appender-ref ref="ASYNC_STDOUT"/>
     </logger>
 
-    <logger name="com.github.tomakehurst.wiremock" level="OFF"/>
+    <logger name="com.github.tomakehurst.wiremock" level="ERROR"/>
 
     <root level="OFF">
         <appender-ref ref="ASYNC_STDOUT"/>

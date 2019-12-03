@@ -19,7 +19,10 @@
 package ch.datascience.http.rest
 
 import cats.data.Validated
+import ch.datascience.config.renku
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.http.client.UrlEncoder._
 import ch.datascience.http.rest.SortBy.Direction.Desc
 import org.http4s.ParseFailure
 import org.scalatest.Matchers._
@@ -83,6 +86,17 @@ class SortBySpec extends WordSpec with ScalaCheckPropertyChecks {
       Map.empty[String, List[String]] match {
         case TestSort.sort(actual) => actual shouldBe None
       }
+    }
+  }
+
+  "by" should {
+
+    "be convertable to QueryParamValue which value is serialized with direction and url encoded" in {
+      val convert = implicitly[TestSort.By => renku.ResourceUrl.QueryParamValue]
+
+      val sort = testSortBys.generateOne
+
+      convert(sort).value shouldBe urlEncode(serialize(sort))
     }
   }
 

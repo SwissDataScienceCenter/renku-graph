@@ -21,12 +21,14 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.config.renku
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import ch.datascience.http.rest.paging.model.Total
 import ch.datascience.http.rest.paging.{PagingHeaders, PagingResponse}
 import ch.datascience.http.server.EndpointTester._
@@ -35,13 +37,13 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
-import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.http4s.MediaType.application
-import org.http4s.Request
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
@@ -129,13 +131,15 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
 
     val context = MonadError[IO, Throwable]
 
-    implicit val request: Request[IO] = Request[IO]()
     val maybePhrase   = phrases.generateOption
     val sort          = searchEndpointSorts.generateOne
     val pagingRequest = pagingRequests.generateOne
 
+    private val renkuResourcesUrl = renkuResourcesUrls.generateOne
+    implicit val renkuResourceUrl: renku.ResourceUrl =
+      (renkuResourcesUrl / "datasets") ? (page.parameterName -> pagingRequest.page) & (perPage.parameterName -> pagingRequest.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
+
     val datasetsFinder        = mock[DatasetsFinder[IO]]
-    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val searchForDatasets = new DatasetsSearchEndpoint[IO](

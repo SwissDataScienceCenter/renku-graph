@@ -231,18 +231,29 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
       Then("he should get OK response with the dataset from the requested page")
       val Right(foundDatasetsPage) = searchForPage.bodyAsJson.as[List[Json]]
-      foundDatasetsPage should contain only datasetsSortedByName(1)
+      foundDatasetsPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByName(1))
+        .flatMap(sortCreators)
 
       When("user calls the GET knowledge-graph/datasets?sort=name:asc")
       val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=name:asc"
 
       Then("he should get OK response with all the datasets")
       val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.bodyAsJson.as[List[Json]]
-      foundDatasetsWithoutPhrase should contain allElementsOf List(
+      foundDatasetsWithoutPhrase.flatMap(sortCreators) should contain allElementsOf List(
         searchResultJson(dataset1),
         searchResultJson(dataset2),
-        searchResultJson(dataset3)
+        searchResultJson(dataset3),
+        searchResultJson(dataset4)
       ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
+
+      When("user uses the response header link with the rel='first'")
+      val firstPageLink     = searchForPage.headerLink(rel = "first")
+      val firstPageResponse = restClient GET firstPageLink
+
+      Then("he should get OK response with the datasets from the first page")
+      val Right(foundFirstPage) = firstPageResponse.bodyAsJson.as[List[Json]]
+      foundFirstPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByName.head)
+        .flatMap(sortCreators)
     }
 
     def pushToStore(dataset: Dataset, projects: List[Project]): Unit =
@@ -282,7 +293,7 @@ object DatasetsResources {
       "name": ${dataset.name.value}
     }""" deepMerge {
     _links(
-      Link(Rel("details"), Href(renkuResourceUrl / "datasets" / dataset.id))
+      Link(Rel("details"), Href(renkuResourcesUrl / "datasets" / dataset.id))
     )
   }
 
@@ -296,7 +307,7 @@ object DatasetsResources {
       .addIfDefined("description" -> dataset.maybeDescription)
       .deepMerge {
         _links(
-          Link(Rel("details"), Href(renkuResourceUrl / "datasets" / dataset.id))
+          Link(Rel("details"), Href(renkuResourcesUrl / "datasets" / dataset.id))
         )
       }
 

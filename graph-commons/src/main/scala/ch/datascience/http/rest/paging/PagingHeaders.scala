@@ -19,9 +19,10 @@
 package ch.datascience.http.rest.paging
 
 import PagingRequest.Decoders.page.{parameterName => pageParamName}
+import ch.datascience.config.renku.ResourceUrl
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Page.first
-import org.http4s.{Header, Request}
+import org.http4s.Header
 
 import scala.language.higherKinds
 
@@ -35,7 +36,7 @@ object PagingHeaders {
   val PrevPage:   String = "Prev-Page"
   val Link:       String = "Link"
 
-  def from[F[_]](response: PagingResponse[_])(implicit request: Request[F]): Set[Header] =
+  def from[F[_]](response: PagingResponse[_])(implicit resourceUrl: ResourceUrl): Set[Header] =
     Set(
       Some(Header(Total, response.pagingInfo.total.toString)),
       Some(Header(TotalPages, totalPages(response.pagingInfo).toString)),
@@ -62,21 +63,26 @@ object PagingHeaders {
     if (pagingRequest.page == first) None
     else Some(Header(PrevPage, (pagingRequest.page.value - 1).toString))
 
-  private def prevLink[F[_]](pagingRequest: PagingRequest)(implicit request: Request[F]): Option[Header] = {
+  private def prevLink[F[_]](pagingRequest: PagingRequest)(implicit resourceUrl: ResourceUrl): Option[Header] = {
     val page = pagingRequest.page
     if (page == first) None
-    else Some(Header(Link, s"""<${request.uri.withQueryParam(pageParamName, page.value - 1)}>; rel="prev""""))
+    else Some(Header(Link, s"""<${uriWithPageParam(pageParamName, page.value - 1)}>; rel="prev""""))
   }
 
-  private def nextLink[F[_]](pagingInfo: PagingInfo)(implicit request: Request[F]): Option[Header] = {
+  private def nextLink[F[_]](pagingInfo: PagingInfo)(implicit resourceUrl: ResourceUrl): Option[Header] = {
     val page = pagingInfo.pagingRequest.page
     if (page.value == totalPages(pagingInfo)) None
-    else Some(Header(Link, s"""<${request.uri.withQueryParam(pageParamName, page.value + 1)}>; rel="next""""))
+    else Some(Header(Link, s"""<${uriWithPageParam(pageParamName, page.value + 1)}>; rel="next""""))
   }
 
-  private def firstLink[F[_]](implicit request: Request[F]): Option[Header] =
-    Some(Header(Link, s"""<${request.uri.withQueryParam(pageParamName, 1)}>; rel="first""""))
+  private def firstLink[F[_]](implicit resourceUrl: ResourceUrl): Option[Header] =
+    Some(Header(Link, s"""<${uriWithPageParam(pageParamName, 1)}>; rel="first""""))
 
-  private def lastLink[F[_]](pagingInfo: PagingInfo)(implicit request: Request[F]): Option[Header] =
-    Some(Header(Link, s"""<${request.uri.withQueryParam(pageParamName, totalPages(pagingInfo))}>; rel="last""""))
+  private def lastLink[F[_]](pagingInfo: PagingInfo)(implicit resourceUrl: ResourceUrl): Option[Header] =
+    Some(Header(Link, s"""<${uriWithPageParam(pageParamName, totalPages(pagingInfo))}>; rel="last""""))
+
+  private def uriWithPageParam[F[_]](
+      paramName:          String,
+      value:              Int
+  )(implicit resourceUrl: ResourceUrl) = resourceUrl ? (paramName -> value)
 }

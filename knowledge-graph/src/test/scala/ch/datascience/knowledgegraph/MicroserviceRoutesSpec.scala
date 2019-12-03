@@ -64,11 +64,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       val phrase  = nonEmptyStrings().generateOne
       val request = Request[IO](Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
       (datasetsSearchEndpoint
-        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest)(_: Request[IO]))
-        .expects(Phrase(phrase).some,
-                 Sort.By(NameProperty, Direction.Asc),
-                 PagingRequest(Page.first, PerPage.default),
-                 request)
+        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+        .expects(Phrase(phrase).some, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage.default))
         .returning(IO.pure(Response[IO](Ok)))
 
       val response = routes.test(request)
@@ -82,11 +79,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       val request = Request[IO](Method.GET, uri"knowledge-graph/datasets")
 
       (datasetsSearchEndpoint
-        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest)(_: Request[IO]))
-        .expects(Option.empty[Phrase],
-                 Sort.By(NameProperty, Direction.Asc),
-                 PagingRequest(Page.first, PerPage.default),
-                 request)
+        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+        .expects(Option.empty[Phrase], Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage.default))
         .returning(IO.pure(Response[IO](Ok)))
 
       val response = routes.test(request)
@@ -103,8 +97,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
             .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
         )
         (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest)(_: Request[IO]))
-          .expects(Phrase(phrase).some, sortBy, PagingRequest.default, request)
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+          .expects(Phrase(phrase).some, sortBy, PagingRequest.default)
           .returning(IO.pure(Response[IO](Ok)))
 
         val response = routes.test(request)
@@ -123,8 +117,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
             .withQueryParam("per_page", perPage.value)
         )
         (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest)(_: Request[IO]))
-          .expects(Phrase(phrase).some, Sort.By(NameProperty, Direction.Asc), PagingRequest(page, perPage), request)
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+          .expects(Phrase(phrase).some, Sort.By(NameProperty, Direction.Asc), PagingRequest(page, perPage))
           .returning(IO.pure(Response[IO](Ok)))
 
         val response = routes.test(request)

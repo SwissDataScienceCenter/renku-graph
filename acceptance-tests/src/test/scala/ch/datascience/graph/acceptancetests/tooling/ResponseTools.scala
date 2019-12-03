@@ -22,12 +22,24 @@ import cats.effect.IO
 import io.circe.Json
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Response}
+import org.scalatest.Matchers._
 
 object ResponseTools {
 
   private implicit val jsonEntityDecoder: EntityDecoder[IO, Json] = jsonOf[IO, Json]
 
   implicit class ResponseOps(response: Response[IO]) {
+
     lazy val bodyAsJson: Json = response.as[Json].unsafeRunSync()
+
+    def headerLink(rel: String): String =
+      response.headers.toList
+        .find(_.value contains s"""rel="$rel"""")
+        .map { header =>
+          val value = header.value
+          value.substring(value.lastIndexOf("<") + 1, value.lastIndexOf(">"))
+        }
+        .getOrElse(fail(s"""No link with the rel="$rel""""))
+
   }
 }

@@ -21,7 +21,9 @@ package ch.datascience.http.rest.paging
 import PagingRequest.Decoders.page.{parameterName => pageParamName}
 import PagingRequest.Decoders.perPage.{parameterName => perPageParamName}
 import cats.implicits._
+import ch.datascience.config.renku
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Page.first
@@ -48,7 +50,7 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
         import response.pagingInfo._
         import response.pagingInfo.pagingRequest._
 
-        implicit val request: Request[Try] = requestFor(page, perPage)
+        implicit val resourceUrl: renku.ResourceUrl = renkuResourceUrlFrom(page, perPage)
 
         val totalPages = findTotalPages(pagingInfo)
         PagingHeaders.from(response) should contain theSameElementsAs Set(
@@ -58,10 +60,10 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
           Header("Page", page.toString),
           Header("Next-Page", (page.value + 1).toString),
           Header("Prev-Page", (page.value - 1).toString),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, page.value + 1)}>; rel="next""""),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, page.value - 1)}>; rel="prev""""),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, first.value)}>; rel="first""""),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, totalPages)}>; rel="last"""")
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
         )
       }
     }
@@ -74,7 +76,7 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
         import response.pagingInfo._
         import response.pagingInfo.pagingRequest._
 
-        implicit val request: Request[Try] = requestFor(page, perPage)
+        implicit val resourceUrl: renku.ResourceUrl = renkuResourceUrlFrom(page, perPage)
 
         val totalPages = findTotalPages(pagingInfo)
         PagingHeaders.from(response) should contain theSameElementsAs Set(
@@ -83,9 +85,9 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
           Header("Per-Page", perPage.toString),
           Header("Page", page.toString),
           Header("Prev-Page", (page.value - 1).toString),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, page.value - 1)}>; rel="prev""""),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, first.value)}>; rel="first""""),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, totalPages)}>; rel="last"""")
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
         )
       }
     }
@@ -98,7 +100,7 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
         import response.pagingInfo._
         import response.pagingInfo.pagingRequest._
 
-        implicit val request: Request[Try] = requestFor(page, perPage)
+        implicit val resourceUrl: renku.ResourceUrl = renkuResourceUrlFrom(page, perPage)
 
         val totalPages = findTotalPages(pagingInfo)
         PagingHeaders.from(response) should contain theSameElementsAs Set(
@@ -107,9 +109,9 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
           Header("Per-Page", perPage.toString),
           Header("Page", page.toString),
           Header("Next-Page", (page.value + 1).toString),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, page.value + 1)}>; rel="next""""),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, first.value)}>; rel="first""""),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, totalPages)}>; rel="last"""")
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
         )
       }
     }
@@ -121,25 +123,22 @@ class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
         import response.pagingInfo._
         import response.pagingInfo.pagingRequest._
 
-        implicit val request: Request[Try] = requestFor(page, perPage)
+        implicit val resourceUrl: renku.ResourceUrl = renkuResourceUrlFrom(page, perPage)
 
         PagingHeaders.from(response) should contain theSameElementsAs Set(
           Header("Total", total.toString),
           Header("Total-Pages", "1"),
           Header("Per-Page", perPage.toString),
           Header("Page", page.toString),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, first.value)}>; rel="first""""),
-          Header("Link", s"""<${request.uri.withQueryParam(pageParamName, 1)}>; rel="last"""")
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
         )
       }
     }
   }
 
-  private def requestFor(page: model.Page, perPage: model.PerPage): Request[Try] = Request[Try](
-    uri = uri"http://host/path?param1=value1"
-      .withQueryParam(pageParamName, page.toString)
-      .withQueryParam(perPageParamName, perPage.toString)
-  )
+  private def renkuResourceUrlFrom(page: model.Page, perPage: model.PerPage): renku.ResourceUrl =
+    renkuResourceUrls().generateOne ? (pageParamName -> page.toString) & (perPageParamName -> perPage.toString)
 
   private def findTotalPages(pagingInfo: PagingInfo): Int = {
     import pagingInfo._

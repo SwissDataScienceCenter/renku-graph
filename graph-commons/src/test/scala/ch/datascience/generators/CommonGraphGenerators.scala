@@ -22,11 +22,12 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
 import cats.implicits._
-import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.config.renku
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.crypto.AesCrypto
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.SchemaVersion
@@ -106,8 +107,17 @@ object CommonGraphGenerators {
     .map(_.mkString("."))
     .map(SchemaVersion.apply)
 
-  implicit val renkuBaseUrls:      Gen[RenkuBaseUrl]      = httpUrls map RenkuBaseUrl.apply
-  implicit val renkuResourcesUrls: Gen[RenkuResourcesUrl] = httpUrls map RenkuResourcesUrl.apply
+  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls map RenkuBaseUrl.apply
+  implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
+    url  <- httpUrls
+    path <- relativePaths(maxSegments = 1)
+  } yield renku.ResourcesUrl(s"$url/$path")
+  def renkuResourceUrls(
+      renkuResourcesUrl: renku.ResourcesUrl = renkuResourcesUrls.generateOne
+  ): Gen[renku.ResourceUrl] =
+    for {
+      path <- relativePaths(maxSegments = 1)
+    } yield renkuResourcesUrl / path
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
     url         <- httpUrls
