@@ -66,8 +66,14 @@ function updateVersionInRenku() {
   git config credential.helper "store --file=.git/credentials"
   echo "https://${GITHUB_TOKEN}:@github.com" >.git/credentials
 
+  # running helm dep udpate
+  cd charts || exit
+  helm dep update renku
+  cd .. || exit
+
   # pushing to the remote
   git add charts/renku/requirements.yaml
+  git add charts/renku/requirements.lock
   git commit -m "chore: updating renku-graph version to $TRAVIS_TAG"
   git push origin master
 }
