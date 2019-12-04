@@ -81,7 +81,7 @@ private object Commands {
 
   class Git {
 
-    def cloneRepo(
+    def clone(
         repositoryUrl:        ServiceUrl,
         destinationDirectory: Path,
         workDirectory:        Path
