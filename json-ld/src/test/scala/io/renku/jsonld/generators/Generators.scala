@@ -250,6 +250,11 @@ object Generators {
 
       def generateOne: T = generator.sample getOrElse generateOne
 
+      def generateNonEmptyList(minElements: Int Refined Positive = 1,
+                               maxElements: Int Refined Positive = 5): NonEmptyList[T] =
+        nonEmptyList(generator, minElements, maxElements).sample
+          .getOrElse(generateNonEmptyList(minElements, maxElements))
+
       def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
 
       def generateDifferentThan(value: T): T = {
