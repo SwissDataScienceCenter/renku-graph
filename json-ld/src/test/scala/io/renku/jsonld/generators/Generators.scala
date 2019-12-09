@@ -151,9 +151,10 @@ object Generators {
                  case true  => "http"
                  case false => "https"
                }
-    port <- httpPorts
     host <- nonEmptyStrings()
-  } yield s"$protocol://$host:$port"
+    port <- httpPorts
+    path <- relativePaths(maxSegments = 3)
+  } yield s"$protocol://$host:$port/$path"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {

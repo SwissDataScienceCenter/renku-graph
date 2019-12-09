@@ -22,5 +22,5 @@ object JsonLDGenerators {
   implicit val entityTypes: Gen[EntityType] = for {
     schema   <- schemas
     property <- nonBlankStrings()
-  } yield schema / property.value
+  } yield EntityType.fromProperty(schema / property.value)
 }

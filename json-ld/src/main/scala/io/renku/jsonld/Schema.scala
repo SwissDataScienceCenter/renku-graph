@@ -4,7 +4,9 @@ abstract class Schema(value: String, separator: String = "/") extends Product wi
   def /(name: String): Property = Property(s"$value$separator$name")
 }
 
-final case class Property(url: String)
+final case class Property(url: String) {
+  override lazy val toString: String = url
+}
 
 object Schema {
 
