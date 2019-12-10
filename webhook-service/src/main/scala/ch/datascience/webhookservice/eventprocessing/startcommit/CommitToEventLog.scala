@@ -82,6 +82,7 @@ class CommitToEventLog[Interpretation[_]: Monad](
       extends RuntimeException("finding commit events failed", cause)
 
   private def logSummary(startCommit: StartCommit): ((ElapsedTime, List[SendingResult])) => Interpretation[Unit] = {
+    case (_, Nil) => ME.unit
     case (elapsedTime, sendingResults) =>
       val groupedByType = sendingResults groupBy identity
       val stored        = groupedByType.get(Stored).map(_.size).getOrElse(0)

@@ -82,6 +82,32 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
       )
     }
 
+    "do nothing (skip logging) if there are no events to send" in new TestCase {
+
+      val maybeAccessToken = Gen.option(accessTokens).generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectId))
+        .expects(projectId)
+        .returning(context pure maybeAccessToken)
+
+      (commitEventsSource
+        .buildEventsSource(_: StartCommit, _: Option[AccessToken]))
+        .expects(startCommit, maybeAccessToken)
+        .returning(context pure eventsFlowBuilder)
+
+      val commitEvents = List.empty[CommitEvent]
+      (eventsFlowBuilder
+        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .expects(*)
+        .onCall { transform: Function1[CommitEvent, Try[SendingResult]] =>
+          commitEvents.map(transform).sequence
+        }
+
+      commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Success(())
+
+      logger.expectNoLogs()
+    }
+
     "fail if finding access token fails" in new TestCase {
 
       val exception = exceptions.generateOne
