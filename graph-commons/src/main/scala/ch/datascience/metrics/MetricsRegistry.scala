@@ -18,8 +18,8 @@
 
 package ch.datascience.metrics
 
-import io.prometheus.client.CollectorRegistry
 import io.prometheus.client.hotspot._
+import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 import pureconfig.loadConfig
 
 import scala.language.higherKinds
@@ -45,6 +45,9 @@ object MetricsRegistry {
     registry.register(new MemoryAllocationExports())
     registry
   }
+
+  def register[Collector <: SimpleCollector[_]](registerTo: CollectorRegistry => Collector): Collector =
+    registerTo(collectorRegistry)
 
   def clear(): Unit = collectorRegistry.clear()
 }
