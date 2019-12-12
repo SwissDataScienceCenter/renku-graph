@@ -52,16 +52,14 @@ object Microservice extends IOMicroservice {
       projectDatasetsEndpoint <- IOProjectDatasetsEndpoint()
       datasetEndpoint         <- IODatasetEndpoint()
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint()
-      httpServer = new HttpServer[IO](
-        serverPort = 9004,
-        serviceRoutes = new MicroserviceRoutes[IO](
-          queryEndpoint,
-          projectEndpoint,
-          projectDatasetsEndpoint,
-          datasetEndpoint,
-          datasetsSearchEndpoint
-        ).routes
-      )
+      routes <- new MicroserviceRoutes[IO](
+                 queryEndpoint,
+                 projectEndpoint,
+                 projectDatasetsEndpoint,
+                 datasetEndpoint,
+                 datasetsSearchEndpoint
+               ).routes
+      httpServer = new HttpServer[IO](serverPort = 9004, routes)
 
       exitCode <- new MicroserviceRunner(sentryInitializer, httpServer).run(args)
     } yield exitCode

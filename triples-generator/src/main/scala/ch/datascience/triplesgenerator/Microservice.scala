@@ -64,6 +64,7 @@ object Microservice extends IOMicroservice {
         reProvisioning           <- IOReProvisioning(triplesGeneration, transactor)
         triplesGenerator         <- TriplesGenerator(triplesGeneration)
         commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator)
+        routes                   <- new MicroserviceRoutes[IO]().routes
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
                                  .withEventsProcessor(commitEventProcessor)
         exitCode <- new MicroserviceRunner(
@@ -72,7 +73,7 @@ object Microservice extends IOMicroservice {
                      fusekiDatasetInitializer,
                      reProvisioning,
                      eventProcessorRunner,
-                     new HttpServer[IO](serverPort = 9002, serviceRoutes = new MicroserviceRoutes[IO]().routes),
+                     new HttpServer[IO](serverPort = 9002, routes),
                      subProcessesCancelTokens
                    ) run args
       } yield exitCode

@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph
 
-import cats.effect.IO
+import cats.effect.{Clock, IO}
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.generators.CommonGraphGenerators._
@@ -32,6 +32,7 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{QueryContext, QueryEndpoint, QueryRunner}
+import ch.datascience.metrics.MetricsRegistry
 import org.http4s.Status._
 import org.http4s._
 import org.scalamock.scalatest.MockFactory
@@ -40,6 +41,7 @@ import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import sangria.schema.Schema
 
+import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
 class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
@@ -53,6 +55,15 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
 
       response.status       shouldBe Ok
       response.body[String] shouldBe "pong"
+    }
+
+    "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
+      val response = routes.call(
+        Request(Method.GET, uri"metrics")
+      )
+
+      response.status       shouldBe Ok
+      response.body[String] should include("server_response_duration_seconds")
     }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
@@ -90,22 +101,24 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $Ok when query and sort parameters given" in new TestCase {
-      forAll(nonEmptyStrings(), sortBys(Sort)) { (phrase, sortBy) =>
+      forAll(phrases, sortBys(Sort)) { (phrase, sortBy) =>
         (datasetsSearchEndpoint
           .searchForDatasets(_: Phrase, _: Sort.By))
-          .expects(Phrase(phrase), sortBy)
+          .expects(phrase, sortBy)
           .returning(IO.pure(Response[IO](Ok)))
 
         val response = routes.call {
           Request(
             Method.GET,
             uri"knowledge-graph/datasets"
-              .withQueryParam(query.parameterName, phrase)
+              .withQueryParam(query.parameterName, phrase.toString)
               .withQueryParam(Sort.sort.parameterName, s"${sortBy.property}:${sortBy.direction}")
           )
         }
 
         response.status shouldBe Ok
+
+        MetricsRegistry.clear()
       }
     }
 
@@ -207,7 +220,11 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
   }
 
+  private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
+
   private trait TestCase {
+    MetricsRegistry.clear()
+
     val queryEndpoint           = mock[IOQueryEndpoint]
     val projectEndpoint         = mock[IOProjectEndpointStub]
     val projectDatasetsEndpoint = mock[IOProjectDatasetsEndpointStub]
@@ -219,7 +236,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       projectDatasetsEndpoint,
       datasetsEndpoint,
       datasetsSearchEndpoint
-    ).routes.or(notAvailableResponse)
+    ).routes.map(_.or(notAvailableResponse))
   }
 
   class IOQueryEndpoint(querySchema: Schema[QueryContext[IO], Unit], queryRunner: QueryRunner[IO, QueryContext[IO]])
