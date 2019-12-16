@@ -7,6 +7,10 @@ metadata:
     chart: {{ template "graph.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '9004'
 spec:
   type: {{ .Values.knowledgeGraph.service.type }}
   ports:

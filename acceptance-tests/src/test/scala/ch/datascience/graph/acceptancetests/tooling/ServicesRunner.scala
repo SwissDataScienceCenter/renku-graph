@@ -22,7 +22,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.effect._
 import cats.effect.concurrent.Semaphore
+import ch.datascience.logging.IOLogger
 import ch.datascience.microservices.IOMicroservice
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
@@ -43,6 +45,8 @@ class ServicesRunner(
   import scala.concurrent.duration._
   import scala.language.postfixOps
 
+  private val logger = new IOLogger(LoggerFactory.getLogger("test"))
+
   def run(services: ServiceRun*): IO[Unit] =
     for {
       _ <- semaphore.acquire
@@ -60,6 +64,7 @@ class ServicesRunner(
       case ServiceUp => IO.unit
       case _ =>
         for {
+          _ <- logger.info(s"Service ${serviceRun.name} starting")
           _ <- preServiceStart.sequence
           _ = service.run(Nil).start.map(fiber => cancelTokens.put(serviceRun, fiber.cancel)).unsafeRunAsyncAndForget()
           _ <- verifyServiceReady(serviceRun)
@@ -70,20 +75,23 @@ class ServicesRunner(
 
   private def verifyServiceReady(serviceRun: ServiceRun)(implicit timer: Timer[IO]): IO[Unit] =
     serviceRun.serviceClient.ping flatMap {
-      case ServiceUp => serviceRun.postServiceStart.sequence map (_ => ())
-      case _         => timer.sleep(500 millis) *> verifyServiceReady(serviceRun)
+      case ServiceUp =>
+        serviceRun.postServiceStart.sequence flatMap (_ => logger.info(s"Service ${serviceRun.name} started"))
+      case _ =>
+        timer.sleep(500 millis) *> verifyServiceReady(serviceRun)
     }
 
   private def verifyServiceDown(serviceRun: ServiceRun)(implicit timer: Timer[IO]): IO[Unit] =
     serviceRun.serviceClient.ping flatMap {
       case ServiceUp => timer.sleep(500 millis) *> verifyServiceDown(serviceRun)
-      case _         => IO.unit
+      case _         => logger.info(s"Service ${serviceRun.name} stopped")
     }
 
   def restart(service: ServiceRun): Unit = cancelTokens.asScala.get(service) match {
     case None => throw new IllegalStateException(s"'${service.name}' service not found so cannot be restarted")
     case Some(cancelToken) => {
       for {
+        _ <- logger.info(s"Service ${service.name} stopping")
         _ <- service.service.stopSubProcesses.sequence
         _ <- cancelToken
         _ <- verifyServiceDown(service)
@@ -93,5 +101,9 @@ class ServicesRunner(
     }.unsafeRunSync()
   }
 
-  def stopAllServices(): Unit = cancelTokens.values().asScala.foreach(_.unsafeRunSync())
+  def stopAllServices(): Unit = cancelTokens.asScala.foreach {
+    case (service, cancelToken) =>
+      logger.info(s"Service ${service.name} stopping")
+      cancelToken.unsafeRunSync()
+  }
 }

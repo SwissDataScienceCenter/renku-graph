@@ -34,12 +34,13 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.interpreters.TryTriplesCurator
-import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult.{DeliveryFailure, DeliverySuccess, InvalidTriplesFailure, InvalidUpdatesFailure}
+import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TryUploader
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -49,6 +50,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.{Assertion, WordSpec}
 
+import scala.collection.JavaConverters._
 import scala.util.Try
 
 class CommitEventProcessorSpec extends WordSpec with MockFactory {
@@ -75,6 +77,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
       eventProcessor(eventBody) shouldBe context.unit
 
       logSummary(commits, uploaded = commitsAndTriples.size, failed = 0)
+
+      verifyMetricsCollected()
     }
 
     "succeed if a Commit Event can be deserialised, turned into triples and all stored in Jena successfully " +
@@ -331,6 +335,21 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     }
   }
 
+  "eventsProcessingTimes histogram" should {
+
+    "have 'events_processing_times' name" in {
+      IOCommitEventProcessor.eventsProcessingTimes.startTimer().observeDuration()
+
+      IOCommitEventProcessor.eventsProcessingTimes.collect().asScala.headOption.map(_.name) shouldBe Some(
+        "events_processing_times"
+      )
+    }
+
+    "be registered in the Metrics Registry" in {
+      MetricsRegistry.verifyInRegistry("events_processing_times") shouldBe true
+    }
+  }
+
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
@@ -420,6 +439,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
         s"Commit Event id: $id, project: ${project.id} ${project.path}, parentId: $parentId"
     }
   }
+
+  private def verifyMetricsCollected() =
+    IOCommitEventProcessor.eventsProcessingTimes
+      .collect()
+      .asScala
+      .flatMap(_.samples.asScala.map(_.name))
+      .exists(_ startsWith "events_processing_times") shouldBe true
 
   private def commits(commitId: CommitId, project: Project): Gen[Commit] =
     for {

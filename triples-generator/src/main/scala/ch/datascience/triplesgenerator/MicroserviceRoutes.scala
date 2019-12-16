@@ -18,17 +18,22 @@
 
 package ch.datascience.triplesgenerator
 
-import cats.effect.ConcurrentEffect
+import cats.effect.{Clock, ConcurrentEffect}
+import cats.implicits._
+import ch.datascience.metrics.RoutesMetrics
 import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
-private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect]() extends Http4sDsl[Interpretation] {
+private class MicroserviceRoutes[F[_]: ConcurrentEffect]()(implicit clock: Clock[F])
+    extends Http4sDsl[F]
+    with RoutesMetrics {
 
   import org.http4s.HttpRoutes
 
-  lazy val routes: HttpRoutes[Interpretation] = HttpRoutes
-    .of[Interpretation] {
+  lazy val routes: F[HttpRoutes[F]] = HttpRoutes
+    .of[F] {
       case GET -> Root / "ping" => Ok("pong")
     }
+    .meter flatMap `add GET Root / metrics`[F]
 }
