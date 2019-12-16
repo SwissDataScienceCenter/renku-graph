@@ -70,9 +70,10 @@ private class IOTriplesUploader(
       .putHeaders(`Content-Type`(`ld+json`))
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
-    case (Ok, _, _)                => IO.pure(DeliverySuccess)
-    case (BadRequest, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
-    case (other, _, response)      => singleLineBody(response).map(message => s"$other: $message").map(DeliveryFailure.apply)
+    case (Ok, _, _)                         => IO.pure(DeliverySuccess)
+    case (BadRequest, _, response)          => singleLineBody(response).map(InvalidTriplesFailure.apply)
+    case (InternalServerError, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
+    case (other, _, response)               => singleLineBody(response).map(message => s"$other: $message").map(DeliveryFailure.apply)
   }
 
   private def singleLineBody(response: Response[IO]): IO[String] =

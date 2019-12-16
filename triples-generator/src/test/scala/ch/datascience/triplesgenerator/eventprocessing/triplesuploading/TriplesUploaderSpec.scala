@@ -54,22 +54,23 @@ class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalService
       triplesUploader.upload(triples).unsafeRunSync() shouldBe DeliverySuccess
     }
 
-    s"return $InvalidTriplesFailure if remote client responds with a BAD_REQUEST 400" in new TestCase {
+    (BadRequest +: InternalServerError +: Nil) foreach { status =>
+      s"return $InvalidTriplesFailure if remote client responds with a $status" in new TestCase {
+        val errorMessage = nonEmptyStrings().generateOne
 
-      val errorMessage = nonEmptyStrings().generateOne
+        stubFor {
+          post(s"/${rdfStoreConfig.datasetName}/data")
+            .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+            .withHeader("content-type", equalTo("application/ld+json"))
+            .withRequestBody(equalToJson(triples.value.toString()))
+            .willReturn(badRequest().withBody(errorMessage))
+        }
 
-      stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/data")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
-          .withHeader("content-type", equalTo("application/ld+json"))
-          .withRequestBody(equalToJson(triples.value.toString()))
-          .willReturn(badRequest().withBody(errorMessage))
+        triplesUploader.upload(triples).unsafeRunSync() shouldBe InvalidTriplesFailure(errorMessage)
       }
-
-      triplesUploader.upload(triples).unsafeRunSync() shouldBe InvalidTriplesFailure(errorMessage)
     }
 
-    s"return $DeliveryFailure if remote responds with status different than OK or BAD_REQUEST" in new TestCase {
+    s"return $DeliveryFailure if remote responds with status different than $Ok, $BadRequest or $InternalServerError" in new TestCase {
 
       val errorMessage = nonEmptyStrings().generateOne
 
