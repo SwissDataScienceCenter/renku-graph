@@ -66,13 +66,13 @@ object EventLogMetrics {
 
   import scala.concurrent.duration._
 
-  private val interval: FiniteDuration = 30 seconds
+  private val interval: FiniteDuration = 15 seconds
 
   private[metrics] val statusesGauge: Gauge = MetricsRegistry.register {
     Gauge
       .build()
       .name("events_statuses_count")
-      .help("Total events by status.")
+      .help("Total Commit Events by status.")
       .labelNames("status")
       .register(_)
   }
@@ -81,7 +81,7 @@ object EventLogMetrics {
     Gauge
       .build()
       .name("events_count")
-      .help("Total events.")
+      .help("Total Commit Events.")
       .register(_)
   }
 }

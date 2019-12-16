@@ -22,6 +22,7 @@ import io.prometheus.client.hotspot._
 import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 import pureconfig.loadConfig
 
+import scala.collection.JavaConverters._
 import scala.language.higherKinds
 
 object MetricsRegistry {
@@ -50,4 +51,10 @@ object MetricsRegistry {
     registerTo(collectorRegistry)
 
   def clear(): Unit = collectorRegistry.clear()
+
+  def verifyInRegistry(name: String): Boolean =
+    collectorRegistry
+      .metricFamilySamples()
+      .asScala
+      .exists(_.name == name)
 }
