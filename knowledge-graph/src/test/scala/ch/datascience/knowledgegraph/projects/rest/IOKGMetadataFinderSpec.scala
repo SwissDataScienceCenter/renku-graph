@@ -32,7 +32,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IOProjectFinderSpec
+class IOKGMetadataFinderSpec
     extends WordSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
@@ -53,12 +53,12 @@ class IOProjectFinderSpec
           )
         )
 
-        projectFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project)
+        metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project)
       }
     }
 
     "return None if there's no project with the given path" in new TestCase {
-      projectFinder.findProject(projectPaths.generateOne).unsafeRunSync() shouldBe None
+      metadataFinder.findProject(projectPaths.generateOne).unsafeRunSync() shouldBe None
     }
 
     "throw an exception if there's more than on project with the given path" in new TestCase {
@@ -72,13 +72,13 @@ class IOProjectFinderSpec
       )
 
       intercept[Exception] {
-        projectFinder.findProject(projectPath).unsafeRunSync() shouldBe None
+        metadataFinder.findProject(projectPath).unsafeRunSync() shouldBe None
       }.getMessage shouldBe s"More than one project with $projectPath path"
     }
   }
 
   private trait TestCase {
     private val logger = TestLogger[IO]()
-    val projectFinder  = new IOProjectFinder(rdfStoreConfig, renkuBaseUrl, logger)
+    val metadataFinder = new IOKGMetadataFinder(rdfStoreConfig, renkuBaseUrl, logger)
   }
 }

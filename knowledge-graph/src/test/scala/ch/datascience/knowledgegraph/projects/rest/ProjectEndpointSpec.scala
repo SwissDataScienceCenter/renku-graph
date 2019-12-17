@@ -124,7 +124,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val projectFinder         = mock[ProjectFinder[IO]]
+    val projectFinder         = mock[IOProjectFinderStub]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
