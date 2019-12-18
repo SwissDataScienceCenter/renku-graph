@@ -16,27 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository.association
+package ch.datascience.tokenrepository.repository.init
 
-import cats.effect.{Bracket, IO}
+import cats.effect.IO
 import ch.datascience.db.DbTransactor
+import ch.datascience.tokenrepository.repository.association.ProjectPathFinder
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 import io.chrisdavenport.log4cats.Logger
 
-import scala.util.Try
+abstract class IODbInitializer(projectPathAdder: ProjectPathAdder[IO],
+                               transactor:       DbTransactor[IO, ProjectsTokensDB],
+                               logger:           Logger[IO])
+    extends DbInitializer(projectPathAdder, transactor, logger)
 
-private class TryAssociationPersister(
-    transactor: DbTransactor[Try, ProjectsTokensDB]
-)(implicit ME:  Bracket[Try, Throwable])
-    extends AssociationPersister[Try](transactor)
-
-private class IOTokenAssociator(
-    pathFinder:           ProjectPathFinder[IO],
-    accessTokenCrypto:    AccessTokenCrypto[IO],
-    associationPersister: AssociationPersister[IO],
-    tokenRemover:         TokenRemover[IO]
-) extends TokenAssociator[IO](pathFinder, accessTokenCrypto, associationPersister, tokenRemover)
-
-class IOAssociateTokenEndpoint(tokenAssociator: TokenAssociator[IO], logger: Logger[IO])
-    extends AssociateTokenEndpoint[IO](tokenAssociator, logger)
+private abstract class IOProjectPathAdder(transactor:        DbTransactor[IO, ProjectsTokensDB],
+                                          accessTokenCrypto: AccessTokenCrypto[IO],
+                                          pathFinder:        ProjectPathFinder[IO],
+                                          tokenRemover:      TokenRemover[IO],
+                                          logger:            Logger[IO])
+    extends ProjectPathAdder(transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)

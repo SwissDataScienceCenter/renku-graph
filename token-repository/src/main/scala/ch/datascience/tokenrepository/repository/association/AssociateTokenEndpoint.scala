@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository.association
 
 import cats.MonadError
-import cats.effect.{ContextShift, Effect, IO}
+import cats.effect.Effect
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
@@ -72,11 +72,17 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 }
 
 object IOAssociateTokenEndpoint {
+  import cats.effect.{ContextShift, IO, Timer}
+
+  import scala.concurrent.ExecutionContext
+
   def apply(
-      transactor:          DbTransactor[IO, ProjectsTokensDB],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[AssociateTokenEndpoint[IO]] =
+      transactor:              DbTransactor[IO, ProjectsTokensDB],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[AssociateTokenEndpoint[IO]] =
     for {
-      tokenAssociator <- IOTokenAssociator(transactor)
+      tokenAssociator <- IOTokenAssociator(transactor, logger)
     } yield new AssociateTokenEndpoint[IO](tokenAssociator, logger)
 }

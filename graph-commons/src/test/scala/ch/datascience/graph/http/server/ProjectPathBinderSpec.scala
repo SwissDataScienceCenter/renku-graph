@@ -20,12 +20,29 @@ package ch.datascience.graph.http.server
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 class ProjectPathBinderSpec extends WordSpec {
 
   import binders.ProjectPath._
+  import binders._
+
+  "unapply" should {
+
+    "convert valid project path as string to a ProjectPath" in {
+      val projectPath = projectPaths.generateOne
+
+      val Some(result) = ProjectPath.unapply(projectPath.value)
+
+      result shouldBe projectPath
+    }
+
+    "return None if string value cannot be converted to a Namespace" in {
+      Namespace.unapply(blankStrings().generateOne) shouldBe None
+    }
+  }
 
   "Namespace.unapply" should {
 

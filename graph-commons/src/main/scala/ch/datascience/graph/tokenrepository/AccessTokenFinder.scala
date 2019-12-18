@@ -59,3 +59,14 @@ class IOAccessTokenFinder(
     jsonOf[IO, AccessToken].map(Option.apply)
   }
 }
+
+object IOAccessTokenFinder {
+  def apply(
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[AccessTokenFinder[IO]] =
+    for {
+      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
+    } yield new IOAccessTokenFinder(tokenRepositoryUrl, logger)
+}

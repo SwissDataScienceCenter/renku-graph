@@ -25,7 +25,7 @@ import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
 import scala.language.higherKinds
 
-private class TokenRemover[Interpretation[_]](
+class TokenRemover[Interpretation[_]](
     transactor: DbTransactor[Interpretation, ProjectsTokensDB]
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
 

@@ -16,23 +16,6 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository.deletion
+package ch.datascience.tokenrepository.config
 
-import cats.effect._
-import ch.datascience.db.DbTransactor
-import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import io.chrisdavenport.log4cats.Logger
-
-import scala.util.Try
-
-class TryTokenRemover(
-    transactor: DbTransactor[Try, ProjectsTokensDB]
-)(implicit ME:  Bracket[Try, Throwable])
-    extends TokenRemover[Try](transactor)
-
-class IOTokenRemover(
-    transactor: DbTransactor[IO, ProjectsTokensDB]
-) extends TokenRemover[IO](transactor)
-
-class IODeleteTokenEndpoint(tokenRemover: TokenRemover[IO], logger: Logger[IO])
-    extends DeleteTokenEndpoint[IO](tokenRemover, logger)
+trait GitLab

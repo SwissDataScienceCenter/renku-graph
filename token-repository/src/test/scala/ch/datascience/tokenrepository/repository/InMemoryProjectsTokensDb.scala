@@ -19,10 +19,12 @@
 package ch.datascience.tokenrepository.repository
 
 import cats.effect.{ContextShift, IO}
+import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.db.TestDbConfig.newDbConfig
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
+import doobie.util.fragment.Fragment
 import doobie.util.transactor.Transactor
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -46,4 +48,29 @@ trait InMemoryProjectsTokensDb {
     query
       .transact(transactor.get)
       .unsafeRunSync()
+
+  protected def tableExists(): Boolean =
+    sql"""select exists (select * from projects_tokens);""".query.option
+      .transact(transactor.get)
+      .recover { case _ => None }
+      .unsafeRunSync()
+      .isDefined
+
+  protected def createTable(): Unit = execute {
+    sql"""
+         |CREATE TABLE projects_tokens(
+         | project_id int4 PRIMARY KEY,
+         | project_path VARCHAR NOT NULL,
+         | token VARCHAR NOT NULL
+         |);
+       """.stripMargin.update.run.map(_ => ())
+  }
+
+  protected def dropTable(): Unit = execute {
+    sql"DROP TABLE IF EXISTS projects_tokens".update.run.map(_ => ())
+  }
+
+  protected def verifyTrue(sql: Fragment): Unit = execute {
+    sql.update.run.map(_ => ())
+  }
 }
