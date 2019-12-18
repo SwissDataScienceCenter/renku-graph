@@ -56,6 +56,7 @@ class CommitEventProcessor[Interpretation[_]](
 )(implicit ME:                MonadError[Interpretation, Throwable])
     extends EventProcessor[Interpretation] {
 
+  import IOAccessTokenFinder._
   import UploadingResult._
   import accessTokenFinder._
   import commitEventsDeserialiser._

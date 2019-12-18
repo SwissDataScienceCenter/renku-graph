@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info, Warn}
@@ -46,6 +46,7 @@ import org.scalatest.WordSpec
 import scala.concurrent.ExecutionContext.global
 
 class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
+  import IOAccessTokenFinder._
 
   "loadMissedEvents" should {
 
@@ -143,8 +144,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
       latestEventsList.headOption.foreach { event =>
         (accessTokenFinder
-          .findAccessToken(_: ProjectId))
-          .expects(event.projectId)
+          .findAccessToken(_: ProjectId)(_: ProjectId => String))
+          .expects(event.projectId, projectIdToPath)
           .returning(context.raiseError(exception))
       }
 
@@ -303,8 +304,8 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
     def givenAccessToken(projectId: ProjectId, maybeAccessToken: Option[AccessToken]) =
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(projectId, projectIdToPath)
         .returning(context.pure(maybeAccessToken))
 
     def givenFindingProjectInfo(latestEvent: CommitEventId, maybeAccessToken: Option[AccessToken]) =

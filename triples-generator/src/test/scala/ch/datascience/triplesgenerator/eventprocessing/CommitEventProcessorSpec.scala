@@ -29,6 +29,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.tokenrepository.IOAccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
@@ -54,6 +55,7 @@ import scala.collection.JavaConverters._
 import scala.util.Try
 
 class CommitEventProcessorSpec extends WordSpec with MockFactory {
+  import IOAccessTokenFinder._
 
   "apply" should {
 
@@ -381,8 +383,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
     def givenFetchingAccessToken(forProjectId: ProjectId) =
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(forProjectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(forProjectId, projectIdToPath)
 
     def generateTriples(forCommits: NonEmptyList[Commit]): NonEmptyList[(Commit, JsonLDTriples)] =
       forCommits map (_ -> jsonLDTriples.generateOne)

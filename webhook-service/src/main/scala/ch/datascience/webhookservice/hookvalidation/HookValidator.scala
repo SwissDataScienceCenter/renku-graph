@@ -50,6 +50,7 @@ class HookValidator[Interpretation[_]](
 
   import HookValidator.HookValidationResult._
   import HookValidator._
+  import IOAccessTokenFinder._
   import ProjectVisibility._
   import Token._
   import accessTokenAssociator._
