@@ -24,7 +24,7 @@ import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.triples.{renkuBaseUrl, singleFileAndCommit, triples}
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -32,7 +32,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IOKGMetadataFinderSpec
+class IOKGProjectFinderSpec
     extends WordSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
@@ -41,7 +41,7 @@ class IOKGMetadataFinderSpec
   "findProject" should {
 
     "return details of the project with the given path" in new TestCase {
-      forAll { project: Project =>
+      forAll { project: KGProject =>
         loadToStore(
           triples(
             singleFileAndCommit(projectPaths.generateOne, commitId = commitIds.generateOne),
@@ -79,6 +79,6 @@ class IOKGMetadataFinderSpec
 
   private trait TestCase {
     private val logger = TestLogger[IO]()
-    val metadataFinder = new IOKGMetadataFinder(rdfStoreConfig, renkuBaseUrl, logger)
+    val metadataFinder = new IOKGProjectFinder(rdfStoreConfig, renkuBaseUrl, logger)
   }
 }

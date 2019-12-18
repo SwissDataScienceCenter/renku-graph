@@ -19,17 +19,51 @@
 package ch.datascience.knowledgegraph.projects.rest
 
 import cats.MonadError
+import cats.implicits._
+import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import IOAccessTokenFinder._
+import cats.data.OptionT
+import ch.datascience.knowledgegraph.config.GitLab
+import ch.datascience.knowledgegraph.projects.model._
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
+import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-class ProjectFinder[Interpretation[_]](kgMetadataFinder: KGMetadataFinder[Interpretation]) {
+class ProjectFinder[Interpretation[_]](
+    kgProjectFinder:     KGProjectFinder[Interpretation],
+    gitLabProjectFinder: GitLabProjectFinder[Interpretation],
+    accessTokenFinder:   AccessTokenFinder[Interpretation]
+)(implicit ME:           MonadError[Interpretation, Throwable]) {
 
-  def findProject(projectPath: ProjectPath): Interpretation[Option[Project]] =
-    kgMetadataFinder.findProject(projectPath)
+  import accessTokenFinder._
+  import gitLabProjectFinder.{findProject => findInGitLab}
+  import kgProjectFinder.{findProject => findInKG}
 
+  def findProject(path: ProjectPath): Interpretation[Option[Project]] =
+    for {
+      accessToken    <- OptionT(findAccessToken(path)) getOrElseF raiseError(s"No access token for $path")
+      gitLabProject  <- findInGitLab(path, Some(accessToken)) getOrElseF raiseError(s"No GitLab project for $path")
+      maybeKgProject <- findInKG(path)
+    } yield merge(path, maybeKgProject, gitLabProject)
+
+  private def raiseError[Out](message: String) = new Exception(message).raiseError[Interpretation, Out]
+
+  private def merge(path: ProjectPath, maybeKgProject: Option[KGProject], gitLabProject: GitLabProject) =
+    maybeKgProject map { kgProject =>
+      Project(
+        path = path,
+        name = kgProject.name,
+        created = Creation(
+          date    = kgProject.created.date,
+          creator = Creator(kgProject.created.creator.email, kgProject.created.creator.name)
+        ),
+        repoUrls = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http)
+      )
+    }
 }
 
 private object IOProjectFinder {
@@ -38,13 +72,16 @@ private object IOProjectFinder {
   import io.chrisdavenport.log4cats.Logger
 
   def apply(
-      logger:         Logger[IO],
-      config:         Config = ConfigFactory.load()
-  )(implicit ME:      MonadError[IO, Throwable],
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]): IO[ProjectFinder[IO]] =
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO],
+      config:          Config = ConfigFactory.load()
+  )(implicit ME:       MonadError[IO, Throwable],
+    executionContext:  ExecutionContext,
+    contextShift:      ContextShift[IO],
+    timer:             Timer[IO]): IO[ProjectFinder[IO]] =
     for {
-      metadataFinder <- IOKGMetadataFinder(logger = logger)
-    } yield new ProjectFinder[IO](metadataFinder)
+      kgProjectFinder     <- IOKGProjectFinder(logger = logger)
+      gitLabProjectFinder <- IOGitLabProjectFinder(gitLabThrottler, logger)
+      accessTokenFinder   <- IOAccessTokenFinder(logger)
+    } yield new ProjectFinder[IO](kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
 }

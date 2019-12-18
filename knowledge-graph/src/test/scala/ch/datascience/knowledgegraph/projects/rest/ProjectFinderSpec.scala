@@ -18,37 +18,173 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
+import cats.data.OptionT
 import cats.implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import org.scalatest.WordSpec
-import org.scalatest.Matchers._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.exceptions
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
+import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.knowledgegraph.projects.model._
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
+import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 class ProjectFinderSpec extends WordSpec with MockFactory {
 
   "findProject" should {
 
-    "find project metadata in the KG" in new TestCase {
-      val project = projects.generateOne.copy(path = path)
+    "merge the project metadata found in the KG and in GitLab" in new TestCase {
 
-      (kgMetadataFinder
+      val accessToken = accessTokens.generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .expects(path, projectPathToPath)
+        .returning(Some(accessToken).pure[Try])
+
+      val gitLabProject = gitLabProjects.generateOne
+      (gitLabProjectFinder
+        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .expects(path, Some(accessToken))
+        .returning(OptionT.some[Try](gitLabProject))
+
+      val kgProject = kgProjects.generateOne.copy(path = path)
+      (kgProjectFinder
         .findProject(_: ProjectPath))
         .expects(path)
-        .returning(Some(project).pure[Try])
+        .returning(Some(kgProject).pure[Try])
 
-      projectFinder.findProject(path) shouldBe Some(project).pure[Try]
+      projectFinder.findProject(path) shouldBe Some(projectFrom(kgProject, gitLabProject)).pure[Try]
+    }
+
+    "return None if there's no project for the path in the KG" in new TestCase {
+
+      val accessToken = accessTokens.generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .expects(path, projectPathToPath)
+        .returning(Some(accessToken).pure[Try])
+
+      val gitLabProject = gitLabProjects.generateOne
+      (gitLabProjectFinder
+        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .expects(path, Some(accessToken))
+        .returning(OptionT.some[Try](gitLabProject))
+
+      (kgProjectFinder
+        .findProject(_: ProjectPath))
+        .expects(path)
+        .returning(Option.empty[KGProject].pure[Try])
+
+      projectFinder.findProject(path) shouldBe Option.empty[Project].pure[Try]
+    }
+
+    "fail if no access token can be found for the given project path" in new TestCase {
+
+      (accessTokenFinder
+        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .expects(path, projectPathToPath)
+        .returning(Option.empty[AccessToken].pure[Try])
+
+      val Failure(exception) = projectFinder.findProject(path)
+
+      exception.getMessage shouldBe s"No access token for $path"
+    }
+
+    "fail if finding access token failed" in new TestCase {
+
+      val exception = exceptions.generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .expects(path, projectPathToPath)
+        .returning(exception.raiseError[Try, Option[AccessToken]])
+
+      projectFinder.findProject(path) shouldBe Failure(exception)
+    }
+
+    "fail if there was no project with the path in GitLab" in new TestCase {
+
+      val accessToken = accessTokens.generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .expects(path, projectPathToPath)
+        .returning(Some(accessToken).pure[Try])
+
+      (gitLabProjectFinder
+        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .expects(path, Some(accessToken))
+        .returning(OptionT.none[Try, GitLabProject])
+
+      val Failure(exception) = projectFinder.findProject(path)
+
+      exception.getMessage shouldBe s"No GitLab project for $path"
+    }
+
+    "fail if finding project in GitLab failed" in new TestCase {
+
+      val accessToken = accessTokens.generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .expects(path, projectPathToPath)
+        .returning(Some(accessToken).pure[Try])
+
+      val exception = exceptions.generateOne
+      (gitLabProjectFinder
+        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .expects(path, Some(accessToken))
+        .returning(OptionT.liftF(exception.raiseError[Try, GitLabProject]))
+
+      projectFinder.findProject(path) shouldBe Failure(exception)
+    }
+
+    "fail if finding project in the KG failed" in new TestCase {
+
+      val accessToken = accessTokens.generateOne
+      (accessTokenFinder
+        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .expects(path, projectPathToPath)
+        .returning(Some(accessToken).pure[Try])
+
+      val gitLabProject = gitLabProjects.generateOne
+      (gitLabProjectFinder
+        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .expects(path, Some(accessToken))
+        .returning(OptionT.some[Try](gitLabProject))
+
+      val exception = exceptions.generateOne
+      (kgProjectFinder
+        .findProject(_: ProjectPath))
+        .expects(path)
+        .returning(exception.raiseError[Try, Option[KGProject]])
+
+      projectFinder.findProject(path) shouldBe Failure(exception)
     }
   }
 
   private trait TestCase {
     val path = projectPaths.generateOne
 
-    val kgMetadataFinder = mock[KGMetadataFinder[Try]]
-    val projectFinder    = new ProjectFinder[Try](kgMetadataFinder)
+    val kgProjectFinder     = mock[KGProjectFinder[Try]]
+    val accessTokenFinder   = mock[AccessTokenFinder[Try]]
+    val gitLabProjectFinder = mock[GitLabProjectFinder[Try]]
+    val projectFinder       = new ProjectFinder[Try](kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
   }
+
+  private def projectFrom(kgProject: KGProject, gitLabProject: GitLabProject) = Project(
+    path = kgProject.path,
+    name = kgProject.name,
+    created = Creation(
+      date    = kgProject.created.date,
+      creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
+    ),
+    repoUrls = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http)
+  )
 }

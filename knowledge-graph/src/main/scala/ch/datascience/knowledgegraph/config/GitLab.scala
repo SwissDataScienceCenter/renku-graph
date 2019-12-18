@@ -16,12 +16,6 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.projects.rest
+package ch.datascience.knowledgegraph.config
 
-import cats.effect.IO
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-
-class IOProjectFinderStub(kgProjectFinder:     KGProjectFinder[IO],
-                          gitLabProjectFinder: GitLabProjectFinder[IO],
-                          accessTokenFinder:   AccessTokenFinder[IO])
-    extends ProjectFinder[IO](kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
+sealed trait GitLab
