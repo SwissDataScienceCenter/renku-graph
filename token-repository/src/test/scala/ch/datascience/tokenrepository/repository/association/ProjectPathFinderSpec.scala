@@ -25,7 +25,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -77,16 +76,14 @@ class ProjectPathFinderSpec extends WordSpec with MockFactory with ExternalServi
       pathFinder.findProjectPath(projectId, None).unsafeRunSync() shouldBe None
     }
 
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+    "return None if remote client responds with UNAUTHORIZED" in new TestCase {
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
           .willReturn(unauthorized())
       }
 
-      intercept[Exception] {
-        pathFinder.findProjectPath(projectId, None).unsafeRunSync()
-      } shouldBe UnauthorizedException
+      pathFinder.findProjectPath(projectId, None).unsafeRunSync() shouldBe None
     }
 
     "return a RuntimeException if remote client responds with status different than OK, NOT_FOUND or UNAUTHORIZED" in new TestCase {

@@ -48,7 +48,6 @@ private class IOProjectPathFinder(
 
   import cats.effect._
   import cats.implicits._
-  import ch.datascience.http.client.RestClientError.UnauthorizedException
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
   import org.http4s.Method.GET
@@ -65,7 +64,7 @@ private class IOProjectPathFinder(
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[ProjectPath]]] = {
     case (Ok, _, response)    => response.as[ProjectPath].map(Option.apply)
     case (NotFound, _, _)     => None.pure[IO]
-    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+    case (Unauthorized, _, _) => None.pure[IO]
   }
 
   private implicit lazy val projectPathDecoder: EntityDecoder[IO, ProjectPath] = {
