@@ -18,8 +18,10 @@
 
 package ch.datascience.webhookservice
 
-import cats.effect.ConcurrentEffect
+import cats.effect.{Clock, ConcurrentEffect}
+import cats.implicits._
 import ch.datascience.graph.http.server.binders.ProjectId
+import ch.datascience.metrics.RoutesMetrics
 import ch.datascience.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import ch.datascience.webhookservice.hookcreation.HookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint
@@ -32,7 +34,9 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     hookCreationEndpoint:     HookCreationEndpoint[F],
     hookValidationEndpoint:   HookValidationEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F]
-) extends Http4sDsl[F] {
+)(implicit clock:             Clock[F])
+    extends Http4sDsl[F]
+    with RoutesMetrics {
 
   import hookCreationEndpoint._
   import hookEventEndpoint._
@@ -41,12 +45,12 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import processingStatusEndpoint._
 
   // format: off
-  lazy val routes: HttpRoutes[F] = HttpRoutes.of[F] {
+  lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"                                                        => Ok("pong")
     case request @ POST -> Root / "webhooks" / "events"                                         => processPushEvent(request)
     case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks"                => createHook(projectId, request)
     case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" => validateHook(projectId, request)
     case           GET  -> Root / "projects" / ProjectId(projectId) / "events" / "status"       => fetchProcessingStatus(projectId)
-  }
+  }.meter flatMap `add GET Root / metrics`[F]
   // format: on
 }

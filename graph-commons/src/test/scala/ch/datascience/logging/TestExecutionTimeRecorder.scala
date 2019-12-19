@@ -49,7 +49,7 @@ class TestExecutionTimeRecorder[Interpretation[_]](
     threshold:    ElapsedTime,
     logger:       Logger[Interpretation]
 )(implicit clock: Clock[Interpretation], ME: MonadError[Interpretation, Throwable])
-    extends ExecutionTimeRecorder[Interpretation](threshold, logger) {
+    extends ExecutionTimeRecorder[Interpretation](threshold, logger, maybeHistogram = None) {
 
   val elapsedTime:            ElapsedTime = threshold
   lazy val executionTimeInfo: String      = s" in ${threshold}ms"

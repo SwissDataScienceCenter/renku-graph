@@ -18,8 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
-import java.nio.file.Paths
-
 import ammonite.ops.{Bytes, CommandResult, Path}
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.CommonGraphGenerators._
@@ -106,8 +104,4 @@ class RenkuSpec extends WordSpec {
     case None           => CommitWithoutParent(commitId, project)
     case Some(parentId) => CommitWithParent(commitId, parentId, project)
   }
-
-  private val paths: Gen[os.Path] = for {
-    path <- relativePaths()
-  } yield os.Path(Paths.get(s"/$path"))
 }

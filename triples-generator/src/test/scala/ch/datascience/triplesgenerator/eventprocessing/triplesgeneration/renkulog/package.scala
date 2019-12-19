@@ -16,24 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration
 
-import cats.effect.{Clock, ConcurrentEffect}
-import cats.implicits._
-import ch.datascience.metrics.RoutesMetrics
-import org.http4s.dsl.Http4sDsl
+import java.nio.file.Paths
 
-import scala.language.higherKinds
+import ch.datascience.generators.Generators.relativePaths
+import org.scalacheck.Gen
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect]()(implicit clock: Clock[F])
-    extends Http4sDsl[F]
-    with RoutesMetrics {
+package object renkulog {
 
-  import org.http4s.HttpRoutes
-
-  lazy val routes: F[HttpRoutes[F]] = HttpRoutes
-    .of[F] {
-      case GET -> Root / "ping" => Ok("pong")
-    }
-    .meter flatMap `add GET Root / metrics`[F]
+  val paths: Gen[os.Path] = for {
+    path <- relativePaths()
+  } yield os.Path(Paths.get(s"/$path"))
 }

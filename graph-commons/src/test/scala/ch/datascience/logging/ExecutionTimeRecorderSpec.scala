@@ -27,6 +27,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import com.typesafe.config.ConfigFactory
+import io.prometheus.client.Histogram
 import org.scalacheck.Gen
 import org.scalacheck.Gen.finiteDuration
 import org.scalamock.scalatest.MockFactory
@@ -78,6 +79,28 @@ class ExecutionTimeRecorderSpec extends WordSpec with MockFactory with ScalaChec
       executionTimeRecorder.measureExecutionTime[String] {
         block()
       } shouldBe context.raiseError(exception)
+    }
+
+    "made the given histogram to collect process' execution time" in new TestCase {
+      val histogram                      = Histogram.build("metric", "help").create()
+      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger, Some(histogram))
+
+      (clock
+        .monotonic(_: TimeUnit))
+        .expects(MILLISECONDS)
+        .returning(context.pure(positiveLongs().generateOne.value))
+
+      val blockOut = nonEmptyStrings().generateOne
+      block.expects().returning(context.pure(blockOut))
+
+      val blockExecutionTime = positiveInts(max = 100).generateOne.value
+      executionTimeRecorder.measureExecutionTime[String] {
+        Thread sleep blockExecutionTime
+        block()
+      }
+
+      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption.map(_.value)
+      sample should be >= blockExecutionTime.toDouble / 1000
     }
   }
 
@@ -190,14 +213,15 @@ class ExecutionTimeRecorderSpec extends WordSpec with MockFactory with ScalaChec
     }
   }
 
+  private val context = MonadError[Try, Throwable]
+
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
 
     val block = mockFunction[Try[String]]
 
     val loggingThreshold = ElapsedTime(1000)
     val logger           = TestLogger[Try]()
     implicit val clock: Clock[Try] = mock[Clock[Try]]
-    val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger)
+    val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger, maybeHistogram = None)
   }
 }

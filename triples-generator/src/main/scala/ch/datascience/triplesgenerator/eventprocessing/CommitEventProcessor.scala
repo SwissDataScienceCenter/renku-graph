@@ -36,6 +36,7 @@ import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.Triples
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
 import io.chrisdavenport.log4cats.Logger
+import io.prometheus.client.Histogram
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -201,6 +202,17 @@ class CommitEventProcessor[Interpretation[_]](
 
 object IOCommitEventProcessor {
 
+  import ch.datascience.metrics.MetricsRegistry
+
+  private[triplesgenerator] lazy val eventsProcessingTimes: Histogram = MetricsRegistry.register {
+    Histogram
+      .build()
+      .name("events_processing_times")
+      .help("Commit Events processing times")
+      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000)
+      .register(_)
+  }
+
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       triplesGenerator:    TriplesGenerator[IO]
@@ -208,9 +220,10 @@ object IOCommitEventProcessor {
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      uploader              <- IOUploader(ApplicationLogger)
-      tokenRepositoryUrl    <- TokenRepositoryUrl[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+      uploader           <- IOUploader(ApplicationLogger)
+      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
+                                                         maybeHistogram = Some(eventsProcessingTimes))
     } yield new CommitEventProcessor[IO](
       new CommitEventsDeserialiser[IO](),
       new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),

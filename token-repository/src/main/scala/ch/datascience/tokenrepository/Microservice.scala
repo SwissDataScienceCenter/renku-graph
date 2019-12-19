@@ -46,14 +46,12 @@ object Microservice extends IOMicroservice {
         sentryInitializer      <- SentryInitializer[IO]
         fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger)
         associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
-        httpServer = new HttpServer[IO](
-          serverPort = 9003,
-          serviceRoutes = new MicroserviceRoutes[IO](
-            fetchTokenEndpoint,
-            associateTokenEndpoint,
-            new IODeleteTokenEndpoint(transactor, ApplicationLogger)
-          ).routes
-        )
+        routes <- new MicroserviceRoutes[IO](
+                   fetchTokenEndpoint,
+                   associateTokenEndpoint,
+                   new IODeleteTokenEndpoint(transactor, ApplicationLogger)
+                 ).routes
+        httpServer = new HttpServer[IO](serverPort = 9003, routes)
 
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,
