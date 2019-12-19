@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.data._
@@ -33,6 +34,7 @@ import ch.datascience.graph.model.datasets.{Description, Identifier, Name}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Name => UserName}
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
@@ -56,6 +58,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   import DatasetsResources._
 
   feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
+
+    implicit val accessToken: AccessToken = accessTokens.generateOne
 
     val project          = projectsGen.generateOne
     val dataset1CommitId = commitIds.generateOne
@@ -168,6 +172,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
     scenario("As a user I would like to be able to search for datasets by some free-text search") {
 
+      implicit val accessToken: AccessToken = accessTokens.generateOne
+
       val text             = nonBlankStrings(minLength = 10).generateOne
       val dataset1Projects = nonEmptyList(projectsGen).generateOne.toList
       val dataset1 = datasets.generateOne.copy(
@@ -230,7 +236,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
     }
 
-    def pushToStore(dataset: Dataset, projects: List[Project]): Unit =
+    def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit =
       projects foreach { project =>
         val commitId = commitIds.generateOne
         `data in the RDF store`(project.toGitLabProject(),

@@ -18,9 +18,8 @@
 
 package ch.datascience.graph.acceptancetests.flows
 
+import AccessTokenPresence._
 import ch.datascience.dbeventlog.EventStatus.New
-import ch.datascience.generators.CommonGraphGenerators.accessTokens
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.db.EventLog
@@ -32,10 +31,10 @@ import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.graph.model.users.Email
+import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.triples.{singleFileAndCommit, triples}
 import ch.datascience.webhookservice.model.HookToken
-import io.circe.syntax._
 import org.http4s.Status._
 import org.scalatest.Assertion
 import org.scalatest.Matchers._
@@ -43,23 +42,25 @@ import org.scalatest.concurrent.Eventually
 
 object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
 
-  def `data in the RDF store`(project:       Project,
-                              commitId:      CommitId,
-                              schemaVersion: SchemaVersion = currentSchemaVersion): Assertion =
+  def `data in the RDF store`(
+      project:            Project,
+      commitId:           CommitId,
+      schemaVersion:      SchemaVersion = currentSchemaVersion
+  )(implicit accessToken: AccessToken): Assertion =
     `data in the RDF store`(
       project,
       commitId,
       triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion))
     )
 
-  def `data in the RDF store`(project: Project, commitId: CommitId, triples: JsonLDTriples): Assertion = {
+  def `data in the RDF store`(
+      project:            Project,
+      commitId:           CommitId,
+      triples:            JsonLDTriples
+  )(implicit accessToken: AccessToken): Assertion = {
     val projectId = project.id
 
-    `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(project)
-
-    tokenRepositoryClient
-      .PUT(s"projects/$projectId/tokens", accessTokens.generateOne.asJson, None)
-      .status shouldBe NoContent
+    givenAccessTokenPresentFor(project)
 
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 

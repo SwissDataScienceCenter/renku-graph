@@ -29,6 +29,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project.ProjectVisibility.Public
 import eu.timepit.refined.api.Refined
@@ -55,6 +56,7 @@ class EventsProcessingStatusSpec
     scenario("As a user I would like to see progress of events processing for my project") {
 
       val projectId = projectIds.generateOne
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")
@@ -91,16 +93,19 @@ class EventsProcessingStatusSpec
     }
   }
 
-  private def givenHookValidationToHookExists(projectId: ProjectId, projectPath: ProjectPath): Unit = {
+  private def givenHookValidationToHookExists(
+      projectId:          ProjectId,
+      projectPath:        ProjectPath
+  )(implicit accessToken: AccessToken): Unit = {
     `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(projectId, projectPath)
     tokenRepositoryClient
-      .PUT(s"projects/$projectId/tokens", accessTokens.generateOne.toJson, maybeAccessToken = None)
+      .PUT(s"projects/$projectId/tokens", accessToken.toJson, maybeAccessToken = None)
       .status shouldBe NoContent
     `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
     `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
   }
 
-  private def sendEventsForProcessing(projectId: ProjectId) =
+  private def sendEventsForProcessing(projectId: ProjectId)(implicit accessToken: AccessToken) =
     nonEmptyList(commitIds, minElements = numberOfEvents, maxElements = numberOfEvents).generateOne
       .map { commitId =>
         `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)

@@ -19,6 +19,7 @@
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
 import cats.implicits._
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
@@ -29,6 +30,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.triples._
@@ -44,6 +46,7 @@ import sangria.macros._
 
 class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
+  private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project          = projects.generateOne.copy(path = ProjectPath("namespace/datasets-project"))
   private val projectName      = projectNames.generateOne
   private val dataset1Creation = datasetInProjectCreations.generateOne

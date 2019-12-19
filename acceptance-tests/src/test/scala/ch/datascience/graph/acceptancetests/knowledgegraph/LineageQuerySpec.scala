@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
@@ -27,6 +28,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.EventsGenerators.projects
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.triples._
 import ch.datascience.rdfstore.triples.multiFileAndCommit.ResourceName
 import io.circe.Json
@@ -39,6 +41,7 @@ import sangria.macros._
 
 class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
+  private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project                = projects.generateOne.copy(path = ProjectPath("namespace/lineage-project"))
   private val commitId               = CommitId("0000001")
   private val multiFileAndCommitData = multiFileAndCommit.MultiFileAndCommitData()

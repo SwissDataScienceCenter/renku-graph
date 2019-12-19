@@ -19,13 +19,15 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.dbeventlog.EventStatus.New
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
+import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
-import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
+import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.literal._
 import org.http4s.Status._
@@ -44,11 +46,16 @@ class PushEventsConsumptionSpec
 
     scenario("Push Event not being processed yet gets translated into Commit Events in the Event Log") {
 
-      val projectId = projectIds.generateOne
+      implicit val accessToken: AccessToken = accessTokens.generateOne
+      val project   = projects.generateOne
+      val projectId = project.id
       val commitId  = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
+
+      And("access token is present")
+      givenAccessTokenPresentFor(project)
 
       When("user does POST webhook-service/webhooks/events happens")
       val payload  = json"""
@@ -56,7 +63,7 @@ class PushEventsConsumptionSpec
           "after": ${commitId.value},
           "project": {
             "id":                  ${projectId.value},
-            "path_with_namespace": ${projectPaths.generateOne.value}
+            "path_with_namespace": ${project.path.value}
           }
         }"""
       val response = webhookServiceClient.POST("webhooks/events", HookToken(projectId), payload)
