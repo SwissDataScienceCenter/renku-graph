@@ -38,8 +38,9 @@ import doobie.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatest.concurrent.Eventually
 
-class ProjectPathAdderSpec extends WordSpec with InMemoryProjectsTokensDbSpec with MockFactory {
+class ProjectPathAdderSpec extends WordSpec with InMemoryProjectsTokensDbSpec with MockFactory with Eventually {
 
   "run" should {
 
@@ -78,8 +79,10 @@ class ProjectPathAdderSpec extends WordSpec with InMemoryProjectsTokensDbSpec wi
 
       projectPathAdder.run.unsafeRunSync() shouldBe ((): Unit)
 
-      findToken(project1Path) shouldBe Some(project1TokenEncrypted.value)
-      findToken(project2Path) shouldBe Some(project2TokenEncrypted.value)
+      eventually {
+        findToken(project1Path) shouldBe Some(project1TokenEncrypted.value)
+        findToken(project2Path) shouldBe Some(project2TokenEncrypted.value)
+      }
 
       verifyTrue(sql"DROP INDEX idx_project_path;")
 
@@ -108,9 +111,13 @@ class ProjectPathAdderSpec extends WordSpec with InMemoryProjectsTokensDbSpec wi
 
       projectPathAdder.run.unsafeRunSync() shouldBe ((): Unit)
 
-      findToken(project2Path) shouldBe Some(project2TokenEncrypted.value)
+      eventually {
+        findToken(project2Path) shouldBe Some(project2TokenEncrypted.value)
+      }
 
-      verifyTrue(sql"DROP INDEX idx_project_path;")
+      eventually {
+        verifyTrue(sql"DROP INDEX idx_project_path;")
+      }
 
       logger.loggedOnly(Info("'project_path' column added"))
     }
@@ -121,7 +128,7 @@ class ProjectPathAdderSpec extends WordSpec with InMemoryProjectsTokensDbSpec wi
     val accessTokenCrypto = mock[IOAccessTokenCrypto]
     val pathFinder        = mock[ProjectPathFinder[IO]]
     val tokenRemover      = new TokenRemover[IO](transactor)
-    val projectPathAdder  = new ProjectPathAdder[IO](transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
+    val projectPathAdder  = new IOProjectPathAdder(transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
 
     def assumePathExistsInGitLab(projectId:        ProjectId,
                                  maybeProjectPath: Option[ProjectPath],

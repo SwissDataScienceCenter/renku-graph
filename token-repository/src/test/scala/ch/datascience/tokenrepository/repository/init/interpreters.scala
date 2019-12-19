@@ -20,19 +20,10 @@ package ch.datascience.tokenrepository.repository.init
 
 import cats.effect.IO
 import ch.datascience.db.DbTransactor
-import ch.datascience.tokenrepository.repository.association.ProjectPathFinder
-import ch.datascience.tokenrepository.repository.deletion.TokenRemover
-import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
+import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 
 abstract class IODbInitializer(projectPathAdder: ProjectPathAdder[IO],
                                transactor:       DbTransactor[IO, ProjectsTokensDB],
                                logger:           Logger[IO])
     extends DbInitializer(projectPathAdder, transactor, logger)
-
-private abstract class IOProjectPathAdder(transactor:        DbTransactor[IO, ProjectsTokensDB],
-                                          accessTokenCrypto: AccessTokenCrypto[IO],
-                                          pathFinder:        ProjectPathFinder[IO],
-                                          tokenRemover:      TokenRemover[IO],
-                                          logger:            Logger[IO])
-    extends ProjectPathAdder(transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)

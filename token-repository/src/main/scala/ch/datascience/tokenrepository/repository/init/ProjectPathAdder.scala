@@ -18,7 +18,7 @@
 
 package ch.datascience.tokenrepository.repository.init
 
-import cats.effect.Bracket
+import cats.effect._
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
@@ -34,24 +34,29 @@ import io.chrisdavenport.log4cats.Logger
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private class ProjectPathAdder[Interpretation[_]](
-    transactor:        DbTransactor[Interpretation, ProjectsTokensDB],
-    accessTokenCrypto: AccessTokenCrypto[Interpretation],
-    pathFinder:        ProjectPathFinder[Interpretation],
-    tokenRemover:      TokenRemover[Interpretation],
-    logger:            Logger[Interpretation]
-)(implicit ME:         Bracket[Interpretation, Throwable]) {
+private trait ProjectPathAdder[Interpretation[_]] {
+  def run: Interpretation[Unit]
+}
+
+private class IOProjectPathAdder(
+    transactor:        DbTransactor[IO, ProjectsTokensDB],
+    accessTokenCrypto: AccessTokenCrypto[IO],
+    pathFinder:        ProjectPathFinder[IO],
+    tokenRemover:      TokenRemover[IO],
+    logger:            Logger[IO]
+)(implicit ME:         Bracket[IO, Throwable], contextShift: ContextShift[IO])
+    extends ProjectPathAdder[IO] {
 
   import accessTokenCrypto._
   import pathFinder._
 
-  def run: Interpretation[Unit] =
+  def run: IO[Unit] =
     checkColumnExists flatMap {
       case true  => logger.info("'project_path' column exists")
       case false => addColumn()
     }
 
-  private def checkColumnExists: Interpretation[Boolean] =
+  private def checkColumnExists: IO[Boolean] =
     sql"select project_path from projects_tokens limit 1"
       .query[String]
       .option
@@ -62,14 +67,19 @@ private class ProjectPathAdder[Interpretation[_]](
   private def addColumn() = {
     for {
       _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS project_path VARCHAR", transactor)
+      _ <- addMissingPaths().start
+    } yield ()
+  } recoverWith logging
+
+  private def addMissingPaths(): IO[Unit] =
+    for {
       _ <- addPathIfMissing()
       _ <- execute(sql"ALTER TABLE projects_tokens ALTER COLUMN project_path SET NOT NULL", transactor)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON projects_tokens(project_path)", transactor)
       _ <- logger.info("'project_path' column added")
     } yield ()
-  } recoverWith logging
 
-  private def addPathIfMissing(): Interpretation[Unit] =
+  private def addPathIfMissing(): IO[Unit] =
     findEntryWithoutPath flatMap {
       case None                              => ME.unit
       case Some((projectId, encryptedToken)) => addPathOrRemoveRow(projectId, encryptedToken)
@@ -82,7 +92,7 @@ private class ProjectPathAdder[Interpretation[_]](
       .transact(transactor.get)
       .flatMap {
         case None =>
-          Option.empty[(ProjectId, EncryptedAccessToken)].pure[Interpretation]
+          Option.empty[(ProjectId, EncryptedAccessToken)].pure[IO]
         case Some((id, token)) =>
           ME.fromEither((ProjectId.from(id), EncryptedAccessToken.from(token)).mapN {
             case (projectId, encryptedToken) => Option(projectId -> encryptedToken)
@@ -102,23 +112,23 @@ private class ProjectPathAdder[Interpretation[_]](
       addPathIfMissing()
   }
 
-  private def addOrRemove(id: ProjectId, maybePath: Option[ProjectPath]): Interpretation[Unit] =
+  private def addOrRemove(id: ProjectId, maybePath: Option[ProjectPath]): IO[Unit] =
     maybePath match {
       case Some(path) => addPath(id, path)
       case None       => tokenRemover.delete(id)
     }
 
-  private def addPath(id: ProjectId, path: ProjectPath): Interpretation[Unit] =
+  private def addPath(id: ProjectId, path: ProjectPath): IO[Unit] =
     sql"update projects_tokens set project_path = ${path.value} where project_id = ${id.value}".update.run
       .transact(transactor.get)
       .map(_ => ())
 
-  private def execute(sql: Fragment, transactor: DbTransactor[Interpretation, ProjectsTokensDB]): Interpretation[Unit] =
+  private def execute(sql: Fragment, transactor: DbTransactor[IO, ProjectsTokensDB]): IO[Unit] =
     sql.update.run
       .transact(transactor.get)
       .map(_ => ())
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
+  private lazy val logging: PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
       logger.error(exception)("'project_path' column adding failure")
       ME.raiseError(exception)
@@ -141,5 +151,5 @@ private object IOProjectPathAdder {
       accessTokenCrypto <- AccessTokenCrypto[IO]()
       pathFinder        <- IOProjectPathFinder(logger)
       tokenRemover = new TokenRemover[IO](transactor)
-    } yield new ProjectPathAdder[IO](transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
+    } yield new IOProjectPathAdder(transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
 }
