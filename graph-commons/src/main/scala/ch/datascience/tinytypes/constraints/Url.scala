@@ -52,7 +52,9 @@ trait UrlOps[T <: StringTinyType] {
           UrlWithQueryParam(
             apply(
               if (url.toString contains s"$key=")
-                url.toString.replaceAll(s"($key=[\\w\\d%\\+]*)", s"$key=${convert(value)}")
+                url.toString
+                  .replaceAll(s"(\\?$key=[\\w\\d%\\+]*)", s"?$key=${convert(value)}")
+                  .replaceAll(s"(&$key=[\\w\\d%\\+]*)", s"&$key=${convert(value)}")
               else if (url.toString contains "?")
                 s"$url&$key=${convert(value)}"
               else
@@ -81,7 +83,9 @@ trait UrlOps[T <: StringTinyType] {
       UrlWithQueryParam {
         apply {
           if (url.toString contains s"$key=")
-            url.toString.replaceAll(s"($key=[\\w\\d%\\+]*)", s"$key=${convert(value)}")
+            url.toString
+              .replaceAll(s"(\\?$key=[\\w\\d%\\+]*)", s"?$key=${convert(value)}")
+              .replaceAll(s"(&$key=[\\w\\d%\\+]*)", s"&$key=${convert(value)}")
           else
             s"$url&$key=${convert(value)}"
         }

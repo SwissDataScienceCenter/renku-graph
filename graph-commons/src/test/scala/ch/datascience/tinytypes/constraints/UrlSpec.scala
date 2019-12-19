@@ -86,10 +86,19 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
     "replace the value of the parameter if it already exists as the last one" in {
       val url = (httpUrls map UrlType.apply).generateOne
 
-      val newUrl: UrlType = url ? ("param" -> "value a")
-      newUrl.toString shouldBe s"$url?param=value+a"
+      val newUrl: UrlType = url ? ("param1" -> "value a") & ("param2" -> "value C")
+      newUrl.toString shouldBe s"$url?param1=value+a&param2=value+C"
 
-      (newUrl ? ("param" -> "value b")).toString shouldBe s"$url?param=value+b"
+      (newUrl ? ("param1" -> "value b")).toString shouldBe s"$url?param1=value+b&param2=value+C"
+    }
+
+    "replace the value of the correct parameter - case with similar param names" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+
+      val newUrl: UrlType = url ? ("page" -> "1") & ("per_page" -> "3")
+      newUrl.toString shouldBe s"$url?page=1&per_page=3"
+
+      (newUrl ? ("page" -> "2")).toString shouldBe s"$url?page=2&per_page=3"
     }
 
     "replace the value of the parameter if it already exists somewhere in the middle" in {
@@ -98,7 +107,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       val newUrl: UrlType = url ? ("param1" -> "value 1") & ("param2" -> "value 2")
       newUrl.toString shouldBe s"$url?param1=value+1&param2=value+2"
 
-      (newUrl ? ("param1" -> "value=3")).toString shouldBe s"$url?param1=value%3D3&param2=value+2"
+      (newUrl ? ("param2" -> "value=3")).toString shouldBe s"$url?param1=value+1&param2=value%3D3"
     }
 
     "add an additional parameter if there's already at least one in the url" in {
@@ -136,10 +145,19 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
     "replace the value of the parameter if it already exists as the last one" in {
       val url = (httpUrls map UrlType.apply).generateOne
 
-      val newUrl = url ? ("param" -> "value a")
-      newUrl.toString shouldBe s"$url?param=value+a"
+      val newUrl = url ? ("param1" -> "value 1") & ("param2" -> "value 2")
+      newUrl.toString shouldBe s"$url?param1=value+1&param2=value+2"
 
-      (newUrl & ("param" -> "value b")).toString shouldBe s"$url?param=value+b"
+      (newUrl & ("param1" -> "value b")).toString shouldBe s"$url?param1=value+b&param2=value+2"
+    }
+
+    "replace the value of the correct parameter - case with similar param names" in {
+      val url = (httpUrls map UrlType.apply).generateOne
+
+      val newUrl = url ? ("page" -> "1") & ("per_page" -> "3")
+      newUrl.toString shouldBe s"$url?page=1&per_page=3"
+
+      (newUrl & ("page" -> "2")).toString shouldBe s"$url?page=2&per_page=3"
     }
 
     "replace the value of the parameter if it already exists somewhere in the middle" in {
@@ -148,7 +166,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       val newUrl = url ? ("param1" -> "value 1") & ("param2" -> "value 2")
       newUrl.toString shouldBe s"$url?param1=value+1&param2=value+2"
 
-      (newUrl & ("param1" -> "value=3")).toString shouldBe s"$url?param1=value%3D3&param2=value+2"
+      (newUrl & ("param2" -> "value=3")).toString shouldBe s"$url?param1=value+1&param2=value%3D3"
     }
   }
 }
