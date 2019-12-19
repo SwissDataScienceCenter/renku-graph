@@ -26,7 +26,9 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project.ProjectVisibility.Public
 import eu.timepit.refined.api.Refined
@@ -59,7 +61,7 @@ class EventsProcessingStatusSpec
       webhookServiceClient.GET(s"projects/$projectId/events/status").status shouldBe NotFound
 
       When("there is a webhook but no events in the Event Log")
-      givenHookValidationToHookExists(projectId)
+      givenHookValidationToHookExists(projectId, projectPaths.generateOne)
 
       Then("the status endpoint should return OK with done = total = 0")
       val noEventsResponse = webhookServiceClient.GET(s"projects/$projectId/events/status")
@@ -89,7 +91,8 @@ class EventsProcessingStatusSpec
     }
   }
 
-  private def givenHookValidationToHookExists(projectId: ProjectId): Unit = {
+  private def givenHookValidationToHookExists(projectId: ProjectId, projectPath: ProjectPath): Unit = {
+    `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(projectId, projectPath)
     tokenRepositoryClient
       .PUT(s"projects/$projectId/tokens", accessTokens.generateOne.toJson, maybeAccessToken = None)
       .status shouldBe NoContent

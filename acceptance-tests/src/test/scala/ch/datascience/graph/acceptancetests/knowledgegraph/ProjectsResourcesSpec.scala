@@ -22,6 +22,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
 import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResources.briefJson
+import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
@@ -75,6 +76,9 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
       `triples updates run`(Set(project.created.creator.email) + project.created.creator.email)
 
+      And("the project exists in GitLab")
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}"
 
@@ -107,6 +111,10 @@ object ProjectsResources {
           "name": ${project.created.creator.name.toString},
           "email": ${project.created.creator.email.toString}
         }
+      },
+      "url": {
+        "ssh": ${project.repoUrls.ssh.toString},
+        "http": ${project.repoUrls.http.toString}
       }
     }""" deepMerge {
     _links(

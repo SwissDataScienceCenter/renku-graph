@@ -23,7 +23,10 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events.{CommitId, Project, ProjectId}
+import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.http.client.UrlEncoder.urlEncode
+import ch.datascience.knowledgegraph.projects.model.{Project => ProjectMetadata}
 import ch.datascience.webhookservice.project.ProjectVisibility
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
@@ -106,6 +109,32 @@ object GitLab {
             "parent_ids":      []
           }                         
         """.noSpaces))
+    }
+    ()
+  }
+
+  def `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(project: Project): Unit =
+    `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(project.id, project.path)
+
+  def `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(projectId:   ProjectId,
+                                                                        projectPath: ProjectPath): Unit = {
+    stubFor {
+      get(s"/api/v4/projects/$projectId")
+        .willReturn(okJson(json"""{
+          "id":                  ${projectId.value},
+          "path_with_namespace": ${projectPath.value}
+        }""".noSpaces))
+    }
+    ()
+  }
+
+  def `GET <gitlab>/api/v4/projects/:path returning OK with`(project: ProjectMetadata): Unit = {
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(project.path.value)}")
+        .willReturn(okJson(json"""{
+          "ssh_url_to_repo":  ${project.repoUrls.ssh.value},
+          "http_url_to_repo": ${project.repoUrls.http.value}
+        }""".noSpaces))
     }
     ()
   }

@@ -22,6 +22,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
+import ch.datascience.graph.acceptancetests.stubs.GitLab.`GET <gitlab>/api/v4/projects/:path returning OK with`
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
@@ -119,6 +120,9 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           .flatMap(_.published.creators.flatMap(_.maybeEmail))
           .toSet + dataset1Creation.agent.email + dataset2Creation.agent.email + project.created.creator.email
       )
+
+      And("the project exists in GitLab")
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"

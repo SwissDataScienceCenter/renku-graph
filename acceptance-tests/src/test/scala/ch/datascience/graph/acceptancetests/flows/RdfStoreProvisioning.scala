@@ -19,6 +19,8 @@
 package ch.datascience.graph.acceptancetests.flows
 
 import ch.datascience.dbeventlog.EventStatus.New
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.db.EventLog
@@ -33,6 +35,7 @@ import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.triples.{singleFileAndCommit, triples}
 import ch.datascience.webhookservice.model.HookToken
+import io.circe.syntax._
 import org.http4s.Status._
 import org.scalatest.Assertion
 import org.scalatest.Matchers._
@@ -51,6 +54,12 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
 
   def `data in the RDF store`(project: Project, commitId: CommitId, triples: JsonLDTriples): Assertion = {
     val projectId = project.id
+
+    `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(project)
+
+    tokenRepositoryClient
+      .PUT(s"projects/$projectId/tokens", accessTokens.generateOne.asJson, None)
+      .status shouldBe NoContent
 
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
