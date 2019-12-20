@@ -84,9 +84,10 @@ class ProjectPathAdderSpec extends WordSpec with InMemoryProjectsTokensDbSpec wi
         findToken(project2Path) shouldBe Some(project2TokenEncrypted.value)
       }
 
-      verifyTrue(sql"DROP INDEX idx_project_path;")
-
-      logger.loggedOnly(Info("'project_path' column added"))
+      eventually {
+        verifyTrue(sql"DROP INDEX idx_project_path;")
+        logger.loggedOnly(Info("'project_path' column added"))
+      }
     }
 
     "add the 'project_path' column if does not exist and remove entries for non-existing projects in GitLab" in new TestCase {
