@@ -60,11 +60,20 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                            eventDate:     CommittedDate,
                            eventBody:     EventBody,
                            createdDate:   CreatedDate = CreatedDate(Instant.now),
-                           projectPath:   ProjectPath = projectPaths.generateOne): Unit = execute {
-    sql"""insert into 
-         |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
-         |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
+                           projectPath:   ProjectPath = projectPaths.generateOne,
+                           maybeMessage:  Option[EventMessage] = None): Unit = execute {
+    maybeMessage match {
+      case None =>
+        sql"""|insert into
+              |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body)
+              |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
       """.stripMargin.update.run.map(_ => ())
+      case Some(message) =>
+        sql"""|insert into
+              |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body, message)
+              |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody, $message)
+      """.stripMargin.update.run.map(_ => ())
+    }
   }
 
   // format: off
@@ -72,11 +81,20 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                            orderBy: Fragment = fr"created_date asc"): List[(CommitEventId, ExecutionDate)] =
     execute {
       (fr"""select event_id, project_id, execution_date
-            from event_log 
+            from event_log
             where status = $status
             order by """ ++ orderBy)
         .query[(CommitEventId, ExecutionDate)]
         .to[List]
     }
   // format: on
+
+  protected def findEventMessage(eventId: CommitEventId): Option[EventMessage] =
+    execute {
+      sql"""select message
+            from event_log 
+            where event_id = ${eventId.id} and project_id = ${eventId.projectId}"""
+        .query[Option[EventMessage]]
+        .unique
+    }
 }
