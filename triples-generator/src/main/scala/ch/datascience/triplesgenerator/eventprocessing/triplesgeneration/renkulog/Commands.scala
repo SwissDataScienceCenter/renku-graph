@@ -74,26 +74,58 @@ private object Commands {
       newDir
     }
 
-    def delete(repositoryDirectory: Path): IO[Unit] = IO {
+    def deleteDirectory(repositoryDirectory: Path): IO[Unit] = IO {
       ops.rm ! repositoryDirectory
     }
   }
 
-  class Git {
-
-    def clone(
-        repositoryUrl:        ServiceUrl,
-        destinationDirectory: Path,
-        workDirectory:        Path
-    ): IO[CommandResult] = IO {
-      %%('git, 'clone, repositoryUrl.toString, destinationDirectory.toString)(workDirectory)
-    }
+  class Git(
+      doClone: (ServiceUrl, Path, Path) => CommandResult = (url, destinationDir, workDir) =>
+        %%('git, 'clone, url.toString, destinationDir.toString)(workDir)
+  ) {
+    import cats.data.EitherT
+    import cats.data.EitherT._
+    import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
     def checkout(
         commitId:            CommitId,
         repositoryDirectory: Path
     ): IO[CommandResult] = IO {
       %%('git, 'checkout, commitId.value)(repositoryDirectory)
+    }
+
+    def clone(
+        repositoryUrl:        ServiceUrl,
+        destinationDirectory: Path,
+        workDirectory:        Path
+    ): EitherT[IO, GenerationRecoverableError, CommandResult] =
+      for {
+        result <- doClone(repositoryUrl, destinationDirectory, workDirectory).toRightT
+        errorOrResult <- if (result.exitCode == 0) result.toRightT
+                        else sslErrorToLeft(result)
+
+      } yield errorOrResult
+
+    private def sslErrorToLeft(result: CommandResult) =
+      for {
+        message <- result.out.string.toRightT
+        errorOrResult <- if (message contains "SSL_ERROR_SYSCALL") GenerationRecoverableError(message).toLeftT
+                        else message.raiseError
+      } yield errorOrResult
+
+    private implicit class CommandResultOps(value: CommandResult) {
+      lazy val toRightT: EitherT[IO, GenerationRecoverableError, CommandResult] =
+        rightT[IO, GenerationRecoverableError](value)
+    }
+
+    private implicit class ErrorOps(value: GenerationRecoverableError) {
+      lazy val toLeftT: EitherT[IO, GenerationRecoverableError, CommandResult] = leftT[IO, CommandResult](value)
+    }
+
+    private implicit class StringOps(value: String) {
+      lazy val toRightT: EitherT[IO, GenerationRecoverableError, String] = rightT[IO, GenerationRecoverableError](value)
+      lazy val raiseError: EitherT[IO, GenerationRecoverableError, CommandResult] =
+        EitherT[IO, GenerationRecoverableError, CommandResult](IO.raiseError(new Exception(value)))
     }
   }
 

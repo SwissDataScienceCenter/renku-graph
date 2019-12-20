@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
-import cats.data.NonEmptyList
+import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
@@ -33,6 +33,7 @@ import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
 import io.chrisdavenport.log4cats.Logger
@@ -89,10 +90,10 @@ class CommitEventProcessor[Interpretation[_]](
                                  maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
       rawTriples     <- generateTriples(commit, maybeAccessToken)
-      curatedTriples <- curate(rawTriples)
-      result         <- upload(curatedTriples) map toUploadingResult(commit)
+      curatedTriples <- EitherT.right[GenerationRecoverableError](curate(rawTriples))
+      result         <- EitherT.right[GenerationRecoverableError](upload(curatedTriples) map toUploadingResult(commit))
     } yield result
-  } recoverWith nonRecoverableFailure(commit)
+  }.value map (_.fold(toRecoverableError(commit), identity)) recoverWith nonRecoverableFailure(commit)
 
   private def toUploadingResult(commit: Commit): TriplesUploadResult => UploadingResult = {
     case DeliverySuccess => Uploaded(commit)
@@ -105,6 +106,11 @@ class CommitEventProcessor[Interpretation[_]](
     case error @ InvalidUpdatesFailure(message) =>
       logger.error(s"${logMessageCommon(commit)} $message")
       NonRecoverableError(commit, error: Throwable)
+  }
+
+  private def toRecoverableError(commit: Commit): GenerationRecoverableError => UploadingResult = { error =>
+    logger.error(s"${logMessageCommon(commit)} ${error.message}")
+    RecoverableError(commit, error)
   }
 
   private def nonRecoverableFailure(commit: Commit): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
