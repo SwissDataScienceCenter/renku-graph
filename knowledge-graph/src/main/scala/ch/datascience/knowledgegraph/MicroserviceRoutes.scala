@@ -23,10 +23,11 @@ import cats.effect.{Clock, ConcurrentEffect}
 import cats.implicits._
 import ch.datascience.graph.http.server.binders.ProjectPath._
 import ch.datascience.http.rest.SortBy.Direction
+import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.paging.PagingRequest.Decoders._
+import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.QueryParameterTools._
-import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.query
-import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.QueryEndpoint
 import ch.datascience.knowledgegraph.projects.rest.ProjectEndpoint
@@ -46,6 +47,9 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     extends Http4sDsl[F]
     with RoutesMetrics {
 
+  import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.query
+  import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
+  import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
   import datasetEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
@@ -54,24 +58,25 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   // format: off
   lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
-    case GET -> Root / "ping"                                                                          => Ok("pong")
-    case GET -> Root / "knowledge-graph" / "datasets" :? query(maybePhrase) +& sort(maybeSortBy)       => searchForDatasets(maybePhrase, maybeSortBy)
-    case GET -> Root / "knowledge-graph" / "datasets" / DatasetId(id)                                  => getDataset(id)
-    case GET -> Root / "knowledge-graph" / "graphql"                                                   => schema
-    case request@POST -> Root / "knowledge-graph" / "graphql"                                          => handleQuery(request)
-    case GET -> Root / "knowledge-graph" / "projects" / Namespace(namespace) / Name(name)              => getProject(namespace / name)
-    case GET -> Root / "knowledge-graph" / "projects" / Namespace(namespace) / Name(name) / "datasets" => getProjectDatasets(namespace / name)
+    case           GET  -> Root / "ping"                                                                                                      => Ok("pong")
+    case           GET  -> Root / "knowledge-graph" / "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) => searchForDatasets(maybePhrase, maybeSortBy,page, perPage)
+    case           GET  -> Root / "knowledge-graph" / "datasets" / DatasetId(id)                                                              => getDataset(id)
+    case           GET  -> Root / "knowledge-graph" / "graphql"                                                                               => schema
+    case request @ POST -> Root / "knowledge-graph" / "graphql"                                                                               => handleQuery(request)
+    case           GET  -> Root / "knowledge-graph" / "projects" / Namespace(namespace) / Name(name)                                          => getProject(namespace / name)
+    case           GET  -> Root / "knowledge-graph" / "projects" / Namespace(namespace) / Name(name) / "datasets"                             => getProjectDatasets(namespace / name)
   }.meter flatMap `add GET Root / metrics`[F]
   // format: on
 
   private def searchForDatasets(
-      maybePhrase: ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase],
-      maybeSort:   Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]]
+      maybePhrase:  Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
+      maybeSort:    Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
+      maybePage:    Option[ValidatedNel[ParseFailure, Page]],
+      maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]
   ): F[Response[F]] =
-    (maybePhrase, maybeSort getOrElse Validated.validNel(Sort.By(NameProperty, Direction.Asc)))
-      .mapN {
-        case (phrase, sort) =>
-          datasetsSearchEndpoint.searchForDatasets(phrase, sort)
-      }
+    (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
+     maybeSort getOrElse Validated.validNel(Sort.By(NameProperty, Direction.Asc)),
+     PagingRequest(maybePage, maybePerPage))
+      .mapN(datasetsSearchEndpoint.searchForDatasets)
       .fold(toBadRequest(), identity)
 }

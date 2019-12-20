@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
-import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.config.renku
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.EventsGenerators.projectIds
@@ -28,9 +28,9 @@ import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.FusekiBaseUrl
 
 package object data {
-  val currentSchemaVersion:   SchemaVersion     = SchemaVersion("0.5.0")
-  val renkuResourceUrl:       RenkuResourcesUrl = RenkuResourcesUrl("http://localhost:9004/knowledge-graph")
-  implicit val fusekiBaseUrl: FusekiBaseUrl     = RDFStore.fusekiBaseUrl
+  val currentSchemaVersion:   SchemaVersion      = SchemaVersion("0.5.0")
+  val renkuResourcesUrl:      renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
+  implicit val fusekiBaseUrl: FusekiBaseUrl      = RDFStore.fusekiBaseUrl
 
   implicit class ProjectOps(project: Project) {
 

@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.projects.rest
 
 import cats.effect._
 import cats.implicits._
-import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.config.renku
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -42,7 +42,7 @@ import scala.util.control.NonFatal
 
 class ProjectEndpoint[Interpretation[_]: Effect](
     projectFinder:         ProjectFinder[Interpretation],
-    renkuResourcesUrl:     RenkuResourcesUrl,
+    renkuResourcesUrl:     renku.ResourcesUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
@@ -118,7 +118,7 @@ object IOProjectEndpoint {
     timer:                     Timer[IO]): IO[ProjectEndpoint[IO]] =
     for {
       projectFinder         <- IOProjectFinder(gitLabThrottler, ApplicationLogger)
-      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ProjectEndpoint[IO](
       projectFinder,

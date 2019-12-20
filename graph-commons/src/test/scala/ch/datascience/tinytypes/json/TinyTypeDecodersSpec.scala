@@ -92,6 +92,14 @@ class TinyTypeDecodersSpec extends WordSpec {
     }
   }
 
+  "longDecoder" should {
+
+    "decode JSON Long value" in {
+      val value = Arbitrary.arbLong.arbitrary.generateOne
+      json"""$value""".as[LongTestType] shouldBe Right(LongTestType(value))
+    }
+  }
+
   "localDateDecoder" should {
 
     "decode JSON String value" in {
