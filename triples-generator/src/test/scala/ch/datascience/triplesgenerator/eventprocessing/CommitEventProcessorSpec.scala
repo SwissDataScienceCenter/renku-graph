@@ -349,6 +349,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     }
 
     "be registered in the Metrics Registry" in {
+      eventsProcessingTimes.startTimer().observeDuration()
       MetricsRegistry.verifyInRegistry("events_processing_times") shouldBe true
     }
   }
