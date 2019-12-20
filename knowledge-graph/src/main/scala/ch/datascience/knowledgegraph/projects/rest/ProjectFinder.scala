@@ -43,27 +43,27 @@ class ProjectFinder[Interpretation[_]](
   import gitLabProjectFinder.{findProject => findInGitLab}
   import kgProjectFinder.{findProject => findInKG}
 
-  def findProject(path: ProjectPath): Interpretation[Option[Project]] =
-    for {
-      accessToken    <- OptionT(findAccessToken(path)) getOrElseF raiseError(s"No access token for $path")
-      gitLabProject  <- findInGitLab(path, Some(accessToken)) getOrElseF raiseError(s"No GitLab project for $path")
-      maybeKgProject <- findInKG(path)
-    } yield merge(path, maybeKgProject, gitLabProject)
+  def findProject(path: ProjectPath): Interpretation[Option[Project]] = {
+    OptionT(findInKG(path)) semiflatMap { kgProject =>
+      for {
+        accessToken   <- OptionT(findAccessToken(path)) getOrElseF raiseError(s"No access token for $path")
+        gitLabProject <- findInGitLab(path, Some(accessToken)) getOrElseF raiseError(s"No GitLab project for $path")
+      } yield merge(path, kgProject, gitLabProject)
+    }
+  }.value
 
   private def raiseError[Out](message: String) = new Exception(message).raiseError[Interpretation, Out]
 
-  private def merge(path: ProjectPath, maybeKgProject: Option[KGProject], gitLabProject: GitLabProject) =
-    maybeKgProject map { kgProject =>
-      Project(
-        path = path,
-        name = kgProject.name,
-        created = Creation(
-          date    = kgProject.created.date,
-          creator = Creator(kgProject.created.creator.email, kgProject.created.creator.name)
-        ),
-        repoUrls = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http)
-      )
-    }
+  private def merge(path: ProjectPath, kgProject: KGProject, gitLabProject: GitLabProject) =
+    Project(
+      path = path,
+      name = kgProject.name,
+      created = Creation(
+        date    = kgProject.created.date,
+        creator = Creator(kgProject.created.creator.email, kgProject.created.creator.name)
+      ),
+      repoUrls = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http)
+    )
 }
 
 private object IOProjectFinder {
