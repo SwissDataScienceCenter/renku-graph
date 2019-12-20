@@ -19,6 +19,7 @@
 package ch.datascience.knowledgegraph
 
 import cats.effect.{Clock, IO}
+import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.generators.CommonGraphGenerators._
@@ -26,6 +27,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.rest.SortBy.Direction
+import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
@@ -67,54 +70,49 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
-      "when a valid 'query' and no 'sort' parameter given" in new TestCase {
-      val phrase = nonEmptyStrings().generateOne
+      "when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
 
+      val phrase  = nonEmptyStrings().generateOne
+      val request = Request[IO](Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
       (datasetsSearchEndpoint
-        .searchForDatasets(_: Phrase, _: Sort.By))
-        .expects(Phrase(phrase), Sort.By(NameProperty, Direction.Asc))
+        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+        .expects(Phrase(phrase).some, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage.default))
         .returning(IO.pure(Response[IO](Ok)))
 
-      val response = routes.call(
-        Request(Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
-      )
+      val response = routes.call(request)
 
       response.status shouldBe Ok
     }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $BadRequest when invalid query parameter given" in new TestCase {
+    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
+      s"when no ${query.parameterName} parameter given" in new TestCase {
 
-      val phrase = blankStrings().generateOne
+      val request = Request[IO](Method.GET, uri"knowledge-graph/datasets")
 
-      val response = routes.call(
-        Request(Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
-      )
+      (datasetsSearchEndpoint
+        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+        .expects(Option.empty[Phrase], Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage.default))
+        .returning(IO.pure(Response[IO](Ok)))
 
-      response.status             shouldBe BadRequest
-      response.body[ErrorMessage] shouldBe ErrorMessage(s"'${query.parameterName}' parameter with invalid value")
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
     }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $ServiceUnavailable when no query parameter given" in new TestCase {
-      val response = routes
-        .call(Request(Method.GET, uri"knowledge-graph/datasets"))
-        .status shouldBe ServiceUnavailable
-    }
-
-    s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $Ok when query and sort parameters given" in new TestCase {
+    s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $Ok when ${query.parameterName} and ${Sort.sort.parameterName} parameters given" in new TestCase {
       forAll(phrases, sortBys(Sort)) { (phrase, sortBy) =>
+        val request = Request[IO](
+          Method.GET,
+          uri"knowledge-graph/datasets"
+            .withQueryParam("query", phrase.value)
+            .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
+        )
         (datasetsSearchEndpoint
-          .searchForDatasets(_: Phrase, _: Sort.By))
-          .expects(phrase, sortBy)
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+          .expects(phrase.some, sortBy, PagingRequest.default)
           .returning(IO.pure(Response[IO](Ok)))
 
-        val response = routes.call {
-          Request(
-            Method.GET,
-            uri"knowledge-graph/datasets"
-              .withQueryParam(query.parameterName, phrase.toString)
-              .withQueryParam(Sort.sort.parameterName, s"${sortBy.property}:${sortBy.direction}")
-          )
-        }
+        val response = routes.call(request)
 
         response.status shouldBe Ok
 
@@ -122,21 +120,57 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       }
     }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $BadRequest for invalid sort parameters" in new TestCase {
-      val property = "invalid"
+    s"define a GET /knowledge-graph/datasets?query=<phrase>&page=<page>&per_page=<per_page> endpoint returning $Ok when query, ${PagingRequest.Decoders.page.parameterName} and ${PagingRequest.Decoders.perPage.parameterName} parameters given" in new TestCase {
+      forAll(phrases, pages, perPages) { (phrase, page, perPage) =>
+        val request = Request[IO](
+          Method.GET,
+          uri"knowledge-graph/datasets"
+            .withQueryParam("query", phrase.value)
+            .withQueryParam("page", page.value)
+            .withQueryParam("per_page", perPage.value)
+        )
+        (datasetsSearchEndpoint
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+          .expects(phrase.some, Sort.By(NameProperty, Direction.Asc), PagingRequest(page, perPage))
+          .returning(IO.pure(Response[IO](Ok)))
+
+        val response = routes.call(request)
+
+        response.status shouldBe Ok
+
+        MetricsRegistry.clear()
+      }
+    }
+
+    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $BadRequest " +
+      s"for invalid ${query.parameterName} parameter " +
+      s"${Sort.sort.parameterName} parameter, " +
+      s"${PagingRequest.Decoders.page.parameterName} parameter and " +
+      s"${PagingRequest.Decoders.perPage.parameterName} parameter" in new TestCase {
+
+      val sortProperty     = "invalid"
+      val requestedPage    = nonPositiveInts().generateOne
+      val requestedPerPage = nonPositiveInts().generateOne
 
       val response = routes.call {
         Request(
           Method.GET,
           uri"knowledge-graph/datasets"
-            .withQueryParam(query.parameterName, nonEmptyStrings().generateOne)
-            .withQueryParam(Sort.sort.parameterName, s"$property:${Direction.Asc}")
+            .withQueryParam("query", blankStrings().generateOne)
+            .withQueryParam("sort", s"$sortProperty:${Direction.Asc}")
+            .withQueryParam("page", requestedPage.toString)
+            .withQueryParam("per_page", requestedPerPage.toString)
         )
       }
 
       response.status shouldBe BadRequest
       response.body[ErrorMessage] shouldBe ErrorMessage(
-        s"'$property' is not a valid sort property. Allowed properties: ${Sort.properties.mkString(", ")}"
+        List(
+          s"'${query.parameterName}' parameter with invalid value",
+          Sort.sort.errorMessage(sortProperty),
+          PagingRequest.Decoders.page.errorMessage(requestedPage.value.toString),
+          PagingRequest.Decoders.perPage.errorMessage(requestedPerPage.value.toString)
+        ).mkString("; ")
       )
     }
 

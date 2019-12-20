@@ -20,9 +20,9 @@ package ch.datascience.tinytypes.constraints
 
 import ch.datascience.tinytypes.Constraints
 
-trait GreaterThanZero extends Constraints[Int] {
+trait PositiveInt extends Constraints[Int] {
   addConstraint(
     check   = _ > 0,
-    message = (value: Int) => s"$typeName cannot be <= 0"
+    message = _ => s"$typeName cannot be <= 0"
   )
 }

@@ -20,6 +20,9 @@ package ch.datascience.config
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
+import ch.datascience.config.renku.{ResourceUrl, ResourcesUrl}
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
@@ -29,11 +32,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class RenkuResourcesUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
+class ResourcesUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "apply" should {
 
-    "return a RenkuResourceUrl if there's a value for 'services.renku.resource-url'" in {
+    "return a ResourcesUrl if there's a value for 'services.renku.resource-url'" in {
       forAll(httpUrls) { url =>
         val config = ConfigFactory.parseMap(
           Map(
@@ -44,12 +47,12 @@ class RenkuResourcesUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
             ).asJava
           ).asJava
         )
-        RenkuResourcesUrl[Try](config) shouldBe Success(RenkuResourcesUrl(url))
+        ResourcesUrl[Try](config) shouldBe Success(ResourcesUrl(url))
       }
     }
 
     "fail if there's no value for the 'services.renku.url'" in {
-      val Failure(exception) = RenkuResourcesUrl[Try](ConfigFactory.empty())
+      val Failure(exception) = ResourcesUrl[Try](ConfigFactory.empty())
       exception shouldBe an[ConfigLoadingException]
     }
 
@@ -64,9 +67,21 @@ class RenkuResourcesUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
         ).asJava
       )
 
-      val Failure(exception) = RenkuResourcesUrl[Try](config)
+      val Failure(exception) = ResourcesUrl[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
+    }
+  }
+
+  "/" should {
+
+    "produce a ResourceUrl" in {
+      val resourcesUrl = renkuResourcesUrls.generateOne
+      val segment      = relativePaths(maxSegments = 1).generateOne
+
+      val resourceUrl = resourcesUrl / segment
+
+      resourceUrl shouldBe a[ResourceUrl]
     }
   }
 }

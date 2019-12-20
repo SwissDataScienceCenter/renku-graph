@@ -110,8 +110,8 @@ object ProjectsResources {
       }
     }""" deepMerge {
     _links(
-      Link(Rel.Self        -> Href(renkuResourceUrl / "projects" / project.path)),
-      Link(Rel("datasets") -> Href(renkuResourceUrl / "projects" / project.path / "datasets"))
+      Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
+      Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
     )
   }
 }

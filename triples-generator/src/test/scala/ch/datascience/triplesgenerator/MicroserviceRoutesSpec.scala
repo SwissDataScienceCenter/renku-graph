@@ -35,9 +35,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
   "routes" should {
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
-      val response = routes.call(
-        Request(Method.GET, uri"ping")
-      )
+
+      val response = routes.call(Request(Method.GET, uri"ping"))
 
       response.status       shouldBe Ok
       response.body[String] shouldBe "pong"

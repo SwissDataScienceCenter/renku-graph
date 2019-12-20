@@ -41,6 +41,7 @@ object EndpointTester {
   implicit val jsonEntityEncoder:     EntityEncoder[IO, Json]       = jsonEncoderOf[IO, Json]
 
   implicit class IOEndpointOps(endpoint: IO[Kleisli[IO, Request[IO], Response[IO]]]) {
+
     def call(request: Request[IO]) = new {
       private val runResponse: Response[IO] = endpoint.flatMap(_.run(request)).unsafeRunSync()
 
