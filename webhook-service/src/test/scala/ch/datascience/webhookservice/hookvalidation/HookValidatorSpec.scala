@@ -29,7 +29,7 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
@@ -61,7 +61,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
     }
 
     "fail if finding stored access token fails when no access token given" in new TestCase {
@@ -77,7 +77,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, maybeAccessToken = None) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
     }
 
     "fail if finding stored access token return NOT_FOUND when no access token given" in new TestCase {
@@ -92,7 +92,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val noAccessTokenException = NoAccessTokenException(s"No access token found for projectId $projectId")
       validator.validateHook(projectId, maybeAccessToken = None) shouldBe context.raiseError(noAccessTokenException)
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", noAccessTokenException))
+      logger.loggedOnly(Info(s"Hook validation failed: ${noAccessTokenException.getMessage}"))
     }
 
     "fail if finding stored access token fails when an invalid access token given" in new TestCase {
@@ -114,7 +114,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
     }
 
     "fail if finding project info with stored access token fails" in new TestCase {
@@ -141,7 +141,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
     }
 
     "fail if finding project info with stored access token fails with UnauthorizedException" in new TestCase {
@@ -169,7 +169,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       exception            shouldBe an[Exception]
       exception.getMessage shouldBe s"Stored access token for $projectId is invalid"
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
     }
 
     "fail if finding stored access token return None" in new TestCase {
@@ -191,7 +191,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       exception            shouldBe an[Exception]
       exception.getMessage shouldBe s"No access token found for projectId $projectId"
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      logger.loggedOnly(Info(s"Hook validation failed: ${exception.getMessage}"))
     }
   }
 
@@ -256,7 +256,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
       validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
     }
   }
 
@@ -332,7 +332,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
         validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+        logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
       }
 
       "fail if access token re-association fails" in new TestCase {
@@ -359,7 +359,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
         validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+        logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
       }
 
       "fail if access token removal fails" in new TestCase {
@@ -386,7 +386,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
         validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+        logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
       }
     }
 
@@ -480,7 +480,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
         validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+        logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
       }
 
       "fail if access token removal fails" in new TestCase {
@@ -515,7 +515,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
         validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-        logger.loggedOnly(Error(s"Hook validation fails for project with id $projectId", exception))
+        logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
       }
     }
   }

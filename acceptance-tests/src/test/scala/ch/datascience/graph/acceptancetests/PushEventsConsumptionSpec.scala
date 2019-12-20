@@ -24,6 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
+import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.model.EventsGenerators._
@@ -54,6 +55,9 @@ class PushEventsConsumptionSpec
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
+      // making the triples generation be happy and not throwing exceptions to the logs
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+
       And("access token is present")
       givenAccessTokenPresentFor(project)
 
@@ -74,6 +78,11 @@ class PushEventsConsumptionSpec
       And("there should be a relevant event added to the Event Log")
       eventually {
         EventLog.findEvents(projectId, status = New) shouldBe List(commitId)
+      }
+
+      // wait for the Event Log to be emptied
+      eventually {
+        EventLog.findEvents(projectId, status = New) shouldBe List.empty
       }
     }
   }
