@@ -210,7 +210,7 @@ object IOCommitEventProcessor {
       .build()
       .name("events_processing_times")
       .help("Commit Events processing times")
-      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000)
+      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
       .register(_)
   }
 
