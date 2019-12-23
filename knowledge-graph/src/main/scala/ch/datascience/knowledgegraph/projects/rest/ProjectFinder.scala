@@ -25,6 +25,8 @@ import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import IOAccessTokenFinder._
 import cats.data.OptionT
+import cats.effect.{ContextShift, IO}
+import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -33,26 +35,36 @@ import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-class ProjectFinder[Interpretation[_]](
-    kgProjectFinder:     KGProjectFinder[Interpretation],
-    gitLabProjectFinder: GitLabProjectFinder[Interpretation],
-    accessTokenFinder:   AccessTokenFinder[Interpretation]
-)(implicit ME:           MonadError[Interpretation, Throwable]) {
+trait ProjectFinder[Interpretation[_]] {
+  def findProject(path: ProjectPath): Interpretation[Option[Project]]
+}
+
+class IOProjectFinder(
+    kgProjectFinder:     KGProjectFinder[IO],
+    gitLabProjectFinder: GitLabProjectFinder[IO],
+    accessTokenFinder:   AccessTokenFinder[IO]
+)(implicit ME:           MonadError[IO, Throwable], cs: ContextShift[IO])
+    extends ProjectFinder[IO] {
 
   import accessTokenFinder._
-  import gitLabProjectFinder.{findProject => findInGitLab}
+  import gitLabProjectFinder.{findProject => findProjectInGitLab}
   import kgProjectFinder.{findProject => findInKG}
 
-  def findProject(path: ProjectPath): Interpretation[Option[Project]] = {
-    OptionT(findInKG(path)) semiflatMap { kgProject =>
-      for {
-        accessToken   <- OptionT(findAccessToken(path)) getOrElseF raiseError(s"No access token for $path")
-        gitLabProject <- findInGitLab(path, Some(accessToken)) getOrElseF raiseError(s"No GitLab project for $path")
-      } yield merge(path, kgProject, gitLabProject)
-    }
-  }.value
+  def findProject(path: ProjectPath): IO[Option[Project]] =
+    ((OptionT(findInKG(path)), findInGitLab(path)) parMapN (merge(path, _, _))).value
 
-  private def raiseError[Out](message: String) = new Exception(message).raiseError[Interpretation, Out]
+  private def findInGitLab(path: ProjectPath) =
+    for {
+      accessToken   <- OptionT(findAccessToken(path)) flatTransform noneToError(path)
+      gitLabProject <- findProjectInGitLab(path, Some(accessToken))
+    } yield gitLabProject
+
+  private def noneToError(path: ProjectPath): Option[AccessToken] => IO[Option[AccessToken]] = {
+    case Some(accessToken) => Option(accessToken).pure[IO]
+    case None              => raiseError(s"No access token for $path")
+  }
+
+  private def raiseError[Out](message: String) = new Exception(message).raiseError[IO, Out]
 
   private def merge(path: ProjectPath, kgProject: KGProject, gitLabProject: GitLabProject) =
     Project(
@@ -83,5 +95,5 @@ private object IOProjectFinder {
       kgProjectFinder     <- IOKGProjectFinder(logger = logger)
       gitLabProjectFinder <- IOGitLabProjectFinder(gitLabThrottler, logger)
       accessTokenFinder   <- IOAccessTokenFinder(logger)
-    } yield new ProjectFinder[IO](kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
+    } yield new IOProjectFinder(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
 }
