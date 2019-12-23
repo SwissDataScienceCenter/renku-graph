@@ -197,7 +197,6 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
            |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
            |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
            |PREFIX schema: <http://schema.org/>
-           |PREFIX dcterms: <http://purl.org/dc/terms/>
            |
            |$query""".stripMargin
       }
@@ -213,7 +212,6 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
            |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
            |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
            |PREFIX schema: <http://schema.org/>
-           |PREFIX dcterms: <http://purl.org/dc/terms/>
            |
            |$query""".stripMargin
       }

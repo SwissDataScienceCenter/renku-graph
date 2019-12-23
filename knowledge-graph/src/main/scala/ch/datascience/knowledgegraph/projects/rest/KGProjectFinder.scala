@@ -67,7 +67,6 @@ private class IOKGProjectFinder(
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
        |SELECT DISTINCT ?name ?dateCreated ?creatorName ?creatorEmail
        |WHERE {
@@ -78,7 +77,8 @@ private class IOKGProjectFinder(
        |  ?creatorResource rdf:type <http://schema.org/Person> ;
        |                   schema:email ?creatorEmail ;
        |                   schema:name ?creatorName .         
-       |}""".stripMargin
+       |}
+       |""".stripMargin
 
   private def recordsDecoder(path: ProjectPath): Decoder[List[KGProject]] = {
     import Decoder._

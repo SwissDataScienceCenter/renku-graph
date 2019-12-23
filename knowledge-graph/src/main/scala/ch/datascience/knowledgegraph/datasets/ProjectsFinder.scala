@@ -51,7 +51,6 @@ private class ProjectsFinder(
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |
        |SELECT DISTINCT ?isPartOf ?name ?minDateCreated ?agentEmail ?agentName
@@ -68,7 +67,7 @@ private class ProjectsFinder(
        |        WHERE {
        |          ?dataset schema:identifier "$identifier" ;
        |                   rdf:type <http://schema.org/Dataset> ;
-       |                   dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |                   schema:isPartOf ?isPartOf .
        |        }
        |      }
        |    }
