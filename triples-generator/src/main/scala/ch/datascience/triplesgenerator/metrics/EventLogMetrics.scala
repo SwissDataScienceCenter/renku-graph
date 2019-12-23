@@ -24,6 +24,7 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.commands.{EventLogStats, IOEventLogStats}
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.metrics.MetricsRegistry
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Gauge
@@ -33,26 +34,34 @@ import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
 class EventLogMetrics[Interpretation[_]](
-    eventLogStats: EventLogStats[Interpretation],
-    logger:        Logger[Interpretation],
-    statusesGauge: Gauge = EventLogMetrics.statusesGauge,
-    totalGauge:    Gauge = EventLogMetrics.totalGauge,
-    interval:      FiniteDuration = EventLogMetrics.interval
-)(implicit ME:     MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
+    eventLogStats:      EventLogStats[Interpretation],
+    logger:             Logger[Interpretation],
+    waitingEventsGauge: Gauge = EventLogMetrics.waitingEventsGauge,
+    statusesGauge:      Gauge = EventLogMetrics.statusesGauge,
+    totalGauge:         Gauge = EventLogMetrics.totalGauge,
+    interval:           FiniteDuration = EventLogMetrics.interval
+)(implicit ME:          MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
 
   def run: Interpretation[Unit] = (timer sleep interval) *> updateCollectors
 
   private def updateCollectors() = {
     for {
       statuses <- eventLogStats.statuses
-      _ = statuses foreach setToGauge
+      _ = statuses foreach toStatusesGauge
       _ = totalGauge set statuses.values.sum
+
+      waitingEvents <- eventLogStats.waitingEvents
+      _ = waitingEvents foreach toWaitingEventsGauge
       _ <- run
     } yield ()
   } recoverWith logAndRetry
 
-  private lazy val setToGauge: ((EventStatus, Long)) => Unit = {
+  private lazy val toStatusesGauge: ((EventStatus, Long)) => Unit = {
     case (status, count) => statusesGauge.labels(status.toString).set(count)
+  }
+
+  private lazy val toWaitingEventsGauge: ((ProjectPath, Long)) => Unit = {
+    case (path, count) => waitingEventsGauge.labels(path.toString).set(count)
   }
 
   private lazy val logAndRetry: PartialFunction[Throwable, Interpretation[Unit]] = {
@@ -66,7 +75,16 @@ object EventLogMetrics {
 
   import scala.concurrent.duration._
 
-  private val interval: FiniteDuration = 15 seconds
+  private val interval: FiniteDuration = 5 seconds
+
+  private[metrics] val waitingEventsGauge: Gauge = MetricsRegistry.register {
+    Gauge
+      .build()
+      .name("events_waiting_count")
+      .help("Number of waiting Events by project path.")
+      .labelNames("project")
+      .register(_)
+  }
 
   private[metrics] val statusesGauge: Gauge = MetricsRegistry.register {
     Gauge
