@@ -110,6 +110,22 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
       projectFinder.findProject(path).unsafeRunSync() shouldBe None
     }
 
+    "return None if no access token can be found for the given project path" in new TestCase {
+
+      val kgProject = kgProjects.generateOne.copy(path = path)
+      (kgProjectFinder
+        .findProject(_: ProjectPath))
+        .expects(path)
+        .returning(Some(kgProject).pure[IO])
+
+      (accessTokenFinder
+        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .expects(path, projectPathToPath)
+        .returning(Option.empty[AccessToken].pure[IO])
+
+      projectFinder.findProject(path).unsafeRunSync() shouldBe None
+    }
+
     "fail if finding project in the KG failed" in new TestCase {
 
       val exception = exceptions.generateOne
@@ -132,24 +148,6 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
       intercept[Exception] {
         projectFinder.findProject(path).unsafeRunSync()
       } shouldBe exception
-    }
-
-    "fail if no access token can be found for the given project path" in new TestCase {
-
-      val kgProject = kgProjects.generateOne.copy(path = path)
-      (kgProjectFinder
-        .findProject(_: ProjectPath))
-        .expects(path)
-        .returning(Some(kgProject).pure[IO])
-
-      (accessTokenFinder
-        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
-        .expects(path, projectPathToPath)
-        .returning(Option.empty[AccessToken].pure[IO])
-
-      intercept[Exception] {
-        projectFinder.findProject(path).unsafeRunSync()
-      }.getMessage shouldBe s"No access token for $path"
     }
 
     "fail if finding access token failed" in new TestCase {

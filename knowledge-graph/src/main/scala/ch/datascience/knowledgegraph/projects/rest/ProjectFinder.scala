@@ -26,7 +26,6 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import IOAccessTokenFinder._
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
-import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -55,16 +54,9 @@ class IOProjectFinder(
 
   private def findInGitLab(path: ProjectPath) =
     for {
-      accessToken   <- OptionT(findAccessToken(path)) flatTransform noneToError(path)
+      accessToken   <- OptionT(findAccessToken(path))
       gitLabProject <- findProjectInGitLab(path, Some(accessToken))
     } yield gitLabProject
-
-  private def noneToError(path: ProjectPath): Option[AccessToken] => IO[Option[AccessToken]] = {
-    case Some(accessToken) => Option(accessToken).pure[IO]
-    case None              => raiseError(s"No access token for $path")
-  }
-
-  private def raiseError[Out](message: String) = new Exception(message).raiseError[IO, Out]
 
   private def merge(path: ProjectPath, kgProject: KGProject, gitLabProject: GitLabProject) =
     Project(
