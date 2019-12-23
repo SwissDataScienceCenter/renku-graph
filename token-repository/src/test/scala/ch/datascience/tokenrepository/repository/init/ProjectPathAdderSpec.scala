@@ -38,9 +38,14 @@ import doobie.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
-class ProjectPathAdderSpec extends WordSpec with InMemoryProjectsTokensDbSpec with MockFactory with Eventually {
+class ProjectPathAdderSpec
+    extends WordSpec
+    with InMemoryProjectsTokensDbSpec
+    with MockFactory
+    with Eventually
+    with IntegrationPatience {
 
   "run" should {
 
@@ -85,8 +90,10 @@ class ProjectPathAdderSpec extends WordSpec with InMemoryProjectsTokensDbSpec wi
       }
 
       eventually {
-        verifyTrue(sql"DROP INDEX idx_project_path;")
         logger.loggedOnly(Info("'project_path' column added"))
+      }
+      eventually {
+        verifyTrue(sql"DROP INDEX idx_project_path;")
       }
     }
 

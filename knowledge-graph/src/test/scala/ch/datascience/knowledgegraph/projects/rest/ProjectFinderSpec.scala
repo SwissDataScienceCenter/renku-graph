@@ -144,6 +144,7 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
         .findProject(_: ProjectPath, _: Option[AccessToken]))
         .expects(path, Some(accessToken))
         .returning(OptionT.none[IO, GitLabProject])
+        .noMoreThanOnce()
 
       intercept[Exception] {
         projectFinder.findProject(path).unsafeRunSync()
