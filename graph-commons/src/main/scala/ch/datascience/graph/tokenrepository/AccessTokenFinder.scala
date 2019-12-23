@@ -21,6 +21,7 @@ package ch.datascience.graph.tokenrepository
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import io.chrisdavenport.log4cats.Logger
 
@@ -28,7 +29,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait AccessTokenFinder[Interpretation[_]] {
-  def findAccessToken(projectId: ProjectId): Interpretation[Option[AccessToken]]
+  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): Interpretation[Option[AccessToken]]
 }
 
 class IOAccessTokenFinder(
@@ -44,9 +45,9 @@ class IOAccessTokenFinder(
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findAccessToken(projectId: ProjectId): IO[Option[AccessToken]] =
+  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): IO[Option[AccessToken]] =
     for {
-      uri         <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
+      uri         <- validateUri(s"$tokenRepositoryUrl/projects/${toPathSegment(projectId)}/tokens")
       accessToken <- send(request(GET, uri))(mapResponse)
     } yield accessToken
 
@@ -58,4 +59,19 @@ class IOAccessTokenFinder(
   private implicit lazy val accessTokenEntityDecoder: EntityDecoder[IO, Option[AccessToken]] = {
     jsonOf[IO, AccessToken].map(Option.apply)
   }
+}
+
+object IOAccessTokenFinder {
+  import ch.datascience.http.client.UrlEncoder.urlEncode
+  implicit val projectPathToPath: ProjectPath => String = path => urlEncode(path.value)
+  implicit val projectIdToPath:   ProjectId => String   = _.toString
+
+  def apply(
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[AccessTokenFinder[IO]] =
+    for {
+      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
+    } yield new IOAccessTokenFinder(tokenRepositoryUrl, logger)
 }

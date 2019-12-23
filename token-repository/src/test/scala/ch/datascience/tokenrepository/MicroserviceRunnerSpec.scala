@@ -41,7 +41,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
       (dbInitializer.run _)
         .expects()
-        .returning(context.pure(ExitCode.Success))
+        .returning(context.unit)
 
       (httpServer.run _)
         .expects()
@@ -86,7 +86,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
       (dbInitializer.run _)
         .expects()
-        .returning(context.pure(ExitCode.Success))
+        .returning(context.unit)
 
       val exception = exceptions.generateOne
       (httpServer.run _)

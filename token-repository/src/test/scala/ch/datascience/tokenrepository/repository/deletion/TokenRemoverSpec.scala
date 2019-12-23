@@ -20,11 +20,9 @@ package ch.datascience.tokenrepository.repository.deletion
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
-import doobie.implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -39,7 +37,7 @@ class TokenRemoverSpec extends WordSpec with InMemoryProjectsTokensDbSpec {
     "succeed if token exists" in new TestCase {
 
       val encryptedToken = encryptedAccessTokens.generateOne
-      insert(projectId, encryptedToken)
+      insert(projectId, projectPath, encryptedToken)
       findToken(projectId) shouldBe Some(encryptedToken.value)
 
       remover.delete(projectId).unsafeRunSync shouldBe ((): Unit)
@@ -49,22 +47,9 @@ class TokenRemoverSpec extends WordSpec with InMemoryProjectsTokensDbSpec {
   }
 
   private trait TestCase {
-
-    val projectId = projectIds.generateOne
+    val projectId   = projectIds.generateOne
+    val projectPath = projectPaths.generateOne
 
     val remover = new TokenRemover(transactor)
-
-    def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit = execute {
-      sql"""insert into 
-            projects_tokens (project_id, token) 
-            values (${projectId.value}, ${encryptedToken.value})
-         """.update.run
-        .map(assureInserted)
-    }
-
-    private lazy val assureInserted: Int => Unit = {
-      case 1 => ()
-      case _ => fail("insertion problem")
-    }
   }
 }

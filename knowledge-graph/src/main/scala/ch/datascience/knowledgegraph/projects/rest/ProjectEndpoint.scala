@@ -21,11 +21,13 @@ package ch.datascience.knowledgegraph.projects.rest
 import cats.effect._
 import cats.implicits._
 import ch.datascience.config.renku
+import ch.datascience.control.Throttler
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
-import ch.datascience.knowledgegraph.projects.model.{Project, ProjectCreator}
+import ch.datascience.knowledgegraph.config.GitLab
+import ch.datascience.knowledgegraph.projects.model.{Creator, Project, RepoUrls}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Encoder
@@ -84,28 +86,38 @@ class ProjectEndpoint[Interpretation[_]: Effect](
         "created": {
           "dateCreated": ${project.created.date.toString},
           "creator": ${project.created.creator}
-        }
+        },
+        "url": ${project.repoUrls}
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
     )
   }
 
-  private implicit lazy val creatorEncoder: Encoder[ProjectCreator] = Encoder.instance[ProjectCreator] { creator =>
+  private implicit lazy val creatorEncoder: Encoder[Creator] = Encoder.instance[Creator] { creator =>
     json"""{
       "name": ${creator.name.toString},
       "email": ${creator.email.toString}
+    }"""
+  }
+
+  private implicit lazy val urlsEncoder: Encoder[RepoUrls] = Encoder.instance[RepoUrls] { urls =>
+    json"""{
+      "ssh": ${urls.ssh.toString},
+      "http": ${urls.http.toString}
     }"""
   }
 }
 
 object IOProjectEndpoint {
 
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[ProjectEndpoint[IO]] =
+  def apply(
+      gitLabThrottler:         Throttler[IO, GitLab]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[ProjectEndpoint[IO]] =
     for {
-      projectFinder         <- IOProjectFinder(logger = ApplicationLogger)
+      projectFinder         <- IOProjectFinder(gitLabThrottler, ApplicationLogger)
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ProjectEndpoint[IO](

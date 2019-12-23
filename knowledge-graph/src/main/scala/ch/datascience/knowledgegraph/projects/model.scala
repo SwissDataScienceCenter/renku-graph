@@ -18,14 +18,44 @@
 
 package ch.datascience.knowledgegraph.projects
 
-import ch.datascience.graph.model.projects._
+import java.net.{MalformedURLException, URL}
+
+import cats.data.Validated
+import ch.datascience.graph.model.projects.{DateCreated, Name, ProjectPath}
 import ch.datascience.graph.model.users
+import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object model {
 
-  final case class Project(path: ProjectPath, name: Name, created: ProjectCreation)
+  final case class Project(path: ProjectPath, name: Name, created: Creation, repoUrls: RepoUrls)
 
-  final case class ProjectCreation(date: DateCreated, creator: ProjectCreator)
+  final case class Creation(date: DateCreated, creator: Creator)
 
-  final case class ProjectCreator(email: users.Email, name: users.Name)
+  final case class Creator(email: users.Email, name: users.Name)
+
+  final case class RepoUrls(ssh: SshUrl, http: HttpUrl)
+
+  object RepoUrls {
+
+    class HttpUrl private (val value: String) extends AnyVal with StringTinyType
+    implicit object HttpUrl extends TinyTypeFactory[HttpUrl](new HttpUrl(_)) with NonBlank {
+      addConstraint(
+        check = url =>
+          (url endsWith ".git") && Validated
+            .catchOnly[MalformedURLException](new URL(url))
+            .isValid,
+        message = url => s"$url is not a valid repository http url"
+      )
+    }
+
+    class SshUrl private (val value: String) extends AnyVal with StringTinyType
+    implicit object SshUrl extends TinyTypeFactory[SshUrl](new SshUrl(_)) with NonBlank {
+      addConstraint(
+        check   = _ matches "^git@.*\\.git$",
+        message = url => s"$url is not a valid repository ssh url"
+      )
+    }
+  }
 }

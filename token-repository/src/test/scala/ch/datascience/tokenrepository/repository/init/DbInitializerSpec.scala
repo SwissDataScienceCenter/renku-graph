@@ -19,15 +19,16 @@
 package ch.datascience.tokenrepository.repository.init
 
 import cats.effect._
-import cats.implicits._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.exceptions
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
+import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDb
-import doobie.implicits._
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class DbInitializerSpec extends WordSpec with InMemoryProjectsTokensDb {
+class DbInitializerSpec extends WordSpec with InMemoryProjectsTokensDb with MockFactory {
 
   "run" should {
 
@@ -36,7 +37,11 @@ class DbInitializerSpec extends WordSpec with InMemoryProjectsTokensDb {
 
       tableExists() shouldBe true
 
-      dbInitializer.run.unsafeRunSync() shouldBe ExitCode.Success
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
+
+      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists() shouldBe true
 
@@ -48,36 +53,38 @@ class DbInitializerSpec extends WordSpec with InMemoryProjectsTokensDb {
 
       tableExists() shouldBe false
 
-      dbInitializer.run.unsafeRunSync() shouldBe ExitCode.Success
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
+
+      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists() shouldBe true
 
       logger.loggedOnly(Info("Projects Tokens database initialization success"))
     }
+
+    "fail if the Projects Paths adding process fails" in new TestCase {
+      if (tableExists()) dropTable()
+
+      tableExists() shouldBe false
+
+      val exception = exceptions.generateOne
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO raiseError exception)
+
+      intercept[Exception] {
+        dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
+      } shouldBe exception
+
+      logger.loggedOnly(Error("Projects Tokens database initialization failure", exception))
+    }
   }
 
   private trait TestCase {
-    val logger        = TestLogger[IO]()
-    val dbInitializer = new DbInitializer[IO](transactor, logger)
-  }
-
-  private def tableExists(): Boolean =
-    sql"""select exists (select * from projects_tokens);""".query.option
-      .transact(transactor.get)
-      .recover { case _ => None }
-      .unsafeRunSync()
-      .isDefined
-
-  private def createTable(): Unit = execute {
-    sql"""
-         |CREATE TABLE projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | token VARCHAR NOT NULL
-         |);
-       """.stripMargin.update.run.map(_ => ())
-  }
-
-  protected def dropTable(): Unit = execute {
-    sql"DROP TABLE IF EXISTS projects_tokens".update.run.map(_ => ())
+    val logger           = TestLogger[IO]()
+    val projectPathAdder = mock[IOProjectPathAdder]
+    val dbInitializer    = new DbInitializer[IO](projectPathAdder, transactor, logger)
   }
 }

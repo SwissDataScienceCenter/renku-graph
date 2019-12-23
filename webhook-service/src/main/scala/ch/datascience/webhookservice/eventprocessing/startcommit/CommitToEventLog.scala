@@ -48,6 +48,7 @@ class CommitToEventLog[Interpretation[_]: Monad](
 
   import CommitToEventLog.SendingResult
   import CommitToEventLog.SendingResult._
+  import IOAccessTokenFinder._
   import accessTokenFinder._
   import commitEventSender._
   import commitEventsSource._

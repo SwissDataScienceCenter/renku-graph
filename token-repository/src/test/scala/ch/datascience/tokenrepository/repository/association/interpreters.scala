@@ -20,7 +20,9 @@ package ch.datascience.tokenrepository.repository.association
 
 import cats.effect.{Bracket, IO}
 import ch.datascience.db.DbTransactor
+import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
+import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
@@ -30,6 +32,11 @@ private class TryAssociationPersister(
     extends AssociationPersister[Try](transactor)
 
 private class IOTokenAssociator(
+    pathFinder:           ProjectPathFinder[IO],
     accessTokenCrypto:    AccessTokenCrypto[IO],
-    associationPersister: AssociationPersister[IO]
-) extends TokenAssociator[IO](accessTokenCrypto, associationPersister)
+    associationPersister: AssociationPersister[IO],
+    tokenRemover:         TokenRemover[IO]
+) extends TokenAssociator[IO](pathFinder, accessTokenCrypto, associationPersister, tokenRemover)
+
+class IOAssociateTokenEndpoint(tokenAssociator: TokenAssociator[IO], logger: Logger[IO])
+    extends AssociateTokenEndpoint[IO](tokenAssociator, logger)

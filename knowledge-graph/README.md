@@ -448,15 +448,19 @@ Response body example:
       "email": "author@mail.org"
     }
   },
+  "url": {
+    "ssh": "git@renku.io:namespace/project-name.git",
+    "http": "https://renku.io/gitlab/namespace/project-name.git"
+  },
   "_links":[  
-     {  
-        "rel":"self",
-        "href":"http://t:5511/projects/namespace/project-name"
-     },
-     {  
-        "rel":"datasets",
-        "href":"http://t:5511/projects/namespace/project-name/datasets"
-     }
+    {  
+      "rel":"self",
+      "href":"http://t:5511/projects/namespace/project-name"
+    },
+    {  
+      "rel":"datasets",
+      "href":"http://t:5511/projects/namespace/project-name/datasets"
+    }
   ]
 }
 ```

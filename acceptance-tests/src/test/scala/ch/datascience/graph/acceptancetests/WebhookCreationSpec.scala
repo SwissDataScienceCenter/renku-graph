@@ -24,6 +24,7 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.EventsGenerators.projectIds
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.webhookservice.project.ProjectVisibility.Public
 import io.circe.literal._
@@ -37,8 +38,8 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
 
     scenario("Graph Services hook is present on the project in GitLab") {
 
-      val projectId   = projectIds.generateOne
-      val accessToken = accessTokens.generateOne
+      val projectId = projectIds.generateOne
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
@@ -55,8 +56,8 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
 
     scenario("No Graph Services webhook on the project in GitLab") {
 
-      val projectId   = projectIds.generateOne
-      val accessToken = accessTokens.generateOne
+      val projectId = projectIds.generateOne
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)

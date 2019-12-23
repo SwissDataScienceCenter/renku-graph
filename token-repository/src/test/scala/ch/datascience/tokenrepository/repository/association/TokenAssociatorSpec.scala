@@ -21,14 +21,17 @@ package ch.datascience.tokenrepository.repository.association
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import ch.datascience.tokenrepository.repository.TryAccessTokenCrypto
+import ch.datascience.tokenrepository.repository.deletion.TryTokenRemover
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -39,7 +42,13 @@ class TokenAssociatorSpec extends WordSpec with MockFactory {
 
   "associate" should {
 
-    "succeed if token encryption and storing in the db is successful" in new TestCase {
+    "succeed if finding the Project Path, token encryption and storing in the db is successful" in new TestCase {
+      val projectPath = projectPaths.generateOne
+      (projectPathFinder
+        .findProjectPath(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
+        .returning(context.pure(Some(projectPath)))
+
       val encryptedAccessToken = encryptedAccessTokens.generateOne
       (accessTokenCrypto
         .encrypt(_: AccessToken))
@@ -47,14 +56,44 @@ class TokenAssociatorSpec extends WordSpec with MockFactory {
         .returning(context.pure(encryptedAccessToken))
 
       (associationPersister
-        .persistAssociation(_: ProjectId, _: EncryptedAccessToken))
-        .expects(projectId, encryptedAccessToken)
-        .returning(context.pure(()))
+        .persistAssociation(_: ProjectId, _: ProjectPath, _: EncryptedAccessToken))
+        .expects(projectId, projectPath, encryptedAccessToken)
+        .returning(context.unit)
 
-      tokenAssociator.associate(projectId, accessToken) shouldBe context.pure(())
+      tokenAssociator.associate(projectId, accessToken) shouldBe context.unit
+    }
+
+    "succeed if finding the Project Path returns none and removing the token is successful" in new TestCase {
+      (projectPathFinder
+        .findProjectPath(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
+        .returning(context.pure(None))
+
+      (tokenRemover
+        .delete(_: ProjectId))
+        .expects(projectId)
+        .returning(context.unit)
+
+      tokenAssociator.associate(projectId, accessToken) shouldBe context.unit
+    }
+
+    "fail if finding Project Path fails" in new TestCase {
+      val exception = exceptions.generateOne
+      (projectPathFinder
+        .findProjectPath(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
+        .returning(context raiseError exception)
+
+      tokenAssociator.associate(projectId, accessToken) shouldBe context.raiseError(exception)
     }
 
     "fail if token encryption fails" in new TestCase {
+      val projectPath = projectPaths.generateOne
+      (projectPathFinder
+        .findProjectPath(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
+        .returning(context.pure(Some(projectPath)))
+
       val exception = exceptions.generateOne
       (accessTokenCrypto
         .encrypt(_: AccessToken))
@@ -65,6 +104,12 @@ class TokenAssociatorSpec extends WordSpec with MockFactory {
     }
 
     "fail if storing in the db fails" in new TestCase {
+      val projectPath = projectPaths.generateOne
+      (projectPathFinder
+        .findProjectPath(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
+        .returning(context.pure(Some(projectPath)))
+
       val encryptedAccessToken = encryptedAccessTokens.generateOne
       (accessTokenCrypto
         .encrypt(_: AccessToken))
@@ -73,9 +118,24 @@ class TokenAssociatorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (associationPersister
-        .persistAssociation(_: ProjectId, _: EncryptedAccessToken))
-        .expects(projectId, encryptedAccessToken)
+        .persistAssociation(_: ProjectId, _: ProjectPath, _: EncryptedAccessToken))
+        .expects(projectId, projectPath, encryptedAccessToken)
         .returning(context.raiseError(exception))
+
+      tokenAssociator.associate(projectId, accessToken) shouldBe context.raiseError(exception)
+    }
+
+    "fail if removing the token fails" in new TestCase {
+      (projectPathFinder
+        .findProjectPath(_: ProjectId, _: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
+        .returning(context.pure(None))
+
+      val exception = exceptions.generateOne
+      (tokenRemover
+        .delete(_: ProjectId))
+        .expects(projectId)
+        .returning(context raiseError exception)
 
       tokenAssociator.associate(projectId, accessToken) shouldBe context.raiseError(exception)
     }
@@ -87,8 +147,15 @@ class TokenAssociatorSpec extends WordSpec with MockFactory {
 
     val context = MonadError[Try, Throwable]
 
+    val projectPathFinder    = mock[ProjectPathFinder[Try]]
     val accessTokenCrypto    = mock[TryAccessTokenCrypto]
     val associationPersister = mock[TryAssociationPersister]
-    val tokenAssociator      = new TokenAssociator[Try](accessTokenCrypto, associationPersister)
+    val tokenRemover         = mock[TryTokenRemover]
+    val tokenAssociator = new TokenAssociator[Try](
+      projectPathFinder,
+      accessTokenCrypto,
+      associationPersister,
+      tokenRemover
+    )
   }
 }

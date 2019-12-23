@@ -21,6 +21,7 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.effect.{Bracket, IO}
 import ch.datascience.db.DbTransactor
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
+import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
@@ -33,3 +34,6 @@ private class IOTokenFinder(
     tokenInRepoFinder: PersistedTokensFinder[IO],
     accessTokenCrypto: AccessTokenCrypto[IO]
 ) extends TokenFinder[IO](tokenInRepoFinder, accessTokenCrypto)
+
+class IOFetchTokenEndpoint(tokenFinder: TokenFinder[IO], logger: Logger[IO])
+    extends FetchTokenEndpoint[IO](tokenFinder, logger)
