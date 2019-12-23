@@ -52,7 +52,7 @@ object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) w
 sealed trait EventStatus extends StringTinyType with Product with Serializable
 object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
 
-  val all: Set[EventStatus] = Set(New, Processing, TriplesStoreFailure, TriplesStore, NonRecoverableFailure)
+  val all: Set[EventStatus] = Set(New, Processing, TriplesStore, RecoverableFailure, NonRecoverableFailure)
 
   final case object New extends EventStatus {
     override val value: String = "NEW"
@@ -66,10 +66,10 @@ object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator)
 
   sealed trait FailureStatus extends EventStatus
 
-  final case object TriplesStoreFailure extends FailureStatus {
-    override val value: String = "TRIPLES_STORE_FAILURE"
+  final case object RecoverableFailure extends FailureStatus {
+    override val value: String = "RECOVERABLE_FAILURE"
   }
-  type TriplesStoreFailure = TriplesStoreFailure.type
+  type RecoverableFailure = RecoverableFailure.type
 
   final case object NonRecoverableFailure extends FailureStatus {
     override val value: String = "NON_RECOVERABLE_FAILURE"

@@ -69,15 +69,14 @@ class RenkuLogTriplesGenerator private[renkulog] (
   private def cloneCheckoutGenerate(
       commit:           Commit,
       maybeAccessToken: Option[AccessToken]
-  ): Path => IO[Either[GenerationRecoverableError, JsonLDTriples]] =
-    repoDirectory => {
-      for {
-        repositoryUrl <- findRepositoryUrl(commit.project.path, maybeAccessToken).toRight
-        _             <- git clone (repositoryUrl, repoDirectory, workDirectory)
-        _             <- (git checkout (commit.id, repoDirectory)).toRight
-        triples       <- findTriples(commit, repoDirectory).toRight
-      } yield triples
-    }.value
+  )(repoDirectory:      Path): IO[Either[GenerationRecoverableError, JsonLDTriples]] = {
+    for {
+      repositoryUrl <- findRepositoryUrl(commit.project.path, maybeAccessToken).toRight
+      _             <- git clone (repositoryUrl, repoDirectory, workDirectory)
+      _             <- (git checkout (commit.id, repoDirectory)).toRight
+      triples       <- findTriples(commit, repoDirectory).toRight
+    } yield triples
+  }.value
 
   private implicit class IOOps[Right](io: IO[Right]) {
     lazy val toRight: EitherT[IO, GenerationRecoverableError, Right] = right[GenerationRecoverableError](io)

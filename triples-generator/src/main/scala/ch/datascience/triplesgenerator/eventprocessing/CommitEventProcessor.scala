@@ -141,7 +141,7 @@ class CommitEventProcessor[Interpretation[_]](
   private def markEventAsRecoverable(maybeUploadingError: Option[UploadingResult]) =
     maybeUploadingError match {
       case Some(RecoverableError(commit, exception)) =>
-        markEventFailed(commit.commitEventId, TriplesStoreFailure, EventMessage(exception))
+        markEventFailed(commit.commitEventId, RecoverableFailure, EventMessage(exception))
       case _ => ME.unit
     }
 

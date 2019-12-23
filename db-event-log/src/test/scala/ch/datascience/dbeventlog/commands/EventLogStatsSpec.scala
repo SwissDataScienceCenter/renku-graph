@@ -41,7 +41,7 @@ class EventLogStatsSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaC
           New                   -> statuses.count(_ == New),
           Processing            -> statuses.count(_ == Processing),
           TriplesStore          -> statuses.count(_ == TriplesStore),
-          TriplesStoreFailure   -> statuses.count(_ == TriplesStoreFailure),
+          RecoverableFailure    -> statuses.count(_ == RecoverableFailure),
           NonRecoverableFailure -> statuses.count(_ == NonRecoverableFailure)
         )
       }

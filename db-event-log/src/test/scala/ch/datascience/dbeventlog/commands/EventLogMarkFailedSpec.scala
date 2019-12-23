@@ -37,7 +37,7 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
 
   "markEventFailed" should {
 
-    s"set the given $TriplesStoreFailure status and message on event with the given id and project " +
+    s"set the given $RecoverableFailure status and message on event with the given id and project " +
       s"if the event has status $Processing" in new TestCase {
 
       storeEvent(commitEventIds.generateOne.copy(id = eventId.id),
@@ -56,15 +56,15 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
       val maybeMessage     = Gen.option(eventMessages).generateOne
       val newExecutionDate = executionDates.generateOne
       (executionDateCalculator
-        .newExecutionDate(_: CreatedDate, _: ExecutionDate)(_: StatusBasedCalculator[TriplesStoreFailure]))
-        .expects(createdDate, executionDate, triplesStoreFailureCalculator)
+        .newExecutionDate(_: CreatedDate, _: ExecutionDate)(_: StatusBasedCalculator[RecoverableFailure]))
+        .expects(createdDate, executionDate, recoverableFailureCalculator)
         .returning(newExecutionDate)
 
       eventLogMarkFailed
-        .markEventFailed(eventId, TriplesStoreFailure, maybeMessage)
+        .markEventFailed(eventId, RecoverableFailure, maybeMessage)
         .unsafeRunSync() shouldBe ((): Unit)
 
-      findEvent(eventId) shouldBe (newExecutionDate, TriplesStoreFailure, maybeMessage)
+      findEvent(eventId) shouldBe (newExecutionDate, RecoverableFailure, maybeMessage)
     }
 
     s"set the given $NonRecoverableFailure status and message on event with the given id and project " +
@@ -97,7 +97,7 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
       findEvent(eventId) shouldBe (newExecutionDate, NonRecoverableFailure, maybeMessage)
     }
 
-    s"do nothing when setting $TriplesStoreFailure and event status is different than $Processing" in new TestCase {
+    s"do nothing when setting $RecoverableFailure and event status is different than $Processing" in new TestCase {
 
       val eventStatus = eventStatuses generateDifferentThan Processing
       storeEvent(eventId, eventStatus, executionDate, committedDates.generateOne, eventBodies.generateOne, createdDate)
@@ -105,12 +105,12 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
       val message          = eventMessages.generateOne
       val newExecutionDate = executionDates.generateOne
       (executionDateCalculator
-        .newExecutionDate(_: CreatedDate, _: ExecutionDate)(_: StatusBasedCalculator[TriplesStoreFailure]))
-        .expects(createdDate, executionDate, triplesStoreFailureCalculator)
+        .newExecutionDate(_: CreatedDate, _: ExecutionDate)(_: StatusBasedCalculator[RecoverableFailure]))
+        .expects(createdDate, executionDate, recoverableFailureCalculator)
         .returning(newExecutionDate)
 
       eventLogMarkFailed
-        .markEventFailed(eventId, TriplesStoreFailure, Some(message))
+        .markEventFailed(eventId, RecoverableFailure, Some(message))
         .unsafeRunSync() shouldBe ((): Unit)
 
       findEvent(eventId) shouldBe (executionDate, eventStatus, None)

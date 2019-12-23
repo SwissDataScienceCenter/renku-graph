@@ -35,7 +35,7 @@ object DbEventLogGenerators {
     New,
     Processing,
     TriplesStore,
-    TriplesStoreFailure,
+    RecoverableFailure,
     NonRecoverableFailure
   )
   implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
