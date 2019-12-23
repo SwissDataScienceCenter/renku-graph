@@ -26,7 +26,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.commands._
 import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -57,6 +57,7 @@ class CommitEventProcessor[Interpretation[_]](
 )(implicit ME:                MonadError[Interpretation, Throwable])
     extends EventProcessor[Interpretation] {
 
+  import IOAccessTokenFinder._
   import UploadingResult._
   import accessTokenFinder._
   import commitEventsDeserialiser._
@@ -215,7 +216,7 @@ object IOCommitEventProcessor {
       .build()
       .name("events_processing_times")
       .help("Commit Events processing times")
-      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000)
+      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
       .register(_)
   }
 
@@ -226,13 +227,13 @@ object IOCommitEventProcessor {
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      uploader           <- IOUploader(ApplicationLogger)
-      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
+      uploader          <- IOUploader(ApplicationLogger)
+      accessTokenFinder <- IOAccessTokenFinder(ApplicationLogger)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
                                                          maybeHistogram = Some(eventsProcessingTimes))
     } yield new CommitEventProcessor[IO](
       new CommitEventsDeserialiser[IO](),
-      new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
+      accessTokenFinder,
       triplesGenerator,
       IOTriplesCurator(),
       uploader,

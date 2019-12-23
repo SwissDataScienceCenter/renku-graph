@@ -140,16 +140,19 @@ abstract class IORestClient[ThrottlingTarget](
   protected object ExceptionMessage {
 
     def apply(request: Request[IO], message: String, cause: Throwable): String =
-      s"${request.method} ${request.uri} $message error: ${toSingleLine(cause.getMessage)}"
+      s"${request.method} ${request.uri} $message error: ${toSingleLine(cause)}"
 
     def apply(request: Request[IO], cause: Throwable): String =
-      s"${request.method} ${request.uri} error: ${toSingleLine(cause.getMessage)}"
+      s"${request.method} ${request.uri} error: ${toSingleLine(cause)}"
 
     def apply(request: Request[IO], response: Response[IO], responseBody: String): String =
       s"${request.method} ${request.uri} returned ${response.status}; body: ${toSingleLine(responseBody)}"
 
     def apply(request: Request[IO], response: Response[IO], cause: Throwable): String =
-      s"${request.method} ${request.uri} returned ${response.status}; error: ${toSingleLine(cause.getMessage)}"
+      s"${request.method} ${request.uri} returned ${response.status}; error: ${toSingleLine(cause)}"
+
+    def toSingleLine(exception: Throwable): String =
+      Option(exception.getMessage) map toSingleLine getOrElse exception.getClass.getSimpleName
 
     def toSingleLine(string: String): String = string.split('\n').map(_.trim.filter(_ >= ' ')).mkString
   }

@@ -18,16 +18,19 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
 import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResources.briefJson
+import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
@@ -45,6 +48,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
   import ProjectsResources._
 
+  private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project          = projectsGen.generateOne
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
@@ -74,6 +78,9 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
 
       `triples updates run`(Set(project.created.creator.email) + project.created.creator.email)
+
+      And("the project exists in GitLab")
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}"
@@ -107,6 +114,10 @@ object ProjectsResources {
           "name": ${project.created.creator.name.toString},
           "email": ${project.created.creator.email.toString}
         }
+      },
+      "url": {
+        "ssh": ${project.repoUrls.ssh.toString},
+        "http": ${project.repoUrls.http.toString}
       }
     }""" deepMerge {
     _links(

@@ -34,11 +34,12 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.syntax._
-import io.circe.{Decoder, HCursor, Json}
+import io.circe.{Decoder, Json}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -58,7 +59,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
         (projectFinder
           .findProject(_: ProjectPath))
           .expects(project.path)
-          .returning(context.pure(Some(project)))
+          .returning(context pure Some(project))
 
         val response = getProject(project.path).unsafeRunSync()
 
@@ -124,7 +125,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val projectFinder         = mock[ProjectFinder[IO]]
+    val projectFinder         = mock[IOProjectFinder]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
@@ -138,22 +139,29 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit val projectEntityDecoder: EntityDecoder[IO, Project] = jsonOf[IO, Project]
 
-  private implicit lazy val projectDecoder: Decoder[Project] = (cursor: HCursor) =>
+  private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
     for {
       path    <- cursor.downField("path").as[ProjectPath]
       name    <- cursor.downField("name").as[Name]
-      created <- cursor.downField("created").as[ProjectCreation]
-    } yield Project(path, name, created)
+      created <- cursor.downField("created").as[Creation]
+      urls    <- cursor.downField("url").as[RepoUrls]
+    } yield Project(path, name, created, urls)
 
-  private implicit lazy val projectCreationDecoder: Decoder[ProjectCreation] = (cursor: HCursor) =>
+  private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
     for {
       date    <- cursor.downField("dateCreated").as[DateCreated]
-      creator <- cursor.downField("creator").as[ProjectCreator]
-    } yield ProjectCreation(date, creator)
+      creator <- cursor.downField("creator").as[Creator]
+    } yield Creation(date, creator)
 
-  private implicit lazy val projectCreatorDecoder: Decoder[ProjectCreator] = (cursor: HCursor) =>
+  private implicit lazy val creatorDecoder: Decoder[Creator] = cursor =>
     for {
       name  <- cursor.downField("name").as[UserName]
       email <- cursor.downField("email").as[Email]
-    } yield ProjectCreator(email, name)
+    } yield Creator(email, name)
+
+  private implicit lazy val urlsDecoder: Decoder[RepoUrls] = cursor =>
+    for {
+      ssh  <- cursor.downField("ssh").as[SshUrl]
+      http <- cursor.downField("http").as[HttpUrl]
+    } yield RepoUrls(ssh, http)
 }

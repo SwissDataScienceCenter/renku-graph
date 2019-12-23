@@ -25,6 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import io.chrisdavenport.log4cats.Logger
+import io.prometheus.client.Histogram
 
 import scala.concurrent.duration.TimeUnit
 import scala.language.higherKinds
@@ -32,11 +33,13 @@ import scala.language.higherKinds
 object TestExecutionTimeRecorder {
 
   def apply[Interpretation[_]](
-      logger:    Logger[Interpretation]
-  )(implicit ME: MonadError[Interpretation, Throwable]): TestExecutionTimeRecorder[Interpretation] =
+      logger:         Logger[Interpretation],
+      maybeHistogram: Option[Histogram] = None
+  )(implicit ME:      MonadError[Interpretation, Throwable]): TestExecutionTimeRecorder[Interpretation] =
     new TestExecutionTimeRecorder[Interpretation](
       threshold = elapsedTimes.generateOne,
-      logger    = logger
+      logger,
+      maybeHistogram
     )
 
   private implicit def clock[Interpretation[_]]: Clock[Interpretation] = new Clock[Interpretation] {
@@ -46,10 +49,11 @@ object TestExecutionTimeRecorder {
 }
 
 class TestExecutionTimeRecorder[Interpretation[_]](
-    threshold:    ElapsedTime,
-    logger:       Logger[Interpretation]
-)(implicit clock: Clock[Interpretation], ME: MonadError[Interpretation, Throwable])
-    extends ExecutionTimeRecorder[Interpretation](threshold, logger, maybeHistogram = None) {
+    threshold:      ElapsedTime,
+    logger:         Logger[Interpretation],
+    maybeHistogram: Option[Histogram]
+)(implicit clock:   Clock[Interpretation], ME: MonadError[Interpretation, Throwable])
+    extends ExecutionTimeRecorder[Interpretation](threshold, logger, maybeHistogram) {
 
   val elapsedTime:            ElapsedTime = threshold
   lazy val executionTimeInfo: String      = s" in ${threshold}ms"

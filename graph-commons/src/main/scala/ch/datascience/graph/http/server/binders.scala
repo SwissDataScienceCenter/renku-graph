@@ -37,6 +37,9 @@ object binders {
 
   object ProjectPath {
 
+    def unapply(value: String): Option[ProjectPathType] =
+      ProjectPathType.from(value).toOption
+
     class Namespace private (val value: String) extends AnyVal with StringTinyType
     object Namespace {
 

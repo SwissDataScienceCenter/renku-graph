@@ -27,9 +27,10 @@ import ch.datascience.microservices.IOMicroservice
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
-import ch.datascience.tokenrepository.repository.init.IODbInitializer
+import ch.datascience.tokenrepository.repository.init.{DbInitializer, IODbInitializer}
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.higherKinds
 
 object Microservice extends IOMicroservice {
@@ -46,6 +47,7 @@ object Microservice extends IOMicroservice {
         sentryInitializer      <- SentryInitializer[IO]
         fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger)
         associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
+        dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
         routes <- new MicroserviceRoutes[IO](
                    fetchTokenEndpoint,
                    associateTokenEndpoint,
@@ -55,7 +57,7 @@ object Microservice extends IOMicroservice {
 
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,
-                     new IODbInitializer(transactor),
+                     dbInitializer,
                      httpServer
                    ) run args
       } yield exitCode
@@ -64,7 +66,7 @@ object Microservice extends IOMicroservice {
 
 private class MicroserviceRunner(
     sentryInitializer: SentryInitializer[IO],
-    dbInitializer:     IODbInitializer,
+    dbInitializer:     DbInitializer[IO],
     httpServer:        HttpServer[IO]
 ) {
 

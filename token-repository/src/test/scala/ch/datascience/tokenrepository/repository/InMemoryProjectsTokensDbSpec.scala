@@ -20,28 +20,45 @@ package ch.datascience.tokenrepository.repository
 
 import ch.datascience.db.DbSpec
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import doobie.implicits._
 import org.scalatest.TestSuite
 
 trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb {
   self: TestSuite =>
 
-  protected def initDb(): Unit = execute {
-    sql"""|CREATE TABLE projects_tokens(
-          | project_id int4 PRIMARY KEY,
-          | token VARCHAR NOT NULL
-          |);""".stripMargin.update.run.map(_ => ())
-  }
+  protected def initDb(): Unit = createTable()
 
   protected def prepareDbForTest(): Unit = execute {
     sql"TRUNCATE TABLE projects_tokens".update.run.map(_ => ())
   }
 
-  protected def findToken(projectId: ProjectId): Option[String] = execute {
-    sql"""select token 
-          from projects_tokens  
-          where project_id = ${projectId.value}"""
+  protected def insert(projectId: ProjectId, projectPath: ProjectPath, encryptedToken: EncryptedAccessToken): Unit =
+    execute {
+      sql"""insert into 
+            projects_tokens (project_id, project_path, token) 
+            values (${projectId.value}, ${projectPath.value}, ${encryptedToken.value})
+         """.update.run
+        .map(assureInserted)
+    }
+
+  private lazy val assureInserted: Int => Unit = {
+    case 1 => ()
+    case _ => fail("insertion problem")
+  }
+
+  protected def findToken(projectPath: ProjectPath): Option[String] =
+    sql"select token from projects_tokens where project_path = ${projectPath.value}"
       .query[String]
       .option
-  }
+      .transact(transactor.get)
+      .unsafeRunSync()
+
+  protected def findToken(projectId: ProjectId): Option[String] =
+    sql"select token from projects_tokens where project_id = ${projectId.value}"
+      .query[String]
+      .option
+      .transact(transactor.get)
+      .unsafeRunSync()
 }

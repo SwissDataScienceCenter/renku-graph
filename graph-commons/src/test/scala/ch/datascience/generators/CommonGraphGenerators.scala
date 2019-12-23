@@ -29,7 +29,7 @@ import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -118,6 +118,10 @@ object CommonGraphGenerators {
     for {
       path <- relativePaths(maxSegments = 1)
     } yield renkuResourcesUrl / path
+  implicit val gitLabUrls: Gen[GitLabUrl] = for {
+    url  <- httpUrls
+    path <- relativePaths(maxSegments = 2)
+  } yield GitLabUrl(s"$url/$path")
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
     url         <- httpUrls

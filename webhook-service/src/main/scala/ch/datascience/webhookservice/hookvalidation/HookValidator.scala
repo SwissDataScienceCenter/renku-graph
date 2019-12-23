@@ -50,6 +50,7 @@ class HookValidator[Interpretation[_]](
 
   import HookValidator.HookValidationResult._
   import HookValidator._
+  import IOAccessTokenFinder._
   import ProjectVisibility._
   import Token._
   import accessTokenAssociator._
@@ -125,8 +126,11 @@ class HookValidator[Interpretation[_]](
       ME.pure(HookMissing)
 
   private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[HookValidationResult]] = {
+    case exception @ NoAccessTokenException(message) =>
+      logger.info(s"Hook validation failed: $message")
+      ME.raiseError(exception)
     case NonFatal(exception) =>
-      logger.error(exception)(s"Hook validation fails for project with id $projectId")
+      logger.error(exception)(s"Hook validation failed for project with id $projectId")
       ME.raiseError(exception)
   }
 

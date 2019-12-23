@@ -43,6 +43,10 @@ spec:
                 secretKeyRef:
                   name: {{ template "jena.fullname" . }}
                   key: jena-renku-password
+            - name: TOKEN_REPOSITORY_BASE_URL
+              value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
+            - name: GITLAB_BASE_URL
+              value: {{ .Values.gitlab.url }}
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
               {{- if .Values.sentry.enabled }}

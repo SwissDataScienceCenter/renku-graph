@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
@@ -43,14 +43,16 @@ import scala.util.{Failure, Success, Try}
 
 class CommitToEventLogSpec extends WordSpec with MockFactory {
 
+  import IOAccessTokenFinder._
+
   "storeCommitsInEventLog" should {
 
     "convert the start Commit into commit events and store them in the event log" in new TestCase {
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(projectId, projectIdToPath)
         .returning(context pure maybeAccessToken)
 
       (commitEventsSource
@@ -86,8 +88,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(projectId, projectIdToPath)
         .returning(context pure maybeAccessToken)
 
       (commitEventsSource
@@ -112,8 +114,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(projectId, projectIdToPath)
         .returning(context raiseError exception)
 
       commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Failure(exception)
@@ -125,8 +127,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(projectId, projectIdToPath)
         .returning(context pure maybeAccessToken)
 
       val exception = exceptions.generateOne
@@ -144,8 +146,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(projectId, projectIdToPath)
         .returning(context.pure(maybeAccessToken))
 
       (commitEventsSource
@@ -168,8 +170,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(projectId, projectIdToPath)
         .returning(context.pure(maybeAccessToken))
 
       (commitEventsSource
@@ -193,8 +195,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
     "store all non failing events and log errors for these for which storing fails" in new TestCase {
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(projectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(projectId, projectIdToPath)
         .returning(context.pure(maybeAccessToken))
 
       (commitEventsSource
