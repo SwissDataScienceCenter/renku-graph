@@ -18,8 +18,11 @@
 
 package ch.datascience.graph.model
 
+import cats.implicits._
+import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
 import ch.datascience.tinytypes.constraints.{RelativePath, Url}
 import eu.timepit.refined.auto._
@@ -27,6 +30,8 @@ import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import scala.util.Try
 
 class ProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
@@ -102,6 +107,16 @@ class ProjectResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
     "fail when ending with a /" in {
       an[IllegalArgumentException] shouldBe thrownBy {
         ProjectResource(httpUrls(pathGenerator).generateOne + "/")
+      }
+    }
+  }
+
+  "toProjectPath converter" should {
+
+    "convert any Project Resource to ProjectPath" in {
+      forAll { (renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath) =>
+        println(projectPath)
+        ProjectResource(renkuBaseUrl, projectPath).as[Try, ProjectPath] shouldBe projectPath.pure[Try]
       }
     }
   }

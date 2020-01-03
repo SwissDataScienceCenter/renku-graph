@@ -47,7 +47,7 @@ object projects {
     def apply(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath): ProjectResource =
       ProjectResource((renkuBaseUrl / "projects" / projectPath).value)
 
-    private val pathExtractor = "^.*\\/projects\\/(.*\\/.*)$".r
+    private val pathExtractor = "^.*\\/projects\\/(.*)$".r
     implicit lazy val projectPathConverter: TinyTypeConverter[ProjectResource, ProjectPath] = {
       case ProjectResource(pathExtractor(path)) => ProjectPath.from(path)
       case illegalValue                         => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
