@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,17 +19,52 @@
 package ch.datascience.knowledgegraph.projects
 
 import ch.datascience.generators.CommonGraphGenerators.{emails, names}
+import ch.datascience.generators.Generators.{nonBlankStrings, nonEmptyList, httpUrls => urls}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.knowledgegraph.projects.model._
+import ch.datascience.knowledgegraph.projects.model.{Creation, Creator, Project, RepoUrls}
+import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{GitLabProject, ProjectUrls}
+import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import org.scalacheck.Gen
 
 object ProjectsGenerators {
 
   implicit val projects: Gen[Project] = for {
+    kgProject     <- kgProjects
+    gitLabProject <- gitLabProjects
+  } yield Project(
+    path = kgProject.path,
+    name = kgProject.name,
+    created = Creation(
+      date    = kgProject.created.date,
+      creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
+    ),
+    repoUrls = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http)
+  )
+
+  implicit lazy val kgProjects: Gen[KGProject] = for {
     id      <- projectPaths
     name    <- projectNames
     created <- projectCreations
-  } yield Project(id, name, created)
+  } yield KGProject(id, name, created)
+
+  implicit lazy val gitLabProjects: Gen[GitLabProject] =
+    projectUrlObjects map GitLabProject
+
+  private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
+    sshUrl  <- sshUrls
+    httpUrl <- httpUrls
+  } yield ProjectUrls(httpUrl, sshUrl)
+
+  private implicit lazy val sshUrls: Gen[SshUrl] = for {
+    hostParts   <- nonEmptyList(nonBlankStrings())
+    projectPath <- projectPaths
+  } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
+
+  private implicit lazy val httpUrls: Gen[HttpUrl] = for {
+    url         <- urls
+    projectPath <- projectPaths
+  } yield HttpUrl(s"$url/$projectPath.git")
 
   private implicit lazy val projectCreations: Gen[ProjectCreation] = for {
     created <- projectCreatedDates

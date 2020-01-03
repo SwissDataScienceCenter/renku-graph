@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,10 +18,21 @@
 
 package ch.datascience.tokenrepository.repository.deletion
 
-import cats.effect.IO
+import cats.effect._
 import ch.datascience.db.DbTransactor
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
+import io.chrisdavenport.log4cats.Logger
 
-private class IOTokenRemover(
+import scala.util.Try
+
+class TryTokenRemover(
+    transactor: DbTransactor[Try, ProjectsTokensDB]
+)(implicit ME:  Bracket[Try, Throwable])
+    extends TokenRemover[Try](transactor)
+
+class IOTokenRemover(
     transactor: DbTransactor[IO, ProjectsTokensDB]
 ) extends TokenRemover[IO](transactor)
+
+class IODeleteTokenEndpoint(tokenRemover: TokenRemover[IO], logger: Logger[IO])
+    extends DeleteTokenEndpoint[IO](tokenRemover, logger)

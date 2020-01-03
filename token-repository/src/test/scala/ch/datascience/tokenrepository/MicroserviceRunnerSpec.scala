@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -41,7 +41,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
       (dbInitializer.run _)
         .expects()
-        .returning(context.pure(ExitCode.Success))
+        .returning(context.unit)
 
       (httpServer.run _)
         .expects()
@@ -86,7 +86,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
       (dbInitializer.run _)
         .expects()
-        .returning(context.pure(ExitCode.Success))
+        .returning(context.unit)
 
       val exception = exceptions.generateOne
       (httpServer.run _)

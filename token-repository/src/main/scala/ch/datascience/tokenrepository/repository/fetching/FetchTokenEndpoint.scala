@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,12 +18,14 @@
 
 package ch.datascience.tokenrepository.repository.fetching
 
+import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
@@ -40,26 +42,31 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
     logger:      Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
-  def fetchToken(projectId: ProjectId): Interpretation[Response[Interpretation]] =
-    tokenFinder
-      .findToken(projectId)
-      .value
-      .flatMap(toHttpResult(projectId))
-      .recoverWith(httpResult(projectId))
+  def fetchToken[ID](
+      projectIdentifier: ID
+  )(implicit findToken:  ID => OptionT[Interpretation, AccessToken]): Interpretation[Response[Interpretation]] =
+    findToken(projectIdentifier).value
+      .flatMap(toHttpResult(projectIdentifier))
+      .recoverWith(httpResult(projectIdentifier))
 
-  private def toHttpResult(projectId: ProjectId): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
+  private def toHttpResult[ID](projectIdentifier: ID): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
     case Some(token) =>
       Ok(token.asJson)
     case None =>
-      NotFound(InfoMessage(s"Token for projectId: $projectId not found"))
+      NotFound(InfoMessage(s"Token for project: $projectIdentifier not found"))
   }
 
-  private def httpResult(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private def httpResult[ID](
+      projectIdentifier: ID
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding token for projectId: $projectId failed")
+      val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
+
+  implicit val findById:   ProjectId => OptionT[Interpretation, AccessToken]   = tokenFinder.findToken
+  implicit val findByPath: ProjectPath => OptionT[Interpretation, AccessToken] = tokenFinder.findToken
 }
 
 object IOFetchTokenEndpoint {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,6 +25,7 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.project.ProjectVisibility.{Private, Public}
 import org.http4s.Status._
 import org.scalatest.Matchers._
@@ -36,8 +37,8 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
 
     scenario("There's a Graph Services hook on a Public project in GitLab") {
 
-      val projectId   = projectIds.generateOne
-      val accessToken = accessTokens.generateOne
+      val projectId = projectIds.generateOne
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
@@ -54,8 +55,8 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
 
     scenario("There's no Graph Services hook on a Public project in GitLab") {
 
-      val projectId   = projectIds.generateOne
-      val accessToken = accessTokens.generateOne
+      val projectId = projectIds.generateOne
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
@@ -72,8 +73,8 @@ class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with G
 
     scenario("There's a Graph Services hook on a non-public project in GitLab") {
 
-      val projectId   = projectIds.generateOne
-      val accessToken = accessTokens.generateOne
+      val projectId = projectIds.generateOne
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       Given("project is present in GitLab")
       `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Private)

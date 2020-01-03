@@ -4,12 +4,12 @@ This is a microservice which provides CRUD operations for `projectId` -> `access
 
 ## API
 
-| Method  | Path                               | Description                                  |
-|---------|------------------------------------|----------------------------------------------|
-|  GET    | ```/ping```                        | To check if service is healthy               |
-|  GET    | ```/projects/:id/tokens```         | Fetches an access token for the project id   |
-|  PUT    | ```/projects/:id/tokens```         | Associates the given token and project id    |
-|  DELETE | ```/projects/:id/tokens```         | Deletes the token and project id association |
+| Method  | Path                               | Description                                        |
+|---------|------------------------------------|----------------------------------------------------|
+|  GET    | ```/ping```                        | To check if service is healthy                     |
+|  GET    | ```/projects/:id/tokens```         | Fetches an access token for the project id or path |
+|  PUT    | ```/projects/:id/tokens```         | Associates the given token and project id          |
+|  DELETE | ```/projects/:id/tokens```         | Deletes the token and project id association       |
 
 #### GET /ping
 
@@ -17,22 +17,24 @@ Verifies service health.
 
 **Response**
 
-| Status                     | Description             |
-|----------------------------|-------------------------|
-| OK (200)                   | If service is healthy   |
-| INTERNAL SERVER ERROR (500)| Otherwise               |
+| Status                     | Description           |
+|----------------------------|-----------------------|
+| OK (200)                   | If service is healthy |
+| INTERNAL SERVER ERROR (500)| Otherwise             |
 
 #### GET /projects/:id/tokens
 
-Fetches an access token for a project id.
+Fetches an access token for a project id or path.
+
+**NOTICE**: if project path used, it has to be URL encoded.
 
 **Response**
 
-| Status                     | Description                                                                           |
-|----------------------------|---------------------------------------------------------------------------------------|
-| OK (200)                   | When an access token can be found for the project                                     |
-| NOT_FOUND (404)            | When an access token cannot be found for the project                                  |
-| INTERNAL SERVER ERROR (500)| When there were problems with finding the token                                       |
+| Status                     | Description                                          |
+|----------------------------|------------------------------------------------------|
+| OK (200)                   | When an access token can be found for the project    |
+| NOT_FOUND (404)            | When an access token cannot be found for the project |
+| INTERNAL SERVER ERROR (500)| When there were problems with finding the token      |
 
 Response for a case when the token is a Personal Access Token
 ```

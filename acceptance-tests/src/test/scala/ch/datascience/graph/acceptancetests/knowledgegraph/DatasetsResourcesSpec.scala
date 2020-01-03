@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,10 +18,12 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
+import ch.datascience.graph.acceptancetests.stubs.GitLab.`GET <gitlab>/api/v4/projects/:path returning OK with`
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
@@ -32,6 +34,7 @@ import ch.datascience.graph.model.datasets.{Description, Identifier, Name}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Name => UserName}
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
@@ -55,6 +58,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   import DatasetsResources._
 
   feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
+
+    implicit val accessToken: AccessToken = accessTokens.generateOne
 
     val project          = projectsGen.generateOne
     val dataset1CommitId = commitIds.generateOne
@@ -120,6 +125,9 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           .toSet + dataset1Creation.agent.email + dataset2Creation.agent.email + project.created.creator.email
       )
 
+      And("the project exists in GitLab")
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
 
@@ -163,6 +171,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {
 
     scenario("As a user I would like to be able to search for datasets by some free-text search") {
+
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       val text             = nonBlankStrings(minLength = 10).generateOne
       val dataset1Projects = nonEmptyList(projectsGen).generateOne.toList
@@ -256,7 +266,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         .flatMap(sortCreators)
     }
 
-    def pushToStore(dataset: Dataset, projects: List[Project]): Unit =
+    def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit =
       projects foreach { project =>
         val commitId = commitIds.generateOne
         `data in the RDF store`(project.toGitLabProject(),

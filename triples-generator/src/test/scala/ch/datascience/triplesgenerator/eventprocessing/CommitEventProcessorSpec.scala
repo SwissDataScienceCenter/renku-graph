@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,6 +29,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.tokenrepository.IOAccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
@@ -37,6 +38,7 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.IOCommitEventProcessor.eventsProcessingTimes
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.interpreters.TryTriplesCurator
@@ -54,6 +56,7 @@ import scala.collection.JavaConverters._
 import scala.util.Try
 
 class CommitEventProcessorSpec extends WordSpec with MockFactory {
+  import IOAccessTokenFinder._
 
   "apply" should {
 
@@ -338,14 +341,15 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
   "eventsProcessingTimes histogram" should {
 
     "have 'events_processing_times' name" in {
-      IOCommitEventProcessor.eventsProcessingTimes.startTimer().observeDuration()
+      eventsProcessingTimes.startTimer().observeDuration()
 
-      IOCommitEventProcessor.eventsProcessingTimes.collect().asScala.headOption.map(_.name) shouldBe Some(
+      eventsProcessingTimes.collect().asScala.headOption.map(_.name) shouldBe Some(
         "events_processing_times"
       )
     }
 
     "be registered in the Metrics Registry" in {
+      eventsProcessingTimes.startTimer().observeDuration()
       MetricsRegistry.verifyInRegistry("events_processing_times") shouldBe true
     }
   }
@@ -365,7 +369,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
     val eventLogMarkNew       = mock[TryEventLogMarkNew]
     val eventLogMarkFailed    = mock[TryEventLogMarkFailed]
     val logger                = TestLogger[Try]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger)
+    val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger, Some(eventsProcessingTimes))
     val eventProcessor = new CommitEventProcessor[Try](
       eventsDeserialiser,
       accessTokenFinder,
@@ -381,8 +385,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
 
     def givenFetchingAccessToken(forProjectId: ProjectId) =
       (accessTokenFinder
-        .findAccessToken(_: ProjectId))
-        .expects(forProjectId)
+        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .expects(forProjectId, projectIdToPath)
 
     def generateTriples(forCommits: NonEmptyList[Commit]): NonEmptyList[(Commit, JsonLDTriples)] =
       forCommits map (_ -> jsonLDTriples.generateOne)
@@ -441,7 +445,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory {
   }
 
   private def verifyMetricsCollected() =
-    IOCommitEventProcessor.eventsProcessingTimes
+    eventsProcessingTimes
       .collect()
       .asScala
       .flatMap(_.samples.asScala.map(_.name))

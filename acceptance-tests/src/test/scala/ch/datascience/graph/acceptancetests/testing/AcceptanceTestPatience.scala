@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,12 +19,12 @@
 package ch.datascience.graph.acceptancetests.testing
 
 import org.scalatest.concurrent.AbstractPatienceConfiguration
-import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.time.{Millis, Minute, Span}
 
 trait AcceptanceTestPatience extends AbstractPatienceConfiguration {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout  = scaled(Span(50, Seconds)),
+    timeout  = scaled(Span(1, Minute)),
     interval = scaled(Span(300, Millis))
   )
 }

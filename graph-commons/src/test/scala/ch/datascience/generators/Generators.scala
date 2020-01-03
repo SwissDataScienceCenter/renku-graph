@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -114,11 +114,16 @@ object Generators {
       list <- Gen.listOfN(size, generator)
     } yield list
 
-  def setOf[T](generator: Gen[T], maxElements: Int Refined Positive = 5): Gen[Set[T]] =
+  def setOf[T](generator:   Gen[T],
+               minElements: Int Refined NonNegative = 0,
+               maxElements: Int Refined Positive = 5): Gen[Set[T]] = {
+    require(minElements.value <= maxElements.value)
+
     for {
-      size <- choose(0, maxElements.value)
+      size <- choose(minElements.value, maxElements.value)
       set  <- Gen.containerOfN[Set, T](size, generator)
     } yield set
+  }
 
   def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
     choose(1, max) map Refined.unsafeApply
