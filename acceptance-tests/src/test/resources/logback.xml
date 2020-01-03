@@ -3,7 +3,7 @@
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <charset>UTF-8</charset>
-            <pattern>%d %-5level %logger{5} - %message%n</pattern>
+            <pattern>[%level] %message%n</pattern>
         </encoder>
     </appender>
 
@@ -11,13 +11,19 @@
         <appender-ref ref="STDOUT"/>
     </appender>
 
-    <logger name="application" level="OFF" additivity="false">
+    <logger name="application" level="ERROR" additivity="false">
         <appender-ref ref="ASYNC_STDOUT"/>
     </logger>
 
-    <logger name="com.github.tomakehurst.wiremock" level="OFF"/>
+    <logger name="test" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_STDOUT"/>
+    </logger>
 
-    <root level="OFF">
+    <logger name="com.github.tomakehurst.wiremock" level="OFF">
+        <appender-ref ref="ASYNC_STDOUT"/>
+    </logger>
+
+    <root level="ERROR">
         <appender-ref ref="ASYNC_STDOUT"/>
     </root>
 

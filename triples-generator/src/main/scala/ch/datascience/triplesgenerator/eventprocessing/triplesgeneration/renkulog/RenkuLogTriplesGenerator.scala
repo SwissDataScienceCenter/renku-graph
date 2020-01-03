@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -59,13 +59,13 @@ class RenkuLogTriplesGenerator private[renkulog] (
     createRepositoryDirectory(commit.project.path)
       .bracket { repositoryDirectory =>
         for {
-          gitRepositoryUrl <- findRepositoryUrl(commit.project.path, maybeAccessToken)
-          _                <- git cloneRepo (gitRepositoryUrl, repositoryDirectory, workDirectory)
-          _                <- git checkout (commit.id, repositoryDirectory)
-          triples          <- findTriples(commit, repositoryDirectory)
+          repositoryUrl <- findRepositoryUrl(commit.project.path, maybeAccessToken)
+          _             <- git clone (repositoryUrl, repositoryDirectory, workDirectory)
+          _             <- git checkout (commit.id, repositoryDirectory)
+          triples       <- findTriples(commit, repositoryDirectory)
         } yield triples
       }(repositoryDirectory => delete(repositoryDirectory))
-      .recoverWith(meaningfulError)
+      .recoverWith(meaningfulError(maybeAccessToken))
 
   private def createRepositoryDirectory(projectPath: ProjectPath): IO[Path] =
     contextShift.shift *> mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
@@ -86,9 +86,18 @@ class RenkuLogTriplesGenerator private[renkulog] (
     }
   }
 
-  private lazy val meaningfulError: PartialFunction[Throwable, IO[JsonLDTriples]] = {
+  private def meaningfulError(maybeAccessToken: Option[AccessToken]): PartialFunction[Throwable, IO[JsonLDTriples]] = {
     case NonFatal(exception) =>
-      IO.raiseError(new RuntimeException("Triples generation failed", exception))
+      IO.raiseError {
+        (Option(exception.getMessage) -> maybeAccessToken)
+          .mapN { (message, token) =>
+            if (message contains token.value)
+              new Exception(s"Triples generation failed: ${message replaceAll (token.value, token.toString)}")
+            else
+              new Exception("Triples generation failed", exception)
+          }
+          .getOrElse(new Exception("Triples generation failed", exception))
+      }
   }
 }
 

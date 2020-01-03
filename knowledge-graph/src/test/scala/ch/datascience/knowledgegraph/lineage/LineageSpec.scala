@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,6 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
+import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -68,7 +69,7 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   private val edgesSets: Gen[Set[Edge]] = for {
     edgesNumber <- positiveInts()
-    edgesSet    <- setOf[Edge](edges, edgesNumber)
+    edgesSet    <- setOf[Edge](edges, minElements = 1, maxElements = edgesNumber)
   } yield edgesSet
 
   private def collectNodes(edges: Set[Edge]): Set[Node] =

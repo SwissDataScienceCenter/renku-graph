@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,14 +19,17 @@
 package ch.datascience.knowledgegraph.projects.rest
 
 import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects._
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
-import io.chrisdavenport.log4cats.Logger
+import cats.implicits._
+import ch.datascience.control.Throttler
+import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import IOAccessTokenFinder._
+import cats.data.OptionT
+import cats.effect.{ContextShift, IO}
+import ch.datascience.knowledgegraph.config.GitLab
+import ch.datascience.knowledgegraph.projects.model._
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
+import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -35,83 +38,54 @@ trait ProjectFinder[Interpretation[_]] {
   def findProject(path: ProjectPath): Interpretation[Option[Project]]
 }
 
-private class IOProjectFinder(
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext,
-  contextShift:              ContextShift[IO],
-  timer:                     Timer[IO],
-  ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient(rdfStoreConfig, logger)
-    with ProjectFinder[IO] {
+class IOProjectFinder(
+    kgProjectFinder:     KGProjectFinder[IO],
+    gitLabProjectFinder: GitLabProjectFinder[IO],
+    accessTokenFinder:   AccessTokenFinder[IO]
+)(implicit ME:           MonadError[IO, Throwable], cs: ContextShift[IO])
+    extends ProjectFinder[IO] {
 
-  import io.circe.Decoder
+  import accessTokenFinder._
+  import gitLabProjectFinder.{findProject => findProjectInGitLab}
+  import kgProjectFinder.{findProject => findInKG}
 
-  override def findProject(path: ProjectPath): IO[Option[Project]] = {
-    implicit val decoder: Decoder[List[Project]] = recordsDecoder(path)
-    queryExpecting[List[Project]](using = query(path)) flatMap toSingleProject
-  }
+  def findProject(path: ProjectPath): IO[Option[Project]] =
+    ((OptionT(findInKG(path)), findInGitLab(path)) parMapN (merge(path, _, _))).value
 
-  private def query(path: ProjectPath): String =
-    s"""
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
-       |
-       |SELECT DISTINCT ?name ?dateCreated ?creatorName ?creatorEmail
-       |WHERE {
-       |  ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
-       |                                                             schema:name ?name ;
-       |                                                             schema:dateCreated ?dateCreated ;
-       |                                                             schema:creator ?creatorResource .
-       |  ?creatorResource rdf:type <http://schema.org/Person> ;
-       |                   schema:email ?creatorEmail ;
-       |                   schema:name ?creatorName .         
-       |}""".stripMargin
+  private def findInGitLab(path: ProjectPath) =
+    for {
+      accessToken   <- OptionT(findAccessToken(path))
+      gitLabProject <- findProjectInGitLab(path, Some(accessToken))
+    } yield gitLabProject
 
-  private def recordsDecoder(path: ProjectPath): Decoder[List[Project]] = {
-    import Decoder._
-    import ch.datascience.graph.model.projects._
-    import ch.datascience.graph.model.users.{Email, Name => UserName}
-    import ch.datascience.knowledgegraph.projects.model._
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
-
-    val project: Decoder[Project] = { cursor =>
-      for {
-        name         <- cursor.downField("name").downField("value").as[Name]
-        dateCreated  <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-        creatorName  <- cursor.downField("creatorName").downField("value").as[UserName]
-        creatorEmail <- cursor.downField("creatorEmail").downField("value").as[Email]
-      } yield Project(
-        path,
-        name,
-        ProjectCreation(dateCreated, ProjectCreator(creatorEmail, creatorName))
-      )
-    }
-
-    _.downField("results").downField("bindings").as(decodeList(project))
-  }
-
-  private lazy val toSingleProject: List[Project] => IO[Option[Project]] = {
-    case Nil            => ME.pure(None)
-    case project +: Nil => ME.pure(Some(project))
-    case projects       => ME.raiseError(new RuntimeException(s"More than one project with ${projects.head.path} path"))
-  }
+  private def merge(path: ProjectPath, kgProject: KGProject, gitLabProject: GitLabProject) =
+    Project(
+      path = path,
+      name = kgProject.name,
+      created = Creation(
+        date    = kgProject.created.date,
+        creator = Creator(kgProject.created.creator.email, kgProject.created.creator.name)
+      ),
+      repoUrls = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http)
+    )
 }
 
 private object IOProjectFinder {
+  import cats.effect.{ContextShift, IO, Timer}
+  import com.typesafe.config.{Config, ConfigFactory}
+  import io.chrisdavenport.log4cats.Logger
 
   def apply(
-      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-      logger:                  Logger[IO] = ApplicationLogger
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ProjectFinder[IO]] =
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO],
+      config:          Config = ConfigFactory.load()
+  )(implicit ME:       MonadError[IO, Throwable],
+    executionContext:  ExecutionContext,
+    contextShift:      ContextShift[IO],
+    timer:             Timer[IO]): IO[ProjectFinder[IO]] =
     for {
-      config       <- rdfStoreConfig
-      renkuBaseUrl <- renkuBaseUrl
-    } yield new IOProjectFinder(config, renkuBaseUrl, logger)
+      kgProjectFinder     <- IOKGProjectFinder(logger = logger)
+      gitLabProjectFinder <- IOGitLabProjectFinder(gitLabThrottler, logger)
+      accessTokenFinder   <- IOAccessTokenFinder(logger)
+    } yield new IOProjectFinder(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
 }

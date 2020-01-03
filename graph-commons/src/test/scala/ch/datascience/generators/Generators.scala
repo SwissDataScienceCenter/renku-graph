@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,7 +28,7 @@ import ch.datascience.tinytypes._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import eu.timepit.refined.numeric.{NonNegative, Positive}
+import eu.timepit.refined.numeric.{NonNegative, NonPositive, Positive}
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
@@ -114,11 +114,16 @@ object Generators {
       list <- Gen.listOfN(size, generator)
     } yield list
 
-  def setOf[T](generator: Gen[T], maxElements: Int Refined Positive = 5): Gen[Set[T]] =
+  def setOf[T](generator:   Gen[T],
+               minElements: Int Refined NonNegative = 0,
+               maxElements: Int Refined Positive = 5): Gen[Set[T]] = {
+    require(minElements.value <= maxElements.value)
+
     for {
-      size <- choose(0, maxElements.value)
+      size <- choose(minElements.value, maxElements.value)
       set  <- Gen.containerOfN[Set, T](size, generator)
     } yield set
+  }
 
   def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
     choose(1, max) map Refined.unsafeApply
@@ -128,7 +133,11 @@ object Generators {
 
   def nonNegativeInts(max: Int = 1000): Gen[Int Refined NonNegative] = choose(0, max) map Refined.unsafeApply
 
+  def nonPositiveInts(min: Int = -1000): Gen[Int Refined NonPositive] = choose(min, 0) map Refined.unsafeApply
+
   def negativeInts(min: Int = -1000): Gen[Int] = choose(min, 0)
+
+  def nonNegativeLongs(max: Long = 1000): Gen[Long Refined NonNegative] = choose(0L, max) map Refined.unsafeApply
 
   def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
     choose(1, max.toMillis)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,22 +26,28 @@ import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
+import io.prometheus.client.Histogram
 
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
 class ExecutionTimeRecorder[Interpretation[_]](
-    threshold:    ElapsedTime,
-    logger:       Logger[Interpretation]
-)(implicit clock: Clock[Interpretation], ME: MonadError[Interpretation, Throwable]) {
+    threshold:      ElapsedTime,
+    logger:         Logger[Interpretation],
+    maybeHistogram: Option[Histogram]
+)(implicit clock:   Clock[Interpretation], ME: MonadError[Interpretation, Throwable]) {
 
+  // format: off
   def measureExecutionTime[BlockOut](block: => Interpretation[BlockOut]): Interpretation[(ElapsedTime, BlockOut)] =
     for {
-      startTime   <- clock monotonic MILLISECONDS
-      result      <- block
-      endTime     <- clock monotonic MILLISECONDS
-      elapsedTime <- ME.fromEither(ElapsedTime.from(endTime - startTime))
+      startTime           <- clock monotonic MILLISECONDS
+      maybeHistogramTimer = maybeHistogram map (_.startTimer())
+      result              <- block
+      _                   = maybeHistogramTimer map (_.observeDuration())
+      endTime             <- clock monotonic MILLISECONDS
+      elapsedTime         <- ME.fromEither(ElapsedTime.from(endTime - startTime))
     } yield (elapsedTime, result)
+  // format: on
 
   def logExecutionTimeWhen[BlockOut](
       condition: PartialFunction[BlockOut, String]
@@ -73,14 +79,15 @@ class ExecutionTimeRecorder[Interpretation[_]](
 object ExecutionTimeRecorder {
 
   def apply[Interpretation[_]](
-      logger:       Logger[Interpretation],
-      config:       Config = ConfigFactory.load()
-  )(implicit clock: Clock[Interpretation],
-    ME:             MonadError[Interpretation, Throwable]): Interpretation[ExecutionTimeRecorder[Interpretation]] =
+      logger:         Logger[Interpretation],
+      config:         Config = ConfigFactory.load(),
+      maybeHistogram: Option[Histogram] = None
+  )(implicit clock:   Clock[Interpretation],
+    ME:               MonadError[Interpretation, Throwable]): Interpretation[ExecutionTimeRecorder[Interpretation]] =
     for {
       duration  <- find[Interpretation, FiniteDuration]("logging.elapsed-time-threshold", config)
       threshold <- ME.fromEither(ElapsedTime from duration.toMillis)
-    } yield new ExecutionTimeRecorder(threshold, logger)
+    } yield new ExecutionTimeRecorder(threshold, logger, maybeHistogram)
 
   class ElapsedTime private (val value: Long) extends AnyVal with LongTinyType
   object ElapsedTime extends TinyTypeFactory[ElapsedTime](new ElapsedTime(_)) {

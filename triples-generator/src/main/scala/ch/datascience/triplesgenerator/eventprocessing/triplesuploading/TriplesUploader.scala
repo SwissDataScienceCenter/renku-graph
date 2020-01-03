@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -70,9 +70,10 @@ private class IOTriplesUploader(
       .putHeaders(`Content-Type`(`ld+json`))
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
-    case (Ok, _, _)                => IO.pure(DeliverySuccess)
-    case (BadRequest, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
-    case (other, _, response)      => singleLineBody(response).map(message => s"$other: $message").map(DeliveryFailure.apply)
+    case (Ok, _, _)                         => IO.pure(DeliverySuccess)
+    case (BadRequest, _, response)          => singleLineBody(response).map(InvalidTriplesFailure.apply)
+    case (InternalServerError, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
+    case (other, _, response)               => singleLineBody(response).map(message => s"$other: $message").map(DeliveryFailure.apply)
   }
 
   private def singleLineBody(response: Response[IO]): IO[String] =

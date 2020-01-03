@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -89,6 +89,14 @@ class TinyTypeDecodersSpec extends WordSpec {
     "decode JSON Int value" in {
       val value = Arbitrary.arbInt.arbitrary.generateOne
       json"""$value""".as[IntTestType] shouldBe Right(IntTestType(value))
+    }
+  }
+
+  "longDecoder" should {
+
+    "decode JSON Long value" in {
+      val value = Arbitrary.arbLong.arbitrary.generateOne
+      json"""$value""".as[LongTestType] shouldBe Right(LongTestType(value))
     }
   }
 

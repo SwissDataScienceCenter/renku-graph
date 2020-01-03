@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -17,8 +17,6 @@
  */
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
-
-import java.nio.file.Paths
 
 import ammonite.ops.{Bytes, CommandResult, Path}
 import cats.effect.{ContextShift, IO, Timer}
@@ -106,8 +104,4 @@ class RenkuSpec extends WordSpec {
     case None           => CommitWithoutParent(commitId, project)
     case Some(parentId) => CommitWithParent(commitId, parentId, project)
   }
-
-  private val paths: Gen[os.Path] = for {
-    path <- relativePaths()
-  } yield os.Path(Paths.get(s"/$path"))
 }

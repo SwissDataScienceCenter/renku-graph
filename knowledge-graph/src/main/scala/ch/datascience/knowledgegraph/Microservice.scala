@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,9 @@ import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
+import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.http.server.HttpServer
+import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.IOQueryEndpoint
 import ch.datascience.knowledgegraph.projects.rest.IOProjectEndpoint
@@ -45,23 +47,22 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      sentryInitializer <- SentryInitializer[IO]
-
+      sentryInitializer       <- SentryInitializer[IO]
+      gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+      gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
+      projectEndpoint         <- IOProjectEndpoint(gitLabThrottler)
       queryEndpoint           <- IOQueryEndpoint()
-      projectEndpoint         <- IOProjectEndpoint()
       projectDatasetsEndpoint <- IOProjectDatasetsEndpoint()
       datasetEndpoint         <- IODatasetEndpoint()
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint()
-      httpServer = new HttpServer[IO](
-        serverPort = 9004,
-        serviceRoutes = new MicroserviceRoutes[IO](
-          queryEndpoint,
-          projectEndpoint,
-          projectDatasetsEndpoint,
-          datasetEndpoint,
-          datasetsSearchEndpoint
-        ).routes
-      )
+      routes <- new MicroserviceRoutes[IO](
+                 queryEndpoint,
+                 projectEndpoint,
+                 projectDatasetsEndpoint,
+                 datasetEndpoint,
+                 datasetsSearchEndpoint
+               ).routes
+      httpServer = new HttpServer[IO](serverPort = 9004, routes)
 
       exitCode <- new MicroserviceRunner(sentryInitializer, httpServer).run(args)
     } yield exitCode

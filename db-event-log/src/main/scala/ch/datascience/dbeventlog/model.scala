@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -51,6 +51,9 @@ object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) w
 
 sealed trait EventStatus extends StringTinyType with Product with Serializable
 object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
+
+  val all: Set[EventStatus] = Set(New, Processing, TriplesStoreFailure, TriplesStore, NonRecoverableFailure)
+
   final case object New extends EventStatus {
     override val value: String = "NEW"
   }
@@ -73,12 +76,9 @@ object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator)
   }
   type NonRecoverableFailure = NonRecoverableFailure.type
 }
+
 private object EventStatusInstantiator extends (String => EventStatus) {
-  import EventStatus._
-
-  private val allStatuses = Set(New, Processing, TriplesStoreFailure, TriplesStore, NonRecoverableFailure)
-
-  override def apply(value: String): EventStatus = allStatuses.find(_.value == value).getOrElse {
+  override def apply(value: String): EventStatus = EventStatus.all.find(_.value == value).getOrElse {
     throw new IllegalArgumentException(s"'$value' unknown EventStatus")
   }
 }

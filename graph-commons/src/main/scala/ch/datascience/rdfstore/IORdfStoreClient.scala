@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,13 +23,13 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.rdfstore.IORdfStoreClient.RdfQueryType
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
+import ch.datascience.http.rest.paging.PagingRequest
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
+import io.circe.Decoder.decodeList
 import org.http4s.{Header, Uri}
 
 import scala.concurrent.ExecutionContext
@@ -46,7 +46,7 @@ abstract class IORdfStoreClient(
   ME:                        MonadError[IO, Throwable])
     extends IORestClient(Throttler.noThrottling, logger, retryInterval, maxRetries) {
 
-  import ch.datascience.rdfstore.IORdfStoreClient.{Query, RdfQuery, RdfUpdate}
+  import IORdfStoreClient._
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
   import org.http4s.Status._
@@ -61,9 +61,12 @@ abstract class IORdfStoreClient(
   protected def updateWitMapping[ResultType](
       using:       String,
       mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
-  ): IO[ResultType] = runQuery(using, mapResponse, RdfUpdate)
+  ): IO[ResultType] = runQuery(SparqlQuery(Set.empty, using), mapResponse, RdfUpdate)
 
   protected def queryExpecting[ResultType](using: String)(implicit decoder: Decoder[ResultType]): IO[ResultType] =
+    queryExpecting[ResultType](SparqlQuery(Set.empty, using))
+
+  protected def queryExpecting[ResultType](using: SparqlQuery)(implicit decoder: Decoder[ResultType]): IO[ResultType] =
     runQuery(
       using,
       toFullResponseMapper(responseMapperFor[ResultType]),
@@ -71,17 +74,16 @@ abstract class IORdfStoreClient(
     )
 
   private def runQuery[ResultType](
-      using:       String,
+      query:       SparqlQuery,
       mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]],
       queryType:   RdfQueryType
   ): IO[ResultType] =
     for {
       uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
-      query  <- ME.fromEither(Query.from(using))
       result <- send(uploadRequest(uri, queryType, query))(mapResponse)
     } yield result
 
-  private def uploadRequest(uri: Uri, queryType: RdfQueryType, query: Query): Request[IO] =
+  private def uploadRequest(uri: Uri, queryType: RdfQueryType, query: SparqlQuery): Request[IO] =
     request(POST, uri, rdfStoreConfig.authCredentials)
       .withEntity(toEntity(queryType, query))
       .putHeaders(`Content-Type`(`x-www-form-urlencoded`), Header(Accept.name.value, "application/sparql-results+json"))
@@ -95,7 +97,7 @@ abstract class IORdfStoreClient(
   private def responseMapperFor[ResultType](implicit decoder: Decoder[ResultType]): Response[IO] => IO[ResultType] =
     _.as[ResultType](implicitly[MonadError[IO, Throwable]], jsonOf[IO, ResultType])
 
-  private def toEntity(queryType: RdfQueryType, query: Query): String = queryType match {
+  private def toEntity(queryType: RdfQueryType, query: SparqlQuery): String = queryType match {
     case _: RdfQuery => s"query=$query"
     case _ => s"update=$query"
   }
@@ -104,12 +106,38 @@ abstract class IORdfStoreClient(
     case _: RdfQuery => "sparql"
     case _ => "update"
   }
+
+  protected def pagedResultsFinder[ResultType](
+      query:          SparqlQuery
+  )(implicit decoder: Decoder[ResultType]): PagedResultsFinder[IO, ResultType] =
+    new PagedResultsFinder[IO, ResultType] {
+      import cats.implicits._
+      import ch.datascience.http.rest.paging.model.Total
+      import ch.datascience.tinytypes.json.TinyTypeDecoders._
+
+      override def findResults(pagingRequest: PagingRequest): IO[List[ResultType]] =
+        for {
+          queryWithPaging <- query.include[IO](pagingRequest)
+          results         <- queryExpecting[List[ResultType]](using = queryWithPaging)
+        } yield results
+
+      override def findTotal() = queryExpecting[Option[Total]](using = query.toCountQuery).flatMap {
+        case Some(total) => total.pure[IO]
+        case None        => new Exception("Total number of records cannot be found").raiseError[IO, Total]
+      }
+
+      private implicit val totalDecoder: Decoder[Option[Total]] = {
+        val totals: Decoder[Total] = _.downField("total").downField("value").as[Total]
+        _.downField("results").downField("bindings").as(decodeList(totals)).map(_.headOption)
+      }
+
+      private implicit val recordsDecoder: Decoder[List[ResultType]] = {
+        _.downField("results").downField("bindings").as(decodeList[ResultType])
+      }
+    }
 }
 
 object IORdfStoreClient {
-
-  class Query private (val value: String) extends AnyVal with StringTinyType
-  object Query extends TinyTypeFactory[Query](new Query(_)) with NonBlank
 
   private trait RdfQueryType
   private final implicit case object RdfQuery extends RdfQueryType

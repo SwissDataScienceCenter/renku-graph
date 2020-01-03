@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,31 +19,31 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
-import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.config.renku
 import ch.datascience.knowledgegraph.projects.rest.{ProjectEndpoint, ProjectFinder}
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
 class IOProjectEndpointStub(projectFinder:         ProjectFinder[IO],
-                            renkuResourcesUrl:     RenkuResourcesUrl,
+                            renkuResourcesUrl:     renku.ResourcesUrl,
                             executionTimeRecorder: ExecutionTimeRecorder[IO],
                             logger:                Logger[IO])
     extends ProjectEndpoint[IO](projectFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
 class IOProjectDatasetsEndpointStub(projectDatasetsFinder: ProjectDatasetsFinder[IO],
-                                    renkuResourcesUrl:     RenkuResourcesUrl,
+                                    renkuResourcesUrl:     renku.ResourcesUrl,
                                     executionTimeRecorder: ExecutionTimeRecorder[IO],
                                     logger:                Logger[IO])
     extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
 class IODatasetEndpointStub(datasetFinder:         DatasetFinder[IO],
-                            renkuResourcesUrl:     RenkuResourcesUrl,
+                            renkuResourcesUrl:     renku.ResourcesUrl,
                             executionTimeRecorder: ExecutionTimeRecorder[IO],
                             logger:                Logger[IO])
     extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
 class IODatasetsSearchEndpointStub(datasetsFinder:        DatasetsFinder[IO],
-                                   renkuResourcesUrl:     RenkuResourcesUrl,
+                                   renkuResourcesUrl:     renku.ResourcesUrl,
                                    executionTimeRecorder: ExecutionTimeRecorder[IO],
                                    logger:                Logger[IO])
     extends DatasetsSearchEndpoint[IO](datasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)

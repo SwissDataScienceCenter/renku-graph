@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -71,32 +71,29 @@ object Microservice extends IOMicroservice {
         gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
         hookTokenCrypto       <- HookTokenCrypto[IO]()
         executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-
-        httpServer = new HttpServer[IO](
-          serverPort = 9001,
-          serviceRoutes = new MicroserviceRoutes[IO](
-            new IOHookEventEndpoint(transactor,
-                                    tokenRepositoryUrl,
-                                    gitLabUrl,
-                                    gitLabThrottler,
-                                    hookTokenCrypto,
-                                    executionTimeRecorder),
-            new IOHookCreationEndpoint(transactor,
-                                       tokenRepositoryUrl,
-                                       projectHookUrl,
-                                       gitLabUrl,
-                                       gitLabThrottler,
-                                       hookTokenCrypto,
-                                       executionTimeRecorder),
-            new IOHookValidationEndpoint(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
-            new IOProcessingStatusEndpoint(transactor,
+        routes <- new MicroserviceRoutes[IO](
+                   new IOHookEventEndpoint(transactor,
                                            tokenRepositoryUrl,
-                                           projectHookUrl,
                                            gitLabUrl,
                                            gitLabThrottler,
-                                           executionTimeRecorder)
-          ).routes
-        )
+                                           hookTokenCrypto,
+                                           executionTimeRecorder),
+                   new IOHookCreationEndpoint(transactor,
+                                              tokenRepositoryUrl,
+                                              projectHookUrl,
+                                              gitLabUrl,
+                                              gitLabThrottler,
+                                              hookTokenCrypto,
+                                              executionTimeRecorder),
+                   new IOHookValidationEndpoint(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
+                   new IOProcessingStatusEndpoint(transactor,
+                                                  tokenRepositoryUrl,
+                                                  projectHookUrl,
+                                                  gitLabUrl,
+                                                  gitLabThrottler,
+                                                  executionTimeRecorder)
+                 ).routes
+        httpServer = new HttpServer[IO](serverPort = 9001, routes)
 
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,

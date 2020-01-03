@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -62,7 +62,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .cloneRepo(_: ServiceUrl, _: Path, _: Path))
+        .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
         .returning(IO.pure(successfulCommandResult))
 
@@ -103,7 +103,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .cloneRepo(_: ServiceUrl, _: Path, _: Path))
+        .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
         .returning(IO.pure(successfulCommandResult))
 
@@ -168,21 +168,23 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       actual.getCause   shouldBe exception
     }
 
-    "fail if cloning the repo fails" in new TestCase {
+    "fail if cloning the repo fails - exception message should not reveal the access token" in new TestCase {
 
       (file
         .mkdir(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
+      val accessToken                    = accessTokens.generateOne
+      override lazy val maybeAccessToken = Some(accessToken)
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
-      val exception = exceptions.generateOne
+      val exception = new Exception(s"${exceptions.generateOne.getMessage} $gitRepositoryUrl")
       (git
-        .cloneRepo(_: ServiceUrl, _: Path, _: Path))
+        .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
         .returning(IO.raiseError(exception))
 
@@ -195,8 +197,11 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
-      actual.getCause   shouldBe exception
+
+      actual.getMessage should startWith("Triples generation failed: ")
+      actual.getMessage should not include accessToken.value
+      actual.getMessage should include(accessToken.toString)
+      actual.getCause   shouldBe null
     }
 
     "fail if checking out the sha fails" in new TestCase {
@@ -212,7 +217,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .cloneRepo(_: ServiceUrl, _: Path, _: Path))
+        .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
         .returning(IO.pure(successfulCommandResult))
 
@@ -248,7 +253,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .cloneRepo(_: ServiceUrl, _: Path, _: Path))
+        .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
         .returning(IO.pure(successfulCommandResult))
 
@@ -289,7 +294,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .cloneRepo(_: ServiceUrl, _: Path, _: Path))
+        .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
         .returning(IO.pure(successfulCommandResult))
 
@@ -323,11 +328,13 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val successfulCommandResult = CommandResult(exitCode = 0, chunks = Nil)
 
-    val repositoryName   = nonEmptyStrings().generateOne
-    val projectPath      = ProjectPath(s"user/$repositoryName")
-    val maybeAccessToken = Gen.option(accessTokens).generateOne
-    val gitRepositoryUrl = serviceUrls.generateOne / s"$projectPath.git"
-    val commitWithoutParent @ CommitWithoutParent(commitId, _) =
+    lazy val repositoryName   = nonEmptyStrings().generateOne
+    lazy val projectPath      = ProjectPath(s"user/$repositoryName")
+    lazy val maybeAccessToken = Gen.option(accessTokens).generateOne
+    lazy val gitRepositoryUrl = serviceUrls.generateOne / maybeAccessToken
+      .map(_.value)
+      .getOrElse("path") / s"$projectPath.git"
+    lazy val commitWithoutParent @ CommitWithoutParent(commitId, _) =
       CommitWithoutParent(commitIds.generateOne, Project(projectIds.generateOne, projectPath))
 
     def toCommitWithParent(commitWithoutParent: CommitWithoutParent): CommitWithParent =

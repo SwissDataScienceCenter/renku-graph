@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -40,10 +40,10 @@ object EndpointTester {
   implicit val jsonListEntityDecoder: EntityDecoder[IO, List[Json]] = jsonOf[IO, List[Json]]
   implicit val jsonEntityEncoder:     EntityEncoder[IO, Json]       = jsonEncoderOf[IO, Json]
 
-  implicit class EndpointOps(endpoint: Kleisli[IO, Request[IO], Response[IO]]) {
+  implicit class IOEndpointOps(endpoint: IO[Kleisli[IO, Request[IO], Response[IO]]]) {
 
     def call(request: Request[IO]) = new {
-      private val runResponse: Response[IO] = endpoint.run(request).unsafeRunSync()
+      private val runResponse: Response[IO] = endpoint.flatMap(_.run(request)).unsafeRunSync()
 
       lazy val status: Status = runResponse.status
 

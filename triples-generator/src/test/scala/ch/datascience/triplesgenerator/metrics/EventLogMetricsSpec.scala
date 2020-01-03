@@ -1,0 +1,114 @@
+/*
+ * Copyright 2020 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.datascience.triplesgenerator.metrics
+
+import EventLogMetrics.{statusesGauge, totalGauge}
+import cats.effect.{ContextShift, IO, Timer}
+import cats.implicits._
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.DbEventLogGenerators._
+import ch.datascience.dbeventlog.commands.EventLogStats
+import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Error
+import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
+class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with IntegrationPatience {
+
+  "run" should {
+
+    "update the gauges with the fetched values" in new TestCase {
+      val statuses = statuesGen.generateOne
+      (eventLogStats.statuses _)
+        .expects()
+        .returning(statuses.pure[IO])
+        .atLeastOnce()
+
+      metrics.run.start.unsafeRunCancelable(_ => ())
+
+      eventually {
+        statuses foreach {
+          case (status, count) =>
+            statusesGauge.labels(status.toString).get().toLong shouldBe count
+        }
+      }
+
+      eventually {
+        totalGauge.get().toLong shouldBe statuses.valuesIterator.sum
+      }
+    }
+
+    "log an eventual error and continue collecting the metrics" in new TestCase {
+      val exception = exceptions.generateOne
+      (eventLogStats.statuses _)
+        .expects()
+        .returning(exception.raiseError[IO, Map[EventStatus, Long]])
+      val statuses = statuesGen.generateOne
+      (eventLogStats.statuses _)
+        .expects()
+        .returning(statuses.pure[IO])
+        .atLeastOnce()
+
+      metrics.run.start.unsafeRunCancelable(_ => ())
+
+      eventually {
+        statuses foreach {
+          case (status, count) =>
+            statusesGauge.labels(status.toString).get().toLong shouldBe count
+        }
+      }
+
+      eventually {
+        totalGauge.get().toLong shouldBe statuses.valuesIterator.sum
+      }
+
+      eventually {
+        logger.loggedOnly(Error("Problem with gathering metrics", exception))
+      }
+    }
+  }
+
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
+
+  private trait TestCase {
+    abstract class IOEventLogStats(transactor: DbTransactor[IO, EventLogDB]) extends EventLogStats[IO](transactor)
+    val eventLogStats = mock[IOEventLogStats]
+    val logger        = TestLogger[IO]()
+    val interval      = 100 millis
+    val metrics       = new EventLogMetrics[IO](eventLogStats, logger, statusesGauge, totalGauge, interval)
+  }
+
+  private lazy val statuesGen: Gen[Map[EventStatus, Long]] = nonEmptySet {
+    for {
+      status <- eventStatuses
+      count  <- positiveLongs()
+    } yield status -> count.value
+  }.map(_.toMap)
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,13 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.tokenrepository.repository.init
 
-import ch.datascience.tinytypes.Constraints
+import cats.effect.IO
+import ch.datascience.db.DbTransactor
+import ch.datascience.tokenrepository.repository.ProjectsTokensDB
+import io.chrisdavenport.log4cats.Logger
 
-trait GreaterThanZero extends Constraints[Int] {
-  addConstraint(
-    check   = _ > 0,
-    message = (value: Int) => s"$typeName cannot be <= 0"
-  )
-}
+abstract class IODbInitializer(projectPathAdder: ProjectPathAdder[IO],
+                               transactor:       DbTransactor[IO, ProjectsTokensDB],
+                               logger:           Logger[IO])
+    extends DbInitializer(projectPathAdder, transactor, logger)

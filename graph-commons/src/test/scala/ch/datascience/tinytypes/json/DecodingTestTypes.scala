@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,6 +38,9 @@ private object DecodingTestTypes {
 
   class IntTestType private (val value: Int) extends AnyVal with IntTinyType
   implicit object IntTestType extends TinyTypeFactory[IntTestType](new IntTestType(_))
+
+  class LongTestType private (val value: Long) extends AnyVal with LongTinyType
+  implicit object LongTestType extends TinyTypeFactory[LongTestType](new LongTestType(_))
 
   class LocalDateTestType private (val value: LocalDate) extends AnyVal with LocalDateTinyType
   implicit object LocalDateTestType extends TinyTypeFactory[LocalDateTestType](new LocalDateTestType(_))

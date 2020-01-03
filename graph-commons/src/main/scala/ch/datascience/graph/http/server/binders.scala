@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -36,6 +36,9 @@ object binders {
   }
 
   object ProjectPath {
+
+    def unapply(value: String): Option[ProjectPathType] =
+      ProjectPathType.from(value).toOption
 
     class Namespace private (val value: String) extends AnyVal with StringTinyType
     object Namespace {

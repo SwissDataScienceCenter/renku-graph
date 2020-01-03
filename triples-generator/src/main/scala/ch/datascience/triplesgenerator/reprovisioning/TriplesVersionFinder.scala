@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -46,32 +46,29 @@ private class IOTriplesVersionFinder(
 
   override def triplesUpToDate: IO[Boolean] =
     measureExecutionTime {
-      findRenkuVersions map {
-        case currentVersion +: Nil => currentVersion == s"renku $schemaVersion"
-        case _                     => false
+      findCommitAgents map {
+        case Nil      => false
+        case versions => versions forall (_.endsWith(schemaVersion.toString))
       }
     } map logExecutionTime(withMessage = "Checking if triples are up to date done")
 
-  private def findRenkuVersions = queryExpecting[List[String]] {
-    s"""
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       |PREFIX prov: <http://www.w3.org/ns/prov#>
-       |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
-       |
-       |SELECT DISTINCT ?version
-       |WHERE {
-       |  ?agent rdf:type prov:SoftwareAgent ;
-       |         rdfs:label ?version .
-       |}
-       |""".stripMargin
+  private def findCommitAgents = queryExpecting[List[String]] {
+    s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        |PREFIX prov: <http://www.w3.org/ns/prov#>
+        |
+        |SELECT DISTINCT ?agent
+        |WHERE {
+        |  ?commit rdf:type prov:Activity ;
+        |          prov:agent ?agent .
+        |  ?agent rdf:type prov:SoftwareAgent .
+        |}
+        |""".stripMargin
   }
 
-  private implicit lazy val versionsDecoder: Decoder[List[String]] =
+  private implicit lazy val agentsDecoder: Decoder[List[String]] =
     _.downField("results")
       .downField("bindings")
-      .as(decodeList(ofVersions))
+      .as(decodeList(ofAgents))
 
-  private lazy val ofVersions: Decoder[String] = _.downField("version").downField("value").as[String]
+  private lazy val ofAgents: Decoder[String] = _.downField("agent").downField("value").as[String]
 }

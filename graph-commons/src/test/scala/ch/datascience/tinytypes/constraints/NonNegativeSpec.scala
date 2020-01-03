@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{IntTinyType, LongTinyType, TinyTypeFactory}
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -26,20 +26,39 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class NonNegativeSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  "NonNegative" should {
+  "NonNegativeInt" should {
 
     "be instantiatable when values are greater or equal zero" in {
       forAll(Gen.choose(0, 100000)) { someValue =>
-        NonNegativeInt(someValue).value shouldBe someValue
+        TestNonNegativeInt(someValue).value shouldBe someValue
       }
     }
 
     "throw an IllegalArgumentException for negative value" in {
-      intercept[IllegalArgumentException](NonNegativeInt(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.NonNegativeInt cannot be < 0"
+      intercept[IllegalArgumentException](TestNonNegativeInt(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.TestNonNegativeInt cannot be < 0"
+    }
+  }
+
+  "NonNegativeLong" should {
+
+    "be instantiatable when values are greater or equal zero" in {
+      forAll(Gen.choose(0, 100000)) { someValue =>
+        TestNonNegativeLong(someValue).value shouldBe someValue
+      }
+    }
+
+    "throw an IllegalArgumentException for negative value" in {
+      intercept[IllegalArgumentException](TestNonNegativeLong(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.TestNonNegativeLong cannot be < 0"
     }
   }
 }
 
-private class NonNegativeInt private (val value: Int) extends AnyVal with IntTinyType
+private class TestNonNegativeInt private (val value: Int) extends AnyVal with IntTinyType
+private object TestNonNegativeInt
+    extends TinyTypeFactory[TestNonNegativeInt](new TestNonNegativeInt(_))
+    with NonNegativeInt
 
-private object NonNegativeInt extends TinyTypeFactory[NonNegativeInt](new NonNegativeInt(_)) with NonNegative
+private class TestNonNegativeLong private (val value: Long) extends AnyVal with LongTinyType
+private object TestNonNegativeLong
+    extends TinyTypeFactory[TestNonNegativeLong](new TestNonNegativeLong(_))
+    with NonNegativeLong

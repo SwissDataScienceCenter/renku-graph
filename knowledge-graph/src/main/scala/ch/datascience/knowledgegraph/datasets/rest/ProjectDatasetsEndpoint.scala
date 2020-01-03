@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,13 +20,13 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect._
 import cats.implicits._
-import ch.datascience.config.RenkuResourcesUrl
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.Links
 import Links._
+import ch.datascience.config.renku
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
@@ -43,7 +43,7 @@ import scala.util.control.NonFatal
 
 class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     projectDatasetsFinder: ProjectDatasetsFinder[Interpretation],
-    renkuResourcesUrl:     RenkuResourcesUrl,
+    renkuResourcesUrl:     renku.ResourcesUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
@@ -69,8 +69,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
   }
 
   private def finishedSuccessfully(projectPath: ProjectPath): PartialFunction[Response[Interpretation], String] = {
-    case response if response.status == Ok || response.status == NotFound =>
-      s"Finding '$projectPath' datasets finished"
+    case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
   }
 
   private implicit val datasetEncoder: Encoder[(Identifier, Name)] = Encoder.instance[(Identifier, Name)] {
@@ -93,7 +92,7 @@ object IOProjectDatasetsEndpoint {
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
-      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ProjectDatasetsEndpoint[IO](
       new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
