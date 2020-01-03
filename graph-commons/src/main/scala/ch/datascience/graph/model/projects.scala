@@ -28,8 +28,10 @@ object projects {
 
   class ProjectPath private (val value: String) extends AnyVal with RelativePathTinyType
   implicit object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with RelativePath {
+    private val allowedFirstChar = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
+    private val regexValidator   = "^([a-zA-Z0-9_.-]+)(\\/([a-zA-Z0-9_.-]+))+$"
     addConstraint(
-      check   = value => value.contains("/") && (value.indexOf("/") == value.lastIndexOf("/")),
+      check   = v => (v contains "/") && (allowedFirstChar contains v.head) && (v matches regexValidator),
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
   }

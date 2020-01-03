@@ -143,16 +143,17 @@ object Generators {
     choose(1, max.toMillis)
       .map(FiniteDuration(_, MILLISECONDS))
 
-  def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] = {
+  def relativePaths(minSegments: Int = 1,
+                    maxSegments: Int = 10,
+                    partsGenerator: Gen[String] = nonEmptyStrings(
+                      charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
+                    )): Gen[String] = {
     require(minSegments <= maxSegments,
             s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense")
 
     for {
       partsNumber <- Gen.choose(minSegments, maxSegments)
-      partsGenerator = nonEmptyStrings(
-        charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
-      )
-      parts <- Gen.listOfN(partsNumber, partsGenerator)
+      parts       <- Gen.listOfN(partsNumber, partsGenerator)
     } yield parts.mkString("/")
   }
 
@@ -165,7 +166,8 @@ object Generators {
                }
     port <- httpPorts
     host <- nonEmptyStrings()
-  } yield s"$protocol://$host:$port"
+    path <- relativePaths(maxSegments = 2)
+  } yield s"$protocol://$host:$port/$path"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
