@@ -37,7 +37,7 @@ class ResourcesUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
   "apply" should {
 
     "return a ResourcesUrl if there's a value for 'services.renku.resource-url'" in {
-      forAll(httpUrls) { url =>
+      forAll(httpUrls()) { url =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(

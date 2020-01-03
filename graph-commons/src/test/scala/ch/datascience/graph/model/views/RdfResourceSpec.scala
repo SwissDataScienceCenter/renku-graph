@@ -28,7 +28,7 @@ class RdfResourceSpec extends WordSpec {
   "fullProjectPathResourceRenderer" should {
 
     "wrap the value into <>" in {
-      val projectPath = fullProjectPaths.generateOne
+      val projectPath = projectResources.generateOne
       projectPath.showAs[RdfResource] shouldBe s"<$projectPath>"
     }
   }

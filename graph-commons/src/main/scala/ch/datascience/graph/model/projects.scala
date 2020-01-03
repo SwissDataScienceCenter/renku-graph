@@ -28,28 +28,28 @@ object projects {
 
   class ProjectPath private (val value: String) extends AnyVal with RelativePathTinyType
   implicit object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with RelativePath {
-    private val allowedFirstChar = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
-    private val regexValidator   = "^([a-zA-Z0-9_.-]+)(\\/([a-zA-Z0-9_.-]+))+$"
+    private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
+    private[projects] val regexValidator = "^([a-zA-Z0-9_.-]+)(\\/([a-zA-Z0-9_.-]+))+$"
     addConstraint(
       check   = v => (v contains "/") && (allowedFirstChar contains v.head) && (v matches regexValidator),
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
   }
 
-  class FullProjectPath private (val value: String) extends AnyVal with StringTinyType
-  implicit object FullProjectPath extends TinyTypeFactory[FullProjectPath](new FullProjectPath(_)) with Url {
-    private val projectPathValidator = "^http[s]?:\\/\\/.*\\/projects\\/.*\\/.*$"
+  class ProjectResource private (val value: String) extends AnyVal with StringTinyType
+  implicit object ProjectResource extends TinyTypeFactory[ProjectResource](new ProjectResource(_)) with Url {
+    private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${ProjectPath.regexValidator.drop(1)}"
     addConstraint(
-      _ matches projectPathValidator,
+      _ matches regexValidator,
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
 
-    def apply(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath): FullProjectPath =
-      FullProjectPath((renkuBaseUrl / "projects" / projectPath).value)
+    def apply(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath): ProjectResource =
+      ProjectResource((renkuBaseUrl / "projects" / projectPath).value)
 
     private val pathExtractor = "^.*\\/projects\\/(.*\\/.*)$".r
-    implicit lazy val projectPathConverter: TinyTypeConverter[FullProjectPath, ProjectPath] = {
-      case FullProjectPath(pathExtractor(path)) => ProjectPath.from(path)
+    implicit lazy val projectPathConverter: TinyTypeConverter[ProjectResource, ProjectPath] = {
+      case ProjectResource(pathExtractor(path)) => ProjectPath.from(path)
       case illegalValue                         => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
     }
   }

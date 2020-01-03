@@ -20,7 +20,7 @@ package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.{FilePath, FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.{FilePath, ProjectPath, ProjectResource}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf, uuid}
@@ -39,14 +39,14 @@ object GraphModelGenerators {
 
     relativePaths(
       minSegments    = 2,
-      maxSegments    = 2,
+      maxSegments    = 5,
       partsGenerator = partsGenerator
     ) map ProjectPath.apply
   }
-  implicit val fullProjectPaths: Gen[FullProjectPath] = for {
-    url  <- httpUrls
+  implicit val projectResources: Gen[ProjectResource] = for {
+    url  <- httpUrls()
     path <- projectPaths
-  } yield FullProjectPath.from(s"$url/projects/$path").fold(throw _, identity)
+  } yield ProjectResource.from(s"$url/projects/$path").fold(throw _, identity)
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIds: Gen[Identifier] = Gen

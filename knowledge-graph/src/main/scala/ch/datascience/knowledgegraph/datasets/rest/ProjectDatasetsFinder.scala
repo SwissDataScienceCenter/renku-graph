@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{Identifier, Name}
-import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
@@ -55,7 +55,7 @@ private class IOProjectDatasetsFinder(
         |
         |SELECT DISTINCT ?identifier ?name
         |WHERE {
-        |  ?dataset dcterms:isPartOf|schema:isPartOf ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} .
+        |  ?dataset dcterms:isPartOf|schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} .
         |  ?dataset rdf:type <http://schema.org/Dataset> ;
         |           schema:identifier ?identifier ;
         |           schema:name ?name .

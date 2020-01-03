@@ -32,7 +32,7 @@ class modelSpec extends WordSpec with ScalaCheckPropertyChecks {
   "HttpUrl" should {
 
     "instantiate for valid absolute git urls" in {
-      forAll(httpUrls, projectPaths) { (httpUrl, projectPath) =>
+      forAll(httpUrls(), projectPaths) { (httpUrl, projectPath) =>
         val url = s"$httpUrl/$projectPath.git"
         HttpUrl.from(url).map(_.value) shouldBe Right(url)
       }

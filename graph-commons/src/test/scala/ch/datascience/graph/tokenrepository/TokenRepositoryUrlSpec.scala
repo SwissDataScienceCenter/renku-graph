@@ -34,7 +34,7 @@ class TokenRepositoryUrlSpec extends WordSpec {
   "apply" should {
 
     "read 'services.token-repository.url' from the config" in {
-      val url = httpUrls.generateOne
+      val url = httpUrls().generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(

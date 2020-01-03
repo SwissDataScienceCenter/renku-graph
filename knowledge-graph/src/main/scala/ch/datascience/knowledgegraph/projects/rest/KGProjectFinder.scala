@@ -71,7 +71,7 @@ private class IOKGProjectFinder(
        |
        |SELECT DISTINCT ?name ?dateCreated ?creatorName ?creatorEmail
        |WHERE {
-       |  ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
+       |  ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
        |                                                             schema:name ?name ;
        |                                                             schema:dateCreated ?dateCreated ;
        |                                                             schema:creator ?creatorResource .
