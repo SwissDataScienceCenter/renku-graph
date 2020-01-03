@@ -89,7 +89,6 @@ class ProjectResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "be successful for URLs ending with a project path" in {
       forAll(httpUrls(pathGenerator)) { url =>
-        println(url)
         ProjectResource(url).value shouldBe url
       }
     }
