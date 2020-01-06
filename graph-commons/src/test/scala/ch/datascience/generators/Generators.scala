@@ -143,29 +143,33 @@ object Generators {
     choose(1, max.toMillis)
       .map(FiniteDuration(_, MILLISECONDS))
 
-  def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] = {
+  def relativePaths(minSegments: Int = 1,
+                    maxSegments: Int = 10,
+                    partsGenerator: Gen[String] = nonEmptyStrings(
+                      charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
+                    )): Gen[String] = {
     require(minSegments <= maxSegments,
             s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense")
 
     for {
       partsNumber <- Gen.choose(minSegments, maxSegments)
-      partsGenerator = nonEmptyStrings(
-        charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
-      )
-      parts <- Gen.listOfN(partsNumber, partsGenerator)
+      parts       <- Gen.listOfN(partsNumber, partsGenerator)
     } yield parts.mkString("/")
   }
 
   val httpPorts: Gen[Int Refined Positive] = choose(1000, 10000) map Refined.unsafeApply
 
-  val httpUrls: Gen[String] = for {
-    protocol <- Arbitrary.arbBool.arbitrary map {
-                 case true  => "http"
-                 case false => "https"
-               }
-    port <- httpPorts
-    host <- nonEmptyStrings()
-  } yield s"$protocol://$host:$port"
+  def httpUrls(pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)): Gen[String] =
+    for {
+      protocol <- Arbitrary.arbBool.arbitrary map {
+                   case true  => "http"
+                   case false => "https"
+                 }
+      port <- httpPorts
+      host <- nonEmptyStrings()
+      path <- pathGenerator
+      pathValidated = if (path.isEmpty) "" else s"/$path"
+    } yield s"$protocol://$host:$port$pathValidated"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
@@ -175,7 +179,7 @@ object Generators {
     port <- httpPorts
   } yield s"$protocol://localhost:$port"
 
-  val validatedUrls: Gen[String Refined Url] = httpUrls map Refined.unsafeApply
+  val validatedUrls: Gen[String Refined Url] = httpUrls() map Refined.unsafeApply
 
   val shas: Gen[String] = for {
     length <- Gen.choose(40, 40)
@@ -211,9 +215,9 @@ object Generators {
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
 
-  implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls.map(ServiceUrl.apply)
+  implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls() map ServiceUrl.apply
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
-  implicit val exceptions:   Gen[Exception]   = nonEmptyStrings(20).map(new Exception(_))
+  implicit val exceptions:   Gen[Exception]   = nonEmptyStrings(20) map (new Exception(_))
   implicit val nestedExceptions: Gen[Exception] = for {
     nestLevels <- positiveInts(5)
     rootCause  <- exceptions
