@@ -159,7 +159,7 @@ object Generators {
 
   val httpPorts: Gen[Int Refined Positive] = choose(1000, 10000) map Refined.unsafeApply
 
-  def httpUrls(pathGenerator: Gen[String] = relativePaths(maxSegments = 2)): Gen[String] =
+  def httpUrls(pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)): Gen[String] =
     for {
       protocol <- Arbitrary.arbBool.arbitrary map {
                    case true  => "http"
@@ -168,7 +168,8 @@ object Generators {
       port <- httpPorts
       host <- nonEmptyStrings()
       path <- pathGenerator
-    } yield s"$protocol://$host:$port/$path"
+      pathValidated = if (path.isEmpty) "" else s"/$path"
+    } yield s"$protocol://$host:$port$pathValidated"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
