@@ -71,7 +71,7 @@ object ProjectsGenerators {
     creator <- projectCreators
   } yield ProjectCreation(created, creator)
 
-  private implicit lazy val projectCreators: Gen[ProjectCreator] = for {
+  implicit lazy val projectCreators: Gen[ProjectCreator] = for {
     email <- emails
     name  <- names
   } yield ProjectCreator(email, name)

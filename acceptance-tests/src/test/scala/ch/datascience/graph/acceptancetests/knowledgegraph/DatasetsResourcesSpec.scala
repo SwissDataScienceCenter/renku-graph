@@ -63,7 +63,9 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
     val project          = projectsGen.generateOne
     val dataset1CommitId = commitIds.generateOne
-    val dataset1Creation = datasetInProjectCreations.generateOne
+    val dataset1Creation = datasetInProjectCreations.generateOne.copy(
+      agent = DatasetAgent(project.created.creator.email, project.created.creator.name)
+    )
     val dataset1 = datasets.generateOne.copy(
       maybeDescription = Some(datasetDescriptions.generateOne),
       published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
@@ -77,7 +79,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       project          = List(DatasetProject(project.path, project.name, dataset2Creation))
     )
 
-    scenario("As a user I would like to find project's datasets by calling a REST enpoint") {
+    scenario("As a user I would like to find project's data-sets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
       val jsonLDTriples = triples(
