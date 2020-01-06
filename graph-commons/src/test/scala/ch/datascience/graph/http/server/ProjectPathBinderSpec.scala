@@ -26,7 +26,6 @@ import org.scalatest.WordSpec
 
 class ProjectPathBinderSpec extends WordSpec {
 
-  import binders.ProjectPath._
   import binders._
 
   "unapply" should {
@@ -39,55 +38,8 @@ class ProjectPathBinderSpec extends WordSpec {
       result shouldBe projectPath
     }
 
-    "return None if string value cannot be converted to a Namespace" in {
-      Namespace.unapply(blankStrings().generateOne) shouldBe None
-    }
-  }
-
-  "Namespace.unapply" should {
-
-    "convert valid namespace as string to a Namespace" in {
-      val namespaceValue = relativePaths(maxSegments = 1).generateOne
-
-      val Some(namespace) = Namespace.unapply(namespaceValue)
-
-      namespace       shouldBe a[Namespace]
-      namespace.value shouldBe namespaceValue
-    }
-
-    "return None if string value cannot be converted to a Namespace" in {
-      Namespace.unapply(blankStrings().generateOne) shouldBe None
-    }
-  }
-
-  "Name.unapply" should {
-
-    "convert valid project name as string to a Name" in {
-      val nameValue = relativePaths(maxSegments = 1).generateOne
-
-      val Some(name) = Name.unapply(nameValue)
-
-      name       shouldBe a[Name]
-      name.value shouldBe nameValue
-    }
-
-    "return None if string value cannot be converted to a Name" in {
-      Name.unapply(blankStrings().generateOne) shouldBe None
-    }
-  }
-
-  "Namespace /" should {
-
-    import ch.datascience.graph.model.projects.{ProjectPath => ProjectPathType}
-
-    "return a ProjectPath" in {
-      val namespaceValue  = relativePaths(maxSegments = 1).generateOne
-      val Some(namespace) = Namespace.unapply(namespaceValue)
-
-      val nameValue  = relativePaths(maxSegments = 1).generateOne
-      val Some(name) = Name.unapply(nameValue)
-
-      namespace / name shouldBe ProjectPathType(s"$namespace/$name")
+    "return None if string value cannot be converted to a ProjectPath" in {
+      ProjectPath.unapply(blankStrings().generateOne) shouldBe None
     }
   }
 }

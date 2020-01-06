@@ -34,7 +34,7 @@ class GitLabUrlSpec extends WordSpec {
   "apply" should {
 
     "read 'services.gitlab.url' from the config" in {
-      val url = httpUrls.generateOne
+      val url = httpUrls().generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(

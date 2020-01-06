@@ -73,10 +73,10 @@ private class IOKGProjectFinder(
         |  {
         |    SELECT ?creatorResource
         |    WHERE {
-        |      ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
+        |      ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
         |                                                                 schema:creator ?creatorResource .
         |      ?commit rdf:type prov:Activity ;
-        |              schema:isPartOf ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} ;
+        |              schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} ;
         |              prov:agent ?creatorResource ;
         |              prov:startedAtTime ?commitCreatedDate .
         |    }
@@ -84,7 +84,7 @@ private class IOKGProjectFinder(
         |    LIMIT 1
         |  }
         |  {
-        |    ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
+        |    ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
         |                                                               schema:name ?name ;
         |                                                               schema:dateCreated ?dateCreated .
         |    ?creatorResource rdf:type <http://schema.org/Person> ;
