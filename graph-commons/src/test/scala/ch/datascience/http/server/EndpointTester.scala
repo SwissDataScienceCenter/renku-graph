@@ -27,6 +27,7 @@ import ch.datascience.http.rest.Links.{Href, Rel}
 import eu.timepit.refined.api.RefType
 import io.circe._
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
+import org.http4s.headers.`Content-Type`
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, Request, Response, Status}
 
 import scala.concurrent.ExecutionContext
@@ -45,7 +46,8 @@ object EndpointTester {
     def call(request: Request[IO]) = new {
       private val runResponse: Response[IO] = endpoint.flatMap(_.run(request)).unsafeRunSync()
 
-      lazy val status: Status = runResponse.status
+      lazy val status:      Status                 = runResponse.status
+      lazy val contentType: Option[`Content-Type`] = runResponse.contentType
 
       def body[T](implicit decoder: EntityDecoder[IO, T]): T = runResponse.as[T].unsafeRunSync
     }
