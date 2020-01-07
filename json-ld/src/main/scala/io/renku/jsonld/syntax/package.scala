@@ -24,4 +24,8 @@ package object syntax {
 
     def asJsonLD(implicit encoder: JsonLDEncoder[Type]): JsonLD = encoder(value)
   }
+
+  final implicit class PropertyOps(property: Property) {
+    lazy val asEntityType: EntityType = EntityType.of(property)
+  }
 }

@@ -57,16 +57,22 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
 
+    "convert an Option into a JsonLD" in {
+      forAll { maybeValue: Option[Long] =>
+        maybeValue.asJsonLD shouldBe JsonLD.fromOption(maybeValue)
+      }
+    }
+
     "convert a custom object into a JsonLD" in {
-      val url        = httpUrls.generateOne
+      val url        = httpUrls().generateOne
       val schema     = schemas.generateOne
       val objectType = schema / nonEmptyStrings().generateOne
 
       case class Object(string: String, int: Int)
       implicit val encoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { o =>
         JsonLD.entity(
-          EntityId.fromAbsoluteUri(s"$url/${o.string}"),
-          EntityType.fromProperty(objectType),
+          EntityId.of(s"$url/${o.string}"),
+          EntityTypes.of(objectType),
           schema / "string" -> o.string.asJsonLD,
           schema / "int"    -> o.int.asJsonLD
         )
@@ -74,8 +80,8 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
 
       forAll { (string: String, int: Int) =>
         Object(string, int).asJsonLD shouldBe JsonLD.entity(
-          EntityId.fromAbsoluteUri(s"$url/$string"),
-          EntityType.fromProperty(objectType),
+          EntityId.of(s"$url/$string"),
+          EntityTypes.of(objectType),
           schema / "string" -> string.asJsonLD,
           schema / "int"    -> int.asJsonLD
         )
@@ -83,7 +89,7 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "convert a custom nested objects into a JsonLD" in {
-      val url        = httpUrls.generateOne
+      val url        = httpUrls().generateOne
       val schema     = schemas.generateOne
       val objectType = schema / nonEmptyStrings().generateOne
       val childType  = schema / nonEmptyStrings().generateOne
@@ -92,15 +98,15 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
       case class ChildObject(int: Int)
       implicit val childEncoder: JsonLDEncoder[ChildObject] = JsonLDEncoder.instance { o =>
         JsonLD.entity(
-          EntityId.fromAbsoluteUri(s"$url/${o.int}"),
-          EntityType.fromProperty(childType),
+          EntityId.of(s"$url/${o.int}"),
+          EntityTypes.of(childType),
           schema / "int" -> o.int.asJsonLD
         )
       }
       implicit val objectEncoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { o =>
         JsonLD.entity(
-          EntityId.fromAbsoluteUri(s"$url/${o.string}"),
-          EntityType.fromProperty(objectType),
+          EntityId.of(s"$url/${o.string}"),
+          EntityTypes.of(objectType),
           schema / "string" -> o.string.asJsonLD,
           schema / "child"  -> o.child.asJsonLD
         )
@@ -108,12 +114,12 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
 
       forAll { (string: String, int: Int) =>
         Object(string, ChildObject(int)).asJsonLD shouldBe JsonLD.entity(
-          EntityId.fromAbsoluteUri(s"$url/$string"),
-          EntityType.fromProperty(objectType),
+          EntityId.of(s"$url/$string"),
+          EntityTypes.of(objectType),
           schema / "string" -> string.asJsonLD,
           schema / "child" -> JsonLD.entity(
-            EntityId.fromAbsoluteUri(s"$url/$int"),
-            EntityType.fromProperty(childType),
+            EntityId.of(s"$url/$int"),
+            EntityTypes.of(childType),
             schema / "int" -> int.asJsonLD
           )
         )
@@ -121,19 +127,19 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "convert a custom nested objects defined by @id only into a JsonLD" in {
-      val url        = httpUrls.generateOne
+      val url        = httpUrls().generateOne
       val schema     = schemas.generateOne
       val objectType = schema / nonEmptyStrings().generateOne
 
       case class Object(string:   String, child: ChildObject)
       case class ChildObject(int: Int)
       implicit val childEncoder: JsonLDEncoder[ChildObject] = JsonLDEncoder.entityId { o =>
-        EntityId.fromAbsoluteUri(s"$url/${o.int}")
+        EntityId.of(s"$url/${o.int}")
       }
       implicit val objectEncoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { o =>
         JsonLD.entity(
-          EntityId.fromAbsoluteUri(s"$url/${o.string}"),
-          EntityType.fromProperty(objectType),
+          EntityId.of(s"$url/${o.string}"),
+          EntityTypes.of(objectType),
           schema / "string" -> o.string.asJsonLD,
           schema / "child"  -> o.child.asJsonLD
         )
@@ -141,11 +147,20 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
 
       forAll { (string: String, int: Int) =>
         Object(string, ChildObject(int)).asJsonLD shouldBe JsonLD.entity(
-          EntityId.fromAbsoluteUri(s"$url/$string"),
-          EntityType.fromProperty(objectType),
+          EntityId.of(s"$url/$string"),
+          EntityTypes.of(objectType),
           schema / "string" -> string.asJsonLD,
-          schema / "child"  -> JsonLD.fromEntityId(EntityId.fromAbsoluteUri(s"$url/$int"))
+          schema / "child"  -> JsonLD.fromEntityId(EntityId.of(s"$url/$int"))
         )
+      }
+    }
+  }
+
+  "asEntityType" should {
+
+    "convert a Property to EntityType" in {
+      forAll { property: Property =>
+        property.asEntityType shouldBe EntityType.of(property)
       }
     }
   }

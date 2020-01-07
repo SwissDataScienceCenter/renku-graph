@@ -24,10 +24,33 @@ abstract class EntityType(val value: String) extends Product with Serializable
 
 object EntityType {
 
-  def fromUrl(url:           String):   EntityType = UrlEntityType(url)
-  def fromProperty(property: Property): EntityType = UrlEntityType(property.url)
+  def of(url:      String):   EntityType = UrlEntityType(url)
+  def of(property: Property): EntityType = UrlEntityType(property.url)
 
   private[jsonld] final case class UrlEntityType(override val value: String) extends EntityType(value)
 
   implicit val entityTypeJsonEncoder: Encoder[EntityType] = Encoder.instance(t => Json.fromString(t.value))
+}
+
+import cats.data.NonEmptyList
+
+final case class EntityTypes(list: NonEmptyList[EntityType]) {
+  lazy val toList: List[EntityType] = list.toList
+}
+
+object EntityTypes {
+
+  def of(first: EntityType, other: EntityType*): EntityTypes = EntityTypes(NonEmptyList.of(first, other: _*))
+  def of(first: Property, other:   Property*): EntityTypes = EntityTypes {
+    NonEmptyList.of(first, other: _*) map EntityType.of
+  }
+
+  import io.circe.syntax._
+
+  implicit val entityTypesJsonEncoder: Encoder[EntityTypes] = Encoder.instance { t =>
+    t.toList match {
+      case only +: Nil => only.asJson
+      case multiple    => Json.arr(multiple.map(_.asJson): _*)
+    }
+  }
 }

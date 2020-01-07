@@ -18,7 +18,7 @@
 
 package io.renku.jsonld
 
-abstract class Schema(value: String, separator: String = "/") extends Product with Serializable {
+abstract class Schema(value: String, separator: String) extends Product with Serializable {
   def /(name: String): Property = Property(s"$value$separator$name")
 }
 
@@ -28,7 +28,10 @@ final case class Property(url: String) {
 
 object Schema {
 
-  def from(baseUrl: String): Schema = StandardSchema(baseUrl)
+  def from(baseUrl: String): Schema = SlashSeparatorSchema(baseUrl)
+  def from(baseUrl: String, separator: String): Schema = CustomSeparatorSchema(baseUrl, separator)
 
-  private[jsonld] final case class StandardSchema(value: String) extends Schema(value)
+  private[jsonld] final case class SlashSeparatorSchema(value:  String) extends Schema(value, separator = "/")
+  private[jsonld] final case class CustomSeparatorSchema(value: String, separator: String)
+      extends Schema(value, separator)
 }

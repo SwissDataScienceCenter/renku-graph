@@ -18,6 +18,8 @@
 
 package io.renku.jsonld
 
+import scala.language.implicitConversions
+
 /**
   * A type class that provides a conversion from a value of type `A` to a [[JsonLD]] value.
   */
@@ -35,6 +37,11 @@ object JsonLDEncoder {
   final def entityId[A](f: A => EntityId): JsonLDEncoder[A] = new JsonLDEncoder[A] {
     final def apply(a: A): JsonLD = JsonLD.fromEntityId(f(a))
   }
+
+  final implicit def encodeOption[A](implicit valueEncoder: JsonLDEncoder[A]): JsonLDEncoder[Option[A]] =
+    new JsonLDEncoder[Option[A]] {
+      final def apply(a: Option[A]): JsonLD = JsonLD.fromOption(a)
+    }
 
   final implicit val encodeString: JsonLDEncoder[String] = new JsonLDEncoder[String] {
     final def apply(a: String): JsonLD = JsonLD.fromString(a)

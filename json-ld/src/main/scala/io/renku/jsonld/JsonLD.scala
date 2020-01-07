@@ -19,6 +19,7 @@
 package io.renku.jsonld
 
 import java.io.Serializable
+import java.time.Instant
 
 import cats.data.NonEmptyList
 import io.circe.{Encoder, Json}
@@ -31,42 +32,62 @@ object JsonLD {
 
   import io.circe.syntax._
 
-  def entity(id: EntityId, entityType: EntityType, first: (Property, JsonLD), subsequent: (Property, JsonLD)*): JsonLD =
-    entity(id, NonEmptyList.one(entityType), NonEmptyList.of(first, subsequent: _*))
+  def entity(
+      id:            EntityId,
+      types:         EntityTypes,
+      firstProperty: (Property, JsonLD),
+      other:         (Property, JsonLD)*
+  ): JsonLD =
+    JsonLDEntity(id, types, properties = NonEmptyList.of(firstProperty, other: _*))
 
-  def entity(id: EntityId, types: NonEmptyList[EntityType], properties: NonEmptyList[(Property, JsonLD)]): JsonLD =
-    JsonLDEntity(id, types, properties)
-
-  def fromString(value: String):   JsonLD = JsonLDValue(value)
-  def fromInt(value:    Int):      JsonLD = JsonLDValue(value)
-  def fromLong(value:   Long):     JsonLD = JsonLDValue(value)
-  def fromEntityId(id:  EntityId): JsonLD = JsonLDEntityId(id)
-  def arr(jsons:        JsonLD*):  JsonLD = JsonLDArray(jsons)
+  def fromString(value:  String): JsonLD = JsonLDValue(value)
+  def fromInt(value:     Int): JsonLD = JsonLDValue(value)
+  def fromLong(value:    Long): JsonLD = JsonLDValue(value)
+  def fromInstant(value: Instant): JsonLD =
+    JsonLDValue(value, Some("http://www.w3.org/2001/XMLSchema#dateTime"))
+  def fromOption[V](value: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD = JsonLDOptionValue(value)
+  def fromEntityId(id:     EntityId): JsonLD = JsonLDEntityId(id)
+  def arr(jsons:           JsonLD*): JsonLD = JsonLDArray(jsons)
 
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
-                                                types:      NonEmptyList[EntityType],
+                                                types:      EntityTypes,
                                                 properties: NonEmptyList[(Property, JsonLD)])
       extends JsonLD {
 
     override lazy val toJson: Json = Json.obj(
       List(
         "@id"   -> id.asJson,
-        "@type" -> serialize(types.toList)
-      ) ++ properties.toList.map(toObjectProperties): _*
+        "@type" -> types.asJson
+      ) ++ properties.toList.map(toObjectProperties).flatten: _*
     )
 
-    private lazy val serialize: List[EntityType] => Json = {
-      case only +: Nil => only.asJson
-      case multiple    => Json.arr(multiple.map(_.asJson): _*)
-    }
-
-    private lazy val toObjectProperties: ((Property, JsonLD)) => (String, Json) = {
-      case (property, value) => property.url -> value.toJson
+    private lazy val toObjectProperties: ((Property, JsonLD)) => Option[(String, Json)] = {
+      case (_, Null)         => None
+      case (property, value) => Some(property.url -> value.toJson)
     }
   }
 
-  private[jsonld] final case class JsonLDValue[V](value: V)(implicit encoder: Encoder[V]) extends JsonLD {
-    override lazy val toJson = Json.obj("@value" -> value.asJson)
+  private[jsonld] final case class JsonLDValue[V](
+      value:          V,
+      maybeType:      Option[String] = None
+  )(implicit encoder: Encoder[V])
+      extends JsonLD {
+    override lazy val toJson = maybeType match {
+      case None    => Json.obj("@value" -> value.asJson)
+      case Some(t) => Json.obj("@type"  -> t.asJson, "@value" -> value.asJson)
+    }
+  }
+
+  private[jsonld] final case object Null extends JsonLD {
+    override lazy val toJson = Json.Null
+  }
+
+  private[jsonld] final case object JsonLDOptionValue {
+    def apply[V](maybeValue: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD =
+      maybeValue match {
+        case None    => JsonLD.Null
+        case Some(v) => encoder(v)
+      }
   }
 
   private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD {

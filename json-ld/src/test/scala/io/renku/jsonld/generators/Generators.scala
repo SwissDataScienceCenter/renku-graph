@@ -146,15 +146,17 @@ object Generators {
 
   val httpPorts: Gen[Int Refined Positive] = choose(1000, 10000) map Refined.unsafeApply
 
-  val httpUrls: Gen[String] = for {
-    protocol <- Arbitrary.arbBool.arbitrary map {
-                 case true  => "http"
-                 case false => "https"
-               }
-    host <- nonEmptyStrings()
-    port <- httpPorts
-    path <- relativePaths(maxSegments = 3)
-  } yield s"$protocol://$host:$port/$path"
+  def httpUrls(pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)): Gen[String] =
+    for {
+      protocol <- Arbitrary.arbBool.arbitrary map {
+                   case true  => "http"
+                   case false => "https"
+                 }
+      port <- httpPorts
+      host <- nonEmptyStrings()
+      path <- pathGenerator
+      pathValidated = if (path.isEmpty) "" else s"/$path"
+    } yield s"$protocol://$host:$port$pathValidated"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
@@ -164,14 +166,14 @@ object Generators {
     port <- httpPorts
   } yield s"$protocol://localhost:$port"
 
-  val validatedUrls: Gen[String Refined Url] = httpUrls map Refined.unsafeApply
+  val validatedUrls: Gen[String Refined Url] = httpUrls() map Refined.unsafeApply
 
   val shas: Gen[String] = for {
     length <- Gen.choose(40, 40)
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'f').map(_.toString)))
   } yield chars.mkString("")
 
-  val timestamps: Gen[Instant] =
+  implicit val timestamps: Gen[Instant] =
     Gen
       .choose(Instant.EPOCH.toEpochMilli, Instant.now().plus(2000, DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)

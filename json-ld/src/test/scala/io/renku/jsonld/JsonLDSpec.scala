@@ -18,6 +18,8 @@
 
 package io.renku.jsonld
 
+import java.time.Instant
+
 import cats.data.NonEmptyList
 import eu.timepit.refined.auto._
 import io.circe.Json
@@ -70,6 +72,49 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
+  "JsonLD.fromInstant" should {
+
+    "allow to construct JsonLD xsd:dateTime value" in {
+      forAll { value: Instant =>
+        JsonLD.fromInstant(value).toJson shouldBe
+          json"""{
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+            "@value": $value
+          }"""
+      }
+    }
+  }
+
+  "JsonLD.Null" should {
+
+    "be Json.Null" in {
+      JsonLD.Null.toJson == null
+    }
+  }
+
+  "JsonLD.fromOption" should {
+
+    "allow to construct JsonLD value when the value is present" in {
+      forAll { value: Long =>
+        JsonLD.fromOption(Some(value)).toJson shouldBe
+          json"""{
+            "@value": $value
+          }"""
+      }
+    }
+
+    "allow to construct JsonLD value when the value is present and has some type" in {
+      forAll { value: Instant =>
+        implicit val jsonLDEncoder: JsonLDEncoder[Instant] = JsonLDEncoder.instance[Instant](JsonLD.fromInstant)
+        JsonLD.fromOption(Some(value)).toJson shouldBe JsonLD.fromInstant(value).toJson
+      }
+    }
+
+    "allow to construct JsonLD value when the value is absent" in {
+      JsonLD.fromOption(Option.empty[String]) shouldBe JsonLD.Null
+    }
+  }
+
   "JsonLD.fromEntityId" should {
 
     "allow to construct JsonLD EntityId object" in {
@@ -100,7 +145,7 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
         val property1 @ (_, value1)     = name1 -> JsonLD.arr(values1.toList: _*)
         val property2 @ (name2, value2) = singleValueProperties(schema).generateOne
 
-        JsonLD.entity(id, types, NonEmptyList.of(property1, property2)).toJson shouldBe
+        JsonLD.entity(id, EntityTypes(types), property1, property2).toJson shouldBe
           parse(s"""{
             "@id": ${id.asJson},
             "@type": ${Json.arr(types.toList.map(_.asJson): _*)},
@@ -116,12 +161,26 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
         val property1 @ (_, value1)     = name1 -> JsonLD.arr(values1.toList: _*)
         val property2 @ (name2, value2) = singleValueProperties(schema).generateOne
 
-        JsonLD.entity(id, entityType, property1, property2).toJson shouldBe
+        JsonLD.entity(id, EntityTypes.of(entityType), property1, property2).toJson shouldBe
           parse(s"""{
             "@id": ${id.asJson},
             "@type": ${entityType.asJson},
             "$name1": ${value1.toJson},
             "$name2": ${value2.toJson}
+          }""").fold(throw _, identity)
+      }
+    }
+
+    "skip properties with properties having None values" in {
+      forAll { (id: EntityId, entityType: EntityType, schema: Schema) =>
+        val property1 @ (name1, value1) = singleValueProperties(schema).generateOne
+        val property2                   = properties.generateOne -> JsonLD.fromOption(Option.empty[String])
+
+        JsonLD.entity(id, EntityTypes.of(entityType), property1, property2).toJson shouldBe
+          parse(s"""{
+            "@id": ${id.asJson},
+            "@type": ${entityType.asJson},
+            "$name1": ${value1.toJson}
           }""").fold(throw _, identity)
       }
     }

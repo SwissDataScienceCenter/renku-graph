@@ -26,11 +26,10 @@ abstract class EntityId(val value: String) extends Product with Serializable {
 
 object EntityId {
 
-  def fromAbsoluteUri(uri: String): EntityId = AbsoluteUriEntityId(uri)
-  def fromRelativeUri(uri: String): EntityId = RelativeUriEntityId(uri)
+  def of[T](value: T)(implicit convert: T => EntityId): EntityId = convert(value)
 
-  private[jsonld] final case class AbsoluteUriEntityId(override val value: String) extends EntityId(value)
-  private[jsonld] final case class RelativeUriEntityId(override val value: String) extends EntityId(value)
+  private[jsonld] final case class StandardEntityId(override val value: String) extends EntityId(value)
 
-  implicit val entityIdJsonEncoder: Encoder[EntityId] = Encoder.instance(id => Json.fromString(id.value))
+  implicit val entityIdJsonEncoder: Encoder[EntityId]  = Encoder.instance(id => Json.fromString(id.value))
+  implicit val stringToEntityId:    String => EntityId = StandardEntityId.apply
 }

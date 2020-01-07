@@ -18,27 +18,42 @@
 
 package io.renku.jsonld.generators
 
-import io.renku.jsonld.{EntityId, EntityType, Schema}
-import org.scalacheck.Gen
 import Generators._
+import io.renku.jsonld._
+import org.scalacheck.{Arbitrary, Gen}
 
 object JsonLDGenerators {
 
-  val absoluteUriEntityIds: Gen[EntityId] = httpUrls map EntityId.fromAbsoluteUri
-  val relativeUriEntityIds: Gen[EntityId] = relativePaths() map EntityId.fromRelativeUri
-
-  implicit val entityIds: Gen[EntityId] = Gen.oneOf(
-    absoluteUriEntityIds,
-    relativeUriEntityIds
-  )
+  implicit val entityIds: Gen[EntityId] = httpUrls() map (EntityId.of(_))
 
   implicit val schemas: Gen[Schema] = for {
-    baseUrl <- httpUrls
+    baseUrl <- httpUrls()
     path    <- relativePaths(maxSegments = 3)
   } yield Schema.from(s"$baseUrl/$path")
 
   implicit val entityTypes: Gen[EntityType] = for {
     schema   <- schemas
     property <- nonBlankStrings()
-  } yield EntityType.fromProperty(schema / property.value)
+  } yield EntityType.of(schema / property.value)
+
+  implicit val entityTypesObject: Gen[EntityTypes] = nonEmptyList(entityTypes) map EntityTypes.apply
+
+  private implicit val stringJsonLDs: Gen[JsonLD] = nonBlankStrings() map (_.value) map JsonLD.fromString
+  private implicit val intJsonLDs:    Gen[JsonLD] = Arbitrary.arbInt.arbitrary map JsonLD.fromInt
+  private implicit val longJsonLDs:   Gen[JsonLD] = Arbitrary.arbLong.arbitrary map JsonLD.fromLong
+  implicit val jsonLDs: Gen[JsonLD] = Gen.oneOf(
+    stringJsonLDs,
+    intJsonLDs,
+    longJsonLDs
+  )
+
+  implicit val properties: Gen[Property] = for {
+    schema       <- schemas
+    propertyName <- nonBlankStrings()
+  } yield schema / propertyName.value
+
+  implicit val entityProperties: Gen[(Property, JsonLD)] = for {
+    property <- properties
+    value    <- jsonLDs
+  } yield property -> value
 }
