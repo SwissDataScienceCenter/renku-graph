@@ -69,6 +69,8 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           projectDateCreated = project.created.date,
           projectCreator     = project.created.creator.name -> project.created.creator.email,
           commitId           = dataset1CommitId,
+          committerName      = project.created.creator.name,
+          committerEmail     = project.created.creator.email,
           datasetIdentifier  = dataset.id,
           datasetName        = dataset.name,
           schemaVersion      = currentSchemaVersion

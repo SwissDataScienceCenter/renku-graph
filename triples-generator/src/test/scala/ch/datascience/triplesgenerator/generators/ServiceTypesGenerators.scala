@@ -28,7 +28,7 @@ import org.scalacheck.Gen
 object ServiceTypesGenerators {
 
   implicit val fusekiAdminConfigs: Gen[FusekiAdminConfig] = for {
-    fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
+    fusekiUrl       <- httpUrls() map FusekiBaseUrl.apply
     datasetName     <- nonEmptyStrings() map DatasetName.apply
     datasetType     <- Gen.oneOf(Mem, TDB)
     authCredentials <- basicAuthCredentials

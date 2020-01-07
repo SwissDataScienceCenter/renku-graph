@@ -20,12 +20,14 @@ package ch.datascience.knowledgegraph
 
 import cats.effect.{Clock, IO}
 import cats.implicits._
-import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
+import ch.datascience.controllers.InfoMessage._
+import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
@@ -38,6 +40,7 @@ import ch.datascience.knowledgegraph.graphql.{QueryContext, QueryEndpoint, Query
 import ch.datascience.metrics.MetricsRegistry
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -219,38 +222,44 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       response.status shouldBe Ok
     }
 
-    s"define a GET /knowledge-graph/projects/:namespace/:name endpoint returning $Ok for valid path parameters" in new TestCase {
-      val projectPath = projectPaths.generateOne
+    s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Ok for valid path parameters" in new TestCase {
+      forAll { projectPath: ProjectPath =>
+        (projectEndpoint.getProject _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
 
-      (projectEndpoint.getProject _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+        val response = routes.call(
+          Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+        )
 
-      val response = routes.call(
-        Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
-      )
+        response.status shouldBe Ok
 
-      response.status shouldBe Ok
+        MetricsRegistry.clear()
+      }
     }
 
-    s"define a GET /knowledge-graph/projects/:namespace/:name endpoint returning $ServiceUnavailable for missing :name" in new TestCase {
+    s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $NotFound for invalid project paths" in new TestCase {
       val namespace = nonBlankStrings().generateOne.value
 
       val response = routes.call(
         Request(Method.GET, uri"knowledge-graph/projects" / namespace)
       )
 
-      response.status shouldBe ServiceUnavailable
+      response.status            shouldBe NotFound
+      response.contentType       shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.body[InfoMessage] shouldBe InfoMessage("Resource not found")
     }
 
-    s"define a GET /knowledge-graph/projects/:namespace/:name/datasets endpoint returning $Ok for valid path parameters" in new TestCase {
-      val projectPath = projectPaths.generateOne
+    s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $Ok for valid path parameters" in new TestCase {
+      forAll { projectPath: ProjectPath =>
+        (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
 
-      (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+        val response = routes.call(
+          Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
+        )
 
-      val response = routes.call(
-        Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
-      )
+        response.status shouldBe Ok
 
-      response.status shouldBe Ok
+        MetricsRegistry.clear()
+      }
     }
   }
 
