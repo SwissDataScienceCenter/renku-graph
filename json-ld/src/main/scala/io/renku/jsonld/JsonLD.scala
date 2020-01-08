@@ -26,6 +26,7 @@ import io.circe.{Encoder, Json}
 
 abstract class JsonLD extends Product with Serializable {
   def toJson: Json
+  def cursor: Cursor = Cursor.from(this)
 }
 
 object JsonLD {

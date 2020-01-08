@@ -38,13 +38,17 @@ object JsonLDGenerators {
 
   implicit val entityTypesObject: Gen[EntityTypes] = nonEmptyList(entityTypes) map EntityTypes.apply
 
-  private implicit val stringJsonLDs: Gen[JsonLD] = nonBlankStrings() map (_.value) map JsonLD.fromString
-  private implicit val intJsonLDs:    Gen[JsonLD] = Arbitrary.arbInt.arbitrary map JsonLD.fromInt
-  private implicit val longJsonLDs:   Gen[JsonLD] = Arbitrary.arbLong.arbitrary map JsonLD.fromLong
+  private implicit val stringJsonLDs:    Gen[JsonLD] = nonBlankStrings() map (_.value) map JsonLD.fromString
+  private implicit val intJsonLDs:       Gen[JsonLD] = Arbitrary.arbInt.arbitrary map JsonLD.fromInt
+  private implicit val longJsonLDs:      Gen[JsonLD] = Arbitrary.arbLong.arbitrary map JsonLD.fromLong
+  private implicit val instantJsonLDs:   Gen[JsonLD] = timestamps map JsonLD.fromInstant
+  private implicit val localDateJsonLDs: Gen[JsonLD] = localDates map JsonLD.fromLocalDate
   implicit val jsonLDs: Gen[JsonLD] = Gen.oneOf(
     stringJsonLDs,
     intJsonLDs,
-    longJsonLDs
+    longJsonLDs,
+    instantJsonLDs,
+    localDateJsonLDs
   )
 
   implicit val properties: Gen[Property] = for {
