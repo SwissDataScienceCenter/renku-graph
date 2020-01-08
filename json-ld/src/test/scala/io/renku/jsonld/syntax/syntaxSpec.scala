@@ -63,6 +63,24 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
 
+    "convert a sequence of objects into a JsonLD" in {
+      forAll { seq: Seq[Long] =>
+        seq.asJsonLD shouldBe JsonLD.arr(seq map JsonLD.fromLong: _*)
+      }
+    }
+
+    "convert a list of objects into a JsonLD" in {
+      forAll { seq: List[Long] =>
+        seq.asJsonLD shouldBe JsonLD.arr(seq map JsonLD.fromLong: _*)
+      }
+    }
+
+    "convert a set of objects into a JsonLD" in {
+      forAll { set: Set[Long] =>
+        set.asJsonLD shouldBe JsonLD.arr(set.toList.sorted map JsonLD.fromLong: _*)
+      }
+    }
+
     "convert a custom object into a JsonLD" in {
       val url        = httpUrls().generateOne
       val schema     = schemas.generateOne

@@ -30,28 +30,26 @@ trait JsonLDEncoder[A] extends Serializable {
 
 object JsonLDEncoder {
 
-  final def instance[A](f: A => JsonLD): JsonLDEncoder[A] = new JsonLDEncoder[A] {
-    final def apply(a: A): JsonLD = f(a)
-  }
+  final def instance[A](f: A => JsonLD): JsonLDEncoder[A] = (a: A) => f(a)
 
-  final def entityId[A](f: A => EntityId): JsonLDEncoder[A] = new JsonLDEncoder[A] {
-    final def apply(a: A): JsonLD = JsonLD.fromEntityId(f(a))
-  }
+  final def entityId[A](f: A => EntityId): JsonLDEncoder[A] = (a: A) => JsonLD.fromEntityId(f(a))
 
   final implicit def encodeOption[A](implicit valueEncoder: JsonLDEncoder[A]): JsonLDEncoder[Option[A]] =
-    new JsonLDEncoder[Option[A]] {
-      final def apply(a: Option[A]): JsonLD = JsonLD.fromOption(a)
-    }
+    (a: Option[A]) => JsonLD.fromOption(a)
 
-  final implicit val encodeString: JsonLDEncoder[String] = new JsonLDEncoder[String] {
-    final def apply(a: String): JsonLD = JsonLD.fromString(a)
-  }
+  final implicit def encodeSeq[A](implicit itemEncoder: JsonLDEncoder[A]): JsonLDEncoder[Seq[A]] =
+    (seq: Seq[A]) => JsonLD.arr(seq map (itemEncoder(_)): _*)
 
-  final implicit val encodeInt: JsonLDEncoder[Int] = new JsonLDEncoder[Int] {
-    final def apply(a: Int): JsonLD = JsonLD.fromInt(a)
-  }
+  final implicit def encodeList[A](implicit itemEncoder: JsonLDEncoder[A]): JsonLDEncoder[List[A]] =
+    (seq: List[A]) => JsonLD.arr(seq map (itemEncoder(_)): _*)
 
-  final implicit val encodeLong: JsonLDEncoder[Long] = new JsonLDEncoder[Long] {
-    final def apply(a: Long): JsonLD = JsonLD.fromLong(a)
-  }
+  final implicit def encodeSet[A](implicit itemEncoder: JsonLDEncoder[A],
+                                  ordering:             Ordering[A]): JsonLDEncoder[Set[A]] =
+    (seq: Set[A]) => JsonLD.arr(seq.toList.sorted map (itemEncoder(_)): _*)
+
+  final implicit val encodeString: JsonLDEncoder[String] = (a: String) => JsonLD.fromString(a)
+
+  final implicit val encodeInt: JsonLDEncoder[Int] = (a: Int) => JsonLD.fromInt(a)
+
+  final implicit val encodeLong: JsonLDEncoder[Long] = (a: Long) => JsonLD.fromLong(a)
 }
