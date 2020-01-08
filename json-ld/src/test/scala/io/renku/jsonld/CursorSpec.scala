@@ -57,4 +57,29 @@ class CursorSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
   }
+
+  "delete" should {
+
+    "allow to remove a selected field" in {
+      forAll { (id: EntityId, entityTypes: EntityTypes, property1: (Property, JsonLD), property2: (Property, JsonLD)) =>
+        JsonLD
+          .entity(id, entityTypes, property1, property2)
+          .cursor
+          .downField(property1._1)
+          .delete
+          .top shouldBe Some(JsonLD.entity(id, entityTypes, property2))
+      }
+    }
+
+    "allow to remove a selected entity" in {
+      forAll { (id: EntityId, entityTypes: EntityTypes, property: (Property, JsonLD)) =>
+        JsonLD
+          .entity(id, entityTypes, property)
+          .cursor
+          .downType(entityTypes.toList.head)
+          .delete
+          .top shouldBe None
+      }
+    }
+  }
 }
