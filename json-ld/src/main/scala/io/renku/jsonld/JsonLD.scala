@@ -19,7 +19,7 @@
 package io.renku.jsonld
 
 import java.io.Serializable
-import java.time.Instant
+import java.time.{Instant, LocalDate}
 
 import cats.data.NonEmptyList
 import io.circe.{Encoder, Json}
@@ -45,6 +45,7 @@ object JsonLD {
   def fromLong(value:    Long): JsonLD = JsonLDValue(value)
   def fromInstant(value: Instant): JsonLD =
     JsonLDValue(value, Some("http://www.w3.org/2001/XMLSchema#dateTime"))
+  def fromLocalDate(value: LocalDate): JsonLD = JsonLDValue(value, Some("http://schema.org/Date"))
   def fromOption[V](value: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD = JsonLDOptionValue(value)
   def fromEntityId(id:     EntityId): JsonLD = JsonLDEntityId(id)
   def arr(jsons:           JsonLD*): JsonLD = JsonLDArray(jsons)

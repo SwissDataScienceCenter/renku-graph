@@ -18,7 +18,7 @@
 
 package io.renku.jsonld
 
-import java.time.Instant
+import java.time.{Instant, LocalDate}
 
 import cats.data.NonEmptyList
 import eu.timepit.refined.auto._
@@ -79,6 +79,19 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
         JsonLD.fromInstant(value).toJson shouldBe
           json"""{
             "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+            "@value": $value
+          }"""
+      }
+    }
+  }
+
+  "JsonLD.fromLocalDate" should {
+
+    "allow to construct JsonLD xsd:dateTime value" in {
+      forAll { value: LocalDate =>
+        JsonLD.fromLocalDate(value).toJson shouldBe
+          json"""{
+            "@type": "http://schema.org/Date",
             "@value": $value
           }"""
       }

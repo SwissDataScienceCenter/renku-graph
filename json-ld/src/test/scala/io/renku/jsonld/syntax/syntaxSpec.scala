@@ -18,6 +18,8 @@
 
 package io.renku.jsonld.syntax
 
+import java.time.{Instant, LocalDate}
+
 import io.renku.jsonld._
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
@@ -45,6 +47,18 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
     "convert a Long object into a JsonLD" in {
       forAll { value: Long =>
         value.asJsonLD shouldBe JsonLD.fromLong(value)
+      }
+    }
+
+    "convert a Instant into a JsonLD" in {
+      forAll { value: Instant =>
+        value.asJsonLD shouldBe JsonLD.fromInstant(value)
+      }
+    }
+
+    "convert a LocalDate into a JsonLD" in {
+      forAll { value: LocalDate =>
+        value.asJsonLD shouldBe JsonLD.fromLocalDate(value)
       }
     }
 

@@ -188,11 +188,11 @@ object Generators {
       .choose(Instant.now().plus(10, MINS).toEpochMilli, Instant.now().plus(2000, DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)
 
-  val zonedDateTimes: Gen[ZonedDateTime] =
+  implicit val zonedDateTimes: Gen[ZonedDateTime] =
     timestamps
       .map(ZonedDateTime.ofInstant(_, ZoneId.systemDefault))
 
-  val localDates: Gen[LocalDate] =
+  implicit val localDates: Gen[LocalDate] =
     timestamps
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)

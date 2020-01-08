@@ -18,6 +18,8 @@
 
 package io.renku.jsonld
 
+import java.time.{Instant, LocalDate}
+
 import scala.language.implicitConversions
 
 /**
@@ -47,9 +49,9 @@ object JsonLDEncoder {
                                   ordering:             Ordering[A]): JsonLDEncoder[Set[A]] =
     (seq: Set[A]) => JsonLD.arr(seq.toList.sorted map (itemEncoder(_)): _*)
 
-  final implicit val encodeString: JsonLDEncoder[String] = (a: String) => JsonLD.fromString(a)
-
-  final implicit val encodeInt: JsonLDEncoder[Int] = (a: Int) => JsonLD.fromInt(a)
-
-  final implicit val encodeLong: JsonLDEncoder[Long] = (a: Long) => JsonLD.fromLong(a)
+  final implicit val encodeString:    JsonLDEncoder[String]    = (a: String) => JsonLD.fromString(a)
+  final implicit val encodeInt:       JsonLDEncoder[Int]       = (a: Int) => JsonLD.fromInt(a)
+  final implicit val encodeLong:      JsonLDEncoder[Long]      = (a: Long) => JsonLD.fromLong(a)
+  final implicit val encodeInstant:   JsonLDEncoder[Instant]   = (a: Instant) => JsonLD.fromInstant(a)
+  final implicit val encodeLocalDate: JsonLDEncoder[LocalDate] = (a: LocalDate) => JsonLD.fromLocalDate(a)
 }
