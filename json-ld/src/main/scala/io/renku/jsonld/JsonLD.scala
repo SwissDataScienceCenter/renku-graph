@@ -32,23 +32,21 @@ object JsonLD {
 
   import io.circe.syntax._
 
+  def fromString(value:    String): JsonLD = JsonLDValue(value)
+  def fromInt(value:       Int): JsonLD = JsonLDValue(value)
+  def fromLong(value:      Long): JsonLD = JsonLDValue(value)
+  def fromInstant(value:   Instant): JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
+  def fromLocalDate(value: LocalDate): JsonLD = JsonLDValue(value, "http://schema.org/Date")
+  def fromOption[V](value: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD = JsonLDOptionValue(value)
+  def fromEntityId(id:     EntityId): JsonLD = JsonLDEntityId(id)
+  def arr(jsons:           JsonLD*): JsonLD = JsonLDArray(jsons)
+
   def entity(
       id:            EntityId,
       types:         EntityTypes,
       firstProperty: (Property, JsonLD),
       other:         (Property, JsonLD)*
-  ): JsonLD =
-    JsonLDEntity(id, types, properties = NonEmptyList.of(firstProperty, other: _*))
-
-  def fromString(value:  String): JsonLD = JsonLDValue(value)
-  def fromInt(value:     Int): JsonLD = JsonLDValue(value)
-  def fromLong(value:    Long): JsonLD = JsonLDValue(value)
-  def fromInstant(value: Instant): JsonLD =
-    JsonLDValue(value, Some("http://www.w3.org/2001/XMLSchema#dateTime"))
-  def fromLocalDate(value: LocalDate): JsonLD = JsonLDValue(value, Some("http://schema.org/Date"))
-  def fromOption[V](value: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD = JsonLDOptionValue(value)
-  def fromEntityId(id:     EntityId): JsonLD = JsonLDEntityId(id)
-  def arr(jsons:           JsonLD*): JsonLD = JsonLDArray(jsons)
+  ): JsonLD = JsonLDEntity(id, types, properties = NonEmptyList.of(firstProperty, other: _*))
 
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
                                                 types:      EntityTypes,
@@ -77,6 +75,11 @@ object JsonLD {
       case None    => Json.obj("@value" -> value.asJson)
       case Some(t) => Json.obj("@type"  -> t.asJson, "@value" -> value.asJson)
     }
+  }
+
+  private[jsonld] object JsonLDValue {
+    def apply[V](value: V, entityType: String)(implicit encoder: Encoder[V]): JsonLDValue[V] =
+      JsonLDValue[V](value, Some(entityType))
   }
 
   private[jsonld] final case object Null extends JsonLD {
