@@ -96,24 +96,19 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "convert a custom object into a JsonLD" in {
-      val url        = httpUrls().generateOne
-      val schema     = schemas.generateOne
-      val objectType = schema / nonEmptyStrings().generateOne
+      forAll { (schema: Schema, id: EntityId, types: EntityTypes, string: String, int: Int) =>
+        implicit val encoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { o =>
+          JsonLD.entity(
+            id,
+            types,
+            schema / "string" -> o.string.asJsonLD,
+            schema / "int"    -> o.int.asJsonLD
+          )
+        }
 
-      case class Object(string: String, int: Int)
-      implicit val encoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { o =>
-        JsonLD.entity(
-          EntityId.of(s"$url/${o.string}"),
-          EntityTypes.of(objectType),
-          schema / "string" -> o.string.asJsonLD,
-          schema / "int"    -> o.int.asJsonLD
-        )
-      }
-
-      forAll { (string: String, int: Int) =>
         Object(string, int).asJsonLD shouldBe JsonLD.entity(
-          EntityId.of(s"$url/$string"),
-          EntityTypes.of(objectType),
+          id,
+          types,
           schema / "string" -> string.asJsonLD,
           schema / "int"    -> int.asJsonLD
         )
@@ -121,68 +116,58 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "convert a custom nested objects into a JsonLD" in {
-      val url        = httpUrls().generateOne
-      val schema     = schemas.generateOne
-      val objectType = schema / nonEmptyStrings().generateOne
-      val childType  = schema / nonEmptyStrings().generateOne
 
-      case class Object(string:   String, child: ChildObject)
-      case class ChildObject(int: Int)
-      implicit val childEncoder: JsonLDEncoder[ChildObject] = JsonLDEncoder.instance { o =>
-        JsonLD.entity(
-          EntityId.of(s"$url/${o.int}"),
-          EntityTypes.of(childType),
-          schema / "int" -> o.int.asJsonLD
-        )
-      }
-      implicit val objectEncoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { o =>
-        JsonLD.entity(
-          EntityId.of(s"$url/${o.string}"),
-          EntityTypes.of(objectType),
-          schema / "string" -> o.string.asJsonLD,
-          schema / "child"  -> o.child.asJsonLD
-        )
-      }
+      val schema = schemas.generateOne
 
-      forAll { (string: String, int: Int) =>
-        Object(string, ChildObject(int)).asJsonLD shouldBe JsonLD.entity(
-          EntityId.of(s"$url/$string"),
-          EntityTypes.of(objectType),
-          schema / "string" -> string.asJsonLD,
-          schema / "child" -> JsonLD.entity(
-            EntityId.of(s"$url/$int"),
-            EntityTypes.of(childType),
-            schema / "int" -> int.asJsonLD
+      forAll {
+        (parentId:    EntityId,
+         parentTypes: EntityTypes,
+         parentField: String,
+         childId:     EntityId,
+         childTypes:  EntityTypes,
+         childField:  Int) =>
+          implicit val childEncoder: JsonLDEncoder[Child] = JsonLDEncoder.instance { o =>
+            JsonLD.entity(childId, childTypes, schema / "int" -> o.int.asJsonLD)
+          }
+          implicit val parentEncoder: JsonLDEncoder[Parent] = JsonLDEncoder.instance { o =>
+            JsonLD.entity(parentId,
+                          parentTypes,
+                          schema / "string" -> o.string.asJsonLD,
+                          schema / "child"  -> o.child.asJsonLD)
+          }
+
+          Parent(parentField, Child(childField)).asJsonLD shouldBe JsonLD.entity(
+            parentId,
+            parentTypes,
+            schema / "string" -> parentField.asJsonLD,
+            schema / "child" -> JsonLD.entity(
+              childId,
+              childTypes,
+              schema / "int" -> childField.asJsonLD
+            )
           )
-        )
       }
     }
 
     "convert a custom nested objects defined by @id only into a JsonLD" in {
-      val url        = httpUrls().generateOne
-      val schema     = schemas.generateOne
-      val objectType = schema / nonEmptyStrings().generateOne
+      forAll { (schema: Schema, parentId: EntityId, parentTypes: EntityTypes, parentField: String, childField: Int) =>
+        implicit val childEncoder: JsonLDEncoder[Child] = JsonLDEncoder.entityId { o =>
+          EntityId.of(schema / o.int)
+        }
+        implicit val objectEncoder: JsonLDEncoder[Parent] = JsonLDEncoder.instance { o =>
+          JsonLD.entity(
+            parentId,
+            parentTypes,
+            schema / "string" -> o.string.asJsonLD,
+            schema / "child"  -> o.child.asJsonLD
+          )
+        }
 
-      case class Object(string:   String, child: ChildObject)
-      case class ChildObject(int: Int)
-      implicit val childEncoder: JsonLDEncoder[ChildObject] = JsonLDEncoder.entityId { o =>
-        EntityId.of(s"$url/${o.int}")
-      }
-      implicit val objectEncoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { o =>
-        JsonLD.entity(
-          EntityId.of(s"$url/${o.string}"),
-          EntityTypes.of(objectType),
-          schema / "string" -> o.string.asJsonLD,
-          schema / "child"  -> o.child.asJsonLD
-        )
-      }
-
-      forAll { (string: String, int: Int) =>
-        Object(string, ChildObject(int)).asJsonLD shouldBe JsonLD.entity(
-          EntityId.of(s"$url/$string"),
-          EntityTypes.of(objectType),
-          schema / "string" -> string.asJsonLD,
-          schema / "child"  -> JsonLD.fromEntityId(EntityId.of(s"$url/$int"))
+        Parent(parentField, Child(childField)).asJsonLD shouldBe JsonLD.entity(
+          parentId,
+          parentTypes,
+          schema / "string" -> parentField.asJsonLD,
+          schema / "child"  -> JsonLD.fromEntityId(EntityId.of(schema / childField))
         )
       }
     }
@@ -196,4 +181,8 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
   }
+
+  private case class Object(string: String, int: Int)
+  private case class Parent(string: String, child: Child)
+  private case class Child(int:     Int)
 }

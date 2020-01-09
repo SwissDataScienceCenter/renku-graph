@@ -26,7 +26,6 @@ import scala.language.implicitConversions
   * A type class that provides a conversion from a value of type `A` to a [[JsonLD]] value.
   */
 trait JsonLDEncoder[A] extends Serializable {
-
   def apply(a: A): JsonLD
 }
 

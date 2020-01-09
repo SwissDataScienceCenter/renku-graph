@@ -46,6 +46,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
           }"""
       }
     }
+
+    "have no entityId" in {
+      forAll { value: String =>
+        JsonLD.fromString(value).entityId shouldBe None
+      }
+    }
   }
 
   "JsonLD.fromInt" should {
@@ -58,6 +64,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
           }"""
       }
     }
+
+    "have no entityId" in {
+      forAll { value: Int =>
+        JsonLD.fromInt(value).entityId shouldBe None
+      }
+    }
   }
 
   "JsonLD.fromLong" should {
@@ -68,6 +80,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
           json"""{
             "@value": $value
           }"""
+      }
+    }
+
+    "have no entityId" in {
+      forAll { value: Long =>
+        JsonLD.fromLong(value).entityId shouldBe None
       }
     }
   }
@@ -83,6 +101,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
           }"""
       }
     }
+
+    "have no entityId" in {
+      forAll { value: Instant =>
+        JsonLD.fromInstant(value).entityId shouldBe None
+      }
+    }
   }
 
   "JsonLD.fromLocalDate" should {
@@ -96,12 +120,22 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
           }"""
       }
     }
+
+    "have no entityId" in {
+      forAll { value: LocalDate =>
+        JsonLD.fromLocalDate(value).entityId shouldBe None
+      }
+    }
   }
 
   "JsonLD.Null" should {
 
     "be Json.Null" in {
-      JsonLD.Null.toJson == null
+      JsonLD.JsonLDNull.toJson == null
+    }
+
+    "have no entityId" in {
+      JsonLD.JsonLDNull.entityId shouldBe None
     }
   }
 
@@ -124,7 +158,21 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "allow to construct JsonLD value when the value is absent" in {
-      JsonLD.fromOption(Option.empty[String]) shouldBe JsonLD.Null
+      JsonLD.fromOption(Option.empty[String]) shouldBe JsonLD.JsonLDNull
+    }
+
+    "have entityId for Some entity having one" in {
+      forAll { (id: EntityId, types: EntityTypes, property: Property, value: String) =>
+        implicit val encoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { (o: Object) =>
+          JsonLD.entity(id, types, property -> JsonLD.fromString(o.value))
+        }
+
+        JsonLD.fromOption(Some(Object(value))).entityId shouldBe Some(id)
+      }
+    }
+
+    "have no entityId for None" in {
+      JsonLD.fromOption(Option.empty[String]).entityId shouldBe None
     }
   }
 
@@ -138,6 +186,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
           }"""
       }
     }
+
+    "have no entityId" in {
+      forAll { value: EntityId =>
+        JsonLD.fromEntityId(value).entityId shouldBe None
+      }
+    }
   }
 
   "JsonLD.arr" should {
@@ -146,6 +200,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
       forAll { values: List[String] =>
         JsonLD.arr(values map JsonLD.fromString: _*).toJson shouldBe
           Json.arr(values map Json.fromString map (json => Json.obj("@value" -> json)): _*)
+      }
+    }
+
+    "have no entityId" in {
+      forAll { values: List[String] =>
+        JsonLD.arr(values map JsonLD.fromString: _*).entityId shouldBe None
       }
     }
   }
@@ -197,6 +257,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
           }""").fold(throw _, identity)
       }
     }
+
+    "have some entityId" in {
+      forAll { (id: EntityId, types: EntityTypes, property: (Property, JsonLD)) =>
+        JsonLD.entity(id, types, property).entityId shouldBe Some(id)
+      }
+    }
   }
 
   private def listValueProperties(schema: Schema): Gen[(Property, NonEmptyList[JsonLD])] =
@@ -211,4 +277,6 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
       property <- nonBlankStrings() map (p => schema / p.value)
       value    <- nonBlankStrings() map (v => JsonLD.fromString(v.value))
     } yield property -> value
+
+  private case class Object(value: String)
 }

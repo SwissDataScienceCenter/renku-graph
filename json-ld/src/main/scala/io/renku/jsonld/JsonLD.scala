@@ -25,13 +25,16 @@ import cats.data.NonEmptyList
 import io.circe.{Encoder, Json}
 
 abstract class JsonLD extends Product with Serializable {
-  def toJson: Json
+  def toJson:   Json
+  def entityId: Option[EntityId]
   def cursor: Cursor = Cursor.from(this)
 }
 
 object JsonLD {
 
   import io.circe.syntax._
+
+  val Null: JsonLD = JsonLDNull
 
   def fromString(value:    String): JsonLD = JsonLDValue(value)
   def fromInt(value:       Int): JsonLD = JsonLDValue(value)
@@ -62,9 +65,11 @@ object JsonLD {
     )
 
     private lazy val toObjectProperties: ((Property, JsonLD)) => Option[(String, Json)] = {
-      case (_, Null)         => None
+      case (_, JsonLDNull)   => None
       case (property, value) => Some(property.url -> value.toJson)
     }
+
+    override lazy val entityId: Option[EntityId] = Some(id)
   }
 
   private[jsonld] final case class JsonLDValue[V](
@@ -72,10 +77,12 @@ object JsonLD {
       maybeType:      Option[String] = None
   )(implicit encoder: Encoder[V])
       extends JsonLD {
-    override lazy val toJson = maybeType match {
+    override lazy val toJson: Json = maybeType match {
       case None    => Json.obj("@value" -> value.asJson)
       case Some(t) => Json.obj("@type"  -> t.asJson, "@value" -> value.asJson)
     }
+
+    override lazy val entityId: Option[EntityId] = None
   }
 
   private[jsonld] object JsonLDValue {
@@ -83,23 +90,26 @@ object JsonLD {
       JsonLDValue[V](value, Some(entityType))
   }
 
-  private[jsonld] final case object Null extends JsonLD {
-    override lazy val toJson = Json.Null
+  private[jsonld] final case object JsonLDNull extends JsonLD {
+    override lazy val toJson:   Json             = Json.Null
+    override lazy val entityId: Option[EntityId] = None
   }
 
   private[jsonld] final case object JsonLDOptionValue {
     def apply[V](maybeValue: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD =
       maybeValue match {
-        case None    => JsonLD.Null
+        case None    => JsonLD.JsonLDNull
         case Some(v) => encoder(v)
       }
   }
 
   private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD {
-    override lazy val toJson = Json.arr(jsons.map(_.toJson): _*)
+    override lazy val toJson:   Json             = Json.arr(jsons.map(_.toJson): _*)
+    override lazy val entityId: Option[EntityId] = None
   }
 
   private[jsonld] final case class JsonLDEntityId[V <: EntityId](id: V)(implicit encoder: Encoder[V]) extends JsonLD {
-    override lazy val toJson = Json.obj("@id" -> id.asJson)
+    override lazy val toJson:   Json             = Json.obj("@id" -> id.asJson)
+    override lazy val entityId: Option[EntityId] = None
   }
 }

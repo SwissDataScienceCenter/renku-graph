@@ -30,6 +30,7 @@ object EntityId {
 
   private[jsonld] final case class StandardEntityId(override val value: String) extends EntityId(value)
 
-  implicit val entityIdJsonEncoder: Encoder[EntityId]  = Encoder.instance(id => Json.fromString(id.value))
-  implicit val stringToEntityId:    String => EntityId = StandardEntityId.apply
+  implicit val entityIdJsonEncoder: Encoder[EntityId]    = Encoder.instance(id => Json.fromString(id.value))
+  implicit val stringToEntityId:    String => EntityId   = StandardEntityId.apply
+  implicit val propertyToEntityId:  Property => EntityId = p => StandardEntityId(p.url)
 }

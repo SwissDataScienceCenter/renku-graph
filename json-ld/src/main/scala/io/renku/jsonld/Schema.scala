@@ -20,6 +20,7 @@ package io.renku.jsonld
 
 abstract class Schema(value: String, separator: String) extends Product with Serializable {
   def /(name: String): Property = Property(s"$value$separator$name")
+  def /(name: Number): Property = Property(s"$value$separator$name")
 }
 
 final case class Property(url: String) {
