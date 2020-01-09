@@ -63,22 +63,36 @@ private class IOKGProjectFinder(
   }
 
   private def query(path: ProjectPath): String =
-    s"""
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       |PREFIX schema: <http://schema.org/>
-       |
-       |SELECT DISTINCT ?name ?dateCreated ?creatorName ?creatorEmail
-       |WHERE {
-       |  ${FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
-       |                                                             schema:name ?name ;
-       |                                                             schema:dateCreated ?dateCreated ;
-       |                                                             schema:creator ?creatorResource .
-       |  ?creatorResource rdf:type <http://schema.org/Person> ;
-       |                   schema:email ?creatorEmail ;
-       |                   schema:name ?creatorName .         
-       |}
-       |""".stripMargin
+    s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        |PREFIX schema: <http://schema.org/>
+        |PREFIX prov: <http://www.w3.org/ns/prov#>
+        |
+        |SELECT DISTINCT ?name ?dateCreated ?creatorName ?creatorEmail
+        |WHERE {
+        |  {
+        |    SELECT ?creatorResource
+        |    WHERE {
+        |      ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
+        |                                                                 schema:creator ?creatorResource .
+        |      ?commit rdf:type prov:Activity ;
+        |              schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} ;
+        |              prov:agent ?creatorResource ;
+        |              prov:startedAtTime ?commitCreatedDate .
+        |    }
+        |    ORDER BY ASC(?commitCreatedDate)
+        |    LIMIT 1
+        |  }
+        |  {
+        |    ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
+        |                                                               schema:name ?name ;
+        |                                                               schema:dateCreated ?dateCreated .
+        |    ?creatorResource rdf:type <http://schema.org/Person> ;
+        |                     schema:email ?creatorEmail ;
+        |                     schema:name ?creatorName .
+        |  }
+        |}
+        |""".stripMargin
 
   private def recordsDecoder(path: ProjectPath): Decoder[List[KGProject]] = {
     import Decoder._

@@ -62,7 +62,7 @@ object ProjectsGenerators {
   } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
 
   private implicit lazy val httpUrls: Gen[HttpUrl] = for {
-    url         <- urls
+    url         <- urls()
     projectPath <- projectPaths
   } yield HttpUrl(s"$url/$projectPath.git")
 
@@ -71,7 +71,7 @@ object ProjectsGenerators {
     creator <- projectCreators
   } yield ProjectCreation(created, creator)
 
-  private implicit lazy val projectCreators: Gen[ProjectCreator] = for {
+  implicit lazy val projectCreators: Gen[ProjectCreator] = for {
     email <- emails
     name  <- names
   } yield ProjectCreator(email, name)

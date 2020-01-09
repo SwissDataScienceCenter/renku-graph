@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.committedDates
 import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames}
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.graph.model.{SchemaVersion, projects, users}
@@ -40,6 +40,7 @@ object singleFileAndCommit {
             commitId:           CommitId,
             committerName:      UserName = names.generateOne,
             committerEmail:     Email = emails.generateOne,
+            committedDate:      CommittedDate = committedDates.generateOne,
             schemaVersion:      SchemaVersion = schemaVersions.generateOne,
             renkuBaseUrl:       RenkuBaseUrl = renkuBaseUrl)(implicit fusekiBaseUrl: FusekiBaseUrl): List[Json] = {
     val filePath                                  = FilePath("README.md")
@@ -56,12 +57,7 @@ object singleFileAndCommit {
       Project(projectId, projectName, projectDateCreated, projectCreatorId),
       Person(projectCreatorId, projectCreatorName),
       CommitEntity(CommitEntity.Id(commitId, filePath), projectId, commitGenerationId),
-      CommitActivity(commitActivityId,
-                     projectId,
-                     committedDates.generateOne,
-                     agentId,
-                     committerPersonId,
-                     maybeInfluencedBy = Nil),
+      CommitActivity(commitActivityId, projectId, committedDate, agentId, committerPersonId, maybeInfluencedBy = Nil),
       Person(committerPersonId, committerName),
       CommitGeneration(commitGenerationId, commitActivityId),
       Agent(agentId)
