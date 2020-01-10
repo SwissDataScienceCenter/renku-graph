@@ -46,11 +46,10 @@ private class BaseDetailsFinder(
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
        |SELECT DISTINCT ?identifier ?name ?url ?sameAs ?description ?publishedDate
        |WHERE {
-       |  ?dataset dcterms:isPartOf|schema:isPartOf <${ProjectResource(renkuBaseUrl, projectPath)}> .
+       |  ?dataset schema:isPartOf <${ProjectResource(renkuBaseUrl, projectPath)}> .
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
        |           schema:identifier ?identifier ;
        |           schema:name ?name .
@@ -58,7 +57,8 @@ private class BaseDetailsFinder(
        |  OPTIONAL { ?dataset schema:sameAs ?sameAs } .         
        |  OPTIONAL { ?dataset schema:description ?description } .         
        |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .         
-       |}""".stripMargin
+       |}
+       |""".stripMargin
 }
 
 private object BaseDetailsFinder {

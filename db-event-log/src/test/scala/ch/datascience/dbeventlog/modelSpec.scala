@@ -36,7 +36,7 @@ class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
       "NEW"                     -> New,
       "PROCESSING"              -> Processing,
       "TRIPLES_STORE"           -> TriplesStore,
-      "TRIPLES_STORE_FAILURE"   -> TriplesStoreFailure,
+      "RECOVERABLE_FAILURE"     -> RecoverableFailure,
       "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
     )
 

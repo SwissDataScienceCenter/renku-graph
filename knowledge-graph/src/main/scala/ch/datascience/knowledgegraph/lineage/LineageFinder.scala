@@ -88,14 +88,13 @@ class IOLineageFinder(
        |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
        |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
        |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
        |SELECT ?target ?source ?target_label ?source_label
        |WHERE {
        |  {
        |    SELECT ?entity
        |    WHERE {
-       |      ?qentity dcterms:isPartOf|schema:isPartOf $projectResource .
+       |      ?qentity schema:isPartOf $projectResource .
        |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) $commitResource .
        |      FILTER (?qentity = $generationResource)
        |      ?qentity (
@@ -121,7 +120,8 @@ class IOLineageFinder(
        |    BIND (?activity AS ?target)
        |    BIND (?entity AS ?source)
        |  }
-       |}""".stripMargin
+       |}
+       |""".stripMargin
   }
 
   import io.circe.{Decoder, DecodingFailure, HCursor}
