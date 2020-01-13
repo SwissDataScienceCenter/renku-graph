@@ -34,12 +34,12 @@ abstract class Cursor {
   def as[T](implicit decoder: JsonLDDecoder[T]): JsonLDDecoder.Result[T] = decoder(this)
 
   def downType(searchedType: EntityType): Cursor = jsonLD match {
-    case JsonLDEntity(_, types, _) if types.list.exists(_ == searchedType) => this
-    case _                                                                 => Empty
+    case JsonLDEntity(_, types, _, _) if types.list.exists(_ == searchedType) => this
+    case _                                                                    => Empty
   }
 
   def downField(name: Property): Cursor = jsonLD match {
-    case JsonLDEntity(_, _, props) =>
+    case JsonLDEntity(_, _, props, _) =>
       props
         .find(_._1 == name)
         .fold(Empty: Cursor) { case (name, value) => new PropertyCursor(this, name, value) }
@@ -65,7 +65,7 @@ object Cursor {
     override lazy val jsonLD: JsonLD = JsonLD.JsonLDNull
     override lazy val delete: Cursor = this
     override lazy val top: Option[JsonLD] = parent.jsonLD match {
-      case json @ JsonLDEntity(_, _, properties) =>
+      case json @ JsonLDEntity(_, _, properties, _) =>
         properties.filterNot {
           case (`property`, _) => true
           case _               => false

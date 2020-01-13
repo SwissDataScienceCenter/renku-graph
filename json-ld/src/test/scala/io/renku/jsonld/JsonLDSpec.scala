@@ -258,6 +258,69 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
 
+    "be able to add a single reverse property" in {
+      forAll {
+        (parentId:       EntityId,
+         parentTypes:    EntityTypes,
+         parentProperty: (Property, JsonLD),
+         childId:        EntityId,
+         childTypes:     EntityTypes,
+         childProperty:  (Property, JsonLD)) =>
+          val reverseProperty: Property = properties.generateOne
+          val child = JsonLD.entity(childId, childTypes, childProperty)
+          JsonLD.entity(parentId, parentTypes, Reverse.of(reverseProperty -> child), parentProperty).toJson shouldBe
+            parse(s"""{
+            "@id":                  ${parentId.asJson},
+            "@type":                ${parentTypes.asJson},
+            "${parentProperty._1}": ${parentProperty._2.toJson},
+            "@reverse":             {
+              "$reverseProperty": {
+                "@id":                 ${childId.asJson},
+                "@type":               ${childTypes.asJson},
+                "${childProperty._1}": ${childProperty._2.toJson}
+              }
+            }
+          }""").fold(throw _, identity)
+      }
+    }
+
+    "be able to add mutliple reverse properties" in {
+      forAll {
+        (parentId:       EntityId,
+         parentTypes:    EntityTypes,
+         parentProperty: (Property, JsonLD),
+         childId:        EntityId,
+         childTypes:     EntityTypes,
+         childProperty:  (Property, JsonLD)) =>
+          val reverseProperty1: Property = properties.generateOne
+          val reverseProperty2: Property = properties.generateOne
+          val child = JsonLD.entity(childId, childTypes, childProperty)
+          JsonLD
+            .entity(parentId,
+                    parentTypes,
+                    Reverse.of(reverseProperty1 -> child, reverseProperty2 -> child),
+                    parentProperty)
+            .toJson shouldBe
+            parse(s"""{
+            "@id":                  ${parentId.asJson},
+            "@type":                ${parentTypes.asJson},
+            "${parentProperty._1}": ${parentProperty._2.toJson},
+            "@reverse":             [{
+              "$reverseProperty1": {
+                "@id":                 ${childId.asJson},
+                "@type":               ${childTypes.asJson},
+                "${childProperty._1}": ${childProperty._2.toJson}
+              }},{
+              "$reverseProperty2": {
+                "@id":                 ${childId.asJson},
+                "@type":               ${childTypes.asJson},
+                "${childProperty._1}": ${childProperty._2.toJson}
+              }}
+            ]
+          }""").fold(throw _, identity)
+      }
+    }
+
     "have some entityId" in {
       forAll { (id: EntityId, types: EntityTypes, property: (Property, JsonLD)) =>
         JsonLD.entity(id, types, property).entityId shouldBe Some(id)

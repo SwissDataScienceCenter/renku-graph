@@ -50,23 +50,39 @@ object JsonLD {
       types:         EntityTypes,
       firstProperty: (Property, JsonLD),
       other:         (Property, JsonLD)*
-  ): JsonLD = JsonLDEntity(id, types, properties = NonEmptyList.of(firstProperty, other: _*))
+  ): JsonLDEntity = entity(id, types, reverse = Reverse.empty, firstProperty, other: _*)
+
+  def entity(
+      id:            EntityId,
+      types:         EntityTypes,
+      reverse:       Reverse,
+      firstProperty: (Property, JsonLD),
+      other:         (Property, JsonLD)*
+  ): JsonLDEntity = JsonLDEntity(id, types, properties = NonEmptyList.of(firstProperty, other: _*), reverse)
 
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
                                                 types:      EntityTypes,
-                                                properties: NonEmptyList[(Property, JsonLD)])
+                                                properties: NonEmptyList[(Property, JsonLD)],
+                                                reverse:    Reverse)
       extends JsonLD {
 
     override lazy val toJson: Json = Json.obj(
       List(
         "@id"   -> id.asJson,
         "@type" -> types.asJson
-      ) ++ properties.toList.map(toObjectProperties).flatten: _*
+      ) ++ (properties.toList.map(toObjectProperties) :+ reverse.asProperty).flatten: _*
     )
 
     private lazy val toObjectProperties: ((Property, JsonLD)) => Option[(String, Json)] = {
       case (_, JsonLDNull)   => None
       case (property, value) => Some(property.url -> value.toJson)
+    }
+
+    private implicit class ReverseOps(reverse: Reverse) {
+      lazy val asProperty: Option[(String, Json)] = reverse match {
+        case Reverse.empty => None
+        case other         => Some("@reverse" -> other.asJson)
+      }
     }
 
     override lazy val entityId: Option[EntityId] = Some(id)
