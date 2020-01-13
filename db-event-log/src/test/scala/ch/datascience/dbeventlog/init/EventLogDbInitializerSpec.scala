@@ -20,9 +20,14 @@ package ch.datascience.dbeventlog.init
 
 import cats.effect._
 import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
+import ch.datascience.dbeventlog.DbEventLogGenerators._
+import ch.datascience.dbeventlog._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.{CommitEventId, CommittedDate}
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
@@ -67,7 +72,7 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
       logger.loggedOnly(Info("Event Log database initialization success"))
     }
 
-    "assures there are indexes created for project_id, status and execution_date" in new TestCase {
+    "ensure indexes are created for project_id, status and execution_date" in new TestCase {
 
       if (!tableExists()) createTable()
 
@@ -84,6 +89,31 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
       verifyTrue(sql"DROP INDEX idx_execution_date;")
       verifyTrue(sql"DROP INDEX idx_event_date;")
       verifyTrue(sql"DROP INDEX idx_created_date;")
+    }
+
+    "ensure TRIPLES_STORE_FAILURE to RECOVERABLE_FAILURE update is run" in new TestCase {
+
+      if (!tableExists()) createTable()
+
+      tableExists() shouldBe true
+
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
+
+      storeEvent()
+      storeEvent(eventStatus = "TRIPLES_STORE_FAILURE")
+      storeEvent()
+
+      execute {
+        sql"select count(*) from event_log where status = 'TRIPLES_STORE_FAILURE';".query[Int].unique
+      } shouldBe 1
+
+      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
+
+      execute {
+        sql"select count(*) from event_log where status = 'TRIPLES_STORE_FAILURE';".query[Int].unique
+      } shouldBe 0
     }
 
     "fails if adding the project_path column fails" in new TestCase {
@@ -111,4 +141,17 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
 
   private class IOProjectPathAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])
       extends ProjectPathAdder[IO](transactor, logger)
+
+  private def storeEvent(commitEventId: CommitEventId = commitEventIds.generateOne,
+                         eventStatus:   String        = eventStatuses.generateOne.value,
+                         executionDate: ExecutionDate = executionDates.generateOne,
+                         eventDate:     CommittedDate = committedDates.generateOne,
+                         eventBody:     EventBody     = eventBodies.generateOne,
+                         createdDate:   CreatedDate   = createdDates.generateOne,
+                         projectPath:   ProjectPath   = projectPaths.generateOne): Unit = execute {
+    sql"""|insert into 
+          |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
+          |values (${commitEventId.id.value}, ${commitEventId.projectId.value}, $eventStatus, ${createdDate.value}, ${executionDate.value}, ${eventDate.value}, ${eventBody.value})
+      """.stripMargin.update.run.map(_ => ())
+  }
 }

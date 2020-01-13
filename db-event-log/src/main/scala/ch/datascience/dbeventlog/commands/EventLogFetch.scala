@@ -63,7 +63,7 @@ class EventLogFetch[Interpretation[_]](
   private def findOldestEvent = {
     fr"""select event_id, project_id, event_body
          from event_log
-         where (""" ++ `status IN`(New, TriplesStoreFailure) ++ fr""" and execution_date < ${now()})
+         where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
            or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
          order by execution_date asc
          limit 1"""
@@ -75,7 +75,7 @@ class EventLogFetch[Interpretation[_]](
     fr"""select event_log.event_id, event_log.project_id, event_log.event_body
          from event_log, (select  project_id, min(execution_date) as oldest_execution_date
                           from event_log
-                          where (""" ++ `status IN`(New, TriplesStoreFailure) ++ fr""" and execution_date < ${now()})
+                          where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
                             or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
                           group by project_id) oldest_events
          where event_log.project_id = oldest_events.project_id 

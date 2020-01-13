@@ -52,7 +52,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
         maxElements = 20
       ).generateOne
       val toBeProcessedEvents = nonEmptyList(
-        Gen.oneOf(New, Processing, TriplesStoreFailure),
+        Gen.oneOf(New, Processing, RecoverableFailure),
         minElements = 10,
         maxElements = 20
       ).generateOne

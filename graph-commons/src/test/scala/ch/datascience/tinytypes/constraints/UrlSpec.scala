@@ -32,7 +32,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
   "Url" should {
 
     "be instantiatable for valid urls" in {
-      forAll(httpUrls) { url =>
+      forAll(httpUrls()) { url =>
         UrlType(url).toString shouldBe url
       }
     }
@@ -45,17 +45,17 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
   "/" should {
 
     "allow to add next path segment" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       (url / "path") shouldBe UrlType(s"$url/path")
     }
 
     "url encode the path segment added to a url" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       (url / "path to smth") shouldBe UrlType(s"$url/path+to+smth")
     }
 
     "use provided converted when adding the next path segment" in {
-      val url       = (httpUrls map UrlType.apply).generateOne
+      val url       = (httpUrls() map UrlType.apply).generateOne
       val otherPath = (relativePaths(minSegments = 2) map RelativePathString.apply).generateOne
       (url / otherPath) shouldBe UrlType(s"$url/$otherPath")
     }
@@ -64,27 +64,27 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
   "?" should {
 
     "allow to add a String query parameter if there's no such a parameter already" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       (url ? ("param" -> "value a")).toString shouldBe s"$url?param=value+a"
     }
 
     "allow to add an Int query parameter if there's no such a parameter already" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       (url ? ("param" -> 1)).toString shouldBe s"$url?param=1"
     }
 
     "allow to add an IntTinyType query parameter if there's no such a parameter already" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       (url ? ("param" -> new IntTinyType { override val value = 1 })).toString shouldBe s"$url?param=1"
     }
 
     "allow to add an StringTinyType query parameter if there's no such a parameter already" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       (url ? ("param" -> new StringTinyType { override val value = "value a" })).toString shouldBe s"$url?param=value+a"
     }
 
     "replace the value of the parameter if it already exists as the last one" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
 
       val newUrl: UrlType = url ? ("param1" -> "value a") & ("param2" -> "value C")
       newUrl.toString shouldBe s"$url?param1=value+a&param2=value+C"
@@ -93,7 +93,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "replace the value of the correct parameter - case with similar param names" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
 
       val newUrl: UrlType = url ? ("page" -> "1") & ("per_page" -> "3")
       newUrl.toString shouldBe s"$url?page=1&per_page=3"
@@ -102,7 +102,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "replace the value of the parameter if it already exists somewhere in the middle" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
 
       val newUrl: UrlType = url ? ("param1" -> "value 1") & ("param2" -> "value 2")
       newUrl.toString shouldBe s"$url?param1=value+1&param2=value+2"
@@ -111,7 +111,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "add an additional parameter if there's already at least one in the url" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
 
       val newUrl: UrlType = url ? ("param1" -> "value 1")
       newUrl.toString shouldBe s"$url?param1=value+1"
@@ -123,27 +123,27 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
   "&" should {
 
     "allow to add a new query parameter" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       ((url ? ("param1" -> "value 1")) & ("param2" -> "value 2")).toString shouldBe s"$url?param1=value+1&param2=value+2"
     }
 
     "allow to add another query parameter if there's more than one" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       (url ? ("param1" -> "value 1") & ("param2" -> "value 2") & ("param3" -> "value 3")).toString shouldBe s"$url?param1=value+1&param2=value+2&param3=value+3"
     }
 
     "add query parameter with optional value if the value is given" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       (url ? ("param1" -> "value 1") && ("param2" -> Some("value 2"))).toString shouldBe s"$url?param1=value+1&param2=value+2"
     }
 
     "do not add query parameter with absent value" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
       (url ? ("param1" -> "value 1") && ("param2" -> Option.empty[String])).toString shouldBe s"$url?param1=value+1"
     }
 
     "replace the value of the parameter if it already exists as the last one" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
 
       val newUrl = url ? ("param1" -> "value 1") & ("param2" -> "value 2")
       newUrl.toString shouldBe s"$url?param1=value+1&param2=value+2"
@@ -152,7 +152,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "replace the value of the correct parameter - case with similar param names" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
 
       val newUrl = url ? ("page" -> "1") & ("per_page" -> "3")
       newUrl.toString shouldBe s"$url?page=1&per_page=3"
@@ -161,7 +161,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "replace the value of the parameter if it already exists somewhere in the middle" in {
-      val url = (httpUrls map UrlType.apply).generateOne
+      val url = (httpUrls() map UrlType.apply).generateOne
 
       val newUrl = url ? ("param1" -> "value 1") & ("param2" -> "value 2")
       newUrl.toString shouldBe s"$url?param1=value+1&param2=value+2"
@@ -179,7 +179,7 @@ class BaseUrlSpec extends WordSpec {
 
     "add the given segment and produce a new type" in {
 
-      val baseUrl = (httpUrls map BaseUrlType.apply).generateOne
+      val baseUrl = (httpUrls() map BaseUrlType.apply).generateOne
       val segment = relativePaths(maxSegments = 1).generateOne
 
       val extendedUrl = baseUrl / segment

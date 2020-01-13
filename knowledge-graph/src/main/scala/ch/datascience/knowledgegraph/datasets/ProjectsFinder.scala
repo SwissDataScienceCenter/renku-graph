@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
@@ -51,7 +51,6 @@ private class ProjectsFinder(
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
        |PREFIX prov: <http://www.w3.org/ns/prov#>
        |
        |SELECT DISTINCT ?isPartOf ?name ?minDateCreated ?agentEmail ?agentName
@@ -68,7 +67,7 @@ private class ProjectsFinder(
        |        WHERE {
        |          ?dataset schema:identifier "$identifier" ;
        |                   rdf:type <http://schema.org/Dataset> ;
-       |                   dcterms:isPartOf|schema:isPartOf ?isPartOf .
+       |                   schema:isPartOf ?isPartOf .
        |        }
        |      }
        |    }
@@ -99,7 +98,7 @@ private object ProjectsFinder {
     import ch.datascience.graph.model.users.{Email, Name => UserName}
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    def toProjectPath(projectPath: FullProjectPath) =
+    def toProjectPath(projectPath: ProjectResource) =
       projectPath
         .as[Try, ProjectPath]
         .toEither
@@ -107,7 +106,7 @@ private object ProjectsFinder {
 
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
-        path        <- cursor.downField("isPartOf").downField("value").as[FullProjectPath].flatMap(toProjectPath)
+        path        <- cursor.downField("isPartOf").downField("value").as[ProjectResource].flatMap(toProjectPath)
         name        <- cursor.downField("name").downField("value").as[projects.Name]
         dateCreated <- cursor.downField("minDateCreated").downField("value").as[DateCreatedInProject]
         agentEmail  <- cursor.downField("agentEmail").downField("value").as[Email]
