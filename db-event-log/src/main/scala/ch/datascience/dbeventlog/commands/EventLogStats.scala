@@ -21,7 +21,9 @@ package ch.datascience.dbeventlog.commands
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.dbeventlog._
+import ch.datascience.graph.model.projects.ProjectPath
 import doobie.implicits._
 
 import scala.language.higherKinds
@@ -40,6 +42,24 @@ class EventLogStats[Interpretation[_]](
 
   private def addMissingStatues(stats: Map[EventStatus, Long]): Map[EventStatus, Long] =
     EventStatus.all.map(status => status -> stats.getOrElse(status, 0L)).toMap
+
+  def waitingEvents: Interpretation[Map[ProjectPath, Long]] =
+    sql"""|select project_path, sum(events)
+          |from (
+          |  select project_path, count(event_id) as events 
+          |  from event_log 
+          |  where status = ${New: EventStatus} 
+          |  group by project_path
+          |  union
+          |  select distinct project_path, 0 as events
+          |  from event_log
+          |) counts
+          |group by project_path; 
+          |""".stripMargin
+      .query[(ProjectPath, Long)]
+      .to[List]
+      .transact(transactor.get)
+      .map(_.toMap)
 }
 
 class IOEventLogStats(
