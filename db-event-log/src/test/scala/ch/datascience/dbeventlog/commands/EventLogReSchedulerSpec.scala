@@ -56,7 +56,7 @@ class EventLogReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with 
       addEvent(event5Id, EventStatus.New, timestampsNotInTheFuture.map(ExecutionDate.apply), event5Date)
       val event6Id   = commitEventIds.generateOne
       val event6Date = committedDates.generateOne
-      addEvent(event6Id, TriplesStoreFailure, timestampsNotInTheFuture.map(ExecutionDate.apply), event6Date)
+      addEvent(event6Id, RecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply), event6Date)
 
       eventLog
         .scheduleEventsForProcessing()

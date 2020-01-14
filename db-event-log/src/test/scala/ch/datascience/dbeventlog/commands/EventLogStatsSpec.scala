@@ -22,7 +22,12 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.events.{CommitEventId, CommitId, ProjectId}
+import ch.datascience.graph.model.projects.ProjectPath
+import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -41,14 +46,45 @@ class EventLogStatsSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaC
           New                   -> statuses.count(_ == New),
           Processing            -> statuses.count(_ == Processing),
           TriplesStore          -> statuses.count(_ == TriplesStore),
-          TriplesStoreFailure   -> statuses.count(_ == TriplesStoreFailure),
+          RecoverableFailure    -> statuses.count(_ == RecoverableFailure),
           NonRecoverableFailure -> statuses.count(_ == NonRecoverableFailure)
         )
       }
     }
   }
 
+  "waitingEvents" should {
+
+    "return info about number of events waiting in the queue split by projects" in {
+      forAll(nonEmptyList(projectPaths, minElements = 2, maxElements = 8)) { projectPaths =>
+        prepareDbForTest()
+
+        val events = generateEventsFor(projectPaths.toList)
+
+        events foreach store
+
+        stats.waitingEvents.unsafeRunSync() shouldBe events
+          .groupBy(_._1)
+          .map {
+            case (projectPath, sameProjectGroup) => projectPath -> sameProjectGroup.count(_._3 == New)
+          }
+      }
+    }
+  }
+
   private val stats = new EventLogStats(transactor)
+
+  private def store: ((ProjectPath, CommitId, EventStatus)) => Unit = {
+    case (projectPath, commitId, status) =>
+      storeEvent(
+        CommitEventId(commitId, ProjectId(Math.abs(projectPath.value.hashCode))),
+        status,
+        executionDates.generateOne,
+        committedDates.generateOne,
+        eventBodies.generateOne,
+        projectPath = projectPath
+      )
+  }
 
   private def store(status: EventStatus): Unit =
     storeEvent(commitEventIds.generateOne,
@@ -56,4 +92,17 @@ class EventLogStatsSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaC
                executionDates.generateOne,
                committedDates.generateOne,
                eventBodies.generateOne)
+
+  private def generateEventsFor(projectPaths: List[ProjectPath]) =
+    projectPaths flatMap { projectPath =>
+      nonEmptyList(commitIdsAndStatuses, maxElements = 20).generateOne.toList.map {
+        case (commitId, status) => (projectPath, commitId, status)
+      }
+    }
+
+  private val commitIdsAndStatuses =
+    for {
+      commitId <- commitIds
+      status   <- eventStatuses
+    } yield commitId -> status
 }

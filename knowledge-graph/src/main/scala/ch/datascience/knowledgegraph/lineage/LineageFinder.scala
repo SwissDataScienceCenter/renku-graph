@@ -22,7 +22,7 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{FilePath, FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.{FilePath, ProjectPath, ProjectResource}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
@@ -76,7 +76,7 @@ class IOLineageFinder(
   }
 
   private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath): String = {
-    val projectResource    = FullProjectPath(renkuBaseUrl, path).showAs[RdfResource]
+    val projectResource    = ProjectResource(renkuBaseUrl, path).showAs[RdfResource]
     val commitResource     = (fusekiBaseUrl / "commit" / commitId).showAs[RdfResource]
     val generationResource = (fusekiBaseUrl / "blob" / commitId / filePath).showAs[RdfResource]
     s"""
@@ -88,14 +88,13 @@ class IOLineageFinder(
        |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
        |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
        |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
        |
        |SELECT ?target ?source ?target_label ?source_label
        |WHERE {
        |  {
        |    SELECT ?entity
        |    WHERE {
-       |      ?qentity dcterms:isPartOf|schema:isPartOf $projectResource .
+       |      ?qentity schema:isPartOf $projectResource .
        |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) $commitResource .
        |      FILTER (?qentity = $generationResource)
        |      ?qentity (
@@ -121,7 +120,8 @@ class IOLineageFinder(
        |    BIND (?activity AS ?target)
        |    BIND (?entity AS ?source)
        |  }
-       |}""".stripMargin
+       |}
+       |""".stripMargin
   }
 
   import io.circe.{Decoder, DecodingFailure, HCursor}

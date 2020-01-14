@@ -97,7 +97,7 @@ object CommonGraphGenerators {
     } yield RateLimit[Target](items, per = unit)
 
   implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
-    fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
+    fusekiUrl       <- httpUrls() map FusekiBaseUrl.apply
     datasetName     <- nonEmptyStrings() map DatasetName.apply
     authCredentials <- basicAuthCredentials
   } yield RdfStoreConfig(fusekiUrl, datasetName, authCredentials)
@@ -107,9 +107,9 @@ object CommonGraphGenerators {
     .map(_.mkString("."))
     .map(SchemaVersion.apply)
 
-  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls map RenkuBaseUrl.apply
+  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls() map RenkuBaseUrl.apply
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
-    url  <- httpUrls
+    url  <- httpUrls()
     path <- relativePaths(maxSegments = 1)
   } yield renku.ResourcesUrl(s"$url/$path")
   def renkuResourceUrls(
@@ -119,12 +119,12 @@ object CommonGraphGenerators {
       path <- relativePaths(maxSegments = 1)
     } yield renkuResourcesUrl / path
   implicit val gitLabUrls: Gen[GitLabUrl] = for {
-    url  <- httpUrls
+    url  <- httpUrls()
     path <- relativePaths(maxSegments = 2)
   } yield GitLabUrl(s"$url/$path")
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
-    url         <- httpUrls
+    url         <- httpUrls()
     projectName <- nonEmptyList(nonEmptyStrings()).map(_.toList.mkString("."))
     projectId   <- positiveInts(max = 100)
   } yield SentryBaseUrl(s"$url@$projectName/$projectId")
@@ -138,7 +138,7 @@ object CommonGraphGenerators {
 
   implicit val rels: Gen[Rel] = nonEmptyStrings() map Rel.apply
   implicit val hrefs: Gen[Href] = for {
-    baseUrl <- httpUrls
+    baseUrl <- httpUrls()
     path    <- relativePaths()
   } yield Href(s"$baseUrl/$path")
   implicit val linkObjects: Gen[Link] = for {
@@ -182,7 +182,7 @@ object CommonGraphGenerators {
       .from[Try, Result](results, PagingRequest(page, perPage), total)
       .fold(throw _, identity)
 
-  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls map FusekiBaseUrl.apply
+  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls() map FusekiBaseUrl.apply
 
   implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
     subject <- nonEmptyStrings()

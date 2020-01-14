@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph
 import cats.data.{Validated, ValidatedNel}
 import cats.effect.{Clock, ConcurrentEffect}
 import cats.implicits._
-import ch.datascience.graph.http.server.binders.ProjectPath._
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.PagingRequest.Decoders._
@@ -63,8 +63,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case           GET  -> Root / "knowledge-graph" / "datasets" / DatasetId(id)                                                              => getDataset(id)
     case           GET  -> Root / "knowledge-graph" / "graphql"                                                                               => schema
     case request @ POST -> Root / "knowledge-graph" / "graphql"                                                                               => handleQuery(request)
-    case           GET  -> Root / "knowledge-graph" / "projects" / Namespace(namespace) / Name(name)                                          => getProject(namespace / name)
-    case           GET  -> Root / "knowledge-graph" / "projects" / Namespace(namespace) / Name(name) / "datasets"                             => getProjectDatasets(namespace / name)
+    case           GET  ->        "knowledge-graph" /: "projects" /: path                                                                     => routeToProjectsEndpoints(path)
   }.meter flatMap `add GET Root / metrics`[F]
   // format: on
 
@@ -79,4 +78,24 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
      PagingRequest(maybePage, maybePerPage))
       .mapN(datasetsSearchEndpoint.searchForDatasets)
       .fold(toBadRequest(), identity)
+
+  private def routeToProjectsEndpoints(path: Path): F[Response[F]] = path.toList match {
+    case projectPathParts :+ "datasets" => projectPathParts.toProjectPath.fold(identity, getProjectDatasets)
+    case projectPathParts               => projectPathParts.toProjectPath.fold(identity, getProject)
+  }
+
+  private implicit class PathPartsOps(parts: List[String]) {
+    import cats.MonadError
+    import cats.implicits._
+    import ch.datascience.controllers.InfoMessage
+    import ch.datascience.controllers.InfoMessage._
+    import org.http4s.{Response, Status}
+
+    private implicit val ME: MonadError[F, Throwable] = implicitly[MonadError[F, Throwable]]
+
+    lazy val toProjectPath: Either[F[Response[F]], ProjectPath] =
+      ProjectPath
+        .from(parts.mkString("/"))
+        .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")).pure[F])
+  }
 }
