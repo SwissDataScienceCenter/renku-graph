@@ -16,23 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.rdfstore.FusekiBaseUrl
-import io.circe.Json
-import io.circe.literal._
+import ch.datascience.graph.model.SchemaVersion
 
-private[triples] object Association {
+final case class Agent(schemaVersion: SchemaVersion, maybeStartedBy: Option[Person] = None)
 
-  def apply(id: Id): Json = json"""
-  {
-    "@id": $id,
-    "@type": "http://www.w3.org/ns/prov#Association"
-  }"""
+object Agent {
 
-  final case class Id(commitId: CommitId)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
-    override val value: String = (fusekiBaseUrl / "commit" / commitId / "association").toString
+  import io.renku.jsonld._
+  import io.renku.jsonld.syntax._
+
+  implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
+    JsonLD.entity(
+      EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.schemaVersion}",
+      EntityTypes of (prov / "SoftwareAgent", wfprov / "WorkflowEngine"),
+      rdfs / "label"        -> s"renku ${entity.schemaVersion}".asJsonLD,
+      prov / "wasStartedBy" -> entity.maybeStartedBy.asJsonLD
+    )
   }
 }

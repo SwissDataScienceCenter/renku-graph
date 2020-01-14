@@ -16,27 +16,26 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples
-package entities
+package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
-import ch.datascience.rdfstore.FusekiBaseUrl
-import io.circe.Json
-import io.circe.literal._
 
-private[triples] object UsageEntity {
+final case class Generation(filePath: FilePath, activity: Activity)
 
-  def apply(id: Id, entityId: EntityId): Json = json"""
-  {
-    "@id": $id,
-    "@type": "http://www.w3.org/ns/prov#Usage",
-    "http://www.w3.org/ns/prov#entity": {
-      "@id": $entityId
+object Generation {
+
+  import ch.datascience.graph.config.RenkuBaseUrl
+  import ch.datascience.rdfstore.FusekiBaseUrl
+  import io.renku.jsonld._
+  import io.renku.jsonld.syntax._
+
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Generation] =
+    JsonLDEncoder.instance { entity =>
+      JsonLD.entity(
+        EntityId of fusekiBaseUrl / "commit" / entity.activity.id / "tree" / entity.filePath,
+        EntityTypes of (prov / "Generation"),
+        prov / "activity" -> entity.activity.asJsonLD,
+        prov / "hadRole"  -> entity.filePath.asJsonLD
+      )
     }
-  }"""
-
-  final case class Id(commitId: CommitId, filePath: FilePath)(implicit fusekiBaseUrl: FusekiBaseUrl) extends EntityId {
-    override val value: String = (fusekiBaseUrl / "commit" / commitId / filePath).toString
-  }
 }

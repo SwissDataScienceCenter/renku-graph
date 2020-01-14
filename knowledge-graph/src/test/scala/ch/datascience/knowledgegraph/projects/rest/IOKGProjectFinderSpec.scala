@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph.projects.rest
 import java.time.temporal.ChronoUnit.DAYS
 
 import cats.effect.IO
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -29,7 +30,8 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.triples.{renkuBaseUrl, singleFileAndCommit, triples}
+import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -47,17 +49,14 @@ class IOKGProjectFinderSpec
       forAll { project: KGProject =>
         val projectCreator = project.created.creator
         loadToStore(
-          triples(
-            singleFileAndCommit(projectPaths.generateOne, commitId = commitIds.generateOne),
-            singleFileAndCommit(
-              projectPath        = project.path,
-              projectName        = project.name,
-              projectDateCreated = project.created.date,
-              projectCreator     = projectCreator.name -> projectCreator.email,
-              commitId           = commitIds.generateOne,
-              committerName      = projectCreator.name,
-              committerEmail     = projectCreator.email
-            )
+          fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne),
+          fileCommit(
+            commitId      = commitIds.generateOne,
+            committedDate = CommittedDate(project.created.date.value),
+            committer     = Person(projectCreator.name, projectCreator.email)
+          )(
+            projectPath = project.path,
+            projectName = project.name
           )
         )
 
@@ -67,31 +66,27 @@ class IOKGProjectFinderSpec
 
     "return details of the project with the given path if there are forks of it" in new TestCase {
       val project             = kgProjects.generateOne
-      val projectCreator      = project.created.creator
       val projectCreationDate = committedDates.generateOne
-      val forkCreator         = projectCreators.generateOne
+      val projectCreator      = Person(project.created.creator.name, project.created.creator.email)
+      val forkCreator         = Person(names.generateOne, emails.generateOne)
       loadToStore(
-        triples(
-          singleFileAndCommit(
-            projectPath        = project.path,
-            projectName        = project.name,
-            projectDateCreated = project.created.date,
-            projectCreator     = projectCreator.name -> projectCreator.email,
-            commitId           = commitIds.generateOne,
-            committerName      = projectCreator.name,
-            committerEmail     = projectCreator.email,
-            committedDate      = projectCreationDate
-          ),
-          singleFileAndCommit(
-            projectPath        = project.path,
-            projectName        = project.name,
-            projectDateCreated = project.created.date,
-            projectCreator     = forkCreator.name -> forkCreator.email,
-            commitId           = commitIds.generateOne,
-            committerName      = forkCreator.name,
-            committerEmail     = forkCreator.email,
-            committedDate      = CommittedDate(projectCreationDate.value.plus(2, DAYS))
-          )
+        fileCommit(
+          commitId      = commitIds.generateOne,
+          committedDate = projectCreationDate,
+          committer     = projectCreator
+        )(
+          projectPath        = project.path,
+          projectName        = project.name,
+          projectDateCreated = project.created.date
+        ),
+        fileCommit(
+          commitId      = commitIds.generateOne,
+          committedDate = CommittedDate(projectCreationDate.value.plus(2, DAYS)),
+          committer     = forkCreator
+        )(
+          projectPath        = project.path,
+          projectName        = project.name,
+          projectDateCreated = project.created.date
         )
       )
 

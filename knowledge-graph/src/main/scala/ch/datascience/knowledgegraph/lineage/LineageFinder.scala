@@ -79,49 +79,49 @@ class IOLineageFinder(
     val projectResource    = ProjectResource(renkuBaseUrl, path).showAs[RdfResource]
     val commitResource     = (fusekiBaseUrl / "commit" / commitId).showAs[RdfResource]
     val generationResource = (fusekiBaseUrl / "blob" / commitId / filePath).showAs[RdfResource]
-    s"""
-       |PREFIX prov: <http://www.w3.org/ns/prov#>
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       |PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>
-       |PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>
-       |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
-       |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-       |PREFIX schema: <http://schema.org/>
-       |PREFIX dcterms: <http://purl.org/dc/terms/>
-       |
-       |SELECT ?target ?source ?target_label ?source_label
-       |WHERE {
-       |  {
-       |    SELECT ?entity
-       |    WHERE {
-       |      ?qentity dcterms:isPartOf|schema:isPartOf $projectResource .
-       |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) $commitResource .
-       |      FILTER (?qentity = $generationResource)
-       |      ?qentity (
-       |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
-       |      ) ?entity .
-       |    }
-       |    GROUP BY ?entity
-       |  }
-       |  {
-       |    ?entity prov:qualifiedGeneration/prov:activity ?activity ;
-       |            rdfs:label ?target_label .
-       |    ?activity rdfs:comment ?source_label .
-       |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
-       |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
-       |    BIND (?entity AS ?target)
-       |    BIND (?activity AS ?source)
-       |  } UNION {
-       |    ?activity prov:qualifiedUsage/prov:entity ?entity ;
-       |              rdfs:comment ?target_label .
-       |    ?entity rdfs:label ?source_label .
-       |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
-       |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
-       |    BIND (?activity AS ?target)
-       |    BIND (?entity AS ?source)
-       |  }
-       |}""".stripMargin
+    s"""|PREFIX prov: <http://www.w3.org/ns/prov#>
+        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        |PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>
+        |PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>
+        |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
+        |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+        |PREFIX schema: <http://schema.org/>
+        |PREFIX dcterms: <http://purl.org/dc/terms/>
+        |
+        |SELECT ?target ?source ?target_label ?source_label
+        |WHERE {
+        |  {
+        |    SELECT ?entity
+        |    WHERE {
+        |      ?qentity dcterms:isPartOf|schema:isPartOf $projectResource .
+        |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) $commitResource .
+        |      FILTER (?qentity = $generationResource)
+        |      ?qentity (
+        |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
+        |      ) ?entity .
+        |    }
+        |    GROUP BY ?entity
+        |  }
+        |  {
+        |    ?entity prov:qualifiedGeneration/prov:activity ?activity ;
+        |            rdfs:label ?target_label .
+        |    ?activity rdfs:comment ?source_label .
+        |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
+        |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
+        |    BIND (?entity AS ?target)
+        |    BIND (?activity AS ?source)
+        |  } UNION {
+        |    ?activity prov:qualifiedUsage/prov:entity ?entity ;
+        |              rdfs:comment ?target_label .
+        |    ?entity rdfs:label ?source_label .
+        |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
+        |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
+        |    BIND (?activity AS ?target)
+        |    BIND (?entity AS ?source)
+        |  }
+        |}
+        |""".stripMargin
   }
 
   import io.circe.{Decoder, DecodingFailure, HCursor}

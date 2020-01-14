@@ -115,7 +115,6 @@ class ProjectResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "convert any Project Resource to ProjectPath" in {
       forAll { (renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath) =>
-        println(projectPath)
         ProjectResource(renkuBaseUrl, projectPath).as[Try, ProjectPath] shouldBe projectPath.pure[Try]
       }
     }

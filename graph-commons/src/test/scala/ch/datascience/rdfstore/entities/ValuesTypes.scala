@@ -16,8 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.triples.entities
+package ch.datascience.rdfstore.entities
 
-import ch.datascience.rdfstore.triples.EntityId
+import ch.datascience.tinytypes.RelativePathTinyType
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 
-trait CommitEntityId extends EntityId
+final class CwlFile private (val value: String) extends AnyVal with RelativePathTinyType
+object CwlFile {
+  def apply(fileName: String Refined NonEmpty): CwlFile = new CwlFile(s".renku/workflow/$fileName")
+}
