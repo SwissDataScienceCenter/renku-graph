@@ -53,6 +53,13 @@ object JsonLD {
   ): JsonLDEntity = entity(id, types, reverse = Reverse.empty, firstProperty, other: _*)
 
   def entity(
+      id:         EntityId,
+      types:      EntityTypes,
+      properties: NonEmptyList[(Property, JsonLD)],
+      other:      (Property, JsonLD)*
+  ): JsonLDEntity = JsonLDEntity(id, types, properties ++ other.toList, Reverse.empty)
+
+  def entity(
       id:            EntityId,
       types:         EntityTypes,
       reverse:       Reverse,
