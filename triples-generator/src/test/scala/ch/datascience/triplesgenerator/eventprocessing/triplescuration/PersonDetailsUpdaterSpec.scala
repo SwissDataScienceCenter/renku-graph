@@ -76,7 +76,6 @@ class PersonDetailsUpdaterSpec extends WordSpec {
       curatedPersons.filter(blankIds)    shouldBe allPersons.filter(blankIds)
       curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
 
-      println(curatedTriples.updates.map(_.query).mkString("\n"))
       curatedTriples.updates should contain theSameElementsAs prepareUpdates(
         datasetCreatorsSet.map(maybeUpdatePerson).flatten + updatePerson(
           projectCreatorName,
