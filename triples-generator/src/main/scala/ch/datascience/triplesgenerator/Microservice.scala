@@ -89,7 +89,7 @@ private class MicroserviceRunner(
     datasetInitializer:       FusekiDatasetInitializer[IO],
     reProvisioning:           ReProvisioning[IO],
     eventProcessorRunner:     EventProcessorRunner[IO],
-    eventLogMetrics:          EventLogMetrics[IO],
+    eventLogMetrics:          EventLogMetrics,
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
