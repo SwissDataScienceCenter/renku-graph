@@ -134,14 +134,15 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
     abstract class IOEventLogStats(transactor: DbTransactor[IO, EventLogDB]) extends EventLogStats[IO](transactor)
     val eventLogStats = mock[IOEventLogStats]
     val logger        = TestLogger[IO]()
-    val interval      = 100 millis
-    val metrics = new EventLogMetrics[IO](
+    val metrics = new EventLogMetrics(
       eventLogStats,
       logger,
       waitingEventsGauge,
       statusesGauge,
       totalGauge,
-      interval
+      interval              = 100 millis,
+      statusesInterval      = 100 millis,
+      waitingEventsInterval = 100 millis
     )
   }
 

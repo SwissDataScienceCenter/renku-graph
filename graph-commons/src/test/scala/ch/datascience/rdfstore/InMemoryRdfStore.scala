@@ -148,9 +148,11 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
 
   before {
-    dataset.asDatasetGraph().clear()
+    clearDataset()
     dataset.asDatasetGraph().isEmpty shouldBe true
   }
+
+  def clearDataset(): Unit = dataset.asDatasetGraph().clear()
 
   protected override def afterAll(): Unit = {
     rdfStoreServer.stop()

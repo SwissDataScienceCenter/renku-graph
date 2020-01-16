@@ -33,28 +33,42 @@ import scala.concurrent.duration.FiniteDuration
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
-class EventLogMetrics[Interpretation[_]](
-    eventLogStats:      EventLogStats[Interpretation],
-    logger:             Logger[Interpretation],
-    waitingEventsGauge: Gauge = EventLogMetrics.waitingEventsGauge,
-    statusesGauge:      Gauge = EventLogMetrics.statusesGauge,
-    totalGauge:         Gauge = EventLogMetrics.totalGauge,
-    interval:           FiniteDuration = EventLogMetrics.interval
-)(implicit ME:          MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
+class EventLogMetrics(
+    eventLogStats:         EventLogStats[IO],
+    logger:                Logger[IO],
+    waitingEventsGauge:    Gauge = EventLogMetrics.waitingEventsGauge,
+    statusesGauge:         Gauge = EventLogMetrics.statusesGauge,
+    totalGauge:            Gauge = EventLogMetrics.totalGauge,
+    interval:              FiniteDuration = EventLogMetrics.interval,
+    statusesInterval:      FiniteDuration = EventLogMetrics.statusesInterval,
+    waitingEventsInterval: FiniteDuration = EventLogMetrics.waitingEventsInterval
+)(implicit ME:             MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO]) {
 
-  def run: Interpretation[Unit] = (timer sleep interval) *> updateCollectors
+  def run: IO[Unit] = (timer sleep interval) *> updateCollectors
 
   private def updateCollectors() = {
+    for {
+      _ <- updateStatuses().start
+      _ <- updateWaitingEvents().start
+    } yield ()
+  } recoverWith logAndRetry(continueWith = run)
+
+  private def updateStatuses(): IO[Unit] = {
     for {
       statuses <- eventLogStats.statuses
       _ = statuses foreach toStatusesGauge
       _ = totalGauge set statuses.values.sum
+      _ <- (timer sleep statusesInterval) *> updateStatuses()
+    } yield ()
+  } recoverWith logAndRetry(continueWith = updateStatuses())
 
+  private def updateWaitingEvents(): IO[Unit] = {
+    for {
       waitingEvents <- eventLogStats.waitingEvents
       _ = waitingEvents foreach toWaitingEventsGauge
-      _ <- run
+      _ <- (timer sleep waitingEventsInterval) *> updateWaitingEvents()
     } yield ()
-  } recoverWith logAndRetry
+  } recoverWith logAndRetry(continueWith = updateWaitingEvents())
 
   private lazy val toStatusesGauge: ((EventStatus, Long)) => Unit = {
     case (status, count) => statusesGauge.labels(status.toString).set(count)
@@ -64,10 +78,10 @@ class EventLogMetrics[Interpretation[_]](
     case (path, count) => waitingEventsGauge.labels(path.toString).set(count)
   }
 
-  private lazy val logAndRetry: PartialFunction[Throwable, Interpretation[Unit]] = {
+  private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
       logger.error(exception)("Problem with gathering metrics")
-      (timer sleep interval) *> run
+      (timer sleep interval) *> continueWith
   }
 }
 
@@ -75,7 +89,9 @@ object EventLogMetrics {
 
   import scala.concurrent.duration._
 
-  private val interval: FiniteDuration = 5 seconds
+  private val interval:              FiniteDuration = 10 seconds
+  private val statusesInterval:      FiniteDuration = 5 seconds
+  private val waitingEventsInterval: FiniteDuration = 2 seconds
 
   private[metrics] val waitingEventsGauge: Gauge = MetricsRegistry.register {
     Gauge
@@ -106,9 +122,11 @@ object EventLogMetrics {
 
 object IOEventLogMetrics {
 
+  import cats.effect.IO._
+
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): EventLogMetrics[IO] =
-    new EventLogMetrics[IO](new IOEventLogStats(transactor), logger)
+  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): EventLogMetrics =
+    new EventLogMetrics(new IOEventLogStats(transactor), logger)
 }
