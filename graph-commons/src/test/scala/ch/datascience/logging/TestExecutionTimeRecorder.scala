@@ -61,5 +61,10 @@ class TestExecutionTimeRecorder[Interpretation[_]](
   override def measureExecutionTime[BlockOut](
       block: => Interpretation[BlockOut]
   ): Interpretation[(ElapsedTime, BlockOut)] =
-    block map (result => threshold -> result)
+    for {
+      _ <- ME.unit
+      maybeHistogramTimer = maybeHistogram map (_.startTimer())
+      result <- block
+      _ = maybeHistogramTimer map (_.observeDuration())
+    } yield threshold -> result
 }
