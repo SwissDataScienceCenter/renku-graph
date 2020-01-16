@@ -280,5 +280,5 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   private implicit val timer: Timer[IO]        = IO.timer(ExecutionContext.global)
 
   class IOEventLogMetrics(eventLogStats: EventLogStats[IO], logger: Logger[IO])
-      extends EventLogMetrics[IO](eventLogStats, logger)
+      extends EventLogMetrics(eventLogStats, logger)
 }

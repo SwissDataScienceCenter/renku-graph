@@ -22,9 +22,9 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit._
 
 import cats.data.NonEmptyList
-import ch.datascience.dbeventlog.DbEventLogGenerators.{eventBodies, eventStatuses, executionDates}
+import ch.datascience.dbeventlog.DbEventLogGenerators.{createdDates, eventBodies, eventStatuses}
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.{CreatedDate, EventStatus}
+import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{commitEventIds, committedDates, projectIds}
@@ -34,13 +34,15 @@ import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
+import scala.util.Random
+
 class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec {
 
   "fetchStatus" should {
 
-    "return a ProcessingStatus for the given project with " +
-      s"$TriplesStore and $NonRecoverableFailure events counted to done " +
-      "and all to total" in new TestCase {
+    "return ProcessingStatus for the given project " +
+      s"where $TriplesStore and $NonRecoverableFailure events are counted as done " +
+      "and all as total" in new TestCase {
 
       storeEventsWithRecentTime(projectIds.generateOne, nonEmptyList(eventStatuses).generateOne)
 
@@ -50,7 +52,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
         maxElements = 20
       ).generateOne
       val toBeProcessedEvents = nonEmptyList(
-        Gen.oneOf(New, Processing, TriplesStoreFailure),
+        Gen.oneOf(New, Processing, RecoverableFailure),
         minElements = 10,
         maxElements = 20
       ).generateOne
@@ -64,13 +66,15 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
       processingStatus.progress.value.floor shouldBe ((doneEvents.size.toDouble / expectedTotal) * 100).floor
     }
 
-    "return a ProcessingStatus for the given project " +
-      "including events only close to the latest created_date" in new TestCase {
+    "return ProcessingStatus for the given project " +
+      "where events that get counted are only these close to the latest execution_date" in new TestCase {
 
       val sameDateEvents = nonEmptyList(eventStatuses, minElements = 10, maxElements = 20).generateOne
       storeEventsWithRecentTime(projectId, sameDateEvents)
 
-      storeEventsWithOlderDate(projectId, nonEmptyList(eventStatuses).generateOne)
+      spreadEventsInThePastAndStore(projectId, nonEmptyList(eventStatuses).generateOne)
+
+      storeEventsInTheFarPast(projectId, nonEmptyList(eventStatuses).generateOne)
 
       val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
@@ -78,12 +82,12 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
     }
 
     "return a ProcessingStatus for the given project " +
-      "even if the last created event was in the past" in new TestCase {
+      "even if the latest project's events were processed in the past" in new TestCase {
 
       val newestSameDateEvents = nonEmptyList(eventStatuses, minElements = 10, maxElements = 20).generateOne
-      storeEventsWithOlderDate(projectId, newestSameDateEvents)
+      spreadEventsInThePastAndStore(projectId, newestSameDateEvents)
 
-      storeEventsWithEvenOlderDate(projectId, nonEmptyList(eventStatuses).generateOne)
+      storeEventsInTheFarPast(projectId, nonEmptyList(eventStatuses).generateOne)
 
       val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
@@ -103,32 +107,32 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
       storeEvent(
         commitEventIds.generateOne.copy(projectId = projectId),
         _,
-        executionDates.generateOne,
+        ExecutionDate(Instant.now),
         committedDates.generateOne,
         eventBodies.generateOne,
-        CreatedDate(Instant.now)
+        createdDates.generateOne
       )
     }
 
-    def storeEventsWithOlderDate(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
+    def spreadEventsInThePastAndStore(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
       storeEvent(
         commitEventIds.generateOne.copy(projectId = projectId),
         _,
-        executionDates.generateOne,
+        ExecutionDate(Instant.now.minus(17 + Random.nextInt(14), MINUTES)),
         committedDates.generateOne,
         eventBodies.generateOne,
-        CreatedDate(Instant.now.minus(122, SECONDS))
+        createdDates.generateOne
       )
     }
 
-    def storeEventsWithEvenOlderDate(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
+    def storeEventsInTheFarPast(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
       storeEvent(
         commitEventIds.generateOne.copy(projectId = projectId),
         _,
-        executionDates.generateOne,
+        ExecutionDate(Instant.now.minus(2, DAYS)),
         committedDates.generateOne,
         eventBodies.generateOne,
-        CreatedDate(Instant.now.minus(2, DAYS))
+        createdDates.generateOne
       )
     }
   }

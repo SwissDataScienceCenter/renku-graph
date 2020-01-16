@@ -19,8 +19,8 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
+import cats.data.NonEmptyList
 import ch.datascience.graph.model.users.{Email, Id, Name}
-import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
@@ -114,6 +114,8 @@ private object PersonDetailsUpdater {
 
   private[triplescuration] object prepareUpdates extends (Set[Person] => List[Update]) {
 
+    import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
+
     override def apply(persons: Set[Person]): List[Update] = persons.toList flatMap updates
 
     private lazy val updates: Person => List[Update] = {
@@ -124,33 +126,36 @@ private object PersonDetailsUpdater {
           emailsDelete(id),
           emailsInsert(id, emails),
           labelsDelete(id)
-        )
+        ).flatten
     }
 
-    private def namesDelete(id: Id) = {
-      val resource = id.showAs[RdfResource]
+    private def namesDelete(id: Id) = Some {
+      val resource = id.asResource
       Update(
-        s"Updating Person $resource schema:name",
+        s"Deleting Person $resource schema:name",
         s"""|PREFIX schema: <http://schema.org/>
             |DELETE { $resource schema:name ?name }
             |WHERE  { $resource schema:name ?name }
             |""".stripMargin
       )
     }
-    private def namesInsert(id: Id, names: Set[Name]) = {
-      val resource = id.showAs[RdfResource]
-      Update(
-        s"Updating Person $resource schema:name",
-        s"""|PREFIX schema: <http://schema.org/>
-            |${`INSERT DATA`(resource, "schema:name", names)}
-            |""".stripMargin
-      )
-    }
+    private def namesInsert(id: Id, names: Set[Name]) =
+      if (names.isEmpty) None
+      else
+        Some {
+          val resource = id.asResource
+          Update(
+            s"Inserting Person $resource schema:name",
+            s"""|PREFIX schema: <http://schema.org/>
+                |${`INSERT DATA`(resource, "schema:name", NonEmptyList.fromListUnsafe(names.toList))}
+                |""".stripMargin
+          )
+        }
 
-    private def emailsDelete(id: Id) = {
-      val resource = id.showAs[RdfResource]
+    private def emailsDelete(id: Id) = Some {
+      val resource = id.asResource
       Update(
-        s"Updating Person $resource schema:email",
+        s"Deleting Person $resource schema:email",
         s"""|PREFIX schema: <http://schema.org/>
             |DELETE { $resource schema:email ?email }
             |WHERE  { $resource schema:email ?email }
@@ -158,18 +163,21 @@ private object PersonDetailsUpdater {
       )
     }
 
-    private def emailsInsert(id: Id, emails: Set[Email]) = {
-      val resource = id.showAs[RdfResource]
-      Update(
-        s"Updating Person $resource schema:email",
-        s"""|PREFIX schema: <http://schema.org/>
-            |${`INSERT DATA`(resource, "schema:email", emails)}
-            |""".stripMargin
-      )
-    }
+    private def emailsInsert(id: Id, emails: Set[Email]) =
+      if (emails.isEmpty) None
+      else
+        Some {
+          val resource = id.asResource
+          Update(
+            s"Inserting Person $resource schema:email",
+            s"""|PREFIX schema: <http://schema.org/>
+                |${`INSERT DATA`(resource, "schema:email", NonEmptyList.fromListUnsafe(emails.toList))}
+                |""".stripMargin
+          )
+        }
 
-    private def labelsDelete(id: Id) = {
-      val resource = id.showAs[RdfResource]
+    private def labelsDelete(id: Id) = Some {
+      val resource = id.asResource
       Update(
         s"Deleting Person $resource rdfs:label",
         s"""|PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -179,10 +187,21 @@ private object PersonDetailsUpdater {
       )
     }
 
-    private def `INSERT DATA`[V <: TinyType](resource: String, property: String, values: Set[V]): String =
-      values match {
-        case set if set.isEmpty => ""
-        case set                => set.map(value => s"$property '$value'").mkString(s"INSERT DATA { $resource ", " ; ", " }")
+    private def `INSERT DATA`[TT <: TinyType { type V = String }](resource: String,
+                                                                  property: String,
+                                                                  values:   NonEmptyList[TT]): String =
+      values
+        .map(tt => s"$property '${sparqlEncode(tt.value)}'")
+        .toList
+        .mkString(s"INSERT DATA { $resource ", " ; ", " }")
+
+    private implicit class IdOps(id: Id) {
+      private val localPartExtractor = "^mailto:(.*)@.*$".r
+
+      lazy val asResource: String = id.value match {
+        case localPartExtractor(localPart) => s"<${id.value.replace(localPart, sparqlEncode(localPart))}>"
+        case otherId                       => s"<$otherId>"
       }
+    }
   }
 }

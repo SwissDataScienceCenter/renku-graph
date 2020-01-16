@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.metrics
 
-import EventLogMetrics.{statusesGauge, totalGauge}
+import EventLogMetrics._
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
@@ -27,6 +27,8 @@ import ch.datascience.dbeventlog.commands.EventLogStats
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import org.scalacheck.Gen
@@ -44,6 +46,13 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
   "run" should {
 
     "update the gauges with the fetched values" in new TestCase {
+
+      val waitingEvents = waitingEventsGen.generateOne
+      (eventLogStats.waitingEvents _)
+        .expects()
+        .returning(waitingEvents.pure[IO])
+        .atLeastOnce()
+
       val statuses = statuesGen.generateOne
       (eventLogStats.statuses _)
         .expects()
@@ -51,6 +60,13 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
         .atLeastOnce()
 
       metrics.run.start.unsafeRunCancelable(_ => ())
+
+      eventually {
+        waitingEvents foreach {
+          case (path, count) =>
+            waitingEventsGauge.labels(path.toString).get().toLong shouldBe count
+        }
+      }
 
       eventually {
         statuses foreach {
@@ -65,17 +81,33 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
     }
 
     "log an eventual error and continue collecting the metrics" in new TestCase {
-      val exception = exceptions.generateOne
+      val exception1 = exceptions.generateOne
       (eventLogStats.statuses _)
         .expects()
-        .returning(exception.raiseError[IO, Map[EventStatus, Long]])
+        .returning(exception1.raiseError[IO, Map[EventStatus, Long]])
+      val exception2 = exceptions.generateOne
+      (eventLogStats.waitingEvents _)
+        .expects()
+        .returning(exception2.raiseError[IO, Map[ProjectPath, Long]])
       val statuses = statuesGen.generateOne
       (eventLogStats.statuses _)
         .expects()
         .returning(statuses.pure[IO])
         .atLeastOnce()
+      val waitingEvents = waitingEventsGen.generateOne
+      (eventLogStats.waitingEvents _)
+        .expects()
+        .returning(waitingEvents.pure[IO])
+        .atLeastOnce()
 
       metrics.run.start.unsafeRunCancelable(_ => ())
+
+      eventually {
+        waitingEvents foreach {
+          case (path, count) =>
+            waitingEventsGauge.labels(path.toString).get().toLong shouldBe count
+        }
+      }
 
       eventually {
         statuses foreach {
@@ -89,7 +121,8 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
       }
 
       eventually {
-        logger.loggedOnly(Error("Problem with gathering metrics", exception))
+        logger.loggedOnly(Error("Problem with gathering metrics", exception1),
+                          Error("Problem with gathering metrics", exception2))
       }
     }
   }
@@ -101,8 +134,16 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
     abstract class IOEventLogStats(transactor: DbTransactor[IO, EventLogDB]) extends EventLogStats[IO](transactor)
     val eventLogStats = mock[IOEventLogStats]
     val logger        = TestLogger[IO]()
-    val interval      = 100 millis
-    val metrics       = new EventLogMetrics[IO](eventLogStats, logger, statusesGauge, totalGauge, interval)
+    val metrics = new EventLogMetrics(
+      eventLogStats,
+      logger,
+      waitingEventsGauge,
+      statusesGauge,
+      totalGauge,
+      interval              = 100 millis,
+      statusesInterval      = 100 millis,
+      waitingEventsInterval = 100 millis
+    )
   }
 
   private lazy val statuesGen: Gen[Map[EventStatus, Long]] = nonEmptySet {
@@ -110,5 +151,12 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
       status <- eventStatuses
       count  <- positiveLongs()
     } yield status -> count.value
+  }.map(_.toMap)
+
+  private lazy val waitingEventsGen: Gen[Map[ProjectPath, Long]] = nonEmptySet {
+    for {
+      path  <- projectPaths
+      count <- positiveLongs()
+    } yield path -> count.value
   }.map(_.toMap)
 }
