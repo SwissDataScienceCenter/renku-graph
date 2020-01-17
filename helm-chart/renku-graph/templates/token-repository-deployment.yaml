@@ -57,7 +57,7 @@ spec:
               value: {{ .Values.sentry.environmentName }}
               {{- end }}
             - name: JAVA_OPTS
-              value: -Xmx100m -XX:+UseG1GC
+              value: -Xmx{{ .Values.tokenRepository.jvmXmx }} -XX:+UseG1GC
           ports:
             - name: http-token-repo
               containerPort: 9003
