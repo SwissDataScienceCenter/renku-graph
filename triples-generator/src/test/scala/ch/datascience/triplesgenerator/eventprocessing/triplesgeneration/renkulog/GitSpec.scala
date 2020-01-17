@@ -44,21 +44,24 @@ class GitSpec extends WordSpec with MockFactory {
       git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Right(commandResult)
     }
 
-    s"$GenerationRecoverableError if command fails with a message containing SSL_ERROR_SYSCALL" in new TestCase {
+    ("SSL_ERROR_SYSCALL": NonBlank) +: ("the remote end hung up unexpectedly": NonBlank) +: Nil foreach {
+      recoverableError =>
+        s"$GenerationRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
 
-      val errorMessage = sentenceContaining("SSL_ERROR_SYSCALL").generateOne.value
-      val commandResult = CommandResult(
-        exitCode = 1,
-        chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
-      )
+          val errorMessage = sentenceContaining(recoverableError).generateOne.value
+          val commandResult = CommandResult(
+            exitCode = 1,
+            chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
+          )
 
-      cloneCommand
-        .expects(repositoryUrl, destDirectory, workDirectory)
-        .returning(commandResult)
+          cloneCommand
+            .expects(repositoryUrl, destDirectory, workDirectory)
+            .returning(commandResult)
 
-      git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Left(
-        GenerationRecoverableError(errorMessage)
-      )
+          git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Left(
+            GenerationRecoverableError(errorMessage)
+          )
+        }
     }
 
     "fail if command fails with a message not containing SSL_ERROR_SYSCALL" in new TestCase {

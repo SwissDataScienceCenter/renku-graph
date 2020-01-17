@@ -58,7 +58,7 @@ spec:
             - name: THREADS_NUMBER
               value: "{{ .Values.knowledgeGraph.threadsNumber }}"
             - name: JAVA_OPTS
-              value: -Xmx200m -XX:+UseG1GC
+              value: -Xmx{{ .Values.knowledgeGraph.jvmXmx }} -XX:+UseG1GC
           ports:
             - name: http-kg
               containerPort: 9004
