@@ -23,11 +23,12 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 import cats.effect._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.commands.IOEventLogFetch
+import ch.datascience.dbeventlog.commands.EventLogFetch
 import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
+import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import com.typesafe.config.ConfigFactory
 import doobie.util.transactor.Transactor
 import org.scalacheck.Gen.listOfN
@@ -103,35 +104,75 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
 
       logger.loggedOnly(Info("Waiting for new events"))
     }
+
+    "continue if there is an error while checking events in the queue" in new TestCase {
+
+      val isEventException  = exceptions.generateOne
+      val popEventException = exceptions.generateOne
+      val eventBody         = eventBodies.generateOne
+      val failingEvenLog = new TestEventLogFetch(
+        List(IO.raiseError[Boolean](isEventException), IO.pure(true)),
+        List(IO.raiseError[Option[EventBody]](popEventException))
+      )
+
+      val accumulator = new ConcurrentHashMap[EventBody, Long]()
+      def processor(event: EventBody): IO[Unit] = {
+        accumulator.put(event, Thread.currentThread().getId)
+        IO.unit
+      }
+
+      eventSourceWith(processor, eventLogFetch = failingEvenLog).run.unsafeRunAsyncAndForget()
+
+      eventually {
+        accumulator.keySet().asScala shouldBe Set.empty
+
+        logger.loggedOnly(
+          Error("Couldn't access Event Log", isEventException),
+          Error("Couldn't access Event Log", popEventException),
+          Info("Waiting for new events")
+        )
+      }
+
+      failingEvenLog.addEventsToReturn(Seq(eventBody))
+
+      eventually {
+        accumulator.keySet().asScala shouldBe Set(eventBody)
+      }
+    }
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
-    class TestDbTransactor(transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, EventLogDB](transactor)
-    private val transactor = mock[TestDbTransactor]
-    val eventLogFetch = new IOEventLogFetch(transactor) {
-      private val eventsQueue = new ConcurrentLinkedQueue[EventBody]()
+    val logger         = TestLogger[IO]()
+    val eventLogFetch  = new TestEventLogFetch()
+    private val config = ConfigFactory.parseMap(Map("generation-processes-number" -> 5).asJava)
 
-      def addEventsToReturn(events: Seq[EventBody]) =
-        eventsQueue addAll events.asJava
+    def eventSourceWith(processor:     EventProcessor[IO],
+                        eventLogFetch: EventLogFetch[IO] = eventLogFetch): EventProcessorRunner[IO] = {
+      val eventRunner = DbEventProcessorRunner(_, eventLogFetch, config, logger)
+      new EventsSource[IO](eventRunner).withEventsProcessor(processor).unsafeRunSync()
+    }
+  }
 
-      override def popEventToProcess: IO[Option[EventBody]] = IO.pure {
-        Option(eventsQueue.poll())
-      }
+  private class TestDbTransactor(transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, EventLogDB](transactor)
 
-      override def isEventToProcess: IO[Boolean] = IO.pure {
-        !eventsQueue.isEmpty
-      }
+  private class TestEventLogFetch(isEventEvents:  List[IO[Boolean]]           = Nil,
+                                  popEventEvents: List[IO[Option[EventBody]]] = Nil)
+      extends EventLogFetch[IO](mock[TestDbTransactor]) {
+    private val isEventEventsQueue  = new ConcurrentLinkedQueue[IO[Boolean]](isEventEvents.asJava)
+    private val popEventEventsQueue = new ConcurrentLinkedQueue[IO[Option[EventBody]]](popEventEvents.asJava)
+
+    def addEventsToReturn(events: Seq[EventBody]) = {
+      isEventEventsQueue addAll events.map(_ => IO.pure(true)).asJava
+      popEventEventsQueue addAll events.map(event => IO.pure(Option(event))).asJava
     }
 
-    val logger               = TestLogger[IO]()
-    private val config       = ConfigFactory.parseMap(Map("generation-processes-number" -> 5).asJava)
-    private val eventRunner  = DbEventProcessorRunner(_, eventLogFetch, config, logger)
-    private val eventsSource = new EventsSource[IO](eventRunner)
+    override def isEventToProcess: IO[Boolean] =
+      Option(isEventEventsQueue.poll()) getOrElse IO.pure(false)
 
-    def eventSourceWith(processor: EventProcessor[IO]): EventProcessorRunner[IO] =
-      eventsSource.withEventsProcessor(processor).unsafeRunSync()
+    override def popEventToProcess: IO[Option[EventBody]] =
+      Option(popEventEventsQueue.poll()) getOrElse IO.pure(None)
   }
 }

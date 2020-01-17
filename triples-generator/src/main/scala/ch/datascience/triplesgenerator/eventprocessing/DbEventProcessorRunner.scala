@@ -32,6 +32,7 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
 class DbEventProcessorRunner private (
     eventProcessor:      EventProcessor[IO],
@@ -59,7 +60,7 @@ class DbEventProcessorRunner private (
     isEventToProcess flatMap {
       case true  => List(popEvent, checkProcessesNumber).parSequence *> IO.unit
       case false => (timer sleep noEventsSleep) *> checkProcessesNumber
-    }
+    } recoverWith logAndRetry
 
   private def popEvent: IO[Unit] =
     for {
@@ -70,6 +71,16 @@ class DbEventProcessorRunner private (
           }
       _ <- semaphore.release
     } yield ()
+
+  private lazy val logAndRetry: PartialFunction[Throwable, IO[Unit]] = {
+    case NonFatal(ex) =>
+      for {
+        _ <- logger.error(ex)("Couldn't access Event Log")
+        _ <- timer sleep noEventsSleep
+        _ <- semaphore.release
+        _ <- checkForNewEvent
+      } yield ()
+  }
 }
 
 object DbEventProcessorRunner extends ConfigLoader[IO] {
