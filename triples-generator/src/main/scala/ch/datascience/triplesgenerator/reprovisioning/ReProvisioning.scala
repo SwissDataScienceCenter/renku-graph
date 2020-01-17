@@ -23,7 +23,7 @@ import cats.effect.Timer
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogReScheduler}
+import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogReScheduler, IOEventLogFetch}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
@@ -121,11 +121,12 @@ object IOReProvisioning {
       initialDelay <- find[IO, FiniteDuration]("re-provisioning-initial-delay", configuration)
                        .flatMap(delay => ME.fromEither(ReProvisioningDelay.from(delay)))
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+      eventsFetcher         <- IOEventLogFetch(dbTransactor)
     } yield new ReProvisioning[IO](
       new IOTriplesVersionFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger),
       new IOTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger),
       new EventLogReScheduler[IO](dbTransactor),
-      new EventLogFetch[IO](dbTransactor),
+      eventsFetcher,
       initialDelay,
       executionTimeRecorder,
       logger,

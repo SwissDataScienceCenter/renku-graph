@@ -18,7 +18,6 @@
 
 package ch.datascience.dbeventlog.commands
 
-import java.time.temporal.ChronoUnit.MINUTES
 import java.time.{Duration, Instant}
 
 import cats.data.NonEmptyList
@@ -28,6 +27,7 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
+import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.graph.model.events.CommitEventId
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
@@ -36,24 +36,27 @@ import doobie.util.fragments._
 import scala.language.higherKinds
 import scala.util.Random
 
-private object EventLogFetch {
-  val MaxProcessingTime: Duration = Duration.of(10, MINUTES)
+trait EventLogFetch[Interpretation[_]] {
+  def isEventToProcess:  Interpretation[Boolean]
+  def popEventToProcess: Interpretation[Option[EventBody]]
 }
 
-class EventLogFetch[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    now:        () => Instant = () => Instant.now
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+class EventLogFetchImpl[Interpretation[_]](
+    transactor:      DbTransactor[Interpretation, EventLogDB],
+    renkuLogTimeout: RenkuLogTimeout,
+    now:             () => Instant = () => Instant.now
+)(implicit ME:       Bracket[Interpretation, Throwable])
+    extends EventLogFetch[Interpretation] {
 
-  import EventLogFetch._
+  private lazy val MaxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 1
 
-  def isEventToProcess: Interpretation[Boolean] =
+  override def isEventToProcess: Interpretation[Boolean] =
     findOldestEvent.transact(transactor.get).map(_.isDefined)
 
-  def popEventToProcess: Interpretation[Option[EventBody]] =
-    findEventAndUpdateForProcessing.transact(transactor.get)
+  override def popEventToProcess: Interpretation[Option[EventBody]] =
+    findEventAndUpdateForProcessing().transact(transactor.get)
 
-  private def findEventAndUpdateForProcessing =
+  private def findEventAndUpdateForProcessing() =
     for {
       maybeIdAndProjectAndBody <- findProjectsOldestEvents map selectRandom
       maybeBody                <- markAsProcessing(maybeIdAndProjectAndBody)
@@ -111,7 +114,10 @@ class EventLogFetch[Interpretation[_]](
   private type EventIdAndBody = (CommitEventId, EventBody)
 }
 
-class IOEventLogFetch(
-    transactor:          DbTransactor[IO, EventLogDB]
-)(implicit contextShift: ContextShift[IO])
-    extends EventLogFetch[IO](transactor)
+object IOEventLogFetch {
+
+  def apply(
+      transactor:          DbTransactor[IO, EventLogDB]
+  )(implicit contextShift: ContextShift[IO]): IO[EventLogFetchImpl[IO]] =
+    RenkuLogTimeout[IO]() map (new EventLogFetchImpl(transactor, _))
+}

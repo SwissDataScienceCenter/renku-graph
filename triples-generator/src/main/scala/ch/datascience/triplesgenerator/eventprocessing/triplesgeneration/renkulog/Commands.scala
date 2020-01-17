@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
+import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.ProjectPath
@@ -31,7 +32,6 @@ import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -130,7 +130,7 @@ private object Commands {
   }
 
   class Renku(
-      timeout:             FiniteDuration
+      timeout:             RenkuLogTimeout
   )(implicit contextShift: ContextShift[IO],
     timer:                 Timer[IO],
     ME:                    MonadError[IO, Throwable],
@@ -146,7 +146,7 @@ private object Commands {
     )(implicit generateTriples: (T, Path) => CommandResult): IO[JsonLDTriples] =
       IO.race(
           call(generateTriples(commit, destinationDirectory)),
-          timer.sleep(timeout)
+          timer sleep timeout.value
         )
         .flatMap {
           case Left(triples) => IO.pure(triples)

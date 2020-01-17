@@ -67,7 +67,8 @@ object Microservice extends IOMicroservice {
         triplesGenerator         <- TriplesGenerator(triplesGeneration)
         commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator)
         routes                   <- new MicroserviceRoutes[IO]().routes
-        eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
+        eventsFetcher            <- IOEventLogFetch(transactor)
+        eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, eventsFetcher))
                                  .withEventsProcessor(commitEventProcessor)
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,

@@ -23,7 +23,7 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 import cats.effect._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.commands.IOEventLogFetch
+import ch.datascience.dbeventlog.commands.EventLogFetch
 import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
@@ -110,8 +110,7 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
 
   private trait TestCase {
     class TestDbTransactor(transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, EventLogDB](transactor)
-    private val transactor = mock[TestDbTransactor]
-    val eventLogFetch = new IOEventLogFetch(transactor) {
+    val eventLogFetch = new EventLogFetch[IO] {
       private val eventsQueue = new ConcurrentLinkedQueue[EventBody]()
 
       def addEventsToReturn(events: Seq[EventBody]) =
