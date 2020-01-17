@@ -102,15 +102,18 @@ private object Commands {
       for {
         result <- doClone(repositoryUrl, destinationDirectory, workDirectory).toRightT
         errorOrResult <- if (result.exitCode == 0) result.toRightT
-                        else sslErrorToLeft(result)
+                        else recoverableErrorToLeft(result)
 
       } yield errorOrResult
 
-    private def sslErrorToLeft(result: CommandResult) =
+    private val recoverableErrors = Set("SSL_ERROR_SYSCALL", "the remote end hung up unexpectedly")
+
+    private def recoverableErrorToLeft(result: CommandResult) =
       for {
-        message <- result.out.string.toRightT
-        errorOrResult <- if (message contains "SSL_ERROR_SYSCALL") GenerationRecoverableError(message).toLeftT
-                        else message.raiseError
+        currentMessage <- result.out.string.toRightT
+        errorOrResult <- if (recoverableErrors exists (currentMessage contains _))
+                          GenerationRecoverableError(currentMessage).toLeftT
+                        else currentMessage.raiseError
       } yield errorOrResult
 
     private implicit class CommandResultOps(value: CommandResult) {
