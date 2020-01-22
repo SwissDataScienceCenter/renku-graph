@@ -280,12 +280,15 @@ object Generators {
 
       def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
 
+      def generateSome: Option[T] = Option(generator.generateOne)
+
       def generateDifferentThan(value: T): T = {
         val generated = generator.sample.getOrElse(generateDifferentThan(value))
         if (generated == value) generateDifferentThan(value)
         else generated
       }
 
+      def toGeneratorOfSomes: Gen[Option[T]] = generator map Option.apply
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)

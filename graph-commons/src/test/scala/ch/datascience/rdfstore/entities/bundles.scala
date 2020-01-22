@@ -83,7 +83,7 @@ object bundles extends Schemas {
       maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
       maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
       maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      maybeDatasetCreatedDate:   Option[datasets.DateCreated] = Gen.option(datasetCreatedDates).generateOne,
+      datasetCreatedDate:        datasets.DateCreated = datasetCreatedDates.generateOne,
       datasetCreators:           Set[Person] = setOf(persons).generateOne,
       datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
   )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
@@ -95,7 +95,7 @@ object bundles extends Schemas {
       maybeDatasetSameAs,
       maybeDatasetDescription,
       maybeDatasetPublishedDate,
-      maybeDatasetCreatedDate,
+      datasetCreatedDate,
       datasetCreators,
       datasetParts map { case (name, location) => DataSetPart(name, location, commitId, project, committer) },
       Generation(FilePath(".renku") / "datasets" / datasetIdentifier,
@@ -337,10 +337,10 @@ object bundles extends Schemas {
         ArtifactEntity(outFile2, Generation(FilePath("outputs/output_1"), commit9ProcessRunActivity)).asJsonLD,
         ArtifactEntity(Generation(FilePath("data/zhbikes/2018velo.csv"), commit10Activity)).asJsonLD,
         DataSet(
-          id               = dataSetId,
-          name             = datasets.Name("zhbikes"),
-          maybeCreatedDate = datasetCreatedDates.generateOption,
-          creators         = Set(persons.generateOne),
+          id          = dataSetId,
+          name        = datasets.Name("zhbikes"),
+          createdDate = datasetCreatedDates.generateOne,
+          creators    = Set(persons.generateOne),
           parts = List(
             DataSetPart(
               datasets.PartName("2019velo.csv"),

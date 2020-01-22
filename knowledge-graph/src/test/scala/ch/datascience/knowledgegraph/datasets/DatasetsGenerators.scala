@@ -19,25 +19,31 @@
 package ch.datascience.knowledgegraph.datasets
 
 import cats.Order
+import cats.data.NonEmptyList
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.datasets.SameAs
 import ch.datascience.knowledgegraph.datasets.model._
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
 object DatasetsGenerators {
 
-  implicit val datasets: Gen[Dataset] = for {
-    id               <- datasetIds
-    name             <- datasetNames
-    maybeUrl         <- Gen.option(datasetUrls)
-    maybeSameAs      <- Gen.option(datasetSameAs)
-    maybeDescription <- Gen.option(datasetDescriptions)
-    published        <- datasetPublishingInfos
-    part             <- listOf(datasetPart)
-    projects         <- nonEmptyList(datasetProjects)
-  } yield Dataset(id, name, maybeUrl, maybeSameAs, maybeDescription, published, part, projects.toList)
+  implicit val datasets: Gen[Dataset] = datasets()
+
+  def datasets(maybeSameAs: Gen[Option[SameAs]]               = Gen.option(datasetSameAs),
+               projects:    Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] =
+    for {
+      id               <- datasetIds
+      name             <- datasetNames
+      maybeUrl         <- Gen.option(datasetUrls)
+      maybeSameAs      <- maybeSameAs
+      maybeDescription <- Gen.option(datasetDescriptions)
+      published        <- datasetPublishingInfos
+      part             <- listOf(datasetPart)
+      projects         <- projects
+    } yield Dataset(id, name, maybeUrl, maybeSameAs, maybeDescription, published, part, projects.toList)
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
     maybeEmail       <- Gen.option(emails)

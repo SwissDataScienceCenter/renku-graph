@@ -46,6 +46,7 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.interpreters.TestLogger
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.jsonld.JsonLD
@@ -68,13 +69,18 @@ import scala.xml.Elem
 trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   this: Suite =>
 
+  protected val pushToLocalJena: Boolean = false
+
   protected implicit val ec:    ExecutionContext          = global
   protected implicit val cs:    ContextShift[IO]          = IO.contextShift(global)
   protected implicit val timer: Timer[IO]                 = IO.timer(global)
   protected val context:        MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-  private lazy val fusekiServerPort = (shuffle((3000 to 3500).toList) find notUsedPort)
-    .getOrElse(throw new Exception("Cannot find not used port for Fuseki"))
+  private lazy val fusekiServerPort =
+    if (pushToLocalJena) 3030
+    else
+      (shuffle((3000 to 3500).toList) find notUsedPort)
+        .getOrElse(throw new Exception("Cannot find not used port for Fuseki"))
 
   private lazy val notUsedPort: Int => Boolean = { port =>
     Validated
@@ -83,7 +89,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   }
 
   protected lazy val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
-    fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
+    fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort"),
+    datasetName   = if (pushToLocalJena) DatasetName("renku") else (nonEmptyStrings() map DatasetName.apply).generateOne
   )
   protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl
 
@@ -114,11 +121,11 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     .add(s"/${rdfStoreConfig.datasetName}", dataset)
     .build
 
-  protected val sparqlEndpoint: Uri = Uri
+  protected lazy val sparqlEndpoint: Uri = Uri
     .fromString(s"$fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql")
     .fold(throw _, identity)
 
-  private val rdfConnectionResource: Resource[IO, RDFConnection] =
+  private lazy val rdfConnectionResource: Resource[IO, RDFConnection] =
     Resource.make(openConnection)(connection => IO(connection.close()))
 
   private def openConnection: IO[RDFConnection] = IO {
@@ -130,7 +137,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    startServer.unsafeRunSync()
+    if (!pushToLocalJena) startServer.unsafeRunSync()
   }
 
   private def startServer: IO[Unit] =
@@ -149,14 +156,16 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
 
   before {
-    clearDataset()
-    dataset.asDatasetGraph().isEmpty shouldBe true
+    if (!pushToLocalJena) {
+      clearDataset()
+      dataset.asDatasetGraph().isEmpty shouldBe true
+    }
   }
 
   def clearDataset(): Unit = dataset.asDatasetGraph().clear()
 
   protected override def afterAll(): Unit = {
-    rdfStoreServer.stop()
+    if (!pushToLocalJena) rdfStoreServer.stop()
     super.afterAll()
   }
 
@@ -200,7 +209,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
       .unsafeRunSync()
 
-  private val queryRunner = new IORdfStoreClient(rdfStoreConfig, TestLogger()) {
+  private lazy val queryRunner = new IORdfStoreClient(rdfStoreConfig, TestLogger()) {
 
     import cats.implicits._
     import io.circe.Decoder._

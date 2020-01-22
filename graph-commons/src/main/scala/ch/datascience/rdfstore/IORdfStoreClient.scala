@@ -108,8 +108,9 @@ abstract class IORdfStoreClient(
   }
 
   protected def pagedResultsFinder[ResultType](
-      query:          SparqlQuery
-  )(implicit decoder: Decoder[ResultType]): PagedResultsFinder[IO, ResultType] =
+      query:           SparqlQuery,
+      maybeCountQuery: Option[SparqlQuery] = None
+  )(implicit decoder:  Decoder[ResultType]): PagedResultsFinder[IO, ResultType] =
     new PagedResultsFinder[IO, ResultType] {
       import cats.implicits._
       import ch.datascience.http.rest.paging.model.Total
@@ -121,10 +122,11 @@ abstract class IORdfStoreClient(
           results         <- queryExpecting[List[ResultType]](using = queryWithPaging)
         } yield results
 
-      override def findTotal() = queryExpecting[Option[Total]](using = query.toCountQuery).flatMap {
-        case Some(total) => total.pure[IO]
-        case None        => new Exception("Total number of records cannot be found").raiseError[IO, Total]
-      }
+      override def findTotal() =
+        queryExpecting[Option[Total]](using = (maybeCountQuery getOrElse query).toCountQuery).flatMap {
+          case Some(total) => total.pure[IO]
+          case None        => new Exception("Total number of records cannot be found").raiseError[IO, Total]
+        }
 
       private implicit val totalDecoder: Decoder[Option[Total]] = {
         val totals: Decoder[Total] = _.downField("total").downField("value").as[Total]

@@ -72,7 +72,8 @@ private class IODatasetsFinder(
                             sort:          Sort.By,
                             pagingRequest: PagingRequest): IO[PagingResponse[DatasetSearchResult]] = {
     implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
-      sparqlQuery(maybePhrase, sort)
+      sparqlQuery(maybePhrase, sort),
+      maybeCountQuery = Some(countQuery(maybePhrase))
     )
     for {
       page                 <- findPage(pagingRequest)
@@ -89,20 +90,7 @@ private class IODatasetsFinder(
       "PREFIX text: <http://jena.apache.org/text#>"
     ),
     maybePhrase match {
-      case None =>
-        s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?maybeProject) AS ?projectsCount)
-            |WHERE {
-            |  ?dataset rdf:type <http://schema.org/Dataset> ;
-            |           schema:name ?name ;
-            |           schema:identifier ?identifier .
-            |  OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-            |  OPTIONAL { ?dataset schema:description ?maybeDescription } .
-            |  OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
-            |}
-            |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
-            |${`ORDER BY`(sort)}
-            |""".stripMargin
-      case Some(phrase) =>
+      case Some(phrase) if phrase.value.trim != "*" =>
         s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?maybeProject) AS ?projectsCount)
             |WHERE {
             |  {
@@ -135,6 +123,143 @@ private class IODatasetsFinder(
             |}
             |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
             |${`ORDER BY`(sort)}
+            |""".stripMargin
+      case _ =>
+        s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
+            |WHERE {
+            |  {
+            |    ?datasetId schema:sameAs ?sameAs ;
+            |               schema:dateCreated ?earliestCreated ;
+            |               schema:name ?name ;
+            |               schema:identifier ?identifier .
+            |    OPTIONAL { ?datasetId schema:description ?maybeDescription } .
+            |    OPTIONAL { ?datasetId schema:datePublished ?maybePublishedDate } {
+            |      SELECT ?sameAs (COUNT(DISTINCT ?dsId) AS ?projectsCount) (MIN(?dateCreated) AS ?earliestCreated)
+            |      WHERE {
+            |        ?dsId rdf:type <http://schema.org/Dataset> ;
+            |              schema:dateCreated ?dateCreated ;
+            |              schema:sameAs ?sameAs .
+            |        FILTER NOT EXISTS { 
+            |          ?dsId schema:sameAs ?dsWithoutSameAsIdString {
+            |            ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
+            |            FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
+            |            BIND (str(?dsWithoutSameAsId) AS ?dsWithoutSameAsIdString)
+            |          } 
+            |        }
+            |      }
+            |      GROUP BY ?sameAs
+            |    }
+            |  } UNION {
+            |    ?dsId schema:name ?name ;
+            |          schema:identifier ?identifier .
+            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
+            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
+            |      SELECT ?dsId ((COUNT(?dsIdString) \\u002B 1) AS ?projectsCount)
+            |      WHERE {
+            |        ?derivedDsId schema:sameAs ?dsIdString {
+            |          ?dsId rdf:type <http://schema.org/Dataset> .
+            |          FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+            |          BIND (str(?dsId) AS ?dsIdString)
+            |        }
+            |      }
+            |      GROUP BY ?dsId
+            |    }
+            |  } UNION {
+            |    ?dsId schema:name ?name ;
+            |          schema:identifier ?identifier .
+            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
+            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
+            |      SELECT ?dsId (1 AS ?projectsCount)
+            |      WHERE {
+            |        ?dsId rdf:type <http://schema.org/Dataset> .
+            |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+            |        BIND (str(?dsId) AS ?dsIdString)
+            |        FILTER NOT EXISTS { ?derivedDsId schema:sameAs ?dsIdString } .
+            |      }
+            |      GROUP BY ?dsId
+            |    }
+            |  }
+            |}
+            |${`ORDER BY`(sort)}
+            |""".stripMargin
+    }
+  )
+
+  private def countQuery(maybePhrase: Option[Phrase]): SparqlQuery = SparqlQuery(
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX schema: <http://schema.org/>",
+      "PREFIX text: <http://jena.apache.org/text#>"
+    ),
+    maybePhrase match {
+      case Some(phrase) if phrase.value.trim != "*" =>
+        s"""|SELECT (MIN(?dsId) as ?datasetId) ?sameAs
+            |WHERE {
+            |  {
+            |    SELECT ?dsId ?sameAs
+            |    WHERE {
+            |      ?dsId text:query (schema:name '$phrase') ;
+            |            rdf:type <http://schema.org/Dataset> ;
+            |            schema:sameAs ?sameAs .
+            |    }
+            |  } UNION {
+            |    SELECT ?dsId ?sameAs
+            |    WHERE {
+            |      ?dsId text:query (schema:description '$phrase') ;
+            |            rdf:type <http://schema.org/Dataset> ;
+            |            schema:sameAs ?sameAs .
+            |    }
+            |  } UNION {
+            |    SELECT ?dsId ?sameAs
+            |    WHERE {
+            |      ?personId text:query (schema:name '$phrase') ;
+            |                rdf:type <http://schema.org/Person> .
+            |      ?dsId schema:creator ?personId ;
+            |            rdf:type <http://schema.org/Dataset> ;
+            |            schema:sameAs ?sameAs .
+            |    }
+            |  }
+            |}
+            |GROUP BY ?sameAs
+            |""".stripMargin
+      case _ =>
+        s"""|SELECT ?smthToCount
+            |WHERE {
+            |  {
+            |    SELECT (?sameAs AS ?smthToCount)
+            |    WHERE {
+            |      ?dsId rdf:type <http://schema.org/Dataset> ;
+            |            schema:sameAs ?sameAs .
+            |      FILTER NOT EXISTS {
+            |        ?dsId schema:sameAs ?dsWithoutSameAsIdString {
+            |          ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
+            |          FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
+            |          BIND (str(?dsWithoutSameAsId) AS ?dsWithoutSameAsIdString)
+            |        }
+            |      }
+            |    }
+            |    GROUP BY ?sameAs
+            |  } UNION {
+            |    SELECT (?dsId AS ?smthToCount)
+            |    WHERE {
+            |      ?derivedDsId schema:sameAs ?dsIdString {
+            |        ?dsId rdf:type <http://schema.org/Dataset> .
+            |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+            |        BIND (str(?dsId) AS ?dsIdString)
+            |      }
+            |    }
+            |    GROUP BY ?dsId
+            |  } UNION {
+            |    SELECT (?dsId AS ?smthToCount)
+            |    WHERE {
+            |      ?dsId rdf:type <http://schema.org/Dataset> .
+            |      FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+            |      BIND (str(?dsId) AS ?dsIdString)
+            |      FILTER NOT EXISTS { ?derivedDsId schema:sameAs ?dsIdString } .
+            |    }
+            |    GROUP BY ?dsId
+            |  }
+            |}
             |""".stripMargin
     }
   )
