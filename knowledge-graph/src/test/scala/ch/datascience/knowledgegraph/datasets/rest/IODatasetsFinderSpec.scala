@@ -53,8 +53,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
-//  override val pushToLocalJena = true
-
   "findDatasets" should {
 
     Option(Phrase("*")) +: Option.empty[Phrase] +: Nil foreach { maybePhrase =>
@@ -96,9 +94,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(datasetsList.size)
     }
 
-    "merge datasets when some datasets are derived from some project's dataset - case when no phrase is given" in new TestCase {
+    "merge datasets when they are imported from other renku project - case when no phrase is given" in new TestCase {
       val dataset1 = datasets(
-        maybeSameAs = Gen.const(Option.empty[SameAs]),
+        maybeSameAs = emptyOptionOf[SameAs],
         projects    = nonEmptyList(datasetProjects, minElements = 2)
       ).generateOne
       val dataset2     = datasets(projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne
@@ -118,9 +116,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     }
 
     "return datasets having neither sameAs nor imported to other projects - case when no phrase is given" in new TestCase {
-      val dataset1 = datasets(maybeSameAs = Gen.const(Option.empty[SameAs]),
+      val dataset1 = datasets(maybeSameAs = emptyOptionOf[SameAs],
                               projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
-      val dataset2 = datasets(maybeSameAs = Gen.const(Option.empty[SameAs]),
+      val dataset2 = datasets(maybeSameAs = emptyOptionOf[SameAs],
                               projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne
       val dataset3 = datasets(maybeSameAs = datasetSameAs.toGeneratorOfSomes,
                               projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
@@ -139,10 +137,105 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(datasetsList.size)
     }
 
+    "merge all datasets having the same sameAs not pointing to project's dataset - case when some phrase is given" in new TestCase {
+
+      val phrase = phrases.generateOne
+      val dataset1 = datasets(
+        maybeSameAs = datasetSameAs.toGeneratorOfSomes,
+        projects    = nonEmptyList(datasetProjects, minElements = 2)
+      ).generateOne.makeNameContaining(phrase)
+      val dataset2 = datasets(
+        maybeSameAs = datasetSameAs.toGeneratorOfSomes,
+        projects    = nonEmptyList(datasetProjects, maxElements = 1)
+      ).generateOne.makeDescContaining(phrase)
+      val dataset3 = datasets(
+        maybeSameAs = datasetSameAs.toGeneratorOfSomes,
+        projects    = nonEmptyList(datasetProjects, maxElements = 1)
+      ).generateOne.makeCreatorNameContaining(phrase)
+
+      loadToStore(List(dataset1, dataset2, dataset3, datasets.generateOne) flatMap toDataSetCommit: _*)
+
+      val pagingRequest = PagingRequest(Page(2), PerPage(1))
+
+      val result = datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .unsafeRunSync()
+
+      val matchingDatasets = List(dataset1, dataset2, dataset3)
+      result.results shouldBe List(matchingDatasets.sorted(byName)(1).toDatasetSearchResult)
+
+      result.pagingInfo.pagingRequest shouldBe pagingRequest
+      result.pagingInfo.total         shouldBe Total(3)
+    }
+
+    "merge datasets when they are imported from other renku project - case when some phrase is given" in new TestCase {
+
+      val phrase = phrases.generateOne
+      val dataset1 = datasets(
+        maybeSameAs = emptyOptionOf[SameAs],
+        projects    = nonEmptyList(datasetProjects, minElements = 2)
+      ).generateOne.makeNameContaining(phrase)
+      val dataset2 = datasets(
+        maybeSameAs = emptyOptionOf[SameAs],
+        projects    = nonEmptyList(datasetProjects, maxElements = 1)
+      ).generateOne.makeDescContaining(phrase)
+      val dataset3 = datasets(
+        maybeSameAs = emptyOptionOf[SameAs],
+        projects    = nonEmptyList(datasetProjects, maxElements = 1)
+      ).generateOne.makeCreatorNameContaining(phrase)
+
+      loadToStore(List(dataset1, dataset2, dataset3, datasets.generateOne) flatMap toDataSetCommit: _*)
+
+      val pagingRequest = PagingRequest(Page(2), PerPage(1))
+
+      val result = datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .unsafeRunSync()
+
+      val matchingDatasets = List(dataset1, dataset2, dataset3)
+      result.results shouldBe List(matchingDatasets.sorted(byName)(1).toDatasetSearchResult)
+
+      result.pagingInfo.pagingRequest shouldBe pagingRequest
+      result.pagingInfo.total         shouldBe Total(3)
+    }
+
+    "return datasets having neither sameAs nor imported to other projects - case when some phrase is given" in new TestCase {
+
+      val phrase = phrases.generateOne
+      val dataset1 = datasets(
+        maybeSameAs = emptyOptionOf[SameAs],
+        projects    = nonEmptyList(datasetProjects, minElements = 2)
+      ).generateOne.makeNameContaining(phrase)
+      val dataset2 = datasets(
+        maybeSameAs = emptyOptionOf[SameAs],
+        projects    = nonEmptyList(datasetProjects, maxElements = 1)
+      ).generateOne.makeDescContaining(phrase)
+      val dataset3 = datasets(
+        maybeSameAs = datasetSameAs.toGeneratorOfSomes,
+        projects    = nonEmptyList(datasetProjects, minElements = 2)
+      ).generateOne.makeCreatorNameContaining(phrase)
+
+      loadToStore(List(dataset1, dataset2, dataset3, datasets.generateOne) flatMap toDataSetCommit: _*)
+
+      val pagingRequest = PagingRequest(Page(2), PerPage(1))
+
+      val result = datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .unsafeRunSync()
+
+      val matchingDatasets = List(dataset1, dataset2, dataset3)
+      result.results shouldBe List(matchingDatasets.sorted(byName)(1).toDatasetSearchResult)
+
+      result.pagingInfo.pagingRequest shouldBe pagingRequest
+      result.pagingInfo.total         shouldBe Total(3)
+    }
+
     s"return datasets with name, description or creator matching the given phrase sorted by $NameProperty" in new TestCase {
-      forAll(datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig) =>
+      forAll(datasets, datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig, nonPhrased) =>
         val phrase                         = phrases.generateOne
-        val (dataset1, dataset2, dataset3) = storeDatasets(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
+        val (dataset1, dataset2, dataset3) = addPhrase(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
+
+        loadToStore(List(dataset1, dataset2, dataset3, nonPhrased) flatMap toDataSetCommit: _*)
 
         datasetsFinder
           .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
@@ -155,12 +248,14 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
     s"return datasets with name, description or creator matching the given phrase sorted by $DatePublishedProperty" in new TestCase {
       val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) = storeDatasets(
+      val (dataset1, dataset2, dataset3) = addPhrase(
         phrase,
         datasets.generateOne changePublishedDateTo Some(PublishedDate(LocalDate.now() minusDays 1)),
         datasets.generateOne changePublishedDateTo None,
         datasets.generateOne changePublishedDateTo Some(PublishedDate(LocalDate.now()))
       )
+
+      loadToStore(List(dataset1, dataset2, dataset3, datasets.generateOne) flatMap toDataSetCommit: _*)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default)
@@ -172,12 +267,14 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
     s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
       val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) = storeDatasets(
+      val (dataset1, dataset2, dataset3) = addPhrase(
         phrase,
-        datasets.generateOne.changeProjectsCountTo(5),
-        datasets.generateOne,
-        datasets.generateOne.changeProjectsCountTo(2)
+        datasets(projects = nonEmptyList(datasetProjects, minElements = 4, maxElements = 4)).generateOne,
+        datasets(projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne,
+        datasets(projects = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)).generateOne
       )
+
+      loadToStore(List(dataset1, dataset2, dataset3, datasets.generateOne) flatMap toDataSetCommit: _*)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default)
@@ -190,57 +287,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     "return the requested page of datasets matching the given phrase" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, dataset2, dataset3) =
-        storeDatasets(phrase, datasets.generateOne, datasets.generateOne, datasets.generateOne)
+        addPhrase(phrase, datasets.generateOne, datasets.generateOne, datasets.generateOne)
 
-      val pagingRequest = PagingRequest(Page(2), PerPage(1))
-
-      val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
-        .unsafeRunSync()
-
-      val expectedDataset = List(dataset1, dataset2, dataset3).sorted(byName)(1)
-      result.results shouldBe List(expectedDataset.toDatasetSearchResult)
-
-      result.pagingInfo.pagingRequest shouldBe pagingRequest
-      result.pagingInfo.total         shouldBe Total(3)
-    }
-
-    "merge all datasets having the same sameAs not pointing to project's dataset - case when phrase is given" in new TestCase {
-      val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) = storeDatasets(
-        phrase,
-        datasets(
-          maybeSameAs = datasetSameAs.toGeneratorOfSomes,
-          projects    = nonEmptyList(datasetProjects, minElements = 2)
-        ).generateOne,
-        datasets.generateOne,
-        datasets.generateOne
-      )
-
-      val pagingRequest = PagingRequest(Page(2), PerPage(1))
-
-      val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
-        .unsafeRunSync()
-
-      val expectedDataset = List(dataset1, dataset2, dataset3).sorted(byName)(1)
-      result.results shouldBe List(expectedDataset.toDatasetSearchResult)
-
-      result.pagingInfo.pagingRequest shouldBe pagingRequest
-      result.pagingInfo.total         shouldBe Total(3)
-    }
-
-    "merge datasets when some datasets are derived from some project's dataset - case when phrase is given" in new TestCase {
-      val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) = storeDatasets(
-        phrase,
-        datasets(
-          maybeSameAs = Gen.const(Option.empty[SameAs]),
-          projects    = nonEmptyList(datasetProjects, minElements = 2)
-        ).generateOne,
-        datasets.generateOne,
-        datasets.generateOne
-      )
+      loadToStore(List(dataset1, dataset2, dataset3, datasets.generateOne) flatMap toDataSetCommit: _*)
 
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
@@ -258,7 +307,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     "return no results if the requested page does not exist" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, dataset2, dataset3) =
-        storeDatasets(phrase, datasets.generateOne, datasets.generateOne, datasets.generateOne)
+        addPhrase(phrase, datasets.generateOne, datasets.generateOne, datasets.generateOne)
+
+      loadToStore(List(dataset1, dataset2, dataset3, datasets.generateOne) flatMap toDataSetCommit: _*)
 
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
 
@@ -293,7 +344,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     )
   }
 
-  private def storeDatasets(
+  private def addPhrase(
       containtingPhrase: Phrase,
       dataset1Orig:      Dataset,
       dataset2Orig:      Dataset,
@@ -316,13 +367,6 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
           )
         )
       )
-    )
-
-    loadToStore(
-      toDataSetCommit(dataset1) ++
-        toDataSetCommit(dataset2) ++
-        toDataSetCommit(dataset3) :+
-        dataSetCommit()(projectPaths.generateOne)(): _*
     )
 
     (dataset1, dataset2, dataset3)
@@ -365,8 +409,34 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     def changePublishedDateTo(maybeDate: Option[PublishedDate]): Dataset =
       dataset.copy(published = dataset.published.copy(maybeDate = maybeDate))
 
-    def changeProjectsCountTo(projectsCount: Int Refined Positive): Dataset =
-      dataset.copy(project = Gen.listOfN(projectsCount.value, datasetProjects).generateOne)
+    def makeNameContaining(phrase: Phrase): Dataset = {
+      val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
+      dataset.copy(
+        name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
+      )
+    }
+
+    def makeCreatorNameContaining(phrase: Phrase): Dataset = {
+      val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
+      dataset.copy(
+        maybeDescription = sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateSome
+      )
+    }
+
+    def makeDescContaining(phrase: Phrase): Dataset = {
+      val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
+      dataset.copy(
+        published = dataset.published.copy(
+          creators = Set(
+            DatasetCreator(
+              emails.generateOption,
+              sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne,
+              affiliations.generateOption
+            )
+          )
+        )
+      )
+    }
 
     lazy val toDatasetSearchResult: DatasetSearchResult = DatasetSearchResult(
       dataset.id,

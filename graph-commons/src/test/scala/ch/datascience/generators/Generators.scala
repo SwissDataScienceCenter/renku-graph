@@ -41,6 +41,8 @@ object Generators {
 
   type NonBlank = String Refined NonEmpty
 
+  def emptyOptionOf[T]: Gen[Option[T]] = Gen.const(Option.empty[T])
+
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
     nonBlankStrings(maxLength = Refined.unsafeApply(maxLength)) map (_.value)

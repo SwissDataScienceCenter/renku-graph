@@ -91,37 +91,138 @@ private class IODatasetsFinder(
     ),
     maybePhrase match {
       case Some(phrase) if phrase.value.trim != "*" =>
-        s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?maybeProject) AS ?projectsCount)
+        s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
             |  {
-            |    ?dataset rdf:type <http://schema.org/Dataset> ;
-            |             text:query (schema:name '$phrase') ;
-            |             schema:name ?name ;
-            |             schema:identifier ?identifier .
-            |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-            |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
-            |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+            |    ?datasetId schema:sameAs ?sameAs ;
+            |               schema:dateCreated ?earliestCreated ;
+            |               schema:name ?name ;
+            |               schema:identifier ?identifier .
+            |    OPTIONAL { ?datasetId schema:description ?maybeDescription } .
+            |    OPTIONAL { ?datasetId schema:datePublished ?maybePublishedDate } {
+            |      SELECT ?sameAs (COUNT(DISTINCT ?dsId) AS ?projectsCount) (MIN(?dateCreated) AS ?earliestCreated)
+            |      WHERE {
+            |        ?dsId schema:sameAs ?sameAs {
+            |          SELECT ?dsId
+            |          WHERE {
+            |            {
+            |              SELECT ?dsId
+            |              WHERE {
+            |                ?dsId text:query (schema:name '$phrase') ;
+            |                      rdf:type <http://schema.org/Dataset> .
+            |              }
+            |            } UNION {
+            |              SELECT ?dsId
+            |              WHERE {
+            |                ?dsId text:query (schema:description '$phrase') ;
+            |                      rdf:type <http://schema.org/Dataset> .
+            |              }
+            |            } UNION {
+            |              SELECT ?dsId
+            |              WHERE {
+            |                ?personId text:query (schema:name '$phrase') ;
+            |                          rdf:type <http://schema.org/Person> .
+            |                ?dsId schema:creator ?personId ;
+            |                      rdf:type <http://schema.org/Dataset> .
+            |              }
+            |            }
+            |          }
+            |          GROUP BY ?dsId
+            |        }
+            |        ?dsId schema:dateCreated ?dateCreated .
+            |        FILTER NOT EXISTS {
+            |          ?dsId schema:sameAs ?dsWithoutSameAsIdString {
+            |            ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
+            |            FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
+            |            BIND (str(?dsWithoutSameAsId) AS ?dsWithoutSameAsIdString)
+            |          }
+            |        }
+            |      }
+            |      GROUP BY ?sameAs
+            |    }
             |  } UNION {
-            |    ?dataset rdf:type <http://schema.org/Dataset> ;
-            |             text:query (schema:description '$phrase') ;
-            |             schema:name ?name ;
-            |             schema:identifier ?identifier .
-            |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-            |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
-            |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+            |    ?dsId schema:name ?name ;
+            |          schema:identifier ?identifier .
+            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
+            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
+            |      SELECT ?dsId ((COUNT(?dsIdString) \\u002B 1) AS ?projectsCount)
+            |      WHERE {
+            |        ?derivedDsId schema:sameAs ?dsIdString {
+            |          {
+            |            SELECT ?dsId
+            |            WHERE {
+            |              {
+            |                SELECT ?dsId
+            |                WHERE {
+            |                  ?dsId text:query (schema:name '$phrase') ;
+            |                        rdf:type <http://schema.org/Dataset> .
+            |                }
+            |              } UNION {
+            |                SELECT ?dsId
+            |                WHERE {
+            |                  ?dsId text:query (schema:description '$phrase') ;
+            |                        rdf:type <http://schema.org/Dataset> .
+            |                }
+            |              } UNION {
+            |                SELECT ?dsId
+            |                WHERE {
+            |                  ?personId text:query (schema:name '$phrase') ;
+            |                            rdf:type <http://schema.org/Person> .
+            |                  ?dsId schema:creator ?personId ;
+            |                        rdf:type <http://schema.org/Dataset> .
+            |                }
+            |              }
+            |            }
+            |            GROUP BY ?dsId
+            |          }
+            |          FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+            |          BIND (str(?dsId) AS ?dsIdString)
+            |        }
+            |      }
+            |      GROUP BY ?dsId
+            |    }
             |  } UNION {
-            |    ?dataset rdf:type <http://schema.org/Dataset> ;
-            |             schema:creator ?creatorResource ;
-            |             schema:identifier ?identifier ;
-            |             schema:name ?name .
-            |    ?creatorResource rdf:type <http://schema.org/Person> ;
-            |             text:query (schema:name '$phrase') .
-            |    OPTIONAL { ?dataset schema:isPartOf ?maybeProject } .
-            |    OPTIONAL { ?dataset schema:description ?maybeDescription } .
-            |    OPTIONAL { ?dataset schema:datePublished ?maybePublishedDate } .
+            |    ?dsId schema:name ?name ;
+            |          schema:identifier ?identifier .
+            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
+            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
+            |      SELECT ?dsId (1 AS ?projectsCount)
+            |      WHERE {
+            |        {
+            |          SELECT ?dsId
+            |          WHERE {
+            |            {
+            |              SELECT ?dsId
+            |              WHERE {
+            |                ?dsId text:query (schema:name '$phrase') ;
+            |                      rdf:type <http://schema.org/Dataset> .
+            |              }
+            |            } UNION {
+            |              SELECT ?dsId
+            |              WHERE {
+            |                ?dsId text:query (schema:description '$phrase') ;
+            |                      rdf:type <http://schema.org/Dataset> .
+            |              }
+            |            } UNION {
+            |              SELECT ?dsId
+            |              WHERE {
+            |                ?personId text:query (schema:name '$phrase') ;
+            |                          rdf:type <http://schema.org/Person> .
+            |                ?dsId schema:creator ?personId ;
+            |                      rdf:type <http://schema.org/Dataset> .
+            |              }
+            |            }
+            |          }
+            |          GROUP BY ?dsId
+            |        }
+            |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+            |        BIND (str(?dsId) AS ?dsIdString)
+            |        FILTER NOT EXISTS { ?derivedDsId schema:sameAs ?dsIdString } .
+            |      }
+            |      GROUP BY ?dsId
+            |    }
             |  }
             |}
-            |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate
             |${`ORDER BY`(sort)}
             |""".stripMargin
       case _ =>
@@ -193,34 +294,120 @@ private class IODatasetsFinder(
     ),
     maybePhrase match {
       case Some(phrase) if phrase.value.trim != "*" =>
-        s"""|SELECT (MIN(?dsId) as ?datasetId) ?sameAs
+        s"""|SELECT ?smthToCount
             |WHERE {
             |  {
-            |    SELECT ?dsId ?sameAs
+            |    SELECT (?sameAs AS ?smthToCount)
             |    WHERE {
-            |      ?dsId text:query (schema:name '$phrase') ;
-            |            rdf:type <http://schema.org/Dataset> ;
-            |            schema:sameAs ?sameAs .
+            |      ?dsId schema:sameAs ?sameAs {
+            |        SELECT ?dsId
+            |        WHERE {
+            |          {
+            |            SELECT ?dsId
+            |            WHERE {
+            |              ?dsId text:query (schema:name '$phrase') ;
+            |                    rdf:type <http://schema.org/Dataset> .
+            |            }
+            |          } UNION {
+            |            SELECT ?dsId
+            |            WHERE {
+            |              ?dsId text:query (schema:description '$phrase') ;
+            |                    rdf:type <http://schema.org/Dataset> .
+            |            }
+            |          } UNION {
+            |            SELECT ?dsId
+            |            WHERE {
+            |              ?personId text:query (schema:name '$phrase') ;
+            |                        rdf:type <http://schema.org/Person> .
+            |              ?dsId schema:creator ?personId ;
+            |                    rdf:type <http://schema.org/Dataset> .
+            |            }
+            |          }
+            |        }
+            |        GROUP BY ?dsId
+            |      }
+            |      FILTER NOT EXISTS {
+            |        ?dsId schema:sameAs ?dsWithoutSameAsIdString {
+            |          ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
+            |          FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
+            |          BIND (str(?dsWithoutSameAsId) AS ?dsWithoutSameAsIdString)
+            |        }
+            |      }
             |    }
+            |    GROUP BY ?sameAs
             |  } UNION {
-            |    SELECT ?dsId ?sameAs
+            |    SELECT (?dsId AS ?smthToCount)
             |    WHERE {
-            |      ?dsId text:query (schema:description '$phrase') ;
-            |            rdf:type <http://schema.org/Dataset> ;
-            |            schema:sameAs ?sameAs .
+            |      ?derivedDsId schema:sameAs ?dsIdString {
+            |        {
+            |          SELECT ?dsId
+            |          WHERE {
+            |            {
+            |              SELECT ?dsId
+            |              WHERE {
+            |                ?dsId text:query (schema:name '$phrase') ;
+            |                      rdf:type <http://schema.org/Dataset> .
+            |              }
+            |            } UNION {
+            |              SELECT ?dsId
+            |              WHERE {
+            |                ?dsId text:query (schema:description '$phrase') ;
+            |                      rdf:type <http://schema.org/Dataset> .
+            |              }
+            |            } UNION {
+            |              SELECT ?dsId
+            |              WHERE {
+            |                ?personId text:query (schema:name '$phrase') ;
+            |                          rdf:type <http://schema.org/Person> .
+            |                ?dsId schema:creator ?personId ;
+            |                      rdf:type <http://schema.org/Dataset> .
+            |              }
+            |            }
+            |          }
+            |          GROUP BY ?dsId
+            |        }
+            |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+            |        BIND (str(?dsId) AS ?dsIdString)
+            |      }
             |    }
+            |    GROUP BY ?dsId
             |  } UNION {
-            |    SELECT ?dsId ?sameAs
+            |    SELECT (?dsId AS ?smthToCount)
             |    WHERE {
-            |      ?personId text:query (schema:name '$phrase') ;
-            |                rdf:type <http://schema.org/Person> .
-            |      ?dsId schema:creator ?personId ;
-            |            rdf:type <http://schema.org/Dataset> ;
-            |            schema:sameAs ?sameAs .
+            |      {
+            |        SELECT ?dsId
+            |        WHERE {
+            |          {
+            |            SELECT ?dsId
+            |            WHERE {
+            |              ?dsId text:query (schema:name '$phrase') ;
+            |                    rdf:type <http://schema.org/Dataset> .
+            |            }
+            |          } UNION {
+            |            SELECT ?dsId
+            |            WHERE {
+            |              ?dsId text:query (schema:description '$phrase') ;
+            |                    rdf:type <http://schema.org/Dataset> .
+            |            }
+            |          } UNION {
+            |            SELECT ?dsId
+            |            WHERE {
+            |              ?personId text:query (schema:name '$phrase') ;
+            |                        rdf:type <http://schema.org/Person> .
+            |              ?dsId schema:creator ?personId ;
+            |                    rdf:type <http://schema.org/Dataset> .
+            |            }
+            |          }
+            |        }
+            |        GROUP BY ?dsId
+            |      }
+            |      FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+            |      BIND (str(?dsId) AS ?dsIdString)
+            |      FILTER NOT EXISTS { ?derivedDsId schema:sameAs ?dsIdString } .
             |    }
+            |    GROUP BY ?dsId
             |  }
             |}
-            |GROUP BY ?sameAs
             |""".stripMargin
       case _ =>
         s"""|SELECT ?smthToCount
