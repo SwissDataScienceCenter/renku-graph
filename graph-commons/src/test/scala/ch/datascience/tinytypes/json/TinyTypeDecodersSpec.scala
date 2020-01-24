@@ -84,6 +84,14 @@ class TinyTypeDecodersSpec extends WordSpec {
     }
   }
 
+  "urlDecoder" should {
+
+    "decode JSON String value" in {
+      val value = httpUrls().generateOne
+      json"""$value""".as[UrlTestType] shouldBe Right(UrlTestType(value))
+    }
+  }
+
   "intDecoder" should {
 
     "decode JSON Int value" in {

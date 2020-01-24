@@ -37,7 +37,7 @@ object TinyTypeDecoders {
     case nonBlank => RefType.applyRef[NonBlank](nonBlank).fold(e => { print(e); None }, Option.apply)
   }
 
-  def toOption[TT <: StringTinyType](
+  def toOption[TT <: TinyType { type V = String }](
       implicit tinyTypeFactory: From[TT]
   ): Option[NonBlank] => Either[DecodingFailure, Option[TT]] = {
     case Some(nonBlank) =>
@@ -54,6 +54,11 @@ object TinyTypeDecoders {
     }
 
   implicit def relativePathDecoder[TT <: RelativePathTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    decodeString.emap { value =>
+      tinyTypeFactory.from(value).leftMap(_.getMessage)
+    }
+
+  implicit def urlDecoder[TT <: UrlTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     decodeString.emap { value =>
       tinyTypeFactory.from(value).leftMap(_.getMessage)
     }

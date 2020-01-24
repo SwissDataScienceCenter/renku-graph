@@ -94,15 +94,15 @@ private class IODatasetsFinder(
         s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
             |  {
-            |    ?datasetId schema:sameAs ?sameAs ;
-            |               schema:dateCreated ?earliestCreated ;
+            |    ?datasetId schema:dateCreated ?earliestCreated ;
+            |               schema:sameAs/schema:url ?sameAs ;
             |               schema:name ?name ;
             |               schema:identifier ?identifier .
             |    OPTIONAL { ?datasetId schema:description ?maybeDescription } .
             |    OPTIONAL { ?datasetId schema:datePublished ?maybePublishedDate } {
             |      SELECT ?sameAs (COUNT(DISTINCT ?dsId) AS ?projectsCount) (MIN(?dateCreated) AS ?earliestCreated)
             |      WHERE {
-            |        ?dsId schema:sameAs ?sameAs {
+            |        ?dsId schema:sameAs/schema:url ?sameAs {
             |          SELECT ?dsId
             |          WHERE {
             |            {
@@ -131,10 +131,9 @@ private class IODatasetsFinder(
             |        }
             |        ?dsId schema:dateCreated ?dateCreated .
             |        FILTER NOT EXISTS {
-            |          ?dsId schema:sameAs ?dsWithoutSameAsIdString {
+            |          ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
             |            ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
             |            FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
-            |            BIND (str(?dsWithoutSameAsId) AS ?dsWithoutSameAsIdString)
             |          }
             |        }
             |      }
@@ -145,9 +144,9 @@ private class IODatasetsFinder(
             |          schema:identifier ?identifier .
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
             |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
-            |      SELECT ?dsId ((COUNT(?dsIdString) \\u002B 1) AS ?projectsCount)
+            |      SELECT ?dsId ((COUNT(?derivedDsId) \\u002B 1) AS ?projectsCount)
             |      WHERE {
-            |        ?derivedDsId schema:sameAs ?dsIdString {
+            |        ?derivedDsId schema:sameAs/schema:url ?dsId {
             |          {
             |            SELECT ?dsId
             |            WHERE {
@@ -176,7 +175,6 @@ private class IODatasetsFinder(
             |            GROUP BY ?dsId
             |          }
             |          FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |          BIND (str(?dsId) AS ?dsIdString)
             |        }
             |      }
             |      GROUP BY ?dsId
@@ -216,8 +214,7 @@ private class IODatasetsFinder(
             |          GROUP BY ?dsId
             |        }
             |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |        BIND (str(?dsId) AS ?dsIdString)
-            |        FILTER NOT EXISTS { ?derivedDsId schema:sameAs ?dsIdString } .
+            |        FILTER NOT EXISTS { ?derivedDsId schema:sameAs/schema:url ?dsId } .
             |      }
             |      GROUP BY ?dsId
             |    }
@@ -229,8 +226,8 @@ private class IODatasetsFinder(
         s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
             |  {
-            |    ?datasetId schema:sameAs ?sameAs ;
-            |               schema:dateCreated ?earliestCreated ;
+            |    ?datasetId schema:dateCreated ?earliestCreated ;
+            |               schema:sameAs/schema:url ?sameAs ;
             |               schema:name ?name ;
             |               schema:identifier ?identifier .
             |    OPTIONAL { ?datasetId schema:description ?maybeDescription } .
@@ -239,13 +236,12 @@ private class IODatasetsFinder(
             |      WHERE {
             |        ?dsId rdf:type <http://schema.org/Dataset> ;
             |              schema:dateCreated ?dateCreated ;
-            |              schema:sameAs ?sameAs .
-            |        FILTER NOT EXISTS { 
-            |          ?dsId schema:sameAs ?dsWithoutSameAsIdString {
+            |              schema:sameAs/schema:url ?sameAs .
+            |        FILTER NOT EXISTS {
+            |          ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
             |            ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
             |            FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
-            |            BIND (str(?dsWithoutSameAsId) AS ?dsWithoutSameAsIdString)
-            |          } 
+            |          }
             |        }
             |      }
             |      GROUP BY ?sameAs
@@ -255,12 +251,11 @@ private class IODatasetsFinder(
             |          schema:identifier ?identifier .
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
             |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
-            |      SELECT ?dsId ((COUNT(?dsIdString) \\u002B 1) AS ?projectsCount)
+            |      SELECT ?dsId ((COUNT(?derivedDsId) \\u002B 1) AS ?projectsCount)
             |      WHERE {
-            |        ?derivedDsId schema:sameAs ?dsIdString {
+            |        ?derivedDsId schema:sameAs/schema:url ?dsId {
             |          ?dsId rdf:type <http://schema.org/Dataset> .
             |          FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |          BIND (str(?dsId) AS ?dsIdString)
             |        }
             |      }
             |      GROUP BY ?dsId
@@ -274,8 +269,7 @@ private class IODatasetsFinder(
             |      WHERE {
             |        ?dsId rdf:type <http://schema.org/Dataset> .
             |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |        BIND (str(?dsId) AS ?dsIdString)
-            |        FILTER NOT EXISTS { ?derivedDsId schema:sameAs ?dsIdString } .
+            |        FILTER NOT EXISTS { ?derivedDsId schema:sameAs/schema:url ?dsId } .
             |      }
             |      GROUP BY ?dsId
             |    }
@@ -299,7 +293,7 @@ private class IODatasetsFinder(
             |  {
             |    SELECT (?sameAs AS ?smthToCount)
             |    WHERE {
-            |      ?dsId schema:sameAs ?sameAs {
+            |      ?dsId schema:sameAs/schema:url ?sameAs {
             |        SELECT ?dsId
             |        WHERE {
             |          {
@@ -327,10 +321,9 @@ private class IODatasetsFinder(
             |        GROUP BY ?dsId
             |      }
             |      FILTER NOT EXISTS {
-            |        ?dsId schema:sameAs ?dsWithoutSameAsIdString {
+            |        ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
             |          ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
             |          FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
-            |          BIND (str(?dsWithoutSameAsId) AS ?dsWithoutSameAsIdString)
             |        }
             |      }
             |    }
@@ -338,7 +331,7 @@ private class IODatasetsFinder(
             |  } UNION {
             |    SELECT (?dsId AS ?smthToCount)
             |    WHERE {
-            |      ?derivedDsId schema:sameAs ?dsIdString {
+            |      ?derivedDsId schema:sameAs/schema:url ?dsId {
             |        {
             |          SELECT ?dsId
             |          WHERE {
@@ -367,7 +360,6 @@ private class IODatasetsFinder(
             |          GROUP BY ?dsId
             |        }
             |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |        BIND (str(?dsId) AS ?dsIdString)
             |      }
             |    }
             |    GROUP BY ?dsId
@@ -402,8 +394,7 @@ private class IODatasetsFinder(
             |        GROUP BY ?dsId
             |      }
             |      FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |      BIND (str(?dsId) AS ?dsIdString)
-            |      FILTER NOT EXISTS { ?derivedDsId schema:sameAs ?dsIdString } .
+            |      FILTER NOT EXISTS { ?derivedDsId schema:sameAs/schema:url ?dsId } .
             |    }
             |    GROUP BY ?dsId
             |  }
@@ -416,12 +407,11 @@ private class IODatasetsFinder(
             |    SELECT (?sameAs AS ?smthToCount)
             |    WHERE {
             |      ?dsId rdf:type <http://schema.org/Dataset> ;
-            |            schema:sameAs ?sameAs .
+            |            schema:sameAs/schema:url ?sameAs .
             |      FILTER NOT EXISTS {
-            |        ?dsId schema:sameAs ?dsWithoutSameAsIdString {
+            |        ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
             |          ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
             |          FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
-            |          BIND (str(?dsWithoutSameAsId) AS ?dsWithoutSameAsIdString)
             |        }
             |      }
             |    }
@@ -429,10 +419,9 @@ private class IODatasetsFinder(
             |  } UNION {
             |    SELECT (?dsId AS ?smthToCount)
             |    WHERE {
-            |      ?derivedDsId schema:sameAs ?dsIdString {
+            |      ?derivedDsId schema:sameAs/schema:url ?dsId {
             |        ?dsId rdf:type <http://schema.org/Dataset> .
             |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |        BIND (str(?dsId) AS ?dsIdString)
             |      }
             |    }
             |    GROUP BY ?dsId
@@ -441,8 +430,7 @@ private class IODatasetsFinder(
             |    WHERE {
             |      ?dsId rdf:type <http://schema.org/Dataset> .
             |      FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |      BIND (str(?dsId) AS ?dsIdString)
-            |      FILTER NOT EXISTS { ?derivedDsId schema:sameAs ?dsIdString } .
+            |      FILTER NOT EXISTS { ?derivedDsId schema:sameAs/schema:url ?dsId } .
             |    }
             |    GROUP BY ?dsId
             |  }

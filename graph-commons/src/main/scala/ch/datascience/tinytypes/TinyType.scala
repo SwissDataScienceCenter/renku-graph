@@ -37,6 +37,7 @@ trait TinyType extends Any {
 
 trait StringTinyType       extends Any with TinyType { type V = String }
 trait RelativePathTinyType extends Any with TinyType { type V = String }
+trait UrlTinyType          extends Any with TinyType { type V = String }
 trait IntTinyType          extends Any with TinyType { type V = Int }
 trait LongTinyType         extends Any with TinyType { type V = Long }
 trait JsonTinyType         extends Any with TinyType { type V = Json }

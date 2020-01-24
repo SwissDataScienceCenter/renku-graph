@@ -40,8 +40,13 @@ object datasets {
   final class Url private (val value: String) extends AnyVal with StringTinyType
   implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
 
-  final class SameAs private (val value: String) extends AnyVal with StringTinyType
-  implicit object SameAs extends TinyTypeFactory[SameAs](new SameAs(_)) with constraints.Url
+  sealed trait SameAs extends Any with UrlTinyType
+  final class IdSameAs private[datasets] (val value:  String) extends AnyVal with SameAs
+  final class UrlSameAs private[datasets] (val value: String) extends AnyVal with SameAs
+  implicit object SameAs extends TinyTypeFactory[SameAs](new UrlSameAs(_)) with constraints.Url {
+    final def fromId(value: String): Either[IllegalArgumentException, SameAs] =
+      from(value) map (sameAs => new IdSameAs(sameAs.value))
+  }
 
   final class DateCreatedInProject private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DateCreatedInProject

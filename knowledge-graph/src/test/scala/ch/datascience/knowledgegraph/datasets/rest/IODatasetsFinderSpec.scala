@@ -44,9 +44,7 @@ import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.renku.jsonld.JsonLD
-import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -387,7 +385,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         datasetCreators           = dataSet.published.creators map toPerson
       )
 
-      val maybeSameAs = dataSet.maybeSameAs orElse firstJsonLd.entityId.map(id => SameAs(id.value))
+      val maybeSameAs = dataSet.maybeSameAs orElse firstJsonLd.entityId.flatMap(id => SameAs.fromId(id.value).toOption)
       val otherJsonLds = otherProjects.map { project =>
         dataSetCommit()(
           projectPath = project.path

@@ -41,19 +41,27 @@ class TinyTypeEncodersSpec extends WordSpec {
     }
   }
 
-  "intEncoder" should {
-
-    "encode IntTinyType to Json" in {
-      val value = Arbitrary.arbInt.arbitrary.generateOne
-      IntTestType(value).asJson shouldBe Json.fromInt(value)
-    }
-  }
-
   "relativePathEncoder" should {
 
     "encode RelativePathTinyType to Json" in {
       val value = nonEmptyStrings().generateOne
       RelativePathTestType(value).asJson shouldBe Json.fromString(value)
+    }
+  }
+
+  "urlEncoder" should {
+
+    "encode UrlTinyType to Json" in {
+      val value = nonEmptyStrings().generateOne
+      UrlTestType(value).asJson shouldBe Json.fromString(value)
+    }
+  }
+
+  "intEncoder" should {
+
+    "encode IntTinyType to Json" in {
+      val value = Arbitrary.arbInt.arbitrary.generateOne
+      IntTestType(value).asJson shouldBe Json.fromInt(value)
     }
   }
 

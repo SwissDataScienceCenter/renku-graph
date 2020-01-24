@@ -18,7 +18,11 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.datasets.{Identifier, PartLocation}
+import GraphModelGenerators.datasetSameAs
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.datasets._
+import ch.datascience.tinytypes.UrlTinyType
 import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -33,9 +37,31 @@ class datasetsSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 
   "PartLocation" should {
-
     "be a RelativePath" in {
       PartLocation shouldBe a[RelativePath]
+    }
+  }
+
+  "SameAs" should {
+
+    "be a UrlTinyType" in {
+      datasetSameAs.generateOne shouldBe a[UrlTinyType]
+    }
+
+    "allow to construct UrlSameAs using the from factory" in {
+      forAll(httpUrls()) { url =>
+        val Right(sameAs) = SameAs.from(url)
+        sameAs       should (be(a[SameAs]) and be(a[UrlSameAs]))
+        sameAs.value shouldBe url
+      }
+    }
+
+    "allow to construct IdSameAs using the fromId factory" in {
+      forAll(httpUrls()) { url =>
+        val Right(sameAs) = SameAs.fromId(url)
+        sameAs       should (be(a[SameAs]) and be(a[IdSameAs]))
+        sameAs.value shouldBe url
+      }
     }
   }
 }
