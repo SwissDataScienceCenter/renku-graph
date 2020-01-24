@@ -52,13 +52,13 @@ import eu.timepit.refined.numeric.Positive
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.{Assertion, WordSpec}
 
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually {
+class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually with IntegrationPatience {
   import IOAccessTokenFinder._
 
   "apply" should {

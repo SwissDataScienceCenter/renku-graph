@@ -23,13 +23,16 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.triples._
-import ch.datascience.rdfstore.triples.entities._
+import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.{Activity, Agent, Person, Project}
+import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -39,15 +42,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
     "return true if there's a single commit Activity SoftwareAgent entity with the current version of Renku" in new TestCase {
 
-      val agentId = Agent.Id(schemaVersion)
-      loadToStore(
-        triples(
-          List(
-            commitActivity(agentId),
-            Agent(agentId)
-          )
-        )
-      )
+      loadToStore(commitActivity(schemaVersion).asJsonLD)
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe true
 
@@ -56,15 +51,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
     "return false if there's a single SoftwareAgent entity with some old version of Renku" in new TestCase {
 
-      val agentId = Agent.Id(schemaVersions generateDifferentThan schemaVersion)
-      loadToStore(
-        triples(
-          List(
-            commitActivity(agentId),
-            Agent(agentId)
-          )
-        )
-      )
+      loadToStore(commitActivity(schemaVersions generateDifferentThan schemaVersion).asJsonLD)
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
@@ -73,18 +60,8 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
     "return false if there are multiple SoftwareAgent entities with different versions of Renku" in new TestCase {
 
-      val agentIdForCurrentVersion = Agent.Id(schemaVersion)
-      val agentIdForOtherVersion   = Agent.Id(schemaVersions generateDifferentThan schemaVersion)
-      loadToStore(
-        triples(
-          List(
-            Agent(agentIdForOtherVersion),
-            commitActivity(agentIdForOtherVersion, commitIds.generateOne),
-            Agent(agentIdForCurrentVersion),
-            commitActivity(agentIdForCurrentVersion)
-          )
-        )
-      )
+      loadToStore(commitActivity(schemaVersion).asJsonLD,
+                  commitActivity(schemaVersions generateDifferentThan schemaVersion).asJsonLD)
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
@@ -93,13 +70,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
     "return false if SoftwareAgent points to the current versions of Renku but it's not linked to a commit activity" in new TestCase {
 
-      loadToStore(
-        triples(
-          List(
-            Agent(Agent.Id(schemaVersion))
-          )
-        )
-      )
+      loadToStore(Agent(schemaVersion).asJsonLD)
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
@@ -114,10 +85,14 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
     val triplesVersionFinder  = new IOTriplesVersionFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger)
   }
 
-  private def commitActivity(agentId: Agent.Id, commitId: CommitId = commitIds.generateOne) =
-    CommitActivity(CommitActivity.Id(commitId),
-                   Project.Id(renkuBaseUrl, projectPaths.generateOne),
-                   committedDates.generateOne,
-                   agentId,
-                   Person.Id(None))
+  private def commitActivity(schemaVersion: SchemaVersion, commitId: CommitId = commitIds.generateOne) = {
+    val committer: Person = persons.generateOne
+    Activity(
+      commitIds.generateOne,
+      committedDates.generateOne,
+      committer,
+      Project(projectPaths.generateOne, projectNames.generateOne, projectCreatedDates.generateOne, committer),
+      Agent(schemaVersion)
+    ).asJsonLD
+  }
 }

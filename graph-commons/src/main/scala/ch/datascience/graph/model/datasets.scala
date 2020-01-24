@@ -34,6 +34,9 @@ object datasets {
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
 
+  final class Keyword private (val value: String) extends AnyVal with StringTinyType
+  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank
+
   final class Url private (val value: String) extends AnyVal with StringTinyType
   implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
 

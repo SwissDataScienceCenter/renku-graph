@@ -48,6 +48,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
 import io.circe.{Decoder, HCursor, Json}
+import io.renku.jsonld.JsonLD
 import org.apache.jena.fuseki.FusekiException
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdf.model.ModelFactory
@@ -177,6 +178,22 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
           connection.load {
             val model = ModelFactory.createDefaultModel()
             RDFDataMgr.read(model, new ByteArrayInputStream(triples.value.noSpaces.getBytes(UTF_8)), null, Lang.JSONLD)
+            model
+          }
+        }
+      }
+      .unsafeRunSync()
+
+  protected def loadToStore(jsonLDs: JsonLD*): Unit =
+    rdfConnectionResource
+      .use { connection =>
+        IO {
+          connection.load {
+            val model = ModelFactory.createDefaultModel()
+            RDFDataMgr.read(model,
+                            new ByteArrayInputStream(Json.arr(jsonLDs.map(_.toJson): _*).noSpaces.getBytes(UTF_8)),
+                            null,
+                            Lang.JSONLD)
             model
           }
         }

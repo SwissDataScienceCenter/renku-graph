@@ -21,9 +21,9 @@ package ch.datascience.graph.acceptancetests.stubs
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, Project}
-import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.rdfstore.triples.{singleFileAndCommit, triples}
+import ch.datascience.rdfstore.entities.bundles._
 import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
+import io.renku.jsonld.JsonLD
 
 object RemoteTriplesGenerator {
 
@@ -35,18 +35,18 @@ object RemoteTriplesGenerator {
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,
       commitId,
-      triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion))
+      fileCommit(commitId = commitId, schemaVersion = schemaVersion)(projectPath = project.path)
     )
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project:  Project,
       commitId: CommitId,
-      triples:  JsonLDTriples
+      triples:  JsonLD
   ): Unit = {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
-          ok(triples.value.spaces2)
+          ok(triples.toJson.spaces2)
         )
     }
     ()

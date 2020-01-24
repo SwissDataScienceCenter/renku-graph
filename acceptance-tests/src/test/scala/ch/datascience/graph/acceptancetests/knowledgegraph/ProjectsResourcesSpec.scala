@@ -37,9 +37,11 @@ import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen}
 import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.triples.{singleFileAndCommitWithDataset, triples}
+import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles._
 import io.circe.Json
 import io.circe.literal._
+import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -62,18 +64,18 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     scenario("As a user I would like to find project's details by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
-      val jsonLDTriples = triples(
-        singleFileAndCommitWithDataset(
+      val jsonLDTriples = JsonLD.arr(
+        dataSetCommit(
+          commitId      = dataset1CommitId,
+          committer     = Person(project.created.creator.name, project.created.creator.email),
+          schemaVersion = currentSchemaVersion
+        )(
           project.path,
           projectName        = project.name,
-          projectDateCreated = project.created.date,
-          projectCreator     = project.created.creator.name -> project.created.creator.email,
-          commitId           = dataset1CommitId,
-          committerName      = project.created.creator.name,
-          committerEmail     = project.created.creator.email,
-          datasetIdentifier  = dataset.id,
-          datasetName        = dataset.name,
-          schemaVersion      = currentSchemaVersion
+          projectDateCreated = project.created.date
+        )(
+          datasetIdentifier = dataset.id,
+          datasetName       = dataset.name
         )
       )
 

@@ -23,10 +23,10 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.users.{Email, Id, Name}
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.triples._
-import ch.datascience.rdfstore.triples.entities.Person
+import ch.datascience.rdfstore.entities.Person
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.PersonDetailsUpdater.{prepareUpdates, Person => UpdaterPerson}
 import io.circe.Json
+import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -37,12 +37,12 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
 
     "generate query changing person's name and removing label - case when email present" in {
       forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
-        val person1Id = Person.Id(Some(email1))
-        val person2Id = Person.Id(Some(email2))
+        val person1Json = Person(name1, email1).asJsonLD
+        val person1Id   = person1Json.entityId.get
+        val person2Json = Person(name2, email2).asJsonLD
+        val person2Id   = person2Json.entityId.get
 
-        loadToStore(
-          triples(List(Person(person1Id, name1), Person(person2Id, name2)))
-        )
+        loadToStore(person1Json, person2Json)
 
         findPersons should contain theSameElementsAs Set(
           (person1Id.value, Some(name1.value), Some(email1.value), Some(name1.value)),
@@ -70,12 +70,12 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
 
     "generate query changing person's name and email and removing label - case when email removed" in {
       forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
-        val person1Id = Person.Id(Some(email1))
-        val person2Id = Person.Id(Some(email2))
+        val person1Json = Person(name1, email1).asJsonLD
+        val person1Id   = person1Json.entityId.get
+        val person2Json = Person(name2, email2).asJsonLD
+        val person2Id   = person2Json.entityId.get
 
-        loadToStore(
-          triples(List(Person(person1Id, name1, Some(email1), None), Person(person2Id, name2, Some(email2), None)))
-        )
+        loadToStore(person1Json, person2Json)
 
         findPersons should contain theSameElementsAs Set(
           (person1Id.value, Some(name1.value), Some(email1.value), Some(name1.value)),
@@ -100,40 +100,6 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
         clearDataset()
       }
     }
-
-    "generate query adding person's name and email - case when there's no name or email on the Person" in {
-      val email    = emails.generateOne
-      val personId = Person.Id(Some(email))
-
-      loadToStore(
-        triples(
-          List(
-            Person(personId, names.generateOne, None, None)
-              .remove("http://schema.org/name")
-              .remove("http://www.w3.org/2000/01/rdf-schema#label")
-          )
-        )
-      )
-
-      findPersons should contain theSameElementsAs Set(
-        (personId.value, None, None, None)
-      )
-
-      val newName  = names.generateOne
-      val newEmail = emails.generateOne
-
-      val updates = prepareUpdates(
-        Set(
-          UpdaterPerson(Id(personId.value), Set(newName), Set(newEmail))
-        )
-      )
-
-      (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
-
-      findPersons should contain theSameElementsAs Set(
-        (personId.value, Some(newName.value), Some(newEmail.value), None)
-      )
-    }
   }
 
   private def findPersons: Set[(String, Option[String], Option[String], Option[String])] =
@@ -147,16 +113,6 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
                  |""".stripMargin)
       .unsafeRunSync()
       .map(row => (row("id"), row.get("name"), row.get("email"), row.get("label")))
-      .toSet
-
-  private def findAll: Set[(String, String, String)] =
-    runQuery(s"""|SELECT ?id ?name ?email
-                 |WHERE {
-                 |  ?id ?name ?email
-                 |}
-                 |""".stripMargin)
-      .unsafeRunSync()
-      .map(row => (row("id"), row("name"), row("email")))
       .toSet
 
   private implicit class JsonOps(json: Json) {
