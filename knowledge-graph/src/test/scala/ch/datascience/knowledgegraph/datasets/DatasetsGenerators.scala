@@ -35,7 +35,7 @@ object DatasetsGenerators {
   def datasets(maybeSameAs: Gen[Option[SameAs]]               = Gen.option(datasetSameAs),
                projects:    Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] =
     for {
-      id               <- datasetIds
+      id               <- datasetIdentifiers
       name             <- datasetNames
       maybeUrl         <- Gen.option(datasetUrls)
       maybeSameAs      <- maybeSameAs
@@ -67,13 +67,13 @@ object DatasetsGenerators {
   implicit lazy val datasetProjects: Gen[DatasetProject] = for {
     path    <- projectPaths
     name    <- projectNames
-    created <- datasetInProjectCreations
+    created <- addedToProject
   } yield DatasetProject(path, name, created)
 
-  implicit lazy val datasetInProjectCreations: Gen[DatasetInProjectCreation] = for {
+  implicit lazy val addedToProject: Gen[AddedToProject] = for {
     createdDate <- datasetInProjectCreationDates
     agent       <- datasetAgents
-  } yield DatasetInProjectCreation(createdDate, agent)
+  } yield AddedToProject(createdDate, agent)
 
   private implicit lazy val datasetAgents: Gen[DatasetAgent] = for {
     email <- emails

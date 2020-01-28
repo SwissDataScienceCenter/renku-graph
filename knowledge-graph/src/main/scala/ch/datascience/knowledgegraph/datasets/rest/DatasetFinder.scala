@@ -59,18 +59,18 @@ private class IODatasetFinder(
     }
 
   private def addCreators(baseInfo: Dataset): IO[Dataset] =
-    findCreators(baseInfo.id).map { creators =>
+    findCreators(baseInfo.id) map { creators =>
       baseInfo.copy(published = baseInfo.published.copy(creators = creators))
     }
 
   private def addParts(baseInfo: Dataset): IO[Dataset] =
-    findParts(baseInfo.id).map { parts =>
-      baseInfo.copy(part = parts)
+    findParts(baseInfo.id) map { parts =>
+      baseInfo.copy(parts = parts)
     }
 
   private def addProjects(baseInfo: Dataset): IO[Dataset] =
-    findProjects(baseInfo.id).map { projects =>
-      baseInfo.copy(project = projects)
+    findProjects(baseInfo.id) map { projects =>
+      baseInfo.copy(projects = projects)
     }
 }
 

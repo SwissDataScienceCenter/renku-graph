@@ -63,12 +63,12 @@ class IOProjectDatasetsFinder(
 
   private def addParts(baseInfo: Dataset): IO[Dataset] =
     findParts(baseInfo.id).map { parts =>
-      baseInfo.copy(part = parts)
+      baseInfo.copy(parts = parts)
     }
 
   private def addProjects(baseInfo: Dataset): IO[Dataset] =
     findProjects(baseInfo.id).map { projects =>
-      baseInfo.copy(project = projects)
+      baseInfo.copy(projects = projects)
     }
 }
 

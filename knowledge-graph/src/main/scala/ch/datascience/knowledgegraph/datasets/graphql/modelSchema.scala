@@ -34,8 +34,8 @@ object modelSchema {
             Some("Data-set description"),
             resolve                                                                                 = _.value.maybeDescription.map(_.toString)),
       Field("published", publishedType, Some("Data-set publishing info"), resolve                   = _.value.published),
-      Field("hasPart", ListType(partType), Some("Data-set files"), resolve                          = _.value.part),
-      Field("isPartOf", ListType(projectType), Some("Projects where this dataset is used"), resolve = _.value.project)
+      Field("hasPart", ListType(partType), Some("Data-set files"), resolve                          = _.value.parts),
+      Field("isPartOf", ListType(projectType), Some("Projects where this dataset is used"), resolve = _.value.projects)
     )
   )
 
@@ -72,10 +72,10 @@ object modelSchema {
     )
   )
 
-  private lazy val createdType: ObjectType[Unit, DatasetInProjectCreation] = ObjectType[Unit, DatasetInProjectCreation](
+  private lazy val createdType: ObjectType[Unit, AddedToProject] = ObjectType[Unit, AddedToProject](
     name        = "datasetCreation",
     description = "Data-set creation info",
-    fields = fields[Unit, DatasetInProjectCreation](
+    fields = fields[Unit, AddedToProject](
       Field("dateCreated", StringType, Some("Data-set creation date"), resolve             = _.value.date.toString),
       Field("agent", agentType, Some("A person who created the dataset in Renku"), resolve = _.value.agent)
     )

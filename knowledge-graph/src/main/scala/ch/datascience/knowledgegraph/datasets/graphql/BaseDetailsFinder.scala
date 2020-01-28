@@ -90,8 +90,8 @@ private object BaseDetailsFinder {
         maybeSameAs,
         maybeDescription,
         DatasetPublishing(maybePublishedDate, Set.empty),
-        part    = List.empty,
-        project = List.empty
+        parts    = List.empty,
+        projects = List.empty
       )
     }
 

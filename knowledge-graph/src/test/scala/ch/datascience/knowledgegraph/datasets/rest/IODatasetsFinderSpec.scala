@@ -370,7 +370,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     (dataset1, dataset2, dataset3)
   }
 
-  private def toDataSetCommit(dataSet: Dataset): List[JsonLD] = dataSet.project match {
+  private def toDataSetCommit(dataSet: Dataset): List[JsonLD] = dataSet.projects match {
     case firstProject +: otherProjects =>
       val createdDate = datasetCreatedDates.generateOne
       val firstJsonLd = dataSetCommit()(
@@ -441,7 +441,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       dataset.name,
       dataset.maybeDescription,
       dataset.published,
-      ProjectsCount(dataset.project.size)
+      ProjectsCount(dataset.projects.size)
     )
   }
 

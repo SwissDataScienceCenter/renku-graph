@@ -56,7 +56,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   private val dataset = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-    project          = List(DatasetProject(project.path, project.name, datasetInProjectCreations.generateOne))
+    projects         = List(DatasetProject(project.path, project.name, addedToProject.generateOne))
   )
 
   feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {

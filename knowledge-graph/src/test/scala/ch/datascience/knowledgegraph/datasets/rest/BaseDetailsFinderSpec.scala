@@ -43,8 +43,8 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
               .copy(maybeUrl = None)
               .copy(maybeSameAs = None)
               .copy(maybeDescription = None)
-              .copy(part = Nil)
-              .copy(project = Nil)
+              .copy(parts = Nil)
+              .copy(projects = Nil)
           )
         }
       }

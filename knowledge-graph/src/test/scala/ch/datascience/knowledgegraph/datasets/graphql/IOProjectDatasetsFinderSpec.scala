@@ -42,60 +42,59 @@ class IOProjectDatasetsFinderSpec
 
   "findDatasets" should {
 
-    "return all datasets of the given project" in new InMemoryStoreTestCase {
-      forAll(datasetProjects, datasets, datasetInProjectCreations, datasets, datasetInProjectCreations) {
-        (projectB, dataset1, projectBDataset1Creation, dataset2, projectBDataset2Creation) =>
-          val projectA         = datasetProjects.generateOne
-          val projectACreation = datasetInProjectCreations.generateOne
+    "return all data-sets of the given project" in new InMemoryStoreTestCase {
+      forAll(datasetProjects, datasets, addedToProject, datasets, addedToProject) {
+        (projectB, dataset1, dataset1AddedToProjectB, dataset2, dataset2AddedToProjectB) =>
+          val projectA                = datasetProjects.generateOne
+          val dataset1AddedToProjectA = addedToProject.generateOne
 
           loadToStore(
             dataSetCommit(
-              committedDate = CommittedDate(projectACreation.date.value),
-              committer     = Person(projectACreation.agent.name, projectACreation.agent.email)
+              committedDate = CommittedDate(dataset1AddedToProjectA.date.value),
+              committer     = Person(dataset1AddedToProjectA.agent.name, dataset1AddedToProjectA.agent.email)
             )(
               projectPath = projectA.path,
               projectName = projectA.name
             )(
-              dataset1.id,
-              dataset1.name,
-              dataset1.maybeUrl,
-              dataset1.maybeSameAs,
-              dataset1.maybeDescription,
-              dataset1.published.maybeDate,
-              datasetCreators = dataset1.published.creators map toPerson,
-              datasetParts    = dataset1.part.map(part => (part.name, part.atLocation))
+              datasetIdentifier         = dataset1.id,
+              datasetName               = dataset1.name,
+              maybeDatasetUrl           = dataset1.maybeUrl,
+              maybeDatasetSameAs        = dataset1.maybeSameAs,
+              maybeDatasetDescription   = dataset1.maybeDescription,
+              maybeDatasetPublishedDate = dataset1.published.maybeDate,
+              datasetCreators           = dataset1.published.creators map toPerson,
+              datasetParts              = dataset1.parts.map(part => (part.name, part.atLocation))
             ),
             dataSetCommit(
-              committedDate = CommittedDate(projectBDataset1Creation.date.value),
-              committer     = Person(projectBDataset1Creation.agent.name, projectBDataset1Creation.agent.email)
+              committedDate = CommittedDate(dataset1AddedToProjectB.date.value),
+              committer     = Person(dataset1AddedToProjectB.agent.name, dataset1AddedToProjectB.agent.email)
             )(
               projectPath = projectB.path,
               projectName = projectB.name
             )(
-              dataset1.id,
-              dataset1.name,
-              dataset1.maybeUrl,
-              dataset1.maybeSameAs,
-              dataset1.maybeDescription,
-              dataset1.published.maybeDate,
-              datasetCreators = dataset1.published.creators map toPerson,
-              datasetParts    = dataset1.part.map(part => (part.name, part.atLocation))
+              datasetName               = dataset1.name,
+              maybeDatasetUrl           = dataset1.maybeUrl,
+              maybeDatasetSameAs        = dataset1.maybeSameAs,
+              maybeDatasetDescription   = dataset1.maybeDescription,
+              maybeDatasetPublishedDate = dataset1.published.maybeDate,
+              datasetCreators           = dataset1.published.creators map toPerson,
+              datasetParts              = dataset1.parts.map(part => (part.name, part.atLocation))
             ),
             dataSetCommit(
-              committedDate = CommittedDate(projectBDataset2Creation.date.value),
-              committer     = Person(projectBDataset2Creation.agent.name, projectBDataset2Creation.agent.email)
+              committedDate = CommittedDate(dataset2AddedToProjectB.date.value),
+              committer     = Person(dataset2AddedToProjectB.agent.name, dataset2AddedToProjectB.agent.email)
             )(
               projectPath = projectB.path,
               projectName = projectB.name
             )(
-              dataset2.id,
-              dataset2.name,
-              dataset2.maybeUrl,
-              dataset2.maybeSameAs,
-              dataset2.maybeDescription,
-              dataset2.published.maybeDate,
-              datasetCreators = dataset2.published.creators map toPerson,
-              datasetParts    = dataset2.part.map(part => (part.name, part.atLocation))
+              datasetIdentifier         = dataset2.id,
+              datasetName               = dataset2.name,
+              maybeDatasetUrl           = dataset2.maybeUrl,
+              maybeDatasetSameAs        = dataset2.maybeSameAs,
+              maybeDatasetDescription   = dataset2.maybeDescription,
+              maybeDatasetPublishedDate = dataset2.published.maybeDate,
+              datasetCreators           = dataset2.published.creators map toPerson,
+              datasetParts              = dataset2.parts.map(part => (part.name, part.atLocation))
             )
           )
 
@@ -103,13 +102,15 @@ class IOProjectDatasetsFinderSpec
 
           foundDatasets should contain theSameElementsAs List(
             dataset1.copy(
-              part = dataset1.part sorted byPartName,
-              project = List(DatasetProject(projectB.path, projectB.name, projectBDataset1Creation),
-                             DatasetProject(projectA.path, projectA.name, projectACreation)) sorted byProjectName
+              parts = dataset1.parts sorted byPartName,
+              projects = List(
+                DatasetProject(projectB.path, projectB.name, dataset1AddedToProjectB),
+                DatasetProject(projectA.path, projectA.name, dataset1AddedToProjectA)
+              ) sorted byProjectName
             ),
             dataset2.copy(
-              part    = dataset2.part sorted byPartName,
-              project = List(DatasetProject(projectB.path, projectB.name, projectBDataset2Creation)) sorted byProjectName
+              parts    = dataset2.parts sorted byPartName,
+              projects = List(DatasetProject(projectB.path, projectB.name, dataset2AddedToProjectB)) sorted byProjectName
             )
           )
       }

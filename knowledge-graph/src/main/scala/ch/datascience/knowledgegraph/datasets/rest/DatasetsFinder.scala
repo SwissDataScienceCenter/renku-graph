@@ -225,7 +225,7 @@ private class IODatasetsFinder(
       case _ =>
         s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
-            |  {
+            |  { # finding datasets having the same sameAs but not pointing to a dataset id from a renku project
             |    ?datasetId schema:dateCreated ?earliestCreated ;
             |               schema:sameAs/schema:url ?sameAs ;
             |               schema:name ?name ;
@@ -246,7 +246,7 @@ private class IODatasetsFinder(
             |      }
             |      GROUP BY ?sameAs
             |    }
-            |  } UNION {
+            |  } UNION { # finding datasets having the sameAs pointing to a dataset from a renku project
             |    ?dsId schema:name ?name ;
             |          schema:identifier ?identifier .
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
@@ -260,7 +260,7 @@ private class IODatasetsFinder(
             |      }
             |      GROUP BY ?dsId
             |    }
-            |  } UNION {
+            |  } UNION { # finding datasets having no sameAs set and not imported to another projects
             |    ?dsId schema:name ?name ;
             |          schema:identifier ?identifier .
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .

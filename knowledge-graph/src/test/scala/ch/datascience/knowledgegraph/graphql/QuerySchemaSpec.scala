@@ -180,8 +180,8 @@ class QuerySchemaSpec
           "datePublished": ${dataset.published.maybeDate.map(_.toString).map(Json.fromString).getOrElse(Json.Null)},
           "creator": ${dataset.published.creators.toList}
         },
-        "hasPart": ${dataset.part},
-        "isPartOf": ${dataset.project}
+        "hasPart": ${dataset.parts},
+        "isPartOf": ${dataset.projects}
       }"""
     // format: on
 

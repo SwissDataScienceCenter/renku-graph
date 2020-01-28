@@ -31,15 +31,15 @@ object model {
                            maybeSameAs:      Option[SameAs],
                            maybeDescription: Option[Description],
                            published:        DatasetPublishing,
-                           part:             List[DatasetPart],
-                           project:          List[DatasetProject])
+                           parts:            List[DatasetPart],
+                           projects:         List[DatasetProject])
 
   final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])
   final case class DatasetCreator(maybeEmail:   Option[Email], name:             UserName, maybeAffiliation: Option[Affiliation])
 
   final case class DatasetPart(name: PartName, atLocation: PartLocation)
 
-  final case class DatasetProject(path:           ProjectPath, name:           projects.Name, created: DatasetInProjectCreation)
-  final case class DatasetInProjectCreation(date: DateCreatedInProject, agent: DatasetAgent)
-  final case class DatasetAgent(email:            Email, name:                 UserName)
+  final case class DatasetProject(path: ProjectPath, name:           projects.Name, created: AddedToProject)
+  final case class AddedToProject(date: DateCreatedInProject, agent: DatasetAgent)
+  final case class DatasetAgent(email:  Email, name:                 UserName)
 }

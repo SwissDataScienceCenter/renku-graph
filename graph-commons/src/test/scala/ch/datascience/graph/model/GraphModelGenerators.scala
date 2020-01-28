@@ -49,7 +49,7 @@ object GraphModelGenerators {
   } yield ProjectResource.from(s"$url/projects/$path").fold(throw _, identity)
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
-  implicit val datasetIds: Gen[Identifier] = Gen
+  implicit val datasetIdentifiers: Gen[Identifier] = Gen
     .oneOf(
       uuid.map(_.toString),
       for {

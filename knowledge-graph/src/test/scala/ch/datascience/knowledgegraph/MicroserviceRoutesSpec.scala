@@ -178,7 +178,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     s"define a GET /knowledge-graph/datasets/:id endpoint returning $Ok when valid :id path parameter given" in new TestCase {
-      val id = datasetIds.generateOne
+      val id = datasetIdentifiers.generateOne
 
       (datasetsEndpoint.getDataset _).expects(id).returning(IO.pure(Response[IO](Ok)))
 
@@ -190,7 +190,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     s"define a GET /knowledge-graph/datasets/:id endpoint returning $ServiceUnavailable when no :id path parameter given" in new TestCase {
-      val id = datasetIds.generateOne
+      val id = datasetIdentifiers.generateOne
 
       val response = routes.call(
         Request(Method.GET, uri"knowledge-graph/datasets/")
@@ -200,7 +200,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     "define a GET /knowledge-graph/graphql endpoint" in new TestCase {
-      val id = datasetIds.generateOne
+      val id = datasetIdentifiers.generateOne
 
       (queryEndpoint.schema _).expects().returning(IO.pure(Response[IO](Ok)))
 
@@ -212,7 +212,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     "define a POST /knowledge-graph/graphql endpoint" in new TestCase {
-      val id = datasetIds.generateOne
+      val id = datasetIdentifiers.generateOne
 
       val request: Request[IO] = Request(Method.POST, uri"knowledge-graph/graphql")
       (queryEndpoint.handleQuery _).expects(request).returning(IO.pure(Response[IO](Ok)))

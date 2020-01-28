@@ -51,19 +51,19 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
   private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project          = projects.generateOne.copy(path = ProjectPath("namespace/datasets-project"))
   private val projectName      = projectNames.generateOne
-  private val dataset1Creation = datasetInProjectCreations.generateOne
+  private val dataset1Creation = addedToProject.generateOne
   private val dataset1CommitId = commitIds.generateOne
   private val dataset1 = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-    project          = List(DatasetProject(project.path, projectName, dataset1Creation))
+    projects         = List(DatasetProject(project.path, projectName, dataset1Creation))
   )
-  private val dataset2Creation = datasetInProjectCreations.generateOne
+  private val dataset2Creation = addedToProject.generateOne
   private val dataset2CommitId = commitIds.generateOne
   private val dataset2 = datasets.generateOne.copy(
     maybeDescription = None,
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = None),
-    project          = List(DatasetProject(project.path, projectName, dataset2Creation))
+    projects         = List(DatasetProject(project.path, projectName, dataset2Creation))
   )
 
   feature("GraphQL query to find project's datasets") {
@@ -86,7 +86,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
           maybeDatasetDescription   = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
           datasetCreators           = dataset1.published.creators.map(toPerson),
-          datasetParts              = dataset1.part.map(part => (part.name, part.atLocation))
+          datasetParts              = dataset1.parts.map(part => (part.name, part.atLocation))
         ),
         dataSetCommit(
           commitId      = dataset2CommitId,
@@ -102,7 +102,7 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
           maybeDatasetDescription   = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
           datasetCreators           = dataset2.published.creators.map(toPerson),
-          datasetParts              = dataset2.part.map(part => (part.name, part.atLocation))
+          datasetParts              = dataset2.parts.map(part => (part.name, part.atLocation))
         )
       )
 
@@ -206,8 +206,8 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         "datePublished": ${dataset.published.maybeDate.map(_.asJson).getOrElse(Json.Null)},
         "creator": ${dataset.published.creators.toList}
       },
-      "hasPart": ${dataset.part},
-      "isPartOf": ${dataset.project}
+      "hasPart": ${dataset.parts},
+      "isPartOf": ${dataset.projects}
     }"""
   // format: on
 

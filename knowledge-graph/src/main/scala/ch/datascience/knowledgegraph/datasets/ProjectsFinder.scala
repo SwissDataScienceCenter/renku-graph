@@ -47,47 +47,105 @@ private class ProjectsFinder(
     queryExpecting[List[DatasetProject]](using = query(identifier))
 
   private def query(identifier: Identifier): String =
-    s"""
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       |PREFIX schema: <http://schema.org/>
-       |PREFIX prov: <http://www.w3.org/ns/prov#>
-       |
-       |SELECT DISTINCT ?isPartOf ?name ?minDateCreated ?agentEmail ?agentName
-       |WHERE {
-       |  {
-       |    SELECT DISTINCT ?isPartOf (MIN(?dataset) as ?datasetResource) (MIN(?dateCreated) as ?minDateCreated)
-       |    WHERE {
-       |      ?dataset rdf:type <http://schema.org/Dataset> ;
-       |               (prov:qualifiedGeneration/prov:activity) ?activity .
-       |      ?activity schema:isPartOf ?isPartOf ;
-       |		            prov:startedAtTime ?dateCreated .
-       |      {
-       |        SELECT ?dataset ?isPartOf
-       |        WHERE {
-       |          ?dataset schema:identifier "$identifier" ;
-       |                   rdf:type <http://schema.org/Dataset> ;
-       |                   schema:isPartOf ?isPartOf .
-       |        }
-       |      }
-       |    }
-       |    GROUP BY ?isPartOf
-       |  }
-       |  {
-       |    ?datasetResource rdf:type <http://schema.org/Dataset> ;
-       |                     (prov:qualifiedGeneration/prov:activity) ?activity .
-       |    ?activity schema:isPartOf ?isPartOf ;
-       |		          prov:startedAtTime ?minDateCreated ;
-       |		          prov:agent ?agentResource .
-       |    ?agentResource rdf:type <http://schema.org/Person> ;
-       |                   schema:email ?agentEmail ;
-       |                   schema:name ?agentName .
-       |    ?isPartOf rdf:type <http://schema.org/Project> ;
-       |              schema:name ?name .
-       |  }
-       |}
-       |ORDER BY ASC(?name)
-       |""".stripMargin
+    s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        |PREFIX schema: <http://schema.org/>
+        |PREFIX prov: <http://www.w3.org/ns/prov#>
+        |
+        |SELECT ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
+        |WHERE {
+        |  { # finding datasets having the same sameAs but not pointing to a dataset id from a renku project
+        |    ?dsId rdf:type <http://schema.org/Dataset> ;
+        |          schema:sameAs/schema:url ?sameAs ;
+        |          schema:isPartOf ?projectId {
+        |            SELECT ?sameAs ?projectId (MIN(?dateCreated) AS ?minDateCreated)
+        |            WHERE {
+        |              ?dsId rdf:type <http://schema.org/Dataset> ;
+        |                    schema:sameAs/schema:url ?sameAs {
+        |                      SELECT ?sameAs
+        |                      WHERE {
+        |                        ?datasetId schema:identifier "$identifier" ;
+        |                                   rdf:type <http://schema.org/Dataset> ;
+        |                                   schema:sameAs/schema:url ?sameAs .
+        |                      }
+        |                      GROUP BY ?sameAs
+        |                    }
+        |              FILTER NOT EXISTS {
+        |                ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
+        |                  ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
+        |                  FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
+        |                }
+        |              }
+        |              ?dsId schema:isPartOf ?projectId ;
+        |                    prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated
+        |            }
+        |            GROUP BY ?sameAs ?projectId
+        |            HAVING (MIN(?dateCreated) != 0)
+        |          }
+        |    ?dsId prov:qualifiedGeneration/prov:activity ?activityId .
+        |    ?projectId rdf:type <http://schema.org/Project> ;
+        |               schema:name ?projectName .
+        |    ?activityId prov:startedAtTime ?minDateCreated ;
+        |                prov:agent ?agentId .
+        |    ?agentId rdf:type <http://schema.org/Person> ;
+        |             schema:email ?agentEmail ;
+        |             schema:name ?agentName .
+        |  } UNION { # finding datasets having the sameAs pointing to a dataset from a renku project
+        |    SELECT ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
+        |    WHERE {
+        |      {
+        |        ?derivedDsId schema:sameAs/schema:url ?dsId {
+        |          ?dsId rdf:type <http://schema.org/Dataset> ;
+        |                schema:identifier "$identifier" .
+        |          FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+        |        }
+        |      } {
+        |        ?dsId rdf:type <http://schema.org/Dataset> ;
+        |              schema:isPartOf ?projectId ;
+        |              prov:qualifiedGeneration/prov:activity ?activityId .
+        |        ?projectId rdf:type <http://schema.org/Project> ;
+        |                   schema:name ?projectName .
+        |        ?activityId prov:startedAtTime ?minDateCreated ;
+        |                    prov:agent ?agentId .
+        |        ?agentId rdf:type <http://schema.org/Person> ;
+        |                 schema:email ?agentEmail ;
+        |                 schema:name ?agentName .
+        |      } UNION {
+        |        ?derivedDsId rdf:type <http://schema.org/Dataset> ;
+        |                     schema:sameAs/schema:url ?dsId ;
+        |                     schema:isPartOf ?projectId ;
+        |                     prov:qualifiedGeneration/prov:activity ?activityId .
+        |        ?projectId rdf:type <http://schema.org/Project> ;
+        |                   schema:name ?projectName .
+        |        ?activityId prov:startedAtTime ?minDateCreated ;
+        |                    prov:agent ?agentId .
+        |        ?agentId rdf:type <http://schema.org/Person> ;
+        |                 schema:email ?agentEmail ;
+        |                 schema:name ?agentName .
+        |      }
+        |    }
+        |  } UNION { # finding datasets having no sameAs set and not imported to another projects
+        |    SELECT ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
+        |    WHERE {
+        |        ?dsId schema:identifier "$identifier" .
+        |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+        |        FILTER NOT EXISTS { ?derivedDsId schema:sameAs/schema:url ?dsId } .
+        |        ?dsId rdf:type <http://schema.org/Dataset> ;
+        |              schema:isPartOf ?projectId ;
+        |              prov:qualifiedGeneration/prov:activity ?activityId .
+        |        ?projectId rdf:type <http://schema.org/Project> ;
+        |                   schema:name ?projectName .
+        |        ?activityId prov:startedAtTime ?minDateCreated ;
+        |                prov:agent ?agentId .
+        |        ?agentId rdf:type <http://schema.org/Person> ;
+        |                 schema:email ?agentEmail ;
+        |                 schema:name ?agentName .
+        |    }
+        |  }
+        |}
+        |GROUP BY ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
+        |ORDER BY ASC(?projectName)
+        |""".stripMargin
 }
 
 private object ProjectsFinder {
@@ -106,12 +164,12 @@ private object ProjectsFinder {
 
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
-        path        <- cursor.downField("isPartOf").downField("value").as[ProjectResource].flatMap(toProjectPath)
-        name        <- cursor.downField("name").downField("value").as[projects.Name]
+        path        <- cursor.downField("projectId").downField("value").as[ProjectResource].flatMap(toProjectPath)
+        name        <- cursor.downField("projectName").downField("value").as[projects.Name]
         dateCreated <- cursor.downField("minDateCreated").downField("value").as[DateCreatedInProject]
         agentEmail  <- cursor.downField("agentEmail").downField("value").as[Email]
         agentName   <- cursor.downField("agentName").downField("value").as[UserName]
-      } yield DatasetProject(path, name, DatasetInProjectCreation(dateCreated, DatasetAgent(agentEmail, agentName)))
+      } yield DatasetProject(path, name, AddedToProject(dateCreated, DatasetAgent(agentEmail, agentName)))
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetProject])
