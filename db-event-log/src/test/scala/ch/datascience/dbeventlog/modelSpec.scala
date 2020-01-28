@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -36,7 +36,7 @@ class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
       "NEW"                     -> New,
       "PROCESSING"              -> Processing,
       "TRIPLES_STORE"           -> TriplesStore,
-      "TRIPLES_STORE_FAILURE"   -> TriplesStoreFailure,
+      "RECOVERABLE_FAILURE"     -> RecoverableFailure,
       "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
     )
 

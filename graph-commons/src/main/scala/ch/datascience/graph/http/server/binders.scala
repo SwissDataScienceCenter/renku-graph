@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,8 +20,6 @@ package ch.datascience.graph.http.server
 
 import ch.datascience.graph.model.events.{ProjectId => ProjectIdType}
 import ch.datascience.graph.model.projects.{ProjectPath => ProjectPathType}
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 import scala.util.Try
 
@@ -37,24 +35,7 @@ object binders {
 
   object ProjectPath {
 
-    class Namespace private (val value: String) extends AnyVal with StringTinyType
-    object Namespace {
-
-      private object NamespaceFactory extends TinyTypeFactory[Namespace](new Namespace(_)) with NonBlank
-
-      def unapply(value: String): Option[Namespace] = NamespaceFactory.from(value).toOption
-
-      implicit class NamespaceOps(namespace: Namespace) {
-        def /(name: Name): ProjectPathType = ProjectPathType(s"$namespace/$name")
-      }
-    }
-
-    class Name private (val value: String) extends AnyVal with StringTinyType
-    object Name {
-
-      private object NameFactory extends TinyTypeFactory[Name](new Name(_)) with NonBlank
-
-      def unapply(value: String): Option[Name] = NameFactory.from(value).toOption
-    }
+    def unapply(value: String): Option[ProjectPathType] =
+      ProjectPathType.from(value).toOption
   }
 }

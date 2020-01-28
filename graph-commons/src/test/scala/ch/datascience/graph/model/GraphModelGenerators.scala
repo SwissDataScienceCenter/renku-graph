@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,19 +20,33 @@ package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.{FilePath, FullProjectPath, ProjectPath}
+import ch.datascience.graph.model.projects.{FilePath, ProjectPath, ProjectResource}
+import eu.timepit.refined.auto._
 import org.scalacheck.Gen
-import org.scalacheck.Gen.uuid
+import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf, uuid}
 
 object GraphModelGenerators {
 
   implicit val projectNames:        Gen[projects.Name]        = nonEmptyStrings() map projects.Name.apply
-  implicit val projectPaths:        Gen[ProjectPath]          = relativePaths(minSegments = 2, maxSegments = 2) map ProjectPath.apply
   implicit val projectCreatedDates: Gen[projects.DateCreated] = timestampsNotInTheFuture map projects.DateCreated.apply
-  implicit val fullProjectPaths: Gen[FullProjectPath] = for {
-    url  <- httpUrls
+  implicit val projectPaths: Gen[ProjectPath] = {
+    val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> const('_'))
+    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf('_', '.', '-'))
+    val partsGenerator = for {
+      firstChar  <- firstCharGen
+      otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
+    } yield s"$firstChar${otherChars.toList.mkString("")}"
+
+    relativePaths(
+      minSegments    = 2,
+      maxSegments    = 5,
+      partsGenerator = partsGenerator
+    ) map ProjectPath.apply
+  }
+  implicit val projectResources: Gen[ProjectResource] = for {
+    url  <- httpUrls()
     path <- projectPaths
-  } yield FullProjectPath.from(s"$url/projects/$path").fold(throw _, identity)
+  } yield ProjectResource.from(s"$url/projects/$path").fold(throw _, identity)
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIds: Gen[Identifier] = Gen
@@ -50,6 +64,8 @@ object GraphModelGenerators {
   implicit val datasetUrls:           Gen[Url]           = validatedUrls map (_.value) map Url.apply
   implicit val datasetSameAs:         Gen[SameAs]        = validatedUrls map (_.value) map SameAs.apply
   implicit val datasetPublishedDates: Gen[PublishedDate] = localDatesNotInTheFuture map PublishedDate.apply
+  implicit val datasetCreatedDates:   Gen[DateCreated]   = timestampsNotInTheFuture map DateCreated.apply
+  implicit val datasetKeywords:       Gen[Keyword]       = nonBlankStrings() map (_.value) map Keyword.apply
   implicit val datasetPartNames:      Gen[PartName]      = nonEmptyStrings() map PartName.apply
   implicit val datasetPartLocations: Gen[PartLocation] =
     relativePaths(minSegments = 2, maxSegments = 2)

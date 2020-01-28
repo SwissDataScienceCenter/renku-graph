@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -48,6 +48,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
 import io.circe.{Decoder, HCursor, Json}
+import io.renku.jsonld.JsonLD
 import org.apache.jena.fuseki.FusekiException
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdf.model.ModelFactory
@@ -148,9 +149,11 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
 
   before {
-    dataset.asDatasetGraph().clear()
+    clearDataset()
     dataset.asDatasetGraph().isEmpty shouldBe true
   }
+
+  def clearDataset(): Unit = dataset.asDatasetGraph().clear()
 
   protected override def afterAll(): Unit = {
     rdfStoreServer.stop()
@@ -181,6 +184,22 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
       .unsafeRunSync()
 
+  protected def loadToStore(jsonLDs: JsonLD*): Unit =
+    rdfConnectionResource
+      .use { connection =>
+        IO {
+          connection.load {
+            val model = ModelFactory.createDefaultModel()
+            RDFDataMgr.read(model,
+                            new ByteArrayInputStream(Json.arr(jsonLDs.map(_.toJson): _*).noSpaces.getBytes(UTF_8)),
+                            null,
+                            Lang.JSONLD)
+            model
+          }
+        }
+      }
+      .unsafeRunSync()
+
   private val queryRunner = new IORdfStoreClient(rdfStoreConfig, TestLogger()) {
 
     import cats.implicits._
@@ -197,7 +216,6 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
            |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
            |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
            |PREFIX schema: <http://schema.org/>
-           |PREFIX dcterms: <http://purl.org/dc/terms/>
            |
            |$query""".stripMargin
       }
@@ -213,7 +231,6 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
            |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
            |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
            |PREFIX schema: <http://schema.org/>
-           |PREFIX dcterms: <http://purl.org/dc/terms/>
            |
            |$query""".stripMargin
       }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,7 +21,6 @@ package ch.datascience.tokenrepository.repository.init
 import cats.effect._
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 
@@ -29,13 +28,22 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class DbInitializer[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, ProjectsTokensDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+    projectPathAdder: ProjectPathAdder[Interpretation],
+    transactor:       DbTransactor[Interpretation, ProjectsTokensDB],
+    logger:           Logger[Interpretation]
+)(implicit ME:        Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
-  def run: Interpretation[ExitCode] = {
+  def run: Interpretation[Unit] = {
+    for {
+      _ <- createTable
+      _ <- projectPathAdder.run
+      _ <- logger.info("Projects Tokens database initialization success")
+    } yield ()
+  } recoverWith logging
+
+  private def createTable: Interpretation[Unit] =
     sql"""
          |CREATE TABLE IF NOT EXISTS projects_tokens(
          | project_id int4 PRIMARY KEY,
@@ -43,23 +51,25 @@ class DbInitializer[Interpretation[_]](
          |);
        """.stripMargin.update.run
       .transact(transactor.get)
-      .map { _ =>
-        logger.info("Projects Tokens database initialization success")
-        ExitCode.Success
-      }
-  } recoverWith logging
+      .map(_ => ())
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[ExitCode]] = {
+  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
       logger.error(exception)("Projects Tokens database initialization failure")
       ME.raiseError(exception)
   }
 }
 
-class IODbInitializer(
-    transactor:          DbTransactor[IO, ProjectsTokensDB]
-)(implicit contextShift: ContextShift[IO])
-    extends DbInitializer[IO](
-      transactor,
-      ApplicationLogger
-    )
+object IODbInitializer {
+  import scala.concurrent.ExecutionContext
+
+  def apply(
+      transactor:              DbTransactor[IO, ProjectsTokensDB],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[DbInitializer[IO]] =
+    for {
+      pathAdder <- IOProjectPathAdder(transactor, logger)
+    } yield new DbInitializer[IO](pathAdder, transactor, logger)
+}

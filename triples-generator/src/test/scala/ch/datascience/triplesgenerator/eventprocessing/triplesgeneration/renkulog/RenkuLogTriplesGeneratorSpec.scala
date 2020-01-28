@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,6 +21,8 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 import java.io.InputStream
 
 import ammonite.ops.{CommandResult, root}
+import cats.data.EitherT
+import cats.data.EitherT.rightT
 import cats.effect.{ContextShift, IO}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.CommonGraphGenerators._
@@ -32,6 +34,7 @@ import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -64,7 +67,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(IO.pure(successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
 
       (git
         .checkout(_: CommitId, _: Path))
@@ -77,12 +80,14 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(triples))
 
       (file
-        .delete(_: Path))
+        .deleteDirectory(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync() shouldBe triples
+      triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync() shouldBe Right(
+        triples
+      )
     }
 
     "create a temp directory, " +
@@ -105,7 +110,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(IO.pure(successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
 
       (git
         .checkout(_: CommitId, _: Path))
@@ -119,12 +124,43 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(triples))
 
       (file
-        .delete(_: Path))
+        .deleteDirectory(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithParent, maybeAccessToken).unsafeRunSync() shouldBe triples
+      triplesGenerator.generateTriples(commitWithParent, maybeAccessToken).value.unsafeRunSync() shouldBe Right(triples)
+    }
+
+    s"return $GenerationRecoverableError if cloning the repo returns such error" in new TestCase {
+
+      (file
+        .mkdir(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
+
+      val accessToken                    = accessTokens.generateOne
+      override lazy val maybeAccessToken = Some(accessToken)
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
+
+      val exception = GenerationRecoverableError(nonBlankStrings().generateOne.value)
+      (git
+        .clone(_: ServiceUrl, _: Path, _: Path))
+        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(EitherT.leftT[IO, CommandResult](exception))
+
+      (file
+        .deleteDirectory(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
+
+      triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync() shouldBe Left(
+        exception
+      )
     }
 
     "fail if temp directory creation fails" in new TestCase {
@@ -136,7 +172,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.raiseError(exception))
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -156,13 +192,13 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.raiseError(exception))
 
       (file
-        .delete(_: Path))
+        .deleteDirectory(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.unit)
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -186,16 +222,16 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(IO.raiseError(exception))
+        .returning(EitherT.liftF[IO, GenerationRecoverableError, CommandResult](IO.raiseError(exception)))
 
       (file
-        .delete(_: Path))
+        .deleteDirectory(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.unit)
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
       }
 
       actual.getMessage should startWith("Triples generation failed: ")
@@ -219,7 +255,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(IO.pure(successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
 
       val exception = exceptions.generateOne
       (git
@@ -228,13 +264,13 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.raiseError(exception))
 
       (file
-        .delete(_: Path))
+        .deleteDirectory(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.unit)
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -255,7 +291,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(IO.pure(successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
 
       (git
         .checkout(_: CommitId, _: Path))
@@ -269,13 +305,13 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.raiseError(exception))
 
       (file
-        .delete(_: Path))
+        .deleteDirectory(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.unit)
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -296,7 +332,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(IO.pure(successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
 
       (git
         .checkout(_: CommitId, _: Path))
@@ -310,13 +346,13 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (file
-        .delete(_: Path))
+        .deleteDirectory(_: Path))
         .expects(repositoryDirectory)
         .returning(IO.raiseError(exception))
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception

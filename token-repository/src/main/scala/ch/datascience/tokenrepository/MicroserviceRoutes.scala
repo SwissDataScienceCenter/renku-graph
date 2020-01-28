@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,8 +18,10 @@
 
 package ch.datascience.tokenrepository
 
-import cats.effect.ConcurrentEffect
-import ch.datascience.graph.http.server.binders.ProjectId
+import cats.effect.{Clock, ConcurrentEffect}
+import cats.implicits._
+import ch.datascience.graph.http.server.binders.{ProjectId, ProjectPath}
+import ch.datascience.metrics.RoutesMetrics
 import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint
@@ -31,7 +33,9 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     fetchTokenEndpoint:     FetchTokenEndpoint[F],
     associateTokenEndpoint: AssociateTokenEndpoint[F],
     deleteTokenEndpoint:    DeleteTokenEndpoint[F]
-) extends Http4sDsl[F] {
+)(implicit clock:           Clock[F])
+    extends Http4sDsl[F]
+    with RoutesMetrics {
 
   import associateTokenEndpoint._
   import deleteTokenEndpoint._
@@ -39,11 +43,12 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import org.http4s.HttpRoutes
 
   // format: off
-  lazy val routes: HttpRoutes[F] = HttpRoutes.of[F] {
-    case           GET    -> Root / "ping"                                       => Ok("pong")
-    case           GET    -> Root / "projects" / ProjectId(projectId) / "tokens" => fetchToken(projectId)
-    case request @ PUT    -> Root / "projects" / ProjectId(projectId) / "tokens" => associateToken(projectId, request)
-    case           DELETE -> Root / "projects" / ProjectId(projectId) / "tokens" => deleteToken(projectId)
-  }
+  lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
+    case           GET    -> Root / "ping"                                           => Ok("pong")
+    case           GET    -> Root / "projects" / ProjectId(projectId) / "tokens"     => fetchToken(projectId)
+    case           GET    -> Root / "projects" / ProjectPath(projectPath) / "tokens" => fetchToken(projectPath)
+    case request @ PUT    -> Root / "projects" / ProjectId(projectId) / "tokens"     => associateToken(projectId, request)
+    case           DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => deleteToken(projectId)
+  }.meter flatMap `add GET Root / metrics`[F]
   // format: on
 }

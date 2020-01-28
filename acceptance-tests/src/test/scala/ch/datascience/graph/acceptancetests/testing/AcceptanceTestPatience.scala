@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,7 +24,7 @@ import org.scalatest.time.{Millis, Seconds, Span}
 trait AcceptanceTestPatience extends AbstractPatienceConfiguration {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout  = scaled(Span(50, Seconds)),
-    interval = scaled(Span(300, Millis))
+    timeout  = scaled(Span(90, Seconds)),
+    interval = scaled(Span(1000, Millis))
   )
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,7 +35,7 @@ object DbEventLogGenerators {
     New,
     Processing,
     TriplesStore,
-    TriplesStoreFailure,
+    RecoverableFailure,
     NonRecoverableFailure
   )
   implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply

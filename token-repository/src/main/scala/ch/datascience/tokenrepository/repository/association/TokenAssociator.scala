@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,35 +19,54 @@
 package ch.datascience.tokenrepository.repository.association
 
 import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
+import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
+import io.chrisdavenport.log4cats.Logger
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private class TokenAssociator[Interpretiation[_]](
+    projectPathFinder:    ProjectPathFinder[Interpretiation],
     accessTokenCrypto:    AccessTokenCrypto[Interpretiation],
-    associationPersister: AssociationPersister[Interpretiation]
+    associationPersister: AssociationPersister[Interpretiation],
+    tokenRemover:         TokenRemover[Interpretiation]
 )(implicit ME:            MonadError[Interpretiation, Throwable]) {
 
   import accessTokenCrypto._
   import associationPersister._
+  import projectPathFinder._
 
   def associate(projectId: ProjectId, token: AccessToken): Interpretiation[Unit] =
+    findProjectPath(projectId, Some(token)) flatMap {
+      case Some(projectPath) => encryptAndPersist(projectId, projectPath, token)
+      case None              => tokenRemover delete projectId
+    }
+
+  private def encryptAndPersist(projectId: ProjectId, projectPath: ProjectPath, token: AccessToken) =
     for {
       encryptedToken <- encrypt(token)
-      _              <- persistAssociation(projectId, encryptedToken)
+      _              <- persistAssociation(projectId, projectPath, encryptedToken)
     } yield ()
 }
 
 private object IOTokenAssociator {
   def apply(
-      transactor:          DbTransactor[IO, ProjectsTokensDB]
-  )(implicit contextShift: ContextShift[IO]): IO[TokenAssociator[IO]] =
+      transactor:              DbTransactor[IO, ProjectsTokensDB],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[TokenAssociator[IO]] =
     for {
+      pathFinder        <- IOProjectPathFinder(logger)
       accessTokenCrypto <- AccessTokenCrypto[IO]()
-    } yield new TokenAssociator[IO](accessTokenCrypto, new IOAssociationPersister(transactor))
+      persister    = new IOAssociationPersister(transactor)
+      tokenRemover = new TokenRemover[IO](transactor)
+    } yield new TokenAssociator[IO](pathFinder, accessTokenCrypto, persister, tokenRemover)
 }

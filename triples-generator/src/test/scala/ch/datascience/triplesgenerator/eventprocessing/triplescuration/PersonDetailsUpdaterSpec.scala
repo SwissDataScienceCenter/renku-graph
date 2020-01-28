@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,8 +25,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, Id, Name}
-import ch.datascience.rdfstore.triples._
-import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
+import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.PersonDetailsUpdater.{Person => UpdatePerson, _}
@@ -34,6 +34,7 @@ import eu.timepit.refined.auto._
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root
 import io.circe.{Decoder, Encoder, Json}
+import io.renku.jsonld.syntax._
 import monocle.function.Plated
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -51,19 +52,20 @@ class PersonDetailsUpdaterSpec extends WordSpec {
       val projectCreatorEmail = emails.generateOne
       val committerName       = names.generateOne
       val committerEmail      = emails.generateOne
-      val datasetCreatorsSet = nonEmptyList(datasetCreators, minElements = 5, maxElements = 10)
+      val datasetCreatorsSet = nonEmptyList(entities.Person.persons, minElements = 5, maxElements = 10)
         .retryUntil(atLeastOneWithoutEmail)
         .generateOne
         .toList
         .toSet
       val jsonTriples = JsonLDTriples {
-        singleFileAndCommitWithDataset(
-          projectPath          = projectPaths.generateOne,
-          projectCreator       = projectCreatorName -> projectCreatorEmail,
-          committerName        = committerName,
-          committerEmail       = committerEmail,
-          maybeDatasetCreators = datasetCreatorsSet
-        )
+        dataSetCommit(
+          committer = entities.Person(committerName, committerEmail)
+        )(
+          projectPath    = projectPaths.generateOne,
+          projectCreator = entities.Person(projectCreatorName, projectCreatorEmail)
+        )(
+          datasetCreators = datasetCreatorsSet
+        ).toJson
       }
 
       val allPersons = jsonTriples.collectAllPersons
@@ -77,13 +79,11 @@ class PersonDetailsUpdaterSpec extends WordSpec {
       curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
 
       curatedTriples.updates should contain theSameElementsAs prepareUpdates(
-        datasetCreatorsSet.map(maybeUpdatePerson).flatten + updatePerson(
-          projectCreatorName,
-          projectCreatorEmail
-        ) + updatePerson(
-          committerName,
-          committerEmail
-        )
+        (
+          datasetCreatorsSet.map(maybeUpdatePerson) +
+            maybeUpdatePerson(entities.Person(projectCreatorName, projectCreatorEmail)) +
+            maybeUpdatePerson(entities.Person(committerName, committerEmail))
+        ).flatten
       )
     }
   }
@@ -123,17 +123,14 @@ class PersonDetailsUpdaterSpec extends WordSpec {
                             maybeEmail:       Option[Email],
                             maybeAffiliation: Option[Affiliation])
 
-  private lazy val maybeUpdatePerson: ((Name, Option[Email], Option[Affiliation])) => Option[UpdatePerson] = {
-    case (name, maybeEmail, _) => maybeEmail map (updatePerson(name, _))
+  private lazy val maybeUpdatePerson: entities.Person => Option[UpdatePerson] = { person =>
+    person.maybeEmail map { email =>
+      val entityId = person.asJsonLD.entityId getOrElse (throw new Exception(s"Cannot find entity id for $person"))
+      UpdatePerson(Id(entityId.toString), Set(person.name), Set(email))
+    }
   }
-  private def updatePerson(name: Name, email: Email) = UpdatePerson(
-    Id(entities.Person.Id(Some(email)).value),
-    Set(name),
-    Set(email)
-  )
 
-  private lazy val atLeastOneWithoutEmail: NonEmptyList[(Name, Option[Email], Option[Affiliation])] => Boolean =
-    _.exists(_._2.isEmpty)
+  private lazy val atLeastOneWithoutEmail: NonEmptyList[entities.Person] => Boolean = _.exists(_.maybeEmail.isEmpty)
 
   private lazy val blankIds:       Person => Boolean = _.id.value startsWith "_"
   private lazy val noEmailAndName: Person => Person  = _.copy(maybeName = None, maybeEmail = None)

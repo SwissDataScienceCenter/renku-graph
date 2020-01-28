@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,57 +20,26 @@ package ch.datascience.graph.http.server
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 class ProjectPathBinderSpec extends WordSpec {
 
-  import binders.ProjectPath._
+  import binders._
 
-  "Namespace.unapply" should {
+  "unapply" should {
 
-    "convert valid namespace as string to a Namespace" in {
-      val namespaceValue = relativePaths(maxSegments = 1).generateOne
+    "convert valid project path as string to a ProjectPath" in {
+      val projectPath = projectPaths.generateOne
 
-      val Some(namespace) = Namespace.unapply(namespaceValue)
+      val Some(result) = ProjectPath.unapply(projectPath.value)
 
-      namespace       shouldBe a[Namespace]
-      namespace.value shouldBe namespaceValue
+      result shouldBe projectPath
     }
 
-    "return None if string value cannot be converted to a Namespace" in {
-      Namespace.unapply(blankStrings().generateOne) shouldBe None
-    }
-  }
-
-  "Name.unapply" should {
-
-    "convert valid project name as string to a Name" in {
-      val nameValue = relativePaths(maxSegments = 1).generateOne
-
-      val Some(name) = Name.unapply(nameValue)
-
-      name       shouldBe a[Name]
-      name.value shouldBe nameValue
-    }
-
-    "return None if string value cannot be converted to a Name" in {
-      Name.unapply(blankStrings().generateOne) shouldBe None
-    }
-  }
-
-  "Namespace /" should {
-
-    import ch.datascience.graph.model.projects.{ProjectPath => ProjectPathType}
-
-    "return a ProjectPath" in {
-      val namespaceValue  = relativePaths(maxSegments = 1).generateOne
-      val Some(namespace) = Namespace.unapply(namespaceValue)
-
-      val nameValue  = relativePaths(maxSegments = 1).generateOne
-      val Some(name) = Name.unapply(nameValue)
-
-      namespace / name shouldBe ProjectPathType(s"$namespace/$name")
+    "return None if string value cannot be converted to a ProjectPath" in {
+      ProjectPath.unapply(blankStrings().generateOne) shouldBe None
     }
   }
 }

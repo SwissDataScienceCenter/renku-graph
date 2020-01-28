@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,9 +20,18 @@ package ch.datascience.tinytypes.constraints
 
 import ch.datascience.tinytypes.Constraints
 
-trait NonNegative extends Constraints[Int] {
+trait NonNegativeInt extends Constraints[Int] {
+
   addConstraint(
     check   = _ >= 0,
-    message = (_: Int) => s"$typeName cannot be < 0"
+    message = _ => s"$typeName cannot be < 0"
+  )
+}
+
+trait NonNegativeLong extends Constraints[Long] {
+
+  addConstraint(
+    check   = _ >= 0L,
+    message = _ => s"$typeName cannot be < 0"
   )
 }

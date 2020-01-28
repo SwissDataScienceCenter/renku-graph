@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.flows
 
+import AccessTokenPresence._
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
@@ -30,9 +31,11 @@ import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.graph.model.users.Email
-import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.rdfstore.triples.{singleFileAndCommit, triples}
+import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.http.client.AccessToken
+import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.webhookservice.model.HookToken
+import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Assertion
 import org.scalatest.Matchers._
@@ -40,17 +43,25 @@ import org.scalatest.concurrent.Eventually
 
 object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
 
-  def `data in the RDF store`(project:       Project,
-                              commitId:      CommitId,
-                              schemaVersion: SchemaVersion = currentSchemaVersion): Assertion =
+  def `data in the RDF store`(
+      project:            Project,
+      commitId:           CommitId,
+      schemaVersion:      SchemaVersion = currentSchemaVersion
+  )(implicit accessToken: AccessToken): Assertion =
     `data in the RDF store`(
       project,
       commitId,
-      triples(singleFileAndCommit(project.path, commitId = commitId, schemaVersion = schemaVersion))
+      fileCommit(commitId = commitId, schemaVersion = schemaVersion)(projectPath = project.path)
     )
 
-  def `data in the RDF store`(project: Project, commitId: CommitId, triples: JsonLDTriples): Assertion = {
+  def `data in the RDF store`(
+      project:            Project,
+      commitId:           CommitId,
+      triples:            JsonLD
+  )(implicit accessToken: AccessToken): Assertion = {
     val projectId = project.id
+
+    givenAccessTokenPresentFor(project)
 
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
@@ -65,19 +76,20 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
     }
 
     eventually {
+      val commitResource = (fusekiBaseUrl / "commit" / commitId).showAs[RdfResource]
       RDFStore
         .run(
-          """|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-             |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-             |
-             |SELECT ?commit
-             |WHERE {
-             |  ?resource rdf:type <http://www.w3.org/ns/prov#Activity> ;
-             |            rdfs:label ?commit .
-             |}
-             |""".stripMargin
+          s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+              |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+              |
+              |SELECT ?label
+              |WHERE {
+              |  $commitResource rdf:type <http://www.w3.org/ns/prov#Activity> ;
+              |                  rdfs:label ?label .
+              |}
+              |""".stripMargin
         )
-        .exists(_.get("commit").contains(commitId.value)) shouldBe true
+        .exists(_.get("label").exists(_ contains commitId.value)) shouldBe true
     }
   }
 

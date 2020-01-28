@@ -17,6 +17,7 @@ lazy val root = Project(
   skip in publish := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
+  jsonLd,
   graphCommons,
   dbEventLog,
   tokenRepository,
@@ -25,11 +26,23 @@ lazy val root = Project(
   knowledgeGraph
 )
 
+lazy val jsonLd = Project(
+  id = "json-ld",
+  base = file("json-ld")
+).settings(
+  commonSettings
+).enablePlugins(
+  AutomateHeaderPlugin
+)
+
 lazy val graphCommons = Project(
   id = "graph-commons",
   base = file("graph-commons")
 ).settings(
   commonSettings
+).dependsOn(
+  jsonLd % "compile->compile",
+  jsonLd % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -178,8 +191,8 @@ releaseTagComment := {
 }
 
 @scala.annotation.tailrec
-def collectCommitsMessages(commitsCounter: Int = 1, messages: List[String] = List.empty)(
-    implicit vcs:                          Vcs): List[String] =
+def collectCommitsMessages(commitsCounter: Int          = 1,
+                           messages:       List[String] = List.empty)(implicit vcs: Vcs): List[String] =
   vcs.cmd("log", "--format=%s", "-1", s"HEAD~$commitsCounter").!!.trim match {
     case message if message startsWith "Setting version" => messages
     case message                                         => collectCommitsMessages(commitsCounter + 1, messages :+ message)

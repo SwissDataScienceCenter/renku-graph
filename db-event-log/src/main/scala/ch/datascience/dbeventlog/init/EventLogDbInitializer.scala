@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,6 +22,7 @@ import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
+import ch.datascience.dbeventlog.EventStatus.RecoverableFailure
 import ch.datascience.logging.ApplicationLogger
 import doobie.util.fragment.Fragment
 import io.chrisdavenport.log4cats.Logger
@@ -39,18 +40,19 @@ class EventLogDbInitializer[Interpretation[_]](
 
   def run: Interpretation[Unit] = {
     for {
-      _ <- createTable(transactor)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)", transactor)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)", transactor)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)", transactor)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)", transactor)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)", transactor)
+      _ <- createTable()
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)")
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)")
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)")
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)")
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)")
+      _ <- execute(sql"UPDATE event_log set status=${RecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'")
       _ <- logger.info("Event Log database initialization success")
       _ <- projectPathAdder.run
     } yield ()
   } recoverWith logging
 
-  private def createTable(transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] =
+  private def createTable(): Interpretation[Unit] =
     sql"""
          |CREATE TABLE IF NOT EXISTS event_log(
          | event_id varchar NOT NULL,
@@ -67,7 +69,7 @@ class EventLogDbInitializer[Interpretation[_]](
       .transact(transactor.get)
       .map(_ => ())
 
-  private def execute(sql: Fragment, transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] =
+  private def execute(sql: Fragment): Interpretation[Unit] =
     sql.update.run
       .transact(transactor.get)
       .map(_ => ())

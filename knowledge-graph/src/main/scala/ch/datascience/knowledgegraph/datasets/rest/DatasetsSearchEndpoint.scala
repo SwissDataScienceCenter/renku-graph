@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,11 +21,13 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.MonadError
 import cats.effect._
 import cats.implicits._
-import ch.datascience.config.RenkuResourcesUrl
+import ch.datascience.config._
+import ch.datascience.config.renku.ResourceUrl
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
+import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -34,8 +36,8 @@ import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
-import org.http4s.dsl.impl.ValidatingQueryParamDecoderMatcher
-import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
+import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
+import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -43,7 +45,7 @@ import scala.util.control.NonFatal
 
 class DatasetsSearchEndpoint[Interpretation[_]: Effect](
     datasetsFinder:        DatasetsFinder[Interpretation],
-    renkuResourcesUrl:     RenkuResourcesUrl,
+    renkuResourcesUrl:     renku.ResourcesUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable])
@@ -52,32 +54,46 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   import DatasetsFinder.DatasetSearchResult
   import DatasetsSearchEndpoint.Query._
   import DatasetsSearchEndpoint.Sort
+  import PagingRequest.Decoders._
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
   import executionTimeRecorder._
   import io.circe.Encoder
   import io.circe.literal._
-  import io.circe.syntax._
-  import org.http4s.circe._
 
-  def searchForDatasets(phrase: Phrase, sort: Sort.By): Interpretation[Response[Interpretation]] =
+  def searchForDatasets(maybePhrase: Option[Phrase],
+                        sort:        Sort.By,
+                        paging:      PagingRequest): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
-      datasetsFinder
-        .findDatasets(phrase, sort)
-        .flatMap(datasets => Ok(datasets.asJson))
-        .recoverWith(httpResult(phrase))
-    } map logExecutionTimeWhen(finishedSuccessfully(phrase))
+      implicit val datasetsUrl: renku.ResourceUrl = requestedUrl(maybePhrase, sort, paging)
 
-  private def httpResult(phrase: Phrase): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+      datasetsFinder
+        .findDatasets(maybePhrase, sort, paging)
+        .map(_.toHttpResponse)
+        .recoverWith(httpResult(maybePhrase))
+    } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))
+
+  private def requestedUrl(maybePhrase: Option[Phrase], sort: Sort.By, paging: PagingRequest): renku.ResourceUrl =
+    (renkuResourcesUrl / "datasets") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
+
+  private def httpResult(
+      maybePhrase: Option[Phrase]
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding datasets matching $phrase' failed")
+      val errorMessage = ErrorMessage(
+        maybePhrase
+          .map(phrase => s"Finding datasets matching '$phrase' failed")
+          .getOrElse("Finding all datasets failed")
+      )
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(phrase: Phrase): PartialFunction[Response[Interpretation], String] = {
-    case response if response.status == Ok || response.status == NotFound =>
-      s"Finding datasets containing '$phrase' phrase finished"
+  private def finishedSuccessfully(maybePhrase: Option[Phrase]): PartialFunction[Response[Interpretation], String] = {
+    case response if response.status == Ok =>
+      maybePhrase
+        .map(phrase => s"Finding datasets containing '$phrase' phrase finished")
+        .getOrElse("Finding all datasets finished")
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
@@ -121,7 +137,7 @@ object DatasetsSearchEndpoint {
           .leftMap(_ => ParseFailure(s"'${query.parameterName}' parameter with invalid value", ""))
           .toValidatedNel
 
-    object query extends ValidatingQueryParamDecoderMatcher[Phrase]("query") {
+    object query extends OptionalValidatingQueryParamDecoderMatcher[Phrase]("query") {
       val parameterName: String = "query"
     }
   }
@@ -147,7 +163,7 @@ object IODatasetsSearchEndpoint {
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
-      renkuResourceUrl      <- RenkuResourcesUrl[IO]()
+      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetsSearchEndpoint[IO](
       new IODatasetsFinder(rdfStoreConfig,

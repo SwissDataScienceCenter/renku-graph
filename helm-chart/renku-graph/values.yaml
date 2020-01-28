@@ -16,6 +16,7 @@ tokenRepository:
   resources:
     limits:
       memory: 250Mi
+  jvmXmx: 100m
   connectionPool: 2
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
@@ -33,6 +34,7 @@ triplesGenerator:
   resources:
     limits:
       memory: 2000Mi
+  jvmXmx: 1G
   renkuLogTimeout: 60 minutes
   reProvisioningInitialDelay: 2 minutes
   gitlab:
@@ -53,7 +55,8 @@ webhookService:
     port: 80
   resources:
     limits:
-      memory: 500Mi
+      memory: 750Mi
+  jvmXmx: 500m
   eventsSynchronization:
     initialDelay: 2 minutes
     interval: 30 minutes
@@ -77,7 +80,8 @@ knowledgeGraph:
     port: 80
   resources:
     limits:
-      memory: 350Mi
+      memory: 500Mi
+  jvmXmx: 200m
   threadsNumber: 3
   services:
     renku:

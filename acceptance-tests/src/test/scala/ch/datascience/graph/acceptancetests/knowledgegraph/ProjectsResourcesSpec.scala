@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,25 +18,30 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
 import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResources.briefJson
+import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen}
 import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.triples.{singleFileAndCommitWithDataset, triples}
+import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles._
 import io.circe.Json
 import io.circe.literal._
+import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -45,6 +50,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
   import ProjectsResources._
 
+  private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project          = projectsGen.generateOne
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
@@ -58,22 +64,27 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     scenario("As a user I would like to find project's details by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
-      val jsonLDTriples = triples(
-        singleFileAndCommitWithDataset(
+      val jsonLDTriples = JsonLD.arr(
+        dataSetCommit(
+          commitId      = dataset1CommitId,
+          committer     = Person(project.created.creator.name, project.created.creator.email),
+          schemaVersion = currentSchemaVersion
+        )(
           project.path,
           projectName        = project.name,
-          projectDateCreated = project.created.date,
-          projectCreator     = project.created.creator.name -> project.created.creator.email,
-          commitId           = dataset1CommitId,
-          datasetIdentifier  = dataset.id,
-          datasetName        = dataset.name,
-          schemaVersion      = currentSchemaVersion
+          projectDateCreated = project.created.date
+        )(
+          datasetIdentifier = dataset.id,
+          datasetName       = dataset.name
         )
       )
 
       `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
 
       `triples updates run`(Set(project.created.creator.email) + project.created.creator.email)
+
+      And("the project exists in GitLab")
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}"
@@ -107,11 +118,15 @@ object ProjectsResources {
           "name": ${project.created.creator.name.toString},
           "email": ${project.created.creator.email.toString}
         }
+      },
+      "url": {
+        "ssh": ${project.repoUrls.ssh.toString},
+        "http": ${project.repoUrls.http.toString}
       }
     }""" deepMerge {
     _links(
-      Link(Rel.Self        -> Href(renkuResourceUrl / "projects" / project.path)),
-      Link(Rel("datasets") -> Href(renkuResourceUrl / "projects" / project.path / "datasets"))
+      Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
+      Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
     )
   }
 }

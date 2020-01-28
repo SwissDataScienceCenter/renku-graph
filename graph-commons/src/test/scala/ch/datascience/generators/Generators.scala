@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,7 +28,7 @@ import ch.datascience.tinytypes._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import eu.timepit.refined.numeric.{NonNegative, Positive}
+import eu.timepit.refined.numeric.{NonNegative, NonPositive, Positive}
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
@@ -114,11 +114,16 @@ object Generators {
       list <- Gen.listOfN(size, generator)
     } yield list
 
-  def setOf[T](generator: Gen[T], maxElements: Int Refined Positive = 5): Gen[Set[T]] =
+  def setOf[T](generator:   Gen[T],
+               minElements: Int Refined NonNegative = 0,
+               maxElements: Int Refined Positive = 5): Gen[Set[T]] = {
+    require(minElements.value <= maxElements.value)
+
     for {
-      size <- choose(0, maxElements.value)
+      size <- choose(minElements.value, maxElements.value)
       set  <- Gen.containerOfN[Set, T](size, generator)
     } yield set
+  }
 
   def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
     choose(1, max) map Refined.unsafeApply
@@ -128,35 +133,43 @@ object Generators {
 
   def nonNegativeInts(max: Int = 1000): Gen[Int Refined NonNegative] = choose(0, max) map Refined.unsafeApply
 
+  def nonPositiveInts(min: Int = -1000): Gen[Int Refined NonPositive] = choose(min, 0) map Refined.unsafeApply
+
   def negativeInts(min: Int = -1000): Gen[Int] = choose(min, 0)
+
+  def nonNegativeLongs(max: Long = 1000): Gen[Long Refined NonNegative] = choose(0L, max) map Refined.unsafeApply
 
   def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
     choose(1, max.toMillis)
       .map(FiniteDuration(_, MILLISECONDS))
 
-  def relativePaths(minSegments: Int = 1, maxSegments: Int = 10): Gen[String] = {
+  def relativePaths(minSegments: Int = 1,
+                    maxSegments: Int = 10,
+                    partsGenerator: Gen[String] = nonEmptyStrings(
+                      charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
+                    )): Gen[String] = {
     require(minSegments <= maxSegments,
             s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense")
 
     for {
       partsNumber <- Gen.choose(minSegments, maxSegments)
-      partsGenerator = nonEmptyStrings(
-        charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
-      )
-      parts <- Gen.listOfN(partsNumber, partsGenerator)
+      parts       <- Gen.listOfN(partsNumber, partsGenerator)
     } yield parts.mkString("/")
   }
 
   val httpPorts: Gen[Int Refined Positive] = choose(1000, 10000) map Refined.unsafeApply
 
-  val httpUrls: Gen[String] = for {
-    protocol <- Arbitrary.arbBool.arbitrary map {
-                 case true  => "http"
-                 case false => "https"
-               }
-    port <- httpPorts
-    host <- nonEmptyStrings()
-  } yield s"$protocol://$host:$port"
+  def httpUrls(pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)): Gen[String] =
+    for {
+      protocol <- Arbitrary.arbBool.arbitrary map {
+                   case true  => "http"
+                   case false => "https"
+                 }
+      port <- httpPorts
+      host <- nonEmptyStrings()
+      path <- pathGenerator
+      pathValidated = if (path.isEmpty) "" else s"/$path"
+    } yield s"$protocol://$host:$port$pathValidated"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
@@ -166,7 +179,7 @@ object Generators {
     port <- httpPorts
   } yield s"$protocol://localhost:$port"
 
-  val validatedUrls: Gen[String Refined Url] = httpUrls map Refined.unsafeApply
+  val validatedUrls: Gen[String Refined Url] = httpUrls() map Refined.unsafeApply
 
   val shas: Gen[String] = for {
     length <- Gen.choose(40, 40)
@@ -202,9 +215,9 @@ object Generators {
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
 
-  implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls.map(ServiceUrl.apply)
+  implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls() map ServiceUrl.apply
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
-  implicit val exceptions:   Gen[Exception]   = nonEmptyStrings(20).map(new Exception(_))
+  implicit val exceptions:   Gen[Exception]   = nonEmptyStrings(20) map (new Exception(_))
   implicit val nestedExceptions: Gen[Exception] = for {
     nestLevels <- positiveInts(5)
     rootCause  <- exceptions

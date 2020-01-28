@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -63,7 +63,7 @@ class EventLogMarkFailed[Interpretation[_]](
     val (createDate, executionDate) = createdAndExecution
     status match {
       case NonRecoverableFailure => newExecutionDate[NonRecoverableFailure](createDate, executionDate)
-      case TriplesStoreFailure   => newExecutionDate[TriplesStoreFailure](createDate, executionDate)
+      case RecoverableFailure    => newExecutionDate[RecoverableFailure](createDate, executionDate)
     }
   }
 
@@ -97,7 +97,7 @@ object ExecutionDateCalculator {
   implicit val nonRecoverableFailureCalculator: StatusBasedCalculator[NonRecoverableFailure] =
     (_, _, now) => ExecutionDate(now)
 
-  implicit val triplesStoreFailureCalculator: StatusBasedCalculator[TriplesStoreFailure] =
+  implicit val recoverableFailureCalculator: StatusBasedCalculator[RecoverableFailure] =
     (_, _, now) => ExecutionDate(now plus (1, MINUTES))
 }
 

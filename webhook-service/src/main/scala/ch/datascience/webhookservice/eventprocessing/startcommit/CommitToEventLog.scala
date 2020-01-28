@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -48,6 +48,7 @@ class CommitToEventLog[Interpretation[_]: Monad](
 
   import CommitToEventLog.SendingResult
   import CommitToEventLog.SendingResult._
+  import IOAccessTokenFinder._
   import accessTokenFinder._
   import commitEventSender._
   import commitEventsSource._

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -47,9 +47,9 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
       eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
     }
 
-    s"return true if there are events with with status $TriplesStoreFailure and execution date in the past" in new TestCase {
+    s"return true if there are events with with status $RecoverableFailure and execution date in the past" in new TestCase {
       storeEvent(commitEventIds.generateOne,
-                 EventStatus.TriplesStoreFailure,
+                 EventStatus.RecoverableFailure,
                  ExecutionDate(now minus (5, SECONDS)),
                  committedDates.generateOne,
                  eventBodies.generateOne)
@@ -83,7 +83,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
                  committedDates.generateOne,
                  eventBodies.generateOne)
       storeEvent(commitEventIds.generateOne,
-                 EventStatus.TriplesStoreFailure,
+                 EventStatus.RecoverableFailure,
                  ExecutionDate(now plus (5, SECONDS)),
                  committedDates.generateOne,
                  eventBodies.generateOne)
@@ -105,7 +105,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
   "popEventToProcess" should {
 
     "find event with execution date farthest in the past " +
-      s"and status $New or $TriplesStoreFailure " +
+      s"and status $New or $RecoverableFailure " +
       s"and mark it as $Processing" in new TestCase {
 
       val projectId = projectIds.generateOne
@@ -121,7 +121,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
       val event3Id   = commitEventIds.generateOne.copy(projectId = projectId)
       val event3Body = eventBodies.generateOne
       storeEvent(event3Id,
-                 EventStatus.TriplesStoreFailure,
+                 EventStatus.RecoverableFailure,
                  ExecutionDate(now minus (5, HOURS)),
                  committedDates.generateOne,
                  event3Body)

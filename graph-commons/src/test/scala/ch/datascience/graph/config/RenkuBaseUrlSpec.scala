@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,7 +34,7 @@ class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
   "apply" should {
 
     "return a RenkuBaseUrl if there's a value for 'services.renku.url'" in {
-      forAll(httpUrls) { url =>
+      forAll(httpUrls()) { url =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(

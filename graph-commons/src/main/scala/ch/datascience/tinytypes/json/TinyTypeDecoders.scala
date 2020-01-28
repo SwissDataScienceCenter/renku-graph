@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -60,6 +60,11 @@ object TinyTypeDecoders {
 
   implicit def intDecoder[TT <: IntTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     decodeInt.emap { value =>
+      tinyTypeFactory.from(value).leftMap(_.getMessage)
+    }
+
+  implicit def longDecoder[TT <: LongTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    decodeLong.emap { value =>
       tinyTypeFactory.from(value).leftMap(_.getMessage)
     }
 

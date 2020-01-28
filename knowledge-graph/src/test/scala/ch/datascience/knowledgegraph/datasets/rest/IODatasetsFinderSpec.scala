@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,6 +29,8 @@ import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.datasets.{Description, Name, PublishedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
+import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
@@ -38,22 +40,31 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.triples._
-import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles._
 import eu.timepit.refined.api.Refined
-import io.circe.Json
+import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IODatasetsFinderSpec
-    extends WordSpec
-    with InMemoryRdfStore
-    with ExternalServiceStubbing
-    with ScalaCheckPropertyChecks {
+class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
   "findDatasets" should {
+
+    "return all datasets when no search phrase given" in new TestCase {
+      val datasetsList = nonEmptyList(datasets).generateOne.toList
+
+      loadToStore(datasetsList flatMap toDataSetCommit: _*)
+
+      datasetsFinder
+        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+        .results shouldBe datasetsList
+        .map(_.toDatasetSearchResult)
+        .sortBy(_.name.value)
+    }
 
     s"return datasets with name, description or creator matching the given phrase sorted by $NameProperty" in new TestCase {
       forAll(datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig) =>
@@ -61,24 +72,11 @@ class IODatasetsFinderSpec
         val (dataset1, dataset2, dataset3) = storeDatasets(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
 
         datasetsFinder
-          .findDatasets(phrase, Sort.By(NameProperty, Direction.Asc))
-          .unsafeRunSync() shouldBe List(
-          DatasetSearchResult(dataset1.id,
-                              dataset1.name,
-                              dataset1.maybeDescription,
-                              dataset1.published,
-                              ProjectsCount(dataset1.project.size)),
-          DatasetSearchResult(dataset2.id,
-                              dataset2.name,
-                              dataset2.maybeDescription,
-                              dataset2.published,
-                              ProjectsCount(dataset2.project.size)),
-          DatasetSearchResult(dataset3.id,
-                              dataset3.name,
-                              dataset3.maybeDescription,
-                              dataset3.published,
-                              ProjectsCount(dataset3.project.size))
-        ).sortBy(_.name.value)
+          .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
+          .results shouldBe List(dataset1.toDatasetSearchResult,
+                                 dataset2.toDatasetSearchResult,
+                                 dataset3.toDatasetSearchResult).sortBy(_.name.value)
       }
     }
 
@@ -92,24 +90,11 @@ class IODatasetsFinderSpec
       )
 
       datasetsFinder
-        .findDatasets(phrase, Sort.By(DatePublishedProperty, Direction.Desc))
-        .unsafeRunSync() shouldBe List(
-        DatasetSearchResult(dataset3.id,
-                            dataset3.name,
-                            dataset3.maybeDescription,
-                            dataset3.published,
-                            ProjectsCount(dataset3.project.size)),
-        DatasetSearchResult(dataset1.id,
-                            dataset1.name,
-                            dataset1.maybeDescription,
-                            dataset1.published,
-                            ProjectsCount(dataset1.project.size)),
-        DatasetSearchResult(dataset2.id,
-                            dataset2.name,
-                            dataset2.maybeDescription,
-                            dataset2.published,
-                            ProjectsCount(dataset2.project.size))
-      )
+        .findDatasets(Some(phrase), Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default)
+        .unsafeRunSync()
+        .results shouldBe List(dataset3.toDatasetSearchResult,
+                               dataset1.toDatasetSearchResult,
+                               dataset2.toDatasetSearchResult)
     }
 
     s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
@@ -122,37 +107,55 @@ class IODatasetsFinderSpec
       )
 
       datasetsFinder
-        .findDatasets(phrase, Sort.By(ProjectsCountProperty, Direction.Asc))
-        .unsafeRunSync() shouldBe List(
-        DatasetSearchResult(dataset2.id,
-                            dataset2.name,
-                            dataset2.maybeDescription,
-                            dataset2.published,
-                            ProjectsCount(dataset2.project.size)),
-        DatasetSearchResult(dataset3.id,
-                            dataset3.name,
-                            dataset3.maybeDescription,
-                            dataset3.published,
-                            ProjectsCount(dataset3.project.size)),
-        DatasetSearchResult(dataset1.id,
-                            dataset1.name,
-                            dataset1.maybeDescription,
-                            dataset1.published,
-                            ProjectsCount(dataset1.project.size))
-      )
+        .findDatasets(Some(phrase), Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+        .results shouldBe List(dataset2.toDatasetSearchResult,
+                               dataset3.toDatasetSearchResult,
+                               dataset1.toDatasetSearchResult)
+    }
+
+    "return the requested page of datasets matching the given phrase" in new TestCase {
+      val phrase = phrases.generateOne
+      val (dataset1, dataset2, dataset3) =
+        storeDatasets(phrase, datasets.generateOne, datasets.generateOne, datasets.generateOne)
+
+      val pagingRequest = PagingRequest(Page(2), PerPage(1))
+
+      val result = datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .unsafeRunSync()
+
+      val expectedDataset = List(dataset1, dataset2, dataset3).sorted(byName)(1)
+      result.results shouldBe List(expectedDataset.toDatasetSearchResult)
+
+      result.pagingInfo.pagingRequest shouldBe pagingRequest
+      result.pagingInfo.total         shouldBe Total(3)
+    }
+
+    "return no results if the requested page does not exist" in new TestCase {
+      val phrase = phrases.generateOne
+      val (dataset1, dataset2, dataset3) =
+        storeDatasets(phrase, datasets.generateOne, datasets.generateOne, datasets.generateOne)
+
+      val pagingRequest = PagingRequest(Page(2), PerPage(3))
+
+      val result = datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .unsafeRunSync()
+
+      result.results                  shouldBe Nil
+      result.pagingInfo.pagingRequest shouldBe pagingRequest
+      result.pagingInfo.total         shouldBe Total(3)
     }
 
     "return no results if there's no datasets with name, description or creator matching the given phrase" in new TestCase {
 
-      loadToStore(
-        triples(
-          singleFileAndCommitWithDataset(projectPaths.generateOne)
-        )
-      )
+      loadToStore(randomDataSetCommit)
 
       datasetsFinder
-        .findDatasets(phrases.generateOne, searchEndpointSorts.generateOne)
-        .unsafeRunSync() shouldBe empty
+        .findDatasets(Some(phrases.generateOne), searchEndpointSorts.generateOne, PagingRequest.default)
+        .unsafeRunSync()
+        .results shouldBe empty
     }
   }
 
@@ -192,46 +195,45 @@ class IODatasetsFinderSpec
     )
 
     loadToStore(
-      triples(
-        toSingleFileAndCommitWithDataset(dataset1),
-        toSingleFileAndCommitWithDataset(dataset2),
-        toSingleFileAndCommitWithDataset(dataset3),
-        singleFileAndCommitWithDataset(projectPaths.generateOne)
-      )
+      toDataSetCommit(dataset1) ++
+        toDataSetCommit(dataset2) ++
+        toDataSetCommit(dataset3) :+
+        dataSetCommit()(projectPaths.generateOne)(): _*
     )
 
     (dataset1, dataset2, dataset3)
   }
 
-  private def toSingleFileAndCommitWithDataset(dataset: Dataset): List[Json] = dataset.project match {
+  private def toDataSetCommit(dataSet: Dataset): List[JsonLD] = dataSet.project match {
     case Nil =>
-      singleFileAndCommitWithDataset(
-        projectPath               = projectPaths.generateOne,
-        datasetIdentifier         = dataset.id,
-        datasetName               = dataset.name,
-        maybeDatasetDescription   = dataset.maybeDescription,
-        maybeDatasetPublishedDate = dataset.published.maybeDate,
-        maybeDatasetCreators =
-          dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation))
-      ) flatMap unlinkDatasetFromProject
+      List {
+        dataSetCommit()(
+          projectPath = projectPaths.generateOne
+        )(
+          datasetIdentifier         = dataSet.id,
+          datasetName               = dataSet.name,
+          maybeDatasetDescription   = dataSet.maybeDescription,
+          maybeDatasetPublishedDate = dataSet.published.maybeDate,
+          datasetCreators           = dataSet.published.creators map toPerson
+        ).cursor
+          .downField(schema / "isPartOf")
+          .delete
+          .top
+          .getOrElse(throw new Exception(s"Cannot find ${schema / "isPartOf"}"))
+      }
     case projects =>
-      projects.flatMap { project =>
-        singleFileAndCommitWithDataset(
-          projectPath               = project.path,
-          datasetIdentifier         = dataset.id,
-          datasetName               = dataset.name,
-          maybeDatasetDescription   = dataset.maybeDescription,
-          maybeDatasetPublishedDate = dataset.published.maybeDate,
-          maybeDatasetCreators =
-            dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation))
+      projects map { project =>
+        dataSetCommit()(
+          projectPath = project.path
+        )(
+          datasetIdentifier         = dataSet.id,
+          datasetName               = dataSet.name,
+          maybeDatasetDescription   = dataSet.maybeDescription,
+          maybeDatasetPublishedDate = dataSet.published.maybeDate,
+          datasetCreators           = dataSet.published.creators map toPerson
         )
       }
   }
-
-  private def unlinkDatasetFromProject(json: Json) =
-    if (json.hcursor.downField("http://schema.org/identifier").as[Option[String]].exists(_.isDefined))
-      json.hcursor.downField("http://schema.org/isPartOf").delete.top
-    else Some(json)
 
   private implicit class DatasetOps(dataset: Dataset) {
 
@@ -240,5 +242,19 @@ class IODatasetsFinderSpec
 
     def changeProjectsCountTo(projectsCount: ProjectsCount): Dataset =
       dataset.copy(project = Gen.listOfN(projectsCount.value, datasetProjects).generateOne)
+
+    lazy val toDatasetSearchResult: DatasetSearchResult = DatasetSearchResult(
+      dataset.id,
+      dataset.name,
+      dataset.maybeDescription,
+      dataset.published,
+      ProjectsCount(dataset.project.size)
+    )
   }
+
+  private lazy val toPerson: DatasetCreator => Person =
+    creator => Person(creator.name, creator.maybeEmail, creator.maybeAffiliation)
+
+  private lazy val byName: Ordering[Dataset] =
+    (ds1: Dataset, ds2: Dataset) => ds1.name.value compareTo ds2.name.value
 }

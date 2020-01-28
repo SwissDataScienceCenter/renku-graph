@@ -46,6 +46,8 @@ spec:
                   key: graph-tokenRepository-postgresPassword
             - name: TOKEN_REPOSITORY_POSTGRES_CONNECTION_POOL
               value: "{{ .Values.tokenRepository.connectionPool }}"
+            - name: GITLAB_BASE_URL
+              value: {{ .Values.gitlab.url }}
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
               {{- if .Values.sentry.enabled }}
@@ -55,7 +57,7 @@ spec:
               value: {{ .Values.sentry.environmentName }}
               {{- end }}
             - name: JAVA_OPTS
-              value: -Xmx100m -XX:+UseG1GC
+              value: -Xmx{{ .Values.tokenRepository.jvmXmx }} -XX:+UseG1GC
           ports:
             - name: http-token-repo
               containerPort: 9003

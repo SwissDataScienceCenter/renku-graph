@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,116 +21,84 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.users.Id
+import ch.datascience.graph.model.users.{Email, Id, Name}
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.triples._
-import ch.datascience.rdfstore.triples.entities.Person
+import ch.datascience.rdfstore.entities.Person
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.PersonDetailsUpdater.{prepareUpdates, Person => UpdaterPerson}
 import io.circe.Json
+import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore {
+class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
   "prepareUpdates" should {
 
     "generate query changing person's name and removing label - case when email present" in {
-      val name1     = names.generateOne
-      val email1    = emails.generateOne
-      val person1Id = Person.Id(Some(email1))
-      val name2     = names.generateOne
-      val email2    = emails.generateOne
-      val person2Id = Person.Id(Some(email2))
+      forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
+        val person1Json = Person(name1, email1).asJsonLD
+        val person1Id   = person1Json.entityId.get
+        val person2Json = Person(name2, email2).asJsonLD
+        val person2Id   = person2Json.entityId.get
 
-      loadToStore(
-        triples(List(Person(person1Id, name1), Person(person2Id, name2)))
-      )
+        loadToStore(person1Json, person2Json)
 
-      findPersons should contain theSameElementsAs Set(
-        (person1Id.value, Some(name1.value), Some(email1.value), Some(name1.value)),
-        (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
-      )
-
-      val name1Updated = names.generateOne
-
-      val updates = prepareUpdates(
-        Set(
-          UpdaterPerson(Id(person1Id.value), Set(name1Updated), Set(email1))
+        findPersons should contain theSameElementsAs Set(
+          (person1Id.value, Some(name1.value), Some(email1.value), Some(name1.value)),
+          (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
         )
-      )
 
-      (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+        val name1Updated = names.generateOne
 
-      findPersons should contain theSameElementsAs Set(
-        (person1Id.value, Some(name1Updated.value), Some(email1.value), None),
-        (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
-      )
+        val updates = prepareUpdates(
+          Set(
+            UpdaterPerson(Id(person1Id.value), Set(name1Updated), Set(email1))
+          )
+        )
+
+        (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+
+        findPersons should contain theSameElementsAs Set(
+          (person1Id.value, Some(name1Updated.value), Some(email1.value), None),
+          (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
+        )
+
+        clearDataset()
+      }
     }
 
     "generate query changing person's name and email and removing label - case when email removed" in {
-      val name1     = names.generateOne
-      val email1    = emails.generateOne
-      val person1Id = Person.Id(Some(email1))
-      val name2     = names.generateOne
-      val email2    = emails.generateOne
-      val person2Id = Person.Id(Some(email2))
+      forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
+        val person1Json = Person(name1, email1).asJsonLD
+        val person1Id   = person1Json.entityId.get
+        val person2Json = Person(name2, email2).asJsonLD
+        val person2Id   = person2Json.entityId.get
 
-      loadToStore(
-        triples(List(Person(person1Id, name1, Some(email1), None), Person(person2Id, name2, Some(email2), None)))
-      )
+        loadToStore(person1Json, person2Json)
 
-      findPersons should contain theSameElementsAs Set(
-        (person1Id.value, Some(name1.value), Some(email1.value), Some(name1.value)),
-        (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
-      )
-
-      val name1Updated = names.generateOne
-
-      val updates = prepareUpdates(
-        Set(
-          UpdaterPerson(Id(person1Id.value), Set(name1Updated), Set.empty)
+        findPersons should contain theSameElementsAs Set(
+          (person1Id.value, Some(name1.value), Some(email1.value), Some(name1.value)),
+          (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
         )
-      )
 
-      (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+        val name1Updated = names.generateOne
 
-      findPersons should contain theSameElementsAs Set(
-        (person1Id.value, Some(name1Updated.value), None, None),
-        (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
-      )
-    }
-
-    "generate query adding person's name and email - case when there's no name or email on the Person" in {
-      val personId = Person.Id(Some(emails.generateOne))
-
-      loadToStore(
-        triples(
-          List(
-            Person(personId, names.generateOne, None, None)
-              .remove("http://schema.org/name")
-              .remove("http://www.w3.org/2000/01/rdf-schema#label")
+        val updates = prepareUpdates(
+          Set(
+            UpdaterPerson(Id(person1Id.value), Set(name1Updated), Set.empty)
           )
         )
-      )
 
-      findPersons should contain theSameElementsAs Set(
-        (personId.value, None, None, None)
-      )
+        (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
 
-      val name  = names.generateOne
-      val email = emails.generateOne
-
-      val updates = prepareUpdates(
-        Set(
-          UpdaterPerson(Id(personId.value), Set(name), Set(email))
+        findPersons should contain theSameElementsAs Set(
+          (person1Id.value, Some(name1Updated.value), None, None),
+          (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
         )
-      )
 
-      (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
-
-      findPersons should contain theSameElementsAs Set(
-        (personId.value, Some(name.value), Some(email.value), None)
-      )
+        clearDataset()
+      }
     }
   }
 

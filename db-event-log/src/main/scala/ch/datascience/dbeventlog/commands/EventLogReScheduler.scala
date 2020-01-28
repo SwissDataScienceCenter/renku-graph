@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,8 +38,8 @@ class EventLogReScheduler[Interpretation[_]](
 
   private def runUpdate() =
     sql"""|update event_log 
-          |set status = ${New: EventStatus}, execution_date = event_date
-          |where status <> ${NonRecoverableFailure: EventStatus}""".stripMargin.update.run
+          |set status = ${New: EventStatus}, execution_date = event_date, message = NULL
+          |""".stripMargin.update.run
 }
 
 class IOEventLogReScheduler(

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,7 +28,7 @@ import org.scalacheck.Gen
 object ServiceTypesGenerators {
 
   implicit val fusekiAdminConfigs: Gen[FusekiAdminConfig] = for {
-    fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
+    fusekiUrl       <- httpUrls() map FusekiBaseUrl.apply
     datasetName     <- nonEmptyStrings() map DatasetName.apply
     datasetType     <- Gen.oneOf(Mem, TDB)
     authCredentials <- basicAuthCredentials

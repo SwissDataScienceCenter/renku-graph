@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.dbeventlog.commands.EventLogLatestEvents
 import ch.datascience.graph.model.events.{CommitEventId, Project}
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
@@ -50,6 +50,7 @@ private class IOMissedEventsLoader(
 )(implicit contextShift:   ContextShift[IO])
     extends MissedEventsLoader[IO] {
 
+  import IOAccessTokenFinder._
   import UpdateResult._
   import accessTokenFinder._
   import commitToEventLog._

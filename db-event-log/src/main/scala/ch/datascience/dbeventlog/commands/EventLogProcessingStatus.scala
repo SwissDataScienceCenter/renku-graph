@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,7 +26,7 @@ import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.{CreatedDate, EventLogDB, EventStatus}
+import ch.datascience.dbeventlog.{EventLogDB, EventStatus, ExecutionDate}
 import ch.datascience.graph.model.events.{CommitId, ProjectId}
 import doobie.implicits._
 import doobie.util.Read
@@ -52,10 +52,10 @@ class EventLogProcessingStatus[Interpretation[_]](
     } yield maybeProcessingStatus
 
   private def findTheLatestEvent(projectId: ProjectId): OptionT[Interpretation, Event] = OptionT(sql"""
-      select event_id, status, created_date 
+      select event_id, status, execution_date 
       from event_log
       where project_id = $projectId
-      order by created_date desc
+      order by execution_date desc
       limit 1
   """.query[Event].option.transact(transactor.get))
 
@@ -70,13 +70,13 @@ class EventLogProcessingStatus[Interpretation[_]](
 
   private def findPreviousFromTheSameBatch(projectId: ProjectId, previousEvent: Event) = OptionT {
     sql"""
-        select event_id, status, created_date
+        select event_id, status, execution_date
         from event_log
         where project_id = $projectId
           and event_id <> ${previousEvent.eventId}
-          and created_date <= ${previousEvent.createdDate}
-          and created_date >= ${previousEvent.createdDate.value minus MaxTimeDiffBetweenEventsInBatch}
-        order by created_date desc
+          and execution_date <= ${previousEvent.executionDate}
+          and execution_date >= ${previousEvent.executionDate.value minus MaxTimeDiffBetweenEventsInBatch}
+        order by execution_date desc
         limit 1
       """.query[Event].option.transact(transactor.get)
   }
@@ -93,13 +93,13 @@ class EventLogProcessingStatus[Interpretation[_]](
 }
 
 private object EventLogProcessingStatus {
-  val MaxTimeDiffBetweenEventsInBatch = Duration.of(15, SECONDS)
+  val MaxTimeDiffBetweenEventsInBatch = Duration.of(15, MINUTES)
 
-  implicit val eventRead: Read[Event] = Read[(CommitId, EventStatus, CreatedDate)].map {
+  implicit val eventRead: Read[Event] = Read[(CommitId, EventStatus, ExecutionDate)].map {
     case (eventId, status, createdDate) => Event(eventId, status, createdDate)
   }
 
-  final case class Event(eventId: CommitId, status: EventStatus, createdDate: CreatedDate)
+  final case class Event(eventId: CommitId, status: EventStatus, executionDate: ExecutionDate)
 }
 
 class IOEventLogProcessingStatus(

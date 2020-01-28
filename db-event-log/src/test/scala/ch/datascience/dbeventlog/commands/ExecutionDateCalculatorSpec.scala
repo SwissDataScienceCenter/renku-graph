@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit._
 
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.EventStatus.{NonRecoverableFailure, TriplesStoreFailure}
+import ch.datascience.dbeventlog.EventStatus.{NonRecoverableFailure, RecoverableFailure}
 import ch.datascience.dbeventlog.{CreatedDate, ExecutionDate}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -43,11 +43,11 @@ class ExecutionDateCalculatorSpec extends WordSpec with MockFactory with ScalaCh
     }
   }
 
-  s"newExecutionDate for $TriplesStoreFailure" should {
+  s"newExecutionDate for $RecoverableFailure" should {
 
     "return current time + 1 min" in new TestCase {
       forAll(timestampsNotInTheFuture, nonNegativeInts()) { (timestamp, createdDateOffset) =>
-        executionDateCalculator.newExecutionDate[TriplesStoreFailure](
+        executionDateCalculator.newExecutionDate[RecoverableFailure](
           CreatedDate(timestamp minus (createdDateOffset.value, SECONDS)),
           ExecutionDate(timestamp)
         ) shouldBe ExecutionDate(now plus (1, MINUTES))

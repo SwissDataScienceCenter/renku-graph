@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
@@ -26,11 +27,13 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.EventsGenerators.projects
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.rdfstore.triples._
-import ch.datascience.rdfstore.triples.multiFileAndCommit.ResourceName
+import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
+import ch.datascience.http.client.AccessToken
+import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.bundles.exemplarLineageFlow.NodeDef
 import io.circe.Json
 import io.circe.literal._
+import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -39,9 +42,14 @@ import sangria.macros._
 
 class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
-  private val project                = projects.generateOne.copy(path = ProjectPath("namespace/lineage-project"))
-  private val commitId               = CommitId("0000001")
-  private val multiFileAndCommitData = multiFileAndCommit.MultiFileAndCommitData()
+  private implicit val accessToken: AccessToken = accessTokens.generateOne
+  private val project = projects.generateOne.copy(path = ProjectPath("namespace/lineage-project"))
+  private val (jsons, examplarData) = exemplarLineageFlow(
+    project.path,
+    CommitId("0000012"),
+    FilePath("figs/grid_plot.png")
+  )
+  import examplarData._
 
   feature("GraphQL query to find lineage") {
 
@@ -51,7 +59,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       `data in the RDF store`(
         project,
         commitId,
-        triples(multiFileAndCommit(project.path, data = multiFileAndCommitData, schemaVersion = currentSchemaVersion))
+        JsonLD.arr(jsons: _*)
       )
 
       When("user posts a graphql query to fetch lineage")
@@ -73,9 +81,9 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       val response = knowledgeGraphClient.POST(
         namedLineageQuery,
         variables = Map(
-          "projectPath" -> "namespace/lineage-project",
-          "commitId"    -> "0000004",
-          "filePath"    -> "result-file-1"
+          "projectPath" -> project.path.toString,
+          "commitId"    -> commitId.toString,
+          "filePath"    -> filePath.toString
         )
       )
 
@@ -90,7 +98,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private val lineageQuery: Document = graphql"""
     {
-      lineage(projectPath: "namespace/lineage-project", commitId: "0000004", filePath: "result-file-1") {
+      lineage(projectPath: "namespace/lineage-project", commitId: "0000012", filePath: "figs/grid_plot.png") {
         nodes {
           id
           label
@@ -116,31 +124,34 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       }
     }"""
 
-  import multiFileAndCommitData._
   private lazy val theExpectedEdges = Right {
     Set(
-      json"""{"source": ${`commit1-input-data`.name.toNodeId},        "target": ${`commit3-renku-run`.name.toNodeId}}""",
-      json"""{"source": ${`commit2-source-file1`.name.toNodeId},      "target": ${`commit3-renku-run`.name.toNodeId}}""",
-      json"""{"source": ${`commit3-renku-run`.name.toNodeId},         "target": ${`commit3-preprocessed-data`.name.toNodeId}}""",
-      json"""{"source": ${`commit3-preprocessed-data`.name.toNodeId}, "target": ${`commit4-renku-run`.name.toNodeId}}""",
-      json"""{"source": ${`commit2-source-file2`.name.toNodeId},      "target": ${`commit4-renku-run`.name.toNodeId}}""",
-      json"""{"source": ${`commit4-renku-run`.name.toNodeId},         "target": ${`commit4-result-file1`.name.toNodeId}}"""
+      json"""{"source": ${`sha10 zhbikes`.toNodeId},            "target": ${`sha12 step2 renku update`.toNodeId}}""",
+      json"""{"source": ${`sha7 plot_data`.toNodeId},           "target": ${`sha9 renku run`.toNodeId}}""",
+      json"""{"source": ${`sha7 plot_data`.toNodeId},           "target": ${`sha12 step1 renku update`.toNodeId}}""",
+      json"""{"source": ${`sha12 parquet`.toNodeId},            "target": ${`sha12 step1 renku update`.toNodeId}}""",
+      json"""{"source": ${`sha12 step1 renku update`.toNodeId}, "target": ${`sha12 step2 grid_plot`.toNodeId}}""",
+      json"""{"source": ${`sha7 clean_data`.toNodeId},          "target": ${`sha8 renku run`.toNodeId}}""",
+      json"""{"source": ${`sha12 step2 renku update`.toNodeId}, "target": ${`sha12 parquet`.toNodeId}}""",
+      json"""{"source": ${`sha7 clean_data`.toNodeId},          "target": ${`sha12 step2 renku update`.toNodeId}}"""
     )
   }
 
   private lazy val theExpectedNodes = Right {
     Set(
-      json"""{"id": ${`commit1-input-data`.name.toNodeId},        "label": ${`commit1-input-data`.label.value}}""",
-      json"""{"id": ${`commit2-source-file1`.name.toNodeId},      "label": ${`commit2-source-file1`.label.value}}""",
-      json"""{"id": ${`commit2-source-file2`.name.toNodeId},      "label": ${`commit2-source-file2`.label.value}}""",
-      json"""{"id": ${`commit3-renku-run`.name.toNodeId},         "label": ${`commit3-renku-run`.label.value}}""",
-      json"""{"id": ${`commit3-preprocessed-data`.name.toNodeId}, "label": ${`commit3-preprocessed-data`.label.value}}""",
-      json"""{"id": ${`commit4-renku-run`.name.toNodeId},         "label": ${`commit4-renku-run`.label.value}}""",
-      json"""{"id": ${`commit4-result-file1`.name.toNodeId},      "label": ${`commit4-result-file1`.label.value}}"""
+      json"""{"id": ${`sha7 clean_data`.toNodeId},        "label": ${`sha7 clean_data`.label}}""",
+      json"""{"id": ${`sha7 plot_data`.toNodeId},      "label": ${`sha7 plot_data`.label}}""",
+      json"""{"id": ${`sha8 renku run`.toNodeId},      "label": ${`sha8 renku run`.label}}""",
+      json"""{"id": ${`sha9 renku run`.toNodeId},         "label": ${`sha9 renku run`.label}}""",
+      json"""{"id": ${`sha10 zhbikes`.toNodeId}, "label": ${`sha10 zhbikes`.label}}""",
+      json"""{"id": ${`sha12 step1 renku update`.toNodeId},         "label": ${`sha12 step1 renku update`.label}}""",
+      json"""{"id": ${`sha12 step2 grid_plot`.toNodeId},      "label": ${`sha12 step2 grid_plot`.label}}""",
+      json"""{"id": ${`sha12 step2 renku update`.toNodeId},      "label": ${`sha12 step2 renku update`.label}}""",
+      json"""{"id": ${`sha12 parquet`.toNodeId},      "label": ${`sha12 parquet`.label}}"""
     )
   }
 
-  private implicit class ResourceNameOps(resourceName: ResourceName) {
-    lazy val toNodeId: String = resourceName.value.replace(fusekiBaseUrl.value, "")
+  private implicit class ResourceNameOps(node: NodeDef) {
+    lazy val toNodeId: String = node.name.replace(fusekiBaseUrl.value, "")
   }
 }

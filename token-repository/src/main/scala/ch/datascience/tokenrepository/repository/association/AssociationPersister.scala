@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,6 +22,7 @@ import cats.Monad
 import cats.effect.{Bracket, ContextShift, IO}
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
@@ -33,31 +34,33 @@ private class AssociationPersister[Interpretation[_]: Monad](
 
   import doobie.implicits._
 
-  def persistAssociation(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
+  def persistAssociation(projectId:      ProjectId,
+                         projectPath:    ProjectPath,
+                         encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
     sql"select token from projects_tokens where project_id = ${projectId.value}"
       .query[String]
       .option
       .flatMap {
-        case Some(_) => update(projectId, encryptedToken)
-        case None    => insert(projectId, encryptedToken)
+        case Some(_) => update(projectId, projectPath, encryptedToken)
+        case None    => insert(projectId, projectPath, encryptedToken)
       }
       .transact(transactor.get)
 
-  private def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken) =
+  private def insert(projectId: ProjectId, projectPath: ProjectPath, encryptedToken: EncryptedAccessToken) =
     sql"""insert into 
-          projects_tokens (project_id, token) 
-          values (${projectId.value}, ${encryptedToken.value})
-      """.update.run.map(failIfMultiUpdate(projectId))
+          projects_tokens (project_id, project_path, token) 
+          values (${projectId.value}, ${projectPath.value}, ${encryptedToken.value})
+      """.update.run.map(failIfMultiUpdate(projectId, projectPath))
 
-  private def update(projectId: ProjectId, encryptedToken: EncryptedAccessToken) =
+  private def update(projectId: ProjectId, projectPath: ProjectPath, encryptedToken: EncryptedAccessToken) =
     sql"""update projects_tokens 
-          set token = ${encryptedToken.value} 
+          set token = ${encryptedToken.value}, project_path = ${projectPath.value}  
           where project_id = ${projectId.value}
-      """.update.run.map(failIfMultiUpdate(projectId))
+      """.update.run.map(failIfMultiUpdate(projectId, projectPath))
 
-  private def failIfMultiUpdate(projectId: ProjectId): Int => Unit = {
+  private def failIfMultiUpdate(projectId: ProjectId, projectPath: ProjectPath): Int => Unit = {
     case 1 => ()
-    case _ => throw new RuntimeException(s"Associating token for a projectId: $projectId")
+    case _ => throw new RuntimeException(s"Associating token for project $projectPath ($projectId)")
   }
 }
 

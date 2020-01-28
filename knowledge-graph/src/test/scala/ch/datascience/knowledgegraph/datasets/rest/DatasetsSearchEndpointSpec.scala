@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,18 +20,25 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.IO
+import cats.implicits._
+import ch.datascience.config.renku
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
+import ch.datascience.http.rest.paging.model.Total
+import ch.datascience.http.rest.paging.{PagingHeaders, PagingResponse}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
+import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.literal._
 import io.circe.syntax._
@@ -50,54 +57,62 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
   "searchForDatasets" should {
 
     "respond with OK and the found datasets" in new TestCase {
-      forAll(nonEmptyList(datasetSearchResultItems)) { datasetSearchResults =>
+      forAll(pagingResponses(datasetSearchResultItems)) { pagingResponse =>
         (datasetsFinder.findDatasets _)
-          .expects(phrase, sort)
-          .returning(context.pure(datasetSearchResults.toList))
+          .expects(maybePhrase, sort, pagingRequest)
+          .returning(pagingResponse.pure[IO])
 
-        val response = searchForDatasets(phrase, sort).unsafeRunSync()
+        val response = searchForDatasets(maybePhrase, sort, pagingRequest).unsafeRunSync()
 
-        response.status      shouldBe Ok
-        response.contentType shouldBe Some(`Content-Type`(application.json))
+        response.status         shouldBe Ok
+        response.contentType    shouldBe Some(`Content-Type`(application.json))
+        response.headers.toList should contain allElementsOf PagingHeaders.from(pagingResponse)
+        response
+          .as[List[Json]]
+          .unsafeRunSync should contain theSameElementsAs (pagingResponse.results map toJson)
 
-        response.as[List[Json]].unsafeRunSync should contain theSameElementsAs (datasetSearchResults.toList map toJson)
-
-        logger.loggedOnly(
-          Warn(s"Finding datasets containing '$phrase' phrase finished${executionTimeRecorder.executionTimeInfo}")
-        )
+        logger.loggedOnly(warn(maybePhrase))
         logger.reset()
       }
     }
 
     "respond with OK and an empty JSON array when no matching datasets found" in new TestCase {
+      val pagingResponse = PagingResponse
+        .from[IO, DatasetSearchResult](Nil, pagingRequest, Total(0))
+        .unsafeRunSync()
       (datasetsFinder.findDatasets _)
-        .expects(phrase, sort)
-        .returning(context.pure(Nil))
+        .expects(maybePhrase, sort, pagingRequest)
+        .returning(pagingResponse.pure[IO])
 
-      val response = searchForDatasets(phrase, sort).unsafeRunSync()
+      val response = searchForDatasets(maybePhrase, sort, pagingRequest).unsafeRunSync()
 
       response.status                       shouldBe Ok
       response.contentType                  shouldBe Some(`Content-Type`(application.json))
       response.as[List[Json]].unsafeRunSync shouldBe empty
+      response.headers.toList               should contain allElementsOf PagingHeaders.from(pagingResponse)
 
-      logger.loggedOnly(
-        Warn(s"Finding datasets containing '$phrase' phrase finished${executionTimeRecorder.executionTimeInfo}")
-      )
+      logger.loggedOnly(warn(maybePhrase))
     }
 
     "respond with INTERNAL_SERVER_ERROR when searching for datasets fails" in new TestCase {
       val exception = exceptions.generateOne
       (datasetsFinder.findDatasets _)
-        .expects(phrase, sort)
+        .expects(maybePhrase, sort, pagingRequest)
         .returning(context.raiseError(exception))
 
-      val response = searchForDatasets(phrase, sort).unsafeRunSync()
+      val response = searchForDatasets(maybePhrase, sort, pagingRequest).unsafeRunSync()
 
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(s"Finding datasets matching $phrase' failed").asJson
+      response.status      shouldBe InternalServerError
+      response.contentType shouldBe Some(`Content-Type`(application.json))
 
-      logger.loggedOnly(Error(s"Finding datasets matching $phrase' failed", exception))
+      val errorMessage = maybePhrase match {
+        case Some(phrase) => s"Finding datasets matching '$phrase' failed"
+        case None         => s"Finding all datasets failed"
+      }
+
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage(errorMessage).asJson
+
+      logger.loggedOnly(Error(errorMessage, exception))
     }
   }
 
@@ -116,11 +131,15 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
 
     val context = MonadError[IO, Throwable]
 
-    val phrase = phrases.generateOne
-    val sort   = searchEndpointSorts.generateOne
+    val maybePhrase   = phrases.generateOption
+    val sort          = searchEndpointSorts.generateOne
+    val pagingRequest = pagingRequests.generateOne
+
+    private val renkuResourcesUrl = renkuResourcesUrls.generateOne
+    implicit val renkuResourceUrl: renku.ResourceUrl =
+      (renkuResourcesUrl / "datasets") ? (page.parameterName -> pagingRequest.page) & (perPage.parameterName -> pagingRequest.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
 
     val datasetsFinder        = mock[DatasetsFinder[IO]]
-    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val searchForDatasets = new DatasetsSearchEndpoint[IO](
@@ -156,6 +175,13 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
         json"""{
         "name": $name
       }""" addIfDefined ("email" -> maybeEmail)
+    }
+
+    def warn(maybePhrase: Option[Phrase]) = maybePhrase match {
+      case Some(phrase) =>
+        Warn(s"Finding datasets containing '$phrase' phrase finished${executionTimeRecorder.executionTimeInfo}")
+      case None =>
+        Warn(s"Finding all datasets finished${executionTimeRecorder.executionTimeInfo}")
     }
   }
 

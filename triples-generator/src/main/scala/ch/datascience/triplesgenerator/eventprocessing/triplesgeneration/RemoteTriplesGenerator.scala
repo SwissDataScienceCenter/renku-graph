@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -57,6 +57,8 @@ class RemoteTriplesGenerator(
     extends IORestClient[RemoteTriplesGenerator](Throttler.noThrottling, logger)
     with TriplesGenerator[IO] {
 
+  import TriplesGenerator.GenerationRecoverableError
+  import cats.data.EitherT
   import cats.effect._
   import ch.datascience.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
@@ -65,12 +67,16 @@ class RemoteTriplesGenerator(
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  override def generateTriples(commit: Commit, maybeAccessToken: Option[AccessToken]): IO[JsonLDTriples] =
+  override def generateTriples(
+      commit:           Commit,
+      maybeAccessToken: Option[AccessToken]
+  ): EitherT[IO, GenerationRecoverableError, JsonLDTriples] = EitherT.right {
     for {
       uri           <- validateUri(s"$serviceUrl/projects/${commit.project.id}/commits/${commit.id}")
       triplesInJson <- send(request(GET, uri))(mapResponse)
       triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
     } yield triples
+  }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {
     case (Ok, _, response)    => response.as[Json]

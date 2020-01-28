@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,23 +19,25 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
-import cats.data.NonEmptyList
+import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.commands._
 import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
 import io.chrisdavenport.log4cats.Logger
+import io.prometheus.client.Histogram
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -55,6 +57,7 @@ class CommitEventProcessor[Interpretation[_]](
 )(implicit ME:                MonadError[Interpretation, Throwable])
     extends EventProcessor[Interpretation] {
 
+  import IOAccessTokenFinder._
   import UploadingResult._
   import accessTokenFinder._
   import commitEventsDeserialiser._
@@ -88,10 +91,10 @@ class CommitEventProcessor[Interpretation[_]](
                                  maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
       rawTriples     <- generateTriples(commit, maybeAccessToken)
-      curatedTriples <- curate(rawTriples)
-      result         <- upload(curatedTriples) map toUploadingResult(commit)
+      curatedTriples <- EitherT.right[GenerationRecoverableError](curate(rawTriples))
+      result         <- EitherT.right[GenerationRecoverableError](upload(curatedTriples) map toUploadingResult(commit))
     } yield result
-  } recoverWith nonRecoverableFailure(commit)
+  }.value map (_.fold(toRecoverableError(commit), identity)) recoverWith nonRecoverableFailure(commit)
 
   private def toUploadingResult(commit: Commit): TriplesUploadResult => UploadingResult = {
     case DeliverySuccess => Uploaded(commit)
@@ -104,6 +107,11 @@ class CommitEventProcessor[Interpretation[_]](
     case error @ InvalidUpdatesFailure(message) =>
       logger.error(s"${logMessageCommon(commit)} $message")
       NonRecoverableError(commit, error: Throwable)
+  }
+
+  private def toRecoverableError(commit: Commit): GenerationRecoverableError => UploadingResult = { error =>
+    logger.error(s"${logMessageCommon(commit)} ${error.message}")
+    RecoverableError(commit, error)
   }
 
   private def nonRecoverableFailure(commit: Commit): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
@@ -134,7 +142,7 @@ class CommitEventProcessor[Interpretation[_]](
   private def markEventAsRecoverable(maybeUploadingError: Option[UploadingResult]) =
     maybeUploadingError match {
       case Some(RecoverableError(commit, exception)) =>
-        markEventFailed(commit.commitEventId, TriplesStoreFailure, EventMessage(exception))
+        markEventFailed(commit.commitEventId, RecoverableFailure, EventMessage(exception))
       case _ => ME.unit
     }
 
@@ -201,6 +209,17 @@ class CommitEventProcessor[Interpretation[_]](
 
 object IOCommitEventProcessor {
 
+  import ch.datascience.metrics.MetricsRegistry
+
+  private[triplesgenerator] lazy val eventsProcessingTimes: Histogram = MetricsRegistry.register {
+    Histogram
+      .build()
+      .name("events_processing_times")
+      .help("Commit Events processing times")
+      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
+      .register(_)
+  }
+
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       triplesGenerator:    TriplesGenerator[IO]
@@ -208,12 +227,13 @@ object IOCommitEventProcessor {
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      uploader              <- IOUploader(ApplicationLogger)
-      tokenRepositoryUrl    <- TokenRepositoryUrl[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+      uploader          <- IOUploader(ApplicationLogger)
+      accessTokenFinder <- IOAccessTokenFinder(ApplicationLogger)
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
+                                                         maybeHistogram = Some(eventsProcessingTimes))
     } yield new CommitEventProcessor[IO](
       new CommitEventsDeserialiser[IO](),
-      new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
+      accessTokenFinder,
       triplesGenerator,
       IOTriplesCurator(),
       uploader,

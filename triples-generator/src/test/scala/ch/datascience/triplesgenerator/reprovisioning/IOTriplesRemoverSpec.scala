@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,12 +19,10 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.triples._
+import ch.datascience.rdfstore.entities.bundles._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -35,10 +33,8 @@ class IOTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
     "remove all the triples from the storage" in new TestCase {
 
       loadToStore(
-        triples(
-          singleFileAndCommitWithDataset(projectPaths.generateOne),
-          singleFileAndCommitWithDataset(projectPaths.generateOne)
-        )
+        randomDataSetCommit,
+        randomDataSetCommit
       )
 
       rdfStoreSize should be > 0

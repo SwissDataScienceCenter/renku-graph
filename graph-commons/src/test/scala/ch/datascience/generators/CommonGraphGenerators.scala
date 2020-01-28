@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,34 +21,50 @@ package ch.datascience.generators
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
-import ch.datascience.config.RenkuResourcesUrl
+import cats.implicits._
+import ch.datascience.config.renku
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.crypto.AesCrypto
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
-import ch.datascience.http.rest.{Links, SortBy}
+import ch.datascience.http.rest.paging.model.Total
+import ch.datascience.http.rest.paging.{PagingRequest, PagingResponse}
+import ch.datascience.http.rest.{Links, SortBy, paging}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import org.scalacheck.Gen
+import org.scalacheck.Gen.{alphaChar, frequency, numChar, oneOf}
+
+import scala.util.Try
 
 object CommonGraphGenerators {
 
   implicit val usernames:    Gen[Username]    = nonEmptyStrings() map Username.apply
   implicit val affiliations: Gen[Affiliation] = nonEmptyStrings() map Affiliation.apply
 
-  implicit val emails: Gen[Email] = for {
-    beforeAt <- nonEmptyStrings()
-    afterAt  <- nonEmptyStrings()
-  } yield Email(s"$beforeAt@$afterAt")
+  implicit val emails: Gen[Email] = {
+    val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~".toList))
+    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~.".toList))
+    val beforeAts = for {
+      firstChar  <- firstCharGen
+      otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
+    } yield s"$firstChar${otherChars.toList.mkString("")}"
+
+    for {
+      beforeAt <- beforeAts
+      afterAt  <- nonEmptyStrings()
+    } yield Email(s"$beforeAt@$afterAt")
+  }
 
   implicit val names: Gen[Name] = for {
     first  <- nonEmptyStrings()
@@ -91,7 +107,7 @@ object CommonGraphGenerators {
     } yield RateLimit[Target](items, per = unit)
 
   implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
-    fusekiUrl       <- httpUrls map FusekiBaseUrl.apply
+    fusekiUrl       <- httpUrls() map FusekiBaseUrl.apply
     datasetName     <- nonEmptyStrings() map DatasetName.apply
     authCredentials <- basicAuthCredentials
   } yield RdfStoreConfig(fusekiUrl, datasetName, authCredentials)
@@ -101,11 +117,24 @@ object CommonGraphGenerators {
     .map(_.mkString("."))
     .map(SchemaVersion.apply)
 
-  implicit val renkuBaseUrls:      Gen[RenkuBaseUrl]      = httpUrls map RenkuBaseUrl.apply
-  implicit val renkuResourcesUrls: Gen[RenkuResourcesUrl] = httpUrls map RenkuResourcesUrl.apply
+  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls() map RenkuBaseUrl.apply
+  implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
+    url  <- httpUrls()
+    path <- relativePaths(maxSegments = 1)
+  } yield renku.ResourcesUrl(s"$url/$path")
+  def renkuResourceUrls(
+      renkuResourcesUrl: renku.ResourcesUrl = renkuResourcesUrls.generateOne
+  ): Gen[renku.ResourceUrl] =
+    for {
+      path <- relativePaths(maxSegments = 1)
+    } yield renkuResourcesUrl / path
+  implicit val gitLabUrls: Gen[GitLabUrl] = for {
+    url  <- httpUrls()
+    path <- relativePaths(maxSegments = 2)
+  } yield GitLabUrl(s"$url/$path")
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
-    url         <- httpUrls
+    url         <- httpUrls()
     projectName <- nonEmptyList(nonEmptyStrings()).map(_.toList.mkString("."))
     projectId   <- positiveInts(max = 100)
   } yield SentryBaseUrl(s"$url@$projectName/$projectId")
@@ -119,7 +148,7 @@ object CommonGraphGenerators {
 
   implicit val rels: Gen[Rel] = nonEmptyStrings() map Rel.apply
   implicit val hrefs: Gen[Href] = for {
-    baseUrl <- httpUrls
+    baseUrl <- httpUrls()
     path    <- relativePaths()
   } yield Href(s"$baseUrl/$path")
   implicit val linkObjects: Gen[Link] = for {
@@ -134,7 +163,36 @@ object CommonGraphGenerators {
       direction <- Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
     } yield sortBy.By(property, direction)
 
-  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls map FusekiBaseUrl.apply
+  object TestSort extends SortBy {
+    type PropertyType = TestProperty
+    sealed trait TestProperty extends Property
+    case object Name          extends Property(name = "name") with TestProperty
+    case object Email         extends Property(name = "email") with TestProperty
+
+    override val properties: Set[TestProperty] = Set(Name, Email)
+  }
+
+  def testSortBys: Gen[TestSort.By] = sortBys(TestSort)
+
+  implicit val pages:    Gen[paging.model.Page]    = positiveInts(max = 100) map (_.value) map paging.model.Page.apply
+  implicit val perPages: Gen[paging.model.PerPage] = positiveInts(max = 20) map (_.value) map paging.model.PerPage.apply
+  implicit val pagingRequests: Gen[PagingRequest] = for {
+    page    <- pages
+    perPage <- perPages
+  } yield PagingRequest(page, perPage)
+  implicit val totals: Gen[paging.model.Total] = nonNegativeInts() map (_.value) map paging.model.Total.apply
+
+  def pagingResponses[Result](resultsGen: Gen[Result]): Gen[PagingResponse[Result]] =
+    for {
+      page    <- pages
+      perPage <- perPages
+      results <- listOf(resultsGen, maxElements = Refined.unsafeApply(perPage.value))
+      total = Total((page.value - 1) * perPage.value + results.size)
+    } yield PagingResponse
+      .from[Try, Result](results, PagingRequest(page, perPage), total)
+      .fold(throw _, identity)
+
+  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls() map FusekiBaseUrl.apply
 
   implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
     subject <- nonEmptyStrings()

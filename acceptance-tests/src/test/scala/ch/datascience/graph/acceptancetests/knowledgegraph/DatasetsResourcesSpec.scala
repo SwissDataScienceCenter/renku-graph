@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,10 +18,12 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
+import ch.datascience.graph.acceptancetests.stubs.GitLab.`GET <gitlab>/api/v4/projects/:path returning OK with`
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
@@ -32,6 +34,7 @@ import ch.datascience.graph.model.datasets.{Description, Identifier, Name}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Name => UserName}
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
@@ -39,11 +42,13 @@ import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen}
 import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.triples.{singleFileAndCommitWithDataset, triples}
+import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
+import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -56,9 +61,13 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
   feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
+    implicit val accessToken: AccessToken = accessTokens.generateOne
+
     val project          = projectsGen.generateOne
     val dataset1CommitId = commitIds.generateOne
-    val dataset1Creation = datasetInProjectCreations.generateOne
+    val dataset1Creation = datasetInProjectCreations.generateOne.copy(
+      agent = DatasetAgent(project.created.creator.email, project.created.creator.name)
+    )
     val dataset1 = datasets.generateOne.copy(
       maybeDescription = Some(datasetDescriptions.generateOne),
       published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
@@ -72,43 +81,45 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       project          = List(DatasetProject(project.path, project.name, dataset2Creation))
     )
 
-    scenario("As a user I would like to find project's datasets by calling a REST enpoint") {
+    scenario("As a user I would like to find project's data-sets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
-      val jsonLDTriples = triples(
-        singleFileAndCommitWithDataset(
-          projectPath               = project.path,
-          projectName               = project.name,
-          projectDateCreated        = project.created.date,
-          projectCreator            = project.created.creator.name -> project.created.creator.email,
-          commitId                  = dataset1CommitId,
-          committerName             = dataset1Creation.agent.name,
-          committerEmail            = dataset1Creation.agent.email,
-          committedDate             = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+      val jsonLDTriples = JsonLD.arr(
+        dataSetCommit(
+          commitId      = dataset1CommitId,
+          committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.email),
+          schemaVersion = currentSchemaVersion
+        )(
+          projectPath        = project.path,
+          projectName        = project.name,
+          projectDateCreated = project.created.date,
+          projectCreator     = Person(project.created.creator.name, project.created.creator.email)
+        )(
           datasetIdentifier         = dataset1.id,
           datasetName               = dataset1.name,
           maybeDatasetDescription   = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
-          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-          maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
-          schemaVersion             = currentSchemaVersion
+          datasetCreators           = dataset1.published.creators.map(toPerson),
+          datasetParts              = dataset1.part.map(part => (part.name, part.atLocation))
         ),
-        singleFileAndCommitWithDataset(
-          projectPath               = project.path,
-          projectName               = project.name,
-          projectDateCreated        = project.created.date,
-          projectCreator            = project.created.creator.name -> project.created.creator.email,
-          commitId                  = dataset2CommitId,
-          committerName             = dataset2Creation.agent.name,
-          committerEmail            = dataset2Creation.agent.email,
-          committedDate             = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+        dataSetCommit(
+          commitId      = dataset2CommitId,
+          committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.email),
+          schemaVersion = currentSchemaVersion
+        )(
+          projectPath        = project.path,
+          projectName        = project.name,
+          projectDateCreated = project.created.date,
+          projectCreator     = Person(project.created.creator.name, project.created.creator.email)
+        )(
           datasetIdentifier         = dataset2.id,
           datasetName               = dataset2.name,
           maybeDatasetDescription   = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
-          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-          maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation)),
-          schemaVersion             = currentSchemaVersion
+          datasetCreators           = dataset2.published.creators.map(toPerson),
+          datasetParts              = dataset2.part.map(part => (part.name, part.atLocation))
         )
       )
 
@@ -119,6 +130,9 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           .flatMap(_.published.creators.flatMap(_.maybeEmail))
           .toSet + dataset1Creation.agent.email + dataset2Creation.agent.email + project.created.creator.email
       )
+
+      And("the project exists in GitLab")
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
@@ -163,6 +177,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {
 
     scenario("As a user I would like to be able to search for datasets by some free-text search") {
+
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       val text             = nonBlankStrings(minLength = 10).generateOne
       val dataset1Projects = nonEmptyList(projectsGen).generateOne.toList
@@ -219,32 +235,62 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       searchSortedByName.status shouldBe Ok
 
       val Right(foundDatasetsSortedByName) = searchSortedByName.bodyAsJson.as[List[Json]]
-      foundDatasetsSortedByName.flatMap(sortCreators) shouldBe List(
+      val datasetsSortedByName = List(
         searchResultJson(dataset1),
         searchResultJson(dataset2),
         searchResultJson(dataset3)
       ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
+      foundDatasetsSortedByName.flatMap(sortCreators) shouldBe datasetsSortedByName
+
+      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc&page=2&per_page=1")
+      val searchForPage = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc&page=2&per_page=1"
+
+      Then("he should get OK response with the dataset from the requested page")
+      val Right(foundDatasetsPage) = searchForPage.bodyAsJson.as[List[Json]]
+      foundDatasetsPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByName(1))
+        .flatMap(sortCreators)
+
+      When("user calls the GET knowledge-graph/datasets?sort=name:asc")
+      val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=name:asc"
+
+      Then("he should get OK response with all the datasets")
+      val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.bodyAsJson.as[List[Json]]
+      foundDatasetsWithoutPhrase.flatMap(sortCreators) should contain allElementsOf List(
+        searchResultJson(dataset1),
+        searchResultJson(dataset2),
+        searchResultJson(dataset3),
+        searchResultJson(dataset4)
+      ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
+
+      When("user uses the response header link with the rel='first'")
+      val firstPageLink     = searchForPage.headerLink(rel = "first")
+      val firstPageResponse = restClient GET firstPageLink
+
+      Then("he should get OK response with the datasets from the first page")
+      val Right(foundFirstPage) = firstPageResponse.bodyAsJson.as[List[Json]]
+      foundFirstPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByName.head)
+        .flatMap(sortCreators)
     }
 
-    def pushToStore(dataset: Dataset, projects: List[Project]): Unit =
+    def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit =
       projects foreach { project =>
         val commitId = commitIds.generateOne
-        `data in the RDF store`(project.toGitLabProject(),
-                                commitId,
-                                triples(toSingleFileAndCommitWithDataset(project.path, commitId, dataset)))
+        `data in the RDF store`(project.toGitLabProject(), commitId, toDataSetCommit(project.path, commitId, dataset))
         `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
       }
 
-    def toSingleFileAndCommitWithDataset(projectPath: ProjectPath, commitId: CommitId, dataset: Dataset): List[Json] =
-      singleFileAndCommitWithDataset(
-        projectPath               = projectPath,
-        commitId                  = commitId,
+    def toDataSetCommit(projectPath: ProjectPath, commitId: CommitId, dataset: Dataset) =
+      dataSetCommit(
+        commitId      = commitId,
+        schemaVersion = currentSchemaVersion
+      )(
+        projectPath = projectPath
+      )(
         datasetIdentifier         = dataset.id,
         datasetName               = dataset.name,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
-        maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-        schemaVersion             = currentSchemaVersion
+        datasetCreators           = dataset.published.creators.map(toPerson)
       )
 
     def toDatasetProject(project: Project) =
@@ -263,7 +309,7 @@ object DatasetsResources {
       "name": ${dataset.name.value}
     }""" deepMerge {
     _links(
-      Link(Rel("details"), Href(renkuResourceUrl / "datasets" / dataset.id))
+      Link(Rel("details"), Href(renkuResourcesUrl / "datasets" / dataset.id))
     )
   }
 
@@ -277,7 +323,7 @@ object DatasetsResources {
       .addIfDefined("description" -> dataset.maybeDescription)
       .deepMerge {
         _links(
-          Link(Rel("details"), Href(renkuResourceUrl / "datasets" / dataset.id))
+          Link(Rel("details"), Href(renkuResourcesUrl / "datasets" / dataset.id))
         )
       }
 
@@ -307,4 +353,6 @@ object DatasetsResources {
 
     json.hcursor.downField("published").downField("creator").withFocus(_.mapArray(orderByName)).top
   }
+
+  lazy val toPerson: DatasetCreator => Person = creator => Person(creator.name, creator.maybeEmail, None)
 }

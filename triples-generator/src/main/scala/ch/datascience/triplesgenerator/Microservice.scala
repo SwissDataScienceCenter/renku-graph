@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,11 +28,13 @@ import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.init._
+import ch.datascience.triplesgenerator.metrics.{EventLogMetrics, IOEventLogMetrics}
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning}
 import pureconfig._
 
@@ -64,6 +66,7 @@ object Microservice extends IOMicroservice {
         reProvisioning           <- IOReProvisioning(triplesGeneration, transactor)
         triplesGenerator         <- TriplesGenerator(triplesGeneration)
         commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator)
+        routes                   <- new MicroserviceRoutes[IO]().routes
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, new IOEventLogFetch(transactor)))
                                  .withEventsProcessor(commitEventProcessor)
         exitCode <- new MicroserviceRunner(
@@ -72,7 +75,8 @@ object Microservice extends IOMicroservice {
                      fusekiDatasetInitializer,
                      reProvisioning,
                      eventProcessorRunner,
-                     new HttpServer[IO](serverPort = 9002, serviceRoutes = new MicroserviceRoutes[IO]().routes),
+                     IOEventLogMetrics(transactor, ApplicationLogger),
+                     new HttpServer[IO](serverPort = 9002, routes),
                      subProcessesCancelTokens
                    ) run args
       } yield exitCode
@@ -85,6 +89,7 @@ private class MicroserviceRunner(
     datasetInitializer:       FusekiDatasetInitializer[IO],
     reProvisioning:           ReProvisioning[IO],
     eventProcessorRunner:     EventProcessorRunner[IO],
+    eventLogMetrics:          EventLogMetrics,
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
@@ -96,6 +101,7 @@ private class MicroserviceRunner(
       _        <- datasetInitializer.run
       _        <- reProvisioning.run.start.map(gatherCancelToken)
       _        <- eventProcessorRunner.run.start.map(gatherCancelToken)
+      _        <- eventLogMetrics.run.start.map(gatherCancelToken)
       exitCode <- httpServer.run
     } yield exitCode
 
