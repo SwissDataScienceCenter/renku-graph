@@ -22,7 +22,6 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
-import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase

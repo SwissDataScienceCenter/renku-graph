@@ -32,7 +32,6 @@ import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}

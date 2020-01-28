@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.datasets
+package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
@@ -24,11 +24,11 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
+import ch.datascience.knowledgegraph.datasets.model.{AddedToProject, DatasetAgent, DatasetProject}
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
 import io.circe.DecodingFailure
-import model._
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds

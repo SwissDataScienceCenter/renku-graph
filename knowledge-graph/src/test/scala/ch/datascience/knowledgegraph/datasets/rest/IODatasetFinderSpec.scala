@@ -28,7 +28,6 @@ import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPart, DatasetProject}
-import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
