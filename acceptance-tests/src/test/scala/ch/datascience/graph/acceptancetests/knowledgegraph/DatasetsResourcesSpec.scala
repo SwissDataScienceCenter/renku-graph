@@ -23,16 +23,15 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
-import ch.datascience.graph.acceptancetests.stubs.GitLab.`GET <gitlab>/api/v4/projects/:path returning OK with`
+import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name, SameAs}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
-import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -272,25 +271,54 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         .flatMap(sortCreators)
     }
 
-    def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit =
-      projects foreach { project =>
+    def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit = {
+      val firstProject +: otherProjects = projects
+
+      val commitId      = commitIds.generateOne
+      val committedDate = committedDates.generateOne
+      val datasetJsonLD = toDataSetCommit(firstProject, commitId, committedDate, dataset)
+      `data in the RDF store`(firstProject.toGitLabProject(), commitId, datasetJsonLD)
+      `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
+
+      val commonSameAs = dataset.maybeSameAs orElse datasetJsonLD.entityId.flatMap { id =>
+        SameAs.fromId(id.value).toOption
+      }
+      otherProjects foreach { project =>
         val commitId = commitIds.generateOne
-        `data in the RDF store`(project.toGitLabProject(), commitId, toDataSetCommit(project.path, commitId, dataset))
+        `data in the RDF store`(
+          project.toGitLabProject(),
+          commitId,
+          toDataSetCommit(project,
+                          commitId,
+                          CommittedDate(committedDate.value plusSeconds positiveInts().generateOne.value),
+                          dataset,
+                          datasetIdentifiers.generateSome,
+                          commonSameAs)
+        )
         `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
       }
+    }
 
-    def toDataSetCommit(projectPath: ProjectPath, commitId: CommitId, dataset: Dataset) =
+    def toDataSetCommit(project:              Project,
+                        commitId:             CommitId,
+                        committedDate:        CommittedDate,
+                        dataset:              Dataset,
+                        overriddenIdentifier: Option[Identifier] = None,
+                        overriddenSameAs:     Option[SameAs] = None) =
       dataSetCommit(
         commitId      = commitId,
+        committedDate = committedDate,
         schemaVersion = currentSchemaVersion
       )(
-        projectPath = projectPath
+        projectPath = project.path,
+        projectName = project.name
       )(
-        datasetIdentifier         = dataset.id,
+        datasetIdentifier         = overriddenIdentifier getOrElse dataset.id,
         datasetName               = dataset.name,
+        maybeDatasetSameAs        = overriddenSameAs orElse dataset.maybeSameAs,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
-        datasetCreators           = dataset.published.creators.map(toPerson)
+        datasetCreators           = dataset.published.creators map toPerson
       )
 
     def toDatasetProject(project: Project) =
