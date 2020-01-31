@@ -92,7 +92,7 @@ private class IODatasetsFinder(
       case Some(phrase) if phrase.value.trim != "*" =>
         s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
-            |  {
+            |  { # finding datasets having the same sameAs but not pointing to a dataset id from a renku project
             |    ?datasetId schema:dateCreated ?earliestCreated ;
             |               schema:sameAs/schema:url ?sameAs ;
             |               schema:name ?name ;
@@ -138,7 +138,7 @@ private class IODatasetsFinder(
             |      }
             |      GROUP BY ?sameAs
             |    }
-            |  } UNION {
+            |  } UNION { # finding datasets having the sameAs pointing to a dataset from a renku project
             |    ?dsId schema:name ?name ;
             |          schema:identifier ?identifier .
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
@@ -178,7 +178,7 @@ private class IODatasetsFinder(
             |      }
             |      GROUP BY ?dsId
             |    }
-            |  } UNION {
+            |  } UNION { # finding datasets having no sameAs set and not imported to another projects
             |    ?dsId schema:name ?name ;
             |          schema:identifier ?identifier .
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
@@ -225,55 +225,92 @@ private class IODatasetsFinder(
         s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
             |  { # finding datasets having the same sameAs but not pointing to a dataset id from a renku project
-            |    ?datasetId schema:dateCreated ?earliestCreated ;
-            |               schema:sameAs/schema:url ?sameAs ;
-            |               schema:name ?name ;
-            |               schema:identifier ?identifier .
-            |    OPTIONAL { ?datasetId schema:description ?maybeDescription } .
-            |    OPTIONAL { ?datasetId schema:datePublished ?maybePublishedDate } {
-            |      SELECT ?sameAs (COUNT(DISTINCT ?dsId) AS ?projectsCount) (MIN(?dateCreated) AS ?earliestCreated)
-            |      WHERE {
-            |        ?dsId rdf:type <http://schema.org/Dataset> ;
-            |              schema:dateCreated ?dateCreated ;
-            |              schema:sameAs/schema:url ?sameAs .
-            |        FILTER NOT EXISTS {
-            |          ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
-            |            ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
-            |            FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
+            |    SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (?smallProjectCounts AS ?projectsCount)
+            |    WHERE {
+            |      { # locating dataset created as first with certain sameAs
+            |        SELECT ?sameAs ?smallProjectCounts (MIN(?dateCreated) AS ?earliestCreated)
+            |        WHERE {
+            |          ?dsId rdf:type <http://schema.org/Dataset> ;
+            |                schema:sameAs/schema:url ?sameAs ;
+            |                schema:dateCreated ?dateCreated { # grouping all sharing sameAs
+            |                  SELECT ?sameAs (SUM(?projectsCnt) AS ?smallProjectCounts)
+            |                  WHERE { # grouping datasets by id and sameAs - to make forks as one row
+            |                    SELECT ?dsId ?sameAs (COUNT(DISTINCT ?prId) AS ?projectsCnt)
+            |                    WHERE {
+            |                      ?dsId rdf:type <http://schema.org/Dataset> ;
+            |                            schema:isPartOf ?prId ;
+            |                            schema:sameAs/schema:url ?sameAs .
+            |                      FILTER NOT EXISTS {
+            |                        ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
+            |                          ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
+            |                        }
+            |                      }
+            |                    }
+            |                    GROUP BY ?dsId ?sameAs
+            |                    HAVING (COUNT(*) > 0)
+            |                  }
+            |                  GROUP BY ?sameAs
+            |                  HAVING (COUNT(*) > 0)
+            |                }
+            |        }
+            |        GROUP BY ?sameAs ?smallProjectCounts
+            |        HAVING (COUNT(*) > 0)
+            |      } {
+            |        ?datasetId schema:sameAs/schema:url ?sameAs ;
+            |                   schema:dateCreated ?earliestCreated ;
+            |                   schema:name ?name ;
+            |                   schema:identifier ?identifier .
+            |        OPTIONAL { ?datasetId schema:description ?maybeDescription } .
+            |        OPTIONAL { ?datasetId schema:datePublished ?maybePublishedDate }
+            |      }
+            |    }
+            |    GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate ?smallProjectCounts
+            |    HAVING (COUNT(*) > 0)
+            |  } UNION { # finding datasets having the sameAs pointing to a dataset from a renku project
+            |    SELECT ?name ?identifier ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?projectId) AS ?projectsCount)
+            |    WHERE {
+            |      {
+            |        SELECT ?sourceDsId ?name ?identifier ?maybeDescription ?maybePublishedDate
+            |        WHERE {
+            |          ?derivedDsId schema:sameAs/schema:url ?sourceDsId {
+            |            ?sourceDsId rdf:type <http://schema.org/Dataset>;
+            |                        schema:name ?name ;
+            |                        schema:identifier ?identifier .
+            |            OPTIONAL { ?sourceDsId schema:description ?maybeDescription } .
+            |            OPTIONAL { ?sourceDsId schema:datePublished ?maybePublishedDate }
             |          }
             |        }
+            |        GROUP BY ?sourceDsId ?name ?identifier ?maybeDescription ?maybePublishedDate
             |      }
-            |      GROUP BY ?sameAs
-            |    }
-            |  } UNION { # finding datasets having the sameAs pointing to a dataset from a renku project
-            |    ?dsId schema:name ?name ;
-            |          schema:identifier ?identifier .
-            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
-            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
-            |      SELECT ?dsId ((COUNT(?derivedDsId) \\u002B 1) AS ?projectsCount)
-            |      WHERE {
-            |        ?derivedDsId schema:sameAs/schema:url ?dsId {
-            |          ?dsId rdf:type <http://schema.org/Dataset> .
-            |          FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |        }
+            |      {
+            |        ?dsId schema:sameAs/schema:url ?sourceDsId;
+            |              schema:isPartOf ?projectId
+            |      } UNION {
+            |        ?sourceDsId schema:isPartOf ?projectId
+            |        BIND (?sourceDsId AS ?dsId)
             |      }
-            |      GROUP BY ?dsId
             |    }
+            |    GROUP BY ?name ?identifier ?maybeDescription ?maybePublishedDate
+            |    HAVING (COUNT(*) > 0)
             |  } UNION { # finding datasets having no sameAs set and not imported to another projects
             |    ?dsId schema:name ?name ;
             |          schema:identifier ?identifier .
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
             |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
-            |      SELECT ?dsId (1 AS ?projectsCount)
+            |      SELECT ?dsId (COUNT(DISTINCT ?projectId) AS ?projectsCount)
             |      WHERE {
-            |        ?dsId rdf:type <http://schema.org/Dataset> .
+            |        ?dsId rdf:type <http://schema.org/Dataset>;
+            |              schema:isPartOf ?projectId.
             |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
             |        FILTER NOT EXISTS { ?derivedDsId schema:sameAs/schema:url ?dsId } .
             |      }
             |      GROUP BY ?dsId
+            |      HAVING (COUNT(*) > 0)
             |    }
             |  }
             |}
+            |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
+            |HAVING (COUNT(*) > 0)
             |${`ORDER BY`(sort)}
             |""".stripMargin
     }
@@ -322,7 +359,6 @@ private class IODatasetsFinder(
             |      FILTER NOT EXISTS {
             |        ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
             |          ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
-            |          FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
             |        }
             |      }
             |    }

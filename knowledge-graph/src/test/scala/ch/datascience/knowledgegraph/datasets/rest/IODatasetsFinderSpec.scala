@@ -33,7 +33,7 @@ import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator}
+import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetCreator, DatasetProject}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
@@ -54,12 +54,13 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
     Option(Phrase("*")) +: Option.empty[Phrase] +: Nil foreach { maybePhrase =>
       s"return all datasets when the given phrase is $maybePhrase" in new TestCase {
-        val datasetsList = nonEmptyList(datasets).generateOne.toList
+
+        val datasetsList = nonEmptyList(datasets, maxElements = 1).generateOne.toList
 
         loadToStore(datasetsList flatMap toDataSetCommit: _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase = maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe datasetsList
@@ -132,6 +133,119 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         .sortBy(_.name.value)
 
       result.pagingInfo.total shouldBe Total(datasetsList.size)
+    }
+
+    "merge all datasets having the same sameAs and forked to different projects - case when no phrase is given" in new TestCase {
+      val datasetProject1CreatedDate = datasetCreatedDates.generateOne
+      val datasetProject1 = datasets(
+        maybeSameAs = datasetSameAs.toGeneratorOfSomes,
+        projects    = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
+      ).generateOne
+      val datasetProject1Fork = datasetProject1.copy(projects = List(datasetProjects.generateOne))
+
+      val datasetProject2CreatedDate = datasetProject1CreatedDate.shiftToFuture
+      val datasetProject2 = datasetProject1.copy(
+        id       = datasetIdentifiers.generateOne,
+        projects = List(datasetProjects.generateOne)
+      )
+      val datasetProject2Fork = datasetProject2.copy(projects = List(datasetProjects.generateOne))
+
+      loadToStore(
+        List(
+          toDataSetCommit(datasetProject1, datasetProject1CreatedDate),
+          toDataSetCommit(datasetProject1Fork, datasetProject1CreatedDate),
+          toDataSetCommit(datasetProject2, datasetProject2CreatedDate),
+          toDataSetCommit(datasetProject2Fork, datasetProject2CreatedDate)
+        ).flatten: _*
+      )
+
+      val result = datasetsFinder
+        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+
+      result.results shouldBe List(
+        datasetProject1 addAll datasetProject1Fork.projects addAll datasetProject2.projects addAll datasetProject2Fork.projects
+      ).map(_.toDatasetSearchResult)
+        .sortBy(_.name.value)
+
+      result.pagingInfo.total shouldBe Total(1)
+    }
+
+    "merge datasets imported from other renku project and forked to different projects - case when no phrase is given" in new TestCase {
+      val initialDatasetCreatedDate = datasetCreatedDates.generateOne
+      val initialDataset = datasets(
+        maybeSameAs = emptyOptionOf[SameAs],
+        projects    = nonEmptyList(datasetProjects, minElements = 3, maxElements = 3)
+      ).generateOne
+      val datasetDatasetJsons = toDataSetCommit(initialDataset, initialDatasetCreatedDate)
+      val initialDatasetFork  = initialDataset.copy(projects = List(datasetProjects.generateOne))
+
+      val importedDatasetCreatedDate = initialDatasetCreatedDate.shiftToFuture
+      val importedDataset = initialDataset.copy(
+        id       = datasetIdentifiers.generateOne,
+        projects = List(datasetProjects.generateOne),
+        maybeSameAs = initialDataset.maybeSameAs orElse datasetDatasetJsons.head.entityId.flatMap(
+          id => SameAs.fromId(id.value).toOption
+        )
+      )
+      val importedDatasetFork = importedDataset.copy(projects = List(datasetProjects.generateOne))
+
+      loadToStore(
+        List(
+          datasetDatasetJsons,
+          toDataSetCommit(initialDatasetFork, initialDatasetCreatedDate),
+          toDataSetCommit(importedDataset, importedDatasetCreatedDate),
+          toDataSetCommit(importedDatasetFork, importedDatasetCreatedDate)
+        ).flatten: _*
+      )
+
+      val result = datasetsFinder
+        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+
+      result.results shouldBe List(
+        initialDataset addAll initialDatasetFork.projects addAll importedDataset.projects addAll importedDatasetFork.projects
+      ).map(_.toDatasetSearchResult)
+        .sortBy(_.name.value)
+
+      result.pagingInfo.total shouldBe Total(1)
+    }
+
+    "merge non-imported and not being imported datasets when they are forked to different projects - case when no phrase is given" in new TestCase {
+      val dataset1CreatedDate = datasetCreatedDates.generateOne
+      val dataset1 = datasets(
+        maybeSameAs = emptyOptionOf[SameAs],
+        projects    = nonEmptyList(datasetProjects, maxElements = 1)
+      ).generateOne
+      val dataset1Fork = dataset1.copy(projects = List(datasetProjects.generateOne))
+
+      val dataset2CreatedDate = datasetCreatedDates.generateOne
+      val dataset2 = datasets(
+        maybeSameAs = emptyOptionOf[SameAs],
+        projects    = nonEmptyList(datasetProjects, maxElements = 1)
+      ).generateOne
+      val dataset2Fork = dataset2.copy(projects = List(datasetProjects.generateOne))
+
+      loadToStore(
+        List(
+          toDataSetCommit(dataset1, dataset1CreatedDate),
+          toDataSetCommit(dataset1Fork, dataset1CreatedDate),
+          toDataSetCommit(dataset2, dataset2CreatedDate),
+          toDataSetCommit(dataset2Fork, dataset2CreatedDate)
+        ).flatten: _*
+      )
+
+      val result = datasetsFinder
+        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+
+      result.results shouldBe List(
+        dataset1 addAll dataset1Fork.projects,
+        dataset2 addAll dataset2Fork.projects
+      ).map(_.toDatasetSearchResult)
+        .sortBy(_.name.value)
+
+      result.pagingInfo.total shouldBe Total(2)
     }
 
     "merge all datasets having the same sameAs not pointing to project's dataset - case when some phrase is given" in new TestCase {
@@ -369,42 +483,50 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     (dataset1, dataset2, dataset3)
   }
 
-  private def toDataSetCommit(dataSet: Dataset): List[JsonLD] = dataSet.projects match {
-    case firstProject +: otherProjects =>
-      val createdDate = datasetCreatedDates.generateOne
-      val firstJsonLd = dataSetCommit()(
-        projectPath = firstProject.path
-      )(
-        datasetIdentifier         = dataSet.id,
-        datasetName               = dataSet.name,
-        maybeDatasetSameAs        = dataSet.maybeSameAs,
-        maybeDatasetDescription   = dataSet.maybeDescription,
-        maybeDatasetPublishedDate = dataSet.published.maybeDate,
-        datasetCreatedDate        = createdDate,
-        datasetCreators           = dataSet.published.creators map toPerson
-      )
+  private def toDataSetCommit(dataSet: Dataset): List[JsonLD] =
+    toDataSetCommit(dataSet, datasetCreatedDates.generateOne)
 
-      val maybeSameAs = dataSet.maybeSameAs orElse firstJsonLd.entityId.flatMap(id => SameAs.fromId(id.value).toOption)
-      val otherJsonLds = otherProjects.map { project =>
-        dataSetCommit()(
-          projectPath = project.path
+  private def toDataSetCommit(dataSet: Dataset, dateCreated: DateCreated): List[JsonLD] =
+    dataSet.projects match {
+      case firstProject +: otherProjects =>
+        val firstJsonLd = dataSetCommit()(
+          projectPath = firstProject.path
         )(
+          datasetIdentifier         = dataSet.id,
           datasetName               = dataSet.name,
-          maybeDatasetSameAs        = maybeSameAs,
+          maybeDatasetSameAs        = dataSet.maybeSameAs,
           maybeDatasetDescription   = dataSet.maybeDescription,
           maybeDatasetPublishedDate = dataSet.published.maybeDate,
-          datasetCreatedDate        = DateCreated(createdDate.value.plusSeconds(positiveInts().generateOne.value)),
+          datasetCreatedDate        = dateCreated,
           datasetCreators           = dataSet.published.creators map toPerson
         )
-      }
 
-      firstJsonLd +: otherJsonLds
-  }
+        val maybeSameAs = dataSet.maybeSameAs orElse firstJsonLd.entityId.flatMap(
+          id => SameAs.fromId(id.value).toOption
+        )
+        val otherJsonLds = otherProjects.map { project =>
+          dataSetCommit()(
+            projectPath = project.path
+          )(
+            datasetName               = dataSet.name,
+            maybeDatasetSameAs        = maybeSameAs,
+            maybeDatasetDescription   = dataSet.maybeDescription,
+            maybeDatasetPublishedDate = dataSet.published.maybeDate,
+            datasetCreatedDate        = dateCreated.shiftToFuture,
+            datasetCreators           = dataSet.published.creators map toPerson
+          )
+        }
+
+        firstJsonLd +: otherJsonLds
+    }
 
   private implicit class DatasetOps(dataset: Dataset) {
 
     def changePublishedDateTo(maybeDate: Option[PublishedDate]): Dataset =
       dataset.copy(published = dataset.published.copy(maybeDate = maybeDate))
+
+    def addAll(projects: List[DatasetProject]): Dataset =
+      dataset.copy(projects = dataset.projects ++ projects)
 
     def makeNameContaining(phrase: Phrase): Dataset = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
@@ -442,6 +564,10 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       dataset.published,
       ProjectsCount(dataset.projects.size)
     )
+  }
+
+  private implicit class DateCreatedOps(dateCreated: DateCreated) {
+    lazy val shiftToFuture = DateCreated(dateCreated.value plusSeconds positiveInts().generateOne.value)
   }
 
   private lazy val toPerson: DatasetCreator => Person =
