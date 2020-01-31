@@ -93,59 +93,78 @@ private class IODatasetsFinder(
         s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
             |  { # finding datasets having the same sameAs but not pointing to a dataset id from a renku project
-            |    ?datasetId schema:dateCreated ?earliestCreated ;
-            |               schema:sameAs/schema:url ?sameAs ;
-            |               schema:name ?name ;
-            |               schema:identifier ?identifier .
-            |    OPTIONAL { ?datasetId schema:description ?maybeDescription } .
-            |    OPTIONAL { ?datasetId schema:datePublished ?maybePublishedDate } {
-            |      SELECT ?sameAs (COUNT(DISTINCT ?dsId) AS ?projectsCount) (MIN(?dateCreated) AS ?earliestCreated)
-            |      WHERE {
-            |        ?dsId schema:sameAs/schema:url ?sameAs {
-            |          SELECT ?dsId
-            |          WHERE {
-            |            {
-            |              SELECT ?dsId
-            |              WHERE {
-            |                ?dsId text:query (schema:name '$phrase') ;
-            |                      rdf:type <http://schema.org/Dataset> .
-            |              }
-            |            } UNION {
-            |              SELECT ?dsId
-            |              WHERE {
-            |                ?dsId text:query (schema:description '$phrase') ;
-            |                      rdf:type <http://schema.org/Dataset> .
-            |              }
-            |            } UNION {
-            |              SELECT ?dsId
-            |              WHERE {
-            |                ?personId text:query (schema:name '$phrase') ;
-            |                          rdf:type <http://schema.org/Person> .
-            |                ?dsId schema:creator ?personId ;
-            |                      rdf:type <http://schema.org/Dataset> .
-            |              }
-            |            }
-            |          }
-            |          GROUP BY ?dsId
+            |    SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate (?smallProjectCounts AS ?projectsCount)
+            |    WHERE {
+            |      { # locating dataset created as first with certain sameAs
+            |        SELECT ?sameAs ?smallProjectCounts (MIN(?dateCreated) AS ?earliestCreated)
+            |        WHERE {
+            |          ?dsId rdf:type <http://schema.org/Dataset> ;
+            |                schema:sameAs/schema:url ?sameAs ;
+            |                schema:dateCreated ?dateCreated { # grouping all sharing sameAs
+            |                  SELECT ?sameAs (SUM(?projectsCnt) AS ?smallProjectCounts)
+            |                  WHERE { # grouping datasets by id and sameAs - to make forks as one row
+            |                    SELECT ?dsId ?sameAs (COUNT(DISTINCT ?prId) AS ?projectsCnt)
+            |                    WHERE {
+            |                      ?dsId schema:sameAs/schema:url ?sameAs {
+            |                        SELECT ?dsId
+            |                        WHERE {
+            |                          {
+            |                            SELECT ?dsId
+            |                            WHERE {
+            |                              ?dsId text:query (schema:name '$phrase') ;
+            |                                    rdf:type <http://schema.org/Dataset> .
+            |                            }
+            |                          } UNION {
+            |                            SELECT ?dsId
+            |                            WHERE {
+            |                              ?dsId text:query (schema:description '$phrase') ;
+            |                                    rdf:type <http://schema.org/Dataset> .
+            |                            }
+            |                          } UNION {
+            |                            SELECT ?dsId
+            |                            WHERE {
+            |                              ?personId text:query (schema:name '$phrase') ;
+            |                                        rdf:type <http://schema.org/Person> .
+            |                              ?dsId schema:creator ?personId ;
+            |                                    rdf:type <http://schema.org/Dataset> .
+            |                            }
+            |                          }
+            |                        }
+            |                        GROUP BY ?dsId
+            |                      }
+            |                      ?dsId schema:isPartOf ?prId
+            |                      FILTER NOT EXISTS {
+            |                        ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
+            |                          ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
+            |                        }
+            |                      }
+            |                    }
+            |                    GROUP BY ?dsId ?sameAs
+            |                    HAVING (COUNT(*) > 0)
+            |                  }
+            |                  GROUP BY ?sameAs
+            |                  HAVING (COUNT(*) > 0)
+            |                }
             |        }
-            |        ?dsId schema:dateCreated ?dateCreated .
-            |        FILTER NOT EXISTS {
-            |          ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
-            |            ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
-            |            FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
-            |          }
-            |        }
+            |        GROUP BY ?sameAs ?smallProjectCounts
+            |        HAVING (COUNT(*) > 0)
+            |      } {
+            |        ?datasetId schema:sameAs/schema:url ?sameAs ;
+            |                   schema:dateCreated ?earliestCreated ;
+            |                   schema:name ?name ;
+            |                   schema:identifier ?identifier .
+            |        OPTIONAL { ?datasetId schema:description ?maybeDescription } .
+            |        OPTIONAL { ?datasetId schema:datePublished ?maybePublishedDate }
             |      }
-            |      GROUP BY ?sameAs
             |    }
+            |    GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate ?smallProjectCounts
+            |    HAVING (COUNT(*) > 0)
             |  } UNION { # finding datasets having the sameAs pointing to a dataset from a renku project
-            |    ?dsId schema:name ?name ;
-            |          schema:identifier ?identifier .
-            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
-            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
-            |      SELECT ?dsId ((COUNT(?derivedDsId) \\u002B 1) AS ?projectsCount)
-            |      WHERE {
-            |        ?derivedDsId schema:sameAs/schema:url ?dsId {
+            |    SELECT ?name ?identifier ?maybeDescription ?maybePublishedDate (COUNT(DISTINCT ?projectId) AS ?projectsCount)
+            |    WHERE {
+            |      {
+            |        SELECT ?dsId ?name ?identifier ?maybeDescription ?maybePublishedDate
+            |        WHERE {
             |          {
             |            SELECT ?dsId
             |            WHERE {
@@ -172,50 +191,68 @@ private class IODatasetsFinder(
             |              }
             |            }
             |            GROUP BY ?dsId
+            |            HAVING (COUNT(*) > 0)
+            |          } {
+            |            ?derivedDsId schema:sameAs/schema:url ?dsId.
+            |            ?dsId rdf:type <http://schema.org/Dataset>;
+            |                  schema:name ?name ;
+            |                  schema:identifier ?identifier .
+            |            OPTIONAL { ?dsId schema:description ?maybeDescription } .
+            |            OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
             |          }
-            |          FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
             |        }
+            |        GROUP BY ?dsId ?name ?identifier ?maybeDescription ?maybePublishedDate
+            |        HAVING (COUNT(*) > 0)
+            |      } {
+            |        ?datasetId schema:sameAs/schema:url ?dsId;
+            |                   schema:isPartOf ?projectId
+            |      } UNION {
+            |        ?dsId schema:isPartOf ?projectId
+            |        BIND (?dsId AS ?datasetId)
             |      }
-            |      GROUP BY ?dsId
             |    }
+            |    GROUP BY ?name ?identifier ?maybeDescription ?maybePublishedDate
+            |    HAVING (COUNT(*) > 0)
             |  } UNION { # finding datasets having no sameAs set and not imported to another projects
             |    ?dsId schema:name ?name ;
             |          schema:identifier ?identifier .
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
             |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate } {
-            |      SELECT ?dsId (1 AS ?projectsCount)
+            |      SELECT ?dsId (COUNT(DISTINCT ?projectId) AS ?projectsCount)
             |      WHERE {
-            |        {
-            |          SELECT ?dsId
-            |          WHERE {
-            |            {
-            |              SELECT ?dsId
-            |              WHERE {
-            |                ?dsId text:query (schema:name '$phrase') ;
-            |                      rdf:type <http://schema.org/Dataset> .
+            |        ?dsId rdf:type <http://schema.org/Dataset>;
+            |              schema:isPartOf ?projectId {
+            |                SELECT ?dsId
+            |                WHERE {
+            |                  {
+            |                    SELECT ?dsId
+            |                    WHERE {
+            |                      ?dsId text:query (schema:name '$phrase') ;
+            |                            rdf:type <http://schema.org/Dataset> .
+            |                    }
+            |                  } UNION {
+            |                    SELECT ?dsId
+            |                    WHERE {
+            |                      ?dsId text:query (schema:description '$phrase') ;
+            |                            rdf:type <http://schema.org/Dataset> .
+            |                    }
+            |                  } UNION {
+            |                    SELECT ?dsId
+            |                    WHERE {
+            |                      ?personId text:query (schema:name '$phrase') ;
+            |                                rdf:type <http://schema.org/Person> .
+            |                      ?dsId schema:creator ?personId ;
+            |                            rdf:type <http://schema.org/Dataset> .
+            |                    }
+            |                  }
+            |                }
+            |                GROUP BY ?dsId
             |              }
-            |            } UNION {
-            |              SELECT ?dsId
-            |              WHERE {
-            |                ?dsId text:query (schema:description '$phrase') ;
-            |                      rdf:type <http://schema.org/Dataset> .
-            |              }
-            |            } UNION {
-            |              SELECT ?dsId
-            |              WHERE {
-            |                ?personId text:query (schema:name '$phrase') ;
-            |                          rdf:type <http://schema.org/Person> .
-            |                ?dsId schema:creator ?personId ;
-            |                      rdf:type <http://schema.org/Dataset> .
-            |              }
-            |            }
-            |          }
-            |          GROUP BY ?dsId
-            |        }
-            |        FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-            |        FILTER NOT EXISTS { ?derivedDsId schema:sameAs/schema:url ?dsId } .
+            |              FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
+            |              FILTER NOT EXISTS { ?derivedDsId schema:sameAs/schema:url ?dsId } .
             |      }
             |      GROUP BY ?dsId
+            |      HAVING (COUNT(*) > 0)
             |    }
             |  }
             |}
