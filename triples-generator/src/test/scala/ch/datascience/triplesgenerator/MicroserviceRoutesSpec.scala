@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator
 
 import cats.effect.{Clock, IO}
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.metrics.MetricsRegistry
+import ch.datascience.interpreters.TestRoutesMetrics
 import org.http4s.Status._
 import org.http4s._
 import org.scalamock.scalatest.MockFactory
@@ -55,8 +55,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
   private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
   private trait TestCase {
-    MetricsRegistry.clear()
 
-    val routes = new MicroserviceRoutes[IO]().routes.map(_.or(notAvailableResponse))
+    val routesMetrics = TestRoutesMetrics()
+    val routes        = new MicroserviceRoutes[IO](routesMetrics).routes.map(_.or(notAvailableResponse))
   }
 }

@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.metrics
 
 import EventLogMetrics._
+import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
@@ -29,8 +30,10 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects.ProjectPath
-import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.interpreters.{TestDbTransactor, TestLogger}
+import ch.datascience.metrics.MetricsRegistry
+import io.prometheus.client.Gauge
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -39,7 +42,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.postfixOps
+import scala.language.{higherKinds, postfixOps}
 
 class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with IntegrationPatience {
 
@@ -127,8 +130,38 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
     }
   }
 
+  "apply" should {
+
+    "register the metrics in the Metrics Registry" in {
+
+      val metricsRegistry = mock[MetricsRegistry[IO]]
+
+      (metricsRegistry
+        .register[Gauge, Gauge.Builder](_: Gauge.Builder)(_: MonadError[IO, Throwable]))
+        .expects(waitingEventsGaugeBuilder, *)
+        .returning(IO.pure(waitingEventsGauge))
+
+      (metricsRegistry
+        .register[Gauge, Gauge.Builder](_: Gauge.Builder)(_: MonadError[IO, Throwable]))
+        .expects(statusesGaugeBuilder, *)
+        .returning(IO.pure(statusesGauge))
+
+      (metricsRegistry
+        .register[Gauge, Gauge.Builder](_: Gauge.Builder)(_: MonadError[IO, Throwable]))
+        .expects(totalGaugeBuilder, *)
+        .returning(IO.pure(totalGauge))
+
+      IOEventLogMetrics(mock[TestDbTransactor[EventLogDB]], TestLogger[IO](), metricsRegistry)
+        .unsafeRunSync()
+    }
+  }
+
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
+
+  private lazy val waitingEventsGauge = waitingEventsGaugeBuilder.create()
+  private lazy val statusesGauge      = statusesGaugeBuilder.create()
+  private lazy val totalGauge         = totalGaugeBuilder.create()
 
   private trait TestCase {
     abstract class IOEventLogStats(transactor: DbTransactor[IO, EventLogDB]) extends EventLogStats[IO](transactor)

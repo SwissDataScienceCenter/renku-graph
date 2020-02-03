@@ -23,6 +23,7 @@ import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
@@ -48,10 +49,12 @@ object Microservice extends IOMicroservice {
         fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger)
         associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
         dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
+        metricsRegistry        <- MetricsRegistry()
         routes <- new MicroserviceRoutes[IO](
                    fetchTokenEndpoint,
                    associateTokenEndpoint,
-                   new IODeleteTokenEndpoint(transactor, ApplicationLogger)
+                   new IODeleteTokenEndpoint(transactor, ApplicationLogger),
+                   new RoutesMetrics[IO](metricsRegistry)
                  ).routes
         httpServer = new HttpServer[IO](serverPort = 9003, routes)
 

@@ -18,43 +18,76 @@
 
 package ch.datascience.metrics
 
+import cats.MonadError
 import io.prometheus.client.hotspot._
 import io.prometheus.client.{CollectorRegistry, SimpleCollector}
-import pureconfig.loadConfig
 
-import scala.collection.JavaConverters._
 import scala.language.higherKinds
+import scala.util.control.NonFatal
+
+trait MetricsRegistry[Interpretation[_]] {
+
+  def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
+      collectorBuilder: Builder
+  )(implicit ME:        MonadError[Interpretation, Throwable]): Interpretation[Collector]
+
+  def maybeCollectorRegistry: Option[CollectorRegistry]
+}
 
 object MetricsRegistry {
 
-  private val metricsEnabled = loadConfig[Boolean]("metrics.enabled").getOrElse(true)
+  import cats.effect.IO
+  import cats.implicits._
+  import ch.datascience.config.ConfigLoader.find
+  import com.typesafe.config.{Config, ConfigFactory}
 
-  private lazy val registry = addJvmMetrics(new CollectorRegistry())
+  def apply(
+      config: Config = ConfigFactory.load()
+  ): IO[MetricsRegistry[IO]] =
+    for {
+      maybeEnabled <- find[IO, Option[Boolean]]("metrics.enabled", config) recoverWith noneValue
+    } yield maybeEnabled match {
+      case Some(false) => DisabledMetricsRegistry
+      case _           => EnabledMetricsRegistry
+    }
 
-  private[metrics] def collectorRegistry: CollectorRegistry =
-    if (metricsEnabled) registry
-    else new CollectorRegistry()
-
-  private def addJvmMetrics(registry: CollectorRegistry): CollectorRegistry = {
-    registry.register(new StandardExports())
-    registry.register(new MemoryPoolsExports())
-    registry.register(new BufferPoolsExports())
-    registry.register(new GarbageCollectorExports())
-    registry.register(new ThreadExports())
-    registry.register(new ClassLoadingExports())
-    registry.register(new VersionInfoExports())
-    registry.register(new MemoryAllocationExports())
-    registry
+  private val noneValue: PartialFunction[Throwable, IO[Option[Boolean]]] = {
+    case NonFatal(_) => IO.pure(Some(true))
   }
 
-  def register[Collector <: SimpleCollector[_]](registerTo: CollectorRegistry => Collector): Collector =
-    registerTo(collectorRegistry)
+  object DisabledMetricsRegistry extends MetricsRegistry[IO] {
 
-  def clear(): Unit = collectorRegistry.clear()
+    override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
+        collectorBuilder: Builder
+    )(implicit ME:        MonadError[IO, Throwable]): IO[Collector] = IO {
+      collectorBuilder.create()
+    }
 
-  def verifyInRegistry(name: String): Boolean =
-    collectorRegistry
-      .metricFamilySamples()
-      .asScala
-      .exists(_.name == name)
+    override lazy val maybeCollectorRegistry: Option[CollectorRegistry] = None
+  }
+
+  object EnabledMetricsRegistry extends MetricsRegistry[IO] {
+
+    private lazy val registry: CollectorRegistry = addJvmMetrics(new CollectorRegistry())
+
+    private def addJvmMetrics(registry: CollectorRegistry): CollectorRegistry = {
+      registry register new StandardExports()
+      registry register new MemoryPoolsExports()
+      registry register new BufferPoolsExports()
+      registry register new GarbageCollectorExports()
+      registry register new ThreadExports()
+      registry register new ClassLoadingExports()
+      registry register new VersionInfoExports()
+      registry register new MemoryAllocationExports()
+      registry
+    }
+
+    override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
+        collectorBuilder: Builder
+    )(implicit ME:        MonadError[IO, Throwable]): IO[Collector] = IO {
+      collectorBuilder register registry
+    }
+
+    override lazy val maybeCollectorRegistry: Option[CollectorRegistry] = Some(registry)
+  }
 }

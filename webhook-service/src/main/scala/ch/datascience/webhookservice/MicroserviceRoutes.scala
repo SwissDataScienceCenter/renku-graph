@@ -33,16 +33,17 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     hookEventEndpoint:        HookEventEndpoint[F],
     hookCreationEndpoint:     HookCreationEndpoint[F],
     hookValidationEndpoint:   HookValidationEndpoint[F],
-    processingStatusEndpoint: ProcessingStatusEndpoint[F]
+    processingStatusEndpoint: ProcessingStatusEndpoint[F],
+    routesMetrics:            RoutesMetrics[F]
 )(implicit clock:             Clock[F])
-    extends Http4sDsl[F]
-    with RoutesMetrics {
+    extends Http4sDsl[F] {
 
   import hookCreationEndpoint._
   import hookEventEndpoint._
   import hookValidationEndpoint._
   import org.http4s.HttpRoutes
   import processingStatusEndpoint._
+  import routesMetrics._
 
   // format: off
   lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
@@ -51,6 +52,6 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks"                => createHook(projectId, request)
     case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" => validateHook(projectId, request)
     case           GET  -> Root / "projects" / ProjectId(projectId) / "events" / "status"       => fetchProcessingStatus(projectId)
-  }.meter flatMap `add GET Root / metrics`[F]
+  }.meter flatMap `add GET Root / metrics`
   // format: on
 }

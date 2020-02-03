@@ -32,6 +32,7 @@ import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
 import ch.datascience.triplesgenerator.metrics.EventLogMetrics
 import ch.datascience.triplesgenerator.reprovisioning.IOReProvisioning
 import io.chrisdavenport.log4cats.Logger
+import io.prometheus.client.Gauge
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -279,6 +280,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   private implicit val cs:    ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val timer: Timer[IO]        = IO.timer(ExecutionContext.global)
 
-  class IOEventLogMetrics(eventLogStats: EventLogStats[IO], logger: Logger[IO])
-      extends EventLogMetrics(eventLogStats, logger)
+  class IOEventLogMetrics(eventLogStats:      EventLogStats[IO],
+                          logger:             Logger[IO],
+                          waitingEventsGauge: Gauge,
+                          statusesGauge:      Gauge,
+                          totalGauge:         Gauge)
+      extends EventLogMetrics(eventLogStats, logger, waitingEventsGauge, statusesGauge, totalGauge)
 }

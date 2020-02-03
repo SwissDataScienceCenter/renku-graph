@@ -16,26 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.interpreters
 
-import cats.effect.{Clock, ConcurrentEffect}
-import cats.implicits._
-import ch.datascience.metrics.RoutesMetrics
-import org.http4s.dsl.Http4sDsl
+import cats.MonadError
+import cats.effect.IO
+import ch.datascience.metrics.MetricsRegistry
+import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 
-import scala.language.higherKinds
+object TestMetricsRegistry extends MetricsRegistry[IO] {
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    routesMetrics: RoutesMetrics[F]
-)(implicit clock:  Clock[F])
-    extends Http4sDsl[F] {
+  private val collectorRegistry: CollectorRegistry = new CollectorRegistry()
 
-  import org.http4s.HttpRoutes
-  import routesMetrics._
+  override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
+      collectorBuilder: Builder
+  )(implicit ME:        MonadError[IO, Throwable]): IO[Collector] = IO {
+    collectorBuilder register collectorRegistry
+  }
 
-  lazy val routes: F[HttpRoutes[F]] = HttpRoutes
-    .of[F] {
-      case GET -> Root / "ping" => Ok("pong")
-    }
-    .meter flatMap `add GET Root / metrics`
+  override def maybeCollectorRegistry: Option[CollectorRegistry] = Some(collectorRegistry)
+
+  def clear(): Unit = collectorRegistry.clear()
 }

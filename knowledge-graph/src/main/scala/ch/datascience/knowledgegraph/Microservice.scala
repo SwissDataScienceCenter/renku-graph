@@ -28,6 +28,7 @@ import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.IOQueryEndpoint
 import ch.datascience.knowledgegraph.projects.rest.IOProjectEndpoint
+import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import pureconfig.loadConfigOrThrow
 
@@ -55,12 +56,14 @@ object Microservice extends IOMicroservice {
       projectDatasetsEndpoint <- IOProjectDatasetsEndpoint()
       datasetEndpoint         <- IODatasetEndpoint()
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint()
+      metricsRegistry         <- MetricsRegistry()
       routes <- new MicroserviceRoutes[IO](
                  queryEndpoint,
                  projectEndpoint,
                  projectDatasetsEndpoint,
                  datasetEndpoint,
-                 datasetsSearchEndpoint
+                 datasetsSearchEndpoint,
+                 new RoutesMetrics[IO](metricsRegistry)
                ).routes
       httpServer = new HttpServer[IO](serverPort = 9004, routes)
 

@@ -16,26 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.interpreters
 
-import cats.effect.{Clock, ConcurrentEffect}
-import cats.implicits._
-import ch.datascience.metrics.RoutesMetrics
-import org.http4s.dsl.Http4sDsl
+import cats.effect.IO
+import ch.datascience.db.DbTransactor
+import doobie.util.transactor.Transactor
 
-import scala.language.higherKinds
-
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    routesMetrics: RoutesMetrics[F]
-)(implicit clock:  Clock[F])
-    extends Http4sDsl[F] {
-
-  import org.http4s.HttpRoutes
-  import routesMetrics._
-
-  lazy val routes: F[HttpRoutes[F]] = HttpRoutes
-    .of[F] {
-      case GET -> Root / "ping" => Ok("pong")
-    }
-    .meter flatMap `add GET Root / metrics`
-}
+class TestDbTransactor[TargetDB](transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, TargetDB](transactor)

@@ -21,10 +21,11 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.data.EitherT.{leftT, rightT}
 import cats.data.{EitherT, NonEmptyList}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.{EventBody, EventMessage}
+import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -32,23 +33,25 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.tokenrepository.IOAccessTokenFinder
 import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
+import ch.datascience.interpreters.{TestDbTransactor, TestLogger}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
-import ch.datascience.triplesgenerator.eventprocessing.IOCommitEventProcessor.eventsProcessingTimes
+import ch.datascience.triplesgenerator.eventprocessing.IOCommitEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.interpreters.TryTriplesCurator
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TryUploader
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.prometheus.client.Histogram
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -56,6 +59,9 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.{Assertion, WordSpec}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.language.higherKinds
 import scala.util.Try
 
 class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually with IntegrationPatience {
@@ -379,13 +385,22 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
     }
 
     "be registered in the Metrics Registry" in {
-      eventsProcessingTimes.startTimer().observeDuration()
 
-      eventually {
-        MetricsRegistry.verifyInRegistry("events_processing_times") shouldBe true
-      }
+      val metricsRegistry = mock[MetricsRegistry[IO]]
+
+      (metricsRegistry
+        .register[Histogram, Histogram.Builder](_: Histogram.Builder)(_: MonadError[IO, Throwable]))
+        .expects(eventsProcessingTimesBuilder, *)
+        .returning(IO.pure(eventsProcessingTimes))
+
+      IOCommitEventProcessor(mock[TestDbTransactor[EventLogDB]], mock[TriplesGenerator[IO]], metricsRegistry)
+        .unsafeRunSync()
     }
   }
+
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
+  private lazy val eventsProcessingTimes = eventsProcessingTimesBuilder.create()
 
   private trait TestCase {
     val context = MonadError[Try, Throwable]
@@ -402,7 +417,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
     val eventLogMarkNew       = mock[TryEventLogMarkNew]
     val eventLogMarkFailed    = mock[TryEventLogMarkFailed]
     val logger                = TestLogger[Try]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger, Some(eventsProcessingTimes))
+    val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger, Option(eventsProcessingTimes))
     val eventProcessor = new CommitEventProcessor[Try](
       eventsDeserialiser,
       accessTokenFinder,
@@ -475,14 +490,14 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       case CommitWithParent(id, parentId, project) =>
         s"Commit Event id: $id, project: ${project.id} ${project.path}, parentId: $parentId"
     }
-  }
 
-  private def verifyMetricsCollected() =
-    eventsProcessingTimes
-      .collect()
-      .asScala
-      .flatMap(_.samples.asScala.map(_.name))
-      .exists(_ startsWith "events_processing_times") shouldBe true
+    def verifyMetricsCollected() =
+      eventsProcessingTimes
+        .collect()
+        .asScala
+        .flatMap(_.samples.asScala.map(_.name))
+        .exists(_ startsWith "events_processing_times") shouldBe true
+  }
 
   private def commits(commitId: CommitId, project: Project): Gen[Commit] =
     for {

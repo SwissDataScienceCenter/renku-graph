@@ -32,15 +32,16 @@ import scala.language.higherKinds
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     fetchTokenEndpoint:     FetchTokenEndpoint[F],
     associateTokenEndpoint: AssociateTokenEndpoint[F],
-    deleteTokenEndpoint:    DeleteTokenEndpoint[F]
+    deleteTokenEndpoint:    DeleteTokenEndpoint[F],
+    routesMetrics:          RoutesMetrics[F]
 )(implicit clock:           Clock[F])
-    extends Http4sDsl[F]
-    with RoutesMetrics {
+    extends Http4sDsl[F] {
 
   import associateTokenEndpoint._
   import deleteTokenEndpoint._
   import fetchTokenEndpoint._
   import org.http4s.HttpRoutes
+  import routesMetrics._
 
   // format: off
   lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
@@ -49,6 +50,6 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case           GET    -> Root / "projects" / ProjectPath(projectPath) / "tokens" => fetchToken(projectPath)
     case request @ PUT    -> Root / "projects" / ProjectId(projectId) / "tokens"     => associateToken(projectId, request)
     case           DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => deleteToken(projectId)
-  }.meter flatMap `add GET Root / metrics`[F]
+  }.meter flatMap `add GET Root / metrics`
   // format: on
 }
