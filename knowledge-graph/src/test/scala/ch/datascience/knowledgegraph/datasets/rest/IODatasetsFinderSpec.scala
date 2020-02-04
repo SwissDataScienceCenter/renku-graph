@@ -50,7 +50,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
-  "findDatasets" should {
+  "findDatasets - no phrase" should {
 
     Option(Phrase("*")) +: Option.empty[Phrase] +: Nil foreach { maybePhrase =>
       s"return all datasets when the given phrase is $maybePhrase" in new TestCase {
@@ -71,7 +71,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       }
     }
 
-    "merge all datasets having the same sameAs not pointing to project's dataset - case when no phrase is given" in new TestCase {
+    "merge all datasets having the same sameAs not pointing to project's dataset" in new TestCase {
       val dataset1 = datasets(
         maybeSameAs = datasetSameAs.toGeneratorOfSomes,
         projects    = nonEmptyList(datasetProjects, minElements = 2)
@@ -92,7 +92,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(datasetsList.size)
     }
 
-    "merge datasets when they are imported from other renku project - case when no phrase is given" in new TestCase {
+    "merge datasets when they are imported from other renku project" in new TestCase {
       val dataset1 = datasets(
         maybeSameAs = emptyOptionOf[SameAs],
         projects    = nonEmptyList(datasetProjects, minElements = 2)
@@ -113,7 +113,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(datasetsList.size)
     }
 
-    "return datasets having neither sameAs nor imported to other projects - case when no phrase is given" in new TestCase {
+    "return datasets having neither sameAs nor imported to other projects" in new TestCase {
       val dataset1 = datasets(maybeSameAs = emptyOptionOf[SameAs],
                               projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
       val dataset2 = datasets(maybeSameAs = emptyOptionOf[SameAs],
@@ -134,8 +134,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
       result.pagingInfo.total shouldBe Total(datasetsList.size)
     }
+  }
 
-    "merge all datasets having the same sameAs and forked to different projects - case when no phrase is given" in new TestCase {
+  "findDatasets in case of forks - no phrase" should {
+
+    "merge all datasets having the same sameAs and forked to different projects" in new TestCase {
       val dataset1CreatedDate = datasetCreatedDates.generateOne
       val dataset1 = datasets(
         maybeSameAs = datasetSameAs.toGeneratorOfSomes,
@@ -171,7 +174,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(1)
     }
 
-    "merge datasets imported from other renku project and forked to different projects - case when no phrase is given" in new TestCase {
+    "merge datasets imported from other renku project and forked to different projects" in new TestCase {
       val initialDatasetCreatedDate = datasetCreatedDates.generateOne
       val initialDataset = datasets(
         maybeSameAs = emptyOptionOf[SameAs],
@@ -209,7 +212,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(1)
     }
 
-    "merge non-imported and not being imported datasets when they are forked to different projects - case when no phrase is given" in new TestCase {
+    "merge non-imported and not being imported datasets when they are forked to different projects" in new TestCase {
       val dataset1CreatedDate = datasetCreatedDates.generateOne
       val dataset1 = datasets(
         maybeSameAs = emptyOptionOf[SameAs],
@@ -245,8 +248,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
       result.pagingInfo.total shouldBe Total(2)
     }
+  }
 
-    "merge all datasets having the same sameAs not pointing to project's dataset - case when some phrase is given" in new TestCase {
+  "findDatasets - some phrase given" should {
+
+    "merge all datasets having the same sameAs not pointing to project's dataset" in new TestCase {
 
       val phrase = phrases.generateOne
       val dataset1 = datasets(
@@ -277,7 +283,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total         shouldBe Total(3)
     }
 
-    "merge datasets when they are imported from other renku project - case when some phrase is given" in new TestCase {
+    "merge datasets when they are imported from other renku project" in new TestCase {
 
       val phrase = phrases.generateOne
       val dataset1 = datasets(
@@ -308,7 +314,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total         shouldBe Total(3)
     }
 
-    "return datasets having neither sameAs nor imported to other projects - case when some phrase is given" in new TestCase {
+    "return datasets having neither sameAs nor imported to other projects" in new TestCase {
 
       val phrase = phrases.generateOne
       val dataset1 = datasets(
@@ -338,8 +344,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.pagingRequest shouldBe pagingRequest
       result.pagingInfo.total         shouldBe Total(3)
     }
+  }
 
-    "merge all datasets having the same sameAs and forked to different projects - case when phrase is given" in new TestCase {
+  "findDatasets in case of forks - some phrase given" should {
+
+    "merge all datasets having the same sameAs and forked to different projects" in new TestCase {
       val phrase = phrases.generateOne
 
       val dataset1CreatedDate = datasetCreatedDates.generateOne
@@ -394,7 +403,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(3)
     }
 
-    "merge datasets imported from other renku project and forked to different projects - case when phrase is given" in new TestCase {
+    "merge datasets imported from other renku project and forked to different projects" in new TestCase {
       val phrase = phrases.generateOne
 
       val dataset1CreatedDate = datasetCreatedDates.generateOne
@@ -451,7 +460,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(3)
     }
 
-    "merge non-imported and not being imported datasets when they are forked to different projects - case when phrase is given" in new TestCase {
+    "merge non-imported and not being imported datasets when they are forked to different projects" in new TestCase {
       val phrase = phrases.generateOne
 
       val dataset1CreatedDate = datasetCreatedDates.generateOne
@@ -499,6 +508,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
       result.pagingInfo.total shouldBe Total(3)
     }
+  }
+
+  "findDatasets with explicit sorting given" should {
 
     s"return datasets with name, description or creator matching the given phrase sorted by $NameProperty" in new TestCase {
       forAll(datasets, datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig, nonPhrased) =>
@@ -553,6 +565,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
                                dataset3.toDatasetSearchResult,
                                dataset1.toDatasetSearchResult)
     }
+  }
+
+  "findDatasets with explicit paging request" should {
 
     "return the requested page of datasets matching the given phrase" in new TestCase {
       val phrase = phrases.generateOne
