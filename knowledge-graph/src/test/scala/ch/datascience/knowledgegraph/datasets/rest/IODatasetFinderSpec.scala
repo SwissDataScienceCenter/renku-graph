@@ -282,6 +282,9 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )
       }
     }
+  }
+
+  "findDataset in case of forks" should {
 
     "return the details of the dataset with the given id " +
       "- a case when unrelated projects are using the same imported dataset and one of them is forked" in new TestCase {
@@ -359,6 +362,11 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             ).sorted
           )
         )
+      }
+
+      "return None if there's no datasets with the given id" in new TestCase {
+        val identifier = datasetIdentifiers.generateOne
+        datasetFinder.findDataset(identifier).unsafeRunSync() shouldBe None
       }
     }
 
@@ -630,11 +638,6 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )
         )
       }
-    }
-
-    "return None if there's no datasets with the given id" in new TestCase {
-      val identifier = datasetIdentifiers.generateOne
-      datasetFinder.findDataset(identifier).unsafeRunSync() shouldBe None
     }
   }
 
