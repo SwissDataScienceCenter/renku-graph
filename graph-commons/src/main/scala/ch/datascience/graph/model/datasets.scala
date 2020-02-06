@@ -40,9 +40,18 @@ object datasets {
   final class Url private (val value: String) extends AnyVal with StringTinyType
   implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
 
-  sealed trait SameAs extends Any with UrlTinyType
-  final class IdSameAs private[datasets] (val value:  String) extends AnyVal with SameAs
-  final class UrlSameAs private[datasets] (val value: String) extends AnyVal with SameAs
+  sealed trait SameAs extends Any with UrlTinyType {
+
+    override def equals(obj: Any): Boolean =
+      Option(obj).exists {
+        case v: SameAs => v.value == value
+        case _ => false
+      }
+
+    override def hashCode(): Int = value.hashCode
+  }
+  final class IdSameAs private[datasets] (val value:  String) extends SameAs
+  final class UrlSameAs private[datasets] (val value: String) extends SameAs
   implicit object SameAs extends TinyTypeFactory[SameAs](new UrlSameAs(_)) with constraints.Url {
     final def fromId(value: String): Either[IllegalArgumentException, SameAs] =
       from(value) map (sameAs => new IdSameAs(sameAs.value))

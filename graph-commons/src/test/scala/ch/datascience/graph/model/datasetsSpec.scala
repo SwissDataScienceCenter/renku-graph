@@ -64,4 +64,23 @@ class datasetsSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
   }
+  
+  "SameAs.equals" should {
+
+    "return true for two SameAs having equal value regardless of the type" in {
+      forAll { sameAs: SameAs =>
+        SameAs.fromId(sameAs.value) shouldBe SameAs.from(sameAs.value)
+        SameAs.from(sameAs.value)   shouldBe SameAs.fromId(sameAs.value)
+      }
+    }
+  }
+
+  "SameAs.hashCode" should {
+
+    "return same values for two SameAs having equal value regardless of the type" in {
+      forAll { sameAs: SameAs =>
+        SameAs.fromId(sameAs.value).map(_.hashCode()) shouldBe SameAs.from(sameAs.value).map(_.hashCode())
+      }
+    }
+  }
 }

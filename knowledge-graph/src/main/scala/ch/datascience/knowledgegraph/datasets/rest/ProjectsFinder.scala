@@ -54,35 +54,79 @@ private class ProjectsFinder(
         |
         |SELECT ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
         |WHERE {
-        |  { # finding datasets having the same sameAs but not pointing to a dataset id from a renku project
-        |    ?dsId rdf:type <http://schema.org/Dataset> ;
-        |          schema:sameAs/schema:url ?sameAs ;
-        |          schema:isPartOf ?projectId {
-        |            SELECT ?sameAs ?projectId (MIN(?dateCreated) AS ?minDateCreated)
+        |  ?l0 rdf:type <http://schema.org/Dataset> ;
+        |      schema:isPartOf ?projectId {
+        |        SELECT ?l0 ?projectId (MIN(?dateCreated) AS ?minDateCreated)
+        |        WHERE {
+        |          {
+        |            {
+        |              {
+        |                ?l0 schema:sameAs+/schema:url ?topmostSameAs;
+        |                    schema:isPartOf ?projectId;
+        |                    prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
+        |                FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l2 }
+        |              } UNION {
+        |                ?topmostSameAs rdf:type <http://schema.org/Dataset>;
+        |                               schema:isPartOf ?projectId;
+        |                               prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
+        |                FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l1 }
+        |              }
+        |            } UNION {
+        |              ?l0 schema:sameAs+/schema:url ?l1;
+        |                  schema:isPartOf ?projectId;
+        |                  prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
+        |              ?l1 schema:sameAs+/schema:url ?topmostSameAs
+        |              FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l3 }
+        |            } UNION {
+        |              ?l0 schema:sameAs+/schema:url ?l1;
+        |                  schema:isPartOf ?projectId;
+        |                  prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
+        |              ?l1 schema:sameAs+/schema:url ?l2.
+        |              ?l2 schema:sameAs+/schema:url ?topmostSameAs
+        |              FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l4 }
+        |            }
+        |          } {
+        |            SELECT ?topmostSameAs
         |            WHERE {
-        |              ?dsId rdf:type <http://schema.org/Dataset> ;
-        |                    schema:sameAs/schema:url ?sameAs {
-        |                      SELECT ?sameAs
-        |                      WHERE {
-        |                        ?datasetId schema:identifier "$identifier" ;
-        |                                   rdf:type <http://schema.org/Dataset> ;
-        |                                   schema:sameAs/schema:url ?sameAs .
-        |                      }
-        |                      GROUP BY ?sameAs
-        |                    }
-        |              FILTER NOT EXISTS {
-        |                ?dsId schema:sameAs/schema:url ?dsWithoutSameAsId {
-        |                  ?dsWithoutSameAsId rdf:type <http://schema.org/Dataset> .
-        |                  FILTER NOT EXISTS { ?dsWithoutSameAsId schema:sameAs ?nonExistingSameAs } .
+        |              {
+        |                {
+        |                  {
+        |                    ?l0 schema:sameAs+/schema:url ?l1.
+        |                    FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
+        |                    BIND (?l1 AS ?topmostSameAs)
+        |                  } UNION {
+        |                    ?l0 rdf:type <http://schema.org/Dataset>.
+        |                    FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
+        |                    BIND (?l0 AS ?topmostSameAs)
+        |                  }
+        |                } UNION {
+        |                  ?l0 schema:sameAs+/schema:url ?l1.
+        |                  ?l1 schema:sameAs+/schema:url ?l2
+        |                  FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
+        |                  BIND (?l2 AS ?topmostSameAs)
+        |                } UNION {
+        |                  ?l0 schema:sameAs+/schema:url ?l1.
+        |                  ?l1 schema:sameAs+/schema:url ?l2.
+        |                  ?l2 schema:sameAs+/schema:url ?l3
+        |                  FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
+        |                  BIND (?l3 AS ?topmostSameAs)
+        |                }
+        |              } {
+        |                SELECT ?l0
+        |                WHERE {
+        |                  ?l0 rdf:type <http://schema.org/Dataset>;
+        |                      schema:identifier "$identifier"
         |                }
         |              }
-        |              ?dsId schema:isPartOf ?projectId ;
-        |                    prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated
         |            }
-        |            GROUP BY ?sameAs ?projectId
-        |            HAVING (MIN(?dateCreated) != 0)
+        |            GROUP BY ?topmostSameAs
+        |            HAVING (COUNT(*) > 0)
         |          }
-        |    ?dsId prov:qualifiedGeneration/prov:activity ?activityId .
+        |        }
+        |        GROUP BY ?l0 ?projectId
+        |        HAVING (MIN(?dateCreated) != 0)
+        |  } {
+        |    ?l0 prov:qualifiedGeneration/prov:activity ?activityId .
         |    ?projectId rdf:type <http://schema.org/Project> ;
         |               schema:name ?projectName .
         |    ?activityId prov:startedAtTime ?minDateCreated ;
@@ -90,69 +134,6 @@ private class ProjectsFinder(
         |    ?agentId rdf:type <http://schema.org/Person> ;
         |             schema:email ?agentEmail ;
         |             schema:name ?agentName .
-        |  } UNION { # finding datasets having the sameAs pointing to a dataset from a renku project
-        |    {
-        |      SELECT ?foundDsId ?projectId ?projectName (MIN(?dateCreated) AS ?minDateCreated)
-        |      WHERE {
-        |        {
-        |          ?derivedDsId schema:sameAs/schema:url ?dsId {
-        |            ?dsId rdf:type <http://schema.org/Dataset> ;
-        |                  schema:identifier "$identifier" .
-        |            FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-        |          }
-        |        } {
-        |          ?dsId schema:isPartOf ?projectId ;
-        |                prov:qualifiedGeneration/prov:activity ?activityId .
-        |          ?projectId rdf:type <http://schema.org/Project> ;
-        |                     schema:name ?projectName .
-        |          ?activityId prov:startedAtTime ?dateCreated
-        |          BIND(?dsId AS ?foundDsId)
-        |        } UNION {
-        |          ?derivedDsId schema:sameAs/schema:url ?dsId ;
-        |                       schema:isPartOf ?projectId ;
-        |                       prov:qualifiedGeneration/prov:activity ?activityId .
-        |          ?projectId rdf:type <http://schema.org/Project> ;
-        |                     schema:name ?projectName .
-        |          ?activityId prov:startedAtTime ?dateCreated
-        |          BIND(?derivedDsId AS ?foundDsId)
-        |        }
-        |      }
-        |      GROUP BY ?foundDsId ?projectId ?projectName
-        |      HAVING (COUNT(*) > 0)
-        |    } {
-        |      ?foundDsId schema:isPartOf ?projectId ;
-        |                 prov:qualifiedGeneration/prov:activity ?activityId .
-        |      ?activityId prov:startedAtTime ?minDateCreated ;
-        |                  prov:agent ?agentId .
-        |      ?agentId rdf:type <http://schema.org/Person> ;
-        |               schema:email ?agentEmail ;
-        |               schema:name ?agentName .
-        |    }
-        |  } UNION { # finding datasets having no sameAs set and not imported to another projects
-        |    SELECT ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
-        |    WHERE {
-        |      ?dsId prov:qualifiedGeneration/prov:activity ?activityId {
-        |        SELECT ?dsId ?projectId ?projectName (MIN(?dateCreated) AS ?minDateCreated)
-        |        WHERE {
-        |            ?dsId schema:identifier "$identifier" .
-        |            FILTER NOT EXISTS { ?dsId schema:sameAs ?nonExistingSameAs } .
-        |            FILTER NOT EXISTS { ?derivedDsId schema:sameAs/schema:url ?dsId } .
-        |            ?dsId rdf:type <http://schema.org/Dataset> ;
-        |                  schema:isPartOf ?projectId ;
-        |                  prov:qualifiedGeneration/prov:activity ?activityId .
-        |            ?projectId rdf:type <http://schema.org/Project> ;
-        |                       schema:name ?projectName .
-        |            ?activityId prov:startedAtTime ?dateCreated .
-        |        }
-        |	       GROUP BY ?dsId ?projectId ?projectName
-        |        HAVING (COUNT(*) > 0)
-        |      }
-        |      ?activityId prov:startedAtTime ?minDateCreated ;
-        |                  prov:agent ?agentId .
-        |      ?agentId rdf:type <http://schema.org/Person> ;
-        |               schema:email ?agentEmail ;
-        |               schema:name ?agentName .
-        |    }
         |  }
         |}
         |GROUP BY ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName

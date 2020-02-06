@@ -105,29 +105,25 @@ private class IODatasetsFinder(
             |              {
             |                {
             |                  {
-            |                    ?l0 schema:sameAs+/schema:url ?l1;
+            |                    ?l0 schema:sameAs+/schema:url ?topmostSameAs;
             |                        schema:isPartOf ?projectId.
-            |                    FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
-            |                    BIND (?l1 AS ?topmostSameAs)
+            |                    FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l2 }
             |                  } UNION {
-            |                    ?l0 rdf:type <http://schema.org/Dataset>;
+            |                    ?topmostSameAs rdf:type <http://schema.org/Dataset>;
             |                        schema:isPartOf ?projectId.
-            |                    FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
-            |                    BIND (?l0 AS ?topmostSameAs)
+            |                    FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l1 }
             |                  }
             |                } UNION {
             |                  ?l0 schema:sameAs+/schema:url ?l1;
             |                      schema:isPartOf ?projectId.
-            |                  ?l1 schema:sameAs+/schema:url ?l2
-            |                  FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
-            |                  BIND (?l2 AS ?topmostSameAs)
+            |                  ?l1 schema:sameAs+/schema:url ?topmostSameAs
+            |                  FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l3 }
             |                } UNION {
             |                  ?l0 schema:sameAs+/schema:url ?l1;
             |                      schema:isPartOf ?projectId.
             |                  ?l1 schema:sameAs+/schema:url ?l2.
-            |                  ?l2 schema:sameAs+/schema:url ?l3
-            |                  FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
-            |                  BIND (?l3 AS ?topmostSameAs)
+            |                  ?l2 schema:sameAs+/schema:url ?topmostSameAs
+            |                  FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l4 }
             |                }
             |              } {
             |                SELECT ?topmostSameAs
