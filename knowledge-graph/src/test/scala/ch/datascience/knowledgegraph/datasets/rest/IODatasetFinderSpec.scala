@@ -172,7 +172,6 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           randomDataSetCommit
         )
 
-        println(dataset.id)
         datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
           dataset.copy(
             parts = dataset.parts.sorted,
