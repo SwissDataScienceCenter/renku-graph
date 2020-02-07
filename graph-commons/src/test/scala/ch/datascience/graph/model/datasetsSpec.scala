@@ -64,7 +64,7 @@ class datasetsSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
   }
-  
+
   "SameAs.equals" should {
 
     "return true for two SameAs having equal value regardless of the type" in {
