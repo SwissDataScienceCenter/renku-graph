@@ -140,15 +140,22 @@ private class IODatasetsFinder(
             |                  }
             |                } UNION {
             |                  ?l0 schema:sameAs+/schema:url ?l1.
-            |                  ?l1 schema:sameAs+/schema:url ?l2
+            |                  ?l1 schema:sameAs+/schema:url ?l2.
             |                  FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
             |                  BIND (?l2 AS ?topmostSameAs)
             |                } UNION {
             |                  ?l0 schema:sameAs+/schema:url ?l1.
             |                  ?l1 schema:sameAs+/schema:url ?l2.
-            |                  ?l2 schema:sameAs+/schema:url ?l3
+            |                  ?l2 schema:sameAs+/schema:url ?l3.
             |                  FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
             |                  BIND (?l3 AS ?topmostSameAs)
+            |                } UNION {
+            |                  ?l0 schema:sameAs+/schema:url ?l1.
+            |                  ?l1 schema:sameAs+/schema:url ?l2.
+            |                  ?l2 schema:sameAs+/schema:url ?l3.
+            |                  ?l3 schema:sameAs+/schema:url ?l4.
+            |                  FILTER NOT EXISTS { ?l4 schema:sameAs ?l5 }
+            |                  BIND (?l4 AS ?topmostSameAs)
             |                }
             |              }
             |            }
@@ -175,6 +182,13 @@ private class IODatasetsFinder(
             |                  schema:isPartOf ?projectId.
             |              ?l1 schema:sameAs+/schema:url ?l2.
             |              ?l2 schema:sameAs+/schema:url ?topmostSameAs
+            |              FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l4 }
+            |            } UNION {
+            |              ?l0 schema:sameAs+/schema:url ?l1;
+            |                  schema:isPartOf ?projectId.
+            |              ?l1 schema:sameAs+/schema:url ?l2.
+            |              ?l2 schema:sameAs+/schema:url ?l3.
+            |              ?l3 schema:sameAs+/schema:url ?topmostSameAs
             |              FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l4 }
             |            }
             |          }
@@ -248,9 +262,17 @@ private class IODatasetsFinder(
             |            ?l0 schema:sameAs+/schema:url ?l1;
             |                schema:isPartOf ?projectId.
             |            ?l1 schema:sameAs+/schema:url ?l2.
-            |            ?l2 schema:sameAs+/schema:url ?l3
+            |            ?l2 schema:sameAs+/schema:url ?l3.
             |            FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
             |            BIND (?l3 AS ?topmostSameAs)
+            |          } UNION {
+            |            ?l0 schema:sameAs+/schema:url ?l1;
+            |                schema:isPartOf ?projectId.
+            |            ?l1 schema:sameAs+/schema:url ?l2.
+            |            ?l2 schema:sameAs+/schema:url ?l3.
+            |            ?l3 schema:sameAs+/schema:url ?l4.
+            |            FILTER NOT EXISTS { ?l4 schema:sameAs ?l5 }
+            |            BIND (?l4 AS ?topmostSameAs)
             |          }
             |        }
             |        GROUP BY ?topmostSameAs
@@ -342,15 +364,22 @@ private class IODatasetsFinder(
             |      }
             |    } UNION {
             |      ?l0 schema:sameAs+/schema:url ?l1.
-            |      ?l1 schema:sameAs+/schema:url ?l2
+            |      ?l1 schema:sameAs+/schema:url ?l2.
             |      FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
             |      BIND (?l2 AS ?topmostSameAs)
             |    } UNION {
             |      ?l0 schema:sameAs+/schema:url ?l1.
-            |      ?l1 schema:sameAs+/schema:url ?l2 .
-            |      ?l2 schema:sameAs+/schema:url ?l3
+            |      ?l1 schema:sameAs+/schema:url ?l2.
+            |      ?l2 schema:sameAs+/schema:url ?l3.
             |      FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
             |      BIND (?l3 AS ?topmostSameAs)
+            |    } UNION {
+            |      ?l0 schema:sameAs+/schema:url ?l1.
+            |      ?l1 schema:sameAs+/schema:url ?l2.
+            |      ?l2 schema:sameAs+/schema:url ?l3.
+            |      ?l3 schema:sameAs+/schema:url ?l4.
+            |      FILTER NOT EXISTS { ?l4 schema:sameAs ?l5 }
+            |      BIND (?l4 AS ?topmostSameAs)
             |    }
             |  }
             |}
@@ -371,15 +400,22 @@ private class IODatasetsFinder(
             |    }
             |  } UNION {
             |    ?l0 schema:sameAs+/schema:url ?l1.
-            |    ?l1 schema:sameAs+/schema:url ?l2
+            |    ?l1 schema:sameAs+/schema:url ?l2.
             |    FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
             |    BIND (?l2 AS ?topmostSameAs)
             |  } UNION {
             |    ?l0 schema:sameAs+/schema:url ?l1.
-            |    ?l1 schema:sameAs+/schema:url ?l2 .
-            |    ?l2 schema:sameAs+/schema:url ?l3
+            |    ?l1 schema:sameAs+/schema:url ?l2.
+            |    ?l2 schema:sameAs+/schema:url ?l3.
             |    FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
             |    BIND (?l3 AS ?topmostSameAs)
+            |  } UNION {
+            |    ?l0 schema:sameAs+/schema:url ?l1.
+            |    ?l1 schema:sameAs+/schema:url ?l2.
+            |    ?l2 schema:sameAs+/schema:url ?l3.
+            |    ?l3 schema:sameAs+/schema:url ?l4.
+            |    FILTER NOT EXISTS { ?l4 schema:sameAs ?l5 }
+            |    BIND (?l4 AS ?topmostSameAs)
             |  }
             |}
             |GROUP BY ?topmostSameAs

@@ -743,6 +743,31 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
         result.pagingInfo.total shouldBe Total(1)
       }
+
+      "return a single dataset " +
+        s"- case when there are 4 levels of inheritance and ${maybePhrase.getOrElse("no")} phrase given" in new TestCase {
+        val dataset1 = datasets(
+          maybeSameAs = datasetSameAs.generateOption,
+          projects    = nonEmptyList(datasetProjects, maxElements = 3)
+        ).generateOne.makeDescContaining(maybePhrase)
+        val dataset1CreatedDate = datasetCreatedDates.generateOne
+        val dataset1Jsons       = toDataSetCommit(dataset1, dataset1CreatedDate)
+
+        val (allDatasets, allJsons) = nestDataset(ifLessThan = 4)(dataset1, dataset1CreatedDate, dataset1Jsons)
+
+        loadToStore(allJsons: _*)
+
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+          .unsafeRunSync()
+
+        result.results shouldBe List(
+          dataset1 addAll allDatasets.tail.flatMap(_.projects)
+        ).map(_.toDatasetSearchResult)
+          .sortBy(_.name.value)
+
+        result.pagingInfo.total shouldBe Total(1)
+      }
     }
   }
 
@@ -876,6 +901,28 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
   private implicit class JsonsOps(jsons: List[JsonLD]) {
     lazy val datasetId: Option[SameAs] = jsons.head.entityId flatMap (id => SameAs.fromId(id.value).toOption)
+  }
+
+  @scala.annotation.tailrec
+  private def nestDataset(ifLessThan: Int)(
+      dataset:                        Dataset,
+      createdDate:                    DateCreated,
+      datasetJsons:                   List[JsonLD],
+      accumulator:                    (List[Dataset], List[JsonLD]) = Nil -> Nil
+  ): (List[Dataset], List[JsonLD]) = {
+    val (datasets, jsons) = accumulator
+    val newDatasets       = datasets :+ dataset
+    val newJsons          = jsons ++ datasetJsons
+    if (newDatasets.size < ifLessThan) {
+      val newDataset = dataset.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = datasetJsons.datasetId,
+        projects    = List(datasetProjects.generateOne)
+      )
+      val newDatasetCreatedDate = createdDate.shiftToFuture
+      val newDatasetJsons       = toDataSetCommit(newDataset, newDatasetCreatedDate)
+      nestDataset(ifLessThan)(newDataset, newDatasetCreatedDate, newDatasetJsons, newDatasets -> newJsons)
+    } else newDatasets -> newJsons
   }
 
   private implicit class DateCreatedOps(dateCreated: DateCreated) {
