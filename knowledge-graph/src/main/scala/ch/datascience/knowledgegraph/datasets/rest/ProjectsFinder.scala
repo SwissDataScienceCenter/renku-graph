@@ -54,83 +54,85 @@ private class ProjectsFinder(
         |
         |SELECT ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
         |WHERE {
-        |  ?l0 rdf:type <http://schema.org/Dataset> ;
-        |      schema:isPartOf ?projectId {
-        |        SELECT ?l0 ?projectId (MIN(?dateCreated) AS ?minDateCreated)
+        |  {
+        |    SELECT ?l0 ?projectId (MIN(?dateCreated) AS ?minDateCreated)
+        |    WHERE {
+        |      {
+        |        {
+        |          {
+        |            ?l0 schema:sameAs+/schema:url ?topmostSameAs;
+        |                schema:isPartOf ?projectId;
+        |                prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
+        |            FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l2 }
+        |          } UNION {
+        |            ?topmostSameAs rdf:type <http://schema.org/Dataset>;
+        |                           schema:isPartOf ?projectId;
+        |                           prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
+        |            FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l1 }
+        |            BIND (?topmostSameAs AS ?l0)
+        |          }
+        |        } UNION {
+        |          ?l0 schema:sameAs+/schema:url ?l1;
+        |              schema:isPartOf ?projectId;
+        |              prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
+        |          ?l1 schema:sameAs+/schema:url ?topmostSameAs
+        |          FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l3 }
+        |        } UNION {
+        |          ?l0 schema:sameAs+/schema:url ?l1;
+        |              schema:isPartOf ?projectId;
+        |              prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
+        |          ?l1 schema:sameAs+/schema:url ?l2.
+        |          ?l2 schema:sameAs+/schema:url ?topmostSameAs
+        |          FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l4 }
+        |        }
+        |      } {
+        |        SELECT ?topmostSameAs
         |        WHERE {
         |          {
         |            {
         |              {
-        |                ?l0 schema:sameAs+/schema:url ?topmostSameAs;
-        |                    schema:isPartOf ?projectId;
-        |                    prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
-        |                FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l2 }
+        |                ?l0 schema:sameAs+/schema:url ?l1.
+        |                FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
+        |                BIND (?l1 AS ?topmostSameAs)
         |              } UNION {
-        |                ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-        |                               schema:isPartOf ?projectId;
-        |                               prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
-        |                FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l1 }
+        |                ?l0 rdf:type <http://schema.org/Dataset>.
+        |                FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
+        |                BIND (?l0 AS ?topmostSameAs)
         |              }
         |            } UNION {
-        |              ?l0 schema:sameAs+/schema:url ?l1;
-        |                  schema:isPartOf ?projectId;
-        |                  prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
-        |              ?l1 schema:sameAs+/schema:url ?topmostSameAs
-        |              FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l3 }
+        |              ?l0 schema:sameAs+/schema:url ?l1.
+        |              ?l1 schema:sameAs+/schema:url ?l2
+        |              FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
+        |              BIND (?l2 AS ?topmostSameAs)
         |            } UNION {
-        |              ?l0 schema:sameAs+/schema:url ?l1;
-        |                  schema:isPartOf ?projectId;
-        |                  prov:qualifiedGeneration/prov:activity/prov:startedAtTime ?dateCreated.
+        |              ?l0 schema:sameAs+/schema:url ?l1.
         |              ?l1 schema:sameAs+/schema:url ?l2.
-        |              ?l2 schema:sameAs+/schema:url ?topmostSameAs
-        |              FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l4 }
+        |              ?l2 schema:sameAs+/schema:url ?l3
+        |              FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
+        |              BIND (?l3 AS ?topmostSameAs)
         |            }
         |          } {
-        |            SELECT ?topmostSameAs
+        |            SELECT ?l0
         |            WHERE {
-        |              {
-        |                {
-        |                  {
-        |                    ?l0 schema:sameAs+/schema:url ?l1.
-        |                    FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
-        |                    BIND (?l1 AS ?topmostSameAs)
-        |                  } UNION {
-        |                    ?l0 rdf:type <http://schema.org/Dataset>.
-        |                    FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
-        |                    BIND (?l0 AS ?topmostSameAs)
-        |                  }
-        |                } UNION {
-        |                  ?l0 schema:sameAs+/schema:url ?l1.
-        |                  ?l1 schema:sameAs+/schema:url ?l2
-        |                  FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
-        |                  BIND (?l2 AS ?topmostSameAs)
-        |                } UNION {
-        |                  ?l0 schema:sameAs+/schema:url ?l1.
-        |                  ?l1 schema:sameAs+/schema:url ?l2.
-        |                  ?l2 schema:sameAs+/schema:url ?l3
-        |                  FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
-        |                  BIND (?l3 AS ?topmostSameAs)
-        |                }
-        |              } {
-        |                SELECT ?l0
-        |                WHERE {
-        |                  ?l0 rdf:type <http://schema.org/Dataset>;
-        |                      schema:identifier "$identifier"
-        |                }
-        |              }
+        |              ?l0 rdf:type <http://schema.org/Dataset>;
+        |                  schema:identifier "$identifier"
         |            }
-        |            GROUP BY ?topmostSameAs
-        |            HAVING (COUNT(*) > 0)
         |          }
         |        }
-        |        GROUP BY ?l0 ?projectId
-        |        HAVING (MIN(?dateCreated) != 0)
+        |        GROUP BY ?topmostSameAs
+        |        HAVING (COUNT(*) > 0)
+        |      }
+        |    }
+        |    GROUP BY ?l0 ?projectId
+        |    HAVING (MIN(?dateCreated) != 0)
         |  } {
-        |    ?l0 prov:qualifiedGeneration/prov:activity ?activityId .
-        |    ?projectId rdf:type <http://schema.org/Project> ;
-        |               schema:name ?projectName .
+        |    ?l0 rdf:type <http://schema.org/Dataset> ;
+        |        schema:isPartOf ?projectId;
+        |        prov:qualifiedGeneration/prov:activity ?activityId .
         |    ?activityId prov:startedAtTime ?minDateCreated ;
         |                prov:agent ?agentId .
+        |    ?projectId rdf:type <http://schema.org/Project> ;
+        |               schema:name ?projectName .
         |    ?agentId rdf:type <http://schema.org/Person> ;
         |             schema:email ?agentEmail ;
         |             schema:name ?agentName .
