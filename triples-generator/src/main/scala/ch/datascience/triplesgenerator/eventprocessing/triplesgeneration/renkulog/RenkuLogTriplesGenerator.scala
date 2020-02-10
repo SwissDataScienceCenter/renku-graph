@@ -21,12 +21,11 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 import java.security.SecureRandom
 
 import Commands.GitLabRepoUrlFinder
-import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.config.ConfigLoader
+import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
@@ -35,10 +34,8 @@ import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.Commit._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
-import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
@@ -124,7 +121,7 @@ object RenkuLogTriplesGenerator {
               executionContext:      ExecutionContext,
               timer:                 Timer[IO]): IO[TriplesGenerator[IO]] =
     for {
-      renkuLogTimeout <- new RenkuLogTimeoutConfigProvider[IO].get
+      renkuLogTimeout <- RenkuLogTimeout[IO]()
       gitLabUrl       <- GitLabUrl[IO]()
     } yield new RenkuLogTriplesGenerator(
       new GitLabRepoUrlFinder[IO](gitLabUrl),
@@ -133,12 +130,4 @@ object RenkuLogTriplesGenerator {
       new Commands.Git,
       randomLong = new SecureRandom().nextLong _
     )
-}
-
-private class RenkuLogTimeoutConfigProvider[Interpretation[_]](
-    configuration: Config = ConfigFactory.load()
-)(implicit ME:     MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
-
-  def get: Interpretation[FiniteDuration] = find[FiniteDuration]("renku-log-timeout", configuration)
 }

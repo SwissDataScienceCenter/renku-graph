@@ -21,12 +21,17 @@ package ch.datascience.dbeventlog
 import EventStatus._
 import cats.implicits._
 import ch.datascience.dbeventlog.commands.ProcessingStatus
+import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
 
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.Try
 
 object DbEventLogGenerators {
+
+  implicit val renkuLogTimeouts: Gen[RenkuLogTimeout] = durations(max = 5 hours) map RenkuLogTimeout.apply
 
   implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
   implicit val createdDates:   Gen[CreatedDate]   = timestampsNotInTheFuture map CreatedDate.apply
