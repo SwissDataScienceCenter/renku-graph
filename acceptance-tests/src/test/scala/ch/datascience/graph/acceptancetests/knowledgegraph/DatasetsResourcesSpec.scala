@@ -42,11 +42,13 @@ import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen}
 import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.triples.{singleFileAndCommitWithDataset, triples}
+import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
+import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -82,40 +84,42 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     scenario("As a user I would like to find project's data-sets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
-      val jsonLDTriples = triples(
-        singleFileAndCommitWithDataset(
-          projectPath               = project.path,
-          projectName               = project.name,
-          projectDateCreated        = project.created.date,
-          projectCreator            = project.created.creator.name -> project.created.creator.email,
-          commitId                  = dataset1CommitId,
-          committerName             = dataset1Creation.agent.name,
-          committerEmail            = dataset1Creation.agent.email,
-          committedDate             = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+      val jsonLDTriples = JsonLD.arr(
+        dataSetCommit(
+          commitId      = dataset1CommitId,
+          committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.email),
+          schemaVersion = currentSchemaVersion
+        )(
+          projectPath        = project.path,
+          projectName        = project.name,
+          projectDateCreated = project.created.date,
+          projectCreator     = Person(project.created.creator.name, project.created.creator.email)
+        )(
           datasetIdentifier         = dataset1.id,
           datasetName               = dataset1.name,
           maybeDatasetDescription   = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
-          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-          maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
-          schemaVersion             = currentSchemaVersion
+          datasetCreators           = dataset1.published.creators.map(toPerson),
+          datasetParts              = dataset1.part.map(part => (part.name, part.atLocation))
         ),
-        singleFileAndCommitWithDataset(
-          projectPath               = project.path,
-          projectName               = project.name,
-          projectDateCreated        = project.created.date,
-          projectCreator            = project.created.creator.name -> project.created.creator.email,
-          commitId                  = dataset2CommitId,
-          committerName             = dataset2Creation.agent.name,
-          committerEmail            = dataset2Creation.agent.email,
-          committedDate             = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+        dataSetCommit(
+          commitId      = dataset2CommitId,
+          committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.email),
+          schemaVersion = currentSchemaVersion
+        )(
+          projectPath        = project.path,
+          projectName        = project.name,
+          projectDateCreated = project.created.date,
+          projectCreator     = Person(project.created.creator.name, project.created.creator.email)
+        )(
           datasetIdentifier         = dataset2.id,
           datasetName               = dataset2.name,
           maybeDatasetDescription   = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
-          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-          maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation)),
-          schemaVersion             = currentSchemaVersion
+          datasetCreators           = dataset2.published.creators.map(toPerson),
+          datasetParts              = dataset2.part.map(part => (part.name, part.atLocation))
         )
       )
 
@@ -271,22 +275,22 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit =
       projects foreach { project =>
         val commitId = commitIds.generateOne
-        `data in the RDF store`(project.toGitLabProject(),
-                                commitId,
-                                triples(toSingleFileAndCommitWithDataset(project.path, commitId, dataset)))
+        `data in the RDF store`(project.toGitLabProject(), commitId, toDataSetCommit(project.path, commitId, dataset))
         `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
       }
 
-    def toSingleFileAndCommitWithDataset(projectPath: ProjectPath, commitId: CommitId, dataset: Dataset): List[Json] =
-      singleFileAndCommitWithDataset(
-        projectPath               = projectPath,
-        commitId                  = commitId,
+    def toDataSetCommit(projectPath: ProjectPath, commitId: CommitId, dataset: Dataset) =
+      dataSetCommit(
+        commitId      = commitId,
+        schemaVersion = currentSchemaVersion
+      )(
+        projectPath = projectPath
+      )(
         datasetIdentifier         = dataset.id,
         datasetName               = dataset.name,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
-        maybeDatasetCreators      = dataset.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-        schemaVersion             = currentSchemaVersion
+        datasetCreators           = dataset.published.creators.map(toPerson)
       )
 
     def toDatasetProject(project: Project) =
@@ -349,4 +353,6 @@ object DatasetsResources {
 
     json.hcursor.downField("published").downField("creator").withFocus(_.mapArray(orderByName)).top
   }
+
+  lazy val toPerson: DatasetCreator => Person = creator => Person(creator.name, creator.maybeEmail, None)
 }

@@ -96,11 +96,16 @@ private object PersonDetailsUpdater {
 
         val valuesDecoder: Decoder[T] = _.downField("@value").as[T]
         val valuesEncoder: Encoder[T] = Encoder.instance[T](value => json"""{"@value": $value}""")
-        root
+        val findListOfValues = root
           .selectDynamic(property)
           .as[List[T]](decodeList(valuesDecoder), encodeList(valuesEncoder))
           .getOption(json)
-          .getOrElse(List.empty)
+        val findSingleValue = root
+          .selectDynamic(property)
+          .as[T](valuesDecoder, valuesEncoder)
+          .getOption(json)
+
+        findListOfValues orElse findSingleValue.map(List(_)) getOrElse List.empty
       }
 
       def remove(property: String): Json = root.obj.modify(_.remove(property))(json)
