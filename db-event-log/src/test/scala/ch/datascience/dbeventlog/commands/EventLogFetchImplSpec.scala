@@ -18,8 +18,8 @@
 
 package ch.datascience.dbeventlog.commands
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit._
+import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN, SECONDS => SEC}
+import java.time.{Duration, Instant}
 
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
@@ -35,14 +35,14 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+import scala.language.postfixOps
 
-  import EventLogFetch._
+class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "isEventToProcess" should {
 
     s"return true if there are events with with status $New and execution date in the past" in new TestCase {
-      storeNewEvent(commitEventIds.generateOne, ExecutionDate(now minus (5, SECONDS)), eventBodies.generateOne)
+      storeNewEvent(commitEventIds.generateOne, ExecutionDate(now minus (5, SEC)), eventBodies.generateOne)
 
       eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
     }
@@ -50,18 +50,19 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     s"return true if there are events with with status $RecoverableFailure and execution date in the past" in new TestCase {
       storeEvent(commitEventIds.generateOne,
                  EventStatus.RecoverableFailure,
-                 ExecutionDate(now minus (5, SECONDS)),
+                 ExecutionDate(now minus (5, SEC)),
                  committedDates.generateOne,
                  eventBodies.generateOne)
 
       eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
     }
 
-    s"return true if there are events with with status $Processing and execution date older than $MaxProcessingTime" in new TestCase {
+    s"return true if there are events with with status $Processing " +
+      "and execution date older than the given RenkuLogTimeout + 1 min" in new TestCase {
       storeEvent(
         commitEventIds.generateOne,
         EventStatus.Processing,
-        ExecutionDate(now minus (MaxProcessingTime.toMinutes + 1, MINUTES)),
+        ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN)),
         committedDates.generateOne,
         eventBodies.generateOne
       )
@@ -73,28 +74,28 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
       storeEvent(
         commitEventIds.generateOne,
         EventStatus.Processing,
-        ExecutionDate(now minus (MaxProcessingTime.toMinutes - 1, MINUTES)),
+        ExecutionDate(now minus (maxProcessingTime.toMinutes - 1, MIN)),
         committedDates.generateOne,
         eventBodies.generateOne
       )
       storeEvent(commitEventIds.generateOne,
                  EventStatus.New,
-                 ExecutionDate(now plus (5, SECONDS)),
+                 ExecutionDate(now plus (5, SEC)),
                  committedDates.generateOne,
                  eventBodies.generateOne)
       storeEvent(commitEventIds.generateOne,
                  EventStatus.RecoverableFailure,
-                 ExecutionDate(now plus (5, SECONDS)),
+                 ExecutionDate(now plus (5, SEC)),
                  committedDates.generateOne,
                  eventBodies.generateOne)
       storeEvent(commitEventIds.generateOne,
                  EventStatus.NonRecoverableFailure,
-                 ExecutionDate(now minus (5, SECONDS)),
+                 ExecutionDate(now minus (5, SEC)),
                  committedDates.generateOne,
                  eventBodies.generateOne)
       storeEvent(commitEventIds.generateOne,
                  EventStatus.TriplesStore,
-                 ExecutionDate(now minus (5, SECONDS)),
+                 ExecutionDate(now minus (5, SEC)),
                  committedDates.generateOne,
                  eventBodies.generateOne)
 
@@ -112,17 +113,17 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       val event1Id   = commitEventIds.generateOne.copy(projectId = projectId)
       val event1Body = eventBodies.generateOne
-      storeNewEvent(event1Id, ExecutionDate(now minus (5, SECONDS)), event1Body)
+      storeNewEvent(event1Id, ExecutionDate(now minus (5, SEC)), event1Body)
 
       val event2Id   = commitEventIds.generateOne.copy(projectId = projectId)
       val event2Body = eventBodies.generateOne
-      storeNewEvent(event2Id, ExecutionDate(now plus (5, HOURS)), event2Body)
+      storeNewEvent(event2Id, ExecutionDate(now plus (5, H)), event2Body)
 
       val event3Id   = commitEventIds.generateOne.copy(projectId = projectId)
       val event3Body = eventBodies.generateOne
       storeEvent(event3Id,
                  EventStatus.RecoverableFailure,
-                 ExecutionDate(now minus (5, HOURS)),
+                 ExecutionDate(now minus (5, H)),
                  committedDates.generateOne,
                  event3Body)
 
@@ -140,13 +141,13 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     }
 
     s"find event with the $Processing status " +
-      s"and execution date older than $MaxProcessingTime" in new TestCase {
+      "and execution date older than RenkuLogTimeout + 1 min" in new TestCase {
 
       val eventId   = commitEventIds.generateOne
       val eventBody = eventBodies.generateOne
       storeEvent(eventId,
                  EventStatus.Processing,
-                 ExecutionDate(now minus (MaxProcessingTime.toMinutes + 1, MINUTES)),
+                 ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN)),
                  committedDates.generateOne,
                  eventBody)
 
@@ -156,12 +157,12 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     }
 
     s"find no event when there there's one with $Processing status " +
-      "but execution date from less than from 10 mins ago" in new TestCase {
+      "but execution date from less than RenkuLogTimeout + 1 min" in new TestCase {
 
       storeEvent(
         commitEventIds.generateOne,
         EventStatus.Processing,
-        ExecutionDate(now minus (9, MINUTES)),
+        ExecutionDate(now minus (maxProcessingTime minusSeconds 1)),
         committedDates.generateOne,
         eventBodies.generateOne
       )
@@ -173,7 +174,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       storeNewEvent(
         commitEventIds.generateOne,
-        ExecutionDate(now plus (5, HOURS)),
+        ExecutionDate(now plus (50, H)),
         eventBodies.generateOne
       )
 
@@ -197,7 +198,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      val eventsFetcher = new EventLogFetch(transactor)
+      val eventsFetcher = new EventLogFetchImpl(transactor, renkuLogTimeout)
       eventIdsBodiesDates.toList foreach { _ =>
         eventsFetcher.popEventToProcess.unsafeRunSync() shouldBe a[Some[_]]
       }
@@ -213,15 +214,17 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
   private trait TestCase {
 
-    val currentTime   = mockFunction[Instant]
-    val eventLogFetch = new EventLogFetch(transactor, currentTime)
+    val currentTime       = mockFunction[Instant]
+    val renkuLogTimeout   = renkuLogTimeouts.generateOne
+    val maxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 1
+    val eventLogFetch     = new EventLogFetchImpl(transactor, renkuLogTimeout, currentTime)
 
     val now           = Instant.now()
     val executionDate = ExecutionDate(now)
     currentTime.expects().returning(now).anyNumberOfTimes()
 
     def executionDateDifferentiated(by: ProjectId, allProjects: NonEmptyList[ProjectId]) =
-      ExecutionDate(now minus (1000 - (allProjects.toList.indexOf(by) * 10), SECONDS))
+      ExecutionDate(now minus (1000 - (allProjects.toList.indexOf(by) * 10), SEC))
   }
 
   private def storeNewEvent(commitEventId: CommitEventId, executionDate: ExecutionDate, eventBody: EventBody): Unit =

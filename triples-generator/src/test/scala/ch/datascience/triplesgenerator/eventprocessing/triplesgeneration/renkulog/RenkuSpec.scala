@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 
 import ammonite.ops.{Bytes, CommandResult, Path}
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -61,7 +62,7 @@ class RenkuSpec extends WordSpec {
     }
 
     "get terminated if calling 'renku log' takes longer than the defined timeout" in new TestCase {
-      val timeout = 100 millis
+      val timeout = RenkuLogTimeout(100 millis)
 
       intercept[Exception] {
         renku(timeout).log(commit, path)(triplesGenerationTakingTooLong).unsafeRunSync()
@@ -77,12 +78,12 @@ class RenkuSpec extends WordSpec {
     val commit = commits.generateOne
     val path   = paths.generateOne
 
-    private val renkuLogTimeout = 1500 millis
-    def renku(timeout: FiniteDuration = renkuLogTimeout) = new Renku(timeout)
+    private val renkuLogTimeout = RenkuLogTimeout(1500 millis)
+    def renku(timeout: RenkuLogTimeout = renkuLogTimeout) = new Renku(timeout)
 
     def triplesGeneration(returning: CommandResult): (Commit, Path) => CommandResult =
       (_, _) => {
-        Thread.sleep((renkuLogTimeout - (1300 millis)).toMillis)
+        Thread sleep (renkuLogTimeout.value - (1300 millis)).toMillis
         returning
       }
 
@@ -91,7 +92,7 @@ class RenkuSpec extends WordSpec {
 
     val triplesGenerationTakingTooLong: (Commit, Path) => CommandResult =
       (_, _) => {
-        blocking(Thread.sleep((renkuLogTimeout * 10).toMillis))
+        blocking(Thread sleep (renkuLogTimeout.value * 10).toMillis)
         CommandResult(exitCode = 0, chunks = Nil)
       }
   }

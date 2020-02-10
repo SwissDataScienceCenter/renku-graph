@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.MonadError
 import cats.effect.{IO, Timer}
 import cats.implicits._
-import ch.datascience.dbeventlog.commands.{IOEventLogFetch, IOEventLogReScheduler}
+import ch.datascience.dbeventlog.commands.{EventLogFetch, IOEventLogReScheduler}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
@@ -279,7 +279,7 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
     val triplesVersionFinder  = mock[TriplesVersionFinder[IO]]
     val triplesRemover        = mock[TriplesRemover[IO]]
     val eventLogReScheduler   = mock[IOEventLogReScheduler]
-    val eventLogFetch         = mock[IOEventLogFetch]
+    val eventLogFetch         = mock[EventLogFetch[IO]]
     val initialDelay          = ReProvisioningDelay(durations(100 millis).generateOne)
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder(logger)
