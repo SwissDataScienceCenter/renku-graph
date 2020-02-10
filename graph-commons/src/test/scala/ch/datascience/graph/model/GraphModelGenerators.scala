@@ -64,6 +64,8 @@ object GraphModelGenerators {
   implicit val datasetUrls:           Gen[Url]           = validatedUrls map (_.value) map Url.apply
   implicit val datasetSameAs:         Gen[SameAs]        = validatedUrls map (_.value) map SameAs.apply
   implicit val datasetPublishedDates: Gen[PublishedDate] = localDatesNotInTheFuture map PublishedDate.apply
+  implicit val datasetCreatedDates:   Gen[DateCreated]   = timestampsNotInTheFuture map DateCreated.apply
+  implicit val datasetKeywords:       Gen[Keyword]       = nonBlankStrings() map (_.value) map Keyword.apply
   implicit val datasetPartNames:      Gen[PartName]      = nonEmptyStrings() map PartName.apply
   implicit val datasetPartLocations: Gen[PartLocation] =
     relativePaths(minSegments = 2, maxSegments = 2)

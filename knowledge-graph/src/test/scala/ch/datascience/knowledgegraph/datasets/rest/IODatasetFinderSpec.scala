@@ -19,17 +19,17 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators.{emails, names => usernames}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model.{DatasetPart, DatasetProject}
+import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPart, DatasetProject}
 import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.triples._
+import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -42,64 +42,57 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       "- a case when unrelated projects are using the same dataset" in new InMemoryStoreTestCase {
       forAll(datasets, datasetProjects, datasetInProjectCreations, datasetProjects, datasetInProjectCreations) {
         (dataset, project1, project1DatasetCreation, project2, project2DatasetCreation) =>
-          val project1DatasetCreationDate = project1DatasetCreation.date
-            .toUnsafe(date => CommittedDate.from(date.value))
+          val project1DatasetCreationDate = CommittedDate(project1DatasetCreation.date.value)
 
           loadToStore(
-            triples(
-              singleFileAndCommitWithDataset(
-                project1.path,
-                project1.name,
-                commitId                  = commitIds.generateOne,
-                committerName             = project1DatasetCreation.agent.name,
-                committerEmail            = project1DatasetCreation.agent.email,
-                committedDate             = project1DatasetCreationDate,
-                datasetIdentifier         = dataset.id,
-                datasetName               = dataset.name,
-                maybeDatasetUrl           = dataset.maybeUrl,
-                maybeDatasetSameAs        = dataset.maybeSameAs,
-                maybeDatasetDescription   = dataset.maybeDescription,
-                maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators = dataset.published.creators
-                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
-                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
-              ),
-              singleFileAndCommitWithDataset( // to reflect a file added to the dataset in another commit
-                project1.path,
-                project1.name,
-                commitId                  = commitIds.generateOne,
-                committerName             = usernames.generateOne,
-                committerEmail            = emails.generateOne,
-                committedDate             = CommittedDate(project1DatasetCreationDate.value.plusSeconds(10)),
-                datasetIdentifier         = dataset.id,
-                datasetName               = dataset.name,
-                maybeDatasetUrl           = dataset.maybeUrl,
-                maybeDatasetSameAs        = dataset.maybeSameAs,
-                maybeDatasetDescription   = dataset.maybeDescription,
-                maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators = dataset.published.creators
-                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
-                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
-              ),
-              singleFileAndCommitWithDataset(
-                project2.path,
-                project2.name,
-                commitId                  = commitIds.generateOne,
-                committerName             = project2DatasetCreation.agent.name,
-                committerEmail            = project2DatasetCreation.agent.email,
-                committedDate             = project2DatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
-                datasetIdentifier         = dataset.id,
-                datasetName               = dataset.name,
-                maybeDatasetUrl           = dataset.maybeUrl,
-                maybeDatasetSameAs        = dataset.maybeSameAs,
-                maybeDatasetDescription   = dataset.maybeDescription,
-                maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators = dataset.published.creators
-                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
-                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
-              ),
-              singleFileAndCommitWithDataset(projectPaths.generateOne, projectNames.generateOne)
-            )
+            dataSetCommit(
+              committedDate = project1DatasetCreationDate,
+              committer     = Person(project1DatasetCreation.agent.name, project1DatasetCreation.agent.email)
+            )(
+              project1.path,
+              project1.name
+            )(
+              datasetIdentifier         = dataset.id,
+              datasetName               = dataset.name,
+              maybeDatasetUrl           = dataset.maybeUrl,
+              maybeDatasetSameAs        = dataset.maybeSameAs,
+              maybeDatasetDescription   = dataset.maybeDescription,
+              maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreators           = dataset.published.creators map toPerson,
+              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
+            ),
+            dataSetCommit( // to reflect a file added to the data-set in another commit
+              committedDate = CommittedDate(project1DatasetCreationDate.value plusSeconds 10)
+            )(
+              project1.path,
+              project1.name
+            )(
+              datasetIdentifier         = dataset.id,
+              datasetName               = dataset.name,
+              maybeDatasetUrl           = dataset.maybeUrl,
+              maybeDatasetSameAs        = dataset.maybeSameAs,
+              maybeDatasetDescription   = dataset.maybeDescription,
+              maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreators           = dataset.published.creators map toPerson,
+              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
+            ),
+            dataSetCommit(
+              committedDate = project2DatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
+              committer     = Person(project2DatasetCreation.agent.name, project2DatasetCreation.agent.email)
+            )(
+              project2.path,
+              project2.name
+            )(
+              datasetIdentifier         = dataset.id,
+              datasetName               = dataset.name,
+              maybeDatasetUrl           = dataset.maybeUrl,
+              maybeDatasetSameAs        = dataset.maybeSameAs,
+              maybeDatasetDescription   = dataset.maybeDescription,
+              maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreators           = dataset.published.creators map toPerson,
+              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
+            ),
+            randomDataSetCommit
           )
 
           datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
@@ -118,58 +111,54 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
         (sourceProject, forkProject, dataset, projectDatasetCreation, commitId) =>
           val datasetCreationDate = projectDatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value))
           loadToStore(
-            triples(
-              singleFileAndCommitWithDataset(
-                sourceProject.path,
-                sourceProject.name,
-                commitId                  = commitId,
-                committerName             = projectDatasetCreation.agent.name,
-                committerEmail            = projectDatasetCreation.agent.email,
-                committedDate             = datasetCreationDate,
-                datasetIdentifier         = dataset.id,
-                datasetName               = dataset.name,
-                maybeDatasetUrl           = dataset.maybeUrl,
-                maybeDatasetSameAs        = dataset.maybeSameAs,
-                maybeDatasetDescription   = dataset.maybeDescription,
-                maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators = dataset.published.creators
-                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
-                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
-              ),
-              singleFileAndCommitWithDataset( // to reflect a file added later to the dataset in another commit
-                sourceProject.path,
-                sourceProject.name,
-                commitId                  = commitIds.generateOne,
-                committerName             = usernames.generateOne,
-                committerEmail            = emails.generateOne,
-                committedDate             = CommittedDate(datasetCreationDate.value.plusSeconds(10)),
-                datasetIdentifier         = dataset.id,
-                datasetName               = dataset.name,
-                maybeDatasetUrl           = dataset.maybeUrl,
-                maybeDatasetSameAs        = dataset.maybeSameAs,
-                maybeDatasetDescription   = dataset.maybeDescription,
-                maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators = dataset.published.creators
-                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
-                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
-              ),
-              singleFileAndCommitWithDataset(
-                forkProject.path,
-                forkProject.name,
-                commitId                  = commitId,
-                committerName             = projectDatasetCreation.agent.name,
-                committerEmail            = projectDatasetCreation.agent.email,
-                committedDate             = datasetCreationDate,
-                datasetIdentifier         = dataset.id,
-                datasetName               = dataset.name,
-                maybeDatasetUrl           = dataset.maybeUrl,
-                maybeDatasetSameAs        = dataset.maybeSameAs,
-                maybeDatasetDescription   = dataset.maybeDescription,
-                maybeDatasetPublishedDate = dataset.published.maybeDate,
-                maybeDatasetCreators = dataset.published.creators
-                  .map(creator => (creator.name, creator.maybeEmail, creator.maybeAffiliation)),
-                maybeDatasetParts = dataset.part.map(part => (part.name, part.atLocation))
-              )
+            dataSetCommit(
+              commitId      = commitId,
+              committedDate = datasetCreationDate,
+              committer     = Person(projectDatasetCreation.agent.name, projectDatasetCreation.agent.email)
+            )(
+              sourceProject.path,
+              sourceProject.name
+            )(
+              datasetIdentifier         = dataset.id,
+              datasetName               = dataset.name,
+              maybeDatasetUrl           = dataset.maybeUrl,
+              maybeDatasetSameAs        = dataset.maybeSameAs,
+              maybeDatasetDescription   = dataset.maybeDescription,
+              maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreators           = dataset.published.creators map toPerson,
+              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
+            ),
+            dataSetCommit( // to reflect a file added later to the dataset in another commit
+              committedDate = CommittedDate(datasetCreationDate.value plusSeconds 10)
+            )(
+              sourceProject.path,
+              sourceProject.name
+            )(
+              datasetIdentifier         = dataset.id,
+              datasetName               = dataset.name,
+              maybeDatasetUrl           = dataset.maybeUrl,
+              maybeDatasetSameAs        = dataset.maybeSameAs,
+              maybeDatasetDescription   = dataset.maybeDescription,
+              maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreators           = dataset.published.creators map toPerson,
+              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
+            ),
+            dataSetCommit(
+              commitId      = commitId,
+              committedDate = datasetCreationDate,
+              committer     = Person(projectDatasetCreation.agent.name, projectDatasetCreation.agent.email)
+            )(
+              forkProject.path,
+              forkProject.name
+            )(
+              datasetIdentifier         = dataset.id,
+              datasetName               = dataset.name,
+              maybeDatasetUrl           = dataset.maybeUrl,
+              maybeDatasetSameAs        = dataset.maybeSameAs,
+              maybeDatasetDescription   = dataset.maybeDescription,
+              maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreators           = dataset.published.creators map toPerson,
+              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
             )
           )
 
@@ -200,6 +189,9 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       new ProjectsFinder(rdfStoreConfig, renkuBaseUrl, logger)
     )
   }
+
+  private lazy val toPerson: DatasetCreator => Person =
+    creator => Person(creator.name, creator.maybeEmail, creator.maybeAffiliation)
 
   private implicit lazy val partsAlphabeticalOrdering: Ordering[DatasetPart] =
     (part1: DatasetPart, part2: DatasetPart) => part1.name.value compareTo part2.name.value

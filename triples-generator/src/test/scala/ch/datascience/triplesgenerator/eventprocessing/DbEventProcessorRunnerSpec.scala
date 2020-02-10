@@ -160,7 +160,7 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
 
   private class TestEventLogFetch(isEventEvents:  List[IO[Boolean]]           = Nil,
                                   popEventEvents: List[IO[Option[EventBody]]] = Nil)
-      extends EventLogFetch[IO](mock[TestDbTransactor]) {
+      extends EventLogFetch[IO] {
     private val isEventEventsQueue  = new ConcurrentLinkedQueue[IO[Boolean]](isEventEvents.asJava)
     private val popEventEventsQueue = new ConcurrentLinkedQueue[IO[Option[EventBody]]](popEventEvents.asJava)
 

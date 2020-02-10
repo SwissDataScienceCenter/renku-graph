@@ -33,11 +33,13 @@ import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.rdfstore.triples._
+import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
@@ -69,36 +71,38 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
     scenario("As a user I would like to find project's datasets with a GraphQL query") {
 
       Given("some data in the RDF Store")
-      val jsonLDTriples = triples(
-        singleFileAndCommitWithDataset(
+      val jsonLDTriples = JsonLD.arr(
+        dataSetCommit(
+          commitId      = dataset1CommitId,
+          committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.email),
+          schemaVersion = currentSchemaVersion
+        )(
           project.path,
-          projectName,
-          commitId                  = dataset1CommitId,
-          committerName             = dataset1Creation.agent.name,
-          committerEmail            = dataset1Creation.agent.email,
-          committedDate             = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          projectName
+        )(
           datasetIdentifier         = dataset1.id,
           datasetName               = dataset1.name,
           maybeDatasetDescription   = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
-          maybeDatasetCreators      = dataset1.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-          maybeDatasetParts         = dataset1.part.map(part => (part.name, part.atLocation)),
-          schemaVersion             = currentSchemaVersion
+          datasetCreators           = dataset1.published.creators.map(toPerson),
+          datasetParts              = dataset1.part.map(part => (part.name, part.atLocation))
         ),
-        singleFileAndCommitWithDataset(
+        dataSetCommit(
+          commitId      = dataset2CommitId,
+          committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.email),
+          schemaVersion = currentSchemaVersion
+        )(
           project.path,
-          projectName,
-          commitId                  = dataset2CommitId,
-          committerName             = dataset2Creation.agent.name,
-          committerEmail            = dataset2Creation.agent.email,
-          committedDate             = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          projectName
+        )(
           datasetIdentifier         = dataset2.id,
           datasetName               = dataset2.name,
           maybeDatasetDescription   = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
-          maybeDatasetCreators      = dataset2.published.creators.map(creator => (creator.name, creator.maybeEmail, None)),
-          maybeDatasetParts         = dataset2.part.map(part => (part.name, part.atLocation)),
-          schemaVersion             = currentSchemaVersion
+          datasetCreators           = dataset2.published.creators.map(toPerson),
+          datasetParts              = dataset2.part.map(part => (part.name, part.atLocation))
         )
       )
 
@@ -234,4 +238,6 @@ class DatasetsQuerySpec extends FeatureSpec with GivenWhenThen with GraphService
         }
       }"""
   }
+
+  private lazy val toPerson: DatasetCreator => Person = creator => Person(creator.name, creator.maybeEmail, None)
 }

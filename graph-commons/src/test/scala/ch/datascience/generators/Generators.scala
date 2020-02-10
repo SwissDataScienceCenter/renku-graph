@@ -18,8 +18,8 @@
 
 package ch.datascience.generators
 
-import java.time._
-import java.time.temporal.ChronoUnit.{DAYS, MINUTES => MINS}
+import java.time.{Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
+import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
 
 import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
@@ -140,8 +140,7 @@ object Generators {
   def nonNegativeLongs(max: Long = 1000): Gen[Long Refined NonNegative] = choose(0L, max) map Refined.unsafeApply
 
   def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
-    choose(1, max.toMillis)
-      .map(FiniteDuration(_, MILLISECONDS))
+    choose(1, max.toMillis) map (FiniteDuration(_, MILLISECONDS).toCoarsest)
 
   def relativePaths(minSegments: Int = 1,
                     maxSegments: Int = 10,
@@ -188,7 +187,7 @@ object Generators {
 
   val timestamps: Gen[Instant] =
     Gen
-      .choose(Instant.EPOCH.toEpochMilli, Instant.now().plus(2000, DAYS).toEpochMilli)
+      .choose(Instant.EPOCH.toEpochMilli, Instant.now().plus(2000, JAVA_DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   val timestampsNotInTheFuture: Gen[Instant] =
@@ -198,7 +197,7 @@ object Generators {
 
   val timestampsInTheFuture: Gen[Instant] =
     Gen
-      .choose(Instant.now().plus(10, MINS).toEpochMilli, Instant.now().plus(2000, DAYS).toEpochMilli)
+      .choose(Instant.now().plus(10, JAVA_MINS).toEpochMilli, Instant.now().plus(2000, JAVA_DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   val zonedDateTimes: Gen[ZonedDateTime] =

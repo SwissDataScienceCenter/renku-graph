@@ -97,15 +97,16 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     def as[Interpretation[_], OUT](
         implicit converter: TinyTypeConverter[TT, OUT],
         ME:                 MonadError[Interpretation, Throwable]
-    ): Interpretation[OUT] = ME.fromEither(converter convert tinyType)
+    ): Interpretation[OUT] = ME.fromEither(converter(tinyType))
 
-    def toUnsafe[Out](implicit convert: TT => Either[Exception, Out]): Out = convert(tinyType).fold(throw _, identity)
+    def toUnsafe[OUT](implicit convert: TT => Either[Exception, OUT]): OUT =
+      convert(tinyType).fold(throw _, identity)
 
     def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
   }
 }
 
-trait TinyTypeConverter[TT <: TinyType, OUT] { def convert(value: TT): Either[Exception, OUT] }
+trait TinyTypeConverter[TT <: TinyType, OUT] extends Function1[TT, Either[Exception, OUT]]
 
 trait Renderer[View, -T] {
   def render(value: T): String
