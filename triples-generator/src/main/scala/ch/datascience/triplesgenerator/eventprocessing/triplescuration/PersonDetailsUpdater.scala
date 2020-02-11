@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 import cats.MonadError
 import cats.data.NonEmptyList
 import ch.datascience.graph.model.users.{Email, Id, Name}
-import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
 import io.circe.Decoder.decodeList
@@ -115,6 +115,7 @@ private object PersonDetailsUpdater {
   private[triplescuration] object prepareUpdates extends (Set[Person] => List[Update]) {
 
     import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
+    import eu.timepit.refined.auto._
 
     override def apply(persons: Set[Person]): List[Update] = persons.toList flatMap updates
 
@@ -133,10 +134,13 @@ private object PersonDetailsUpdater {
       val resource = id.asResource
       Update(
         s"Deleting Person $resource schema:name",
-        s"""|PREFIX schema: <http://schema.org/>
-            |DELETE { $resource schema:name ?name }
-            |WHERE  { $resource schema:name ?name }
-            |""".stripMargin
+        SparqlQuery(
+          name = "deleting person name",
+          Set("PREFIX schema: <http://schema.org/>"),
+          s"""|DELETE { $resource schema:name ?name }
+              |WHERE  { $resource schema:name ?name }
+              |""".stripMargin
+        )
       )
     }
     private def namesInsert(id: Id, names: Set[Name]) =
@@ -146,9 +150,12 @@ private object PersonDetailsUpdater {
           val resource = id.asResource
           Update(
             s"Inserting Person $resource schema:name",
-            s"""|PREFIX schema: <http://schema.org/>
-                |${`INSERT DATA`(resource, "schema:name", NonEmptyList.fromListUnsafe(names.toList))}
-                |""".stripMargin
+            SparqlQuery(
+              name = "inserting person name",
+              Set("PREFIX schema: <http://schema.org/>"),
+              s"""|${`INSERT DATA`(resource, "schema:name", NonEmptyList.fromListUnsafe(names.toList))}
+                  |""".stripMargin
+            )
           )
         }
 
@@ -156,10 +163,13 @@ private object PersonDetailsUpdater {
       val resource = id.asResource
       Update(
         s"Deleting Person $resource schema:email",
-        s"""|PREFIX schema: <http://schema.org/>
-            |DELETE { $resource schema:email ?email }
-            |WHERE  { $resource schema:email ?email }
-            |""".stripMargin
+        SparqlQuery(
+          name = "deleting person email",
+          Set("PREFIX schema: <http://schema.org/>"),
+          s"""|DELETE { $resource schema:email ?email }
+              |WHERE  { $resource schema:email ?email }
+              |""".stripMargin
+        )
       )
     }
 
@@ -170,9 +180,12 @@ private object PersonDetailsUpdater {
           val resource = id.asResource
           Update(
             s"Inserting Person $resource schema:email",
-            s"""|PREFIX schema: <http://schema.org/>
-                |${`INSERT DATA`(resource, "schema:email", NonEmptyList.fromListUnsafe(emails.toList))}
-                |""".stripMargin
+            SparqlQuery(
+              name = "inserting person email",
+              Set("PREFIX schema: <http://schema.org/>"),
+              s"""|${`INSERT DATA`(resource, "schema:email", NonEmptyList.fromListUnsafe(emails.toList))}
+                  |""".stripMargin
+            )
           )
         }
 
@@ -180,10 +193,13 @@ private object PersonDetailsUpdater {
       val resource = id.asResource
       Update(
         s"Deleting Person $resource rdfs:label",
-        s"""|PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            |DELETE { $resource rdfs:label ?label }
-            |WHERE  { $resource rdfs:label ?label }
-            |""".stripMargin
+        SparqlQuery(
+          name = "deleting person label",
+          Set("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"),
+          s"""|DELETE { $resource rdfs:label ?label }
+              |WHERE  { $resource rdfs:label ?label }
+              |""".stripMargin
+        )
       )
     }
 

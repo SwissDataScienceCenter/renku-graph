@@ -22,6 +22,7 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -34,7 +35,7 @@ class SparqlQuerySpec extends WordSpec {
     "render the body only if no prefixes and paging request given" in {
       val body = sentences().generateOne.value
 
-      SparqlQuery(Set.empty, body).toString shouldBe body
+      SparqlQuery(name = "test query", Set.empty, body).toString shouldBe body
     }
 
     "render the prefixes and body only if no paging request given" in {
@@ -42,7 +43,7 @@ class SparqlQuerySpec extends WordSpec {
       val prefix2 = nonBlankStrings().generateOne
       val body    = sentences().generateOne.value
 
-      SparqlQuery(Set(prefix1, prefix2), body).toString should (
+      SparqlQuery(name = "test query", Set(prefix1, prefix2), body).toString should (
         equal(
           s"""|$prefix1
               |$prefix2
@@ -62,7 +63,7 @@ class SparqlQuerySpec extends WordSpec {
             |ORDER BY ASC(?field)""".stripMargin
       val pagingRequest = pagingRequests.generateOne
 
-      val Success(query) = SparqlQuery(Set(prefix), body).include[Try](pagingRequest)
+      val Success(query) = SparqlQuery(name = "test query", Set(prefix), body).include[Try](pagingRequest)
 
       query.toString shouldBe
         s"""|$prefix
@@ -76,6 +77,7 @@ class SparqlQuerySpec extends WordSpec {
 
     "successfully add the given paging request to the SparqlQuery if there's 'ORDER BY' clause in the body" in {
       val query = SparqlQuery(
+        name     = "test query",
         prefixes = Set.empty,
         body     = s"""|${sentences().generateOne.value}
                    |ORDER BY ASC(?field)
@@ -83,11 +85,15 @@ class SparqlQuerySpec extends WordSpec {
       )
       val pagingRequest = pagingRequests.generateOne
 
-      query.include[Try](pagingRequest) shouldBe SparqlQuery(query.prefixes, query.body, Some(pagingRequest)).pure[Try]
+      query.include[Try](pagingRequest) shouldBe SparqlQuery(name = "test query",
+                                                             query.prefixes,
+                                                             query.body,
+                                                             Some(pagingRequest)).pure[Try]
     }
 
     "successfully add the given paging request to the SparqlQuery if there's 'order by' clause in the body" in {
       val query = SparqlQuery(
+        name     = "test query",
         prefixes = Set.empty,
         body     = s"""|${sentences().generateOne.value}
                    |order by asc(?field)
@@ -95,11 +101,14 @@ class SparqlQuerySpec extends WordSpec {
       )
       val pagingRequest = pagingRequests.generateOne
 
-      query.include[Try](pagingRequest) shouldBe SparqlQuery(query.prefixes, query.body, Some(pagingRequest)).pure[Try]
+      query.include[Try](pagingRequest) shouldBe SparqlQuery(name = "test query",
+                                                             query.prefixes,
+                                                             query.body,
+                                                             Some(pagingRequest)).pure[Try]
     }
 
     "fail adding the given paging request if there's no ORDER BY clause in the body" in {
-      val query         = SparqlQuery(prefixes = Set.empty, body = sentences().generateOne.value)
+      val query         = SparqlQuery(name = "test query", prefixes = Set.empty, body = sentences().generateOne.value)
       val pagingRequest = pagingRequests.generateOne
 
       val Failure(exception) = query.include[Try](pagingRequest)
@@ -113,7 +122,7 @@ class SparqlQuerySpec extends WordSpec {
     "wrap query's body with the COUNT clause" in {
       val prefixes = Set(nonBlankStrings().generateOne)
       val body     = sentences().generateOne.value
-      val query    = SparqlQuery(prefixes, body)
+      val query    = SparqlQuery(name = "test query", prefixes, body)
 
       val actual = query.toCountQuery
 

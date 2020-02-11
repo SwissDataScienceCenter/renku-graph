@@ -47,6 +47,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.logging.TestExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -170,40 +171,35 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
       .unsafeRunSync()
 
-  private lazy val queryRunner = new IORdfStoreClient(rdfStoreConfig, TestLogger()) {
+  private lazy val logger = TestLogger[IO]()
+  private lazy val queryRunner = new IORdfStoreClient(
+    rdfStoreConfig,
+    logger,
+    new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+  ) {
 
     import cats.implicits._
     import io.circe.Decoder._
 
     def runQuery(query: String): IO[List[Map[String, String]]] =
       queryExpecting[List[Map[String, String]]] {
-        s"""
-           |PREFIX prov: <http://www.w3.org/ns/prov#>
-           |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-           |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-           |PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>
-           |PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>
-           |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
-           |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-           |PREFIX schema: <http://schema.org/>
-           |
-           |$query""".stripMargin
+        SparqlQuery(
+          name = "test query",
+          Set(
+            "PREFIX prov: <http://www.w3.org/ns/prov#>",
+            "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+            "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+            "PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>",
+            "PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>",
+            "PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>",
+            "PREFIX foaf: <http://xmlns.com/foaf/0.1/>",
+            "PREFIX schema: <http://schema.org/>"
+          ),
+          query
+        )
       }
 
-    def runUpdate(query: String): IO[Unit] =
-      updateWitNoResult {
-        s"""
-           |PREFIX prov: <http://www.w3.org/ns/prov#>
-           |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-           |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-           |PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>
-           |PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>
-           |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
-           |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-           |PREFIX schema: <http://schema.org/>
-           |
-           |$query""".stripMargin
-      }
+    def runUpdate(query: SparqlQuery): IO[Unit] = updateWitNoResult(using = query)
 
     private implicit lazy val valuesDecoder: Decoder[List[Map[String, String]]] = { cursor =>
       for {
@@ -236,7 +232,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
 
   protected def runQuery(query: String): IO[List[Map[String, String]]] = queryRunner.runQuery(query)
 
-  protected def runUpdate(query: String): IO[Unit] = queryRunner.runUpdate(query)
+  protected def runUpdate(query: SparqlQuery): IO[Unit] = queryRunner.runUpdate(query)
 
   protected def rdfStoreSize: Int =
     runQuery("SELECT (COUNT(*) as ?triples) WHERE { ?s ?p ?o }")

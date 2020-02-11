@@ -24,7 +24,8 @@ import eu.timepit.refined.collection.NonEmpty
 
 import scala.language.higherKinds
 
-final case class SparqlQuery(prefixes:           Set[String Refined NonEmpty],
+final case class SparqlQuery(name:               String Refined NonEmpty,
+                             prefixes:           Set[String Refined NonEmpty],
                              body:               String,
                              maybePagingRequest: Option[PagingRequest] = None) {
   override lazy val toString: String =

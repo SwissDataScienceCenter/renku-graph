@@ -29,6 +29,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.{Creator, Project, RepoUrls}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Encoder
 import io.circe.literal._
@@ -112,12 +113,13 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 object IOProjectEndpoint {
 
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab]
+      gitLabThrottler:         Throttler[IO, GitLab],
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[ProjectEndpoint[IO]] =
     for {
-      projectFinder         <- IOProjectFinder(gitLabThrottler, ApplicationLogger)
+      projectFinder         <- IOProjectFinder(gitLabThrottler, ApplicationLogger, timeRecorder)
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ProjectEndpoint[IO](

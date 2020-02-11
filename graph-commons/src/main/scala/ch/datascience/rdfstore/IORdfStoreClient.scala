@@ -19,10 +19,10 @@
 package ch.datascience.rdfstore
 
 import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect._
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import ch.datascience.http.client.{HttpRequest, IORestClient}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.PagingRequest
 import eu.timepit.refined.api.Refined
@@ -38,13 +38,14 @@ import scala.concurrent.duration.FiniteDuration
 abstract class IORdfStoreClient(
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO],
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
 )(implicit executionContext: ExecutionContext,
   contextShift:              ContextShift[IO],
   timer:                     Timer[IO],
   ME:                        MonadError[IO, Throwable])
-    extends IORestClient(Throttler.noThrottling, logger, retryInterval, maxRetries) {
+    extends IORestClient(Throttler.noThrottling, logger, Some(timeRecorder.instance), retryInterval, maxRetries) {
 
   import IORdfStoreClient._
   import org.http4s.MediaType.application._
@@ -55,16 +56,13 @@ abstract class IORdfStoreClient(
   import org.http4s.{Request, Response, Status}
   import rdfStoreConfig._
 
-  protected def updateWitNoResult(using: String): IO[Unit] =
+  protected def updateWitNoResult(using: SparqlQuery): IO[Unit] =
     updateWitMapping[Unit](using, toFullResponseMapper(_ => IO.unit))
 
   protected def updateWitMapping[ResultType](
-      using:       String,
+      using:       SparqlQuery,
       mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
-  ): IO[ResultType] = runQuery(SparqlQuery(Set.empty, using), mapResponse, RdfUpdate)
-
-  protected def queryExpecting[ResultType](using: String)(implicit decoder: Decoder[ResultType]): IO[ResultType] =
-    queryExpecting[ResultType](SparqlQuery(Set.empty, using))
+  ): IO[ResultType] = runQuery(using, mapResponse, RdfUpdate)
 
   protected def queryExpecting[ResultType](using: SparqlQuery)(implicit decoder: Decoder[ResultType]): IO[ResultType] =
     runQuery(
@@ -80,13 +78,16 @@ abstract class IORdfStoreClient(
   ): IO[ResultType] =
     for {
       uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
-      result <- send(uploadRequest(uri, queryType, query))(mapResponse)
+      result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)
     } yield result
 
-  private def uploadRequest(uri: Uri, queryType: RdfQueryType, query: SparqlQuery): Request[IO] =
+  private def sparqlQueryRequest(uri: Uri, queryType: RdfQueryType, query: SparqlQuery) = HttpRequest(
     request(POST, uri, rdfStoreConfig.authCredentials)
       .withEntity(toEntity(queryType, query))
-      .putHeaders(`Content-Type`(`x-www-form-urlencoded`), Header(Accept.name.value, "application/sparql-results+json"))
+      .putHeaders(`Content-Type`(`x-www-form-urlencoded`),
+                  Header(Accept.name.value, "application/sparql-results+json")),
+    name = query.name
+  )
 
   private def toFullResponseMapper[ResultType](
       mapResponse: Response[IO] => IO[ResultType]

@@ -19,8 +19,7 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -32,20 +31,19 @@ private trait TriplesRemover[Interpretation[_]] {
 
 private class IOTriplesRemover(
     rdfStoreConfig:          RdfStoreConfig,
-    executionTimeRecorder:   ExecutionTimeRecorder[IO],
-    logger:                  Logger[IO]
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with TriplesRemover[IO] {
 
-  import executionTimeRecorder._
+  import eu.timepit.refined.auto._
 
-  override def removeAllTriples(): IO[Unit] =
-    measureExecutionTime {
-      removeEverything()
-    } map logExecutionTime(withMessage = "Removing outdated triples done")
-
-  private def removeEverything(): IO[Unit] = updateWitNoResult {
-    "DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }"
+  override def removeAllTriples(): IO[Unit] = updateWitNoResult {
+    SparqlQuery(
+      name = "removing all triples",
+      Set.empty,
+      "DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }"
+    )
   }
 }

@@ -28,7 +28,8 @@ import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.rdfstore.InMemoryRdfStore
+import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import io.renku.jsonld.JsonLD
@@ -823,12 +824,13 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
   }
 
   private trait TestCase {
-    private val logger = TestLogger[IO]()
+    private val logger       = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val datasetFinder = new IODatasetFinder(
-      new BaseDetailsFinder(rdfStoreConfig, renkuBaseUrl, logger),
-      new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger),
-      new PartsFinder(rdfStoreConfig, renkuBaseUrl, logger),
-      new ProjectsFinder(rdfStoreConfig, renkuBaseUrl, logger)
+      new BaseDetailsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+      new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+      new PartsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+      new ProjectsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
     )
   }
 

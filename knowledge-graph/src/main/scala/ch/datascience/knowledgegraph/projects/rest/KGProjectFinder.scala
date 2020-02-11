@@ -26,7 +26,7 @@ import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -47,14 +47,16 @@ object KGProjectFinder {
 private class IOKGProjectFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO]
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext,
   contextShift:              ContextShift[IO],
   timer:                     Timer[IO],
   ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient(rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with KGProjectFinder[IO] {
 
+  import eu.timepit.refined.auto._
   import io.circe.Decoder
 
   override def findProject(path: ProjectPath): IO[Option[KGProject]] = {
@@ -62,13 +64,15 @@ private class IOKGProjectFinder(
     queryExpecting[List[KGProject]](using = query(path)) flatMap toSingleProject
   }
 
-  private def query(path: ProjectPath): String =
-    s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        |PREFIX schema: <http://schema.org/>
-        |PREFIX prov: <http://www.w3.org/ns/prov#>
-        |
-        |SELECT DISTINCT ?name ?dateCreated ?creatorName ?creatorEmail
+  private def query(path: ProjectPath) = SparqlQuery(
+    name = "project details",
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+      "PREFIX schema: <http://schema.org/>",
+      "PREFIX prov: <http://www.w3.org/ns/prov#>"
+    ),
+    s"""|SELECT DISTINCT ?name ?dateCreated ?creatorName ?creatorEmail
         |WHERE {
         |  {
         |    SELECT ?creatorResource
@@ -93,6 +97,7 @@ private class IOKGProjectFinder(
         |  }
         |}
         |""".stripMargin
+  )
 
   private def recordsDecoder(path: ProjectPath): Decoder[List[KGProject]] = {
     import Decoder._
@@ -126,6 +131,7 @@ private class IOKGProjectFinder(
 private object IOKGProjectFinder {
 
   def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO],
       rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
       renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
       logger:                  Logger[IO] = ApplicationLogger
@@ -135,5 +141,5 @@ private object IOKGProjectFinder {
     for {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
-    } yield new IOKGProjectFinder(config, renkuBaseUrl, logger)
+    } yield new IOKGProjectFinder(config, renkuBaseUrl, logger, timeRecorder)
 }

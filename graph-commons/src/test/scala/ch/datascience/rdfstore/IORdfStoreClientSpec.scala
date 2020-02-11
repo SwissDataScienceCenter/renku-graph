@@ -27,9 +27,11 @@ import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging._
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
+import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import org.http4s.Status.{BadRequest, Ok}
 import org.http4s.{Request, Response, Status}
@@ -199,7 +201,9 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
           .willReturn(okJson(responseBody.noSpaces))
       }
 
-      val countQuery        = SparqlQuery(Set.empty, """SELECT ?s ?p ?o WHERE { ?s ?p ?o} ORDER BY ASC(?o)""")
+      val countQuery = SparqlQuery(name = "test count query",
+                                   prefixes = Set.empty,
+                                   body     = """SELECT ?s ?p ?o WHERE { ?s ?p ?o} ORDER BY ASC(?o)""")
       val totalResponseBody = json"""{
         "results": {
           "bindings": [
@@ -230,7 +234,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
     "fail if sparql body does not end with the ORDER BY clause" in new TestCase {
 
       val client = new TestRdfQueryClient(
-        query = SparqlQuery(Set.empty, "SELECT ?s ?p ?o WHERE { ?s ?p ?o}"),
+        query = SparqlQuery(name = "test query", Set.empty, "SELECT ?s ?p ?o WHERE { ?s ?p ?o}"),
         rdfStoreConfig
       )
 
@@ -323,14 +327,16 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
 
   private trait QueryClientTestCase extends TestCase {
     val client = new TestRdfQueryClient(
-      query = SparqlQuery(Set.empty, """SELECT ?s ?p ?o WHERE { ?s ?p ?o} ORDER BY ASC(?s)"""),
+      query = SparqlQuery(name = "find all triples",
+                          prefixes = Set.empty,
+                          body     = """SELECT ?s ?p ?o WHERE { ?s ?p ?o} ORDER BY ASC(?s)"""),
       rdfStoreConfig
     )
   }
 
   private trait UpdateClientTestCase extends TestCase {
     val client = new TestRdfClient(
-      query = """INSERT { "o" "p" "s"} {}""",
+      query = SparqlQuery(name = "insert", Set.empty, """INSERT { "o" "p" "s"} {}"""),
       rdfStoreConfig
     )
   }
@@ -339,9 +345,10 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private class TestRdfClient(
-      val query:      String,
-      rdfStoreConfig: RdfStoreConfig
-  ) extends IORdfStoreClient(rdfStoreConfig, TestLogger[IO]()) {
+      val query:      SparqlQuery,
+      rdfStoreConfig: RdfStoreConfig,
+      logger:         Logger[IO] = TestLogger[IO]()
+  ) extends IORdfStoreClient(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))) {
 
     def sendUpdate: IO[Unit] = updateWitNoResult(query)
 
@@ -350,8 +357,10 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
     ): IO[ResultType] = updateWitMapping(query, mapResponse)
   }
 
-  private class TestRdfQueryClient(val query: SparqlQuery, rdfStoreConfig: RdfStoreConfig)
-      extends IORdfStoreClient(rdfStoreConfig, TestLogger[IO]())
+  private class TestRdfQueryClient(val query:      SparqlQuery,
+                                   rdfStoreConfig: RdfStoreConfig,
+                                   logger:         Logger[IO] = TestLogger[IO]())
+      extends IORdfStoreClient(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)))
       with Paging[IO, String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)

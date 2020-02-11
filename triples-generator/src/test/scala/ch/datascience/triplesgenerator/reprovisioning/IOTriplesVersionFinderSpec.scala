@@ -28,7 +28,7 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.InMemoryRdfStore
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.entities.{Activity, Agent, Person, Project}
@@ -46,7 +46,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe true
 
-      logger.loggedOnly(Warn(s"Checking if triples are up to date done${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"renku version finding finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "return false if there's a single SoftwareAgent entity with some old version of Renku" in new TestCase {
@@ -55,7 +55,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
-      logger.loggedOnly(Warn(s"Checking if triples are up to date done${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"renku version finding finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "return false if there are multiple SoftwareAgent entities with different versions of Renku" in new TestCase {
@@ -65,7 +65,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
-      logger.loggedOnly(Warn(s"Checking if triples are up to date done${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"renku version finding finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "return false if SoftwareAgent points to the current versions of Renku but it's not linked to a commit activity" in new TestCase {
@@ -74,15 +74,16 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
-      logger.loggedOnly(Warn(s"Checking if triples are up to date done${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"renku version finding finished${executionTimeRecorder.executionTimeInfo}"))
     }
   }
 
   private trait TestCase {
-    val schemaVersion         = schemaVersions.generateOne
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val triplesVersionFinder  = new IOTriplesVersionFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger)
+    val schemaVersion              = schemaVersions.generateOne
+    val logger                     = TestLogger[IO]()
+    val executionTimeRecorder      = TestExecutionTimeRecorder(logger)
+    private val sparqlTimeRecorder = new SparqlQueryTimeRecorder(executionTimeRecorder)
+    val triplesVersionFinder       = new IOTriplesVersionFinder(rdfStoreConfig, schemaVersion, logger, sparqlTimeRecorder)
   }
 
   private def commitActivity(schemaVersion: SchemaVersion, commitId: CommitId = commitIds.generateOne) = {

@@ -24,8 +24,9 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath, ProjectResource}
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.logging.ApplicationLogger
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import model.Node.{SourceNode, TargetNode}
 import model._
@@ -40,22 +41,19 @@ trait LineageFinder[Interpretation[_]] {
 class IOLineageFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
-    executionTimeRecorder:   ExecutionTimeRecorder[IO],
-    logger:                  Logger[IO]
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with LineageFinder[IO] {
 
-  import executionTimeRecorder._
   import rdfStoreConfig._
 
   override def findLineage(projectPath: ProjectPath, commitId: CommitId, filePath: FilePath): IO[Option[Lineage]] =
-    measureExecutionTime {
-      for {
-        edges        <- queryExpecting[Set[Edge]](using = query(projectPath, commitId, filePath))
-        maybeLineage <- toLineage(edges)
-      } yield maybeLineage
-    } map logExecutionTimeWhen(lineageFound(projectPath, commitId, filePath))
+    for {
+      edges        <- queryExpecting[Set[Edge]](using = query(projectPath, commitId, filePath))
+      maybeLineage <- toLineage(edges)
+    } yield maybeLineage
 
   private lazy val toLineage: Set[Edge] => IO[Option[Lineage]] = {
     case edges if edges.isEmpty => IO.pure(Option.empty)
@@ -67,60 +65,56 @@ class IOLineageFinder(
       (nodes, edge) => nodes + edge.source + edge.target
     )
 
-  private def lineageFound(
-      projectPath: ProjectPath,
-      commitId:    CommitId,
-      filePath:    FilePath
-  ): PartialFunction[Option[Lineage], String] = {
-    case _ => s"Searched for lineage for $projectPath commit: $commitId filePath: $filePath"
-  }
-
-  private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath): String = {
+  private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath) = {
     val projectResource    = ProjectResource(renkuBaseUrl, path).showAs[RdfResource]
     val commitResource     = (fusekiBaseUrl / "commit" / commitId).showAs[RdfResource]
     val generationResource = (fusekiBaseUrl / "blob" / commitId / filePath).showAs[RdfResource]
-    s"""|PREFIX prov: <http://www.w3.org/ns/prov#>
-        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        |PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>
-        |PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>
-        |PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>
-        |PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-        |PREFIX schema: <http://schema.org/>
-        |
-        |SELECT ?target ?source ?target_label ?source_label
-        |WHERE {
-        |  {
-        |    SELECT ?entity
-        |    WHERE {
-        |      ?qentity schema:isPartOf $projectResource .
-        |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) $commitResource .
-        |      FILTER (?qentity = $generationResource)
-        |      ?qentity (
-        |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
-        |      ) ?entity .
-        |    }
-        |    GROUP BY ?entity
-        |  }
-        |  {
-        |    ?entity prov:qualifiedGeneration/prov:activity ?activity ;
-        |            rdfs:label ?target_label .
-        |    ?activity rdfs:comment ?source_label .
-        |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
-        |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
-        |    BIND (?entity AS ?target)
-        |    BIND (?activity AS ?source)
-        |  } UNION {
-        |    ?activity prov:qualifiedUsage/prov:entity ?entity ;
-        |              rdfs:comment ?target_label .
-        |    ?entity rdfs:label ?source_label .
-        |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
-        |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
-        |    BIND (?activity AS ?target)
-        |    BIND (?entity AS ?source)
-        |  }
-        |}
-        |""".stripMargin
+    SparqlQuery(
+      name = "lineage finding",
+      Set(
+        "PREFIX prov: <http://www.w3.org/ns/prov#>",
+        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+        "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+        "PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>",
+        "PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>",
+        "PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>",
+        "PREFIX foaf: <http://xmlns.com/foaf/0.1/>",
+        "PREFIX schema: <http://schema.org/>"
+      ),
+      s"""|SELECT ?target ?source ?target_label ?source_label
+          |WHERE {
+          |  {
+          |    SELECT ?entity
+          |    WHERE {
+          |      ?qentity schema:isPartOf $projectResource .
+          |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) $commitResource .
+          |      FILTER (?qentity = $generationResource)
+          |      ?qentity (
+          |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
+          |      ) ?entity .
+          |    }
+          |    GROUP BY ?entity
+          |  }
+          |  {
+          |    ?entity prov:qualifiedGeneration/prov:activity ?activity ;
+          |            rdfs:label ?target_label .
+          |    ?activity rdfs:comment ?source_label .
+          |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
+          |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
+          |    BIND (?entity AS ?target)
+          |    BIND (?activity AS ?source)
+          |  } UNION {
+          |    ?activity prov:qualifiedUsage/prov:entity ?entity ;
+          |              rdfs:comment ?target_label .
+          |    ?entity rdfs:label ?source_label .
+          |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
+          |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
+          |    BIND (?activity AS ?target)
+          |    BIND (?entity AS ?source)
+          |  }
+          |}
+          |""".stripMargin
+    )
   }
 
   import io.circe.{Decoder, DecodingFailure, HCursor}
@@ -158,6 +152,7 @@ class IOLineageFinder(
 object IOLineageFinder {
 
   def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO],
       rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
       renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
       logger:                  Logger[IO] = ApplicationLogger
@@ -165,13 +160,12 @@ object IOLineageFinder {
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[LineageFinder[IO]] =
     for {
-      config                <- rdfStoreConfig
-      renkuBaseUrl          <- renkuBaseUrl
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](logger)
+      config       <- rdfStoreConfig
+      renkuBaseUrl <- renkuBaseUrl
     } yield new IOLineageFinder(
       config,
       renkuBaseUrl,
-      executionTimeRecorder,
-      logger
+      logger,
+      timeRecorder
     )
 }

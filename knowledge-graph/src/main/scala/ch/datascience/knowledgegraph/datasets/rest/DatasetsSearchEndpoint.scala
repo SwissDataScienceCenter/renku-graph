@@ -30,7 +30,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.RdfStoreConfig
+import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
@@ -156,9 +156,11 @@ object DatasetsSearchEndpoint {
 
 object IODatasetsSearchEndpoint {
 
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[DatasetsSearchEndpoint[IO]] =
+  def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[DatasetsSearchEndpoint[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
@@ -166,8 +168,9 @@ object IODatasetsSearchEndpoint {
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetsSearchEndpoint[IO](
       new IODatasetsFinder(rdfStoreConfig,
-                           new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
-                           ApplicationLogger),
+                           new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder),
+                           ApplicationLogger,
+                           timeRecorder),
       renkuResourceUrl,
       executionTimeRecorder,
       ApplicationLogger

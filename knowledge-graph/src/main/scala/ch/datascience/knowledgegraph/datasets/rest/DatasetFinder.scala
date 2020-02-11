@@ -23,7 +23,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.rdfstore.RdfStoreConfig
+import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -68,6 +68,7 @@ private class IODatasetFinder(
 private object IODatasetFinder {
 
   def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO],
       rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
       renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
       logger:                  Logger[IO] = ApplicationLogger
@@ -78,9 +79,9 @@ private object IODatasetFinder {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
     } yield new IODatasetFinder(
-      new BaseDetailsFinder(config, renkuBaseUrl, logger),
-      new CreatorsFinder(config, renkuBaseUrl, logger),
-      new PartsFinder(config, renkuBaseUrl, logger),
-      new ProjectsFinder(config, renkuBaseUrl, logger)
+      new BaseDetailsFinder(config, renkuBaseUrl, logger, timeRecorder),
+      new CreatorsFinder(config, renkuBaseUrl, logger, timeRecorder),
+      new PartsFinder(config, renkuBaseUrl, logger, timeRecorder),
+      new ProjectsFinder(config, renkuBaseUrl, logger, timeRecorder)
     )
 }

@@ -27,6 +27,7 @@ import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 import io.circe.literal._
 import io.circe.syntax._
@@ -136,11 +137,13 @@ class DatasetEndpoint[Interpretation[_]: Effect](
 
 object IODatasetEndpoint {
 
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[DatasetEndpoint[IO]] =
+  def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[DatasetEndpoint[IO]] =
     for {
-      datasetFinder         <- IODatasetFinder(logger = ApplicationLogger)
+      datasetFinder         <- IODatasetFinder(timeRecorder, logger = ApplicationLogger)
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetEndpoint[IO](

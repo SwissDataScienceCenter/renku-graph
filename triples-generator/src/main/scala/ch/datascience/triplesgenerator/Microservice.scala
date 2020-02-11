@@ -31,6 +31,7 @@ import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
@@ -64,13 +65,17 @@ object Microservice extends IOMicroservice {
         sentryInitializer        <- SentryInitializer[IO]
         fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
         triplesGeneration        <- TriplesGeneration[IO]()
-        reProvisioning           <- IOReProvisioning(triplesGeneration, transactor)
-        triplesGenerator         <- TriplesGenerator(triplesGeneration)
         metricsRegistry          <- MetricsRegistry()
-        commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator, metricsRegistry)
+        sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
+        reProvisioning           <- IOReProvisioning(triplesGeneration, transactor, sparqlTimeRecorder)
+        triplesGenerator         <- TriplesGenerator(triplesGeneration)
         routes                   <- new MicroserviceRoutes[IO](new RoutesMetrics[IO](metricsRegistry)).routes
         eventsFetcher            <- IOEventLogFetch(transactor)
         eventLogMetrics          <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
+        commitEventProcessor <- IOCommitEventProcessor(transactor,
+                                                       triplesGenerator,
+                                                       metricsRegistry,
+                                                       sparqlTimeRecorder)
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, eventsFetcher))
                                  .withEventsProcessor(commitEventProcessor)
         exitCode <- new MicroserviceRunner(

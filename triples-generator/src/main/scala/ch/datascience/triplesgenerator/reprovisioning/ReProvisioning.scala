@@ -26,7 +26,7 @@ import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogReScheduler, IOEventLogFetch}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.RdfStoreConfig
+import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import com.typesafe.config.{Config, ConfigFactory}
@@ -109,6 +109,7 @@ object IOReProvisioning {
   def apply(
       triplesGeneration: TriplesGeneration,
       dbTransactor:      DbTransactor[IO, EventLogDB],
+      timeRecorder:      SparqlQueryTimeRecorder[IO],
       configuration:     Config = ConfigFactory.load(),
       logger:            Logger[IO] = ApplicationLogger
   )(implicit ME:         MonadError[IO, Throwable],
@@ -123,8 +124,8 @@ object IOReProvisioning {
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
       eventsFetcher         <- IOEventLogFetch(dbTransactor)
     } yield new ReProvisioning[IO](
-      new IOTriplesVersionFinder(rdfStoreConfig, executionTimeRecorder, schemaVersion, logger),
-      new IOTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger),
+      new IOTriplesVersionFinder(rdfStoreConfig, schemaVersion, logger, timeRecorder),
+      new IOTriplesRemover(rdfStoreConfig, logger, timeRecorder),
       new EventLogReScheduler[IO](dbTransactor),
       eventsFetcher,
       initialDelay,

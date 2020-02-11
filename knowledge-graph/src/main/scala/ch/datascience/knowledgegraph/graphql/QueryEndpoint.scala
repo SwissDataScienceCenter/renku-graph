@@ -106,12 +106,15 @@ private object QueryEndpoint {
 }
 
 object IOQueryEndpoint {
+  import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[QueryEndpoint[IO]] =
+  def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[QueryEndpoint[IO]] =
     for {
-      queryContext <- IOQueryContext()
+      queryContext <- IOQueryContext(timeRecorder)
       querySchema = QuerySchema[IO](lineage.graphql.QueryFields())
     } yield new QueryEndpoint[IO](querySchema, new QueryRunner(querySchema, queryContext))
 }

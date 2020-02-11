@@ -25,7 +25,8 @@ import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
 import ch.datascience.knowledgegraph.datasets.model.{AddedToProject, DatasetAgent, DatasetProject}
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.rdfstore._
+import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
 import io.circe.DecodingFailure
@@ -37,22 +38,25 @@ import scala.util.Try
 private class ProjectsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO]
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger) {
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
 
   import ProjectsFinder._
 
   def findProjects(identifier: Identifier): IO[List[DatasetProject]] =
     queryExpecting[List[DatasetProject]](using = query(identifier))
 
-  private def query(identifier: Identifier): String =
-    s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        |PREFIX schema: <http://schema.org/>
-        |PREFIX prov: <http://www.w3.org/ns/prov#>
-        |
-        |SELECT ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
+  private def query(identifier: Identifier) = SparqlQuery(
+    name = "projects sharing dataset",
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+      "PREFIX schema: <http://schema.org/>",
+      "PREFIX prov: <http://www.w3.org/ns/prov#>"
+    ),
+    s"""|SELECT ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
         |WHERE {
         |  {
         |    SELECT ?l0 ?projectId (MIN(?dateCreated) AS ?minDateCreated)
@@ -141,6 +145,7 @@ private class ProjectsFinder(
         |GROUP BY ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
         |ORDER BY ASC(?projectName)
         |""".stripMargin
+  )
 }
 
 private object ProjectsFinder {
