@@ -28,6 +28,7 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.http.client.RestClientError.{MappingError, UnexpectedResponseError}
 import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.AuthScheme.Bearer
@@ -48,6 +49,8 @@ abstract class IORestClient[ThrottlingTarget](
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
+
+  import HttpRequest._
 
   protected lazy val validateUri: String => IO[Uri] = IORestClient.validateUri
 
@@ -102,7 +105,7 @@ abstract class IORestClient[ThrottlingTarget](
       case None => block
       case Some(timeRecorder) =>
         timeRecorder
-          .measureExecutionTime(block)
+          .measureExecutionTime(block, request.toHistogramLabel)
           .map(timeRecorder.logExecutionTime(withMessage = LogMessage(request, "finished")))
     }
 
@@ -151,9 +154,14 @@ abstract class IORestClient[ThrottlingTarget](
 
   private type ResponseMapping[ResultType] = PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
 
-  protected object LogMessage {
+  private implicit class HttpRequestOps(request: HttpRequest) {
+    lazy val toHistogramLabel: Option[String Refined NonEmpty] = request match {
+      case UnnamedRequest(_)     => None
+      case NamedRequest(_, name) => Some(name)
+    }
+  }
 
-    import HttpRequest._
+  protected object LogMessage {
 
     def apply(request: HttpRequest, message: String): String =
       request match {

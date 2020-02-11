@@ -21,6 +21,9 @@ package ch.datascience.rdfstore
 import cats.MonadError
 import cats.effect.{Clock, IO}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
@@ -30,10 +33,12 @@ class SparqlQueryTimeRecorder[Interpretation[_]](val instance: ExecutionTimeReco
 
 object SparqlQueryTimeRecorder {
 
+  private val QueryExecutionTimeLabel: String Refined NonEmpty = "query_id"
   private lazy val queriesExecutionTimesHistogram =
     Histogram
       .build()
       .name("sparql_execution_times")
+      .labelNames(QueryExecutionTimeLabel.value)
       .help("Sparql execution times")
       .buckets(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
 

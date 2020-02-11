@@ -24,11 +24,14 @@ import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import scala.concurrent.duration.TimeUnit
 import scala.language.higherKinds
+import scala.util.Try
 
 object TestExecutionTimeRecorder {
 
@@ -59,12 +62,19 @@ class TestExecutionTimeRecorder[Interpretation[_]](
   lazy val executionTimeInfo: String      = s" in ${threshold}ms"
 
   override def measureExecutionTime[BlockOut](
-      block: => Interpretation[BlockOut]
+      block:               => Interpretation[BlockOut],
+      maybeHistogramLabel: Option[String Refined NonEmpty] = None
   ): Interpretation[(ElapsedTime, BlockOut)] =
     for {
       _ <- ME.unit
-      maybeHistogramTimer = maybeHistogram map (_.startTimer())
+      maybeHistogramTimer = startTimer(maybeHistogramLabel)
       result <- block
       _ = maybeHistogramTimer map (_.observeDuration())
     } yield threshold -> result
+
+  private def startTimer(maybeHistogramLabel: Option[String Refined NonEmpty]) = maybeHistogram flatMap { histogram =>
+    maybeHistogramLabel
+      .map(label => histogram.labels(label.value).startTimer())
+      .orElse(Try(histogram.startTimer()).toOption)
+  }
 }

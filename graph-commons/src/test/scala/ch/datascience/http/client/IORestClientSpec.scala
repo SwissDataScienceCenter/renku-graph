@@ -30,12 +30,14 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
+import io.prometheus.client.Histogram
 import org.http4s.Method.GET
 import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -90,6 +92,43 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
       client.callRemote(requestName).unsafeRunSync() shouldBe 1
 
       logger.loggedOnly(Warn(s"$requestName finished${executionTimeRecorder.executionTimeInfo}"))
+    }
+
+    "cause the given histogram to capture execution time - case with some given label" in new TestCase {
+
+      stubFor {
+        get("/resource")
+          .willReturn(ok("1"))
+      }
+
+      verifyThrottling()
+
+      val requestName: String Refined NonEmpty = "some request"
+      client.callRemote(requestName).unsafeRunSync() shouldBe 1
+
+      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
+      sample.value               should be >= 0d
+      sample.labelNames.asScala  should contain only histogramLabel.value
+      sample.labelValues.asScala should contain only requestName.value
+    }
+
+    "cause the given histogram to capture execution time - case without label" in new TestCase {
+
+      stubFor {
+        get("/resource")
+          .willReturn(ok("1"))
+      }
+
+      verifyThrottling()
+
+      override val histogram = Histogram.build("histogram", "help").create()
+
+      client.callRemote.unsafeRunSync() shouldBe 1
+
+      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
+      sample.value               should be >= 0d
+      sample.labelNames.asScala  shouldBe empty
+      sample.labelValues.asScala shouldBe empty
     }
 
     "fail if remote responds with status which does not match the response mapping rules" in new TestCase {
@@ -154,9 +193,11 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
   }
 
   private trait TestCase {
+    val histogramLabel: String Refined NonEmpty = "label"
+    val histogram             = Histogram.build("histogram", "help").labelNames(histogramLabel.value).create()
     val throttler             = mock[Throttler[IO, Any]]
     val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger, Some(histogram))
     val client                = new TestRestClient(hostUrl, throttler, logger, Some(executionTimeRecorder))
 
     def verifyThrottling() = inSequence {

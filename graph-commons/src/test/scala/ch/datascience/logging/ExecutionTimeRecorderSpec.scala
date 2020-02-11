@@ -24,9 +24,12 @@ import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Warn
+import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import com.typesafe.config.ConfigFactory
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.Histogram
 import org.scalacheck.Gen
 import org.scalacheck.Gen.finiteDuration
@@ -81,7 +84,7 @@ class ExecutionTimeRecorderSpec extends WordSpec with MockFactory with ScalaChec
       } shouldBe context.raiseError(exception)
     }
 
-    "made the given histogram to collect process' execution time" in new TestCase {
+    "made the given histogram to collect process' execution time - case without a label" in new TestCase {
       val histogram                      = Histogram.build("metric", "help").create()
       override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger, Some(histogram))
 
@@ -99,8 +102,58 @@ class ExecutionTimeRecorderSpec extends WordSpec with MockFactory with ScalaChec
         block()
       }
 
-      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption.map(_.value)
-      sample should be >= blockExecutionTime.toDouble / 1000
+      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
+      sample.value              should be >= blockExecutionTime.toDouble / 1000
+      sample.labelNames.asScala shouldBe empty
+    }
+
+    "made the given histogram to collect process' execution time - case with a label" in new TestCase {
+      val label: String Refined NonEmpty = "label"
+      val histogram                      = Histogram.build("metric", "help").labelNames(label.value).create()
+      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger, Some(histogram))
+
+      (clock
+        .monotonic(_: TimeUnit))
+        .expects(MILLISECONDS)
+        .returning(context.pure(positiveLongs().generateOne.value))
+
+      val blockOut = nonEmptyStrings().generateOne
+      block.expects().returning(context.pure(blockOut))
+
+      val blockExecutionTime = positiveInts(max = 100).generateOne.value
+      executionTimeRecorder.measureExecutionTime[String]({
+        Thread sleep blockExecutionTime
+        block()
+      }, Some(label))
+
+      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
+      sample.value              should be >= blockExecutionTime.toDouble / 1000
+      sample.labelNames.asScala should contain only label.value
+    }
+
+    "log an error when collecting process' execution time fails due to histogram misconfiguration" in new TestCase {
+      val label: String Refined NonEmpty = "label"
+      val histogramName                  = "metric"
+      val histogram                      = Histogram.build(histogramName, "help").labelNames(label.value).create()
+      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger, Some(histogram))
+
+      (clock
+        .monotonic(_: TimeUnit))
+        .expects(MILLISECONDS)
+        .returning(context.pure(positiveLongs().generateOne.value))
+
+      val blockOut = nonEmptyStrings().generateOne
+      block.expects().returning(context.pure(blockOut))
+
+      val blockExecutionTime = positiveInts(max = 100).generateOne.value
+      executionTimeRecorder.measureExecutionTime[String]({
+        Thread sleep blockExecutionTime
+        block()
+      })
+
+      histogram.collect().asScala.flatMap(_.samples.asScala).lastOption shouldBe None
+
+      logger.loggedOnly(Error(s"$histogramName histogram labels not configured correctly"))
     }
   }
 
