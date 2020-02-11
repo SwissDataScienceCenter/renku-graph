@@ -20,16 +20,18 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, SameAs}
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPart, DatasetProject}
-import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}
+import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
+import io.renku.jsonld.JsonLD
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -39,18 +41,159 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
   "findDataset" should {
 
     "return the details of the dataset with the given id " +
-      "- a case when unrelated projects are using the same dataset" in new InMemoryStoreTestCase {
-      forAll(datasets, datasetProjects, datasetInProjectCreations, datasetProjects, datasetInProjectCreations) {
-        (dataset, project1, project1DatasetCreation, project2, project2DatasetCreation) =>
-          val project1DatasetCreationDate = CommittedDate(project1DatasetCreation.date.value)
+      "- a case when unrelated projects are using the same imported dataset" in new TestCase {
+      forAll(datasets(maybeSameAs = datasetSameAs.toGeneratorOfSomes),
+             datasetProjects,
+             addedToProject,
+             datasetProjects,
+             addedToProject) { (dataset, project1, addedToProject1, project2, addedToProject2) =>
+        val project1DatasetCreationDate = CommittedDate(addedToProject1.date.value)
 
+        loadToStore(
+          dataSetCommit(
+            committedDate = project1DatasetCreationDate,
+            committer     = Person(addedToProject1.agent.name, addedToProject1.agent.email)
+          )(
+            project1.path,
+            project1.name
+          )(
+            datasetIdentifier         = dataset.id,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = dataset.maybeSameAs,
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreatedDate        = DateCreated(addedToProject1.date.value),
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          ),
+          dataSetCommit( // to simulate adding a file to the data-set in another commit
+            committedDate = CommittedDate(project1DatasetCreationDate.value plusSeconds 10)
+          )(
+            project1.path,
+            project1.name
+          )(
+            datasetIdentifier         = dataset.id,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = dataset.maybeSameAs,
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreatedDate        = DateCreated(addedToProject1.date.value),
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          ),
+          dataSetCommit( // to simulate adding the same data-set to another project
+            committedDate = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value)),
+            committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+          )(
+            project2.path,
+            project2.name
+          )(
+            datasetIdentifier         = datasetIdentifiers.generateOne,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = dataset.maybeSameAs,
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          ),
+          randomDataSetCommit
+        )
+
+        datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+          dataset.copy(
+            parts = dataset.parts.sorted,
+            projects = List(DatasetProject(project1.path, project1.name, addedToProject1),
+                            DatasetProject(project2.path, project2.name, addedToProject2)).sorted
+          )
+        )
+      }
+    }
+
+    "return the details of the dataset with the given id " +
+      "- a case when unrelated projects are using the same dataset created in renku project" in new TestCase {
+      forAll(datasets(maybeSameAs = emptyOptionOf[SameAs]),
+             datasetProjects,
+             addedToProject,
+             datasetProjects,
+             addedToProject) { (dataset, project1, addedToProject1, project2, addedToProject2) =>
+        val project1DataSet = dataSetCommit(
+          committedDate = CommittedDate(addedToProject1.date.value),
+          committer     = Person(addedToProject1.agent.name, addedToProject1.agent.email)
+        )(
+          project1.path,
+          project1.name
+        )(
+          datasetIdentifier         = dataset.id,
+          datasetName               = dataset.name,
+          maybeDatasetUrl           = dataset.maybeUrl,
+          maybeDatasetSameAs        = dataset.maybeSameAs,
+          maybeDatasetDescription   = dataset.maybeDescription,
+          maybeDatasetPublishedDate = dataset.published.maybeDate,
+          datasetCreatedDate        = DateCreated(addedToProject1.date.value),
+          datasetCreators           = dataset.published.creators map toPerson,
+          datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+        )
+        loadToStore(
+          project1DataSet,
+          dataSetCommit( // simulating dataset modification
+            committedDate = CommittedDate(addedToProject1.date.value).shiftToFuture
+          )(
+            project1.path,
+            project1.name
+          )(
+            datasetIdentifier         = dataset.id,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = dataset.maybeSameAs,
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreatedDate        = DateCreated(addedToProject1.date.value),
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          ),
+          dataSetCommit( // to simulate adding first project's data-set to another project
+            committedDate = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value)),
+            committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+          )(
+            project2.path,
+            project2.name
+          )(
+            datasetIdentifier         = datasetIdentifiers.generateOne,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = project1DataSet.entityId flatMap (id => SameAs.fromId(id.value).toOption),
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          ),
+          randomDataSetCommit
+        )
+
+        datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+          dataset.copy(
+            parts = dataset.parts.sorted,
+            projects = List(DatasetProject(project1.path, project1.name, addedToProject1),
+                            DatasetProject(project2.path, project2.name, addedToProject2)).sorted
+          )
+        )
+      }
+    }
+
+    "return the details of the dataset with the given id " +
+      "- a case when an imported dataset is used in one project" in new TestCase {
+      forAll(datasets(maybeSameAs = datasetSameAs.toGeneratorOfSomes), datasetProjects, addedToProject) {
+        (dataset, project, addedToProject) =>
           loadToStore(
             dataSetCommit(
-              committedDate = project1DatasetCreationDate,
-              committer     = Person(project1DatasetCreation.agent.name, project1DatasetCreation.agent.email)
+              committedDate = CommittedDate(addedToProject.date.value),
+              committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
             )(
-              project1.path,
-              project1.name
+              project.path,
+              project.name
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
@@ -58,30 +201,15 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               maybeDatasetSameAs        = dataset.maybeSameAs,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreatedDate        = DateCreated(addedToProject.date.value),
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit( // to reflect a file added to the data-set in another commit
-              committedDate = CommittedDate(project1DatasetCreationDate.value plusSeconds 10)
+            dataSetCommit( // simulating dataset modification
+              committedDate = CommittedDate(addedToProject.date.value).shiftToFuture
             )(
-              project1.path,
-              project1.name
-            )(
-              datasetIdentifier         = dataset.id,
-              datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
-              maybeDatasetSameAs        = dataset.maybeSameAs,
-              maybeDatasetDescription   = dataset.maybeDescription,
-              maybeDatasetPublishedDate = dataset.published.maybeDate,
-              datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
-            ),
-            dataSetCommit(
-              committedDate = project2DatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value)),
-              committer     = Person(project2DatasetCreation.agent.name, project2DatasetCreation.agent.email)
-            )(
-              project2.path,
-              project2.name
+              project.path,
+              project.name
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
@@ -89,32 +217,249 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               maybeDatasetSameAs        = dataset.maybeSameAs,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreatedDate        = DateCreated(addedToProject.date.value),
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
             randomDataSetCommit
           )
 
           datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
             dataset.copy(
-              part = dataset.part.sorted,
-              project = List(DatasetProject(project1.path, project1.name, project1DatasetCreation),
-                             DatasetProject(project2.path, project2.name, project2DatasetCreation)).sorted
+              parts    = dataset.parts.sorted,
+              projects = List(DatasetProject(project.path, project.name, addedToProject))
             )
           )
       }
     }
 
     "return the details of the dataset with the given id " +
-      "- a case when a dataset is defined on a source project which has a fork" in new InMemoryStoreTestCase {
-      forAll(datasetProjects, datasetProjects, datasets, datasetInProjectCreations, commitIds) {
-        (sourceProject, forkProject, dataset, projectDatasetCreation, commitId) =>
-          val datasetCreationDate = projectDatasetCreation.date.toUnsafe(date => CommittedDate.from(date.value))
+      "- a case of a single used in-project created dataset" in new TestCase {
+      forAll(datasets(maybeSameAs = emptyOptionOf[SameAs]), datasetProjects, addedToProject) {
+        (dataset, project, addedToProject) =>
+          loadToStore(
+            dataSetCommit(
+              committedDate = CommittedDate(addedToProject.date.value),
+              committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+            )(
+              project.path,
+              project.name
+            )(
+              datasetIdentifier         = dataset.id,
+              datasetName               = dataset.name,
+              maybeDatasetUrl           = dataset.maybeUrl,
+              maybeDatasetSameAs        = dataset.maybeSameAs,
+              maybeDatasetDescription   = dataset.maybeDescription,
+              maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreatedDate        = DateCreated(addedToProject.date.value),
+              datasetCreators           = dataset.published.creators map toPerson,
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+            ),
+            dataSetCommit( // simulating dataset modification
+              committedDate = CommittedDate(addedToProject.date.value).shiftToFuture
+            )(
+              project.path,
+              project.name
+            )(
+              datasetIdentifier         = dataset.id,
+              datasetName               = dataset.name,
+              maybeDatasetUrl           = dataset.maybeUrl,
+              maybeDatasetSameAs        = dataset.maybeSameAs,
+              maybeDatasetDescription   = dataset.maybeDescription,
+              maybeDatasetPublishedDate = dataset.published.maybeDate,
+              datasetCreatedDate        = DateCreated(addedToProject.date.value),
+              datasetCreators           = dataset.published.creators map toPerson,
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+            ),
+            randomDataSetCommit
+          )
+
+          datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+            dataset.copy(
+              parts    = dataset.parts.sorted,
+              projects = List(DatasetProject(project.path, project.name, addedToProject))
+            )
+          )
+      }
+    }
+  }
+
+  "findDataset in case of forks" should {
+
+    "return the details of the dataset with the given id " +
+      "- a case when unrelated projects are using the same imported dataset and one of them is forked" in new TestCase {
+      forAll(datasets(maybeSameAs = datasetSameAs.toGeneratorOfSomes),
+             datasetProjects,
+             addedToProject,
+             datasetProjects,
+             addedToProject,
+             datasetProjects) { (dataset, project1, addedToProject1, project2, addedToProject2, project2Fork) =>
+        val project1DatasetCreationDate = CommittedDate(addedToProject1.date.value)
+        val project2DatasetCommit       = commitIds.generateOne
+        val project2DatasetCommitDate   = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value))
+        val project2DatasetId           = datasetIdentifiers.generateOne
+
+        loadToStore(
+          dataSetCommit(
+            committedDate = project1DatasetCreationDate,
+            committer     = Person(addedToProject1.agent.name, addedToProject1.agent.email)
+          )(
+            project1.path,
+            project1.name
+          )(
+            datasetIdentifier         = dataset.id,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = dataset.maybeSameAs,
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          ),
+          dataSetCommit( // to simulate adding the same data-set to another project
+            commitId      = project2DatasetCommit,
+            committedDate = project2DatasetCommitDate,
+            committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+          )(
+            project2.path,
+            project2.name
+          )(
+            datasetIdentifier         = project2DatasetId,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = dataset.maybeSameAs,
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          ),
+          dataSetCommit( // to simulate forking project2
+            commitId      = project2DatasetCommit,
+            committedDate = project2DatasetCommitDate,
+            committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+          )(
+            project2Fork.path,
+            project2Fork.name
+          )(
+            datasetIdentifier         = project2DatasetId,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = dataset.maybeSameAs,
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          )
+        )
+
+        datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+          dataset.copy(
+            parts = dataset.parts.sorted,
+            projects = List(
+              DatasetProject(project1.path, project1.name, addedToProject1),
+              DatasetProject(project2.path, project2.name, addedToProject2),
+              DatasetProject(project2Fork.path, project2Fork.name, addedToProject2)
+            ).sorted
+          )
+        )
+      }
+    }
+
+    "return None if there's no datasets with the given id" in new TestCase {
+      val identifier = datasetIdentifiers.generateOne
+      datasetFinder.findDataset(identifier).unsafeRunSync() shouldBe None
+    }
+
+    "return the details of the dataset with the given id " +
+      "- a case when unrelated projects are using the same dataset created in renku project and one of them is forked" in new TestCase {
+      forAll(datasets(maybeSameAs = emptyOptionOf[SameAs]),
+             datasetProjects,
+             addedToProject,
+             datasetProjects,
+             addedToProject,
+             datasetProjects) { (dataset, project1, addedToProject1, project2, addedToProject2, project2Fork) =>
+        val project1DatasetCreationDate = CommittedDate(addedToProject1.date.value)
+        val project2DatasetCommit       = commitIds.generateOne
+        val project2DatasetCommitDate   = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value))
+        val project2DatasetId           = datasetIdentifiers.generateOne
+
+        val project1DataSet = dataSetCommit(
+          committedDate = project1DatasetCreationDate,
+          committer     = Person(addedToProject1.agent.name, addedToProject1.agent.email)
+        )(
+          project1.path,
+          project1.name
+        )(
+          datasetIdentifier         = dataset.id,
+          datasetName               = dataset.name,
+          maybeDatasetUrl           = dataset.maybeUrl,
+          maybeDatasetSameAs        = dataset.maybeSameAs,
+          maybeDatasetDescription   = dataset.maybeDescription,
+          maybeDatasetPublishedDate = dataset.published.maybeDate,
+          datasetCreators           = dataset.published.creators map toPerson,
+          datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+        )
+        loadToStore(
+          project1DataSet,
+          dataSetCommit( // to simulate adding first project's data-set to another project
+            commitId      = project2DatasetCommit,
+            committedDate = project2DatasetCommitDate,
+            committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+          )(
+            project2.path,
+            project2.name
+          )(
+            datasetIdentifier         = project2DatasetId,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = project1DataSet.entityId flatMap (id => SameAs.fromId(id.value).toOption),
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          ),
+          dataSetCommit(
+            commitId      = project2DatasetCommit,
+            committedDate = project2DatasetCommitDate,
+            committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+          )(
+            project2Fork.path,
+            project2Fork.name
+          )(
+            datasetIdentifier         = project2DatasetId,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = project1DataSet.entityId flatMap (id => SameAs.fromId(id.value).toOption),
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          )
+        )
+
+        datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+          dataset.copy(
+            parts = dataset.parts.sorted,
+            projects = List(
+              DatasetProject(project1.path, project1.name, addedToProject1),
+              DatasetProject(project2.path, project2.name, addedToProject2),
+              DatasetProject(project2Fork.path, project2Fork.name, addedToProject2)
+            ).sorted
+          )
+        )
+      }
+    }
+
+    "return the details of the dataset with the given id " +
+      "- a case when a created dataset is defined on a project which has a fork" in new TestCase {
+      forAll(datasetProjects, datasetProjects, datasets(maybeSameAs = emptyOptionOf[SameAs]), addedToProject, commitIds) {
+        (sourceProject, forkProject, dataset, addedToProject, commitId) =>
+          val datasetCreationDate = addedToProject.date.toUnsafe(date => CommittedDate.from(date.value))
           loadToStore(
             dataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
-              committer     = Person(projectDatasetCreation.agent.name, projectDatasetCreation.agent.email)
+              committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
             )(
               sourceProject.path,
               sourceProject.name
@@ -126,27 +471,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
-            ),
-            dataSetCommit( // to reflect a file added later to the dataset in another commit
-              committedDate = CommittedDate(datasetCreationDate.value plusSeconds 10)
-            )(
-              sourceProject.path,
-              sourceProject.name
-            )(
-              datasetIdentifier         = dataset.id,
-              datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
-              maybeDatasetSameAs        = dataset.maybeSameAs,
-              maybeDatasetDescription   = dataset.maybeDescription,
-              maybeDatasetPublishedDate = dataset.published.maybeDate,
-              datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
             dataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
-              committer     = Person(projectDatasetCreation.agent.name, projectDatasetCreation.agent.email)
+              committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
             )(
               forkProject.path,
               forkProject.name
@@ -158,29 +488,341 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.part.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             )
           )
 
           datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
             dataset.copy(
-              part = dataset.part.sorted,
-              project = List(
-                DatasetProject(sourceProject.path, sourceProject.name, projectDatasetCreation),
-                DatasetProject(forkProject.path, forkProject.name, projectDatasetCreation)
+              parts = dataset.parts.sorted,
+              projects = List(
+                DatasetProject(sourceProject.path, sourceProject.name, addedToProject),
+                DatasetProject(forkProject.path, forkProject.name, addedToProject)
               ).sorted
             )
           )
       }
     }
 
-    "return None if there's no datasets with the given id" in new InMemoryStoreTestCase {
-      val identifier = datasetIds.generateOne
-      datasetFinder.findDataset(identifier).unsafeRunSync() shouldBe None
+    "return the details of the dataset with the given id " +
+      "- a case when an imported dataset is defined on a project which has a fork" in new TestCase {
+      forAll(datasetProjects,
+             datasetProjects,
+             datasets(maybeSameAs = datasetSameAs.toGeneratorOfSomes),
+             addedToProject,
+             commitIds) { (sourceProject, forkProject, dataset, addedToProject, commitId) =>
+        val datasetCreationDate = addedToProject.date.toUnsafe(date => CommittedDate.from(date.value))
+        val sourceProjectDataSet = dataSetCommit(
+          commitId      = commitId,
+          committedDate = datasetCreationDate,
+          committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+        )(
+          sourceProject.path,
+          sourceProject.name
+        )(
+          datasetIdentifier         = dataset.id,
+          datasetName               = dataset.name,
+          maybeDatasetUrl           = dataset.maybeUrl,
+          maybeDatasetSameAs        = dataset.maybeSameAs,
+          maybeDatasetDescription   = dataset.maybeDescription,
+          maybeDatasetPublishedDate = dataset.published.maybeDate,
+          datasetCreators           = dataset.published.creators map toPerson,
+          datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+        )
+        loadToStore(
+          sourceProjectDataSet,
+          dataSetCommit(
+            commitId      = commitId,
+            committedDate = datasetCreationDate,
+            committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+          )(
+            forkProject.path,
+            forkProject.name
+          )(
+            datasetIdentifier         = dataset.id,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = dataset.maybeSameAs,
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          )
+        )
+
+        datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+          dataset.copy(
+            parts = dataset.parts.sorted,
+            projects = List(
+              DatasetProject(sourceProject.path, sourceProject.name, addedToProject),
+              DatasetProject(forkProject.path, forkProject.name, addedToProject)
+            ).sorted
+          )
+        )
+      }
+    }
+
+    "return the details of the dataset with the given id " +
+      "- a case when a created dataset is defined on a grandparent project which has two levels of forks" in new TestCase {
+      forAll(datasetProjects,
+             datasetProjects,
+             datasetProjects,
+             datasets(maybeSameAs = emptyOptionOf[SameAs]),
+             addedToProject,
+             commitIds) { (grandparentProject, parentProject, childProject, dataset, addedToProject, commitId) =>
+        val datasetCreationDate = addedToProject.date.toUnsafe(date => CommittedDate.from(date.value))
+        val grandparentProjectDataSet = dataSetCommit(
+          commitId      = commitId,
+          committedDate = datasetCreationDate,
+          committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+        )(
+          grandparentProject.path,
+          grandparentProject.name
+        )(
+          datasetIdentifier         = dataset.id,
+          datasetName               = dataset.name,
+          maybeDatasetUrl           = dataset.maybeUrl,
+          maybeDatasetSameAs        = dataset.maybeSameAs,
+          maybeDatasetDescription   = dataset.maybeDescription,
+          maybeDatasetPublishedDate = dataset.published.maybeDate,
+          datasetCreators           = dataset.published.creators map toPerson,
+          datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+        )
+        val parentProjectDataSet = dataSetCommit(
+          commitId      = commitId,
+          committedDate = datasetCreationDate,
+          committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+        )(
+          parentProject.path,
+          parentProject.name
+        )(
+          datasetIdentifier         = dataset.id,
+          datasetName               = dataset.name,
+          maybeDatasetUrl           = dataset.maybeUrl,
+          maybeDatasetSameAs        = dataset.maybeSameAs,
+          maybeDatasetDescription   = dataset.maybeDescription,
+          maybeDatasetPublishedDate = dataset.published.maybeDate,
+          datasetCreators           = dataset.published.creators map toPerson,
+          datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+        )
+        loadToStore(
+          grandparentProjectDataSet,
+          parentProjectDataSet,
+          dataSetCommit(
+            commitId      = commitId,
+            committedDate = datasetCreationDate,
+            committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+          )(
+            childProject.path,
+            childProject.name
+          )(
+            datasetIdentifier         = dataset.id,
+            datasetName               = dataset.name,
+            maybeDatasetUrl           = dataset.maybeUrl,
+            maybeDatasetSameAs        = dataset.maybeSameAs,
+            maybeDatasetDescription   = dataset.maybeDescription,
+            maybeDatasetPublishedDate = dataset.published.maybeDate,
+            datasetCreators           = dataset.published.creators map toPerson,
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+          )
+        )
+
+        datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+          dataset.copy(
+            parts = dataset.parts.sorted,
+            projects = List(
+              DatasetProject(grandparentProject.path, grandparentProject.name, addedToProject),
+              DatasetProject(parentProject.path, parentProject.name, addedToProject),
+              DatasetProject(childProject.path, childProject.name, addedToProject)
+            ).sorted
+          )
+        )
+      }
     }
   }
 
-  private trait InMemoryStoreTestCase {
+  "findDataset in case of import hierarchy" should {
+
+    "return the details of the dataset with the given id - case when the first dataset is externally imported" in new TestCase {
+      val dataset1Project = datasetProjects.generateOne
+      val dataset1 = datasets(maybeSameAs = datasetSameAs.generateSome).generateOne
+        .copy(projects = List(dataset1Project))
+      val dataset1Json = toDataSetCommit(dataset1)
+
+      val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
+      val dataset2 = dataset1.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = dataset1Json.datasetId,
+        projects    = List(dataset2Project)
+      )
+      val dataset2Json = toDataSetCommit(dataset2)
+
+      val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
+      val dataset3 = dataset2.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = dataset2Json.datasetId,
+        projects    = List(dataset3Project)
+      )
+
+      loadToStore(dataset1Json, dataset2Json, toDataSetCommit(dataset3))
+
+      datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
+        dataset1.copy(
+          parts = dataset1.parts.sorted,
+          projects = List(
+            dataset1Project,
+            dataset2Project,
+            dataset3Project
+          ).sorted
+        )
+      )
+    }
+
+    "return the details of the dataset with the given id - case when the first dataset is in-project created" in new TestCase {
+      val dataset1Project = datasetProjects.generateOne
+      val dataset1 = datasets(maybeSameAs = emptyOptionOf[SameAs]).generateOne
+        .copy(projects = List(dataset1Project))
+      val dataset1Json = toDataSetCommit(dataset1)
+
+      val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
+      val dataset2 = dataset1.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = dataset1Json.datasetId,
+        projects    = List(dataset2Project)
+      )
+      val dataset2Json = toDataSetCommit(dataset2)
+
+      val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
+      val dataset3 = dataset2.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = dataset2Json.datasetId,
+        projects    = List(dataset3Project)
+      )
+
+      loadToStore(dataset1Json, dataset2Json, toDataSetCommit(dataset3))
+
+      datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
+        dataset1.copy(
+          parts = dataset1.parts.sorted,
+          projects = List(
+            dataset1Project,
+            dataset2Project,
+            dataset3Project
+          ).sorted
+        )
+      )
+    }
+
+    "return the details of the dataset with the given id - " +
+      "case when the requested id is in the middle of the hierarchy" in new TestCase {
+      val dataset1Project = datasetProjects.generateOne
+      val dataset1 = datasets(maybeSameAs = emptyOptionOf[SameAs]).generateOne
+        .copy(projects = List(dataset1Project))
+      val dataset1Json = toDataSetCommit(dataset1)
+
+      val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
+      val dataset2 = dataset1.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = dataset1Json.datasetId,
+        projects    = List(dataset2Project)
+      )
+      val dataset2Json = toDataSetCommit(dataset2)
+
+      val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
+      val dataset3 = dataset2.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = dataset2Json.datasetId,
+        projects    = List(dataset3Project)
+      )
+
+      loadToStore(dataset1Json, dataset2Json, toDataSetCommit(dataset3))
+
+      datasetFinder.findDataset(dataset2.id).unsafeRunSync() shouldBe Some(
+        dataset2.copy(
+          parts = dataset2.parts.sorted,
+          projects = List(
+            dataset1Project,
+            dataset2Project,
+            dataset3Project
+          ).sorted
+        )
+      )
+    }
+
+    "return the details of the dataset with the given id - " +
+      "case when the requested id is at the end of the hierarchy" in new TestCase {
+      val dataset1Project = datasetProjects.generateOne
+      val dataset1 = datasets(maybeSameAs = emptyOptionOf[SameAs]).generateOne
+        .copy(projects = List(dataset1Project))
+      val dataset1Json = toDataSetCommit(dataset1)
+
+      val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
+      val dataset2 = dataset1.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = dataset1Json.datasetId,
+        projects    = List(dataset2Project)
+      )
+      val dataset2Json = toDataSetCommit(dataset2)
+
+      val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
+      val dataset3 = dataset2.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = dataset2Json.datasetId,
+        projects    = List(dataset3Project)
+      )
+
+      loadToStore(dataset1Json, dataset2Json, toDataSetCommit(dataset3))
+
+      datasetFinder.findDataset(dataset3.id).unsafeRunSync() shouldBe Some(
+        dataset3.copy(
+          parts = dataset3.parts.sorted,
+          projects = List(
+            dataset1Project,
+            dataset2Project,
+            dataset3Project
+          ).sorted
+        )
+      )
+    }
+
+    "return the details of the dataset with the given id - " +
+      "case when there're two first level projects sharing a dataset " +
+      "and some other project imports from on of these two" in new TestCase {
+      val dataset1Project = datasetProjects.generateOne
+      val dataset1 = datasets(maybeSameAs = datasetSameAs.generateSome).generateOne
+        .copy(projects = List(dataset1Project))
+      val dataset1Json = toDataSetCommit(dataset1)
+
+      val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
+      val dataset2 = datasets(maybeSameAs = datasetSameAs.generateSome).generateOne.copy(
+        maybeSameAs = dataset1.maybeSameAs,
+        projects    = List(dataset2Project)
+      )
+      val dataset2Json = toDataSetCommit(dataset2)
+
+      val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
+      val dataset3 = dataset2.copy(
+        id          = datasetIdentifiers.generateOne,
+        maybeSameAs = dataset2Json.datasetId,
+        projects    = List(dataset3Project)
+      )
+
+      loadToStore(dataset1Json, dataset2Json, toDataSetCommit(dataset3))
+
+      datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
+        dataset1.copy(
+          parts = dataset1.parts.sorted,
+          projects = List(
+            dataset1Project,
+            dataset2Project,
+            dataset3Project
+          ).sorted
+        )
+      )
+    }
+  }
+
+  private trait TestCase {
     private val logger = TestLogger[IO]()
     val datasetFinder = new IODatasetFinder(
       new BaseDetailsFinder(rdfStoreConfig, renkuBaseUrl, logger),
@@ -189,6 +831,46 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       new ProjectsFinder(rdfStoreConfig, renkuBaseUrl, logger)
     )
   }
+
+  private implicit class CommittedDateOps(date: CommittedDate) {
+    lazy val shiftToFuture = CommittedDate(date.value plusSeconds positiveInts().generateOne.value)
+  }
+
+  private implicit class DatasetProjectOps(datasetProject: DatasetProject) {
+    def shiftDateAfter(project: DatasetProject): DatasetProject =
+      datasetProject.copy(
+        created = datasetProject.created.copy(
+          date = DateCreatedInProject(project.created.date.value plusSeconds positiveInts().generateOne.value)
+        )
+      )
+  }
+
+  private implicit class JsonOps(json: JsonLD) {
+    lazy val datasetId: Option[SameAs] = json.entityId flatMap (id => SameAs.fromId(id.value).toOption)
+  }
+
+  private def toDataSetCommit(dataSet: Dataset): JsonLD =
+    dataSet.projects match {
+      case project +: Nil =>
+        dataSetCommit(
+          committedDate = CommittedDate(project.created.date.value),
+          committer     = Person(project.created.agent.name, project.created.agent.email)
+        )(
+          projectPath = project.path,
+          projectName = project.name
+        )(
+          datasetIdentifier         = dataSet.id,
+          datasetName               = dataSet.name,
+          maybeDatasetUrl           = dataSet.maybeUrl,
+          maybeDatasetSameAs        = dataSet.maybeSameAs,
+          maybeDatasetDescription   = dataSet.maybeDescription,
+          maybeDatasetPublishedDate = dataSet.published.maybeDate,
+          datasetCreatedDate        = DateCreated(project.created.date.value),
+          datasetCreators           = dataSet.published.creators map toPerson,
+          datasetParts              = dataSet.parts.map(part => (part.name, part.atLocation))
+        )
+      case _ => fail("Not prepared to work datasets having multiple projects")
+    }
 
   private lazy val toPerson: DatasetCreator => Person =
     creator => Person(creator.name, creator.maybeEmail, creator.maybeAffiliation)

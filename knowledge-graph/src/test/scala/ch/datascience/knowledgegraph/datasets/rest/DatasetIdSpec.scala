@@ -28,7 +28,7 @@ class DatasetIdSpec extends WordSpec {
   "unapply" should {
 
     "convert valid dataset id as string to Identifier" in {
-      val id = datasetIds.generateOne
+      val id = datasetIdentifiers.generateOne
       DatasetId.unapply(id.toString) shouldBe Some(id)
     }
 

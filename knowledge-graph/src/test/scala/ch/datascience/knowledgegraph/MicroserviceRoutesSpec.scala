@@ -32,12 +32,12 @@ import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{QueryContext, QueryEndpoint, QueryRunner}
-import ch.datascience.metrics.MetricsRegistry
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -119,7 +119,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
 
         response.status shouldBe Ok
 
-        MetricsRegistry.clear()
+        routesMetrics.clearRegistry()
       }
     }
 
@@ -141,7 +141,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
 
         response.status shouldBe Ok
 
-        MetricsRegistry.clear()
+        routesMetrics.clearRegistry()
       }
     }
 
@@ -178,7 +178,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     s"define a GET /knowledge-graph/datasets/:id endpoint returning $Ok when valid :id path parameter given" in new TestCase {
-      val id = datasetIds.generateOne
+      val id = datasetIdentifiers.generateOne
 
       (datasetsEndpoint.getDataset _).expects(id).returning(IO.pure(Response[IO](Ok)))
 
@@ -190,7 +190,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     s"define a GET /knowledge-graph/datasets/:id endpoint returning $ServiceUnavailable when no :id path parameter given" in new TestCase {
-      val id = datasetIds.generateOne
+      val id = datasetIdentifiers.generateOne
 
       val response = routes.call(
         Request(Method.GET, uri"knowledge-graph/datasets/")
@@ -200,7 +200,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     "define a GET /knowledge-graph/graphql endpoint" in new TestCase {
-      val id = datasetIds.generateOne
+      val id = datasetIdentifiers.generateOne
 
       (queryEndpoint.schema _).expects().returning(IO.pure(Response[IO](Ok)))
 
@@ -212,7 +212,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     "define a POST /knowledge-graph/graphql endpoint" in new TestCase {
-      val id = datasetIds.generateOne
+      val id = datasetIdentifiers.generateOne
 
       val request: Request[IO] = Request(Method.POST, uri"knowledge-graph/graphql")
       (queryEndpoint.handleQuery _).expects(request).returning(IO.pure(Response[IO](Ok)))
@@ -232,7 +232,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
 
         response.status shouldBe Ok
 
-        MetricsRegistry.clear()
+        routesMetrics.clearRegistry()
       }
     }
 
@@ -258,7 +258,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
 
         response.status shouldBe Ok
 
-        MetricsRegistry.clear()
+        routesMetrics.clearRegistry()
       }
     }
   }
@@ -266,19 +266,20 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
   private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
   private trait TestCase {
-    MetricsRegistry.clear()
 
     val queryEndpoint           = mock[IOQueryEndpoint]
     val projectEndpoint         = mock[IOProjectEndpointStub]
     val projectDatasetsEndpoint = mock[IOProjectDatasetsEndpointStub]
     val datasetsEndpoint        = mock[IODatasetEndpointStub]
     val datasetsSearchEndpoint  = mock[IODatasetsSearchEndpointStub]
+    val routesMetrics           = TestRoutesMetrics()
     val routes = new MicroserviceRoutes[IO](
       queryEndpoint,
       projectEndpoint,
       projectDatasetsEndpoint,
       datasetsEndpoint,
-      datasetsSearchEndpoint
+      datasetsSearchEndpoint,
+      routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }
 

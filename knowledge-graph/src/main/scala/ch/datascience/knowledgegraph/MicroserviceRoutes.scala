@@ -42,10 +42,10 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     projectEndpoint:         ProjectEndpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     datasetEndpoint:         DatasetEndpoint[F],
-    datasetsSearchEndpoint:  DatasetsSearchEndpoint[F]
+    datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
+    routesMetrics:           RoutesMetrics[F]
 )(implicit clock:            Clock[F])
-    extends Http4sDsl[F]
-    with RoutesMetrics {
+    extends Http4sDsl[F] {
 
   import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.query
   import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
@@ -55,6 +55,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import projectDatasetsEndpoint._
   import projectEndpoint._
   import queryEndpoint._
+  import routesMetrics._
 
   // format: off
   lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
@@ -64,7 +65,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case           GET  -> Root / "knowledge-graph" / "graphql"                                                                               => schema
     case request @ POST -> Root / "knowledge-graph" / "graphql"                                                                               => handleQuery(request)
     case           GET  ->        "knowledge-graph" /: "projects" /: path                                                                     => routeToProjectsEndpoints(path)
-  }.meter flatMap `add GET Root / metrics`[F]
+  }.meter flatMap `add GET Root / metrics`
   // format: on
 
   private def searchForDatasets(

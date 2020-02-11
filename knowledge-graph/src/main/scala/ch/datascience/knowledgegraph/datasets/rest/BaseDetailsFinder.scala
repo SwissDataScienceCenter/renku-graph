@@ -58,7 +58,7 @@ private class BaseDetailsFinder(
        |           rdf:type <http://schema.org/Dataset> ;
        |           schema:name ?name .
        |  OPTIONAL { ?dataset schema:url ?url } .         
-       |  OPTIONAL { ?dataset schema:sameAs ?sameAs } .         
+       |  OPTIONAL { ?dataset schema:sameAs/schema:url ?sameAs } .         
        |  OPTIONAL { ?dataset schema:description ?description } .
        |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .
        |}""".stripMargin
@@ -99,8 +99,8 @@ private object BaseDetailsFinder {
         maybeSameAs,
         maybeDescription,
         DatasetPublishing(maybePublishedDate, Set.empty),
-        part    = List.empty,
-        project = List.empty
+        parts    = List.empty,
+        projects = List.empty
       )
     }
 

@@ -284,7 +284,7 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
 
-    "be able to add mutliple reverse properties" in {
+    "be able to add multiple reverse properties" in {
       forAll {
         (parentId:       EntityId,
          parentTypes:    EntityTypes,

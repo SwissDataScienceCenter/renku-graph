@@ -29,6 +29,7 @@ import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
@@ -65,9 +66,11 @@ object Microservice extends IOMicroservice {
         triplesGeneration        <- TriplesGeneration[IO]()
         reProvisioning           <- IOReProvisioning(triplesGeneration, transactor)
         triplesGenerator         <- TriplesGenerator(triplesGeneration)
-        commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator)
-        routes                   <- new MicroserviceRoutes[IO]().routes
+        metricsRegistry          <- MetricsRegistry()
+        commitEventProcessor     <- IOCommitEventProcessor(transactor, triplesGenerator, metricsRegistry)
+        routes                   <- new MicroserviceRoutes[IO](new RoutesMetrics[IO](metricsRegistry)).routes
         eventsFetcher            <- IOEventLogFetch(transactor)
+        eventLogMetrics          <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, eventsFetcher))
                                  .withEventsProcessor(commitEventProcessor)
         exitCode <- new MicroserviceRunner(
@@ -76,7 +79,7 @@ object Microservice extends IOMicroservice {
                      fusekiDatasetInitializer,
                      reProvisioning,
                      eventProcessorRunner,
-                     IOEventLogMetrics(transactor, ApplicationLogger),
+                     eventLogMetrics,
                      new HttpServer[IO](serverPort = 9002, routes),
                      subProcessesCancelTokens
                    ) run args

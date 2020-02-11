@@ -186,7 +186,7 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
   }
 
   private implicit val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
-    id               <- datasetIds
+    id               <- datasetIdentifiers
     name             <- datasetNames
     maybeDescription <- Gen.option(datasetDescriptions)
     published        <- datasetPublishingInfos

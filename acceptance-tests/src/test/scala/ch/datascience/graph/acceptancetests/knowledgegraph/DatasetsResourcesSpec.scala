@@ -23,16 +23,15 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
-import ch.datascience.graph.acceptancetests.stubs.GitLab.`GET <gitlab>/api/v4/projects/:path returning OK with`
+import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name, SameAs}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
-import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -65,20 +64,20 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
     val project          = projectsGen.generateOne
     val dataset1CommitId = commitIds.generateOne
-    val dataset1Creation = datasetInProjectCreations.generateOne.copy(
+    val dataset1Creation = addedToProject.generateOne.copy(
       agent = DatasetAgent(project.created.creator.email, project.created.creator.name)
     )
     val dataset1 = datasets.generateOne.copy(
       maybeDescription = Some(datasetDescriptions.generateOne),
       published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-      project          = List(DatasetProject(project.path, project.name, dataset1Creation))
+      projects         = List(DatasetProject(project.path, project.name, dataset1Creation))
     )
-    val dataset2Creation = datasetInProjectCreations.generateOne
+    val dataset2Creation = addedToProject.generateOne
     val dataset2CommitId = commitIds.generateOne
     val dataset2 = datasets.generateOne.copy(
       maybeDescription = None,
       published        = datasetPublishingInfos.generateOne.copy(maybeDate = None),
-      project          = List(DatasetProject(project.path, project.name, dataset2Creation))
+      projects         = List(DatasetProject(project.path, project.name, dataset2Creation))
     )
 
     scenario("As a user I would like to find project's data-sets by calling a REST endpoint") {
@@ -101,7 +100,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           maybeDatasetDescription   = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
           datasetCreators           = dataset1.published.creators.map(toPerson),
-          datasetParts              = dataset1.part.map(part => (part.name, part.atLocation))
+          datasetParts              = dataset1.parts.map(part => (part.name, part.atLocation))
         ),
         dataSetCommit(
           commitId      = dataset2CommitId,
@@ -119,7 +118,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           maybeDatasetDescription   = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
           datasetCreators           = dataset2.published.creators.map(toPerson),
-          datasetParts              = dataset2.part.map(part => (part.name, part.atLocation))
+          datasetParts              = dataset2.parts.map(part => (part.name, part.atLocation))
         )
       )
 
@@ -183,13 +182,13 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       val text             = nonBlankStrings(minLength = 10).generateOne
       val dataset1Projects = nonEmptyList(projectsGen).generateOne.toList
       val dataset1 = datasets.generateOne.copy(
-        name    = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
-        project = dataset1Projects map toDatasetProject
+        name     = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
+        projects = dataset1Projects map toDatasetProject
       )
       val dataset2Projects = nonEmptyList(projectsGen).generateOne.toList
       val dataset2 = datasets.generateOne.copy(
         maybeDescription = Some(sentenceContaining(text).map(_.value).map(Description.apply).generateOne),
-        project          = dataset2Projects map toDatasetProject
+        projects         = dataset2Projects map toDatasetProject
       )
       val dataset3Projects = nonEmptyList(projectsGen).generateOne.toList
       val dataset3 = {
@@ -201,12 +200,12 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
                 .copy(name = sentenceContaining(text).map(_.value).map(UserName.apply).generateOne)
             )
           ),
-          project = dataset3Projects map toDatasetProject
+          projects = dataset3Projects map toDatasetProject
         )
       }
       val dataset4Projects = List(projectsGen.generateOne)
       val dataset4 = datasets.generateOne.copy(
-        project = dataset4Projects map toDatasetProject
+        projects = dataset4Projects map toDatasetProject
       )
 
       Given("some datasets with description, name and author containing some arbitrary chosen text")
@@ -272,29 +271,58 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         .flatMap(sortCreators)
     }
 
-    def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit =
-      projects foreach { project =>
+    def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit = {
+      val firstProject +: otherProjects = projects
+
+      val commitId      = commitIds.generateOne
+      val committedDate = committedDates.generateOne
+      val datasetJsonLD = toDataSetCommit(firstProject, commitId, committedDate, dataset)
+      `data in the RDF store`(firstProject.toGitLabProject(), commitId, datasetJsonLD)
+      `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
+
+      val commonSameAs = dataset.maybeSameAs orElse datasetJsonLD.entityId.flatMap { id =>
+        SameAs.fromId(id.value).toOption
+      }
+      otherProjects foreach { project =>
         val commitId = commitIds.generateOne
-        `data in the RDF store`(project.toGitLabProject(), commitId, toDataSetCommit(project.path, commitId, dataset))
+        `data in the RDF store`(
+          project.toGitLabProject(),
+          commitId,
+          toDataSetCommit(project,
+                          commitId,
+                          CommittedDate(committedDate.value plusSeconds positiveInts().generateOne.value),
+                          dataset,
+                          datasetIdentifiers.generateSome,
+                          commonSameAs)
+        )
         `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
       }
+    }
 
-    def toDataSetCommit(projectPath: ProjectPath, commitId: CommitId, dataset: Dataset) =
+    def toDataSetCommit(project:              Project,
+                        commitId:             CommitId,
+                        committedDate:        CommittedDate,
+                        dataset:              Dataset,
+                        overriddenIdentifier: Option[Identifier] = None,
+                        overriddenSameAs:     Option[SameAs] = None) =
       dataSetCommit(
         commitId      = commitId,
+        committedDate = committedDate,
         schemaVersion = currentSchemaVersion
       )(
-        projectPath = projectPath
+        projectPath = project.path,
+        projectName = project.name
       )(
-        datasetIdentifier         = dataset.id,
+        datasetIdentifier         = overriddenIdentifier getOrElse dataset.id,
         datasetName               = dataset.name,
+        maybeDatasetSameAs        = overriddenSameAs orElse dataset.maybeSameAs,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
-        datasetCreators           = dataset.published.creators.map(toPerson)
+        datasetCreators           = dataset.published.creators map toPerson
       )
 
     def toDatasetProject(project: Project) =
-      DatasetProject(project.path, project.name, datasetInProjectCreations.generateOne)
+      DatasetProject(project.path, project.name, addedToProject.generateOne)
   }
 }
 
@@ -318,7 +346,7 @@ object DatasetsResources {
       "identifier": ${dataset.id.value}, 
       "name": ${dataset.name.value},
       "published": ${dataset.published},
-      "projectsCount": ${dataset.project.size}
+      "projectsCount": ${dataset.projects.size}
     }"""
       .addIfDefined("description" -> dataset.maybeDescription)
       .deepMerge {

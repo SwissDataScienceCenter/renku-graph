@@ -28,7 +28,6 @@ import ch.datascience.controllers.InfoMessage._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.rest.paging.PagingRequest
-import ch.datascience.knowledgegraph.datasets.CreatorsFinder
 import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.RdfStoreConfig
@@ -37,7 +36,7 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
-import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response}
+import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds

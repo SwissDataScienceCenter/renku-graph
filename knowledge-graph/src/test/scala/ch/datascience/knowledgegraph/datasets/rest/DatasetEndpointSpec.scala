@@ -74,7 +74,7 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
           Links.of(Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
         )
         val Right(projectsJsons) = response.as[Json].unsafeRunSync.hcursor.downField("isPartOf").as[List[Json]]
-        projectsJsons should have size dataset.project.size
+        projectsJsons should have size dataset.projects.size
         projectsJsons.foreach { json =>
           (json.hcursor.downField("path").as[ProjectPath], json._links)
             .mapN {
@@ -91,7 +91,7 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
     "respond with NOT_FOUND if there is no dataset with the given id" in new TestCase {
 
-      val identifier = datasetIds.generateOne
+      val identifier = datasetIdentifiers.generateOne
 
       (datasetsFinder
         .findDataset(_: Identifier))
@@ -110,7 +110,7 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
     "respond with INTERNAL_SERVER_ERROR if finding the dataset fails" in new TestCase {
 
-      val identifier = datasetIds.generateOne
+      val identifier = datasetIdentifiers.generateOne
 
       val exception = exceptions.generateOne
       (datasetsFinder
@@ -181,13 +181,13 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
     for {
       path    <- cursor.downField("path").as[ProjectPath]
       name    <- cursor.downField("name").as[projects.Name]
-      created <- cursor.downField("created").as[DatasetInProjectCreation]
+      created <- cursor.downField("created").as[AddedToProject]
     } yield DatasetProject(path, name, created)
 
-  private implicit lazy val datasetInProjectCreationDecoder: Decoder[DatasetInProjectCreation] = (cursor: HCursor) =>
+  private implicit lazy val datasetInProjectCreationDecoder: Decoder[AddedToProject] = (cursor: HCursor) =>
     for {
       date       <- cursor.downField("dateCreated").as[DateCreatedInProject]
       agentEmail <- cursor.downField("agent").downField("email").as[Email]
       agentName  <- cursor.downField("agent").downField("name").as[UserName]
-    } yield DatasetInProjectCreation(date, DatasetAgent(agentEmail, agentName))
+    } yield AddedToProject(date, DatasetAgent(agentEmail, agentName))
 }

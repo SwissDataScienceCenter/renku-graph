@@ -16,30 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.datasets.graphql
+package ch.datascience.interpreters
 
 import cats.effect.IO
-import ch.datascience.knowledgegraph.graphql.CommonQueryFields._
-import ch.datascience.knowledgegraph.graphql.QueryContext
-import sangria.schema._
+import ch.datascience.db.DbTransactor
+import doobie.util.transactor.Transactor
 
-import scala.language.higherKinds
-
-object QueryFields {
-
-  import modelSchema._
-
-  def apply(): List[Field[QueryContext[IO], Unit]] =
-    fields[QueryContext[IO], Unit](
-      Field(
-        name        = "datasets",
-        fieldType   = ListType(datasetType),
-        description = Some("Returns datasets defined in the project"),
-        arguments   = List(projectPathArgument),
-        resolve = context =>
-          context.ctx.datasetsFinder
-            .findDatasets(context.args arg projectPathArgument)
-            .unsafeToFuture()
-      )
-    )
-}
+class TestDbTransactor[TargetDB](transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, TargetDB](transactor)

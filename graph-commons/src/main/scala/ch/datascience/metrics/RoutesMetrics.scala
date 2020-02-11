@@ -26,25 +26,30 @@ import org.http4s.server.middleware.{Metrics => ServerMetrics}
 
 import scala.language.higherKinds
 
-trait RoutesMetrics {
+class RoutesMetrics[Interpretation[_]](metricsRegistry: MetricsRegistry[Interpretation]) {
 
-  import MetricsRegistry._
-
-  implicit class RoutesOps[Interpretation[_]](routes: HttpRoutes[Interpretation]) {
+  implicit class RoutesOps(routes: HttpRoutes[Interpretation]) {
 
     def meter(implicit F: ConcurrentEffect[Interpretation],
               clock:      Clock[Interpretation]): Interpretation[HttpRoutes[Interpretation]] =
-      for {
-        metrics <- Prometheus[Interpretation](collectorRegistry, "server")
-        meteredRoutes = ServerMetrics[Interpretation](metrics)(routes)
-      } yield meteredRoutes
-
+      metricsRegistry.maybeCollectorRegistry match {
+        case Some(collectorRegistry) =>
+          for {
+            metrics <- Prometheus[Interpretation](collectorRegistry, "server")
+            meteredRoutes = ServerMetrics[Interpretation](metrics)(routes)
+          } yield meteredRoutes
+        case _ => F.pure(routes)
+      }
   }
 
-  def `add GET Root / metrics`[Interpretation[_]](
+  def `add GET Root / metrics`(
       routes:   HttpRoutes[Interpretation]
   )(implicit F: ConcurrentEffect[Interpretation]): Interpretation[HttpRoutes[Interpretation]] =
-    for {
-      prometheusService <- PrometheusExportService(collectorRegistry).pure[Interpretation]
-    } yield prometheusService.routes <+> routes
+    metricsRegistry.maybeCollectorRegistry match {
+      case Some(collectorRegistry) =>
+        for {
+          prometheusService <- PrometheusExportService(collectorRegistry).pure[Interpretation]
+        } yield prometheusService.routes <+> routes
+      case _ => F.pure(routes)
+    }
 }

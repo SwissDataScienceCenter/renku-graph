@@ -25,6 +25,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
+import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
@@ -40,7 +41,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import org.http4s.Status._
 import org.scalatest.Matchers._
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.concurrent.Eventually
 import org.scalatest.{FeatureSpec, GivenWhenThen}
 
 import scala.language.postfixOps
@@ -50,7 +51,7 @@ class EventsProcessingStatusSpec
     with GivenWhenThen
     with GraphServices
     with Eventually
-    with IntegrationPatience {
+    with AcceptanceTestPatience {
 
   private val numberOfEvents: Int Refined Positive = 10
 
@@ -70,7 +71,7 @@ class EventsProcessingStatusSpec
       givenHookValidationToHookExists(projectId, projectPaths.generateOne)
 
       Then("the status endpoint should return OK with done = total = 0")
-      val noEventsResponse = webhookServiceClient.GET(s"projects/$projectId/events/status")
+      val noEventsResponse = webhookServiceClient GET s"projects/$projectId/events/status"
       noEventsResponse.status shouldBe Ok
       val noEventsResponseJson = noEventsResponse.bodyAsJson.hcursor
       noEventsResponseJson.downField("done").as[Int]        shouldBe Right(0)
@@ -82,7 +83,7 @@ class EventsProcessingStatusSpec
 
       Then("the status endpoint should return OK with some progress info")
       eventually {
-        val response = webhookServiceClient.GET(s"projects/$projectId/events/status")
+        val response = webhookServiceClient GET s"projects/$projectId/events/status"
 
         response.status shouldBe Ok
 

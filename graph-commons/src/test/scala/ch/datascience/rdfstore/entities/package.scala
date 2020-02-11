@@ -19,12 +19,15 @@
 package ch.datascience.rdfstore
 
 import java.time.{Instant, LocalDate}
+import java.util.UUID
 
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.datasets.{IdSameAs, SameAs, UrlSameAs}
 import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.RelativePath
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 package object entities extends Schemas {
 
@@ -36,7 +39,30 @@ package object entities extends Schemas {
   implicit val fusekiBaseUrlToEntityId: FusekiBaseUrl => EntityId = url => EntityId of url.value
   implicit val renkuBaseUrlToEntityId:  RenkuBaseUrl => EntityId  = url => EntityId of url.value
 
-  implicit def stringTTEncoder[TT <: TinyType { type V = String }]: JsonLDEncoder[TT] =
+  implicit val sameAsEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
+    case v: IdSameAs  => idSameAsEncoder(v)
+    case v: UrlSameAs => urlSameAsEncoder(v)
+  }
+
+  private lazy val idSameAsEncoder: JsonLDEncoder[IdSameAs] = JsonLDEncoder.instance { sameAs =>
+    JsonLD.entity(
+      EntityId of s"_:${UUID.randomUUID()}",
+      EntityTypes of (schema / "URL"),
+      schema / "url" -> EntityId.of(sameAs.value).asJsonLD
+    )
+  }
+
+  private lazy val urlSameAsEncoder: JsonLDEncoder[UrlSameAs] = JsonLDEncoder.instance { sameAs =>
+    JsonLD.entity(
+      EntityId of s"_:${UUID.randomUUID()}",
+      EntityTypes of (schema / "URL"),
+      schema / "url" -> sameAs.value.asJsonLD
+    )
+  }
+
+  implicit def stringTTEncoder[TT <: StringTinyType]: JsonLDEncoder[TT] =
+    JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
+  implicit def relativePathTTEncoder[TT <: RelativePathTinyType]: JsonLDEncoder[TT] =
     JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
   implicit def instantTTEncoder[TT <: TinyType { type V = Instant }]: JsonLDEncoder[TT] =
     JsonLDEncoder.instance(v => JsonLD.fromInstant(v.value))

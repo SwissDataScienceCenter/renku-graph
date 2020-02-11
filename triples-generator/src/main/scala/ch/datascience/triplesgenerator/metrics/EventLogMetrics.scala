@@ -36,9 +36,9 @@ import scala.util.control.NonFatal
 class EventLogMetrics(
     eventLogStats:         EventLogStats[IO],
     logger:                Logger[IO],
-    waitingEventsGauge:    Gauge = EventLogMetrics.waitingEventsGauge,
-    statusesGauge:         Gauge = EventLogMetrics.statusesGauge,
-    totalGauge:            Gauge = EventLogMetrics.totalGauge,
+    waitingEventsGauge:    Gauge,
+    statusesGauge:         Gauge,
+    totalGauge:            Gauge,
     interval:              FiniteDuration = EventLogMetrics.interval,
     statusesInterval:      FiniteDuration = EventLogMetrics.statusesInterval,
     waitingEventsInterval: FiniteDuration = EventLogMetrics.waitingEventsInterval
@@ -93,40 +93,40 @@ object EventLogMetrics {
   private val statusesInterval:      FiniteDuration = 5 seconds
   private val waitingEventsInterval: FiniteDuration = 2 seconds
 
-  private[metrics] val waitingEventsGauge: Gauge = MetricsRegistry.register {
+  private[metrics] val waitingEventsGaugeBuilder: Gauge.Builder =
     Gauge
       .build()
       .name("events_waiting_count")
       .help("Number of waiting Events by project path.")
       .labelNames("project")
-      .register(_)
-  }
 
-  private[metrics] val statusesGauge: Gauge = MetricsRegistry.register {
+  private[metrics] val statusesGaugeBuilder: Gauge.Builder =
     Gauge
       .build()
       .name("events_statuses_count")
       .help("Total Commit Events by status.")
       .labelNames("status")
-      .register(_)
-  }
 
-  private[metrics] val totalGauge: Gauge = MetricsRegistry.register {
+  private[metrics] val totalGaugeBuilder: Gauge.Builder =
     Gauge
       .build()
       .name("events_count")
       .help("Total Commit Events.")
-      .register(_)
-  }
 }
 
 object IOEventLogMetrics {
 
+  import EventLogMetrics._
   import cats.effect.IO._
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): EventLogMetrics =
-    new EventLogMetrics(new IOEventLogStats(transactor), logger)
+      logger:              Logger[IO],
+      metricsRegistry:     MetricsRegistry[IO]
+  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[EventLogMetrics] =
+    for {
+      waitingEventsGauge <- metricsRegistry.register[Gauge, Gauge.Builder](waitingEventsGaugeBuilder)
+      statusesGauge      <- metricsRegistry.register[Gauge, Gauge.Builder](statusesGaugeBuilder)
+      totalGauge         <- metricsRegistry.register[Gauge, Gauge.Builder](totalGaugeBuilder)
+    } yield new EventLogMetrics(new IOEventLogStats(transactor), logger, waitingEventsGauge, statusesGauge, totalGauge)
 }

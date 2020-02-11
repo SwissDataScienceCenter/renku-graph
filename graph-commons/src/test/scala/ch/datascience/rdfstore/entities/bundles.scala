@@ -77,13 +77,13 @@ object bundles extends Schemas {
       projectDateCreated: projects.DateCreated = DateCreated(committedDate.value),
       projectCreator:     Person               = committer
   )(
-      datasetIdentifier:         Identifier = datasetIds.generateOne,
+      datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
       datasetName:               Name = datasetNames.generateOne,
       maybeDatasetUrl:           Option[Url] = Gen.option(datasetUrls).generateOne,
       maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
       maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
       maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      maybeDatasetCreatedDate:   Option[datasets.DateCreated] = Gen.option(datasetCreatedDates).generateOne,
+      datasetCreatedDate:        datasets.DateCreated = datasets.DateCreated(committedDate.value),
       datasetCreators:           Set[Person] = setOf(persons).generateOne,
       datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
   )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
@@ -95,7 +95,7 @@ object bundles extends Schemas {
       maybeDatasetSameAs,
       maybeDatasetDescription,
       maybeDatasetPublishedDate,
-      maybeDatasetCreatedDate,
+      datasetCreatedDate,
       datasetCreators,
       datasetParts map { case (name, location) => DataSetPart(name, location, commitId, project, committer) },
       Generation(FilePath(".renku") / "datasets" / datasetIdentifier,
@@ -115,15 +115,15 @@ object bundles extends Schemas {
     final case class ExamplarData(
         commitId: CommitId,
         filePath: FilePath,
-        `sha7 plot_data`:    NodeDef        = NodeDef(name = "/blob/000007/src/plot_data.py",                   label = "src/plot_data.py@000007"),
-        `sha7 clean_data`:    NodeDef       = NodeDef(name = "/blob/000007/src/clean_data.py",                  label = "src/clean_data.py@000007"),
-        `sha8 renku run`:    NodeDef        = NodeDef(name = "/commit/000008",                                  label = "renku run python"),
-        `sha9 renku run`:    NodeDef        = NodeDef(name = "/commit/000009",                                  label = "renku run python"),
-        `sha10 zhbikes`:      NodeDef       = NodeDef(name = "/blob/0000010/data/zhbikes",                      label = "data/zhbikes@0000010"),
+        `sha7 plot_data`: NodeDef           = NodeDef(name = "/blob/000007/src/plot_data.py",                   label = "src/plot_data.py@000007"),
+        `sha7 clean_data`: NodeDef          = NodeDef(name = "/blob/000007/src/clean_data.py",                  label = "src/clean_data.py@000007"),
+        `sha8 renku run`: NodeDef           = NodeDef(name = "/commit/000008",                                  label = "renku run python"),
+        `sha9 renku run`: NodeDef           = NodeDef(name = "/commit/000009",                                  label = "renku run python"),
+        `sha10 zhbikes`: NodeDef            = NodeDef(name = "/blob/0000010/data/zhbikes",                      label = "data/zhbikes@0000010"),
         `sha12 step1 renku update`: NodeDef = NodeDef(name = "/commit/0000012/steps/step_1",                    label = "renku update"),
         `sha12 step2 renku update`: NodeDef = NodeDef(name = "/commit/0000012/steps/step_2",                    label = "renku update"),
         `sha12 step2 grid_plot`: NodeDef    = NodeDef(name = "/blob/0000012/figs/grid_plot.png",                label = "figs/grid_plot.png@0000012"),
-        `sha12 parquet`:    NodeDef         = NodeDef(name = "/blob/0000012/data/preprocessed/zhbikes.parquet", label = "data/preprocessed/zhbikes.parquet@0000012")
+        `sha12 parquet`: NodeDef            = NodeDef(name = "/blob/0000012/data/preprocessed/zhbikes.parquet", label = "data/preprocessed/zhbikes.parquet@0000012")
     )
     case class NodeDef(name: String, label: String)
     // format: on
@@ -337,10 +337,10 @@ object bundles extends Schemas {
         ArtifactEntity(outFile2, Generation(FilePath("outputs/output_1"), commit9ProcessRunActivity)).asJsonLD,
         ArtifactEntity(Generation(FilePath("data/zhbikes/2018velo.csv"), commit10Activity)).asJsonLD,
         DataSet(
-          id               = dataSetId,
-          name             = datasets.Name("zhbikes"),
-          maybeCreatedDate = datasetCreatedDates.generateOption,
-          creators         = Set(persons.generateOne),
+          id          = dataSetId,
+          name        = datasets.Name("zhbikes"),
+          createdDate = datasetCreatedDates.generateOne,
+          creators    = Set(persons.generateOne),
           parts = List(
             DataSetPart(
               datasets.PartName("2019velo.csv"),

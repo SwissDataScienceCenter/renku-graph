@@ -179,6 +179,54 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
       results.pagingInfo.total         shouldBe Total(allItems.size)
     }
 
+    "use the special count query if given to fetch the total if a full page is returned" in new QueryClientTestCase {
+
+      val allItems      = nonEmptyList(nonBlankStrings(), minElements = 5).generateOne.map(_.value).toList
+      val pagingRequest = PagingRequest(Page.first, PerPage(4))
+      val pageItems     = allItems.take(pagingRequest.perPage.value)
+      val responseBody  = json"""{
+        "results": {
+          "bindings": $pageItems
+        }
+      }"""
+
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/sparql")
+          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+          .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
+          .withHeader("accept", equalTo("application/sparql-results+json"))
+          .withRequestBody(equalTo(s"query=${client.query.include[Try](pagingRequest).get}"))
+          .willReturn(okJson(responseBody.noSpaces))
+      }
+
+      val countQuery        = SparqlQuery(Set.empty, """SELECT ?s ?p ?o WHERE { ?s ?p ?o} ORDER BY ASC(?o)""")
+      val totalResponseBody = json"""{
+        "results": {
+          "bindings": [
+            {
+              "total": {
+                "value": ${allItems.size}
+              }
+            }
+          ]
+        }
+      }"""
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/sparql")
+          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+          .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
+          .withHeader("accept", equalTo("application/sparql-results+json"))
+          .withRequestBody(equalTo(s"query=${countQuery.toCountQuery}"))
+          .willReturn(okJson(totalResponseBody.noSpaces))
+      }
+
+      val results = client.callWith(pagingRequest, maybeCountQuery = Some(countQuery)).unsafeRunSync()
+
+      results.results                  shouldBe pageItems
+      results.pagingInfo.pagingRequest shouldBe pagingRequest
+      results.pagingInfo.total         shouldBe Total(allItems.size)
+    }
+
     "fail if sparql body does not end with the ORDER BY clause" in new TestCase {
 
       val client = new TestRdfQueryClient(
@@ -308,8 +356,9 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
 
     def callRemote: IO[Json] = queryExpecting[Json](query)
 
-    def callWith(pagingRequest: PagingRequest): IO[PagingResponse[String]] = {
-      implicit val resultsFinder: PagedResultsFinder[IO, String] = pagedResultsFinder(query)
+    def callWith(pagingRequest:   PagingRequest,
+                 maybeCountQuery: Option[SparqlQuery] = None): IO[PagingResponse[String]] = {
+      implicit val resultsFinder: PagedResultsFinder[IO, String] = pagedResultsFinder(query, maybeCountQuery)
       findPage(pagingRequest)
     }
   }

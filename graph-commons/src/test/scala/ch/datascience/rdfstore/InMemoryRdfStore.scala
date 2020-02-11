@@ -37,30 +37,29 @@ package ch.datascience.rdfstore
  */
 
 import java.io.ByteArrayInputStream
-import java.net.{BindException, ServerSocket, SocketException}
+import java.net.{ServerSocket, SocketException}
 import java.nio.charset.StandardCharsets.UTF_8
 
 import cats.MonadError
 import cats.data.Validated
 import cats.effect._
-import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.interpreters.TestLogger
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.jsonld.JsonLD
-import org.apache.jena.fuseki.FusekiException
-import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 import org.apache.jena.riot.{Lang, RDFDataMgr}
 import org.http4s.Uri
-import org.scalatest.Matchers._
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
-import scala.concurrent.duration._
 import scala.language.{postfixOps, reflectiveCalls}
 import scala.util.Random.shuffle
 import scala.xml.Elem
@@ -68,13 +67,20 @@ import scala.xml.Elem
 trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   this: Suite =>
 
+  protected val givenServerRunning: Boolean = false
+
   protected implicit val ec:    ExecutionContext          = global
   protected implicit val cs:    ContextShift[IO]          = IO.contextShift(global)
   protected implicit val timer: Timer[IO]                 = IO.timer(global)
   protected val context:        MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-  private lazy val fusekiServerPort = (shuffle((3000 to 3500).toList) find notUsedPort)
-    .getOrElse(throw new Exception("Cannot find not used port for Fuseki"))
+  private lazy val fusekiServerPort: Int Refined Positive =
+    if (givenServerRunning) 3030
+    else
+      Refined.unsafeApply {
+        (shuffle((3000 to 3500).toList) find notUsedPort)
+          .getOrElse(throw new Exception("Cannot find not used port for Fuseki"))
+      }
 
   private lazy val notUsedPort: Int => Boolean = { port =>
     Validated
@@ -83,42 +89,20 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   }
 
   protected lazy val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
-    fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
+    fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort"),
+    datasetName =
+      if (givenServerRunning) DatasetName("renku") else (nonEmptyStrings() map DatasetName.apply).generateOne
   )
+
   protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl
 
-  private lazy val dataset = {
-    import org.apache.jena.graph.NodeFactory
-    import org.apache.jena.query.DatasetFactory
-    import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
-    import org.apache.lucene.store.RAMDirectory
+  private lazy val rdfStoreServer = new RdfStoreServer(fusekiServerPort, rdfStoreConfig.datasetName)
 
-    val entityDefinition: EntityDefinition = {
-      val definition = new EntityDefinition("uri", "name")
-      definition.setPrimaryPredicate(NodeFactory.createURI("http://schema.org/name"))
-      definition.set("description", NodeFactory.createURI("http://schema.org/description"))
-      definition
-    }
-
-    TextDatasetFactory.createLucene(
-      DatasetFactory.create(),
-      new RAMDirectory,
-      new TextIndexConfig(entityDefinition)
-    )
-  }
-
-  private lazy val rdfStoreServer: FusekiServer = FusekiServer
-    .create()
-    .loopback(true)
-    .port(fusekiServerPort)
-    .add(s"/${rdfStoreConfig.datasetName}", dataset)
-    .build
-
-  protected val sparqlEndpoint: Uri = Uri
+  protected lazy val sparqlEndpoint: Uri = Uri
     .fromString(s"$fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql")
     .fold(throw _, identity)
 
-  private val rdfConnectionResource: Resource[IO, RDFConnection] =
+  private lazy val rdfConnectionResource: Resource[IO, RDFConnection] =
     Resource.make(openConnection)(connection => IO(connection.close()))
 
   private def openConnection: IO[RDFConnection] = IO {
@@ -130,33 +114,19 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    startServer.unsafeRunSync()
+    if (!givenServerRunning) rdfStoreServer.start.unsafeRunSync()
   }
-
-  private def startServer: IO[Unit] =
-    IO(rdfStoreServer.start())
-      .map(_ => ())
-      .recoverWith {
-        case exception: FusekiException =>
-          exception.getCause match {
-            case _: BindException =>
-              timer.sleep(1 second) *> startServer
-            case other =>
-              IO.raiseError(new IllegalStateException(s"Cannot start fuseki on $fusekiBaseUrl", other))
-          }
-        case other: Exception =>
-          IO.raiseError(new IllegalStateException(s"Cannot start fuseki on $fusekiBaseUrl", other))
-      }
 
   before {
-    clearDataset()
-    dataset.asDatasetGraph().isEmpty shouldBe true
+    if (!givenServerRunning) {
+      clearDataset()
+    }
   }
 
-  def clearDataset(): Unit = dataset.asDatasetGraph().clear()
+  def clearDataset(): Unit = rdfStoreServer.clearDataset().unsafeRunSync()
 
   protected override def afterAll(): Unit = {
-    rdfStoreServer.stop()
+    if (!givenServerRunning) rdfStoreServer.stop.unsafeRunSync()
     super.afterAll()
   }
 
@@ -200,7 +170,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
       .unsafeRunSync()
 
-  private val queryRunner = new IORdfStoreClient(rdfStoreConfig, TestLogger()) {
+  private lazy val queryRunner = new IORdfStoreClient(rdfStoreConfig, TestLogger()) {
 
     import cats.implicits._
     import io.circe.Decoder._

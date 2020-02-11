@@ -41,6 +41,8 @@ object Generators {
 
   type NonBlank = String Refined NonEmpty
 
+  def emptyOptionOf[T]: Gen[Option[T]] = Gen.const(Option.empty[T])
+
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
     nonBlankStrings(maxLength = Refined.unsafeApply(maxLength)) map (_.value)
@@ -279,12 +281,15 @@ object Generators {
 
       def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
 
+      def generateSome: Option[T] = Option(generator.generateOne)
+
       def generateDifferentThan(value: T): T = {
         val generated = generator.sample.getOrElse(generateDifferentThan(value))
         if (generated == value) generateDifferentThan(value)
         else generated
       }
 
+      def toGeneratorOfSomes: Gen[Option[T]] = generator map Option.apply
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)

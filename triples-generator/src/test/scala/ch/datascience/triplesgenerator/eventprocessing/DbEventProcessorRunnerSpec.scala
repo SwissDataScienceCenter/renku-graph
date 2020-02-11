@@ -21,16 +21,14 @@ package ch.datascience.triplesgenerator.eventprocessing
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 
 import cats.effect._
-import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.DbEventLogGenerators._
+import ch.datascience.dbeventlog.EventBody
 import ch.datascience.dbeventlog.commands.EventLogFetch
-import ch.datascience.dbeventlog.{EventBody, EventLogDB}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import com.typesafe.config.ConfigFactory
-import doobie.util.transactor.Transactor
 import org.scalacheck.Gen.listOfN
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -81,6 +79,7 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
       eventLogFetch.addEventsToReturn(Seq(eventBody1, eventBody2, eventBody3))
 
       val accumulator = new ConcurrentHashMap[EventBody, Long]()
+
       def processor(event: EventBody): IO[Unit] =
         if (event == eventBody2)
           IO.raiseError(new Exception("error during processing eventBody2"))
@@ -116,6 +115,7 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
       )
 
       val accumulator = new ConcurrentHashMap[EventBody, Long]()
+
       def processor(event: EventBody): IO[Unit] = {
         accumulator.put(event, Thread.currentThread().getId)
         IO.unit
@@ -145,8 +145,9 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
   private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
-    val logger         = TestLogger[IO]()
+
     val eventLogFetch  = new TestEventLogFetch()
+    val logger         = TestLogger[IO]()
     private val config = ConfigFactory.parseMap(Map("generation-processes-number" -> 5).asJava)
 
     def eventSourceWith(processor:     EventProcessor[IO],
@@ -155,8 +156,6 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
       new EventsSource[IO](eventRunner).withEventsProcessor(processor).unsafeRunSync()
     }
   }
-
-  private class TestDbTransactor(transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, EventLogDB](transactor)
 
   private class TestEventLogFetch(isEventEvents:  List[IO[Boolean]]           = Nil,
                                   popEventEvents: List[IO[Option[EventBody]]] = Nil)

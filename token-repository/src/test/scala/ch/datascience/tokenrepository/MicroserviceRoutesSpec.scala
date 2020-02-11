@@ -27,7 +27,7 @@ import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.metrics.MetricsRegistry
+import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
@@ -129,15 +129,16 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
   private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
   private trait TestCase {
-    MetricsRegistry.clear()
 
     val fetchEndpoint     = mock[IOFetchTokenEndpoint]
     val associateEndpoint = mock[IOAssociateTokenEndpoint]
     val deleteEndpoint    = mock[IODeleteTokenEndpoint]
+    val routesMetrics     = TestRoutesMetrics()
     val routes = new MicroserviceRoutes[IO](
       fetchEndpoint,
       associateEndpoint,
-      deleteEndpoint
+      deleteEndpoint,
+      routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }
 }

@@ -22,7 +22,6 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.knowledgegraph.datasets.model.Dataset
-import ch.datascience.knowledgegraph.datasets.{CreatorsFinder, PartsFinder, ProjectsFinder}
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.RdfStoreConfig
 import io.chrisdavenport.log4cats.Logger
@@ -48,29 +47,21 @@ private class IODatasetFinder(
   import projectsFinder._
 
   def findDataset(identifier: Identifier): IO[Option[Dataset]] =
-    findBaseDetails(identifier) flatMap {
-      case None => IO.pure(None)
-      case Some(baseDetails) =>
-        for {
-          withCreators <- addCreators(baseDetails)
-          withParts    <- addParts(withCreators)
-          withProjects <- addProjects(withParts)
-        } yield Some(withProjects)
-    }
-
-  private def addCreators(baseInfo: Dataset): IO[Dataset] =
-    findCreators(baseInfo.id).map { creators =>
-      baseInfo.copy(published = baseInfo.published.copy(creators = creators))
-    }
-
-  private def addParts(baseInfo: Dataset): IO[Dataset] =
-    findParts(baseInfo.id).map { parts =>
-      baseInfo.copy(part = parts)
-    }
-
-  private def addProjects(baseInfo: Dataset): IO[Dataset] =
-    findProjects(baseInfo.id).map { projects =>
-      baseInfo.copy(project = projects)
+    for {
+      maybeDetailsFiber <- findBaseDetails(identifier).start
+      creatorsFiber     <- findCreators(identifier).start
+      partsFiber        <- findParts(identifier).start
+      projectsFiber     <- findProjects(identifier).start
+      maybeDetails      <- maybeDetailsFiber.join
+      creators          <- creatorsFiber.join
+      parts             <- partsFiber.join
+      projects          <- projectsFiber.join
+    } yield maybeDetails map { details =>
+      details.copy(
+        published = details.published.copy(creators = creators),
+        parts     = parts,
+        projects  = projects
+      )
     }
 }
 

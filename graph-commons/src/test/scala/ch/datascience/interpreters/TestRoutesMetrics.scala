@@ -16,26 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.interpreters
 
-import cats.effect.{Clock, ConcurrentEffect}
-import cats.implicits._
+import cats.effect.IO
 import ch.datascience.metrics.RoutesMetrics
-import org.http4s.dsl.Http4sDsl
 
-import scala.language.higherKinds
+class TestRoutesMetrics(metricsRegistry: TestMetricsRegistry.type) extends RoutesMetrics[IO](metricsRegistry) {
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    routesMetrics: RoutesMetrics[F]
-)(implicit clock:  Clock[F])
-    extends Http4sDsl[F] {
+  def clearRegistry(): Unit = metricsRegistry.clear()
+}
 
-  import org.http4s.HttpRoutes
-  import routesMetrics._
+object TestRoutesMetrics {
 
-  lazy val routes: F[HttpRoutes[F]] = HttpRoutes
-    .of[F] {
-      case GET -> Root / "ping" => Ok("pong")
-    }
-    .meter flatMap `add GET Root / metrics`
+  def apply(): TestRoutesMetrics = {
+    val metricsRegistry = TestMetricsRegistry
+    metricsRegistry.clear()
+
+    new TestRoutesMetrics(metricsRegistry)
+  }
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.datasets
+package ch.datascience.knowledgegraph.datasets.rest
 
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.blankStrings

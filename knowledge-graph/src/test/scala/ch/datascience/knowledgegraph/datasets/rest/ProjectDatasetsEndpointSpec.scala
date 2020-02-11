@@ -137,7 +137,7 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
   }
 
   private implicit val datasetBasicDetails: Gen[(Identifier, Name)] = for {
-    id   <- datasetIds
+    id   <- datasetIdentifiers
     name <- datasetNames
   } yield (id, name)
 }

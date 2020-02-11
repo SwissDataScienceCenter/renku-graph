@@ -30,6 +30,7 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
@@ -209,26 +210,24 @@ class CommitEventProcessor[Interpretation[_]](
 
 object IOCommitEventProcessor {
 
-  import ch.datascience.metrics.MetricsRegistry
-
-  private[triplesgenerator] lazy val eventsProcessingTimes: Histogram = MetricsRegistry.register {
+  private[triplesgenerator] lazy val eventsProcessingTimesBuilder =
     Histogram
       .build()
       .name("events_processing_times")
       .help("Commit Events processing times")
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
-      .register(_)
-  }
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
-      triplesGenerator:    TriplesGenerator[IO]
+      triplesGenerator:    TriplesGenerator[IO],
+      metricsRegistry:     MetricsRegistry[IO]
   )(implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      uploader          <- IOUploader(ApplicationLogger)
-      accessTokenFinder <- IOAccessTokenFinder(ApplicationLogger)
+      uploader              <- IOUploader(ApplicationLogger)
+      accessTokenFinder     <- IOAccessTokenFinder(ApplicationLogger)
+      eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
                                                          maybeHistogram = Some(eventsProcessingTimes))
     } yield new CommitEventProcessor[IO](

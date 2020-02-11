@@ -16,72 +16,65 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.datasets
+package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
+import ch.datascience.knowledgegraph.datasets.model.DatasetPart
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Decoder.{Result, decodeList}
-import io.circe.HCursor
-import model._
+import io.circe.Decoder.decodeList
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private class CreatorsFinder(
+private class PartsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient(rdfStoreConfig, logger) {
 
-  import CreatorsFinder._
+  import PartsFinder._
 
-  def findCreators(identifier: Identifier): IO[Set[DatasetCreator]] =
-    queryExpecting[List[DatasetCreator]](using = query(identifier))
-      .map(_.toSet)
+  def findParts(identifier: Identifier): IO[List[DatasetPart]] =
+    queryExpecting[List[DatasetPart]](using = query(identifier))
 
   private def query(identifier: Identifier): String =
     s"""
+       |PREFIX prov: <http://www.w3.org/ns/prov#>
        |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
        |PREFIX schema: <http://schema.org/>
        |
-       |SELECT DISTINCT ?email ?name ?affiliation
+       |SELECT DISTINCT ?partName ?partLocation
        |WHERE {
        |  ?dataset rdf:type <http://schema.org/Dataset> ;
        |           schema:identifier "$identifier" ;
-       |           schema:creator ?creatorResource .
-       |  OPTIONAL { ?creatorResource rdf:type <http://schema.org/Person> ;
-       |                              schema:email ?email . } .         
-       |  OPTIONAL { ?creatorResource rdf:type <http://schema.org/Person> ;
-       |                              schema:affiliation ?affiliation . } .         
-       |  ?creatorResource rdf:type <http://schema.org/Person> ;
-       |                   schema:name ?name .         
-       |}""".stripMargin
+       |           schema:hasPart ?partResource .
+       |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
+       |                schema:name ?partName ;
+       |                prov:atLocation ?partLocation .
+       |}
+       |ORDER BY ASC(?partName)
+       |""".stripMargin
 }
 
-private object CreatorsFinder {
+private object PartsFinder {
 
   import io.circe.Decoder
 
-  private[datasets] implicit val creatorsDecoder: Decoder[List[DatasetCreator]] = {
+  private implicit val partsDecoder: Decoder[List[DatasetPart]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    def extract(property: String, from: HCursor): Result[Option[String]] =
-      from.downField(property).downField("value").as[Option[String]]
-
-    val creator: Decoder[DatasetCreator] = { cursor =>
+    implicit val datasetDecoder: Decoder[DatasetPart] = { cursor =>
       for {
-        maybeEmail       <- cursor.downField("email").downField("value").as[Option[Email]]
-        name             <- cursor.downField("name").downField("value").as[UserName]
-        maybeAffiliation <- extract("affiliation", from = cursor).map(blankToNone).flatMap(toOption[Affiliation])
-      } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
+        partName     <- cursor.downField("partName").downField("value").as[PartName]
+        partLocation <- cursor.downField("partLocation").downField("value").as[PartLocation]
+      } yield DatasetPart(partName, partLocation)
     }
 
-    _.downField("results").downField("bindings").as(decodeList(creator))
+    _.downField("results").downField("bindings").as(decodeList[DatasetPart])
   }
 }

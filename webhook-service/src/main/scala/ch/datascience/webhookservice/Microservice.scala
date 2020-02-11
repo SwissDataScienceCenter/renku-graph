@@ -30,6 +30,7 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
@@ -71,6 +72,7 @@ object Microservice extends IOMicroservice {
         gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
         hookTokenCrypto       <- HookTokenCrypto[IO]()
         executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+        metricsRegistry       <- MetricsRegistry()
         routes <- new MicroserviceRoutes[IO](
                    new IOHookEventEndpoint(transactor,
                                            tokenRepositoryUrl,
@@ -91,7 +93,8 @@ object Microservice extends IOMicroservice {
                                                   projectHookUrl,
                                                   gitLabUrl,
                                                   gitLabThrottler,
-                                                  executionTimeRecorder)
+                                                  executionTimeRecorder),
+                   new RoutesMetrics[IO](metricsRegistry)
                  ).routes
         httpServer = new HttpServer[IO](serverPort = 9001, routes)
 
