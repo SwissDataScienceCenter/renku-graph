@@ -18,11 +18,12 @@
 
 package ch.datascience.triplesgenerator.metrics
 
+import java.util.concurrent.ConcurrentLinkedQueue
+
 import EventLogMetrics._
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.commands.EventLogStats
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
@@ -40,6 +41,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
@@ -80,6 +82,58 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
 
       eventually {
         totalGauge.get().toLong shouldBe statuses.valuesIterator.sum
+      }
+    }
+
+    "update the waitingEventsGauge with all the data just during the first update; " +
+      "next updates should contain non-zero values and zeros only for projects having non-zeros before" in new TestCase {
+
+      val project1           = projectPaths.generateOne
+      val project2           = projectPaths.generateOne
+      val project3           = projectPaths.generateOne
+      val waitingEventsCall1 = Map(project1 -> positiveLongs().generateOne.value, project2 -> 0L, project3 -> 0L)
+      val waitingEventsCall2 = Map(project1 -> positiveLongs().generateOne.value,
+                                   project2 -> 0L,
+                                   project3 -> positiveLongs().generateOne.value)
+      val waitingEventsCall3 = Map(project1 -> 0L, project2 -> 0L, project3 -> positiveLongs().generateOne.value)
+
+      override lazy val eventLogStats: EventLogStats[IO] = new EventLogStats[IO] {
+
+        override def statuses: IO[Map[EventStatus, Long]] = statuesGen.generateOne.pure[IO]
+
+        private val waitingEventsQueue = new ConcurrentLinkedQueue(
+          List(waitingEventsCall1, waitingEventsCall2, waitingEventsCall3).asJava
+        )
+
+        override def waitingEvents: IO[Map[ProjectPath, Long]] =
+          Option(waitingEventsQueue.poll())
+            .getOrElse(waitingEventsCall3)
+            .pure[IO]
+      }
+
+      metrics.run.start.unsafeRunCancelable(_ => ())
+
+      eventually {
+        waitingEventsGauge.labels(project1.toString).get().toLong shouldBe waitingEventsCall1(project1)
+        waitingEventsGauge.labels(project2.toString).get().toLong shouldBe waitingEventsCall1(project2)
+        waitingEventsGauge.labels(project3.toString).get().toLong shouldBe waitingEventsCall1(project3)
+      }
+
+      eventually {
+        waitingEventsGauge.collect.asScala
+          .flatMap(_.samples.asScala)
+          .flatMap(_.labelValues.asScala) should contain only (project1.toString, project3.toString)
+
+        waitingEventsGauge.labels(project1.toString).get().toLong shouldBe waitingEventsCall2(project1)
+        waitingEventsGauge.labels(project3.toString).get().toLong shouldBe waitingEventsCall2(project3)
+      }
+
+      eventually {
+        waitingEventsGauge.collect.asScala
+          .flatMap(_.samples.asScala)
+          .flatMap(_.labelValues.asScala) should contain only project3.toString
+
+        waitingEventsGauge.labels(project3.toString).get().toLong shouldBe waitingEventsCall3(project3)
       }
     }
 
@@ -132,7 +186,7 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
 
   "apply" should {
 
-    "register the metrics in the Metrics Registry" in {
+    "register the metrics in the Metrics Registry" in new TestGauges {
 
       val metricsRegistry = mock[MetricsRegistry[IO]]
 
@@ -159,15 +213,16 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
-  private lazy val waitingEventsGauge = waitingEventsGaugeBuilder.create()
-  private lazy val statusesGauge      = statusesGaugeBuilder.create()
-  private lazy val totalGauge         = totalGaugeBuilder.create()
+  private trait TestGauges {
+    lazy val waitingEventsGauge = waitingEventsGaugeBuilder.create()
+    lazy val statusesGauge      = statusesGaugeBuilder.create()
+    lazy val totalGauge         = totalGaugeBuilder.create()
+  }
 
-  private trait TestCase {
-    abstract class IOEventLogStats(transactor: DbTransactor[IO, EventLogDB]) extends EventLogStats[IO](transactor)
-    val eventLogStats = mock[IOEventLogStats]
-    val logger        = TestLogger[IO]()
-    val metrics = new EventLogMetrics(
+  private trait TestCase extends TestGauges {
+    lazy val eventLogStats: EventLogStats[IO] = mock[EventLogStats[IO]]
+    lazy val logger = TestLogger[IO]()
+    lazy val metrics = new EventLogMetrics(
       eventLogStats,
       logger,
       waitingEventsGauge,
@@ -175,21 +230,21 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
       totalGauge,
       interval              = 100 millis,
       statusesInterval      = 100 millis,
-      waitingEventsInterval = 100 millis
+      waitingEventsInterval = 500 millis
     )
   }
 
   private lazy val statuesGen: Gen[Map[EventStatus, Long]] = nonEmptySet {
     for {
       status <- eventStatuses
-      count  <- positiveLongs()
+      count  <- nonNegativeLongs()
     } yield status -> count.value
   }.map(_.toMap)
 
   private lazy val waitingEventsGen: Gen[Map[ProjectPath, Long]] = nonEmptySet {
     for {
       path  <- projectPaths
-      count <- positiveLongs()
+      count <- nonNegativeLongs()
     } yield path -> count.value
   }.map(_.toMap)
 }

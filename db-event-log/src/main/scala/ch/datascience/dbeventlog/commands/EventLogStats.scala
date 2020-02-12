@@ -28,11 +28,17 @@ import doobie.implicits._
 
 import scala.language.higherKinds
 
-class EventLogStats[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+trait EventLogStats[Interpretation[_]] {
+  def statuses:      Interpretation[Map[EventStatus, Long]]
+  def waitingEvents: Interpretation[Map[ProjectPath, Long]]
+}
 
-  def statuses: Interpretation[Map[EventStatus, Long]] =
+class EventLogStatsImpl[Interpretation[_]](
+    transactor: DbTransactor[Interpretation, EventLogDB]
+)(implicit ME:  Bracket[Interpretation, Throwable])
+    extends EventLogStats[Interpretation] {
+
+  override def statuses: Interpretation[Map[EventStatus, Long]] =
     sql"""select status, count(event_id) from event_log group by status;""".stripMargin
       .query[(EventStatus, Long)]
       .to[List]
@@ -43,7 +49,7 @@ class EventLogStats[Interpretation[_]](
   private def addMissingStatues(stats: Map[EventStatus, Long]): Map[EventStatus, Long] =
     EventStatus.all.map(status => status -> stats.getOrElse(status, 0L)).toMap
 
-  def waitingEvents: Interpretation[Map[ProjectPath, Long]] =
+  override def waitingEvents: Interpretation[Map[ProjectPath, Long]] =
     sql"""|select project_path, sum(events)
           |from (
           |  select project_path, count(event_id) as events 
@@ -65,4 +71,4 @@ class EventLogStats[Interpretation[_]](
 class IOEventLogStats(
     transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogStats[IO](transactor)
+    extends EventLogStatsImpl[IO](transactor)

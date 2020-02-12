@@ -72,7 +72,7 @@ class EventLogStatsSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaC
     }
   }
 
-  private val stats = new EventLogStats(transactor)
+  private val stats = new EventLogStatsImpl(transactor)
 
   private def store: ((ProjectPath, CommitId, EventStatus)) => Unit = {
     case (projectPath, commitId, status) =>
