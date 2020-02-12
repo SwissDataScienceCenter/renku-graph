@@ -38,7 +38,7 @@ import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import ch.datascience.interpreters.{TestDbTransactor, TestLogger}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.IOCommitEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
@@ -393,7 +393,10 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(eventsProcessingTimesBuilder, *)
         .returning(IO.pure(eventsProcessingTimes))
 
-      IOCommitEventProcessor(mock[TestDbTransactor[EventLogDB]], mock[TriplesGenerator[IO]], metricsRegistry)
+      IOCommitEventProcessor(mock[TestDbTransactor[EventLogDB]],
+                             mock[TriplesGenerator[IO]],
+                             metricsRegistry,
+                             new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(TestLogger())))
         .unsafeRunSync()
     }
   }

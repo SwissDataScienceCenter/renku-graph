@@ -29,7 +29,8 @@ import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
-import ch.datascience.rdfstore.InMemoryRdfStore
+import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -99,7 +100,8 @@ class IOKGProjectFinderSpec
   }
 
   private trait TestCase {
-    private val logger = TestLogger[IO]()
-    val metadataFinder = new IOKGProjectFinder(rdfStoreConfig, renkuBaseUrl, logger)
+    private val logger       = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    val metadataFinder       = new IOKGProjectFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
   }
 }

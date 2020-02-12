@@ -23,7 +23,8 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.rdfstore._
+import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
 
@@ -37,9 +38,10 @@ private trait ProjectDatasetsFinder[Interpretation[_]] {
 private class IOProjectDatasetsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO]
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with ProjectDatasetsFinder[IO] {
 
   import IOProjectDatasetsFinder._
@@ -47,12 +49,14 @@ private class IOProjectDatasetsFinder(
   def findProjectDatasets(projectPath: ProjectPath): IO[List[(Identifier, Name)]] =
     queryExpecting[List[(Identifier, Name)]](using = query(projectPath))
 
-  private def query(path: ProjectPath): String =
-    s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        |PREFIX schema: <http://schema.org/>
-        |
-        |SELECT DISTINCT ?identifier ?name
+  private def query(path: ProjectPath) = SparqlQuery(
+    name = "project datasets",
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+      "PREFIX schema: <http://schema.org/>"
+    ),
+    s"""|SELECT DISTINCT ?identifier ?name
         |WHERE {
         |  ?dataset schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} .
         |  ?dataset rdf:type <http://schema.org/Dataset> ;
@@ -60,6 +64,7 @@ private class IOProjectDatasetsFinder(
         |           schema:name ?name .
         |}
         |""".stripMargin
+  )
 }
 
 private object IOProjectDatasetsFinder {

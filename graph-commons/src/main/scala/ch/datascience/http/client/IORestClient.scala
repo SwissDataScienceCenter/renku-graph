@@ -26,7 +26,9 @@ import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.RestClientError.{MappingError, UnexpectedResponseError}
+import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.AuthScheme.Bearer
@@ -43,9 +45,12 @@ import scala.util.control.NonFatal
 abstract class IORestClient[ThrottlingTarget](
     throttler:               Throttler[IO, ThrottlingTarget],
     logger:                  Logger[IO],
+    maybeTimeRecorder:       Option[ExecutionTimeRecorder[IO]] = None,
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
+
+  import HttpRequest._
 
   protected lazy val validateUri: String => IO[Uri] = IORestClient.validateUri
 
@@ -84,20 +89,32 @@ abstract class IORestClient[ThrottlingTarget](
     Authorization(BasicCredentials(basicAuth.username.value, basicAuth.password.value))
 
   protected def send[ResultType](request: Request[IO])(mapResponse: ResponseMapping[ResultType]): IO[ResultType] =
+    send(HttpRequest(request))(mapResponse)
+
+  protected def send[ResultType](request: HttpRequest)(mapResponse: ResponseMapping[ResultType]): IO[ResultType] =
     BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>
       for {
         _          <- throttler.acquire
-        callResult <- callRemote(httpClient, request, mapResponse, attempt = 1)
+        callResult <- measureExecutionTime(callRemote(httpClient, request, mapResponse, attempt = 1), request)
         _          <- throttler.release
       } yield callResult
     }
 
+  private def measureExecutionTime[ResultType](block: => IO[ResultType], request: HttpRequest): IO[ResultType] =
+    maybeTimeRecorder match {
+      case None => block
+      case Some(timeRecorder) =>
+        timeRecorder
+          .measureExecutionTime(block, request.toHistogramLabel)
+          .map(timeRecorder.logExecutionTime(withMessage = LogMessage(request, "finished")))
+    }
+
   private def callRemote[ResultType](httpClient:  Client[IO],
-                                     request:     Request[IO],
+                                     request:     HttpRequest,
                                      mapResponse: ResponseMapping[ResultType],
-                                     attempt:     Int) =
+                                     attempt:     Int): IO[ResultType] =
     httpClient
-      .fetch[ResultType](request)(processResponse(request, mapResponse))
+      .fetch[ResultType](request.request)(processResponse(request.request, mapResponse))
       .recoverWith(connectionError(httpClient, request, mapResponse, attempt))
 
   private def processResponse[ResultType](request:     Request[IO],
@@ -110,17 +127,17 @@ abstract class IORestClient[ThrottlingTarget](
       response
         .as[String]
         .flatMap { bodyAsString =>
-          IO.raiseError(UnexpectedResponseError(ExceptionMessage(request, response, bodyAsString)))
+          IO.raiseError(UnexpectedResponseError(LogMessage(request, response, bodyAsString)))
         }
   }
 
   private def mappingError[T](request: Request[IO], response: Response[IO]): PartialFunction[Throwable, IO[T]] = {
     case error: RestClientError => IO.raiseError(error)
-    case NonFatal(cause) => IO.raiseError(MappingError(ExceptionMessage(request, response, cause), cause))
+    case NonFatal(cause) => IO.raiseError(MappingError(LogMessage(request, response, cause), cause))
   }
 
   private def connectionError[T](httpClient:  Client[IO],
-                                 request:     Request[IO],
+                                 request:     HttpRequest,
                                  mapResponse: ResponseMapping[T],
                                  attempt:     Int): PartialFunction[Throwable, IO[T]] = {
     case error: RestClientError =>
@@ -128,16 +145,29 @@ abstract class IORestClient[ThrottlingTarget](
     case NonFatal(cause) =>
       cause match {
         case exception: ConnectException if attempt <= maxRetries.value =>
-          logger.warn(ExceptionMessage(request, s"timed out -> retrying attempt $attempt", exception))
+          logger.warn(LogMessage(request.request, s"timed out -> retrying attempt $attempt", exception))
           timer.sleep(retryInterval) *> callRemote(httpClient, request, mapResponse, attempt + 1)
         case other =>
-          throttler.release *> IO.raiseError(new Exception(ExceptionMessage(request, other), other))
+          throttler.release *> IO.raiseError(new Exception(LogMessage(request.request, other), other))
       }
   }
 
   private type ResponseMapping[ResultType] = PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
 
-  protected object ExceptionMessage {
+  private implicit class HttpRequestOps(request: HttpRequest) {
+    lazy val toHistogramLabel: Option[String Refined NonEmpty] = request match {
+      case UnnamedRequest(_)     => None
+      case NamedRequest(_, name) => Some(name)
+    }
+  }
+
+  protected object LogMessage {
+
+    def apply(request: HttpRequest, message: String): String =
+      request match {
+        case UnnamedRequest(request) => s"${request.method} ${request.uri} $message"
+        case NamedRequest(_, name)   => s"$name $message"
+      }
 
     def apply(request: Request[IO], message: String, cause: Throwable): String =
       s"${request.method} ${request.uri} $message error: ${toSingleLine(cause)}"
@@ -167,6 +197,5 @@ object IORestClient {
   val SleepAfterConnectionIssue:        FiniteDuration          = 10 seconds
   val MaxRetriesAfterConnectionTimeout: Int Refined NonNegative = 10
 
-  def validateUri(uri: String): IO[Uri] =
-    IO.fromEither(Uri.fromString(uri))
+  def validateUri(uri: String): IO[Uri] = IO.fromEither(Uri.fromString(uri))
 }

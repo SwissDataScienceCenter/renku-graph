@@ -23,16 +23,21 @@ import ch.datascience.config.ServiceUrl
 import ch.datascience.control.Throttler
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
+import ch.datascience.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
+import io.prometheus.client.Histogram
 import org.http4s.Method.GET
 import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -52,6 +57,78 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
       verifyThrottling()
 
       client.callRemote.unsafeRunSync() shouldBe 1
+
+      logger.loggedOnly(Warn(s"GET $hostUrl/resource finished${executionTimeRecorder.executionTimeInfo}"))
+    }
+
+    "succeed returning value calculated with the given response mapping rules " +
+      "and do not measure execution time if Time Recorder not given" in new TestCase {
+
+      stubFor {
+        get("/resource")
+          .willReturn(ok("1"))
+      }
+
+      verifyThrottling()
+
+      override val client = new TestRestClient(hostUrl, throttler, logger, maybeTimeRecorder = None)
+
+      client.callRemote.unsafeRunSync() shouldBe 1
+
+      logger.expectNoLogs()
+    }
+
+    "succeed returning value calculated with the given response mapping rules and " +
+      "log execution time along with the given request name if Time Recorder present" in new TestCase {
+
+      stubFor {
+        get("/resource")
+          .willReturn(ok("1"))
+      }
+
+      verifyThrottling()
+
+      val requestName: String Refined NonEmpty = "some request"
+      client.callRemote(requestName).unsafeRunSync() shouldBe 1
+
+      logger.loggedOnly(Warn(s"$requestName finished${executionTimeRecorder.executionTimeInfo}"))
+    }
+
+    "cause the given histogram to capture execution time - case with some given label" in new TestCase {
+
+      stubFor {
+        get("/resource")
+          .willReturn(ok("1"))
+      }
+
+      verifyThrottling()
+
+      val requestName: String Refined NonEmpty = "some request"
+      client.callRemote(requestName).unsafeRunSync() shouldBe 1
+
+      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
+      sample.value               should be >= 0d
+      sample.labelNames.asScala  should contain only histogramLabel.value
+      sample.labelValues.asScala should contain only requestName.value
+    }
+
+    "cause the given histogram to capture execution time - case without label" in new TestCase {
+
+      stubFor {
+        get("/resource")
+          .willReturn(ok("1"))
+      }
+
+      verifyThrottling()
+
+      override val histogram = Histogram.build("histogram", "help").create()
+
+      client.callRemote.unsafeRunSync() shouldBe 1
+
+      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
+      sample.value               should be >= 0d
+      sample.labelNames.asScala  shouldBe empty
+      sample.labelValues.asScala shouldBe empty
     }
 
     "fail if remote responds with status which does not match the response mapping rules" in new TestCase {
@@ -104,7 +181,7 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
       val logger = TestLogger[IO]()
 
       intercept[Exception] {
-        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, logger).callRemote
+        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, logger, None).callRemote
           .unsafeRunSync()
       }.getMessage shouldBe s"GET http://localhost:1024/resource error: Connection refused"
 
@@ -116,9 +193,12 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
   }
 
   private trait TestCase {
-    val throttler = mock[Throttler[IO, Any]]
-    val logger    = TestLogger[IO]()
-    val client    = new TestRestClient(hostUrl, throttler, logger)
+    val histogramLabel: String Refined NonEmpty = "label"
+    val histogram             = Histogram.build("histogram", "help").labelNames(histogramLabel.value).create()
+    val throttler             = mock[Throttler[IO, Any]]
+    val logger                = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger, Some(histogram))
+    val client                = new TestRestClient(hostUrl, throttler, logger, Some(executionTimeRecorder))
 
     def verifyThrottling() = inSequence {
       (throttler.acquire _).expects().returning(IO.unit)
@@ -130,13 +210,22 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
   private implicit val timer: Timer[IO]        = IO.timer(global)
   private val hostUrl = ServiceUrl(externalServiceBaseUrl)
 
-  private class TestRestClient(hostUrl: ServiceUrl, throttler: Throttler[IO, Any], logger: Logger[IO])
-      extends IORestClient(throttler, logger, retryInterval = 1 millisecond, maxRetries = 2) {
+  private class TestRestClient(hostUrl:           ServiceUrl,
+                               throttler:         Throttler[IO, Any],
+                               logger:            Logger[IO],
+                               maybeTimeRecorder: Option[ExecutionTimeRecorder[IO]])
+      extends IORestClient(throttler, logger, maybeTimeRecorder, retryInterval = 1 millisecond, maxRetries = 2) {
 
     def callRemote: IO[Int] =
       for {
         uri         <- validateUri(s"$hostUrl/resource")
         accessToken <- send(request(GET, uri))(mapResponse)
+      } yield accessToken
+
+    def callRemote(requestName: String Refined NonEmpty): IO[Int] =
+      for {
+        uri         <- validateUri(s"$hostUrl/resource")
+        accessToken <- send(HttpRequest(request(GET, uri), requestName))(mapResponse)
       } yield accessToken
 
     private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Int]] = {

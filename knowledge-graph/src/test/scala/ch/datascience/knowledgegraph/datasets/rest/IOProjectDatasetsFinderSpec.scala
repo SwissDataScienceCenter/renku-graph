@@ -23,7 +23,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.rdfstore.InMemoryRdfStore
+import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
@@ -66,7 +67,8 @@ class IOProjectDatasetsFinderSpec
   }
 
   private trait InMemoryStoreTestCase {
-    private val logger = TestLogger[IO]()
-    val datasetsFinder = new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, logger)
+    private val logger       = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    val datasetsFinder       = new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
   }
 }

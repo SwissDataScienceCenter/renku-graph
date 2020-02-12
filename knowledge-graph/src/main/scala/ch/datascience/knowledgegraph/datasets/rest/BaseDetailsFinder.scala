@@ -23,7 +23,8 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.knowledgegraph.datasets.model.Dataset
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.rdfstore._
+import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.HCursor
 
@@ -33,35 +34,38 @@ import scala.language.higherKinds
 private class BaseDetailsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO]
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext,
   contextShift:              ContextShift[IO],
   timer:                     Timer[IO],
   ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient(rdfStoreConfig, logger) {
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
 
   def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
     queryExpecting[List[Dataset]](using = query(identifier)) flatMap toSingleDataset
 
-  private def query(identifier: Identifier): String =
-    s"""
-       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       |PREFIX schema: <http://schema.org/>
-       |
-       |SELECT DISTINCT ?identifier ?name ?url ?sameAs ?description ?publishedDate
-       |WHERE {
-       |  ?dataset schema:identifier "$identifier" ;
-       |           schema:identifier ?identifier ;
-       |           rdf:type <http://schema.org/Dataset> ;
-       |           schema:name ?name .
-       |  OPTIONAL { ?dataset schema:url ?url } .         
-       |  OPTIONAL { ?dataset schema:sameAs/schema:url ?sameAs } .         
-       |  OPTIONAL { ?dataset schema:description ?description } .
-       |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .
-       |}""".stripMargin
+  private def query(identifier: Identifier) = SparqlQuery(
+    name = "base dataset details",
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+      "PREFIX schema: <http://schema.org/>"
+    ),
+    s"""|SELECT DISTINCT ?identifier ?name ?url ?sameAs ?description ?publishedDate
+        |WHERE {
+        |  ?dataset schema:identifier "$identifier" ;
+        |           schema:identifier ?identifier ;
+        |           rdf:type <http://schema.org/Dataset> ;
+        |           schema:name ?name .
+        |  OPTIONAL { ?dataset schema:url ?url } .
+        |  OPTIONAL { ?dataset schema:sameAs/schema:url ?sameAs } .
+        |  OPTIONAL { ?dataset schema:description ?description } .
+        |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .
+        |}""".stripMargin
+  )
 
   private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
     case Nil            => ME.pure(None)

@@ -25,11 +25,15 @@ import ch.datascience.config.ConfigLoader.find
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.higherKinds
+import scala.util.Try
 
 class ExecutionTimeRecorder[Interpretation[_]](
     threshold:      ElapsedTime,
@@ -38,16 +42,30 @@ class ExecutionTimeRecorder[Interpretation[_]](
 )(implicit clock:   Clock[Interpretation], ME: MonadError[Interpretation, Throwable]) {
 
   // format: off
-  def measureExecutionTime[BlockOut](block: => Interpretation[BlockOut]): Interpretation[(ElapsedTime, BlockOut)] =
+  def measureExecutionTime[BlockOut](block: => Interpretation[BlockOut], 
+                                     maybeHistogramLabel: Option[String Refined NonEmpty] = None): Interpretation[(ElapsedTime, BlockOut)] =
     for {
       startTime           <- clock monotonic MILLISECONDS
-      maybeHistogramTimer = maybeHistogram map (_.startTimer())
+      maybeHistogramTimer = startTimer(maybeHistogramLabel)
       result              <- block
       _                   = maybeHistogramTimer map (_.observeDuration())
       endTime             <- clock monotonic MILLISECONDS
       elapsedTime         <- ME.fromEither(ElapsedTime.from(endTime - startTime))
     } yield (elapsedTime, result)
   // format: on
+
+  private def startTimer(maybeHistogramLabel: Option[String Refined NonEmpty]) =
+    maybeHistogram flatMap { histogram =>
+      Try {
+        maybeHistogramLabel
+          .map(label => histogram.labels(label.value).startTimer())
+          .getOrElse(histogram.startTimer())
+      }.toOption.orElse {
+        val histogramName = histogram.describe().asScala.headOption.map(_.name).getOrElse("Execution Time Recorder")
+        logger.error(s"$histogramName histogram labels not configured correctly")
+        None
+      }
+    }
 
   def logExecutionTimeWhen[BlockOut](
       condition: PartialFunction[BlockOut, String]

@@ -72,19 +72,21 @@ class IOProjectFinder(
 
 private object IOProjectFinder {
   import cats.effect.{ContextShift, IO, Timer}
+  import ch.datascience.rdfstore.SparqlQueryTimeRecorder
   import com.typesafe.config.{Config, ConfigFactory}
   import io.chrisdavenport.log4cats.Logger
 
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],
       logger:          Logger[IO],
+      timeRecorder:    SparqlQueryTimeRecorder[IO],
       config:          Config = ConfigFactory.load()
   )(implicit ME:       MonadError[IO, Throwable],
     executionContext:  ExecutionContext,
     contextShift:      ContextShift[IO],
     timer:             Timer[IO]): IO[ProjectFinder[IO]] =
     for {
-      kgProjectFinder     <- IOKGProjectFinder(logger = logger)
+      kgProjectFinder     <- IOKGProjectFinder(timeRecorder, logger = logger)
       gitLabProjectFinder <- IOGitLabProjectFinder(gitLabThrottler, logger)
       accessTokenFinder   <- IOAccessTokenFinder(logger)
     } yield new IOProjectFinder(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)

@@ -18,11 +18,12 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import org.scalacheck.Gen
 import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
 import ch.datascience.generators.Generators._
+import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
 import eu.timepit.refined.auto._
+import org.scalacheck.Gen
 
 object CurationGenerators {
 
@@ -36,6 +37,6 @@ object CurationGenerators {
 
   implicit lazy val curationUpdates: Gen[Update] = for {
     name    <- nonBlankStrings(minLength = 5)
-    message <- sentences()
+    message <- sentences() map (v => SparqlQuery("curation update", Set.empty, v.value))
   } yield Update(name, message)
 }

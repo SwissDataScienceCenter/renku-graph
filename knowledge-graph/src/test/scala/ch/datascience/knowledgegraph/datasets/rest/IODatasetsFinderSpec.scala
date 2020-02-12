@@ -39,7 +39,8 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearch
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
-import ch.datascience.rdfstore.InMemoryRdfStore
+import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import eu.timepit.refined.api.Refined
@@ -772,11 +773,13 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
   }
 
   private trait TestCase {
-    private val logger = TestLogger[IO]()
+    private val logger       = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val datasetsFinder = new IODatasetsFinder(
       rdfStoreConfig,
-      new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger),
-      logger
+      new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+      logger,
+      timeRecorder
     )
   }
 

@@ -21,8 +21,8 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -48,8 +48,9 @@ class IOTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
   }
 
   private trait TestCase {
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val triplesRemover        = new IOTriplesRemover(rdfStoreConfig, executionTimeRecorder, logger)
+    val logger                        = TestLogger[IO]()
+    private val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    private val sparqlTimeRecorder    = new SparqlQueryTimeRecorder(executionTimeRecorder)
+    val triplesRemover                = new IOTriplesRemover(rdfStoreConfig, logger, sparqlTimeRecorder)
   }
 }

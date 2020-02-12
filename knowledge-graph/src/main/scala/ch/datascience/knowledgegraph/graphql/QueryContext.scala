@@ -20,6 +20,7 @@ package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.knowledgegraph.lineage.{IOLineageFinder, LineageFinder}
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -29,10 +30,12 @@ class QueryContext[Interpretation[_]](
 )
 
 object IOQueryContext {
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[QueryContext[IO]] =
+  def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[QueryContext[IO]] =
     for {
-      lineageFinder <- IOLineageFinder()
+      lineageFinder <- IOLineageFinder(timeRecorder)
     } yield new QueryContext[IO](lineageFinder)
 }

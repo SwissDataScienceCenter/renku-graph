@@ -28,9 +28,9 @@ import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.entities.bundles.exemplarLineageFlow.NodeDef
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -75,11 +75,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
         )
       )
 
-      logger.loggedOnly(
-        Warn(
-          s"Searched for lineage for $projectPath commit: $commitId filePath: $filePath${executionTimeRecorder.executionTimeInfo}"
-        )
-      )
+      logger.loggedOnly(Warn(s"lineage finding finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "return None if there's no lineage for the project" in new InMemoryStoreTestCase {
@@ -91,11 +87,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
         .findLineage(projectPath, commitId, filePath)
         .unsafeRunSync() shouldBe None
 
-      logger.loggedOnly(
-        Warn(
-          s"Searched for lineage for $projectPath commit: $commitId filePath: $filePath${executionTimeRecorder.executionTimeInfo}"
-        )
-      )
+      logger.loggedOnly(Warn(s"lineage finding finished${executionTimeRecorder.executionTimeInfo}"))
     }
   }
 
@@ -119,8 +111,8 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
     val lineageFinder = new IOLineageFinder(
       rdfStoreConfig,
       renkuBaseUrl,
-      executionTimeRecorder,
-      logger
+      logger,
+      new SparqlQueryTimeRecorder(executionTimeRecorder)
     )
   }
 }

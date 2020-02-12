@@ -29,7 +29,7 @@ import Links._
 import ch.datascience.config.renku
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.RdfStoreConfig
+import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Encoder
 import io.circe.literal._
@@ -86,16 +86,18 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
 
 object IOProjectDatasetsEndpoint {
 
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): IO[ProjectDatasetsEndpoint[IO]] =
+  def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[ProjectDatasetsEndpoint[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ProjectDatasetsEndpoint[IO](
-      new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger),
+      new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder),
       renkuResourceUrl,
       executionTimeRecorder,
       ApplicationLogger

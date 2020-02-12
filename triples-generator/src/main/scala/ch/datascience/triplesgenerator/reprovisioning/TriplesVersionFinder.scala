@@ -20,8 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -33,36 +32,37 @@ private trait TriplesVersionFinder[Interpretation[_]] {
 
 private class IOTriplesVersionFinder(
     rdfStoreConfig:          RdfStoreConfig,
-    executionTimeRecorder:   ExecutionTimeRecorder[IO],
     schemaVersion:           SchemaVersion,
-    logger:                  Logger[IO]
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger)
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with TriplesVersionFinder[IO] {
 
-  import executionTimeRecorder._
+  import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.circe.Decoder._
 
-  override def triplesUpToDate: IO[Boolean] =
-    measureExecutionTime {
-      findCommitAgents map {
-        case Nil      => false
-        case versions => versions forall (_.endsWith(schemaVersion.toString))
-      }
-    } map logExecutionTime(withMessage = "Checking if triples are up to date done")
+  override def triplesUpToDate: IO[Boolean] = findCommitAgents map {
+    case Nil      => false
+    case versions => versions forall (_.endsWith(schemaVersion.toString))
+  }
 
   private def findCommitAgents = queryExpecting[List[String]] {
-    s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        |PREFIX prov: <http://www.w3.org/ns/prov#>
-        |
-        |SELECT DISTINCT ?agent
-        |WHERE {
-        |  ?commit rdf:type prov:Activity ;
-        |          prov:agent ?agent .
-        |  ?agent rdf:type prov:SoftwareAgent .
-        |}
-        |""".stripMargin
+    SparqlQuery(
+      name = "renku version finding",
+      Set(
+        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+        "PREFIX prov: <http://www.w3.org/ns/prov#>"
+      ),
+      s"""|SELECT DISTINCT ?agent
+          |WHERE {
+          |  ?commit rdf:type prov:Activity ;
+          |          prov:agent ?agent .
+          |  ?agent rdf:type prov:SoftwareAgent .
+          |}
+          |""".stripMargin
+    )
   }
 
   private implicit lazy val agentsDecoder: Decoder[List[String]] =

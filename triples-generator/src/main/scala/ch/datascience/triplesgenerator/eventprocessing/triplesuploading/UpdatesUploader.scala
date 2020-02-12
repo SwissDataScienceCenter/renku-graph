@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig}
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -38,16 +38,17 @@ private trait UpdatesUploader[Interpretation[_]] {
 private class IOUpdatesUploader(
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO],
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
 )(implicit executionContext: ExecutionContext,
   contextShift:              ContextShift[IO],
   timer:                     Timer[IO],
   ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient(rdfStoreConfig, logger, retryInterval, maxRetries)
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder, retryInterval, maxRetries)
     with UpdatesUploader[IO] {
 
-  import ExceptionMessage._
+  import LogMessage._
   import TriplesUploadResult._
   import cats.implicits._
   import org.http4s.Status.{BadRequest, Ok}

@@ -16,13 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package ch.datascience.http.client
 
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import cats.effect.IO
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
+import org.http4s.Request
 
-final case class CuratedTriples(triples: JsonLDTriples, updates: List[Update])
+sealed trait HttpRequest {
+  def request: Request[IO]
+}
 
-object CuratedTriples {
-  final case class Update(name: String, query: SparqlQuery)
+object HttpRequest {
+
+  def apply(request: Request[IO]): UnnamedRequest = UnnamedRequest(request)
+  def apply(request: Request[IO], name: String Refined NonEmpty): NamedRequest = NamedRequest(request, name)
+
+  final case class UnnamedRequest(request: Request[IO]) extends HttpRequest
+  final case class NamedRequest(request:   Request[IO], name: String Refined NonEmpty) extends HttpRequest
 }

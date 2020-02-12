@@ -62,17 +62,29 @@ class EventLogMetrics(
     } yield ()
   } recoverWith logAndRetry(continueWith = updateStatuses())
 
-  private def updateWaitingEvents(): IO[Unit] = {
-    for {
-      waitingEvents <- eventLogStats.waitingEvents
-      _ = waitingEvents foreach toWaitingEventsGauge
-      _ <- (timer sleep waitingEventsInterval) *> updateWaitingEvents()
-    } yield ()
-  } recoverWith logAndRetry(continueWith = updateWaitingEvents())
-
   private lazy val toStatusesGauge: ((EventStatus, Long)) => Unit = {
     case (status, count) => statusesGauge.labels(status.toString).set(count)
   }
+
+  private def updateWaitingEvents(previousState: Map[ProjectPath, Long] = Map.empty): IO[Unit] = {
+    for {
+      waitingEvents <- eventLogStats.waitingEvents
+      newState = removeZeroCountProjects(waitingEvents, previousState)
+      _        = newState foreach toWaitingEventsGauge
+      _ <- (timer sleep waitingEventsInterval) *> updateWaitingEvents(newState)
+    } yield ()
+  } recoverWith logAndRetry(continueWith = updateWaitingEvents())
+
+  private def removeZeroCountProjects(currentEvents: Map[ProjectPath, Long],
+                                      previousState: Map[ProjectPath, Long]): Map[ProjectPath, Long] =
+    if (previousState.isEmpty) currentEvents
+    else {
+      val currentZeros  = currentEvents.filter(_._2 == 0).keySet
+      val previousZeros = previousState.filter(_._2 == 0).keySet
+      val zerosToDelete = currentZeros intersect previousZeros
+      zerosToDelete foreach (project => waitingEventsGauge remove project.toString)
+      currentEvents.filterNot { case (project, _) => zerosToDelete contains project }
+    }
 
   private lazy val toWaitingEventsGauge: ((ProjectPath, Long)) => Unit = {
     case (path, count) => waitingEventsGauge.labels(path.toString).set(count)
@@ -91,7 +103,7 @@ object EventLogMetrics {
 
   private val interval:              FiniteDuration = 10 seconds
   private val statusesInterval:      FiniteDuration = 5 seconds
-  private val waitingEventsInterval: FiniteDuration = 2 seconds
+  private val waitingEventsInterval: FiniteDuration = 5 seconds
 
   private[metrics] val waitingEventsGaugeBuilder: Gauge.Builder =
     Gauge

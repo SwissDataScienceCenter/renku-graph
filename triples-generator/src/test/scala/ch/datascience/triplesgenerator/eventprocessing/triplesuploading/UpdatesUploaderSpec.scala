@@ -23,7 +23,8 @@ import ch.datascience.generators.CommonGraphGenerators.rdfStoreConfigs
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
@@ -102,13 +103,15 @@ class UpdatesUploaderSpec extends WordSpec with ExternalServiceStubbing {
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val logger = TestLogger[IO]()
+    val logger               = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
       fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     )
     lazy val updater = new IOUpdatesUploader(
       rdfStoreConfig,
       logger,
+      timeRecorder,
       retryInterval = 100 millis,
       maxRetries    = 1
     )

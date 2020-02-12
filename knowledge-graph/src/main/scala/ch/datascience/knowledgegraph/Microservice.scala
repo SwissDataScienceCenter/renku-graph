@@ -30,6 +30,7 @@ import ch.datascience.knowledgegraph.graphql.IOQueryEndpoint
 import ch.datascience.knowledgegraph.projects.rest.IOProjectEndpoint
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import pureconfig.loadConfigOrThrow
 
 import scala.concurrent.ExecutionContext
@@ -51,12 +52,13 @@ object Microservice extends IOMicroservice {
       sentryInitializer       <- SentryInitializer[IO]
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
-      projectEndpoint         <- IOProjectEndpoint(gitLabThrottler)
-      queryEndpoint           <- IOQueryEndpoint()
-      projectDatasetsEndpoint <- IOProjectDatasetsEndpoint()
-      datasetEndpoint         <- IODatasetEndpoint()
-      datasetsSearchEndpoint  <- IODatasetsSearchEndpoint()
       metricsRegistry         <- MetricsRegistry()
+      sparqlTimeRecorder      <- SparqlQueryTimeRecorder(metricsRegistry)
+      projectEndpoint         <- IOProjectEndpoint(gitLabThrottler, sparqlTimeRecorder)
+      projectDatasetsEndpoint <- IOProjectDatasetsEndpoint(sparqlTimeRecorder)
+      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder)
+      datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
+      datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
       routes <- new MicroserviceRoutes[IO](
                  queryEndpoint,
                  projectEndpoint,

@@ -31,6 +31,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.metrics.MetricsRegistry
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
@@ -220,12 +221,13 @@ object IOCommitEventProcessor {
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       triplesGenerator:    TriplesGenerator[IO],
-      metricsRegistry:     MetricsRegistry[IO]
+      metricsRegistry:     MetricsRegistry[IO],
+      timeRecorder:        SparqlQueryTimeRecorder[IO]
   )(implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      uploader              <- IOUploader(ApplicationLogger)
+      uploader              <- IOUploader(ApplicationLogger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(ApplicationLogger)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
