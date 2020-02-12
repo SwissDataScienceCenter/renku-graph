@@ -115,10 +115,13 @@ object bundles extends Schemas {
     final case class ExamplarData(
         commitId: CommitId,
         filePath: FilePath,
+        `sha3 zhbikes`: NodeDef             = NodeDef(name = "/blob/000003/data/zhbikes",                       label = "data/zhbikes@000003"),
         `sha7 plot_data`: NodeDef           = NodeDef(name = "/blob/000007/src/plot_data.py",                   label = "src/plot_data.py@000007"),
         `sha7 clean_data`: NodeDef          = NodeDef(name = "/blob/000007/src/clean_data.py",                  label = "src/clean_data.py@000007"),
         `sha8 renku run`: NodeDef           = NodeDef(name = "/commit/000008",                                  label = "renku run python"),
+        `sha8 parquet`: NodeDef             = NodeDef(name = "/blob/000008/data/preprocessed/zhbikes.parquet",  label = "data/preprocessed/zhbikes.parquet@000008"),
         `sha9 renku run`: NodeDef           = NodeDef(name = "/commit/000009",                                  label = "renku run python"),
+        `sha9 plot_data`: NodeDef           = NodeDef(name = "/blob/000009/figs/grid_plot.png",                 label = "figs/grid_plot.png@000009"),
         `sha10 zhbikes`: NodeDef            = NodeDef(name = "/blob/0000010/data/zhbikes",                      label = "data/zhbikes@0000010"),
         `sha12 step1 renku update`: NodeDef = NodeDef(name = "/commit/0000012/steps/step_1",                    label = "renku update"),
         `sha12 step2 renku update`: NodeDef = NodeDef(name = "/commit/0000012/steps/step_2",                    label = "renku update"),

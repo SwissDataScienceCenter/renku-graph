@@ -65,10 +65,7 @@ class IOLineageFinder(
       (nodes, edge) => nodes + edge.source + edge.target
     )
 
-  private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath) = {
-    val projectResource    = ProjectResource(renkuBaseUrl, path).showAs[RdfResource]
-    val commitResource     = (fusekiBaseUrl / "commit" / commitId).showAs[RdfResource]
-    val generationResource = (fusekiBaseUrl / "blob" / commitId / filePath).showAs[RdfResource]
+  private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath) =
     SparqlQuery(
       name = "lineage finding",
       Set(
@@ -84,18 +81,28 @@ class IOLineageFinder(
       s"""|SELECT ?target ?source ?target_label ?source_label
           |WHERE {
           |  {
+          |    SELECT (MIN(?startedAt) AS ?minStartedAt)
+          |    WHERE {
+          |      ?qentity schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]};
+          |               prov:atLocation "$filePath".
+          |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?activityId.
+          |      ?activityId rdf:type <http://www.w3.org/ns/prov#Activity>;
+          |                  prov:startedAtTime ?startedAt.
+          |    }
+          |  } {
           |    SELECT ?entity
           |    WHERE {
-          |      ?qentity schema:isPartOf $projectResource .
-          |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) $commitResource .
-          |      FILTER (?qentity = $generationResource)
+          |      ?qentity schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]};
+          |               prov:atLocation "$filePath".
+          |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?activityId.
+          |      ?activityId rdf:type <http://www.w3.org/ns/prov#Activity>;
+          |                  prov:startedAtTime ?minStartedAt.
           |      ?qentity (
           |        ^(prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)* | (prov:qualifiedGeneration/prov:activity/prov:qualifiedUsage/prov:entity)*
           |      ) ?entity .
           |    }
           |    GROUP BY ?entity
-          |  }
-          |  {
+          |  } {
           |    ?entity prov:qualifiedGeneration/prov:activity ?activity ;
           |            rdfs:label ?target_label .
           |    ?activity rdfs:comment ?source_label .
@@ -115,7 +122,6 @@ class IOLineageFinder(
           |}
           |""".stripMargin
     )
-  }
 
   import io.circe.{Decoder, DecodingFailure, HCursor}
 

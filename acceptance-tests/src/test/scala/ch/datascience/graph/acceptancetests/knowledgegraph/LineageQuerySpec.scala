@@ -126,28 +126,35 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private lazy val theExpectedEdges = Right {
     Set(
-      json"""{"source": ${`sha10 zhbikes`.toNodeId},            "target": ${`sha12 step2 renku update`.toNodeId}}""",
+      json"""{"source": ${`sha3 zhbikes`.toNodeId},             "target": ${`sha8 renku run`.toNodeId}}""",
       json"""{"source": ${`sha7 plot_data`.toNodeId},           "target": ${`sha9 renku run`.toNodeId}}""",
       json"""{"source": ${`sha7 plot_data`.toNodeId},           "target": ${`sha12 step1 renku update`.toNodeId}}""",
+      json"""{"source": ${`sha7 clean_data`.toNodeId},          "target": ${`sha8 renku run`.toNodeId}}""",
+      json"""{"source": ${`sha7 clean_data`.toNodeId},          "target": ${`sha12 step2 renku update`.toNodeId}}""",
+      json"""{"source": ${`sha8 renku run`.toNodeId},           "target": ${`sha8 parquet`.toNodeId}}""",
+      json"""{"source": ${`sha8 parquet`.toNodeId},             "target": ${`sha9 renku run`.toNodeId}}""",
+      json"""{"source": ${`sha9 renku run`.toNodeId},           "target": ${`sha9 plot_data`.toNodeId}}""",
+      json"""{"source": ${`sha10 zhbikes`.toNodeId},            "target": ${`sha12 step2 renku update`.toNodeId}}""",
       json"""{"source": ${`sha12 parquet`.toNodeId},            "target": ${`sha12 step1 renku update`.toNodeId}}""",
       json"""{"source": ${`sha12 step1 renku update`.toNodeId}, "target": ${`sha12 step2 grid_plot`.toNodeId}}""",
-      json"""{"source": ${`sha7 clean_data`.toNodeId},          "target": ${`sha8 renku run`.toNodeId}}""",
-      json"""{"source": ${`sha12 step2 renku update`.toNodeId}, "target": ${`sha12 parquet`.toNodeId}}""",
-      json"""{"source": ${`sha7 clean_data`.toNodeId},          "target": ${`sha12 step2 renku update`.toNodeId}}"""
+      json"""{"source": ${`sha12 step2 renku update`.toNodeId}, "target": ${`sha12 parquet`.toNodeId}}"""
     )
   }
 
   private lazy val theExpectedNodes = Right {
     Set(
-      json"""{"id": ${`sha7 clean_data`.toNodeId},        "label": ${`sha7 clean_data`.label}}""",
-      json"""{"id": ${`sha7 plot_data`.toNodeId},      "label": ${`sha7 plot_data`.label}}""",
-      json"""{"id": ${`sha8 renku run`.toNodeId},      "label": ${`sha8 renku run`.label}}""",
-      json"""{"id": ${`sha9 renku run`.toNodeId},         "label": ${`sha9 renku run`.label}}""",
-      json"""{"id": ${`sha10 zhbikes`.toNodeId}, "label": ${`sha10 zhbikes`.label}}""",
-      json"""{"id": ${`sha12 step1 renku update`.toNodeId},         "label": ${`sha12 step1 renku update`.label}}""",
-      json"""{"id": ${`sha12 step2 grid_plot`.toNodeId},      "label": ${`sha12 step2 grid_plot`.label}}""",
-      json"""{"id": ${`sha12 step2 renku update`.toNodeId},      "label": ${`sha12 step2 renku update`.label}}""",
-      json"""{"id": ${`sha12 parquet`.toNodeId},      "label": ${`sha12 parquet`.label}}"""
+      json"""{"id": ${`sha3 zhbikes`.toNodeId},             "label": ${`sha3 zhbikes`.label}}""",
+      json"""{"id": ${`sha7 clean_data`.toNodeId},          "label": ${`sha7 clean_data`.label}}""",
+      json"""{"id": ${`sha7 plot_data`.toNodeId},           "label": ${`sha7 plot_data`.label}}""",
+      json"""{"id": ${`sha8 renku run`.toNodeId},           "label": ${`sha8 renku run`.label}}""",
+      json"""{"id": ${`sha8 parquet`.toNodeId},             "label": ${`sha8 parquet`.label}}""",
+      json"""{"id": ${`sha9 renku run`.toNodeId},           "label": ${`sha9 renku run`.label}}""",
+      json"""{"id": ${`sha9 plot_data`.toNodeId},           "label": ${`sha9 plot_data`.label}}""",
+      json"""{"id": ${`sha10 zhbikes`.toNodeId},            "label": ${`sha10 zhbikes`.label}}""",
+      json"""{"id": ${`sha12 step1 renku update`.toNodeId}, "label": ${`sha12 step1 renku update`.label}}""",
+      json"""{"id": ${`sha12 step2 grid_plot`.toNodeId},    "label": ${`sha12 step2 grid_plot`.label}}""",
+      json"""{"id": ${`sha12 step2 renku update`.toNodeId}, "label": ${`sha12 step2 renku update`.label}}""",
+      json"""{"id": ${`sha12 parquet`.toNodeId},            "label": ${`sha12 parquet`.label}}"""
     )
   }
 

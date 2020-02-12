@@ -52,20 +52,27 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
         .unsafeRunSync() shouldBe Some(
         Lineage(
           edges = Set(
-            Edge(sourceNode(`sha10 zhbikes`), targetNode(`sha12 step2 renku update`)),
+            Edge(sourceNode(`sha3 zhbikes`), targetNode(`sha8 renku run`)),
             Edge(sourceNode(`sha7 plot_data`), targetNode(`sha9 renku run`)),
             Edge(sourceNode(`sha7 plot_data`), targetNode(`sha12 step1 renku update`)),
+            Edge(sourceNode(`sha7 clean_data`), targetNode(`sha8 renku run`)),
+            Edge(sourceNode(`sha7 clean_data`), targetNode(`sha12 step2 renku update`)),
+            Edge(sourceNode(`sha8 renku run`), targetNode(`sha8 parquet`)),
+            Edge(sourceNode(`sha8 parquet`), targetNode(`sha9 renku run`)),
+            Edge(sourceNode(`sha9 renku run`), targetNode(`sha9 plot_data`)),
+            Edge(sourceNode(`sha10 zhbikes`), targetNode(`sha12 step2 renku update`)),
             Edge(sourceNode(`sha12 parquet`), targetNode(`sha12 step1 renku update`)),
             Edge(sourceNode(`sha12 step1 renku update`), targetNode(`sha12 step2 grid_plot`)),
-            Edge(sourceNode(`sha7 clean_data`), targetNode(`sha8 renku run`)),
-            Edge(sourceNode(`sha12 step2 renku update`), targetNode(`sha12 parquet`)),
-            Edge(sourceNode(`sha7 clean_data`), targetNode(`sha12 step2 renku update`))
+            Edge(sourceNode(`sha12 step2 renku update`), targetNode(`sha12 parquet`))
           ),
           nodes = Set(
+            node(`sha3 zhbikes`),
             node(`sha7 clean_data`),
             node(`sha7 plot_data`),
             node(`sha8 renku run`),
+            node(`sha8 parquet`),
             node(`sha9 renku run`),
+            node(`sha9 plot_data`),
             node(`sha10 zhbikes`),
             node(`sha12 step1 renku update`),
             node(`sha12 step2 grid_plot`),
