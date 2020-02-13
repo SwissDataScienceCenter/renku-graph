@@ -135,7 +135,7 @@ private object PersonDetailsUpdater {
       Update(
         s"Deleting Person $resource schema:name",
         SparqlQuery(
-          name = "deleting person name",
+          name = "upload - person name delete",
           Set("PREFIX schema: <http://schema.org/>"),
           s"""|DELETE { $resource schema:name ?name }
               |WHERE  { $resource schema:name ?name }
@@ -151,7 +151,7 @@ private object PersonDetailsUpdater {
           Update(
             s"Inserting Person $resource schema:name",
             SparqlQuery(
-              name = "inserting person name",
+              name = "upload - person name insert",
               Set("PREFIX schema: <http://schema.org/>"),
               s"""|${`INSERT DATA`(resource, "schema:name", NonEmptyList.fromListUnsafe(names.toList))}
                   |""".stripMargin
@@ -164,7 +164,7 @@ private object PersonDetailsUpdater {
       Update(
         s"Deleting Person $resource schema:email",
         SparqlQuery(
-          name = "deleting person email",
+          name = "upload - person email delete",
           Set("PREFIX schema: <http://schema.org/>"),
           s"""|DELETE { $resource schema:email ?email }
               |WHERE  { $resource schema:email ?email }
@@ -181,7 +181,7 @@ private object PersonDetailsUpdater {
           Update(
             s"Inserting Person $resource schema:email",
             SparqlQuery(
-              name = "inserting person email",
+              name = "upload - person email insert",
               Set("PREFIX schema: <http://schema.org/>"),
               s"""|${`INSERT DATA`(resource, "schema:email", NonEmptyList.fromListUnsafe(emails.toList))}
                   |""".stripMargin
@@ -194,7 +194,7 @@ private object PersonDetailsUpdater {
       Update(
         s"Deleting Person $resource rdfs:label",
         SparqlQuery(
-          name = "deleting person label",
+          name = "upload - person label delete",
           Set("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"),
           s"""|DELETE { $resource rdfs:label ?label }
               |WHERE  { $resource rdfs:label ?label }

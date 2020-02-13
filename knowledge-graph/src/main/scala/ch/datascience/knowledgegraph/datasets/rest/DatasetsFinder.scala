@@ -83,7 +83,7 @@ private class IODatasetsFinder(
   }
 
   private def sparqlQuery(maybePhrase: Option[Phrase], sort: Sort.By): SparqlQuery = SparqlQuery(
-    name = "free-text datasets search",
+    name = "ds free-text search",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
@@ -319,7 +319,7 @@ private class IODatasetsFinder(
   )
 
   private def countQuery(maybePhrase: Option[Phrase]): SparqlQuery = SparqlQuery(
-    name = "free-text datasets count",
+    name = "ds free-text search - count",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX schema: <http://schema.org/>",

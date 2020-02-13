@@ -49,7 +49,7 @@ private class ProjectsFinder(
     queryExpecting[List[DatasetProject]](using = query(identifier))
 
   private def query(identifier: Identifier) = SparqlQuery(
-    name = "projects sharing dataset",
+    name = "ds by id - projects",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",

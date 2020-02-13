@@ -65,7 +65,7 @@ private class IOKGProjectFinder(
   }
 
   private def query(path: ProjectPath) = SparqlQuery(
-    name = "project details",
+    name = "project by id",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",

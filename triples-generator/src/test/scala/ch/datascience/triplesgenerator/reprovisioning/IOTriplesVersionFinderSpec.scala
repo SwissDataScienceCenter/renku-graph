@@ -46,7 +46,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe true
 
-      logger.loggedOnly(Warn(s"renku version finding finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "return false if there's a single SoftwareAgent entity with some old version of Renku" in new TestCase {
@@ -55,7 +55,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
-      logger.loggedOnly(Warn(s"renku version finding finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "return false if there are multiple SoftwareAgent entities with different versions of Renku" in new TestCase {
@@ -65,7 +65,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
-      logger.loggedOnly(Warn(s"renku version finding finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "return false if SoftwareAgent points to the current versions of Renku but it's not linked to a commit activity" in new TestCase {
@@ -74,7 +74,7 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
-      logger.loggedOnly(Warn(s"renku version finding finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
   }
 
