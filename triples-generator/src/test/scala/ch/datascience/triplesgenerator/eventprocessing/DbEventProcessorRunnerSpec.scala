@@ -146,9 +146,14 @@ class DbEventProcessorRunnerSpec extends WordSpec with Eventually with Integrati
 
   private trait TestCase {
 
-    val eventLogFetch  = new TestEventLogFetch()
-    val logger         = TestLogger[IO]()
-    private val config = ConfigFactory.parseMap(Map("generation-processes-number" -> 5).asJava)
+    val eventLogFetch = new TestEventLogFetch()
+    val logger        = TestLogger[IO]()
+    private val config = ConfigFactory.parseMap(
+      Map(
+        "generation-process-initial-delay" -> "1 millisecond",
+        "generation-processes-number"      -> 5
+      ).asJava
+    )
 
     def eventSourceWith(processor:     EventProcessor[IO],
                         eventLogFetch: EventLogFetch[IO] = eventLogFetch): EventProcessorRunner[IO] = {
