@@ -31,6 +31,7 @@ import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -38,6 +39,7 @@ class DbEventProcessorRunner private (
     eventProcessor:      EventProcessor[IO],
     eventLogFetch:       EventLogFetch[IO],
     semaphore:           Semaphore[IO],
+    initialDelay:        FiniteDuration,
     logger:              Logger[IO]
 )(implicit contextShift: ContextShift[IO], executionContext: ExecutionContext, timer: Timer[IO])
     extends EventProcessorRunner[IO](eventProcessor) {
@@ -46,6 +48,7 @@ class DbEventProcessorRunner private (
   import eventLogFetch._
 
   lazy val run: IO[Unit] = for {
+    _ <- timer sleep initialDelay
     _ <- logger.info("Waiting for new events")
     _ <- checkProcessesNumber
   } yield ()
@@ -98,10 +101,11 @@ object DbEventProcessorRunner extends ConfigLoader[IO] {
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[DbEventProcessorRunner] =
     for {
+      initialDelay        <- find[FiniteDuration]("generation-process-initial-delay", config)
       generationProcesses <- find[Long Refined Positive]("generation-processes-number", config)
       semaphore           <- Semaphore(generationProcesses.value)
-    } yield new DbEventProcessorRunner(eventProcessor, eventLogFetch, semaphore, logger)
+    } yield new DbEventProcessorRunner(eventProcessor, eventLogFetch, semaphore, initialDelay, logger)
 
   private val noEventsSleep:     FiniteDuration = 2 seconds
-  private val maxProcessesSleep: FiniteDuration = 50 millis
+  private val maxProcessesSleep: FiniteDuration = 500 millis
 }

@@ -47,7 +47,7 @@ private class CreatorsFinder(
       .map(_.toSet)
 
   private def query(identifier: Identifier) = SparqlQuery(
-    name = "dataset creators",
+    name = "ds by id - creators",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",

@@ -67,7 +67,7 @@ class IOLineageFinder(
 
   private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath) =
     SparqlQuery(
-      name = "lineage finding",
+      name = "lineage",
       Set(
         "PREFIX prov: <http://www.w3.org/ns/prov#>",
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",

@@ -25,5 +25,6 @@ if [[ -n $TRAVIS_TAG ]]; then
   publishCharts
   git clean -dffx
   chartpress --tag $TRAVIS_TAG --push --publish-chart
+  sleep 2m
   updateVersionInRenku
 fi

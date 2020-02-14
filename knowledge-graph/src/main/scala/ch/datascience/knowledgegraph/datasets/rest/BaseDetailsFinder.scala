@@ -48,7 +48,7 @@ private class BaseDetailsFinder(
     queryExpecting[List[Dataset]](using = query(identifier)) flatMap toSingleDataset
 
   private def query(identifier: Identifier) = SparqlQuery(
-    name = "base dataset details",
+    name = "ds by id - base details",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",

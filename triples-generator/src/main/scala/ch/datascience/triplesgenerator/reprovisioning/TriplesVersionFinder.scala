@@ -50,7 +50,7 @@ private class IOTriplesVersionFinder(
 
   private def findCommitAgents = queryExpecting[List[String]] {
     SparqlQuery(
-      name = "renku version finding",
+      name = "renku version find",
       Set(
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
         "PREFIX prov: <http://www.w3.org/ns/prov#>"
