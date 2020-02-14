@@ -70,7 +70,7 @@ class IOLineageFinder(
     val commitResource     = (fusekiBaseUrl / "commit" / commitId).showAs[RdfResource]
     val generationResource = (fusekiBaseUrl / "blob" / commitId / filePath).showAs[RdfResource]
     SparqlQuery(
-      name = "lineage finding",
+      name = "lineage",
       Set(
         "PREFIX prov: <http://www.w3.org/ns/prov#>",
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",

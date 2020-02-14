@@ -75,7 +75,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
         )
       )
 
-      logger.loggedOnly(Warn(s"lineage finding finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"lineage finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "return None if there's no lineage for the project" in new InMemoryStoreTestCase {
@@ -87,7 +87,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
         .findLineage(projectPath, commitId, filePath)
         .unsafeRunSync() shouldBe None
 
-      logger.loggedOnly(Warn(s"lineage finding finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"lineage finished${executionTimeRecorder.executionTimeInfo}"))
     }
   }
 

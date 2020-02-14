@@ -49,7 +49,7 @@ private class ProjectsFinder(
     queryExpecting[List[DatasetProject]](using = query(identifier))
 
   private def query(identifier: Identifier) = SparqlQuery(
-    name = "projects sharing dataset",
+    name = "ds by id - projects",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
@@ -62,6 +62,39 @@ private class ProjectsFinder(
         |    SELECT ?l0 ?projectId (MIN(?dateCreated) AS ?minDateCreated)
         |    WHERE {
         |      {
+        |        SELECT ?topmostSameAs
+        |        WHERE {
+        |          {
+        |            ?l0 rdf:type <http://schema.org/Dataset>;
+        |                schema:identifier "$identifier"
+        |          } {
+        |            {
+        |              {
+        |                ?l0 schema:sameAs+/schema:url ?l1.
+        |                FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
+        |                BIND (?l1 AS ?topmostSameAs)
+        |              } UNION {
+        |                ?l0 rdf:type <http://schema.org/Dataset>.
+        |                FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
+        |                BIND (?l0 AS ?topmostSameAs)
+        |              }
+        |            } UNION {
+        |              ?l0 schema:sameAs+/schema:url ?l1.
+        |              ?l1 schema:sameAs+/schema:url ?l2
+        |              FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
+        |              BIND (?l2 AS ?topmostSameAs)
+        |            } UNION {
+        |              ?l0 schema:sameAs+/schema:url ?l1.
+        |              ?l1 schema:sameAs+/schema:url ?l2.
+        |              ?l2 schema:sameAs+/schema:url ?l3
+        |              FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
+        |              BIND (?l3 AS ?topmostSameAs)
+        |            }
+        |          }
+        |        }
+        |        GROUP BY ?topmostSameAs
+        |        HAVING (COUNT(*) > 0)
+        |      } {
         |        {
         |          {
         |            ?l0 schema:sameAs+/schema:url ?topmostSameAs;
@@ -89,42 +122,6 @@ private class ProjectsFinder(
         |          ?l2 schema:sameAs+/schema:url ?topmostSameAs
         |          FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l4 }
         |        }
-        |      } {
-        |        SELECT ?topmostSameAs
-        |        WHERE {
-        |          {
-        |            {
-        |              {
-        |                ?l0 schema:sameAs+/schema:url ?l1.
-        |                FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
-        |                BIND (?l1 AS ?topmostSameAs)
-        |              } UNION {
-        |                ?l0 rdf:type <http://schema.org/Dataset>.
-        |                FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
-        |                BIND (?l0 AS ?topmostSameAs)
-        |              }
-        |            } UNION {
-        |              ?l0 schema:sameAs+/schema:url ?l1.
-        |              ?l1 schema:sameAs+/schema:url ?l2
-        |              FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
-        |              BIND (?l2 AS ?topmostSameAs)
-        |            } UNION {
-        |              ?l0 schema:sameAs+/schema:url ?l1.
-        |              ?l1 schema:sameAs+/schema:url ?l2.
-        |              ?l2 schema:sameAs+/schema:url ?l3
-        |              FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
-        |              BIND (?l3 AS ?topmostSameAs)
-        |            }
-        |          } {
-        |            SELECT ?l0
-        |            WHERE {
-        |              ?l0 rdf:type <http://schema.org/Dataset>;
-        |                  schema:identifier "$identifier"
-        |            }
-        |          }
-        |        }
-        |        GROUP BY ?topmostSameAs
-        |        HAVING (COUNT(*) > 0)
         |      }
         |    }
         |    GROUP BY ?l0 ?projectId

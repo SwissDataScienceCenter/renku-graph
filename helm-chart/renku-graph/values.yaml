@@ -33,9 +33,10 @@ triplesGenerator:
       memory: 2000Mi
   jvmXmx: 1G
   renkuLogTimeout: 60 minutes
-  reProvisioningInitialDelay: 2 minutes
+  reProvisioningInitialDelay: 1 second
   gitlab:
     rateLimit: 30/sec
+  generationProcessInitialDelay: 10 seconds
   ## a demanded number of concurrent triples generation processes
   generationProcessesNumber: 4
   threadsNumber: 6

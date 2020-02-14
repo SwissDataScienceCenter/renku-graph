@@ -83,7 +83,7 @@ private class IODatasetsFinder(
   }
 
   private def sparqlQuery(maybePhrase: Option[Phrase], sort: Sort.By): SparqlQuery = SparqlQuery(
-    name = "free-text datasets search",
+    name = "ds free-text search",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
@@ -96,12 +96,16 @@ private class IODatasetsFinder(
         s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
             |  {
+            |    # locating earliest commit (date) where dataset with same origin was added
             |    SELECT ?topmostSameAs (MIN(?dateCreated) AS ?minDateCreated) ?projectsCount
             |    WHERE {
             |      {
+            |        # grouping datasets by sameAs and finding number of projects sharing the sameAs
             |        SELECT ?topmostSameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
             |        WHERE {
             |          {
+            |            # finding datasets matching the phrase 
+            |            # (to narrow down the ds ids set and to prevent from additional lookups to lucene)
             |            SELECT ?topmostSameAs
             |            WHERE {
             |              {
@@ -130,6 +134,7 @@ private class IODatasetsFinder(
             |                GROUP BY ?l0
             |                HAVING (COUNT(*) > 0)
             |              } {
+            |                # flattening project the import hierarchy
             |                {
             |                  {
             |                    ?l0 schema:sameAs+/schema:url ?l1.
@@ -237,11 +242,14 @@ private class IODatasetsFinder(
         s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
             |  {
+            |    # locating earliest commit (date) where dataset with same origin was added
             |    SELECT ?topmostSameAs (MIN(?dateCreated) AS ?minDateCreated) ?projectsCount
             |    WHERE {
             |      {
+            |        # grouping datasets by sameAs and finding number of projects sharing the sameAs 
             |        SELECT ?topmostSameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
             |        WHERE {
+            |          # flattening project the import hierarchy
             |          {
             |            {
             |              ?l0 schema:sameAs+/schema:url ?l1;
@@ -319,7 +327,7 @@ private class IODatasetsFinder(
   )
 
   private def countQuery(maybePhrase: Option[Phrase]): SparqlQuery = SparqlQuery(
-    name = "free-text datasets count",
+    name = "ds free-text search - count",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX schema: <http://schema.org/>",
