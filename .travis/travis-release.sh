@@ -24,8 +24,4 @@ source $(dirname "$0")/travis-functions.sh
 COMMIT_MESSAGE_PATTERN="Setting version to .*"
 if [[ -z $TRAVIS_TAG ]] && [[ ! $TRAVIS_COMMIT_MESSAGE =~ $COMMIT_MESSAGE_PATTERN ]]; then
   createRelease
-  publishCharts
-# publish charts if this build is not triggered by a tag and a new snapshot setting push
-elif [[ -z $TRAVIS_TAG ]] && [[ $TRAVIS_COMMIT_MESSAGE =~ $COMMIT_MESSAGE_PATTERN ]]; then
-  publishCharts
 fi
