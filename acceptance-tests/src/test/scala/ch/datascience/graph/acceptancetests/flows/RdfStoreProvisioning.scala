@@ -76,7 +76,6 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
     }
 
     eventually {
-      val commitResource = (fusekiBaseUrl / "commit" / commitId).showAs[RdfResource]
       RDFStore
         .run(
           s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -84,8 +83,9 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
               |
               |SELECT ?label
               |WHERE {
-              |  $commitResource rdf:type <http://www.w3.org/ns/prov#Activity> ;
-              |                  rdfs:label ?label .
+              |  ?id rdf:type <http://www.w3.org/ns/prov#Activity>;
+              |      rdfs:label ?label.
+              |  FILTER (CONTAINS (?label, "$commitId"))    
               |}
               |""".stripMargin
         )
