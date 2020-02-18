@@ -49,7 +49,7 @@ object ProcessRunActivity {
                        fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[ProcessRunActivity] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
-        EntityId of (s"$fusekiBaseUrl/commit/${entity.id}${entity.maybeStepId.map(id => s"/$id").getOrElse("")}"),
+        EntityId of (s"$fusekiBaseUrl/activities/commit/${entity.id}${entity.maybeStepId.map(id => s"/$id").getOrElse("")}"),
         EntityTypes of (prov / "Activity", wfprov / "ProcessRun"),
         Activity.toProperties(entity),
         rdfs / "label"                -> s"${entity.association.processPlan.cwlFile}@${entity.id}".asJsonLD,

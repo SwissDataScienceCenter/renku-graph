@@ -52,6 +52,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
         JsonLD.fromString(value).entityId shouldBe None
       }
     }
+
+    "have no entityTypes" in {
+      forAll { value: String =>
+        JsonLD.fromString(value).entityTypes shouldBe None
+      }
+    }
   }
 
   "JsonLD.fromInt" should {
@@ -70,6 +76,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
         JsonLD.fromInt(value).entityId shouldBe None
       }
     }
+
+    "have no entityTypes" in {
+      forAll { value: Int =>
+        JsonLD.fromInt(value).entityTypes shouldBe None
+      }
+    }
   }
 
   "JsonLD.fromLong" should {
@@ -86,6 +98,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
     "have no entityId" in {
       forAll { value: Long =>
         JsonLD.fromLong(value).entityId shouldBe None
+      }
+    }
+
+    "have no entityTypes" in {
+      forAll { value: Long =>
+        JsonLD.fromLong(value).entityTypes shouldBe None
       }
     }
   }
@@ -107,6 +125,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
         JsonLD.fromInstant(value).entityId shouldBe None
       }
     }
+
+    "have no entityTypes" in {
+      forAll { value: Instant =>
+        JsonLD.fromInstant(value).entityTypes shouldBe None
+      }
+    }
   }
 
   "JsonLD.fromLocalDate" should {
@@ -126,6 +150,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
         JsonLD.fromLocalDate(value).entityId shouldBe None
       }
     }
+
+    "have no entityTypes" in {
+      forAll { value: LocalDate =>
+        JsonLD.fromLocalDate(value).entityTypes shouldBe None
+      }
+    }
   }
 
   "JsonLD.Null" should {
@@ -136,6 +166,10 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "have no entityId" in {
       JsonLD.JsonLDNull.entityId shouldBe None
+    }
+
+    "have no entityTypes" in {
+      JsonLD.JsonLDNull.entityTypes shouldBe None
     }
   }
 
@@ -163,7 +197,7 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "have entityId for Some entity having one" in {
       forAll { (id: EntityId, types: EntityTypes, property: Property, value: String) =>
-        implicit val encoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { (o: Object) =>
+        implicit val encoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { o: Object =>
           JsonLD.entity(id, types, property -> JsonLD.fromString(o.value))
         }
 
@@ -173,6 +207,20 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "have no entityId for None" in {
       JsonLD.fromOption(Option.empty[String]).entityId shouldBe None
+    }
+
+    "have entityTypes for Some entity having one" in {
+      forAll { (id: EntityId, types: EntityTypes, property: Property, value: String) =>
+        implicit val encoder: JsonLDEncoder[Object] = JsonLDEncoder.instance { o: Object =>
+          JsonLD.entity(id, types, property -> JsonLD.fromString(o.value))
+        }
+
+        JsonLD.fromOption(Some(Object(value))).entityTypes shouldBe Some(types)
+      }
+    }
+
+    "have no entityTypes for None" in {
+      JsonLD.fromOption(Option.empty[String]).entityTypes shouldBe None
     }
   }
 
@@ -192,6 +240,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
         JsonLD.fromEntityId(value).entityId shouldBe None
       }
     }
+
+    "have no entityTypes" in {
+      forAll { value: EntityId =>
+        JsonLD.fromEntityId(value).entityTypes shouldBe None
+      }
+    }
   }
 
   "JsonLD.arr" should {
@@ -206,6 +260,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
     "have no entityId" in {
       forAll { values: List[String] =>
         JsonLD.arr(values map JsonLD.fromString: _*).entityId shouldBe None
+      }
+    }
+
+    "have no entityTypes" in {
+      forAll { values: List[String] =>
+        JsonLD.arr(values map JsonLD.fromString: _*).entityTypes shouldBe None
       }
     }
   }
@@ -324,6 +384,12 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
     "have some entityId" in {
       forAll { (id: EntityId, types: EntityTypes, property: (Property, JsonLD)) =>
         JsonLD.entity(id, types, property).entityId shouldBe Some(id)
+      }
+    }
+
+    "have some entityTypes" in {
+      forAll { (id: EntityId, types: EntityTypes, property: (Property, JsonLD)) =>
+        JsonLD.entity(id, types, property).entityTypes shouldBe Some(types)
       }
     }
   }

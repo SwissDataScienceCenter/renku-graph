@@ -25,8 +25,9 @@ import cats.data.NonEmptyList
 import io.circe.{Encoder, Json}
 
 abstract class JsonLD extends Product with Serializable {
-  def toJson:   Json
-  def entityId: Option[EntityId]
+  def toJson:      Json
+  def entityId:    Option[EntityId]
+  def entityTypes: Option[EntityTypes]
   def cursor: Cursor = Cursor.from(this)
 }
 
@@ -92,7 +93,8 @@ object JsonLD {
       }
     }
 
-    override lazy val entityId: Option[EntityId] = Some(id)
+    override lazy val entityId:    Option[EntityId]    = Some(id)
+    override lazy val entityTypes: Option[EntityTypes] = Some(types)
   }
 
   private[jsonld] final case class JsonLDValue[V](
@@ -105,7 +107,8 @@ object JsonLD {
       case Some(t) => Json.obj("@type"  -> t.asJson, "@value" -> value.asJson)
     }
 
-    override lazy val entityId: Option[EntityId] = None
+    override lazy val entityId:    Option[EntityId]    = None
+    override lazy val entityTypes: Option[EntityTypes] = None
   }
 
   private[jsonld] object JsonLDValue {
@@ -114,8 +117,9 @@ object JsonLD {
   }
 
   private[jsonld] final case object JsonLDNull extends JsonLD {
-    override lazy val toJson:   Json             = Json.Null
-    override lazy val entityId: Option[EntityId] = None
+    override lazy val toJson:      Json                = Json.Null
+    override lazy val entityId:    Option[EntityId]    = None
+    override lazy val entityTypes: Option[EntityTypes] = None
   }
 
   private[jsonld] final case object JsonLDOptionValue {
@@ -127,12 +131,14 @@ object JsonLD {
   }
 
   private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD {
-    override lazy val toJson:   Json             = Json.arr(jsons.map(_.toJson): _*)
-    override lazy val entityId: Option[EntityId] = None
+    override lazy val toJson:      Json                = Json.arr(jsons.map(_.toJson): _*)
+    override lazy val entityId:    Option[EntityId]    = None
+    override lazy val entityTypes: Option[EntityTypes] = None
   }
 
   private[jsonld] final case class JsonLDEntityId[V <: EntityId](id: V)(implicit encoder: Encoder[V]) extends JsonLD {
-    override lazy val toJson:   Json             = Json.obj("@id" -> id.asJson)
-    override lazy val entityId: Option[EntityId] = None
+    override lazy val toJson:      Json                = Json.obj("@id" -> id.asJson)
+    override lazy val entityId:    Option[EntityId]    = None
+    override lazy val entityTypes: Option[EntityTypes] = None
   }
 }

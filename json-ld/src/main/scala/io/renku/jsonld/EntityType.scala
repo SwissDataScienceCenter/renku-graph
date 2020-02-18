@@ -20,7 +20,9 @@ package io.renku.jsonld
 
 import io.circe.{Encoder, Json}
 
-abstract class EntityType(val value: String) extends Product with Serializable
+abstract class EntityType(val value: String) extends Product with Serializable {
+  override lazy val toString: String = value
+}
 
 object EntityType {
 

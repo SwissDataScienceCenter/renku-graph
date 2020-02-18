@@ -21,8 +21,8 @@ package ch.datascience.knowledgegraph.lineage
 import cats.MonadError
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import model.Node.{SourceNode, TargetNode}
 
+import scala.collection.Set
 import scala.language.higherKinds
 
 object model {
@@ -34,39 +34,58 @@ object model {
     def from[Interpretation[_]](edges: Set[Edge], nodes: Set[Node])(
         implicit ME:                   MonadError[Interpretation, Throwable]
     ): Interpretation[Lineage] = {
-      val edgesNodes = collectNodes(edges)
-      if (edgesNodes == nodes) ME.pure(Lineage(edges, nodes))
-      else if ((nodes diff edgesNodes).nonEmpty) ME.raiseError(new IllegalArgumentException("There are orphan nodes"))
-      else ME.raiseError(new IllegalArgumentException("There are edges with no nodes definitions"))
+      val idsFromEdges = collectNodesIds(edges)
+      val idsFromNodes = nodes.map(_.id)
+      if (idsFromEdges == idsFromNodes) ME.pure(Lineage(edges, nodes))
+      else if ((idsFromNodes diff idsFromEdges).nonEmpty)
+        ME.raiseError(new IllegalArgumentException("There are orphan nodes"))
+      else
+        ME.raiseError(new IllegalArgumentException("There are edges with no nodes definitions"))
     }
 
-    private def collectNodes(edges: Set[Edge]): Set[Node] =
-      edges.foldLeft(Set.empty[Node]) { (nodes, edge) =>
-        nodes + edge.source + edge.target
+    private def collectNodesIds(edges: Set[Edge]): Set[Node.Id] =
+      edges.foldLeft(Set.empty[Node.Id]) {
+        case (acc, Edge(source, target)) => acc + source + target
       }
   }
 
-  final case class Edge(source: SourceNode, target: TargetNode)
+  final case class Edge(source: Node.Id, target: Node.Id)
 
-  sealed case class Node(id: NodeId, label: NodeLabel)
+  final case class Node(id: Node.Id, label: Node.Label, types: Set[Node.Type])
 
   object Node {
-    sealed trait SourceNode extends Node
 
-    object SourceNode {
-      def apply(id: NodeId, label: NodeLabel): SourceNode = new Node(id, label) with SourceNode
+    final class Id private (val value: String) extends AnyVal with StringTinyType
+    object Id extends TinyTypeFactory[Id](new Id(_)) with NonBlank
+
+    final class Label private (val value: String) extends AnyVal with StringTinyType
+    object Label extends TinyTypeFactory[Label](new Label(_)) with NonBlank
+
+    final class Type private (val value: String) extends AnyVal with StringTinyType
+    object Type extends TinyTypeFactory[Type](new Type(_)) with NonBlank
+
+    sealed trait SingleWordType {
+      val name: String
+      override lazy val toString: String = name
     }
 
-    sealed trait TargetNode extends Node
+    object SingleWordType {
+      val ProcessRun: SingleWordType = new SingleWordType { val name: String = "ProcessRun" }
+      val File:       SingleWordType = new SingleWordType { val name: String = "File" }
+      val Directory:  SingleWordType = new SingleWordType { val name: String = "Directory" }
+    }
 
-    object TargetNode {
-      def apply(id: NodeId, label: NodeLabel): TargetNode = new Node(id, label) with TargetNode
+    implicit class NodeOps(node: Node) {
+
+      import SingleWordType._
+
+      private lazy val FileTypes = Set("http://www.w3.org/ns/prov#Entity", "http://purl.org/wf4ever/wfprov#Artifact")
+
+      lazy val singleWordType: SingleWordType = node.types.map(_.toString) match {
+        case types if types contains "http://purl.org/wf4ever/wfprov#ProcessRun" => ProcessRun
+        case types if types contains "http://www.w3.org/ns/prov#Collection"      => Directory
+        case FileTypes                                                           => File
+      }
     }
   }
-
-  final class NodeId private (val value: String) extends AnyVal with StringTinyType
-  object NodeId extends TinyTypeFactory[NodeId](new NodeId(_)) with NonBlank
-
-  final class NodeLabel private (val value: String) extends AnyVal with StringTinyType
-  object NodeLabel extends TinyTypeFactory[NodeLabel](new NodeLabel(_)) with NonBlank
 }

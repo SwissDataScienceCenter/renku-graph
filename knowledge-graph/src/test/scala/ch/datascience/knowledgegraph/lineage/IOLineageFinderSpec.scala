@@ -25,7 +25,6 @@ import ch.datascience.graph.model.GraphModelGenerators.{filePaths, projectPaths}
 import ch.datascience.graph.model.{events, projects}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
-import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
@@ -52,37 +51,40 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
         .unsafeRunSync() shouldBe Some(
         Lineage(
           edges = Set(
-            Edge(sourceNode(`sha3 zhbikes`), targetNode(`sha8 renku run`)),
-            Edge(sourceNode(`sha7 plot_data`), targetNode(`sha9 renku run`)),
-            Edge(sourceNode(`sha7 plot_data`), targetNode(`sha12 step1 renku update`)),
-            Edge(sourceNode(`sha7 clean_data`), targetNode(`sha8 renku run`)),
-            Edge(sourceNode(`sha7 clean_data`), targetNode(`sha12 step2 renku update`)),
-            Edge(sourceNode(`sha8 renku run`), targetNode(`sha8 parquet`)),
-            Edge(sourceNode(`sha8 parquet`), targetNode(`sha9 renku run`)),
-            Edge(sourceNode(`sha9 renku run`), targetNode(`sha9 plot_data`)),
-            Edge(sourceNode(`sha10 zhbikes`), targetNode(`sha12 step2 renku update`)),
-            Edge(sourceNode(`sha12 parquet`), targetNode(`sha12 step1 renku update`)),
-            Edge(sourceNode(`sha12 step1 renku update`), targetNode(`sha12 step2 grid_plot`)),
-            Edge(sourceNode(`sha12 step2 renku update`), targetNode(`sha12 parquet`))
+            Edge(`sha3 zhbikes`.toNodeId, `sha8 renku run`.toNodeId),
+            Edge(`sha7 plot_data`.toNodeId, `sha9 renku run`.toNodeId),
+            Edge(`sha7 plot_data`.toNodeId, `sha12 step1 renku update`.toNodeId),
+            Edge(`sha7 clean_data`.toNodeId, `sha8 renku run`.toNodeId),
+            Edge(`sha7 clean_data`.toNodeId, `sha12 step2 renku update`.toNodeId),
+            Edge(`sha8 renku run`.toNodeId, `sha8 parquet`.toNodeId),
+            Edge(`sha8 parquet`.toNodeId, `sha9 renku run`.toNodeId),
+            Edge(`sha9 renku run`.toNodeId, `sha9 plot_data`.toNodeId),
+            Edge(`sha10 zhbikes`.toNodeId, `sha12 step2 renku update`.toNodeId),
+            Edge(`sha12 parquet`.toNodeId, `sha12 step1 renku update`.toNodeId),
+            Edge(`sha12 step1 renku update`.toNodeId, `sha12 step2 grid_plot`.toNodeId),
+            Edge(`sha12 step2 renku update`.toNodeId, `sha12 parquet`.toNodeId)
           ),
           nodes = Set(
-            node(`sha3 zhbikes`),
-            node(`sha7 clean_data`),
-            node(`sha7 plot_data`),
-            node(`sha8 renku run`),
-            node(`sha8 parquet`),
-            node(`sha9 renku run`),
-            node(`sha9 plot_data`),
-            node(`sha10 zhbikes`),
-            node(`sha12 step1 renku update`),
-            node(`sha12 step2 grid_plot`),
-            node(`sha12 step2 renku update`),
-            node(`sha12 parquet`)
+            `sha3 zhbikes`.toNode,
+            `sha7 clean_data`.toNode,
+            `sha7 plot_data`.toNode,
+            `sha8 renku run`.toNode,
+            `sha8 parquet`.toNode,
+            `sha9 renku run`.toNode,
+            `sha9 plot_data`.toNode,
+            `sha10 zhbikes`.toNode,
+            `sha12 step1 renku update`.toNode,
+            `sha12 step2 grid_plot`.toNode,
+            `sha12 step2 renku update`.toNode,
+            `sha12 parquet`.toNode
           )
         )
       )
 
-      logger.loggedOnly(Warn(s"lineage finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.logged(
+        Warn(s"lineage finished${executionTimeRecorder.executionTimeInfo}"),
+        Warn(s"lineage - node details finished${executionTimeRecorder.executionTimeInfo}")
+      )
     }
 
     "return None if there's no lineage for the project" in new InMemoryStoreTestCase {
@@ -101,18 +103,6 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
   private trait InMemoryStoreTestCase {
     val projectPath = projectPaths.generateOne
 
-    def sourceNode(node: NodeDef): SourceNode = SourceNode(
-      NodeId(node.name),
-      NodeLabel(node.label)
-    )
-
-    def targetNode(node: NodeDef): TargetNode = TargetNode(
-      NodeId(node.name),
-      NodeLabel(node.label)
-    )
-
-    def node(node: NodeDef): Node = sourceNode(node)
-
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val lineageFinder = new IOLineageFinder(
@@ -120,6 +110,15 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
       renkuBaseUrl,
       logger,
       new SparqlQueryTimeRecorder(executionTimeRecorder)
+    )
+  }
+
+  private implicit class NodeDefOps(nodeDef: NodeDef) {
+    lazy val toNodeId: Node.Id = Node.Id(nodeDef.id)
+    lazy val toNode: Node = Node(
+      nodeDef.toNodeId,
+      Node.Label(nodeDef.label),
+      nodeDef.types.map(Node.Type.apply)
     )
   }
 }
