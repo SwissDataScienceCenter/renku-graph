@@ -47,7 +47,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
       import examplarData._
 
       lineageFinder
-        .findLineage(projectPath, commitId, filePath)
+        .findLineage(projectPath, filePath)
         .unsafeRunSync() shouldBe Some(
         Lineage(
           edges = Set(
@@ -88,15 +88,9 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
     }
 
     "return None if there's no lineage for the project" in new InMemoryStoreTestCase {
-
-      val commitId: events.CommitId   = commitIds.generateOne
-      val filePath: projects.FilePath = filePaths.generateOne
-
       lineageFinder
-        .findLineage(projectPath, commitId, filePath)
+        .findLineage(projectPath, filePaths.generateOne)
         .unsafeRunSync() shouldBe None
-
-      logger.loggedOnly(Warn(s"lineage finished${executionTimeRecorder.executionTimeInfo}"))
     }
   }
 

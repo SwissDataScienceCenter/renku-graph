@@ -20,7 +20,6 @@ package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
 import ch.datascience.knowledgegraph.lineage
 import ch.datascience.knowledgegraph.lineage.LineageFinder
@@ -53,7 +52,7 @@ class QuerySchemaSpec
     "allow to search for lineage of a given projectPath, commitId and file" in new LineageTestCase {
       val query = graphql"""
         {
-          lineage(projectPath: "namespace/project", commitId: "1234567", filePath: "directory/file") {
+          lineage(projectPath: "namespace/project", filePath: "directory/file") {
             nodes {
               id
               label
@@ -66,7 +65,7 @@ class QuerySchemaSpec
           }
         }"""
 
-      givenFindLineage(ProjectPath("namespace/project"), CommitId("1234567"), FilePath("directory/file"))
+      givenFindLineage(ProjectPath("namespace/project"), FilePath("directory/file"))
         .returning(IO.pure(Some(lineage)))
 
       execute(query) shouldBe json(lineage)
@@ -88,15 +87,11 @@ class QuerySchemaSpec
 
   private trait LineageTestCase extends TestCase {
 
-    def givenFindLineage(
-        projectPath: ProjectPath,
-        commitId:    CommitId,
-        filePath:    FilePath
-    ) = new {
+    def givenFindLineage(projectPath: ProjectPath, filePath: FilePath) = new {
       def returning(result: IO[Option[Lineage]]) =
         (lineageFinder
-          .findLineage(_: ProjectPath, _: CommitId, _: FilePath))
-          .expects(projectPath, commitId, filePath)
+          .findLineage(_: ProjectPath, _: FilePath))
+          .expects(projectPath, filePath)
           .returning(result)
     }
 

@@ -79,7 +79,6 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
         namedLineageQuery,
         variables = Map(
           "projectPath" -> project.path.toString,
-          "commitId"    -> commitId.toString,
           "filePath"    -> filePath.toString
         )
       )
@@ -95,7 +94,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private val lineageQuery: Document = graphql"""
     {
-      lineage(projectPath: "namespace/lineage-project", commitId: "0000012", filePath: "figs/grid_plot.png") {
+      lineage(projectPath: "namespace/lineage-project", filePath: "figs/grid_plot.png") {
         nodes {
           id
           label
@@ -109,8 +108,8 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
     }"""
 
   private val namedLineageQuery: Document = graphql"""
-    query($$projectPath: ProjectPath!, $$commitId: CommitId!, $$filePath: FilePath!) { 
-      lineage(projectPath: $$projectPath, commitId: $$commitId, filePath: $$filePath) { 
+    query($$projectPath: ProjectPath!, $$filePath: FilePath!) { 
+      lineage(projectPath: $$projectPath, filePath: $$filePath) { 
         nodes {
           id
           label

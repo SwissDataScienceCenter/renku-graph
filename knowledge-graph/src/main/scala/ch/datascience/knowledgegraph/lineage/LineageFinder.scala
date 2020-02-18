@@ -21,7 +21,6 @@ package ch.datascience.knowledgegraph.lineage
 import cats.effect._
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath, ProjectResource}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.logging.ApplicationLogger
@@ -34,7 +33,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait LineageFinder[Interpretation[_]] {
-  def findLineage(projectPath: ProjectPath, commitId: CommitId, filePath: FilePath): Interpretation[Option[Lineage]]
+  def findLineage(projectPath: ProjectPath, filePath: FilePath): Interpretation[Option[Lineage]]
 }
 
 class IOLineageFinder(
@@ -46,9 +45,9 @@ class IOLineageFinder(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with LineageFinder[IO] {
 
-  override def findLineage(projectPath: ProjectPath, commitId: CommitId, filePath: FilePath): IO[Option[Lineage]] =
+  override def findLineage(projectPath: ProjectPath, filePath: FilePath): IO[Option[Lineage]] =
     for {
-      edges <- queryExpecting[Set[Edge]](using = query(projectPath, commitId, filePath))
+      edges <- queryExpecting[Set[Edge]](using = query(projectPath, filePath))
       nodes <- edges.toNodeIdSet.toList
                 .map(toNodeQuery(projectPath))
                 .map(queryExpecting[Option[Node]](_).flatMap(toNodeOrError(projectPath)))
@@ -57,7 +56,7 @@ class IOLineageFinder(
       maybeLineage <- toLineage(edges, nodes)
     } yield maybeLineage
 
-  private def query(path: ProjectPath, commitId: CommitId, filePath: FilePath) = SparqlQuery(
+  private def query(path: ProjectPath, filePath: FilePath) = SparqlQuery(
     name = "lineage",
     Set(
       "PREFIX prov: <http://www.w3.org/ns/prov#>",

@@ -221,7 +221,7 @@ Query example:
 ```
 {
   "query": "{ 
-    lineage(projectPath: \"namespace/project\", commitId: \"6e4f4cc8d30886a9f17192c65db6c799602bcd7d\", filePath: \"zhbikes.parquet\") {
+    lineage(projectPath: \"namespace/project\", filePath: \"zhbikes.parquet\") {
       nodes { id label type } 
       edges { source target } 
     } 
