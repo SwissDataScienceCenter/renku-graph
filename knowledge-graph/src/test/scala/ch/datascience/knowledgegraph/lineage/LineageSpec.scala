@@ -69,7 +69,8 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "singleWordType" should {
 
-    "return 'ProcessRun' if node contains the 'http://purl.org/wf4ever/wfprov#ProcessRun' type" in {
+    s"return '${Node.SingleWordType.ProcessRun}' " +
+      "if node contains the 'http://purl.org/wf4ever/wfprov#ProcessRun' type" in {
       val node = nodes.generateOne.copy(
         types = Set(
           "http://www.w3.org/ns/prov#Activity",
@@ -77,10 +78,11 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
         ).map(Node.Type.apply)
       )
 
-      node.singleWordType shouldBe Node.SingleWordType.ProcessRun
+      node.singleWordType shouldBe Right(Node.SingleWordType.ProcessRun)
     }
 
-    "return 'File' if node contains the 'http://www.w3.org/ns/prov#Entity' type but not 'http://www.w3.org/ns/prov#Collection'" in {
+    s"return '${Node.SingleWordType.File}' " +
+      "if node contains the 'http://www.w3.org/ns/prov#Entity' type but not 'http://www.w3.org/ns/prov#Collection'" in {
       val node = nodes.generateOne.copy(
         types = Set(
           "http://www.w3.org/ns/prov#Entity",
@@ -88,10 +90,11 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
         ).map(Node.Type.apply)
       )
 
-      node.singleWordType shouldBe Node.SingleWordType.File
+      node.singleWordType shouldBe Right(Node.SingleWordType.File)
     }
 
-    "return 'Directory' if node contains the 'http://www.w3.org/ns/prov#Entity' and 'http://www.w3.org/ns/prov#Collection' types" in {
+    s"return '${Node.SingleWordType.Directory}' " +
+      "if node contains the 'http://www.w3.org/ns/prov#Entity' and 'http://www.w3.org/ns/prov#Collection' types" in {
       val node = nodes.generateOne.copy(
         types = Set(
           "http://www.w3.org/ns/prov#Entity",
@@ -100,7 +103,20 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
         ).map(Node.Type.apply)
       )
 
-      node.singleWordType shouldBe Node.SingleWordType.Directory
+      node.singleWordType shouldBe Right(Node.SingleWordType.Directory)
+    }
+
+    "return an Exception there's no match to the given types" in {
+      val types = Set(
+        "http://purl.org/wf4ever/wfprov#Artifact",
+        "http://schema.org/Dataset"
+      )
+
+      val Left(exception) = nodes.generateOne
+        .copy(types = types.map(Node.Type.apply))
+        .singleWordType
+
+      exception.getMessage shouldBe s"${types.mkString(", ")} cannot be converted to a NodeType"
     }
   }
 

@@ -64,15 +64,15 @@ object model {
     final class Type private (val value: String) extends AnyVal with StringTinyType
     object Type extends TinyTypeFactory[Type](new Type(_)) with NonBlank
 
-    sealed trait SingleWordType {
+    sealed trait SingleWordType extends Product with Serializable {
       val name: String
       override lazy val toString: String = name
     }
 
     object SingleWordType {
-      val ProcessRun: SingleWordType = new SingleWordType { val name: String = "ProcessRun" }
-      val File:       SingleWordType = new SingleWordType { val name: String = "File" }
-      val Directory:  SingleWordType = new SingleWordType { val name: String = "Directory" }
+      case object ProcessRun extends SingleWordType { val name: String = "ProcessRun" }
+      case object File       extends SingleWordType { val name: String = "File" }
+      case object Directory  extends SingleWordType { val name: String = "Directory" }
     }
 
     implicit class NodeOps(node: Node) {
@@ -80,11 +80,15 @@ object model {
       import SingleWordType._
 
       private lazy val FileTypes = Set("http://www.w3.org/ns/prov#Entity", "http://purl.org/wf4ever/wfprov#Artifact")
+      private lazy val DirectoryTypes = Set("http://www.w3.org/ns/prov#Entity",
+                                            "http://purl.org/wf4ever/wfprov#Artifact",
+                                            "http://www.w3.org/ns/prov#Collection")
 
-      lazy val singleWordType: SingleWordType = node.types.map(_.toString) match {
-        case types if types contains "http://purl.org/wf4ever/wfprov#ProcessRun" => ProcessRun
-        case types if types contains "http://www.w3.org/ns/prov#Collection"      => Directory
-        case FileTypes                                                           => File
+      lazy val singleWordType: Either[Exception, SingleWordType] = node.types.map(_.toString) match {
+        case types if types contains "http://purl.org/wf4ever/wfprov#ProcessRun" => Right(ProcessRun)
+        case types if (DirectoryTypes diff types).isEmpty                        => Right(Directory)
+        case types if (FileTypes diff types).isEmpty                             => Right(File)
+        case types                                                               => Left(new Exception(s"${types.mkString(", ")} cannot be converted to a NodeType"))
       }
     }
   }

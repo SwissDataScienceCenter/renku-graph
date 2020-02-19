@@ -41,7 +41,7 @@ private object modelSchema {
           )
         ),
         Some("Node type"),
-        resolve = _.value.singleWordType
+        resolve = _.value.singleWordType.fold[Node.SingleWordType](throw _, identity)
       )
     )
   )

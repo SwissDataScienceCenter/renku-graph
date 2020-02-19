@@ -115,7 +115,7 @@ class QuerySchemaSpec
       {
         "id": ${node.id.value},
         "label": ${node.label.value},
-        "type": ${node.singleWordType.name}
+        "type": ${node.singleWordType.fold(throw _, identity).name}
       }"""
 
     private def toJson(edge: Edge) =
