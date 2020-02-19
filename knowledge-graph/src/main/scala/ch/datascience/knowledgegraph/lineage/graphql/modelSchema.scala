@@ -32,7 +32,7 @@ private object modelSchema {
       Field(
         "type",
         EnumType(
-          "type",
+          "NodeType",
           description = None,
           values = List(
             EnumValue(Node.SingleWordType.ProcessRun.name, value = Node.SingleWordType.ProcessRun),
