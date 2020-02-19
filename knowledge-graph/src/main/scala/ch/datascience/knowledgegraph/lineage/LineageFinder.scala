@@ -70,7 +70,8 @@ class IOLineageFinder(
         |    SELECT (MIN(?startedAt) AS ?minStartedAt)
         |    WHERE {
         |      ?qentity schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]};
-        |               prov:atLocation "$filePath".
+        |               prov:atLocation ?location.
+        |      FILTER (strStarts("$filePath", ?location))
         |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?activityId.
         |      ?activityId rdf:type <http://www.w3.org/ns/prov#Activity>;
         |                  prov:startedAtTime ?startedAt.
@@ -79,7 +80,8 @@ class IOLineageFinder(
         |    SELECT ?entity
         |    WHERE {
         |      ?qentity schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]};
-        |               prov:atLocation "$filePath".
+        |               prov:atLocation ?location.
+        |      FILTER (strStarts("$filePath", ?location))
         |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?activityId.
         |      ?activityId rdf:type <http://www.w3.org/ns/prov#Activity>;
         |                  prov:startedAtTime ?minStartedAt.
