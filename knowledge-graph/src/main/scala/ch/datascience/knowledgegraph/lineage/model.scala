@@ -19,8 +19,6 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.MonadError
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 import scala.collection.Set
 import scala.language.higherKinds
@@ -51,9 +49,11 @@ object model {
 
   final case class Edge(source: Node.Id, target: Node.Id)
 
-  final case class Node(id: Node.Id, label: Node.Label, types: Set[Node.Type])
+  final case class Node(id: Node.Id, location: Node.Location, label: Node.Label, types: Set[Node.Type])
 
   object Node {
+    import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
+    import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
     final class Id private (val value: String) extends AnyVal with StringTinyType
     object Id extends TinyTypeFactory[Id](new Id(_)) with NonBlank
@@ -63,6 +63,9 @@ object model {
 
     final class Type private (val value: String) extends AnyVal with StringTinyType
     object Type extends TinyTypeFactory[Type](new Type(_)) with NonBlank
+
+    final class Location private (val value: String) extends AnyVal with StringTinyType
+    object Location extends TinyTypeFactory[Location](new Location(_)) with RelativePath
 
     sealed trait SingleWordType extends Product with Serializable {
       val name: String

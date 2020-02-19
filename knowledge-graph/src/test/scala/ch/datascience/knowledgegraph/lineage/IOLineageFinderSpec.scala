@@ -20,9 +20,7 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.{filePaths, projectPaths}
-import ch.datascience.graph.model.{events, projects}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.knowledgegraph.lineage.model._
@@ -38,7 +36,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
 
   "findLineage" should {
 
-    "return the lineage of the given project for a given commit id and file path" in new InMemoryStoreTestCase {
+    "return the lineage of the given project for a given commit id and file path" in new TestCase {
 
       val (jsons, examplarData) = exemplarLineageFlow(projectPath)
 
@@ -87,14 +85,14 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
       )
     }
 
-    "return None if there's no lineage for the project" in new InMemoryStoreTestCase {
+    "return None if there's no lineage for the project" in new TestCase {
       lineageFinder
         .findLineage(projectPath, filePaths.generateOne)
         .unsafeRunSync() shouldBe None
     }
   }
 
-  private trait InMemoryStoreTestCase {
+  private trait TestCase {
     val projectPath = projectPaths.generateOne
 
     val logger                = TestLogger[IO]()
@@ -111,6 +109,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
     lazy val toNodeId: Node.Id = Node.Id(nodeDef.id)
     lazy val toNode: Node = Node(
       nodeDef.toNodeId,
+      Node.Location(nodeDef.location),
       Node.Label(nodeDef.label),
       nodeDef.types.map(Node.Type.apply)
     )

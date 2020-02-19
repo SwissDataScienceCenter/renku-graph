@@ -19,6 +19,7 @@
 package io.renku.jsonld
 
 import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLD.JsonLDValue
 import io.renku.jsonld.JsonLDDecoder.Result
 
 /**
@@ -34,5 +35,10 @@ object JsonLDDecoder {
 
   type Result[A] = Either[DecodingFailure, A]
 
-  implicit val jsonLDDecoder: JsonLDDecoder[JsonLD] = (cursor: Cursor) => cursor.jsonLD.asRight[DecodingFailure]
+  implicit val decodeJsonLD: JsonLDDecoder[JsonLD] = (cursor: Cursor) => cursor.jsonLD.asRight[DecodingFailure]
+  implicit val decodeString: JsonLDDecoder[String] = (cursor: Cursor) =>
+    cursor.jsonLD match {
+      case JsonLDValue(value: String, _) => Right(value)
+      case json => Left(DecodingFailure(s"Cannot decode $json to String", Nil))
+    }
 }

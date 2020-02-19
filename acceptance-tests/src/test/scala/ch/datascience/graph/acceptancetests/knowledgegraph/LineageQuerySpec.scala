@@ -97,6 +97,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       lineage(projectPath: "namespace/lineage-project", filePath: "figs/grid_plot.png") {
         nodes {
           id
+          location
           label
           type
         }
@@ -112,6 +113,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       lineage(projectPath: $$projectPath, filePath: $$filePath) { 
         nodes {
           id
+          location
           label
           type
         }
@@ -141,18 +143,18 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private lazy val theExpectedNodes = Right {
     Set(
-      json"""{"id": ${`sha3 zhbikes`.id},             "label": ${`sha3 zhbikes`.label},             "type": ${`sha3 zhbikes`.singleWordType}            }""",
-      json"""{"id": ${`sha7 clean_data`.id},          "label": ${`sha7 clean_data`.label},          "type": ${`sha7 clean_data`.singleWordType}         }""",
-      json"""{"id": ${`sha7 plot_data`.id},           "label": ${`sha7 plot_data`.label},           "type": ${`sha7 plot_data`.singleWordType}          }""",
-      json"""{"id": ${`sha8 renku run`.id},           "label": ${`sha8 renku run`.label},           "type": ${`sha8 renku run`.singleWordType}          }""",
-      json"""{"id": ${`sha8 parquet`.id},             "label": ${`sha8 parquet`.label},             "type": ${`sha8 parquet`.singleWordType}            }""",
-      json"""{"id": ${`sha9 renku run`.id},           "label": ${`sha9 renku run`.label},           "type": ${`sha9 renku run`.singleWordType}          }""",
-      json"""{"id": ${`sha9 plot_data`.id},           "label": ${`sha9 plot_data`.label},           "type": ${`sha9 plot_data`.singleWordType}          }""",
-      json"""{"id": ${`sha10 zhbikes`.id},            "label": ${`sha10 zhbikes`.label},            "type": ${`sha10 zhbikes`.singleWordType}           }""",
-      json"""{"id": ${`sha12 step1 renku update`.id}, "label": ${`sha12 step1 renku update`.label}, "type": ${`sha12 step1 renku update`.singleWordType}}""",
-      json"""{"id": ${`sha12 step2 grid_plot`.id},    "label": ${`sha12 step2 grid_plot`.label},    "type": ${`sha12 step2 grid_plot`.singleWordType}   }""",
-      json"""{"id": ${`sha12 step2 renku update`.id}, "label": ${`sha12 step2 renku update`.label}, "type": ${`sha12 step2 renku update`.singleWordType}}""",
-      json"""{"id": ${`sha12 parquet`.id},            "label": ${`sha12 parquet`.label},            "type": ${`sha12 parquet`.singleWordType}           }"""
+      json"""{"id": ${`sha3 zhbikes`.id},             "location": ${`sha3 zhbikes`.location},             "label": ${`sha3 zhbikes`.label},             "type": ${`sha3 zhbikes`.singleWordType}            }""",
+      json"""{"id": ${`sha7 clean_data`.id},          "location": ${`sha7 clean_data`.location},          "label": ${`sha7 clean_data`.label},          "type": ${`sha7 clean_data`.singleWordType}         }""",
+      json"""{"id": ${`sha7 plot_data`.id},           "location": ${`sha7 plot_data`.location},           "label": ${`sha7 plot_data`.label},           "type": ${`sha7 plot_data`.singleWordType}          }""",
+      json"""{"id": ${`sha8 renku run`.id},           "location": ${`sha8 renku run`.location},           "label": ${`sha8 renku run`.label},           "type": ${`sha8 renku run`.singleWordType}          }""",
+      json"""{"id": ${`sha8 parquet`.id},             "location": ${`sha8 parquet`.location},             "label": ${`sha8 parquet`.label},             "type": ${`sha8 parquet`.singleWordType}            }""",
+      json"""{"id": ${`sha9 renku run`.id},           "location": ${`sha9 renku run`.location},           "label": ${`sha9 renku run`.label},           "type": ${`sha9 renku run`.singleWordType}          }""",
+      json"""{"id": ${`sha9 plot_data`.id},           "location": ${`sha9 plot_data`.location},           "label": ${`sha9 plot_data`.label},           "type": ${`sha9 plot_data`.singleWordType}          }""",
+      json"""{"id": ${`sha10 zhbikes`.id},            "location": ${`sha10 zhbikes`.location},            "label": ${`sha10 zhbikes`.label},            "type": ${`sha10 zhbikes`.singleWordType}           }""",
+      json"""{"id": ${`sha12 step1 renku update`.id}, "location": ${`sha12 step1 renku update`.location}, "label": ${`sha12 step1 renku update`.label}, "type": ${`sha12 step1 renku update`.singleWordType}}""",
+      json"""{"id": ${`sha12 step2 grid_plot`.id},    "location": ${`sha12 step2 grid_plot`.location},    "label": ${`sha12 step2 grid_plot`.label},    "type": ${`sha12 step2 grid_plot`.singleWordType}   }""",
+      json"""{"id": ${`sha12 step2 renku update`.id}, "location": ${`sha12 step2 renku update`.location}, "label": ${`sha12 step2 renku update`.label}, "type": ${`sha12 step2 renku update`.singleWordType}}""",
+      json"""{"id": ${`sha12 parquet`.id},            "location": ${`sha12 parquet`.location},            "label": ${`sha12 parquet`.label},            "type": ${`sha12 parquet`.singleWordType}           }"""
     )
   }
 

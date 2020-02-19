@@ -55,6 +55,7 @@ class QuerySchemaSpec
           lineage(projectPath: "namespace/project", filePath: "directory/file") {
             nodes {
               id
+              location
               label
               type
             }
@@ -114,6 +115,7 @@ class QuerySchemaSpec
       json"""
       {
         "id": ${node.id.value},
+        "location": ${node.location.value},
         "label": ${node.label.value},
         "type": ${node.singleWordType.fold(throw _, identity).name}
       }"""

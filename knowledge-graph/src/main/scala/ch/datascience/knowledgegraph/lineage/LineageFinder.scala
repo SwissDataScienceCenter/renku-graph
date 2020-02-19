@@ -110,14 +110,16 @@ class IOLineageFinder(
   private def toNodeQuery(path: ProjectPath)(nodeId: Node.Id) = SparqlQuery(
     name = "lineage - node details",
     Set(
+      "PREFIX prov: <http://www.w3.org/ns/prov#>",
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"
     ),
-    s"""|SELECT ?id ?type ?label ?maybeComment
+    s"""|SELECT ?id ?type ?location ?label ?maybeComment
         |WHERE {
         |  {
         |    ${nodeId.showAs[RdfResource]} rdf:type ?type;
-        |                                  rdfs:label ?label.
+        |                                  rdfs:label ?label;
+        |                                  prov:atLocation ?location.
         |    OPTIONAL { ${nodeId.showAs[RdfResource]} rdfs:comment ?maybeComment }
         |    BIND (${nodeId.showAs[RdfResource]} AS ?id)
         |  }
@@ -142,31 +144,33 @@ class IOLineageFinder(
   }
 
   private implicit val nodeDecoder: Decoder[Option[Node]] = {
-    implicit val labelDecoder: Decoder[Node.Label] = TinyTypeDecoders.stringDecoder(Node.Label)
-    implicit val typeDecoder:  Decoder[Node.Type]  = TinyTypeDecoders.stringDecoder(Node.Type)
+    implicit val labelDecoder:    Decoder[Node.Label]    = TinyTypeDecoders.stringDecoder(Node.Label)
+    implicit val typeDecoder:     Decoder[Node.Type]     = TinyTypeDecoders.stringDecoder(Node.Type)
+    implicit val locationDecoder: Decoder[Node.Location] = TinyTypeDecoders.stringDecoder(Node.Location)
 
-    implicit lazy val fieldsDecoder: Decoder[(Node.Id, Node.Type, Node.Label)] = { implicit cursor =>
+    implicit lazy val fieldsDecoder: Decoder[(Node.Id, Node.Type, Node.Location, Node.Label)] = { implicit cursor =>
       for {
         id           <- cursor.downField("id").downField("value").as[Node.Id]
         nodeType     <- cursor.downField("type").downField("value").as[Node.Type]
+        location     <- cursor.downField("location").downField("value").as[Node.Location]
         label        <- cursor.downField("label").downField("value").as[Node.Label]
         maybeComment <- cursor.downField("maybeComment").downField("value").as[Option[Node.Label]]
-      } yield (id, nodeType, maybeComment getOrElse label)
+      } yield (id, nodeType, location, maybeComment getOrElse label)
     }
 
-    lazy val maybeToNode: List[(Node.Id, Node.Type, Node.Label)] => Option[Node] = {
+    lazy val maybeToNode: List[(Node.Id, Node.Type, Node.Location, Node.Label)] => Option[Node] = {
       case Nil => None
-      case (id, typ, label) +: tail =>
+      case (id, typ, location, label) +: tail =>
         Some {
-          tail.foldLeft(Node(id, label, Set(typ))) {
-            case (node, (`id`, t, `label`)) => node.copy(types = node.types + t)
+          tail.foldLeft(Node(id, location, label, Set(typ))) {
+            case (node, (`id`, t, `location`, `label`)) => node.copy(types = node.types + t)
           }
         }
     }
 
     _.downField("results")
       .downField("bindings")
-      .as[List[(Node.Id, Node.Type, Node.Label)]]
+      .as[List[(Node.Id, Node.Type, Node.Location, Node.Label)]]
       .map(maybeToNode)
   }
 

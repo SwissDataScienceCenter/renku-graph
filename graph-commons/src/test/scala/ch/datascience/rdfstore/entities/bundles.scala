@@ -162,11 +162,19 @@ object bundles extends Schemas {
         )
     }
 
-    final case class NodeDef(id: String, label: String, types: Set[String])
+    final case class NodeDef(id: String, location: String, label: String, types: Set[String])
 
     object NodeDef {
+      import io.renku.jsonld.JsonLDDecoder._
+
       def apply(entityJson: JsonLD, label: String): NodeDef = NodeDef(
-        entityJson.entityId.getOrElse(throw new Exception("No entityId found")).toString,
+        entityJson.entityId
+          .getOrElse(throw new Exception("No entityId found"))
+          .toString,
+        entityJson.cursor
+          .downField(prov / "atLocation")
+          .as[String]
+          .fold(error => throw new Exception(error.message), identity),
         label,
         entityJson.entityTypes
           .map(_.toList.map(_.toString))

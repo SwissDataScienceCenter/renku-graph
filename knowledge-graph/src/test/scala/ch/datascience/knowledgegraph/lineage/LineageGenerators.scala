@@ -25,8 +25,9 @@ import org.scalacheck.Gen
 
 object LineageGenerators {
 
-  implicit val nodeIds:    Gen[Node.Id]    = nonBlankStrings(minLength = 3) map (_.value) map Node.Id.apply
-  implicit val nodeLabels: Gen[Node.Label] = nonBlankStrings(minLength = 3) map (_.value) map Node.Label.apply
+  implicit val nodeIds:       Gen[Node.Id]       = nonBlankStrings(minLength = 3) map (_.value) map Node.Id.apply
+  implicit val nodeLocations: Gen[Node.Location] = relativePaths() map Node.Location.apply
+  implicit val nodeLabels:    Gen[Node.Label]    = nonBlankStrings(minLength = 3) map (_.value) map Node.Label.apply
   implicit val nodeTypesSet: Gen[Set[Node.Type]] = Gen.oneOf(
     Set(
       "http://www.w3.org/ns/prov#Entity",
@@ -38,10 +39,11 @@ object LineageGenerators {
   )
 
   implicit val nodes: Gen[Node] = for {
-    id    <- nodeIds
-    label <- nodeLabels
-    types <- nodeTypesSet
-  } yield Node(id, label, types)
+    id       <- nodeIds
+    location <- nodeLocations
+    label    <- nodeLabels
+    types    <- nodeTypesSet
+  } yield Node(id, location, label, types)
 
   implicit val edges: Gen[Edge] = for {
     sourceNodeId <- nodeIds
