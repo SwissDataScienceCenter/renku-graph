@@ -19,7 +19,6 @@
 package ch.datascience.knowledgegraph.lineage.graphql
 
 import cats.effect.IO
-import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.knowledgegraph.graphql.Arguments._
 import ch.datascience.knowledgegraph.graphql.CommonQueryFields._
@@ -39,20 +38,13 @@ object QueryFields {
         name        = "lineage",
         fieldType   = OptionType(lineageType),
         description = Some("Returns a lineage for a project with the given path"),
-        arguments   = List(projectPathArgument, commitIdArgument, filePathArgument),
+        arguments   = List(projectPathArgument, filePathArgument),
         resolve = context =>
           context.ctx.lineageFinder
-            .findLineage(context.args arg projectPathArgument,
-                         context.args arg commitIdArgument,
-                         context.args arg filePathArgument)
+            .findLineage(context.args arg projectPathArgument, context.args arg filePathArgument)
             .unsafeToFuture()
       )
     )
-
-  private val commitIdArgument = Argument(
-    name         = "commitId",
-    argumentType = CommitId.toScalarType(description = "Commit Id")
-  )
 
   private val filePathArgument = Argument(
     name         = "filePath",

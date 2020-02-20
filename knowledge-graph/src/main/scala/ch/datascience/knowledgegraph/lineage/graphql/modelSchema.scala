@@ -27,8 +27,23 @@ private object modelSchema {
     name        = "node",
     description = "Lineage node",
     fields[Unit, Node](
-      Field("id", StringType, Some("Node identifier"), resolve = _.value.id.toString),
-      Field("label", StringType, Some("Node label"), resolve   = _.value.label.toString)
+      Field("id", StringType, Some("Node identifier"), resolve     = _.value.id.toString),
+      Field("location", StringType, Some("Node location"), resolve = _.value.location.toString),
+      Field("label", StringType, Some("Node label"), resolve       = _.value.label.toString),
+      Field(
+        "type",
+        EnumType(
+          "NodeType",
+          description = None,
+          values = List(
+            EnumValue(Node.SingleWordType.ProcessRun.name, value = Node.SingleWordType.ProcessRun),
+            EnumValue(Node.SingleWordType.Directory.name, value  = Node.SingleWordType.Directory),
+            EnumValue(Node.SingleWordType.File.name, value       = Node.SingleWordType.File)
+          )
+        ),
+        Some("Node type"),
+        resolve = _.value.singleWordType.fold[Node.SingleWordType](throw _, identity)
+      )
     )
   )
 
@@ -36,8 +51,8 @@ private object modelSchema {
     name        = "edge",
     description = "Lineage edge",
     fields = fields[Unit, Edge](
-      Field("source", StringType, Some("Source node"), resolve = _.value.source.id.toString),
-      Field("target", StringType, Some("Target node"), resolve = _.value.target.id.toString)
+      Field("source", StringType, Some("Source node"), resolve = _.value.source.toString),
+      Field("target", StringType, Some("Target node"), resolve = _.value.target.toString)
     )
   )
 

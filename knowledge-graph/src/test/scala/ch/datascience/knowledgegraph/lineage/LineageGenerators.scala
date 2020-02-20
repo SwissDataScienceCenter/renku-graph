@@ -19,33 +19,34 @@
 package ch.datascience.knowledgegraph.lineage
 
 import ch.datascience.generators.Generators._
-import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
 import ch.datascience.knowledgegraph.lineage.model._
 import eu.timepit.refined.auto._
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen
 
 object LineageGenerators {
 
-  implicit val nodeIds:    Gen[NodeId]    = nonBlankStrings(minLength = 3) map (_.value) map NodeId.apply
-  implicit val nodeLabels: Gen[NodeLabel] = nonBlankStrings(minLength = 3) map (_.value) map NodeLabel.apply
-
-  implicit val sourceNodes: Gen[SourceNode] = for {
-    id    <- nodeIds
-    label <- nodeLabels
-  } yield SourceNode(id, label)
-
-  implicit val targetNodes: Gen[TargetNode] = for {
-    id    <- nodeIds
-    label <- nodeLabels
-  } yield TargetNode(id, label)
+  implicit val nodeIds:       Gen[Node.Id]       = nonBlankStrings(minLength = 3) map (_.value) map Node.Id.apply
+  implicit val nodeLocations: Gen[Node.Location] = relativePaths() map Node.Location.apply
+  implicit val nodeLabels:    Gen[Node.Label]    = nonBlankStrings(minLength = 3) map (_.value) map Node.Label.apply
+  implicit val nodeTypesSet: Gen[Set[Node.Type]] = Gen.oneOf(
+    Set(
+      "http://www.w3.org/ns/prov#Entity",
+      "http://purl.org/wf4ever/wfprov#Artifact",
+      "http://www.w3.org/ns/prov#Collection"
+    ).map(Node.Type.apply),
+    Set("http://www.w3.org/ns/prov#Entity", "http://purl.org/wf4ever/wfprov#Artifact").map(Node.Type.apply),
+    Set("http://www.w3.org/ns/prov#Activity", "http://purl.org/wf4ever/wfprov#ProcessRun").map(Node.Type.apply)
+  )
 
   implicit val nodes: Gen[Node] = for {
-    source <- Arbitrary.arbBool.arbitrary
-    node   <- if (source) sourceNodes else targetNodes
-  } yield node
+    id       <- nodeIds
+    location <- nodeLocations
+    label    <- nodeLabels
+    types    <- nodeTypesSet
+  } yield Node(id, location, label, types)
 
   implicit val edges: Gen[Edge] = for {
-    sourceNode <- sourceNodes
-    targetNode <- targetNodes
-  } yield Edge(sourceNode, targetNode)
+    sourceNodeId <- nodeIds
+    targetNodeId <- nodeIds
+  } yield Edge(sourceNodeId, targetNodeId)
 }

@@ -26,8 +26,7 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.EventsGenerators.projects
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
+import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.entities.bundles.exemplarLineageFlow.NodeDef
@@ -40,15 +39,13 @@ import org.scalatest.{FeatureSpec, GivenWhenThen}
 import sangria.ast.Document
 import sangria.macros._
 
+import scala.collection.Set
+
 class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
-  private val project = projects.generateOne.copy(path = ProjectPath("namespace/lineage-project"))
-  private val (jsons, examplarData) = exemplarLineageFlow(
-    project.path,
-    CommitId("0000012"),
-    FilePath("figs/grid_plot.png")
-  )
+  private val project               = projects.generateOne.copy(path = ProjectPath("namespace/lineage-project"))
+  private val (jsons, examplarData) = exemplarLineageFlow(project.path)
   import examplarData._
 
   feature("GraphQL query to find lineage") {
@@ -82,7 +79,6 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
         namedLineageQuery,
         variables = Map(
           "projectPath" -> project.path.toString,
-          "commitId"    -> commitId.toString,
           "filePath"    -> filePath.toString
         )
       )
@@ -98,10 +94,12 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private val lineageQuery: Document = graphql"""
     {
-      lineage(projectPath: "namespace/lineage-project", commitId: "0000012", filePath: "figs/grid_plot.png") {
+      lineage(projectPath: "namespace/lineage-project", filePath: "figs/grid_plot.png") {
         nodes {
           id
+          location
           label
+          type
         }
         edges {
           source
@@ -111,11 +109,13 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
     }"""
 
   private val namedLineageQuery: Document = graphql"""
-    query($$projectPath: ProjectPath!, $$commitId: CommitId!, $$filePath: FilePath!) { 
-      lineage(projectPath: $$projectPath, commitId: $$commitId, filePath: $$filePath) { 
+    query($$projectPath: ProjectPath!, $$filePath: FilePath!) { 
+      lineage(projectPath: $$projectPath, filePath: $$filePath) { 
         nodes {
           id
+          location
           label
+          type
         }
         edges {
           source
@@ -126,32 +126,46 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private lazy val theExpectedEdges = Right {
     Set(
-      json"""{"source": ${`sha10 zhbikes`.toNodeId},            "target": ${`sha12 step2 renku update`.toNodeId}}""",
-      json"""{"source": ${`sha7 plot_data`.toNodeId},           "target": ${`sha9 renku run`.toNodeId}}""",
-      json"""{"source": ${`sha7 plot_data`.toNodeId},           "target": ${`sha12 step1 renku update`.toNodeId}}""",
-      json"""{"source": ${`sha12 parquet`.toNodeId},            "target": ${`sha12 step1 renku update`.toNodeId}}""",
-      json"""{"source": ${`sha12 step1 renku update`.toNodeId}, "target": ${`sha12 step2 grid_plot`.toNodeId}}""",
-      json"""{"source": ${`sha7 clean_data`.toNodeId},          "target": ${`sha8 renku run`.toNodeId}}""",
-      json"""{"source": ${`sha12 step2 renku update`.toNodeId}, "target": ${`sha12 parquet`.toNodeId}}""",
-      json"""{"source": ${`sha7 clean_data`.toNodeId},          "target": ${`sha12 step2 renku update`.toNodeId}}"""
+      json"""{"source": ${`sha3 zhbikes`.id},             "target": ${`sha8 renku run`.id}}""",
+      json"""{"source": ${`sha7 plot_data`.id},           "target": ${`sha9 renku run`.id}}""",
+      json"""{"source": ${`sha7 plot_data`.id},           "target": ${`sha12 step1 renku update`.id}}""",
+      json"""{"source": ${`sha7 clean_data`.id},          "target": ${`sha8 renku run`.id}}""",
+      json"""{"source": ${`sha7 clean_data`.id},          "target": ${`sha12 step2 renku update`.id}}""",
+      json"""{"source": ${`sha8 renku run`.id},           "target": ${`sha8 parquet`.id}}""",
+      json"""{"source": ${`sha8 parquet`.id},             "target": ${`sha9 renku run`.id}}""",
+      json"""{"source": ${`sha9 renku run`.id},           "target": ${`sha9 plot_data`.id}}""",
+      json"""{"source": ${`sha10 zhbikes`.id},            "target": ${`sha12 step2 renku update`.id}}""",
+      json"""{"source": ${`sha12 parquet`.id},            "target": ${`sha12 step1 renku update`.id}}""",
+      json"""{"source": ${`sha12 step1 renku update`.id}, "target": ${`sha12 step2 grid_plot`.id}}""",
+      json"""{"source": ${`sha12 step2 renku update`.id}, "target": ${`sha12 parquet`.id}}"""
     )
   }
 
   private lazy val theExpectedNodes = Right {
     Set(
-      json"""{"id": ${`sha7 clean_data`.toNodeId},        "label": ${`sha7 clean_data`.label}}""",
-      json"""{"id": ${`sha7 plot_data`.toNodeId},      "label": ${`sha7 plot_data`.label}}""",
-      json"""{"id": ${`sha8 renku run`.toNodeId},      "label": ${`sha8 renku run`.label}}""",
-      json"""{"id": ${`sha9 renku run`.toNodeId},         "label": ${`sha9 renku run`.label}}""",
-      json"""{"id": ${`sha10 zhbikes`.toNodeId}, "label": ${`sha10 zhbikes`.label}}""",
-      json"""{"id": ${`sha12 step1 renku update`.toNodeId},         "label": ${`sha12 step1 renku update`.label}}""",
-      json"""{"id": ${`sha12 step2 grid_plot`.toNodeId},      "label": ${`sha12 step2 grid_plot`.label}}""",
-      json"""{"id": ${`sha12 step2 renku update`.toNodeId},      "label": ${`sha12 step2 renku update`.label}}""",
-      json"""{"id": ${`sha12 parquet`.toNodeId},      "label": ${`sha12 parquet`.label}}"""
+      json"""{"id": ${`sha3 zhbikes`.id},             "location": ${`sha3 zhbikes`.location},             "label": ${`sha3 zhbikes`.label},             "type": ${`sha3 zhbikes`.singleWordType}            }""",
+      json"""{"id": ${`sha7 clean_data`.id},          "location": ${`sha7 clean_data`.location},          "label": ${`sha7 clean_data`.label},          "type": ${`sha7 clean_data`.singleWordType}         }""",
+      json"""{"id": ${`sha7 plot_data`.id},           "location": ${`sha7 plot_data`.location},           "label": ${`sha7 plot_data`.label},           "type": ${`sha7 plot_data`.singleWordType}          }""",
+      json"""{"id": ${`sha8 renku run`.id},           "location": ${`sha8 renku run`.location},           "label": ${`sha8 renku run`.label},           "type": ${`sha8 renku run`.singleWordType}          }""",
+      json"""{"id": ${`sha8 parquet`.id},             "location": ${`sha8 parquet`.location},             "label": ${`sha8 parquet`.label},             "type": ${`sha8 parquet`.singleWordType}            }""",
+      json"""{"id": ${`sha9 renku run`.id},           "location": ${`sha9 renku run`.location},           "label": ${`sha9 renku run`.label},           "type": ${`sha9 renku run`.singleWordType}          }""",
+      json"""{"id": ${`sha9 plot_data`.id},           "location": ${`sha9 plot_data`.location},           "label": ${`sha9 plot_data`.label},           "type": ${`sha9 plot_data`.singleWordType}          }""",
+      json"""{"id": ${`sha10 zhbikes`.id},            "location": ${`sha10 zhbikes`.location},            "label": ${`sha10 zhbikes`.label},            "type": ${`sha10 zhbikes`.singleWordType}           }""",
+      json"""{"id": ${`sha12 step1 renku update`.id}, "location": ${`sha12 step1 renku update`.location}, "label": ${`sha12 step1 renku update`.label}, "type": ${`sha12 step1 renku update`.singleWordType}}""",
+      json"""{"id": ${`sha12 step2 grid_plot`.id},    "location": ${`sha12 step2 grid_plot`.location},    "label": ${`sha12 step2 grid_plot`.label},    "type": ${`sha12 step2 grid_plot`.singleWordType}   }""",
+      json"""{"id": ${`sha12 step2 renku update`.id}, "location": ${`sha12 step2 renku update`.location}, "label": ${`sha12 step2 renku update`.label}, "type": ${`sha12 step2 renku update`.singleWordType}}""",
+      json"""{"id": ${`sha12 parquet`.id},            "location": ${`sha12 parquet`.location},            "label": ${`sha12 parquet`.label},            "type": ${`sha12 parquet`.singleWordType}           }"""
     )
   }
 
-  private implicit class ResourceNameOps(node: NodeDef) {
-    lazy val toNodeId: String = node.name.replace(fusekiBaseUrl.value, "")
+  private implicit class NodeOps(node: NodeDef) {
+
+    private lazy val FileTypes = Set("http://www.w3.org/ns/prov#Entity", "http://purl.org/wf4ever/wfprov#Artifact")
+
+    lazy val singleWordType: String = node.types match {
+      case types if types contains "http://purl.org/wf4ever/wfprov#ProcessRun" => "ProcessRun"
+      case types if types contains "http://www.w3.org/ns/prov#Collection"      => "Directory"
+      case FileTypes                                                           => "File"
+    }
   }
 }

@@ -19,11 +19,11 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
 import ch.datascience.knowledgegraph.lineage
 import ch.datascience.knowledgegraph.lineage.LineageFinder
-import ch.datascience.knowledgegraph.lineage.model.Node.{SourceNode, TargetNode}
+import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model._
 import io.circe.Json
 import io.circe.literal._
@@ -52,10 +52,12 @@ class QuerySchemaSpec
     "allow to search for lineage of a given projectPath, commitId and file" in new LineageTestCase {
       val query = graphql"""
         {
-          lineage(projectPath: "namespace/project", commitId: "1234567", filePath: "directory/file") {
+          lineage(projectPath: "namespace/project", filePath: "directory/file") {
             nodes {
               id
+              location
               label
+              type
             }
             edges {
               source
@@ -64,7 +66,7 @@ class QuerySchemaSpec
           }
         }"""
 
-      givenFindLineage(ProjectPath("namespace/project"), CommitId("1234567"), FilePath("directory/file"))
+      givenFindLineage(ProjectPath("namespace/project"), FilePath("directory/file"))
         .returning(IO.pure(Some(lineage)))
 
       execute(query) shouldBe json(lineage)
@@ -86,42 +88,43 @@ class QuerySchemaSpec
 
   private trait LineageTestCase extends TestCase {
 
-    def givenFindLineage(
-        projectPath: ProjectPath,
-        commitId:    CommitId,
-        filePath:    FilePath
-    ) = new {
+    def givenFindLineage(projectPath: ProjectPath, filePath: FilePath) = new {
       def returning(result: IO[Option[Lineage]]) =
         (lineageFinder
-          .findLineage(_: ProjectPath, _: CommitId, _: FilePath))
-          .expects(projectPath, commitId, filePath)
+          .findLineage(_: ProjectPath, _: FilePath))
+          .expects(projectPath, filePath)
           .returning(result)
     }
 
-    private val sourceNode = SourceNode(NodeId("node-1"), NodeLabel("node-1-label"))
-    private val targetNode = TargetNode(NodeId("node-2"), NodeLabel("node-2-label"))
-    lazy val lineage       = Lineage(edges = Set(Edge(sourceNode, targetNode)), nodes = Set(sourceNode, targetNode))
+    private val sourceNode = nodes.generateOne
+    private val targetNode = nodes.generateOne
+    lazy val lineage       = Lineage(edges = Set(Edge(sourceNode.id, targetNode.id)), nodes = Set(sourceNode, targetNode))
 
-    def json(lineage: Lineage) = json"""
-        {
-          "data" : {
-            "lineage" : {
-              "nodes" : ${Json.arr(lineage.nodes.map(toJson).to[List]: _*)},
-              "edges" : ${Json.arr(lineage.edges.map(toJson).to[List]: _*)}
-            }
+    def json(lineage: Lineage) =
+      json"""
+      {
+        "data": {
+          "lineage": {
+            "nodes": ${Json.arr(lineage.nodes.map(toJson).to[List]: _*)},
+            "edges": ${Json.arr(lineage.edges.map(toJson).to[List]: _*)}
           }
-        }"""
+        }
+      }"""
 
-    private def toJson(node: Node) = json"""
-        {
-          "id" : ${node.id.value},
-          "label" : ${node.label.value}
-        }"""
+    private def toJson(node: Node) =
+      json"""
+      {
+        "id": ${node.id.value},
+        "location": ${node.location.value},
+        "label": ${node.label.value},
+        "type": ${node.singleWordType.fold(throw _, identity).name}
+      }"""
 
-    private def toJson(edge: Edge) = json"""
-        {
-          "source" : ${edge.source.id.value},
-          "target" : ${edge.target.id.value}
-        }"""
+    private def toJson(edge: Edge) =
+      json"""
+      {
+        "source" : ${edge.source.value},
+        "target" : ${edge.target.value}
+      }"""
   }
 }

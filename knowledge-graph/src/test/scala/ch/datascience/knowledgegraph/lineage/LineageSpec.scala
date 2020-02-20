@@ -37,7 +37,7 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "succeed if all the edges have nodes definitions" in {
       forAll(edgesSets) { edgesSet =>
-        val nodesSet                                 = collectNodes(edgesSet)
+        val nodesSet                                 = generateNodes(edgesSet)
         val Right(Lineage(actualEdges, actualNodes)) = Lineage.from[EitherLineage](edgesSet, nodesSet)
 
         actualEdges shouldBe edgesSet
@@ -47,7 +47,7 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "fail if there are edges with no nodes definitions" in {
       val edgesSet        = edgesSets.generateOne
-      val nodesSet        = collectNodes(edgesSet)
+      val nodesSet        = generateNodes(edgesSet)
       val nodeToBeMissing = Gen.oneOf(nodesSet.toList).generateOne
 
       val Left(exception) = Lineage.from[EitherLineage](edgesSet, nodesSet - nodeToBeMissing)
@@ -58,7 +58,7 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "fail if there are orphan nodes" in {
       val edgesSet = edgesSets.generateOne
-      val nodesSet = collectNodes(edgesSet) + nodes.generateOne
+      val nodesSet = generateNodes(edgesSet) + nodes.generateOne
 
       val Left(exception) = Lineage.from[EitherLineage](edgesSet, nodesSet)
 
@@ -67,13 +67,66 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
+  "singleWordType" should {
+
+    s"return '${Node.SingleWordType.ProcessRun}' " +
+      "if node contains the 'http://purl.org/wf4ever/wfprov#ProcessRun' type" in {
+      val node = nodes.generateOne.copy(
+        types = Set(
+          "http://www.w3.org/ns/prov#Activity",
+          "http://purl.org/wf4ever/wfprov#ProcessRun"
+        ).map(Node.Type.apply)
+      )
+
+      node.singleWordType shouldBe Right(Node.SingleWordType.ProcessRun)
+    }
+
+    s"return '${Node.SingleWordType.File}' " +
+      "if node contains the 'http://www.w3.org/ns/prov#Entity' type but not 'http://www.w3.org/ns/prov#Collection'" in {
+      val node = nodes.generateOne.copy(
+        types = Set(
+          "http://www.w3.org/ns/prov#Entity",
+          "http://purl.org/wf4ever/wfprov#Artifact"
+        ).map(Node.Type.apply)
+      )
+
+      node.singleWordType shouldBe Right(Node.SingleWordType.File)
+    }
+
+    s"return '${Node.SingleWordType.Directory}' " +
+      "if node contains the 'http://www.w3.org/ns/prov#Entity' and 'http://www.w3.org/ns/prov#Collection' types" in {
+      val node = nodes.generateOne.copy(
+        types = Set(
+          "http://www.w3.org/ns/prov#Entity",
+          "http://purl.org/wf4ever/wfprov#Artifact",
+          "http://www.w3.org/ns/prov#Collection"
+        ).map(Node.Type.apply)
+      )
+
+      node.singleWordType shouldBe Right(Node.SingleWordType.Directory)
+    }
+
+    "return an Exception there's no match to the given types" in {
+      val types = Set(
+        "http://purl.org/wf4ever/wfprov#Artifact",
+        "http://schema.org/Dataset"
+      )
+
+      val Left(exception) = nodes.generateOne
+        .copy(types = types.map(Node.Type.apply))
+        .singleWordType
+
+      exception.getMessage shouldBe s"${types.mkString(", ")} cannot be converted to a NodeType"
+    }
+  }
+
   private val edgesSets: Gen[Set[Edge]] = for {
-    edgesNumber <- positiveInts()
+    edgesNumber <- positiveInts(max               = 20)
     edgesSet    <- setOf[Edge](edges, minElements = 1, maxElements = edgesNumber)
   } yield edgesSet
 
-  private def collectNodes(edges: Set[Edge]): Set[Node] =
-    edges.foldLeft(Set.empty[Node]) { (nodes, edge) =>
-      nodes + edge.source + edge.target
+  private def generateNodes(edges: Set[Edge]): Set[Node] =
+    edges.foldLeft(Set.empty[Node]) { (acc, edge) =>
+      acc + nodes.generateOne.copy(id = edge.source) + nodes.generateOne.copy(id = edge.target)
     }
 }

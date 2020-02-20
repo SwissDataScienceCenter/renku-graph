@@ -86,7 +86,7 @@ object StandardActivity {
                        fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[StandardActivity] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
-        EntityId of (fusekiBaseUrl / "commit" / entity.id),
+        EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.id),
         EntityTypes of (prov / "Activity"),
         Activity.toProperties(entity) :+ rdfs / "label" -> entity.id.asJsonLD
       )

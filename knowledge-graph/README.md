@@ -221,8 +221,8 @@ Query example:
 ```
 {
   "query": "{ 
-    lineage(projectPath: \"namespace/project\", commitId: \"6e4f4cc8d30886a9f17192c65db6c799602bcd7d\", filePath: \"zhbikes.parquet\") {
-      nodes { id label } 
+    lineage(projectPath: \"namespace/project\", filePath: \"zhbikes.parquet\") {
+      nodes { id location label type } 
       edges { source target } 
     } 
   }"
@@ -247,15 +247,21 @@ Response body example:
       "nodes": [
         {
           "id": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
-          "label": "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297"
+          "location": "data/zhbikes",
+          "label": "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297",
+          "type": "Directory"
         },
         {
           "id": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "label": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet"
+          "location": ".renku/workflow/3144e9aa470441cf905f94105e1d27ca_python.cwl",
+          "label": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet",
+          "type": "ProcessRun"
         },
         {
           "id": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
-          "label": "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87"
+          "location": "data/preprocessed/zhbikes.parquet",
+          "label": "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "type": "File"
         }
       ]
     }

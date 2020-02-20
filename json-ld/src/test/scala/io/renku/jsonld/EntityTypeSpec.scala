@@ -18,27 +18,20 @@
 
 package io.renku.jsonld
 
-import io.circe.DecodingFailure
-import io.renku.jsonld.JsonLD.JsonLDValue
-import io.renku.jsonld.JsonLDDecoder.Result
+import io.renku.jsonld.generators.Generators.Implicits._
+import io.renku.jsonld.generators.JsonLDGenerators._
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-/**
-  * A type class that provides a conversion from a [[Cursor]] to an object of type `A`
-  */
-trait JsonLDDecoder[A] extends Serializable {
-  def apply(cursor: Cursor): Result[A]
-}
+class EntityTypeSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-object JsonLDDecoder {
+  "toString" should {
 
-  import cats.implicits._
-
-  type Result[A] = Either[DecodingFailure, A]
-
-  implicit val decodeJsonLD: JsonLDDecoder[JsonLD] = (cursor: Cursor) => cursor.jsonLD.asRight[DecodingFailure]
-  implicit val decodeString: JsonLDDecoder[String] = (cursor: Cursor) =>
-    cursor.jsonLD match {
-      case JsonLDValue(value: String, _) => Right(value)
-      case json => Left(DecodingFailure(s"Cannot decode $json to String", Nil))
+    "return the value" in {
+      forAll { typ: EntityType =>
+        typ.toString shouldBe typ.value
+      }
     }
+  }
 }
