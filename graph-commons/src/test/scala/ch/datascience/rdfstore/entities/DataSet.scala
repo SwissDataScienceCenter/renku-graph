@@ -40,12 +40,15 @@ object DataSet {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
+  def entityId(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
+    EntityId of (renkuBaseUrl / "datasets" / identifier)
+
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[DataSet] = {
     implicit val creatorsOrdering: Ordering[Person] = Ordering.by((p: Person) => p.name.value)
 
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
-        EntityId of (renkuBaseUrl / "datasets" / entity.id),
+        entityId(entity.id),
         EntityTypes of (prov / "Entity", wfprov / "Artifact", schema / "Dataset"),
         prov / "atLocation"          -> entity.generation.filePath.asJsonLD,
         prov / "qualifiedGeneration" -> entity.generation.asJsonLD,

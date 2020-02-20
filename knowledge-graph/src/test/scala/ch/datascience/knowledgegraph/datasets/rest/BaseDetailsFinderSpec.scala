@@ -18,17 +18,23 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
+import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.PublishedDate
+import ch.datascience.graph.model.datasets.{PublishedDate, SameAs}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.Dataset
+import ch.datascience.rdfstore.entities.DataSet
 import io.circe.literal._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
   import BaseDetailsFinder._
 
@@ -40,8 +46,8 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
           List(
             dataset
               .copy(published = dataset.published.copy(maybeDate = Some(publishedDate), creators = Set.empty))
+              .copy(sameAs = SameAs(DataSet.entityId(dataset.id).value))
               .copy(maybeUrl = None)
-              .copy(maybeSameAs = None)
               .copy(maybeDescription = None)
               .copy(parts = Nil)
               .copy(projects = Nil)
@@ -56,6 +62,7 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
     "results": {
       "bindings": [
         {
+          "datasetId": {"value": ${DataSet.entityId(dataset.id).value}},
           "identifier": {"value": ${dataset.id.value}},
           "name": {"value": ${dataset.name.value}},
           "publishedDate": {"value": ${publishedDate.value}},

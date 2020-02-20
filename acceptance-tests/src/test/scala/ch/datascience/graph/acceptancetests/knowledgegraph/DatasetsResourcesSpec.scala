@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -30,7 +31,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, SameAs}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.client.AccessToken
@@ -97,6 +98,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         )(
           datasetIdentifier         = dataset1.id,
           datasetName               = dataset1.name,
+          maybeDatasetSameAs        = dataset1.sameAs.some,
           maybeDatasetDescription   = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
           datasetCreators           = dataset1.published.creators.map(toPerson),
@@ -115,6 +117,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         )(
           datasetIdentifier         = dataset2.id,
           datasetName               = dataset2.name,
+          maybeDatasetSameAs        = dataset2.sameAs.some,
           maybeDatasetDescription   = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
           datasetCreators           = dataset2.published.creators.map(toPerson),
@@ -280,9 +283,6 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       `data in the RDF store`(firstProject.toGitLabProject(), commitId, datasetJsonLD)
       `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
 
-      val commonSameAs = dataset.maybeSameAs orElse datasetJsonLD.entityId.flatMap { id =>
-        SameAs.fromId(id.value).toOption
-      }
       otherProjects foreach { project =>
         val commitId = commitIds.generateOne
         `data in the RDF store`(
@@ -292,8 +292,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
                           commitId,
                           CommittedDate(committedDate.value plusSeconds positiveInts().generateOne.value),
                           dataset,
-                          datasetIdentifiers.generateSome,
-                          commonSameAs)
+                          datasetIdentifiers.generateSome)
         )
         `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
       }
@@ -303,8 +302,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
                         commitId:             CommitId,
                         committedDate:        CommittedDate,
                         dataset:              Dataset,
-                        overriddenIdentifier: Option[Identifier] = None,
-                        overriddenSameAs:     Option[SameAs] = None) =
+                        overriddenIdentifier: Option[Identifier] = None) =
       dataSetCommit(
         commitId      = commitId,
         committedDate = committedDate,
@@ -315,7 +313,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       )(
         datasetIdentifier         = overriddenIdentifier getOrElse dataset.id,
         datasetName               = dataset.name,
-        maybeDatasetSameAs        = overriddenSameAs orElse dataset.maybeSameAs,
+        maybeDatasetSameAs        = dataset.sameAs.some,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
         datasetCreators           = dataset.published.creators map toPerson
