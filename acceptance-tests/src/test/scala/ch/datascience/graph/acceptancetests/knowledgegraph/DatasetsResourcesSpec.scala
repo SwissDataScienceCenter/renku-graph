@@ -332,7 +332,8 @@ object DatasetsResources {
   def briefJson(dataset: Dataset): Json = json"""
     {
       "identifier": ${dataset.id.value}, 
-      "name": ${dataset.name.value}
+      "name": ${dataset.name.value},
+      "sameAs": ${dataset.sameAs.value}
     }""" deepMerge {
     _links(
       Link(Rel("details"), Href(renkuResourcesUrl / "datasets" / dataset.id))

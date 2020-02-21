@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
@@ -74,8 +75,9 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           projectName        = project.name,
           projectDateCreated = project.created.date
         )(
-          datasetIdentifier = dataset.id,
-          datasetName       = dataset.name
+          datasetIdentifier  = dataset.id,
+          datasetName        = dataset.name,
+          maybeDatasetSameAs = dataset.sameAs.some
         )
       )
 
