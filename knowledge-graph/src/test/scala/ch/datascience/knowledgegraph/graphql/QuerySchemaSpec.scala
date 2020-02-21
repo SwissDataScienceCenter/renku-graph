@@ -98,7 +98,10 @@ class QuerySchemaSpec
 
     private val sourceNode = nodes.generateOne
     private val targetNode = nodes.generateOne
-    lazy val lineage       = Lineage(edges = Set(Edge(sourceNode.id, targetNode.id)), nodes = Set(sourceNode, targetNode))
+    lazy val lineage = Lineage(
+      edges = Set(Edge(sourceNode.location, targetNode.location)),
+      nodes = Set(sourceNode, targetNode)
+    )
 
     def json(lineage: Lineage) =
       json"""
@@ -114,7 +117,7 @@ class QuerySchemaSpec
     private def toJson(node: Node) =
       json"""
       {
-        "id": ${node.id.value},
+        "id": ${node.location.value},
         "location": ${node.location.value},
         "label": ${node.label.value},
         "type": ${node.singleWordType.fold(throw _, identity).name}

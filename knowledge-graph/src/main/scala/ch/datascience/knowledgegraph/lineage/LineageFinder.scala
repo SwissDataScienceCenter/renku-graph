@@ -45,15 +45,17 @@ class IOLineageFinder(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with LineageFinder[IO] {
 
+  private type EdgeData = (Node.Id, Node.Location, Node.Id, Node.Location)
+
   override def findLineage(projectPath: ProjectPath, filePath: FilePath): IO[Option[Lineage]] =
     for {
-      edges <- queryExpecting[Set[Edge]](using = query(projectPath, filePath))
-      nodes <- edges.toNodeIdSet.toList
+      edgesAndLocations <- queryExpecting[Set[EdgeData]](using = query(projectPath, filePath))
+      nodes <- edgesAndLocations.toNodesIdsSet.toList
                 .map(toNodeQuery(projectPath))
                 .map(queryExpecting[Option[Node]](_).flatMap(toNodeOrError(projectPath)))
                 .parSequence
                 .map(_.toSet)
-      maybeLineage <- toLineage(edges, nodes)
+      maybeLineage <- toLineage(edgesAndLocations, nodes)
     } yield maybeLineage
 
   private def query(path: ProjectPath, filePath: FilePath) = SparqlQuery(
@@ -61,10 +63,11 @@ class IOLineageFinder(
     Set(
       "PREFIX prov: <http://www.w3.org/ns/prov#>",
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
       "PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT ?sourceId ?targetId
+    s"""|SELECT ?sourceId ?sourceLocation ?targetId ?targetLocation
         |WHERE {
         |  {
         |    SELECT (MIN(?startedAt) AS ?minStartedAt)
@@ -92,16 +95,24 @@ class IOLineageFinder(
         |    GROUP BY ?entity
         |  } {
         |    ?entity prov:qualifiedGeneration/prov:activity ?activity.
+        |    FILTER NOT EXISTS {?entity rdfs:comment "renku update"}
+        |    FILTER NOT EXISTS {?activity rdfs:comment "renku update"}
         |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
         |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
         |    BIND (?entity AS ?targetId)
         |    BIND (?activity AS ?sourceId)
+        |    ?sourceId prov:atLocation ?sourceLocation.
+        |    ?targetId prov:atLocation ?targetLocation.
         |  } UNION {
         |    ?activity prov:qualifiedUsage/prov:entity ?entity.
+        |    FILTER NOT EXISTS {?entity rdfs:comment "renku update"}
+        |    FILTER NOT EXISTS {?activity rdfs:comment "renku update"}
         |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
         |    FILTER EXISTS {?activity rdf:type wfprov:ProcessRun}
         |    BIND (?activity AS ?targetId)
         |    BIND (?entity AS ?sourceId)
+        |    ?sourceId prov:atLocation ?sourceLocation.
+        |    ?targetId prov:atLocation ?targetLocation.
         |  }
         |}
         |""".stripMargin
@@ -114,14 +125,13 @@ class IOLineageFinder(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"
     ),
-    s"""|SELECT ?id ?type ?location ?label ?maybeComment
+    s"""|SELECT ?type ?location ?label ?maybeComment
         |WHERE {
         |  {
         |    ${nodeId.showAs[RdfResource]} rdf:type ?type;
         |                                  rdfs:label ?label;
         |                                  prov:atLocation ?location.
         |    OPTIONAL { ${nodeId.showAs[RdfResource]} rdfs:comment ?maybeComment }
-        |    BIND (${nodeId.showAs[RdfResource]} AS ?id)
         |  }
         |}
         |""".stripMargin
@@ -130,53 +140,54 @@ class IOLineageFinder(
   import ch.datascience.tinytypes.json.TinyTypeDecoders
   import io.circe.Decoder
 
-  private implicit val nodeIdDecoder: Decoder[Node.Id] = TinyTypeDecoders.stringDecoder(Node.Id)
+  private implicit val nodeIdDecoder:   Decoder[Node.Id]       = TinyTypeDecoders.stringDecoder(Node.Id)
+  private implicit val locationDecoder: Decoder[Node.Location] = TinyTypeDecoders.stringDecoder(Node.Location)
 
-  private implicit val edgesDecoder: Decoder[Set[Edge]] = {
-    implicit lazy val edgeDecoder: Decoder[Edge] = { implicit cursor =>
+  private implicit val edgesDecoder: Decoder[Set[EdgeData]] = {
+    implicit lazy val edgeDecoder: Decoder[EdgeData] = { implicit cursor =>
       for {
-        sourceId <- cursor.downField("sourceId").downField("value").as[Node.Id]
-        targetId <- cursor.downField("targetId").downField("value").as[Node.Id]
-      } yield Edge(sourceId, targetId)
+        sourceId       <- cursor.downField("sourceId").downField("value").as[Node.Id]
+        sourceLocation <- cursor.downField("sourceLocation").downField("value").as[Node.Location]
+        targetId       <- cursor.downField("targetId").downField("value").as[Node.Id]
+        targetLocation <- cursor.downField("targetLocation").downField("value").as[Node.Location]
+      } yield (sourceId, sourceLocation, targetId, targetLocation)
     }
 
-    _.downField("results").downField("bindings").as[List[Edge]].map(_.toSet)
+    _.downField("results").downField("bindings").as[List[(Node.Id, Node.Location, Node.Id, Node.Location)]].map(_.toSet)
   }
 
   private implicit val nodeDecoder: Decoder[Option[Node]] = {
-    implicit val labelDecoder:    Decoder[Node.Label]    = TinyTypeDecoders.stringDecoder(Node.Label)
-    implicit val typeDecoder:     Decoder[Node.Type]     = TinyTypeDecoders.stringDecoder(Node.Type)
-    implicit val locationDecoder: Decoder[Node.Location] = TinyTypeDecoders.stringDecoder(Node.Location)
+    implicit val labelDecoder: Decoder[Node.Label] = TinyTypeDecoders.stringDecoder(Node.Label)
+    implicit val typeDecoder:  Decoder[Node.Type]  = TinyTypeDecoders.stringDecoder(Node.Type)
 
-    implicit lazy val fieldsDecoder: Decoder[(Node.Id, Node.Type, Node.Location, Node.Label)] = { implicit cursor =>
+    implicit lazy val fieldsDecoder: Decoder[(Node.Location, Node.Type, Node.Label)] = { implicit cursor =>
       for {
-        id           <- cursor.downField("id").downField("value").as[Node.Id]
         nodeType     <- cursor.downField("type").downField("value").as[Node.Type]
         location     <- cursor.downField("location").downField("value").as[Node.Location]
         label        <- cursor.downField("label").downField("value").as[Node.Label]
         maybeComment <- cursor.downField("maybeComment").downField("value").as[Option[Node.Label]]
-      } yield (id, nodeType, location, maybeComment getOrElse label)
+      } yield (location, nodeType, maybeComment getOrElse label)
     }
 
-    lazy val maybeToNode: List[(Node.Id, Node.Type, Node.Location, Node.Label)] => Option[Node] = {
+    lazy val maybeToNode: List[(Node.Location, Node.Type, Node.Label)] => Option[Node] = {
       case Nil => None
-      case (id, typ, location, label) +: tail =>
+      case (location, typ, label) +: tail =>
         Some {
-          tail.foldLeft(Node(id, location, label, Set(typ))) {
-            case (node, (`id`, t, `location`, `label`)) => node.copy(types = node.types + t)
+          tail.foldLeft(Node(location, label, Set(typ))) {
+            case (node, (`location`, t, `label`)) => node.copy(types = node.types + t)
           }
         }
     }
 
     _.downField("results")
       .downField("bindings")
-      .as[List[(Node.Id, Node.Type, Node.Location, Node.Label)]]
+      .as[List[(Node.Location, Node.Type, Node.Label)]]
       .map(maybeToNode)
   }
 
-  private implicit class EdgesOps(edges: Set[Edge]) {
-    lazy val toNodeIdSet: Set[Node.Id] = edges.foldLeft(Set.empty[Node.Id]) {
-      case (acc, Edge(leftEdge, rightEdge)) => acc + leftEdge + rightEdge
+  private implicit class EdgesAndLocationsOps(edges: Set[EdgeData]) {
+    lazy val toNodesIdsSet: Set[Node.Id] = edges.foldLeft(Set.empty[Node.Id]) {
+      case (acc, (leftEdge, _, rightEdge, _)) => acc + leftEdge + rightEdge
     }
   }
 
@@ -185,9 +196,15 @@ class IOLineageFinder(
     case _          => new Exception(s"Cannot find node details for $projectPath").raiseError[IO, Node]
   }
 
-  private lazy val toLineage: (Set[Edge], Set[Node]) => IO[Option[Lineage]] = {
-    case (edges, _) if edges.isEmpty => IO.pure(Option.empty)
-    case (edges, nodes)              => Lineage.from[IO](edges, nodes) map Option.apply
+  private lazy val toLineage: (Set[EdgeData], Set[Node]) => IO[Option[Lineage]] = {
+    case (edgesAndLocations, _) if edgesAndLocations.isEmpty => IO.pure(Option.empty)
+    case (edgesAndLocations, nodes)                          => Lineage.from[IO](edgesAndLocations.toEdges, nodes) map Option.apply
+  }
+
+  private implicit class EdgeDataOps(edgesAndLocations: Set[EdgeData]) {
+    lazy val toEdges: Set[Edge] = edgesAndLocations map {
+      case (_, sourceLocation, _, targetLocation) => Edge(sourceLocation, targetLocation)
+    }
   }
 }
 

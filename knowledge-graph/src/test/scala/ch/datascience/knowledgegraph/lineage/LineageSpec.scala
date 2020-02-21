@@ -127,6 +127,6 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   private def generateNodes(edges: Set[Edge]): Set[Node] =
     edges.foldLeft(Set.empty[Node]) { (acc, edge) =>
-      acc + nodes.generateOne.copy(id = edge.source) + nodes.generateOne.copy(id = edge.target)
+      acc + nodes.generateOne.copy(location = edge.source) + nodes.generateOne.copy(location = edge.target)
     }
 }
