@@ -60,9 +60,10 @@ class IOProjectFinder(
 
   private def merge(path: ProjectPath, kgProject: KGProject, gitLabProject: GitLabProject) =
     Project(
-      id   = gitLabProject.id,
-      path = path,
-      name = kgProject.name,
+      id         = gitLabProject.id,
+      path       = path,
+      name       = kgProject.name,
+      visibility = gitLabProject.visibility,
       created = Creation(
         date    = kgProject.created.date,
         creator = Creator(kgProject.created.creator.email, kgProject.created.creator.name)

@@ -18,13 +18,15 @@
 
 package ch.datascience.interpreters
 
+import java.util.concurrent.ConcurrentLinkedQueue
+
 import cats.Monad
 import ch.datascience.interpreters.TestLogger.LogMessage._
 import io.chrisdavenport.log4cats.Logger
 import org.scalatest.Assertion
 import org.scalatest.Matchers._
+import scala.collection.JavaConverters._
 
-import scala.collection.mutable.ArrayBuffer
 import scala.language.higherKinds
 
 class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
@@ -33,7 +35,7 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
   import TestLogger._
   import LogMessage._
 
-  private[this] val invocations = ArrayBuffer.empty[LogEntry]
+  private[this] val invocations = new ConcurrentLinkedQueue[LogEntry]()
 
   def logged(expected: LogEntry*): Assertion =
     invocations should contain allElementsOf expected
@@ -48,65 +50,65 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
     loggedOnly(List.fill(times)(expected))
 
   def loggedOnly(expected: List[LogEntry]): Assertion =
-    invocations.to[List] should contain theSameElementsAs expected
+    invocations.asScala.to[List] should contain theSameElementsAs expected
 
   def expectNoLogs(): Unit =
-    if (invocations.nonEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")
+    if (!invocations.isEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")
 
   def reset(): Unit = invocations.clear()
 
   override def error(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Error, MessageAndThrowable(message, t))
+    invocations add LogEntry(Error, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def warn(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Warn, MessageAndThrowable(message, t))
+    invocations add LogEntry(Warn, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def info(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Info, MessageAndThrowable(message, t))
+    invocations add LogEntry(Info, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def debug(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Debug, MessageAndThrowable(message, t))
+    invocations add LogEntry(Debug, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def trace(t: Throwable)(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Trace, MessageAndThrowable(message, t))
+    invocations add LogEntry(Trace, MessageAndThrowable(message, t))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def error(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Error, Message(message))
+    invocations add LogEntry(Error, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def warn(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Warn, Message(message))
+    invocations add LogEntry(Warn, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def info(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Info, Message(message))
+    invocations add LogEntry(Info, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def debug(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Debug, Message(message))
+    invocations add LogEntry(Debug, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   override def trace(message: => String): Interpretation[Unit] = {
-    invocations += LogEntry(Trace, Message(message))
+    invocations add LogEntry(Trace, Message(message))
     implicitly[Monad[Interpretation]].pure(())
   }
 
   private def invocationsPrettyPrint: String =
-    invocations
+    invocations.asScala
       .map {
         case LogEntry(level, Message(message))                        => s"$level '$message'"
         case LogEntry(level, MessageAndThrowable(message, throwable)) => s"$level '$message' $throwable"

@@ -83,11 +83,12 @@ class ProjectEndpoint[Interpretation[_]: Effect](
   private implicit lazy val projectEncoder: Encoder[Project] = Encoder.instance[Project] { project =>
     json"""{
         "identifier": ${project.id.value},
-        "path": ${project.path.toString},
-        "name": ${project.name.toString},
+        "path":       ${project.path.value},
+        "name":       ${project.name.value},
+        "visibility": ${project.visibility.value},
         "created": {
-          "dateCreated": ${project.created.date.toString},
-          "creator": ${project.created.creator}
+          "dateCreated": ${project.created.date.value},
+          "creator":     ${project.created.creator}
         },
         "url": ${project.repoUrls}
     }""" deepMerge _links(
@@ -98,15 +99,15 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val creatorEncoder: Encoder[Creator] = Encoder.instance[Creator] { creator =>
     json"""{
-      "name": ${creator.name.toString},
-      "email": ${creator.email.toString}
+      "name":  ${creator.name.value},
+      "email": ${creator.email.value}
     }"""
   }
 
   private implicit lazy val urlsEncoder: Encoder[RepoUrls] = Encoder.instance[RepoUrls] { urls =>
     json"""{
-      "ssh": ${urls.ssh.toString},
-      "http": ${urls.http.toString}
+      "ssh":  ${urls.ssh.value},
+      "http": ${urls.http.value}
     }"""
   }
 }

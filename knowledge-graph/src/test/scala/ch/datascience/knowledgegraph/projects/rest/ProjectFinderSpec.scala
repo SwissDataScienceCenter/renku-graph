@@ -208,9 +208,10 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
   }
 
   private def projectFrom(kgProject: KGProject, gitLabProject: GitLabProject) = Project(
-    id   = gitLabProject.id,
-    path = kgProject.path,
-    name = kgProject.name,
+    id         = gitLabProject.id,
+    path       = kgProject.path,
+    name       = kgProject.name,
+    visibility = gitLabProject.visibility,
     created = Creation(
       date    = kgProject.created.date,
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)

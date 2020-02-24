@@ -32,10 +32,10 @@ import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, projects => projectsGen}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.Project
+import ch.datascience.graph.model.projects.ProjectVisibility.Public
 import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
-import ch.datascience.webhookservice.project.ProjectVisibility.Public
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive

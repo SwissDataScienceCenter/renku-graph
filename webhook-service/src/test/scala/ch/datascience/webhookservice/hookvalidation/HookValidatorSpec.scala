@@ -25,6 +25,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.ProjectVisibility.{Internal, Private, Public}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
@@ -33,7 +34,6 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
-import ch.datascience.webhookservice.project.ProjectVisibility._
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTokenRemover}
 import io.chrisdavenport.log4cats.Logger

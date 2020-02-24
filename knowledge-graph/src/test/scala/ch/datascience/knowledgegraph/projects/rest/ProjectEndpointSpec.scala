@@ -141,12 +141,13 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
     for {
-      id      <- cursor.downField("identifier").as[ProjectId]
-      path    <- cursor.downField("path").as[ProjectPath]
-      name    <- cursor.downField("name").as[Name]
-      created <- cursor.downField("created").as[Creation]
-      urls    <- cursor.downField("url").as[RepoUrls]
-    } yield Project(id, path, name, created, urls)
+      id         <- cursor.downField("identifier").as[ProjectId]
+      path       <- cursor.downField("path").as[ProjectPath]
+      name       <- cursor.downField("name").as[Name]
+      visibility <- cursor.downField("visibility").as[ProjectVisibility]
+      created    <- cursor.downField("created").as[Creation]
+      urls       <- cursor.downField("url").as[RepoUrls]
+    } yield Project(id, path, name, visibility, created, urls)
 
   private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
     for {

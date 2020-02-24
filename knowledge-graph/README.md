@@ -287,6 +287,7 @@ Response body example:
   "identifier": 123,
   "path": "namespace/project-name", 
   "name": "Some project name",
+  "visibility": "public|private|internal",
   "created": {
     "dateCreated": "2001-09-05T10:48:29.457Z",
     "creator": {

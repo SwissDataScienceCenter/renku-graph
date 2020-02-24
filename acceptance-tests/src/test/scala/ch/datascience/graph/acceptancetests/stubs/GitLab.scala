@@ -24,12 +24,11 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, Project}
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath, ProjectVisibility}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.knowledgegraph.projects.model.{Project => ProjectMetadata}
-import ch.datascience.webhookservice.project.ProjectVisibility
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
@@ -152,6 +151,7 @@ object GitLab {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
         .willReturn(okJson(json"""{
           "id":               ${project.id.value},
+          "visibility":       ${project.visibility.value},
           "ssh_url_to_repo":  ${project.repoUrls.ssh.value},
           "http_url_to_repo": ${project.repoUrls.http.value}
         }""".noSpaces))

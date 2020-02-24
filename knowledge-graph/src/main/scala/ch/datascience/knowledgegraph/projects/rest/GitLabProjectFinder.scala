@@ -22,7 +22,7 @@ import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath, ProjectVisibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
@@ -42,7 +42,7 @@ trait GitLabProjectFinder[Interpretation[_]] {
 
 object GitLabProjectFinder {
 
-  final case class GitLabProject(id: ProjectId, urls: ProjectUrls)
+  final case class GitLabProject(id: ProjectId, visibility: ProjectVisibility, urls: ProjectUrls)
 
   final case class ProjectUrls(http: HttpUrl, ssh: SshUrl)
 }
@@ -80,10 +80,11 @@ private class IOGitLabProjectFinder(
   private implicit lazy val projectDecoder: EntityDecoder[IO, GitLabProject] = {
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        id      <- cursor.downField("id").as[ProjectId]
-        sshUrl  <- cursor.downField("ssh_url_to_repo").as[SshUrl]
-        httpUrl <- cursor.downField("http_url_to_repo").as[HttpUrl]
-      } yield GitLabProject(id, ProjectUrls(httpUrl, sshUrl))
+        id         <- cursor.downField("id").as[ProjectId]
+        visibility <- cursor.downField("visibility").as[ProjectVisibility]
+        sshUrl     <- cursor.downField("ssh_url_to_repo").as[SshUrl]
+        httpUrl    <- cursor.downField("http_url_to_repo").as[HttpUrl]
+      } yield GitLabProject(id, visibility, ProjectUrls(httpUrl, sshUrl))
 
     jsonOf[IO, GitLabProject]
   }

@@ -23,9 +23,10 @@ import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath, ProjectResource}
+import ch.datascience.graph.model.projects._
 import ch.datascience.tinytypes.constraints.{RelativePath, Url}
 import eu.timepit.refined.auto._
+import io.circe.{DecodingFailure, Json}
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -94,6 +95,34 @@ class ProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
       firstChar  <- firstCharGen
       otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
     } yield s"$firstChar${otherChars.toList.mkString("")}"
+  }
+}
+
+class ProjectVisibilitySpec extends WordSpec {
+
+  "Visibility" should {
+
+    "define cases for 'private', 'public' and 'internal'" in {
+      ProjectVisibility.all.map(_.value) should contain only ("private", "public", "internal")
+    }
+  }
+
+  "projectVisibilityDecoder" should {
+
+    ProjectVisibility.all foreach { visibility =>
+      s"deserialize $visibility" in {
+        Json.fromString(visibility.value).as[ProjectVisibility] shouldBe Right(visibility)
+      }
+    }
+
+    "fail for unknown value" in {
+      Json.fromString("unknown").as[ProjectVisibility] shouldBe Left(
+        DecodingFailure(
+          s"'unknown' is not a valid project visibility. Allowed values are: ${ProjectVisibility.all.mkString(", ")}",
+          Nil
+        )
+      )
+    }
   }
 }
 

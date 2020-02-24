@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.{ProjectId, ProjectVisibility}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException

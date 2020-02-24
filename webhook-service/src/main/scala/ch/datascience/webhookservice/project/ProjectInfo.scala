@@ -18,39 +18,7 @@
 
 package ch.datascience.webhookservice.project
 
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
-import ch.datascience.tinytypes.StringTinyType
-import io.circe.Decoder
-
-sealed trait ProjectVisibility extends StringTinyType with Product with Serializable
-
-object ProjectVisibility {
-
-  val all: Set[ProjectVisibility] = Set(Public, Private, Internal)
-
-  implicit lazy val projectVisibilityDecoder: Decoder[ProjectVisibility] =
-    Decoder.decodeString.flatMap { decoded =>
-      all.find(_.value == decoded) match {
-        case Some(value) => Decoder.const(value)
-        case None =>
-          Decoder.failedWithMessage(
-            s"'$decoded' is not a valid project visibility. Allowed values are: ${all.mkString(", ")}"
-          )
-      }
-    }
-
-  final case object Public extends ProjectVisibility {
-    override val value: String = "public"
-  }
-
-  sealed trait TokenProtectedProject extends ProjectVisibility
-  final case object Private extends TokenProtectedProject {
-    override val value: String = "private"
-  }
-  final case object Internal extends TokenProtectedProject {
-    override val value: String = "internal"
-  }
-}
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath, ProjectVisibility}
 
 final case class ProjectInfo(
     id:         ProjectId,

@@ -111,18 +111,19 @@ object ProjectsResources {
   def fullJson(project: Project): Json = json"""
     {
       "identifier": ${project.id.value}, 
-      "path": ${project.path.toString}, 
-      "name": ${project.name.toString},
+      "path": ${project.path.value}, 
+      "name": ${project.name.value},
+      "visibility": ${project.visibility.value},
       "created": {
-        "dateCreated": ${project.created.date.toString},
+        "dateCreated": ${project.created.date.value},
         "creator": {
-          "name": ${project.created.creator.name.toString},
-          "email": ${project.created.creator.email.toString}
+          "name": ${project.created.creator.name.value},
+          "email": ${project.created.creator.email.value}
         }
       },
       "url": {
-        "ssh": ${project.repoUrls.ssh.toString},
-        "http": ${project.repoUrls.http.toString}
+        "ssh": ${project.repoUrls.ssh.value},
+        "http": ${project.repoUrls.http.value}
       }
     }""" deepMerge {
     _links(

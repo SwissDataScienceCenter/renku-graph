@@ -33,9 +33,10 @@ object ProjectsGenerators {
     kgProject     <- kgProjects
     gitLabProject <- gitLabProjects
   } yield Project(
-    id   = gitLabProject.id,
-    path = kgProject.path,
-    name = kgProject.name,
+    id         = gitLabProject.id,
+    path       = kgProject.path,
+    name       = kgProject.name,
+    visibility = gitLabProject.visibility,
     created = Creation(
       date    = kgProject.created.date,
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
@@ -50,9 +51,10 @@ object ProjectsGenerators {
   } yield KGProject(id, name, created)
 
   implicit lazy val gitLabProjects: Gen[GitLabProject] = for {
-    id   <- projectIds
-    urls <- projectUrlObjects
-  } yield GitLabProject(id, urls)
+    id         <- projectIds
+    visibility <- projectVisibilities
+    urls       <- projectUrlObjects
+  } yield GitLabProject(id, visibility, urls)
 
   private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
     sshUrl  <- sshUrls

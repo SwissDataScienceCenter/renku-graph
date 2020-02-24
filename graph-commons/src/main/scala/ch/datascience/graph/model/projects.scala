@@ -65,4 +65,29 @@ object projects {
 
   final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
   object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
+
+  sealed trait ProjectVisibility extends StringTinyType with Product with Serializable
+
+  object ProjectVisibility {
+
+    val all: Set[ProjectVisibility] = Set(Public, Private, Internal)
+
+    sealed trait TokenProtectedProject extends ProjectVisibility
+    final case object Public           extends ProjectVisibility { override val value: String = "public" }
+    final case object Private          extends TokenProtectedProject { override val value: String = "private" }
+    final case object Internal         extends TokenProtectedProject { override val value: String = "internal" }
+
+    import io.circe.Decoder
+
+    implicit lazy val projectVisibilityDecoder: Decoder[ProjectVisibility] =
+      Decoder.decodeString.flatMap { decoded =>
+        all.find(_.value == decoded) match {
+          case Some(value) => Decoder.const(value)
+          case None =>
+            Decoder.failedWithMessage(
+              s"'$decoded' is not a valid project visibility. Allowed values are: ${all.mkString(", ")}"
+            )
+        }
+      }
+  }
 }

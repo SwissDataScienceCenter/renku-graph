@@ -24,9 +24,9 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.projects.ProjectVisibility.Public
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.webhookservice.project.ProjectVisibility.Public
 import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.Matchers._
