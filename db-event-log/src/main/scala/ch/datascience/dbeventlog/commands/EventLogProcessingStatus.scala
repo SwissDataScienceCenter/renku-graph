@@ -28,7 +28,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus, ExecutionDate}
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import doobie.implicits._
 import doobie.util.Read
 import eu.timepit.refined.api.RefType.applyRef
@@ -45,14 +45,14 @@ class EventLogProcessingStatus[Interpretation[_]](
 
   import EventLogProcessingStatus._
 
-  def fetchStatus(projectId: ProjectId): OptionT[Interpretation, ProcessingStatus] =
+  def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus] =
     for {
       latestEvent           <- findTheLatestEvent(projectId)
       events                <- addPreviousFromTheSameBatch(projectId, latestEvent, List(latestEvent))
       maybeProcessingStatus <- toProcessingStatus(events)
     } yield maybeProcessingStatus
 
-  private def findTheLatestEvent(projectId: ProjectId): OptionT[Interpretation, Event] = OptionT(sql"""
+  private def findTheLatestEvent(projectId: Id): OptionT[Interpretation, Event] = OptionT(sql"""
       select event_id, status, execution_date 
       from event_log
       where project_id = $projectId
@@ -60,7 +60,7 @@ class EventLogProcessingStatus[Interpretation[_]](
       limit 1
   """.query[Event].option.transact(transactor.get))
 
-  private def addPreviousFromTheSameBatch(projectId:      ProjectId,
+  private def addPreviousFromTheSameBatch(projectId:      Id,
                                           previousEvent:  Event,
                                           previousEvents: List[Event]): OptionT[Interpretation, List[Event]] =
     OptionT.liftF {
@@ -69,7 +69,7 @@ class EventLogProcessingStatus[Interpretation[_]](
         .getOrElse(previousEvents)
     }
 
-  private def findPreviousFromTheSameBatch(projectId: ProjectId, previousEvent: Event) = OptionT {
+  private def findPreviousFromTheSameBatch(projectId: Id, previousEvent: Event) = OptionT {
     sql"""
         select event_id, status, execution_date
         from event_log

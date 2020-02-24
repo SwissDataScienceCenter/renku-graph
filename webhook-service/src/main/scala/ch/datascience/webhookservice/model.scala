@@ -18,11 +18,8 @@
 
 package ch.datascience.webhookservice
 
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 
 object model {
-
-  final case class HookToken(
-      projectId: ProjectId
-  )
+  final case class HookToken(projectId: Id)
 }

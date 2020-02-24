@@ -24,7 +24,7 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects.ProjectVisibility.Public
+import ch.datascience.graph.model.projects.Visibility.Public
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.circe.literal._

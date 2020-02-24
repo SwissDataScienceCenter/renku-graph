@@ -32,8 +32,8 @@ import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, projects => projectsGen}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.Project
-import ch.datascience.graph.model.projects.ProjectVisibility.Public
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.projects.Visibility.Public
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
@@ -104,8 +104,8 @@ class EventsProcessingStatusSpec
   }
 
   private def givenHookValidationToHookExists(
-      projectId:          ProjectId,
-      projectPath:        ProjectPath
+      projectId:          Id,
+      projectPath:        Path
   )(implicit accessToken: AccessToken): Unit = {
     `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(projectId, projectPath)
     tokenRepositoryClient

@@ -24,7 +24,8 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.server.EndpointTester._
@@ -48,7 +49,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
       val projectId   = projectIds.generateOne
 
       (tokensFinder
-        .findToken(_: ProjectId))
+        .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
@@ -70,7 +71,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
       val projectId   = projectIds.generateOne
 
       (tokensFinder
-        .findToken(_: ProjectId))
+        .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
@@ -92,7 +93,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
       val projectPath = projectPaths.generateOne
 
       (tokensFinder
-        .findToken(_: ProjectPath))
+        .findToken(_: projects.Path))
         .expects(projectPath)
         .returning(OptionT.some[IO](accessToken))
 
@@ -114,7 +115,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
       val projectId   = projectIds.generateOne
 
       (tokensFinder
-        .findToken(_: ProjectId))
+        .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.none[IO, AccessToken])
 
@@ -139,7 +140,7 @@ class FetchTokenEndpointSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (tokensFinder
-        .findToken(_: ProjectId))
+        .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT(IO.raiseError[Option[AccessToken]](exception)))
 

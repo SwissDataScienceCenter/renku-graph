@@ -24,7 +24,7 @@ import ch.datascience.config.renku
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.{Creator, Project, RepoUrls}
@@ -51,7 +51,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  def getProject(path: ProjectPath): Interpretation[Response[Interpretation]] =
+  def getProject(path: projects.Path): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       projectFinder
         .findProject(path)
@@ -60,14 +60,14 @@ class ProjectEndpoint[Interpretation[_]: Effect](
     } map logExecutionTimeWhen(finishedSuccessfully(path))
 
   private def toHttpResult(
-      path: ProjectPath
+      path: projects.Path
   ): Option[Project] => Interpretation[Response[Interpretation]] = {
     case None          => NotFound(InfoMessage(s"No '$path' project found"))
     case Some(project) => Ok(project.asJson)
   }
 
   private def httpResult(
-      path: ProjectPath
+      path: projects.Path
   ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Finding '$path' project failed")
@@ -75,7 +75,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(projectPath: ProjectPath): PartialFunction[Response[Interpretation], String] = {
+  private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[Interpretation], String] = {
     case response if response.status == Ok || response.status == NotFound =>
       s"Finding '$projectPath' details finished"
   }

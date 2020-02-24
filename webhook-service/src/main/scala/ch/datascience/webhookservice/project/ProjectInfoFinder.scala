@@ -21,8 +21,9 @@ package ch.datascience.webhookservice.project
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects.ProjectVisibility.Public
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath, ProjectVisibility}
+import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.Visibility.Public
+import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLab
 import io.chrisdavenport.log4cats.Logger
@@ -32,7 +33,7 @@ import scala.language.higherKinds
 
 trait ProjectInfoFinder[Interpretation[_]] {
   def findProjectInfo(
-      projectId:        ProjectId,
+      projectId:        projects.Id,
       maybeAccessToken: Option[AccessToken]
   ): Interpretation[ProjectInfo]
 }
@@ -55,7 +56,7 @@ class IOProjectInfoFinder(
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: ProjectId, maybeAccessToken: Option[AccessToken]): IO[ProjectInfo] =
+  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): IO[ProjectInfo] =
     for {
       uri         <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
       projectInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
@@ -69,14 +70,14 @@ class IOProjectInfoFinder(
   private implicit lazy val projectInfoDecoder: EntityDecoder[IO, ProjectInfo] = {
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
       for {
-        id         <- cursor.downField("id").as[ProjectId]
-        visibility <- cursor.downField("visibility").as[Option[ProjectVisibility]] map defaultToPublic
-        path       <- cursor.downField("path_with_namespace").as[ProjectPath]
+        id         <- cursor.downField("id").as[projects.Id]
+        visibility <- cursor.downField("visibility").as[Option[Visibility]] map defaultToPublic
+        path       <- cursor.downField("path_with_namespace").as[projects.Path]
       } yield ProjectInfo(id, visibility, path)
 
     jsonOf[IO, ProjectInfo]
   }
 
-  private def defaultToPublic(maybeVisibility: Option[ProjectVisibility]): ProjectVisibility =
+  private def defaultToPublic(maybeVisibility: Option[Visibility]): Visibility =
     maybeVisibility getOrElse Public
 }

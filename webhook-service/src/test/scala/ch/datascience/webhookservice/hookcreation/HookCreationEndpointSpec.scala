@@ -25,7 +25,7 @@ import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
@@ -55,7 +55,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(accessToken))
 
       (hookCreator
-        .createHook(_: ProjectId, _: AccessToken))
+        .createHook(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.pure(HookCreated))
 
@@ -77,7 +77,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(accessToken))
 
       (hookCreator
-        .createHook(_: ProjectId, _: AccessToken))
+        .createHook(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.pure(HookExisted))
 
@@ -116,7 +116,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
 
       val errorMessage = ErrorMessage("some error")
       (hookCreator
-        .createHook(_: ProjectId, _: AccessToken))
+        .createHook(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
@@ -139,7 +139,7 @@ class HookCreationEndpointSpec extends WordSpec with MockFactory {
 
       val errorMessage = ErrorMessage("some error")
       (hookCreator
-        .createHook(_: ProjectId, _: AccessToken))
+        .createHook(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 

@@ -23,14 +23,14 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.dbeventlog._
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import doobie.implicits._
 
 import scala.language.higherKinds
 
 trait EventLogStats[Interpretation[_]] {
   def statuses:      Interpretation[Map[EventStatus, Long]]
-  def waitingEvents: Interpretation[Map[ProjectPath, Long]]
+  def waitingEvents: Interpretation[Map[Path, Long]]
 }
 
 class EventLogStatsImpl[Interpretation[_]](
@@ -49,7 +49,7 @@ class EventLogStatsImpl[Interpretation[_]](
   private def addMissingStatues(stats: Map[EventStatus, Long]): Map[EventStatus, Long] =
     EventStatus.all.map(status => status -> stats.getOrElse(status, 0L)).toMap
 
-  override def waitingEvents: Interpretation[Map[ProjectPath, Long]] =
+  override def waitingEvents: Interpretation[Map[Path, Long]] =
     sql"""|select project_path, sum(events)
           |from (
           |  select project_path, count(event_id) as events 
@@ -62,7 +62,7 @@ class EventLogStatsImpl[Interpretation[_]](
           |) counts
           |group by project_path; 
           |""".stripMargin
-      .query[(ProjectPath, Long)]
+      .query[(Path, Long)]
       .to[List]
       .transact(transactor.get)
       .map(_.toMap)

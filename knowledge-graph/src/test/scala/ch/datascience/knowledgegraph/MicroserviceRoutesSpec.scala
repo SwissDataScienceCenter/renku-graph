@@ -27,7 +27,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
@@ -223,7 +223,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Ok for valid path parameters" in new TestCase {
-      forAll { projectPath: ProjectPath =>
+      forAll { projectPath: Path =>
         (projectEndpoint.getProject _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
 
         val response = routes.call(
@@ -249,7 +249,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $Ok for valid path parameters" in new TestCase {
-      forAll { projectPath: ProjectPath =>
+      forAll { projectPath: Path =>
         (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
 
         val response = routes.call(

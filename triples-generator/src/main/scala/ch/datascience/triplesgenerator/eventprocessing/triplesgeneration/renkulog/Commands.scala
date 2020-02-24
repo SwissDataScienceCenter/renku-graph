@@ -24,7 +24,7 @@ import ch.datascience.config.ServiceUrl
 import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.rdfstore.JsonLDTriples
@@ -43,7 +43,8 @@ private object Commands {
 
     import java.net.URL
 
-    def findRepositoryUrl(projectPath: ProjectPath, maybeAccessToken: Option[AccessToken]): Interpretation[ServiceUrl] =
+    def findRepositoryUrl(projectPath:      projects.Path,
+                          maybeAccessToken: Option[AccessToken]): Interpretation[ServiceUrl] =
       merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectPath)
 
     private lazy val findUrlTokenPart: Option[AccessToken] => String = {
@@ -54,7 +55,7 @@ private object Commands {
 
     private def merge(gitLabUrl:    GitLabUrl,
                       urlTokenPart: String,
-                      projectPath:  ProjectPath): Interpretation[ServiceUrl] = ME.fromEither {
+                      projectPath:  projects.Path): Interpretation[ServiceUrl] = ME.fromEither {
       ServiceUrl.from {
         val url              = gitLabUrl.value
         val protocol         = new URL(url).getProtocol

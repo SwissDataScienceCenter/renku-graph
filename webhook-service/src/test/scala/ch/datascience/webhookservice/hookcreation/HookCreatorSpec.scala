@@ -23,7 +23,7 @@ import cats.effect.{ConcurrentEffect, ContextShift, IO}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
@@ -50,12 +50,12 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     "return HookCreated if hook does not exists and it was successfully created" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
@@ -70,7 +70,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.unit)
 
       (accessTokenAssociator
-        .associate(_: ProjectId, _: AccessToken))
+        .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(context.unit)
 
@@ -84,7 +84,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     "return HookExisted if hook was already created for that project" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(HookExists))
 
@@ -97,7 +97,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (projectHookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.raiseError(exception))
 
@@ -111,13 +111,13 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     "log an error if project info fetching fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       val exception = exceptions.generateOne
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.raiseError(exception))
 
@@ -131,12 +131,12 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     "log an error if hook token encryption fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
@@ -156,12 +156,12 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     "log an error if hook creation fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
@@ -186,12 +186,12 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     "log an error if associating projectId with accessToken fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
@@ -207,7 +207,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (accessTokenAssociator
-        .associate(_: ProjectId, _: AccessToken))
+        .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(context.raiseError(exception))
 
@@ -221,12 +221,12 @@ class HookCreatorSpec extends WordSpec with MockFactory {
     "return either HookExisted/HookCreated if loading all events fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(projectInfo))
 
@@ -241,7 +241,7 @@ class HookCreatorSpec extends WordSpec with MockFactory {
         .returning(context.unit)
 
       (accessTokenAssociator
-        .associate(_: ProjectId, _: AccessToken))
+        .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(context.unit)
 

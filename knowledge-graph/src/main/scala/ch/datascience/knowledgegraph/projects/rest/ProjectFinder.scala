@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.projects.rest
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import IOAccessTokenFinder._
 import cats.data.OptionT
@@ -35,7 +35,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait ProjectFinder[Interpretation[_]] {
-  def findProject(path: ProjectPath): Interpretation[Option[Project]]
+  def findProject(path: Path): Interpretation[Option[Project]]
 }
 
 class IOProjectFinder(
@@ -49,16 +49,16 @@ class IOProjectFinder(
   import gitLabProjectFinder.{findProject => findProjectInGitLab}
   import kgProjectFinder.{findProject => findInKG}
 
-  def findProject(path: ProjectPath): IO[Option[Project]] =
+  def findProject(path: Path): IO[Option[Project]] =
     ((OptionT(findInKG(path)), findInGitLab(path)) parMapN (merge(path, _, _))).value
 
-  private def findInGitLab(path: ProjectPath) =
+  private def findInGitLab(path: Path) =
     for {
       accessToken   <- OptionT(findAccessToken(path))
       gitLabProject <- findProjectInGitLab(path, Some(accessToken))
     } yield gitLabProject
 
-  private def merge(path: ProjectPath, kgProject: KGProject, gitLabProject: GitLabProject) =
+  private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) =
     Project(
       id         = gitLabProject.id,
       path       = path,

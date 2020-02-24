@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, Project}
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath, ProjectVisibility}
+import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -36,8 +36,8 @@ import io.circe.literal._
 object GitLab {
 
   def `GET <gitlab>/api/v4/projects/:id returning OK`(
-      projectId:          ProjectId,
-      projectVisibility:  ProjectVisibility
+      projectId:          Id,
+      projectVisibility:  Visibility
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
@@ -52,7 +52,7 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(
-      projectId:          ProjectId
+      projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     val webhookUrl = s"${webhookServiceClient.baseUrl}/webhooks/events"
     stubFor {
@@ -63,7 +63,7 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(
-      projectId:          ProjectId
+      projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId/hooks").withAccessTokenInHeader
@@ -73,7 +73,7 @@ object GitLab {
   }
 
   def `POST <gitlab>/api/v4/projects/:id/hooks returning CREATED`(
-      projectId:          ProjectId
+      projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       post(s"/api/v4/projects/$projectId/hooks").withAccessTokenInHeader
@@ -83,7 +83,7 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:id/repository/commits returning OK with a commit`(
-      projectId:          ProjectId
+      projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits?per_page=1").withAccessTokenInHeader
@@ -104,7 +104,7 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(
-      projectId:          ProjectId,
+      projectId:          Id,
       commitId:           CommitId
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -131,8 +131,8 @@ object GitLab {
     `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(project.id, project.path)
 
   def `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(
-      projectId:          ProjectId,
-      projectPath:        ProjectPath
+      projectId:          Id,
+      projectPath:        Path
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId").withAccessTokenInHeader

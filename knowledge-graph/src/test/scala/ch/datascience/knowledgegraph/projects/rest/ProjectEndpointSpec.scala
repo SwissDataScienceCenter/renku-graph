@@ -57,7 +57,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
     "respond with OK and the found project details" in new TestCase {
       forAll { project: Project =>
         (projectFinder
-          .findProject(_: ProjectPath))
+          .findProject(_: Path))
           .expects(project.path)
           .returning(context pure Some(project))
 
@@ -86,7 +86,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       val path = projectPaths.generateOne
 
       (projectFinder
-        .findProject(_: ProjectPath))
+        .findProject(_: Path))
         .expects(path)
         .returning(context.pure(None))
 
@@ -107,7 +107,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       val path      = projectPaths.generateOne
       val exception = exceptions.generateOne
       (projectFinder
-        .findProject(_: ProjectPath))
+        .findProject(_: Path))
         .expects(path)
         .returning(context.raiseError(exception))
 
@@ -141,10 +141,10 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
     for {
-      id         <- cursor.downField("identifier").as[ProjectId]
-      path       <- cursor.downField("path").as[ProjectPath]
+      id         <- cursor.downField("identifier").as[Id]
+      path       <- cursor.downField("path").as[Path]
       name       <- cursor.downField("name").as[Name]
-      visibility <- cursor.downField("visibility").as[ProjectVisibility]
+      visibility <- cursor.downField("visibility").as[Visibility]
       created    <- cursor.downField("created").as[Creation]
       urls       <- cursor.downField("url").as[RepoUrls]
     } yield Project(id, path, name, visibility, created, urls)

@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph.graphql
 
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.knowledgegraph.graphql.Arguments._
 import eu.timepit.refined.auto._
 import sangria.schema._
@@ -29,7 +29,8 @@ object CommonQueryFields {
 
   val projectPathArgument = Argument(
     name = "projectPath",
-    argumentType = ProjectPath.toScalarType(
+    argumentType = Path.toScalarType(
+      name             = "ProjectPath",
       description      = "Project's path in the GitLab.",
       exceptionMessage = "ProjectPath value expected in format <namespace>/<project>"
     )

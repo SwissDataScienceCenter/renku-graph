@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.projects.{FilePath, ProjectPath}
+import ch.datascience.graph.model.projects.{FilePath, Path}
 import ch.datascience.knowledgegraph.lineage
 import ch.datascience.knowledgegraph.lineage.LineageFinder
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
@@ -66,7 +66,7 @@ class QuerySchemaSpec
           }
         }"""
 
-      givenFindLineage(ProjectPath("namespace/project"), FilePath("directory/file"))
+      givenFindLineage(Path("namespace/project"), FilePath("directory/file"))
         .returning(IO.pure(Some(lineage)))
 
       execute(query) shouldBe json(lineage)
@@ -88,10 +88,10 @@ class QuerySchemaSpec
 
   private trait LineageTestCase extends TestCase {
 
-    def givenFindLineage(projectPath: ProjectPath, filePath: FilePath) = new {
+    def givenFindLineage(projectPath: Path, filePath: FilePath) = new {
       def returning(result: IO[Option[Lineage]]) =
         (lineageFinder
-          .findLineage(_: ProjectPath, _: FilePath))
+          .findLineage(_: Path, _: FilePath))
           .expects(projectPath, filePath)
           .returning(result)
     }

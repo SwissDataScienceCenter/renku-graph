@@ -24,7 +24,7 @@ import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -137,8 +137,8 @@ class ProjectPathAdderSpec
     val tokenRemover      = new TokenRemover[IO](transactor)
     val projectPathAdder  = new IOProjectPathAdder(transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
 
-    def assumePathExistsInGitLab(projectId:        ProjectId,
-                                 maybeProjectPath: Option[ProjectPath],
+    def assumePathExistsInGitLab(projectId:        Id,
+                                 maybeProjectPath: Option[Path],
                                  encryptedToken:   EncryptedAccessToken,
                                  token:            AccessToken) = {
       (accessTokenCrypto.decrypt _)
@@ -146,7 +146,7 @@ class ProjectPathAdderSpec
         .returning(token.pure[IO])
         .atLeastOnce()
       (pathFinder
-        .findProjectPath(_: ProjectId, _: Option[AccessToken]))
+        .findProjectPath(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(token))
         .returning(maybeProjectPath.pure[IO])
         .atLeastOnce()
@@ -169,7 +169,7 @@ class ProjectPathAdderSpec
       .recover { case _ => false }
       .unsafeRunSync()
 
-  def insert(projectId: ProjectId, encryptedToken: EncryptedAccessToken): Unit = execute {
+  def insert(projectId: Id, encryptedToken: EncryptedAccessToken): Unit = execute {
     sql"""insert into
             projects_tokens (project_id, token)
             values (${projectId.value}, ${encryptedToken.value})

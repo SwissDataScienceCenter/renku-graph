@@ -23,7 +23,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
@@ -42,7 +42,7 @@ class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
     "respond with NO_CONTENT if the token removal was successful" in new TestCase {
 
       (tokenRemover
-        .delete(_: ProjectId))
+        .delete(_: Id))
         .expects(projectId)
         .returning(context.pure(()))
 
@@ -60,7 +60,7 @@ class DeleteTokenEndpointSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (tokenRemover
-        .delete(_: ProjectId))
+        .delete(_: Id))
         .expects(projectId)
         .returning(context.raiseError(exception))
 

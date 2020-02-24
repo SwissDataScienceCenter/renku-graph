@@ -25,7 +25,7 @@ import ch.datascience.dbeventlog._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 import org.scalatest.TestSuite
@@ -60,7 +60,7 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                            eventDate:     CommittedDate,
                            eventBody:     EventBody,
                            createdDate:   CreatedDate = CreatedDate(Instant.now),
-                           projectPath:   ProjectPath = projectPaths.generateOne,
+                           projectPath:   Path = projectPaths.generateOne,
                            maybeMessage:  Option[EventMessage] = None): Unit = execute {
     maybeMessage match {
       case None =>

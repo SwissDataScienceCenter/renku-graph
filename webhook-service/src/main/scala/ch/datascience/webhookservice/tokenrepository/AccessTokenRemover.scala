@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.tokenrepository
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.IORestClient
 import io.chrisdavenport.log4cats.Logger
@@ -30,7 +30,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait AccessTokenRemover[Interpretation[_]] {
-  def removeAccessToken(projectId: ProjectId): Interpretation[Unit]
+  def removeAccessToken(projectId: Id): Interpretation[Unit]
 }
 
 class IOAccessTokenRemover(
@@ -45,7 +45,7 @@ class IOAccessTokenRemover(
   import org.http4s.Status.NoContent
   import org.http4s.{Request, Response}
 
-  override def removeAccessToken(projectId: ProjectId): IO[Unit] =
+  override def removeAccessToken(projectId: Id): IO[Unit] =
     for {
       uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
       _   <- send(request(DELETE, uri))(mapResponse)

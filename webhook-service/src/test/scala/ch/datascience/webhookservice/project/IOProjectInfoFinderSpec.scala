@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.ProjectVisibility
+import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
@@ -89,7 +89,7 @@ class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalSer
 
       projectInfoFinder.findProjectInfo(projectId, maybeAccessToken = None).unsafeRunSync() shouldBe ProjectInfo(
         projectId,
-        ProjectVisibility.Public,
+        Visibility.Public,
         projectPath
       )
     }

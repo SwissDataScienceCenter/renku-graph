@@ -25,7 +25,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
@@ -48,7 +48,7 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
 
       val commitInfo = commitInfos.generateOne
       (latestCommitFinder
-        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
+        .findLatestCommit(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(OptionT.some[Try](commitInfo))
 
@@ -63,7 +63,7 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
     "do nothing if there's no latest Commit" in new TestCase {
 
       (latestCommitFinder
-        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
+        .findLatestCommit(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(OptionT.none[Try, CommitInfo])
 
@@ -75,7 +75,7 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
       val error     = context.raiseError(exception)
       (latestCommitFinder
-        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
+        .findLatestCommit(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(OptionT.liftF(error))
 
@@ -88,7 +88,7 @@ class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
 
       val commitInfo = commitInfos.generateOne
       (latestCommitFinder
-        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
+        .findLatestCommit(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(OptionT.some[Try](commitInfo))
 

@@ -25,7 +25,7 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects.ProjectVisibility.{Private, Public}
+import ch.datascience.graph.model.projects.Visibility.{Private, Public}
 import ch.datascience.http.client.AccessToken
 import org.http4s.Status._
 import org.scalatest.Matchers._

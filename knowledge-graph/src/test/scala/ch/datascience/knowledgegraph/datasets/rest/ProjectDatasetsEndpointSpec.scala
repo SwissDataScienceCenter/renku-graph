@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Identifier, Name}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
@@ -52,7 +52,7 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
 
       forAll(nonEmptyList(datasetBasicDetails).map(_.toList)) { datasetsList =>
         (projectDatasetsFinder
-          .findProjectDatasets(_: ProjectPath))
+          .findProjectDatasets(_: Path))
           .expects(projectPath)
           .returning(context.pure(datasetsList))
 
@@ -73,7 +73,7 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
     "respond with OK an empty JSON array if no datasets found" in new TestCase {
 
       (projectDatasetsFinder
-        .findProjectDatasets(_: ProjectPath))
+        .findProjectDatasets(_: Path))
         .expects(projectPath)
         .returning(context.pure(Nil))
 
@@ -92,7 +92,7 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
 
       val exception = exceptions.generateOne
       (projectDatasetsFinder
-        .findProjectDatasets(_: ProjectPath))
+        .findProjectDatasets(_: Path))
         .expects(projectPath)
         .returning(context.raiseError(exception))
 

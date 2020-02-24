@@ -22,7 +22,8 @@ import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath, ProjectVisibility}
+import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.{Id, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
@@ -35,14 +36,14 @@ import scala.language.higherKinds
 
 trait GitLabProjectFinder[Interpretation[_]] {
   def findProject(
-      projectPath:      ProjectPath,
+      projectPath:      projects.Path,
       maybeAccessToken: Option[AccessToken]
   ): OptionT[Interpretation, GitLabProject]
 }
 
 object GitLabProjectFinder {
 
-  final case class GitLabProject(id: ProjectId, visibility: ProjectVisibility, urls: ProjectUrls)
+  final case class GitLabProject(id: Id, visibility: Visibility, urls: ProjectUrls)
 
   final case class ProjectUrls(http: HttpUrl, ssh: SshUrl)
 }
@@ -64,7 +65,7 @@ private class IOGitLabProjectFinder(
   import org.http4s._
   import org.http4s.dsl.io._
 
-  def findProject(projectPath: ProjectPath, maybeAccessToken: Option[AccessToken]): OptionT[IO, GitLabProject] =
+  def findProject(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): OptionT[IO, GitLabProject] =
     OptionT {
       for {
         uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}")
@@ -80,8 +81,8 @@ private class IOGitLabProjectFinder(
   private implicit lazy val projectDecoder: EntityDecoder[IO, GitLabProject] = {
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        id         <- cursor.downField("id").as[ProjectId]
-        visibility <- cursor.downField("visibility").as[ProjectVisibility]
+        id         <- cursor.downField("id").as[Id]
+        visibility <- cursor.downField("visibility").as[Visibility]
         sshUrl     <- cursor.downField("ssh_url_to_repo").as[SshUrl]
         httpUrl    <- cursor.downField("http_url_to_repo").as[HttpUrl]
       } yield GitLabProject(id, visibility, ProjectUrls(httpUrl, sshUrl))

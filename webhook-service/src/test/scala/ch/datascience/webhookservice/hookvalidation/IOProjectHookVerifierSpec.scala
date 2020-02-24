@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -147,7 +147,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
     val verifier = new IOProjectHookVerifier(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
-  private def withHooks(projectId: ProjectId, oneHookUrl: ProjectHookUrl): String =
+  private def withHooks(projectId: Id, oneHookUrl: ProjectHookUrl): String =
     Json
       .arr(
         hook(
@@ -165,7 +165,7 @@ class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalS
       )
       .toString()
 
-  private def hook(projectId: ProjectId, url: ProjectHookUrl): Json = Json.obj(
+  private def hook(projectId: Id, url: ProjectHookUrl): Json = Json.obj(
     "id"         -> Json.fromInt(positiveInts().generateOne.value),
     "url"        -> Json.fromString(url.value),
     "project_id" -> Json.fromInt(projectId.value)

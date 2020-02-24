@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators
@@ -153,7 +153,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (eventLogVerifyExistence
-        .filterNotExistingInLog(_: List[CommitId], _: ProjectId))
+        .filterNotExistingInLog(_: List[CommitId], _: Id))
         .expects(List(commitInfo.id), startCommit.project.id)
         .returning(context.raiseError(exception))
 
@@ -172,7 +172,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (commitInfoFinder
-        .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+        .findCommitInfo(_: Id, _: CommitId, _: Option[AccessToken]))
         .expects(startCommit.project.id, level2Info1.id, maybeAccessToken)
         .returning(context.raiseError(exception))
 
@@ -224,7 +224,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
     def givenFindingCommitInfoReturns(commitInfos: CommitInfo*): Unit =
       commitInfos foreach { commitInfo =>
         (commitInfoFinder
-          .findCommitInfo(_: ProjectId, _: CommitId, _: Option[AccessToken]))
+          .findCommitInfo(_: Id, _: CommitId, _: Option[AccessToken]))
           .expects(startCommit.project.id, commitInfo.id, maybeAccessToken)
           .returning(context pure commitInfo)
       }
@@ -234,7 +234,7 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
     def givenNonExistingInLog(in: List[CommitId], out: List[CommitId]): Unit = {
       (eventLogVerifyExistence
-        .filterNotExistingInLog(_: List[CommitId], _: ProjectId))
+        .filterNotExistingInLog(_: List[CommitId], _: Id))
         .expects(in, startCommit.project.id)
         .returning(context pure out)
       ()

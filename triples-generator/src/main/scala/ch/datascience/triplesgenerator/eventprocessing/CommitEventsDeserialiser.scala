@@ -23,7 +23,7 @@ import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.dbeventlog.EventBody
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
 import io.circe.parser._
@@ -44,8 +44,8 @@ private class CommitEventsDeserialiser[Interpretation[_]](
   private implicit val commitsDecoder: Decoder[NonEmptyList[Commit]] = (cursor: HCursor) =>
     for {
       commitId      <- cursor.downField("id").as[CommitId]
-      projectId     <- cursor.downField("project").downField("id").as[ProjectId]
-      projectPath   <- cursor.downField("project").downField("path").as[ProjectPath]
+      projectId     <- cursor.downField("project").downField("id").as[Id]
+      projectPath   <- cursor.downField("project").downField("path").as[Path]
       parentCommits <- cursor.downField("parents").as[List[CommitId]]
     } yield {
       val project = Project(projectId, projectPath)

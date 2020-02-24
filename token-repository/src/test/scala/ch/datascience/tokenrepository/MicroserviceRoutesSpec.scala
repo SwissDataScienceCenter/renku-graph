@@ -22,7 +22,7 @@ import cats.data.OptionT
 import cats.effect.{Clock, IO}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
@@ -67,7 +67,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       val projectId = projectIds.generateOne
 
       (fetchEndpoint
-        .fetchToken(_: ProjectId)(_: ProjectId => OptionT[IO, AccessToken]))
+        .fetchToken(_: projects.Id)(_: projects.Id => OptionT[IO, AccessToken]))
         .expects(projectId, findById)
         .returning(IO.pure(Response[IO](Ok)))
 
@@ -84,7 +84,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       val projectPath = projectPaths.generateOne
 
       (fetchEndpoint
-        .fetchToken(_: ProjectPath)(_: ProjectPath => OptionT[IO, AccessToken]))
+        .fetchToken(_: projects.Path)(_: projects.Path => OptionT[IO, AccessToken]))
         .expects(projectPath, findByPath)
         .returning(IO.pure(Response[IO](Ok)))
 
@@ -101,7 +101,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       val request   = Request[IO](Method.PUT, uri"projects" / projectId.toString / "tokens")
 
       (associateEndpoint
-        .associateToken(_: ProjectId, _: Request[IO]))
+        .associateToken(_: projects.Id, _: Request[IO]))
         .expects(projectId, request)
         .returning(IO.pure(Response[IO](NoContent)))
 
@@ -114,7 +114,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
 
       val projectId = projectIds.generateOne
       (deleteEndpoint
-        .deleteToken(_: ProjectId))
+        .deleteToken(_: projects.Id))
         .expects(projectId)
         .returning(IO.pure(Response[IO](NoContent)))
 

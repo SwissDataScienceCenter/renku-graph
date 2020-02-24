@@ -23,13 +23,13 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CommitId, Project}
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import io.circe.Json
 import io.circe.literal._
 
 object GitLab {
 
-  def pushEvent(projectId: ProjectId, commitId: CommitId): Json =
+  def pushEvent(projectId: Id, commitId: CommitId): Json =
     pushEvent(projects.generateOne.copy(id = projectId), commitId)
 
   def pushEvent(project: Project, commitId: CommitId): Json = json"""

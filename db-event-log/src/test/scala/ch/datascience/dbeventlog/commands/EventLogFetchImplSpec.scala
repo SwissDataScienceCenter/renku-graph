@@ -30,7 +30,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitEventId
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
@@ -225,7 +225,7 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
     val executionDate = ExecutionDate(now)
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def executionDateDifferentiated(by: ProjectId, allProjects: NonEmptyList[ProjectId]) =
+    def executionDateDifferentiated(by: Id, allProjects: NonEmptyList[Id]) =
       ExecutionDate(now minus (1000 - (allProjects.toList.indexOf(by) * 10), SEC))
   }
 

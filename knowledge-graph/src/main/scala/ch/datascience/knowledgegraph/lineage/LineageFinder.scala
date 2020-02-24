@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.lineage
 import cats.effect._
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects.{FilePath, ProjectPath, ProjectResource}
+import ch.datascience.graph.model.projects.{FilePath, Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore._
@@ -33,7 +33,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait LineageFinder[Interpretation[_]] {
-  def findLineage(projectPath: ProjectPath, filePath: FilePath): Interpretation[Option[Lineage]]
+  def findLineage(projectPath: Path, filePath: FilePath): Interpretation[Option[Lineage]]
 }
 
 class IOLineageFinder(
@@ -45,7 +45,7 @@ class IOLineageFinder(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with LineageFinder[IO] {
 
-  override def findLineage(projectPath: ProjectPath, filePath: FilePath): IO[Option[Lineage]] =
+  override def findLineage(projectPath: Path, filePath: FilePath): IO[Option[Lineage]] =
     for {
       edges <- queryExpecting[Set[Edge]](using = query(projectPath, filePath))
       nodes <- edges.toNodeIdSet.toList
@@ -56,7 +56,7 @@ class IOLineageFinder(
       maybeLineage <- toLineage(edges, nodes)
     } yield maybeLineage
 
-  private def query(path: ProjectPath, filePath: FilePath) = SparqlQuery(
+  private def query(path: Path, filePath: FilePath) = SparqlQuery(
     name = "lineage",
     Set(
       "PREFIX prov: <http://www.w3.org/ns/prov#>",
@@ -69,7 +69,7 @@ class IOLineageFinder(
         |  {
         |    SELECT (MIN(?startedAt) AS ?minStartedAt)
         |    WHERE {
-        |      ?qentity schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]};
+        |      ?qentity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |               prov:atLocation ?location.
         |      FILTER (strStarts("$filePath", ?location))
         |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?activityId.
@@ -79,7 +79,7 @@ class IOLineageFinder(
         |  } {
         |    SELECT ?entity
         |    WHERE {
-        |      ?qentity schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]};
+        |      ?qentity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |               prov:atLocation ?location.
         |      FILTER (strStarts("$filePath", ?location))
         |      ?qentity (prov:qualifiedGeneration/prov:activity | ^prov:entity/^prov:qualifiedUsage) ?activityId.
@@ -107,7 +107,7 @@ class IOLineageFinder(
         |""".stripMargin
   )
 
-  private def toNodeQuery(path: ProjectPath)(nodeId: Node.Id) = SparqlQuery(
+  private def toNodeQuery(path: Path)(nodeId: Node.Id) = SparqlQuery(
     name = "lineage - node details",
     Set(
       "PREFIX prov: <http://www.w3.org/ns/prov#>",
@@ -180,7 +180,7 @@ class IOLineageFinder(
     }
   }
 
-  private def toNodeOrError(projectPath: ProjectPath): Option[Node] => IO[Node] = {
+  private def toNodeOrError(projectPath: Path): Option[Node] => IO[Node] = {
     case Some(node) => node.pure[IO]
     case _          => new Exception(s"Cannot find node details for $projectPath").raiseError[IO, Node]
   }

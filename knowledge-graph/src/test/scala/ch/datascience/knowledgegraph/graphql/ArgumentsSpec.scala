@@ -37,39 +37,40 @@ class ArgumentsSpec extends WordSpec {
   "TinyTypeOps" should {
 
     "provide an extension method toScalarType which converts a String TinyType to ScalarType" in {
+      val name:        NonBlank = Refined.unsafeApply(nonEmptyStrings().generateOne)
       val description: NonBlank = Refined.unsafeApply(nonEmptyStrings().generateOne)
 
-      val scalarType = TestTinyType.toScalarType(description)
+      val scalarType = TestTinyType.toScalarType(name, description)
 
       scalarType             shouldBe a[ScalarType[_]]
-      scalarType.name        shouldBe TestTinyType.shortTypeName
+      scalarType.name        shouldBe name.value
       scalarType.description shouldBe Some(description.value)
     }
 
     "provide an extension method toScalarType which returns a ScalarType converting user value to the TinyType" in {
-      val scalarType = TestTinyType.toScalarType("description")
+      val scalarType = TestTinyType.toScalarType("name", "description")
 
       val value = nonEmptyStrings().generateOne
       scalarType.coerceUserInput(value) shouldBe Right(TestTinyType(value))
       val Left(exception) = scalarType.coerceUserInput(positiveInts().generateOne)
       exception              shouldBe a[ValueCoercionViolation]
-      exception.errorMessage shouldBe s"${TestTinyType.shortTypeName} has invalid value"
+      exception.errorMessage shouldBe "name has invalid value"
     }
 
     "provide an extension method toScalarType which returns a ScalarType converting the AST value to the TinyType" in {
-      val scalarType = TestTinyType.toScalarType("description")
+      val scalarType = TestTinyType.toScalarType("name", "description")
 
       val value = nonEmptyStrings().generateOne
       scalarType.coerceInput(StringValue(value)) shouldBe Right(TestTinyType(value))
       val Left(exception) = scalarType.coerceUserInput(positiveInts().generateOne)
       exception              shouldBe a[ValueCoercionViolation]
-      exception.errorMessage shouldBe s"${TestTinyType.shortTypeName} has invalid value"
+      exception.errorMessage shouldBe "name has invalid value"
     }
 
     "provide an extension method toScalarType which returns a ScalarType which uses the given exception message on value conversion failures" in {
       val customConversionMessage: NonBlank = Refined.unsafeApply(nonEmptyStrings().generateOne)
 
-      val scalarType = TestTinyType.toScalarType("description", customConversionMessage)
+      val scalarType = TestTinyType.toScalarType("name", "description", customConversionMessage)
 
       val Left(exception) = scalarType.coerceUserInput(positiveInts().generateOne)
       exception.errorMessage shouldBe customConversionMessage.value

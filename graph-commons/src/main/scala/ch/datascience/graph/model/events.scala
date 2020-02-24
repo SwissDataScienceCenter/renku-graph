@@ -20,7 +20,6 @@ package ch.datascience.graph.model
 
 import java.time.Instant
 
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.graph.model.users.{Email, Username}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -45,8 +44,8 @@ object events {
   }
 
   final case class Project(
-      id:   ProjectId,
-      path: ProjectPath
+      id:   projects.Id,
+      path: projects.Path
   )
 
   final case class User(
@@ -54,7 +53,7 @@ object events {
       email:    Email
   )
 
-  final case class CommitEventId(id: CommitId, projectId: ProjectId) {
+  final case class CommitEventId(id: CommitId, projectId: projects.Id) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }
 

@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLab
 import io.chrisdavenport.log4cats.Logger
@@ -34,7 +34,7 @@ import scala.language.higherKinds
 
 trait CommitInfoFinder[Interpretation[_]] {
   def findCommitInfo(
-      projectId:        ProjectId,
+      projectId:        Id,
       commitId:         CommitId,
       maybeAccessToken: Option[AccessToken]
   ): Interpretation[CommitInfo]
@@ -55,7 +55,7 @@ class IOCommitInfoFinder(
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.{Request, Response}
 
-  def findCommitInfo(projectId: ProjectId, commitId: CommitId, maybeAccessToken: Option[AccessToken]): IO[CommitInfo] =
+  def findCommitInfo(projectId: Id, commitId: CommitId, maybeAccessToken: Option[AccessToken]): IO[CommitInfo] =
     for {
       uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId")
       result <- send(request(GET, uri, maybeAccessToken))(mapResponse)

@@ -29,7 +29,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{commitEventIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
@@ -104,7 +104,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
     val projectId              = projectIds.generateOne
     val processingStatusFinder = new IOEventLogProcessingStatus(transactor)
 
-    def storeEventsWithRecentTime(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
+    def storeEventsWithRecentTime(projectId: Id, statuses: NonEmptyList[EventStatus]) = statuses map {
       storeEvent(
         commitEventIds.generateOne.copy(projectId = projectId),
         _,
@@ -115,7 +115,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
       )
     }
 
-    def spreadEventsInThePastAndStore(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
+    def spreadEventsInThePastAndStore(projectId: Id, statuses: NonEmptyList[EventStatus]) = statuses map {
       storeEvent(
         commitEventIds.generateOne.copy(projectId = projectId),
         _,
@@ -126,7 +126,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
       )
     }
 
-    def storeEventsInTheFarPast(projectId: ProjectId, statuses: NonEmptyList[EventStatus]) = statuses map {
+    def storeEventsInTheFarPast(projectId: Id, statuses: NonEmptyList[EventStatus]) = statuses map {
       storeEvent(
         commitEventIds.generateOne.copy(projectId = projectId),
         _,

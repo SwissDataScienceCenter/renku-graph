@@ -24,7 +24,7 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Response
@@ -39,13 +39,13 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
 )(implicit ME:    MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  def deleteToken(projectId: ProjectId): Interpretation[Response[Interpretation]] =
+  def deleteToken(projectId: Id): Interpretation[Response[Interpretation]] =
     tokenRemover
       .delete(projectId)
       .flatMap(_ => NoContent())
       .recoverWith(httpResult(projectId))
 
-  private def httpResult(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private def httpResult(projectId: Id): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Deleting token for projectId: $projectId failed")
       logger.error(exception)(errorMessage.value)

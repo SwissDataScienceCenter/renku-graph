@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{CommitEventId, CommittedDate}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
@@ -148,7 +148,7 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
                          eventDate:     CommittedDate = committedDates.generateOne,
                          eventBody:     EventBody     = eventBodies.generateOne,
                          createdDate:   CreatedDate   = createdDates.generateOne,
-                         projectPath:   ProjectPath   = projectPaths.generateOne): Unit = execute {
+                         projectPath:   Path          = projectPaths.generateOne): Unit = execute {
     sql"""|insert into 
           |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
           |values (${commitEventId.id.value}, ${commitEventId.projectId.value}, $eventStatus, ${createdDate.value}, ${executionDate.value}, ${eventDate.value}, ${eventBody.value})

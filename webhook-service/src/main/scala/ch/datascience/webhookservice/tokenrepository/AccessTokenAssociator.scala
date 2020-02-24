@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.tokenrepository
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import io.chrisdavenport.log4cats.Logger
@@ -30,7 +30,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait AccessTokenAssociator[Interpretation[_]] {
-  def associate(projectId: ProjectId, accessToken: AccessToken): Interpretation[Unit]
+  def associate(projectId: Id, accessToken: AccessToken): Interpretation[Unit]
 }
 
 class IOAccessTokenAssociator(
@@ -47,7 +47,7 @@ class IOAccessTokenAssociator(
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  override def associate(projectId: ProjectId, accessToken: AccessToken): IO[Unit] =
+  override def associate(projectId: Id, accessToken: AccessToken): IO[Unit] =
     for {
       uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
       requestWithPayload = request(PUT, uri).withEntity(accessToken.asJson)

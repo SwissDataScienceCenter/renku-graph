@@ -21,7 +21,7 @@ package ch.datascience.tokenrepository.repository.init
 import cats.effect._
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.association.{IOProjectPathFinder, ProjectPathFinder}
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
@@ -91,14 +91,14 @@ private class IOProjectPathAdder(
       .transact(transactor.get)
       .flatMap {
         case None =>
-          Option.empty[(ProjectId, EncryptedAccessToken)].pure[IO]
+          Option.empty[(Id, EncryptedAccessToken)].pure[IO]
         case Some((id, token)) =>
-          ME.fromEither((ProjectId.from(id), EncryptedAccessToken.from(token)).mapN {
+          ME.fromEither((Id from id, EncryptedAccessToken from token).mapN {
             case (projectId, encryptedToken) => Option(projectId -> encryptedToken)
           })
       }
 
-  private def addPathOrRemoveRow(id: ProjectId, encryptedToken: EncryptedAccessToken) = {
+  private def addPathOrRemoveRow(id: Id, encryptedToken: EncryptedAccessToken) = {
     for {
       token            <- decrypt(encryptedToken)
       maybeProjectPath <- findProjectPath(id, Some(token))
@@ -111,13 +111,13 @@ private class IOProjectPathAdder(
       addPathIfMissing()
   }
 
-  private def addOrRemove(id: ProjectId, maybePath: Option[ProjectPath]): IO[Unit] =
+  private def addOrRemove(id: Id, maybePath: Option[Path]): IO[Unit] =
     maybePath match {
       case Some(path) => addPath(id, path)
       case None       => tokenRemover.delete(id)
     }
 
-  private def addPath(id: ProjectId, path: ProjectPath): IO[Unit] =
+  private def addPath(id: Id, path: Path): IO[Unit] =
     sql"update projects_tokens set project_path = ${path.value} where project_id = ${id.value}".update.run
       .transact(transactor.get)
       .map(_ => ())

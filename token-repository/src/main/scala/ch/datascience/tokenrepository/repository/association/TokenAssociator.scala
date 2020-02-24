@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
@@ -42,13 +42,13 @@ private class TokenAssociator[Interpretiation[_]](
   import associationPersister._
   import projectPathFinder._
 
-  def associate(projectId: ProjectId, token: AccessToken): Interpretiation[Unit] =
+  def associate(projectId: Id, token: AccessToken): Interpretiation[Unit] =
     findProjectPath(projectId, Some(token)) flatMap {
       case Some(projectPath) => encryptAndPersist(projectId, projectPath, token)
       case None              => tokenRemover delete projectId
     }
 
-  private def encryptAndPersist(projectId: ProjectId, projectPath: ProjectPath, token: AccessToken) =
+  private def encryptAndPersist(projectId: Id, projectPath: Path, token: AccessToken) =
     for {
       encryptedToken <- encrypt(token)
       _              <- persistAssociation(projectId, projectPath, encryptedToken)

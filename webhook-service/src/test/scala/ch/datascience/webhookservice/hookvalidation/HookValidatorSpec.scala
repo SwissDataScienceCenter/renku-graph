@@ -24,8 +24,8 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.projects.ProjectId
-import ch.datascience.graph.model.projects.ProjectVisibility.{Internal, Private, Public}
+import ch.datascience.graph.model.projects.Id
+import ch.datascience.graph.model.projects.Visibility.{Internal, Private, Public}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
@@ -55,7 +55,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))
         .returning(error)
 
@@ -71,7 +71,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
       (accessTokenFinder
-        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
         .returning(error)
 
@@ -85,7 +85,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val projectId = projectInfos.generateOne.copy(visibility = Internal).id
 
       (accessTokenFinder
-        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
         .returning(context.pure(None))
 
@@ -100,7 +100,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val projectId = projectInfos.generateOne.copy(visibility = Internal).id
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))
         .returning(context.raiseError(UnauthorizedException))
 
@@ -108,7 +108,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val error:     Try[Nothing] = context.raiseError(exception)
       val storedAccessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
         .returning(error)
 
@@ -122,20 +122,20 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val projectId = projectInfos.generateOne.copy(visibility = Internal).id
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))
         .returning(context.raiseError(UnauthorizedException))
 
       val storedAccessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
         .returning(context.pure(Some(storedAccessToken)))
 
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = context.raiseError(exception)
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(storedAccessToken))
         .returning(error)
 
@@ -149,18 +149,18 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val projectId = projectInfos.generateOne.copy(visibility = Internal).id
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))
         .returning(context.raiseError(UnauthorizedException))
 
       val storedAccessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
         .returning(context.pure(Some(storedAccessToken)))
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(storedAccessToken))
         .returning(context.raiseError(UnauthorizedException))
 
@@ -177,12 +177,12 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val projectId = projectInfos.generateOne.copy(visibility = Internal).id
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))
         .returning(context.raiseError(UnauthorizedException))
 
       (accessTokenFinder
-        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
         .returning(context.pure(None))
 
@@ -203,7 +203,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val projectId   = projectInfo.id
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))
         .returning(context.pure(projectInfo))
 
@@ -223,7 +223,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val projectId   = projectInfo.id
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))
         .returning(context.pure(projectInfo))
 
@@ -243,7 +243,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       val projectId   = projectInfo.id
 
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))
         .returning(context.pure(projectInfo))
 
@@ -269,7 +269,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
         val projectId   = projectInfo.id
 
         (projectInfoFinder
-          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .findProjectInfo(_: Id, _: Option[AccessToken]))
           .expects(projectId, Some(givenAccessToken))
           .returning(context.pure(projectInfo))
 
@@ -279,7 +279,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
           .returning(context.pure(true))
 
         (accessTokenAssociator
-          .associate(_: ProjectId, _: AccessToken))
+          .associate(_: Id, _: AccessToken))
           .expects(projectId, givenAccessToken)
           .returning(context.unit)
 
@@ -294,7 +294,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
         val projectId   = projectInfo.id
 
         (projectInfoFinder
-          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .findProjectInfo(_: Id, _: Option[AccessToken]))
           .expects(projectId, Some(givenAccessToken))
           .returning(context.pure(projectInfo))
 
@@ -304,7 +304,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
           .returning(context.pure(false))
 
         (accessTokenRemover
-          .removeAccessToken(_: ProjectId))
+          .removeAccessToken(_: Id))
           .expects(projectId)
           .returning(context.unit)
 
@@ -319,7 +319,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
         val projectId   = projectInfo.id
 
         (projectInfoFinder
-          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .findProjectInfo(_: Id, _: Option[AccessToken]))
           .expects(projectId, Some(givenAccessToken))
           .returning(context.pure(projectInfo))
 
@@ -341,7 +341,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
         val projectId   = projectInfo.id
 
         (projectInfoFinder
-          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .findProjectInfo(_: Id, _: Option[AccessToken]))
           .expects(projectId, Some(givenAccessToken))
           .returning(context.pure(projectInfo))
 
@@ -353,7 +353,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
         val exception: Exception    = exceptions.generateOne
         val error:     Try[Nothing] = context.raiseError(exception)
         (accessTokenAssociator
-          .associate(_: ProjectId, _: AccessToken))
+          .associate(_: Id, _: AccessToken))
           .expects(projectId, givenAccessToken)
           .returning(error)
 
@@ -368,7 +368,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
         val projectId   = projectInfo.id
 
         (projectInfoFinder
-          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .findProjectInfo(_: Id, _: Option[AccessToken]))
           .expects(projectId, Some(givenAccessToken))
           .returning(context.pure(projectInfo))
 
@@ -380,7 +380,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
         val exception: Exception    = exceptions.generateOne
         val error:     Try[Nothing] = context.raiseError(exception)
         (accessTokenRemover
-          .removeAccessToken(_: ProjectId))
+          .removeAccessToken(_: Id))
           .expects(projectId)
           .returning(error)
 
@@ -401,12 +401,12 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
         val storedAccessToken = accessTokens.generateOne
         (accessTokenFinder
-          .findAccessToken(_: ProjectId)(_: ProjectId => String))
+          .findAccessToken(_: Id)(_: Id => String))
           .expects(projectId, projectIdToPath)
           .returning(context.pure(Some(storedAccessToken)))
 
         (projectInfoFinder
-          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .findProjectInfo(_: Id, _: Option[AccessToken]))
           .expects(projectId, Some(storedAccessToken))
           .returning(context.pure(projectInfo))
 
@@ -429,12 +429,12 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
         val storedAccessToken = accessTokens.generateOne
         (accessTokenFinder
-          .findAccessToken(_: ProjectId)(_: ProjectId => String))
+          .findAccessToken(_: Id)(_: Id => String))
           .expects(projectId, projectIdToPath)
           .returning(context.pure(Some(storedAccessToken)))
 
         (projectInfoFinder
-          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .findProjectInfo(_: Id, _: Option[AccessToken]))
           .expects(projectId, Some(storedAccessToken))
           .returning(context.pure(projectInfo))
 
@@ -444,7 +444,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
           .returning(context.pure(false))
 
         (accessTokenRemover
-          .removeAccessToken(_: ProjectId))
+          .removeAccessToken(_: Id))
           .expects(projectId)
           .returning(context.unit)
 
@@ -462,12 +462,12 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
         val storedAccessToken = accessTokens.generateOne
         (accessTokenFinder
-          .findAccessToken(_: ProjectId)(_: ProjectId => String))
+          .findAccessToken(_: Id)(_: Id => String))
           .expects(projectId, projectIdToPath)
           .returning(context.pure(Some(storedAccessToken)))
 
         (projectInfoFinder
-          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .findProjectInfo(_: Id, _: Option[AccessToken]))
           .expects(projectId, Some(storedAccessToken))
           .returning(context.pure(projectInfo))
 
@@ -492,12 +492,12 @@ class HookValidatorSpec extends WordSpec with MockFactory {
 
         val storedAccessToken = accessTokens.generateOne
         (accessTokenFinder
-          .findAccessToken(_: ProjectId)(_: ProjectId => String))
+          .findAccessToken(_: Id)(_: Id => String))
           .expects(projectId, projectIdToPath)
           .returning(context.pure(Some(storedAccessToken)))
 
         (projectInfoFinder
-          .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+          .findProjectInfo(_: Id, _: Option[AccessToken]))
           .expects(projectId, Some(storedAccessToken))
           .returning(context.pure(projectInfo))
 
@@ -509,7 +509,7 @@ class HookValidatorSpec extends WordSpec with MockFactory {
         val exception: Exception    = exceptions.generateOne
         val error:     Try[Nothing] = context.raiseError(exception)
         (accessTokenRemover
-          .removeAccessToken(_: ProjectId))
+          .removeAccessToken(_: Id))
           .expects(projectId)
           .returning(error)
 
@@ -542,9 +542,9 @@ class HookValidatorSpec extends WordSpec with MockFactory {
       logger
     )
 
-    def assumeGivenAccessTokenInvalid(projectId: ProjectId) =
+    def assumeGivenAccessTokenInvalid(projectId: Id) =
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(givenAccessToken))
         .returning(context.raiseError(UnauthorizedException))
   }

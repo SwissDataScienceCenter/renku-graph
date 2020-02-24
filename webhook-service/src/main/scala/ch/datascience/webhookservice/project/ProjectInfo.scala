@@ -18,10 +18,10 @@
 
 package ch.datascience.webhookservice.project
 
-import ch.datascience.graph.model.projects.{ProjectId, ProjectPath, ProjectVisibility}
+import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 
 final case class ProjectInfo(
-    id:         ProjectId,
-    visibility: ProjectVisibility,
-    path:       ProjectPath
+    id:         Id,
+    visibility: Visibility,
+    path:       Path
 )
