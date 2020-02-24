@@ -31,8 +31,8 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, projects => projectsGen}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.{Project, ProjectId}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.events.Project
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project.ProjectVisibility.Public

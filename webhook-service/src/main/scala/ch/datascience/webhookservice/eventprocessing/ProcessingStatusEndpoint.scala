@@ -29,7 +29,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands.{EventLogProcessingStatus, IOEventLogProcessingStatus, ProcessingStatus}
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects.ProjectId
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.config.GitLab

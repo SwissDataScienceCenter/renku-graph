@@ -21,12 +21,11 @@ package ch.datascience.tokenrepository.repository.association
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._

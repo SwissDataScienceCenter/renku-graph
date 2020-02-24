@@ -22,8 +22,7 @@ import cats.effect.Bracket
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import doobie.implicits._
 import doobie.util.fragment.Fragment

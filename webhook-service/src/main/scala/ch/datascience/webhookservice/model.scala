@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice
 
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectId
 
 object model {
 

@@ -20,13 +20,18 @@ package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.{FilePath, ProjectPath, ProjectResource}
+import ch.datascience.graph.model.projects.{FilePath, ProjectId, ProjectPath, ProjectResource}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
-import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf, uuid}
+import org.scalacheck.Gen.{alphaChar, choose, const, frequency, numChar, oneOf, uuid}
 
 object GraphModelGenerators {
 
+  implicit val projectIds: Gen[ProjectId] = for {
+    min <- choose(1, 1000)
+    max <- choose(1001, 100000)
+    id  <- choose(min, max)
+  } yield ProjectId(id)
   implicit val projectNames:        Gen[projects.Name]        = nonEmptyStrings() map projects.Name.apply
   implicit val projectCreatedDates: Gen[projects.DateCreated] = timestampsNotInTheFuture map projects.DateCreated.apply
   implicit val projectPaths: Gen[ProjectPath] = {

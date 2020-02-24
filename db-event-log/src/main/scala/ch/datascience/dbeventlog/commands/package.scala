@@ -19,8 +19,8 @@
 package ch.datascience.dbeventlog
 import java.time.Instant
 
-import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.events.{CommitEventId, CommitId, CommittedDate}
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import doobie.util._
 
 package object commands {

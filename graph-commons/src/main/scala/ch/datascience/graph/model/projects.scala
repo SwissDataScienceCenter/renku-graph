@@ -26,6 +26,9 @@ import ch.datascience.tinytypes.constraints._
 
 object projects {
 
+  final class ProjectId private (val value: Int) extends AnyVal with IntTinyType
+  implicit object ProjectId extends TinyTypeFactory[ProjectId](new ProjectId(_)) with NonNegativeInt
+
   class ProjectPath private (val value: String) extends AnyVal with RelativePathTinyType
   implicit object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with RelativePath {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'

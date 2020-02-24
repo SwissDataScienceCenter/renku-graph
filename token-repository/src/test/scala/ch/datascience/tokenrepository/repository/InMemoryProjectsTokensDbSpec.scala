@@ -19,8 +19,7 @@
 package ch.datascience.tokenrepository.repository
 
 import ch.datascience.db.DbSpec
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import doobie.implicits._
 import org.scalatest.TestSuite

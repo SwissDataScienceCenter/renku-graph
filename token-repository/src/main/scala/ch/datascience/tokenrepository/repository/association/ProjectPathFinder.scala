@@ -21,8 +21,7 @@ package ch.datascience.tokenrepository.repository.association
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.tokenrepository.config.GitLab
 import io.chrisdavenport.log4cats.Logger

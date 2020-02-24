@@ -23,7 +23,7 @@ import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath, ProjectResource}
 import ch.datascience.tinytypes.constraints.{RelativePath, Url}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf}
@@ -32,6 +32,24 @@ import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Try
+
+class ProjectIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "instantiation" should {
+
+    "be successful for non-negative values" in {
+      forAll(nonNegativeInts()) { id =>
+        ProjectId(id.value).value shouldBe id.value
+      }
+    }
+
+    "fail for negative ids" in {
+      an[IllegalArgumentException] shouldBe thrownBy {
+        ProjectId(-1).value
+      }
+    }
+  }
+}
 
 class ProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
 

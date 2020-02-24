@@ -22,7 +22,8 @@ import cats.effect.IO
 import ch.datascience.db.DBConfigProvider
 import ch.datascience.dbeventlog._
 import ch.datascience.dbeventlog.commands._
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.ProjectId
 import doobie.implicits._
 
 import scala.language.postfixOps

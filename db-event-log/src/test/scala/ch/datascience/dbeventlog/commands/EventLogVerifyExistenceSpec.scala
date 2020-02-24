@@ -21,6 +21,7 @@ package ch.datascience.dbeventlog.commands
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 

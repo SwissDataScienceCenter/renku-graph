@@ -22,8 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}

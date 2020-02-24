@@ -23,7 +23,7 @@ import cats.effect.{ConcurrentEffect, ContextShift, IO}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error

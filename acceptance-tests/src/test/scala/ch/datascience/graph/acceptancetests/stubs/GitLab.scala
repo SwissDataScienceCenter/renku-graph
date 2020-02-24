@@ -23,8 +23,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, Project, ProjectId}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode

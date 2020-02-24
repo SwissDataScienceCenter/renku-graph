@@ -26,7 +26,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectId
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}

@@ -19,12 +19,10 @@
 package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonNegativeInts
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class CommitEventSpec extends WordSpec {
 
@@ -46,24 +44,6 @@ class CommitEventIdSpec extends WordSpec {
       val commitEventId = commitEventIds.generateOne
 
       commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
-    }
-  }
-}
-
-class ProjectIdSpec extends WordSpec with ScalaCheckPropertyChecks {
-
-  "instantiation" should {
-
-    "be successful for non-negative values" in {
-      forAll(nonNegativeInts()) { id =>
-        ProjectId(id.value).value shouldBe id.value
-      }
-    }
-
-    "fail for negative ids" in {
-      an[IllegalArgumentException] shouldBe thrownBy {
-        ProjectId(-1).value
-      }
     }
   }
 }

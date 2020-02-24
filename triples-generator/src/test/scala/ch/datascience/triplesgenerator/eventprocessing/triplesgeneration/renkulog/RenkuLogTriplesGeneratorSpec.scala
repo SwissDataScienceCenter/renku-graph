@@ -29,6 +29,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.{CommitId, Project}
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken

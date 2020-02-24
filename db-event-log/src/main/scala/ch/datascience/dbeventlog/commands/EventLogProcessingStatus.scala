@@ -27,7 +27,8 @@ import cats.effect.{Bracket, ContextShift, IO}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus, ExecutionDate}
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.ProjectId
 import doobie.implicits._
 import doobie.util.Read
 import eu.timepit.refined.api.RefType.applyRef

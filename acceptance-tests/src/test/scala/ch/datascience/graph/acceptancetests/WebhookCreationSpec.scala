@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
-import ch.datascience.graph.model.EventsGenerators.projectIds
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.webhookservice.project.ProjectVisibility.Public

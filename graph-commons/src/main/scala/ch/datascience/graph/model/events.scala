@@ -20,7 +20,7 @@ package ch.datascience.graph.model
 
 import java.time.Instant
 
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.graph.model.users.{Email, Username}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -66,7 +66,4 @@ object events {
 
   final class CommittedDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object CommittedDate extends TinyTypeFactory[CommittedDate](new CommittedDate(_)) with InstantNotInTheFuture
-
-  final class ProjectId private (val value: Int) extends AnyVal with IntTinyType
-  implicit object ProjectId extends TinyTypeFactory[ProjectId](new ProjectId(_)) with NonNegativeInt
 }

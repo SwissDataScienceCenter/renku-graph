@@ -21,8 +21,7 @@ package ch.datascience.tokenrepository.repository.init
 import cats.effect._
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.association.{IOProjectPathFinder, ProjectPathFinder}
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover

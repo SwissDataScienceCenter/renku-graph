@@ -36,12 +36,6 @@ object EventsGenerators {
     email    <- emails
   } yield User(username, email)
 
-  implicit val projectIds: Gen[ProjectId] = for {
-    min <- choose(1, 1000)
-    max <- choose(1001, 100000)
-    id  <- choose(min, max)
-  } yield ProjectId(id)
-
   implicit val projects: Gen[Project] = for {
     projectId <- projectIds
     path      <- projectPaths

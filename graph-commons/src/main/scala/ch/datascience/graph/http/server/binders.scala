@@ -18,8 +18,7 @@
 
 package ch.datascience.graph.http.server
 
-import ch.datascience.graph.model.events.{ProjectId => ProjectIdType}
-import ch.datascience.graph.model.projects.{ProjectPath => ProjectPathType}
+import ch.datascience.graph.model.projects.{ProjectId => ProjectIdType, ProjectPath => ProjectPathType}
 
 import scala.util.Try
 

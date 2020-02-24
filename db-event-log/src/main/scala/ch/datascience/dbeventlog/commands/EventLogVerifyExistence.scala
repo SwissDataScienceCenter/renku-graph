@@ -23,7 +23,8 @@ import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.ProjectId
 import doobie.implicits._
 import doobie.util.fragments.in
 

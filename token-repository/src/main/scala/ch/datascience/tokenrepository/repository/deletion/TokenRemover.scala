@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.deletion
 
 import cats.effect.Bracket
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.ProjectId
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
 import scala.language.higherKinds

@@ -25,8 +25,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.{CommitEventId, CommitId, ProjectId}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.events.{CommitEventId, CommitId}
+import ch.datascience.graph.model.projects.{ProjectId, ProjectPath}
 import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
