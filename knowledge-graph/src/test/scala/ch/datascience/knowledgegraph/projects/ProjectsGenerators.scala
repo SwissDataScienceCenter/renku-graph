@@ -21,8 +21,8 @@ package ch.datascience.knowledgegraph.projects
 import ch.datascience.generators.CommonGraphGenerators.{emails, names}
 import ch.datascience.generators.Generators.{nonBlankStrings, nonEmptyList, httpUrls => urls}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.knowledgegraph.projects.model.{Creation, Creator, Project, RepoUrls}
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
+import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{GitLabProject, ProjectUrls}
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import org.scalacheck.Gen
@@ -33,6 +33,7 @@ object ProjectsGenerators {
     kgProject     <- kgProjects
     gitLabProject <- gitLabProjects
   } yield Project(
+    id   = gitLabProject.id,
     path = kgProject.path,
     name = kgProject.name,
     created = Creation(
@@ -48,8 +49,10 @@ object ProjectsGenerators {
     created <- projectCreations
   } yield KGProject(id, name, created)
 
-  implicit lazy val gitLabProjects: Gen[GitLabProject] =
-    projectUrlObjects map GitLabProject
+  implicit lazy val gitLabProjects: Gen[GitLabProject] = for {
+    id   <- projectIds
+    urls <- projectUrlObjects
+  } yield GitLabProject(id, urls)
 
   private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
     sshUrl  <- sshUrls

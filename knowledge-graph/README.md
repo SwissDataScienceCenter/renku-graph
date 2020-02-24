@@ -284,6 +284,7 @@ Finds details of the project with the given `namespace/name`.
 Response body example:
 ```
 {
+  "identifier": 123,
   "path": "namespace/project-name", 
   "name": "Some project name",
   "created": {

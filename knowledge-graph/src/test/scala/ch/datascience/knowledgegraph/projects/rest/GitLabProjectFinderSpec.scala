@@ -117,6 +117,7 @@ class GitLabProjectFinderSpec extends WordSpec with MockFactory with ExternalSer
     val projectFinder = new IOGitLabProjectFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
 
     lazy val projectJson: String = json"""{
+      "id": ${project.id.toString},
       "ssh_url_to_repo": ${project.urls.ssh.toString},
       "http_url_to_repo": ${project.urls.http.toString}
     }""".noSpaces

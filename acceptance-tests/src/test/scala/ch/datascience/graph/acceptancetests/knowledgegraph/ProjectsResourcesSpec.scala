@@ -110,6 +110,7 @@ object ProjectsResources {
 
   def fullJson(project: Project): Json = json"""
     {
+      "identifier": ${project.id.value}, 
       "path": ${project.path.toString}, 
       "name": ${project.name.toString},
       "created": {

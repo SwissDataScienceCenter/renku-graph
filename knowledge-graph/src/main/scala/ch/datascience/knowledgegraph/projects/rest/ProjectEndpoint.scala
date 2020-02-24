@@ -82,6 +82,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val projectEncoder: Encoder[Project] = Encoder.instance[Project] { project =>
     json"""{
+        "identifier": ${project.id.value},
         "path": ${project.path.toString},
         "name": ${project.name.toString},
         "created": {

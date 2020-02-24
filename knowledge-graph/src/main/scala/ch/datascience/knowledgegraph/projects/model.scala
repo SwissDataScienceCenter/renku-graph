@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.projects
 import java.net.{MalformedURLException, URL}
 
 import cats.data.Validated
-import ch.datascience.graph.model.projects.{DateCreated, Name, ProjectPath}
+import ch.datascience.graph.model.projects.{DateCreated, Name, ProjectId, ProjectPath}
 import ch.datascience.graph.model.users
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
 import ch.datascience.tinytypes.constraints.NonBlank
@@ -29,7 +29,7 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object model {
 
-  final case class Project(path: ProjectPath, name: Name, created: Creation, repoUrls: RepoUrls)
+  final case class Project(id: ProjectId, path: ProjectPath, name: Name, created: Creation, repoUrls: RepoUrls)
 
   final case class Creation(date: DateCreated, creator: Creator)
 
