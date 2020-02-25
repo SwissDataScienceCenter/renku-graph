@@ -207,19 +207,22 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
     val projectFinder       = new IOProjectFinder(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
   }
 
-  private def projectFrom(kgProject: KGProject, gitLabProject: GitLabProject) = Project(
-    id               = gitLabProject.id,
-    path             = kgProject.path,
-    name             = kgProject.name,
-    maybeDescription = gitLabProject.maybeDescription,
-    visibility       = gitLabProject.visibility,
-    created = Creation(
-      date    = kgProject.created.date,
-      creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
-    ),
-    repoUrls   = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http, gitLabProject.urls.web),
-    forksCount = gitLabProject.forksCount,
-    starsCount = gitLabProject.starsCount,
-    updatedAt  = gitLabProject.updatedAt
-  )
+  private def projectFrom(kgProject: KGProject, gitLabProject: GitLabProject) = {
+    val urls = gitLabProject.urls
+    Project(
+      id               = gitLabProject.id,
+      path             = kgProject.path,
+      name             = kgProject.name,
+      maybeDescription = gitLabProject.maybeDescription,
+      visibility       = gitLabProject.visibility,
+      created = Creation(
+        date    = kgProject.created.date,
+        creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
+      ),
+      repoUrls   = RepoUrls(urls.ssh, urls.http, urls.web, urls.readme),
+      forksCount = gitLabProject.forksCount,
+      starsCount = gitLabProject.starsCount,
+      updatedAt  = gitLabProject.updatedAt
+    )
+  }
 }

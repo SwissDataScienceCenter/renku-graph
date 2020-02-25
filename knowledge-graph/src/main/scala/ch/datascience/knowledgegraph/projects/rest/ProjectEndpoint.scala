@@ -109,9 +109,10 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val urlsEncoder: Encoder[RepoUrls] = Encoder.instance[RepoUrls] { urls =>
     json"""{
-      "ssh":  ${urls.ssh.value},
-      "http": ${urls.http.value},
-      "web":  ${urls.web.value}
+      "ssh":    ${urls.ssh.value},
+      "http":   ${urls.http.value},
+      "web":    ${urls.web.value},
+      "readme": ${urls.readme.value}
     }"""
   }
 }

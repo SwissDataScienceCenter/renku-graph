@@ -22,7 +22,7 @@ import ch.datascience.generators.CommonGraphGenerators.{emails, names}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl, WebUrl}
+import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, ForksCount, GitLabProject, ProjectUrls, StarsCount}
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
@@ -33,6 +33,7 @@ object ProjectsGenerators {
   implicit val projects: Gen[Project] = for {
     kgProject     <- kgProjects
     gitLabProject <- gitLabProjects
+    urls = gitLabProject.urls
   } yield Project(
     id               = gitLabProject.id,
     path             = kgProject.path,
@@ -43,7 +44,7 @@ object ProjectsGenerators {
       date    = kgProject.created.date,
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
     ),
-    repoUrls   = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http, gitLabProject.urls.web),
+    repoUrls   = RepoUrls(urls.ssh, urls.http, urls.web, urls.readme),
     forksCount = gitLabProject.forksCount,
     starsCount = gitLabProject.starsCount,
     updatedAt  = gitLabProject.updatedAt
@@ -66,10 +67,11 @@ object ProjectsGenerators {
   } yield GitLabProject(id, maybeDescription, visibility, urls, forksCount, starsCount, updatedAt)
 
   private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
-    sshUrl  <- sshUrls
-    httpUrl <- httpUrls
-    webUrl  <- webUrls
-  } yield ProjectUrls(httpUrl, sshUrl, webUrl)
+    sshUrl    <- sshUrls
+    httpUrl   <- httpUrls
+    webUrl    <- webUrls
+    readmeUrl <- readmeUrls
+  } yield ProjectUrls(httpUrl, sshUrl, webUrl, readmeUrl)
 
   private implicit lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())
@@ -80,6 +82,11 @@ object ProjectsGenerators {
     url         <- urls()
     projectPath <- projectPaths
   } yield HttpUrl(s"$url/$projectPath.git")
+
+  private implicit lazy val readmeUrls: Gen[ReadmeUrl] = for {
+    url         <- urls()
+    projectPath <- projectPaths
+  } yield ReadmeUrl(s"$url/$projectPath/blob/master/README.md")
 
   private implicit lazy val webUrls:     Gen[WebUrl]      = urls() map WebUrl.apply
   private implicit lazy val forksCounts: Gen[ForksCount]  = nonNegativeInts() map (v => ForksCount.apply(v.value))

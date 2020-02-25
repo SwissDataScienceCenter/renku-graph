@@ -123,9 +123,10 @@ object ProjectsResources {
         }
       },
       "url": {
-        "ssh":  ${project.repoUrls.ssh.value},
-        "http": ${project.repoUrls.http.value},
-        "web":  ${project.repoUrls.web.value}
+        "ssh":    ${project.repoUrls.ssh.value},
+        "http":   ${project.repoUrls.http.value},
+        "web":    ${project.repoUrls.web.value},
+        "readme": ${project.repoUrls.readme.value}
       },
       "forksCount": ${project.forksCount.value},
       "starsCount": ${project.starsCount.value},

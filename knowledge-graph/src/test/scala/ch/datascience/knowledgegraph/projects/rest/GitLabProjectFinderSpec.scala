@@ -145,6 +145,7 @@ class GitLabProjectFinderSpec
     "ssh_url_to_repo":  ${project.urls.ssh.value},
     "http_url_to_repo": ${project.urls.http.value},
     "web_url":          ${project.urls.web.value},
+    "readme_url":       ${project.urls.readme.value},
     "forks_count":      ${project.forksCount.value},
     "star_count":       ${project.starsCount.value},
     "last_activity_at": ${project.updatedAt.value}

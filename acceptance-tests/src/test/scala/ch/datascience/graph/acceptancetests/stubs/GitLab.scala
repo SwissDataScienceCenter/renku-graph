@@ -156,6 +156,7 @@ object GitLab {
           "ssh_url_to_repo":  ${project.repoUrls.ssh.value},
           "http_url_to_repo": ${project.repoUrls.http.value},
           "web_url":          ${project.repoUrls.web.value},
+          "readme_url":       ${project.repoUrls.readme.value},
           "forks_count":      ${project.forksCount.value},
           "star_count":       ${project.starsCount.value},
           "last_activity_at": ${project.updatedAt.value}

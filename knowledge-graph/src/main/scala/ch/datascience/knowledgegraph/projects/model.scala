@@ -45,7 +45,7 @@ object model {
 
   final case class Creator(email: users.Email, name: users.Name)
 
-  final case class RepoUrls(ssh: SshUrl, http: HttpUrl, web: WebUrl)
+  final case class RepoUrls(ssh: SshUrl, http: HttpUrl, web: WebUrl, readme: ReadmeUrl)
 
   object RepoUrls {
 
@@ -70,5 +70,8 @@ object model {
 
     final class WebUrl private (val value: String) extends AnyVal with StringTinyType
     implicit object WebUrl extends TinyTypeFactory[WebUrl](new WebUrl(_)) with Url
+
+    final class ReadmeUrl private (val value: String) extends AnyVal with StringTinyType
+    implicit object ReadmeUrl extends TinyTypeFactory[ReadmeUrl](new ReadmeUrl(_)) with Url
   }
 }

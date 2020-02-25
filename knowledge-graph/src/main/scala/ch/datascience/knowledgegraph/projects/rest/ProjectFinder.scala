@@ -58,7 +58,8 @@ class IOProjectFinder(
       gitLabProject <- findProjectInGitLab(path, Some(accessToken))
     } yield gitLabProject
 
-  private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) =
+  private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) = {
+    val urls = gitLabProject.urls
     Project(
       id               = gitLabProject.id,
       path             = path,
@@ -69,11 +70,12 @@ class IOProjectFinder(
         date    = kgProject.created.date,
         creator = Creator(kgProject.created.creator.email, kgProject.created.creator.name)
       ),
-      repoUrls   = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http, gitLabProject.urls.web),
+      repoUrls   = RepoUrls(urls.ssh, urls.http, urls.web, urls.readme),
       forksCount = gitLabProject.forksCount,
       starsCount = gitLabProject.starsCount,
       updatedAt  = gitLabProject.updatedAt
     )
+  }
 }
 
 private object IOProjectFinder {
