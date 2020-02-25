@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Id, Visibility}
+import ch.datascience.graph.model.projects.{Description, Id, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
@@ -45,11 +45,12 @@ trait GitLabProjectFinder[Interpretation[_]] {
 
 object GitLabProjectFinder {
 
-  final case class GitLabProject(id:         Id,
-                                 visibility: Visibility,
-                                 urls:       ProjectUrls,
-                                 forksCount: ForksCount,
-                                 starsCount: StarsCount)
+  final case class GitLabProject(id:               Id,
+                                 maybeDescription: Option[Description],
+                                 visibility:       Visibility,
+                                 urls:             ProjectUrls,
+                                 forksCount:       ForksCount,
+                                 starsCount:       StarsCount)
 
   final case class ProjectUrls(http: HttpUrl, ssh: SshUrl)
 
@@ -93,13 +94,18 @@ private class IOGitLabProjectFinder(
   private implicit lazy val projectDecoder: EntityDecoder[IO, GitLabProject] = {
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        id         <- cursor.downField("id").as[Id]
+        id <- cursor.downField("id").as[Id]
+        maybeDescription <- cursor
+                             .downField("description")
+                             .as[Option[String]]
+                             .map(blankToNone)
+                             .flatMap(toOption[Description])
         visibility <- cursor.downField("visibility").as[Visibility]
         sshUrl     <- cursor.downField("ssh_url_to_repo").as[SshUrl]
         httpUrl    <- cursor.downField("http_url_to_repo").as[HttpUrl]
         forksCount <- cursor.downField("forks_count").as[ForksCount]
         starsCount <- cursor.downField("star_count").as[StarsCount]
-      } yield GitLabProject(id, visibility, ProjectUrls(httpUrl, sshUrl), forksCount, starsCount)
+      } yield GitLabProject(id, maybeDescription, visibility, ProjectUrls(httpUrl, sshUrl), forksCount, starsCount)
 
     jsonOf[IO, GitLabProject]
   }

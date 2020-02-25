@@ -66,6 +66,9 @@ object projects {
   final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
   object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
 
+  final class Description private (val value: String) extends AnyVal with StringTinyType
+  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
+
   sealed trait Visibility extends StringTinyType with Product with Serializable
 
   object Visibility {

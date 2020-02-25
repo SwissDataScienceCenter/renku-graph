@@ -151,6 +151,7 @@ object GitLab {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
         .willReturn(okJson(json"""{
           "id":               ${project.id.value},
+          "description":      ${project.maybeDescription.map(_.value)},
           "visibility":       ${project.visibility.value},
           "ssh_url_to_repo":  ${project.repoUrls.ssh.value},
           "http_url_to_repo": ${project.repoUrls.http.value},

@@ -22,87 +22,111 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.blankStrings
 import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.Json
 import io.circe.literal._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class GitLabProjectFinderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class GitLabProjectFinderSpec
+    extends WordSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with ScalaCheckPropertyChecks {
 
   "findProject" should {
 
     "return fetched project info if service responds with OK and a valid body - personal access token case" in new TestCase {
+      forAll { (path: model.projects.Path, accessToken: PersonalAccessToken, project: GitLabProject) =>
+        stubFor {
+          get(s"/api/v4/projects/${urlEncode(path.toString)}")
+            .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
+            .willReturn(okJson(projectJson(project).noSpaces))
+        }
 
-      val personalAccessToken = personalAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/${urlEncode(projectPath.toString)}")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(okJson(projectJson))
+        projectFinder.findProject(path, Some(accessToken)).value.unsafeRunSync() shouldBe Some(project)
       }
-
-      projectFinder.findProject(projectPath, Some(personalAccessToken)).value.unsafeRunSync() shouldBe Some(
-        project
-      )
     }
 
     "return fetched project info if service responds with OK and a valid body - oauth access token case" in new TestCase {
+      forAll { (path: model.projects.Path, accessToken: OAuthAccessToken, project: GitLabProject) =>
+        stubFor {
+          get(s"/api/v4/projects/${urlEncode(path.toString)}")
+            .withHeader("Authorization", equalTo(s"Bearer ${accessToken.value}"))
+            .willReturn(okJson(projectJson(project).noSpaces))
+        }
 
-      val oauthAccessToken = oauthAccessTokens.generateOne
+        projectFinder.findProject(path, Some(accessToken)).value.unsafeRunSync() shouldBe Some(project)
+      }
+    }
 
+    "return fetched project info with no description if description in remote is blank" in new TestCase {
+      val path    = projectPaths.generateOne
+      val project = gitLabProjects.generateOne.copy(maybeDescription = None)
       stubFor {
-        get(s"/api/v4/projects/${urlEncode(projectPath.toString)}")
-          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(okJson(projectJson))
+        get(s"/api/v4/projects/${urlEncode(path.toString)}")
+          .willReturn(
+            okJson(
+              projectJson(project)
+                .deepMerge(json"""{"description": ${blankStrings().generateOne}}""")
+                .noSpaces
+            )
+          )
       }
 
-      projectFinder.findProject(projectPath, Some(oauthAccessToken)).value.unsafeRunSync() shouldBe Some(
-        project
-      )
+      projectFinder.findProject(path, maybeAccessToken = None).value.unsafeRunSync() shouldBe Some(project)
     }
 
     "return None if service responds with NOT_FOUND" in new TestCase {
 
+      val path = projectPaths.generateOne
       stubFor {
-        get(s"/api/v4/projects/${urlEncode(projectPath.toString)}")
+        get(s"/api/v4/projects/${urlEncode(path.toString)}")
           .willReturn(notFound())
       }
 
-      projectFinder.findProject(projectPath, None).value.unsafeRunSync() shouldBe None
+      projectFinder.findProject(path, None).value.unsafeRunSync() shouldBe None
     }
 
     "return a RuntimeException if remote client responds with status different than OK or NOT_FOUND" in new TestCase {
 
+      val path = projectPaths.generateOne
       stubFor {
-        get(s"/api/v4/projects/${urlEncode(projectPath.toString)}")
+        get(s"/api/v4/projects/${urlEncode(path.toString)}")
           .willReturn(unauthorized().withBody("some error"))
       }
 
       intercept[Exception] {
-        projectFinder.findProject(projectPath, None).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(projectPath.toString)} returned ${Status.Unauthorized}; body: some error"
+        projectFinder.findProject(path, None).value.unsafeRunSync()
+      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)} returned ${Status.Unauthorized}; body: some error"
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
 
+      val path = projectPaths.generateOne
       stubFor {
-        get(s"/api/v4/projects/${urlEncode(projectPath.toString)}")
+        get(s"/api/v4/projects/${urlEncode(path.toString)}")
           .willReturn(okJson("{}"))
       }
 
       intercept[Exception] {
-        projectFinder.findProject(projectPath, None).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(projectPath.toString)} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+        projectFinder.findProject(path, None).value.unsafeRunSync()
+      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
   }
 
@@ -110,19 +134,17 @@ class GitLabProjectFinderSpec extends WordSpec with MockFactory with ExternalSer
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val gitLabUrl   = GitLabUrl(externalServiceBaseUrl)
-    val projectPath = projectPaths.generateOne
-    val project     = gitLabProjects.generateOne
-
+    val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
     val projectFinder = new IOGitLabProjectFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
-
-    lazy val projectJson: String = json"""{
-      "id": ${project.id.value},
-      "visibility": ${project.visibility.value},
-      "ssh_url_to_repo": ${project.urls.ssh.value},
-      "http_url_to_repo": ${project.urls.http.value},
-      "forks_count": ${project.forksCount.value},
-      "star_count": ${project.starsCount.value}
-    }""".noSpaces
   }
+
+  private def projectJson(project: GitLabProject): Json = json"""{
+    "id": ${project.id.value},
+    "description": ${project.maybeDescription.map(_.value)},
+    "visibility": ${project.visibility.value},
+    "ssh_url_to_repo": ${project.urls.ssh.value},
+    "http_url_to_repo": ${project.urls.http.value},
+    "forks_count": ${project.forksCount.value},
+    "star_count": ${project.starsCount.value}
+  }"""
 }

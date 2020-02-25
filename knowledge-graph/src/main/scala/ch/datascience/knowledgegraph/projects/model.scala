@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.projects
 import java.net.{MalformedURLException, URL}
 
 import cats.data.Validated
-import ch.datascience.graph.model.projects.{DateCreated, Id, Name, Path, Visibility}
+import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, StarsCount}
@@ -30,14 +30,15 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object model {
 
-  final case class Project(id:         Id,
-                           path:       Path,
-                           name:       Name,
-                           visibility: Visibility,
-                           created:    Creation,
-                           repoUrls:   RepoUrls,
-                           forksCount: ForksCount,
-                           starsCount: StarsCount)
+  final case class Project(id:               Id,
+                           path:             Path,
+                           name:             Name,
+                           maybeDescription: Option[Description],
+                           visibility:       Visibility,
+                           created:          Creation,
+                           repoUrls:         RepoUrls,
+                           forksCount:       ForksCount,
+                           starsCount:       StarsCount)
 
   final case class Creation(date: DateCreated, creator: Creator)
 

@@ -51,7 +51,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   import ProjectsResources._
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
-  private val project          = projectsGen.generateOne
+  private val project          = projectsGen.generateOne.copy(maybeDescription = projectDescriptions.generateSome)
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
@@ -113,6 +113,7 @@ object ProjectsResources {
       "identifier": ${project.id.value}, 
       "path": ${project.path.value}, 
       "name": ${project.name.value},
+      "description": ${project.maybeDescription.getOrElse(throw new Exception("Description expected")).value},
       "visibility": ${project.visibility.value},
       "created": {
         "dateCreated": ${project.created.date.value},

@@ -19,6 +19,7 @@
 package ch.datascience.knowledgegraph.projects
 
 import ch.datascience.generators.CommonGraphGenerators.{emails, names}
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
@@ -33,10 +34,11 @@ object ProjectsGenerators {
     kgProject     <- kgProjects
     gitLabProject <- gitLabProjects
   } yield Project(
-    id         = gitLabProject.id,
-    path       = kgProject.path,
-    name       = kgProject.name,
-    visibility = gitLabProject.visibility,
+    id               = gitLabProject.id,
+    path             = kgProject.path,
+    name             = kgProject.name,
+    maybeDescription = gitLabProject.maybeDescription,
+    visibility       = gitLabProject.visibility,
     created = Creation(
       date    = kgProject.created.date,
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
@@ -53,12 +55,13 @@ object ProjectsGenerators {
   } yield KGProject(id, name, created)
 
   implicit lazy val gitLabProjects: Gen[GitLabProject] = for {
-    id         <- projectIds
-    visibility <- projectVisibilities
-    urls       <- projectUrlObjects
-    forksCount <- forksCounts
-    starsCount <- starsCounts
-  } yield GitLabProject(id, visibility, urls, forksCount, starsCount)
+    id               <- projectIds
+    maybeDescription <- projectDescriptions.toGeneratorOfOptions
+    visibility       <- projectVisibilities
+    urls             <- projectUrlObjects
+    forksCount       <- forksCounts
+    starsCount       <- starsCounts
+  } yield GitLabProject(id, maybeDescription, visibility, urls, forksCount, starsCount)
 
   private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
     sshUrl  <- sshUrls

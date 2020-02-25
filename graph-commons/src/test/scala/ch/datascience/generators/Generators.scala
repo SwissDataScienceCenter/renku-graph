@@ -289,7 +289,8 @@ object Generators {
         else generated
       }
 
-      def toGeneratorOfSomes: Gen[Option[T]] = generator map Option.apply
+      def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
+      def toGeneratorOfOptions: Gen[Option[T]] = Gen.option(generator)
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)

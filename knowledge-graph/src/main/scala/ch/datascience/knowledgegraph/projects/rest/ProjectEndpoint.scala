@@ -31,9 +31,6 @@ import ch.datascience.knowledgegraph.projects.model.{Creator, Project, RepoUrls}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Encoder
-import io.circe.literal._
-import io.circe.syntax._
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 
@@ -49,6 +46,9 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 ) extends Http4sDsl[Interpretation] {
 
   import executionTimeRecorder._
+  import io.circe.literal._
+  import io.circe.syntax._
+  import io.circe.{Encoder, Json}
   import org.http4s.circe._
 
   def getProject(path: projects.Path): Interpretation[Response[Interpretation]] =
@@ -96,7 +96,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
-    )
+    ) deepMerge (project.maybeDescription.map(desc => json"""{"description": ${desc.value}}""") getOrElse Json.obj())
   }
 
   private implicit lazy val creatorEncoder: Encoder[Creator] = Encoder.instance[Creator] { creator =>
