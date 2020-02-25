@@ -24,6 +24,7 @@ import cats.data.Validated
 import ch.datascience.graph.model.projects.{DateCreated, Id, Name, Path, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.ForksCount
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -34,7 +35,8 @@ object model {
                            name:       Name,
                            visibility: Visibility,
                            created:    Creation,
-                           repoUrls:   RepoUrls)
+                           repoUrls:   RepoUrls,
+                           forksCount: ForksCount)
 
   final case class Creation(date: DateCreated, creator: Creator)
 

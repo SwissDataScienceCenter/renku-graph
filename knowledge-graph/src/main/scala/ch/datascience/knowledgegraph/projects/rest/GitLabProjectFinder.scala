@@ -27,7 +27,9 @@ import ch.datascience.graph.model.projects.{Id, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{GitLabProject, ProjectUrls}
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, GitLabProject, ProjectUrls}
+import ch.datascience.tinytypes.constraints.NonNegativeInt
+import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
 
@@ -43,9 +45,12 @@ trait GitLabProjectFinder[Interpretation[_]] {
 
 object GitLabProjectFinder {
 
-  final case class GitLabProject(id: Id, visibility: Visibility, urls: ProjectUrls)
+  final case class GitLabProject(id: Id, visibility: Visibility, urls: ProjectUrls, forksCount: ForksCount)
 
   final case class ProjectUrls(http: HttpUrl, ssh: SshUrl)
+
+  class ForksCount private (val value: Int) extends AnyVal with IntTinyType
+  implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt
 }
 
 private class IOGitLabProjectFinder(
@@ -85,7 +90,8 @@ private class IOGitLabProjectFinder(
         visibility <- cursor.downField("visibility").as[Visibility]
         sshUrl     <- cursor.downField("ssh_url_to_repo").as[SshUrl]
         httpUrl    <- cursor.downField("http_url_to_repo").as[HttpUrl]
-      } yield GitLabProject(id, visibility, ProjectUrls(httpUrl, sshUrl))
+        forksCount <- cursor.downField("forks_count").as[ForksCount]
+      } yield GitLabProject(id, visibility, ProjectUrls(httpUrl, sshUrl), forksCount)
 
     jsonOf[IO, GitLabProject]
   }

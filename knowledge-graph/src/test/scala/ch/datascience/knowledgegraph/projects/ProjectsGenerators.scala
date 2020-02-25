@@ -19,11 +19,11 @@
 package ch.datascience.knowledgegraph.projects
 
 import ch.datascience.generators.CommonGraphGenerators.{emails, names}
-import ch.datascience.generators.Generators.{nonBlankStrings, nonEmptyList, httpUrls => urls}
+import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
 import ch.datascience.knowledgegraph.projects.model._
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{GitLabProject, ProjectUrls}
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, GitLabProject, ProjectUrls}
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import org.scalacheck.Gen
 
@@ -41,7 +41,8 @@ object ProjectsGenerators {
       date    = kgProject.created.date,
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
     ),
-    repoUrls = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http)
+    repoUrls   = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http),
+    forksCount = gitLabProject.forksCount
   )
 
   implicit lazy val kgProjects: Gen[KGProject] = for {
@@ -54,7 +55,8 @@ object ProjectsGenerators {
     id         <- projectIds
     visibility <- projectVisibilities
     urls       <- projectUrlObjects
-  } yield GitLabProject(id, visibility, urls)
+    forksCount <- forksCounts
+  } yield GitLabProject(id, visibility, urls, forksCount)
 
   private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
     sshUrl  <- sshUrls
@@ -65,6 +67,8 @@ object ProjectsGenerators {
     hostParts   <- nonEmptyList(nonBlankStrings())
     projectPath <- projectPaths
   } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
+
+  private implicit lazy val forksCounts: Gen[ForksCount] = nonNegativeInts() map (v => ForksCount.apply(v.value))
 
   private implicit lazy val httpUrls: Gen[HttpUrl] = for {
     url         <- urls()

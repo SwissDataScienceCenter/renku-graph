@@ -120,7 +120,8 @@ class GitLabProjectFinderSpec extends WordSpec with MockFactory with ExternalSer
       "id": ${project.id.value},
       "visibility": ${project.visibility.value},
       "ssh_url_to_repo": ${project.urls.ssh.value},
-      "http_url_to_repo": ${project.urls.http.value}
+      "http_url_to_repo": ${project.urls.http.value},
+      "forks_count": ${project.forksCount.value}
     }""".noSpaces
   }
 }

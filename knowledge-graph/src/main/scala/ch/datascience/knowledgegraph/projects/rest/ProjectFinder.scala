@@ -68,7 +68,8 @@ class IOProjectFinder(
         date    = kgProject.created.date,
         creator = Creator(kgProject.created.creator.email, kgProject.created.creator.name)
       ),
-      repoUrls = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http)
+      repoUrls   = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http),
+      forksCount = gitLabProject.forksCount
     )
 }
 

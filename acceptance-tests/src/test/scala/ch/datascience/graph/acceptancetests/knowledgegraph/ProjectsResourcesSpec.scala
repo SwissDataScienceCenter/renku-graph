@@ -124,6 +124,9 @@ object ProjectsResources {
       "url": {
         "ssh": ${project.repoUrls.ssh.value},
         "http": ${project.repoUrls.http.value}
+      },
+      "forks": {
+        "count": ${project.forksCount.value}
       }
     }""" deepMerge {
     _links(
