@@ -28,9 +28,10 @@ import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.knowledgegraph.projects.model.{Project => ProjectMetadata}
+import ch.datascience.knowledgegraph.projects.model.{ParentProject, Project => ProjectMetadata}
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.Json
 import io.circe.literal._
 
 object GitLab {
@@ -147,20 +148,37 @@ object GitLab {
   def `GET <gitlab>/api/v4/projects/:path returning OK with`(
       project:            ProjectMetadata
   )(implicit accessToken: AccessToken): Unit = {
+
+    def toJson(parent: ParentProject) = json"""{
+      "id":                  ${parent.id.value},
+      "path_with_namespace": ${parent.path.value},
+      "name":                ${parent.name.value}
+    }"""
+
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
-        .willReturn(okJson(json"""{
-          "id":               ${project.id.value},
-          "description":      ${project.maybeDescription.map(_.value)},
-          "visibility":       ${project.visibility.value},
-          "ssh_url_to_repo":  ${project.repoUrls.ssh.value},
-          "http_url_to_repo": ${project.repoUrls.http.value},
-          "web_url":          ${project.repoUrls.web.value},
-          "readme_url":       ${project.repoUrls.readme.value},
-          "forks_count":      ${project.forksCount.value},
-          "star_count":       ${project.starsCount.value},
-          "last_activity_at": ${project.updatedAt.value}
-        }""".noSpaces))
+        .willReturn(
+          okJson(
+            json"""{
+              "id":               ${project.id.value},
+              "description":      ${project.maybeDescription.map(_.value)},
+              "visibility":       ${project.visibility.value},
+              "ssh_url_to_repo":  ${project.repoUrls.ssh.value},
+              "http_url_to_repo": ${project.repoUrls.http.value},
+              "web_url":          ${project.repoUrls.web.value},
+              "readme_url":       ${project.repoUrls.readme.value},
+              "forks_count":      ${project.forks.count.value},
+              "star_count":       ${project.starsCount.value},
+              "last_activity_at": ${project.updatedAt.value}
+            }"""
+              .deepMerge(
+                project.forks.maybeParent
+                  .map(parent => Json.obj("forked_from_project" -> toJson(parent)))
+                  .getOrElse(Json.obj())
+              )
+              .noSpaces
+          )
+        )
     }
     ()
   }

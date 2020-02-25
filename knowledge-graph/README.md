@@ -296,15 +296,22 @@ Response body example:
       "email": "author@mail.org"
     }
   },
+  "updatedAt":  "2001-10-06T10:48:29.457Z",
   "url": {
     "ssh":    "git@renku.io:namespace/project-name.git",
     "http":   "https://renku.io/gitlab/namespace/project-name.git",
     "web":    "https://renku.io/gitlab/namespace/project-name",
     "readme": "https://renku.io/gitlab/namespace/project-name/blob/master/README.md"
   },
-  "forksCount": 1,
+  "forks": {
+    "count": 1,
+    "parent": { // optional
+      "identifier": 122,
+      "path":       "namespace/parent-project",
+      "name":       "Parent project name"
+    }
+  },
   "starsCount": 0,
-  "updatedAt":  "2001-10-06T10:48:29.457Z",
   "_links":[  
     {  
       "rel":"self",

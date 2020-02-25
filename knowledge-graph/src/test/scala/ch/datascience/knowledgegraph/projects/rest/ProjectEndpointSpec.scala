@@ -149,10 +149,10 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       visibility       <- cursor.downField("visibility").as[Visibility]
       created          <- cursor.downField("created").as[Creation]
       urls             <- cursor.downField("url").as[RepoUrls]
-      forksCount       <- cursor.downField("forksCount").as[ForksCount]
+      forks            <- cursor.downField("forks").as[Forks]
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
       updatedAt        <- cursor.downField("updatedAt").as[DateUpdated]
-    } yield Project(id, path, name, maybeDescription, visibility, created, urls, forksCount, starsCount, updatedAt)
+    } yield Project(id, path, name, maybeDescription, visibility, created, urls, forks, starsCount, updatedAt)
 
   private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
     for {
@@ -165,6 +165,19 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       name  <- cursor.downField("name").as[UserName]
       email <- cursor.downField("email").as[Email]
     } yield Creator(email, name)
+
+  private implicit lazy val forksDecoder: Decoder[Forks] = cursor =>
+    for {
+      count       <- cursor.downField("count").as[ForksCount]
+      maybeParent <- cursor.downField("parent").as[Option[ParentProject]]
+    } yield Forks(count, maybeParent)
+
+  private implicit lazy val parentDecoder: Decoder[ParentProject] = cursor =>
+    for {
+      id   <- cursor.downField("identifier").as[Id]
+      path <- cursor.downField("path").as[Path]
+      name <- cursor.downField("name").as[Name]
+    } yield ParentProject(id, path, name)
 
   private implicit lazy val urlsDecoder: Decoder[RepoUrls] = cursor =>
     for {

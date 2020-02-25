@@ -35,7 +35,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen, forksObjects, parentProjects}
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
@@ -51,7 +51,10 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   import ProjectsResources._
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
-  private val project          = projectsGen.generateOne.copy(maybeDescription = projectDescriptions.generateSome)
+  private val project = projectsGen.generateOne.copy(
+    maybeDescription = projectDescriptions.generateSome,
+    forks            = forksObjects.generateOne.copy(maybeParent = parentProjects.generateSome)
+  )
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
@@ -128,7 +131,14 @@ object ProjectsResources {
         "web":    ${project.repoUrls.web.value},
         "readme": ${project.repoUrls.readme.value}
       },
-      "forksCount": ${project.forksCount.value},
+      "forks": {
+        "count": ${project.forks.count.value},
+        "parent": {
+          "identifier": ${project.forks.maybeParent.getOrElse(throw new Exception("Parent expected")).id.value},
+          "path":       ${project.forks.maybeParent.getOrElse(throw new Exception("Parent expected")).path.value},
+          "name":       ${project.forks.maybeParent.getOrElse(throw new Exception("Parent expected")).name.value}
+        }
+      },
       "starsCount": ${project.starsCount.value},
       "updatedAt":  ${project.updatedAt.value}
     }""" deepMerge {

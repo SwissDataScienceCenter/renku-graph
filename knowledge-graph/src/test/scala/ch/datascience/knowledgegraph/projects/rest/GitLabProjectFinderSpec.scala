@@ -30,6 +30,7 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.knowledgegraph.projects.model.ParentProject
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -138,16 +139,25 @@ class GitLabProjectFinderSpec
     val projectFinder = new IOGitLabProjectFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
-  private def projectJson(project: GitLabProject): Json = json"""{
-    "id":               ${project.id.value},
-    "description":      ${project.maybeDescription.map(_.value)},
-    "visibility":       ${project.visibility.value},
-    "ssh_url_to_repo":  ${project.urls.ssh.value},
-    "http_url_to_repo": ${project.urls.http.value},
-    "web_url":          ${project.urls.web.value},
-    "readme_url":       ${project.urls.readme.value},
-    "forks_count":      ${project.forksCount.value},
-    "star_count":       ${project.starsCount.value},
-    "last_activity_at": ${project.updatedAt.value}
-  }"""
+  private def projectJson(project: GitLabProject): Json =
+    json"""{
+      "id":               ${project.id.value},
+      "description":      ${project.maybeDescription.map(_.value)},
+      "visibility":       ${project.visibility.value},
+      "ssh_url_to_repo":  ${project.urls.ssh.value},
+      "http_url_to_repo": ${project.urls.http.value},
+      "web_url":          ${project.urls.web.value},
+      "readme_url":       ${project.urls.readme.value},
+      "forks_count":      ${project.forks.count.value},
+      "star_count":       ${project.starsCount.value},
+      "last_activity_at": ${project.updatedAt.value}
+    }""" deepMerge (project.forks.maybeParent.map {
+      case ParentProject(id, path, name) => json"""{
+        "forked_from_project": {
+          "id":                  ${id.value},
+          "path_with_namespace": ${path.value},
+          "name":                ${name.value}
+        }
+      }"""
+    } getOrElse Json.obj())
 }

@@ -27,7 +27,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.config.GitLab
-import ch.datascience.knowledgegraph.projects.model.{Creator, Project, RepoUrls}
+import ch.datascience.knowledgegraph.projects.model.{Creator, Forks, ParentProject, Project, RepoUrls}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
@@ -82,18 +82,18 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val projectEncoder: Encoder[Project] = Encoder.instance[Project] { project =>
     json"""{
-        "identifier": ${project.id.value},
-        "path":       ${project.path.value},
-        "name":       ${project.name.value},
-        "visibility": ${project.visibility.value},
-        "created": {
-          "dateCreated": ${project.created.date.value},
-          "creator":     ${project.created.creator}
-        },
-        "url":        ${project.repoUrls},
-        "forksCount": ${project.forksCount.value},
-        "starsCount": ${project.starsCount.value},
-        "updatedAt":  ${project.updatedAt.value}
+      "identifier": ${project.id.value},
+      "path":       ${project.path.value},
+      "name":       ${project.name.value},
+      "visibility": ${project.visibility.value},
+      "created": {
+        "dateCreated": ${project.created.date.value},
+        "creator":     ${project.created.creator}
+      },
+      "updatedAt":  ${project.updatedAt.value},
+      "url":        ${project.repoUrls},
+      "forks":      ${project.forks},
+      "starsCount": ${project.starsCount.value}
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
@@ -113,6 +113,20 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       "http":   ${urls.http.value},
       "web":    ${urls.web.value},
       "readme": ${urls.readme.value}
+    }"""
+  }
+
+  private implicit lazy val forksEncoder: Encoder[Forks] = Encoder.instance[Forks] { forks =>
+    json"""{
+      "count": ${forks.count.value}
+    }""" deepMerge (forks.maybeParent.map(parent => json"""{"parent": $parent}""") getOrElse Json.obj())
+  }
+
+  private implicit lazy val parentProjectEncoder: Encoder[ParentProject] = Encoder.instance[ParentProject] { parent =>
+    json"""{
+      "identifier": ${parent.id.value},
+      "path":       ${parent.path.value},
+      "name":       ${parent.name.value}
     }"""
   }
 }

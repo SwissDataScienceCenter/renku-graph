@@ -37,13 +37,17 @@ object model {
                            visibility:       Visibility,
                            created:          Creation,
                            repoUrls:         RepoUrls,
-                           forksCount:       ForksCount,
+                           forks:            Forks,
                            starsCount:       StarsCount,
                            updatedAt:        DateUpdated)
 
   final case class Creation(date: DateCreated, creator: Creator)
 
   final case class Creator(email: users.Email, name: users.Name)
+
+  final case class Forks(count: ForksCount, maybeParent: Option[ParentProject])
+
+  final case class ParentProject(id: Id, path: Path, name: Name)
 
   final case class RepoUrls(ssh: SshUrl, http: HttpUrl, web: WebUrl, readme: ReadmeUrl)
 

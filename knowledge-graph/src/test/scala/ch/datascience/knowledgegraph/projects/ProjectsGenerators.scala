@@ -45,7 +45,7 @@ object ProjectsGenerators {
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
     ),
     repoUrls   = RepoUrls(urls.ssh, urls.http, urls.web, urls.readme),
-    forksCount = gitLabProject.forksCount,
+    forks      = gitLabProject.forks,
     starsCount = gitLabProject.starsCount,
     updatedAt  = gitLabProject.updatedAt
   )
@@ -61,10 +61,10 @@ object ProjectsGenerators {
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     visibility       <- projectVisibilities
     urls             <- projectUrlObjects
-    forksCount       <- forksCounts
+    forks            <- forksObjects
     starsCount       <- starsCounts
     updatedAt        <- updatedAts
-  } yield GitLabProject(id, maybeDescription, visibility, urls, forksCount, starsCount, updatedAt)
+  } yield GitLabProject(id, maybeDescription, visibility, urls, forks, starsCount, updatedAt)
 
   private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
     sshUrl    <- sshUrls
@@ -72,6 +72,17 @@ object ProjectsGenerators {
     webUrl    <- webUrls
     readmeUrl <- readmeUrls
   } yield ProjectUrls(httpUrl, sshUrl, webUrl, readmeUrl)
+
+  implicit lazy val forksObjects: Gen[Forks] = for {
+    count       <- forksCounts
+    maybeParent <- parentProjects.toGeneratorOfOptions
+  } yield Forks(count, maybeParent)
+
+  implicit lazy val parentProjects: Gen[ParentProject] = for {
+    id   <- projectIds
+    path <- projectPaths
+    name <- projectNames
+  } yield ParentProject(id, path, name)
 
   private implicit lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())

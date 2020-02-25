@@ -23,9 +23,10 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Description, Id, Visibility}
+import ch.datascience.graph.model.projects.{Description, Id, Name, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
+import ch.datascience.knowledgegraph.projects.model.{Forks, ParentProject}
 import ch.datascience.knowledgegraph.projects.model.RepoUrls._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, GitLabProject}
 import io.chrisdavenport.log4cats.Logger
@@ -51,7 +52,7 @@ object GitLabProjectFinder {
                                  maybeDescription: Option[Description],
                                  visibility:       Visibility,
                                  urls:             ProjectUrls,
-                                 forksCount:       ForksCount,
+                                 forks:            Forks,
                                  starsCount:       StarsCount,
                                  updatedAt:        DateUpdated)
 
@@ -101,6 +102,13 @@ private class IOGitLabProjectFinder(
     import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
     import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, GitLabProject, ProjectUrls, StarsCount}
 
+    implicit val parentProjectDecoder: Decoder[ParentProject] = cursor =>
+      for {
+        id   <- cursor.downField("id").as[Id]
+        path <- cursor.downField("path_with_namespace").as[projects.Path]
+        name <- cursor.downField("name").as[Name]
+      } yield ParentProject(id, path, name)
+
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
         id <- cursor.downField("id").as[Id]
@@ -109,19 +117,20 @@ private class IOGitLabProjectFinder(
                              .as[Option[String]]
                              .map(blankToNone)
                              .flatMap(toOption[Description])
-        visibility <- cursor.downField("visibility").as[Visibility]
-        sshUrl     <- cursor.downField("ssh_url_to_repo").as[SshUrl]
-        httpUrl    <- cursor.downField("http_url_to_repo").as[HttpUrl]
-        webUrl     <- cursor.downField("web_url").as[WebUrl]
-        readmeUrl  <- cursor.downField("readme_url").as[ReadmeUrl]
-        forksCount <- cursor.downField("forks_count").as[ForksCount]
-        starsCount <- cursor.downField("star_count").as[StarsCount]
-        updatedAt  <- cursor.downField("last_activity_at").as[DateUpdated]
+        visibility  <- cursor.downField("visibility").as[Visibility]
+        sshUrl      <- cursor.downField("ssh_url_to_repo").as[SshUrl]
+        httpUrl     <- cursor.downField("http_url_to_repo").as[HttpUrl]
+        webUrl      <- cursor.downField("web_url").as[WebUrl]
+        readmeUrl   <- cursor.downField("readme_url").as[ReadmeUrl]
+        forksCount  <- cursor.downField("forks_count").as[ForksCount]
+        starsCount  <- cursor.downField("star_count").as[StarsCount]
+        updatedAt   <- cursor.downField("last_activity_at").as[DateUpdated]
+        maybeParent <- cursor.downField("forked_from_project").as[Option[ParentProject]]
       } yield GitLabProject(id,
                             maybeDescription,
                             visibility,
                             ProjectUrls(httpUrl, sshUrl, webUrl, readmeUrl),
-                            forksCount,
+                            Forks(forksCount, maybeParent),
                             starsCount,
                             updatedAt)
 
