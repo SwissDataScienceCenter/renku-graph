@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
 import ch.datascience.knowledgegraph.projects.model._
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, GitLabProject, ProjectUrls}
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, GitLabProject, ProjectUrls, StarsCount}
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import org.scalacheck.Gen
 
@@ -42,7 +42,8 @@ object ProjectsGenerators {
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
     ),
     repoUrls   = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http),
-    forksCount = gitLabProject.forksCount
+    forksCount = gitLabProject.forksCount,
+    starsCount = gitLabProject.starsCount
   )
 
   implicit lazy val kgProjects: Gen[KGProject] = for {
@@ -56,7 +57,8 @@ object ProjectsGenerators {
     visibility <- projectVisibilities
     urls       <- projectUrlObjects
     forksCount <- forksCounts
-  } yield GitLabProject(id, visibility, urls, forksCount)
+    starsCount <- starsCounts
+  } yield GitLabProject(id, visibility, urls, forksCount, starsCount)
 
   private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
     sshUrl  <- sshUrls
@@ -69,6 +71,7 @@ object ProjectsGenerators {
   } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
 
   private implicit lazy val forksCounts: Gen[ForksCount] = nonNegativeInts() map (v => ForksCount.apply(v.value))
+  private implicit lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount.apply(v.value))
 
   private implicit lazy val httpUrls: Gen[HttpUrl] = for {
     url         <- urls()

@@ -125,9 +125,8 @@ object ProjectsResources {
         "ssh": ${project.repoUrls.ssh.value},
         "http": ${project.repoUrls.http.value}
       },
-      "forks": {
-        "count": ${project.forksCount.value}
-      }
+      "forksCount": ${project.forksCount.value},
+      "starsCount": ${project.starsCount.value}
     }""" deepMerge {
     _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),

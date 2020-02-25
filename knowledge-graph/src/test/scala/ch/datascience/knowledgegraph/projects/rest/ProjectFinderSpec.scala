@@ -217,6 +217,7 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
     ),
     repoUrls   = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http),
-    forksCount = gitLabProject.forksCount
+    forksCount = gitLabProject.forksCount,
+    starsCount = gitLabProject.starsCount
   )
 }

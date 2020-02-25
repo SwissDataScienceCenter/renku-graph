@@ -299,9 +299,8 @@ Response body example:
     "ssh": "git@renku.io:namespace/project-name.git",
     "http": "https://renku.io/gitlab/namespace/project-name.git"
   },
-  "forks": {
-    "count": 1
-  }
+  "forksCount": 1,
+  "starsCount": 0,
   "_links":[  
     {  
       "rel":"self",

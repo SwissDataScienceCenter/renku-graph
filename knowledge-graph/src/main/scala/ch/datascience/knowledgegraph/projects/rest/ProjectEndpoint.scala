@@ -91,9 +91,8 @@ class ProjectEndpoint[Interpretation[_]: Effect](
           "creator":     ${project.created.creator}
         },
         "url": ${project.repoUrls},
-        "forks": {
-          "count": ${project.forksCount.value}
-        }
+        "forksCount": ${project.forksCount.value},
+        "starsCount": ${project.starsCount.value}
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))

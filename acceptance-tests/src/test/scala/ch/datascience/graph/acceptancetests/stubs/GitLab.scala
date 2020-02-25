@@ -154,7 +154,8 @@ object GitLab {
           "visibility":       ${project.visibility.value},
           "ssh_url_to_repo":  ${project.repoUrls.ssh.value},
           "http_url_to_repo": ${project.repoUrls.http.value},
-          "forks_count":      ${project.forksCount.value}
+          "forks_count":      ${project.forksCount.value},
+          "star_count":       ${project.starsCount.value}
         }""".noSpaces))
     }
     ()
