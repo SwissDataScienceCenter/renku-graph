@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Description, Id, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
-import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
+import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl, WebUrl}
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, GitLabProject}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
@@ -55,7 +55,7 @@ object GitLabProjectFinder {
                                  starsCount:       StarsCount,
                                  updatedAt:        DateUpdated)
 
-  final case class ProjectUrls(http: HttpUrl, ssh: SshUrl)
+  final case class ProjectUrls(http: HttpUrl, ssh: SshUrl, web: WebUrl)
 
   final class ForksCount private (val value: Int) extends AnyVal with IntTinyType
   implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt
@@ -112,13 +112,14 @@ private class IOGitLabProjectFinder(
         visibility <- cursor.downField("visibility").as[Visibility]
         sshUrl     <- cursor.downField("ssh_url_to_repo").as[SshUrl]
         httpUrl    <- cursor.downField("http_url_to_repo").as[HttpUrl]
+        webUrl     <- cursor.downField("web_url").as[WebUrl]
         forksCount <- cursor.downField("forks_count").as[ForksCount]
         starsCount <- cursor.downField("star_count").as[StarsCount]
         updatedAt  <- cursor.downField("last_activity_at").as[DateUpdated]
       } yield GitLabProject(id,
                             maybeDescription,
                             visibility,
-                            ProjectUrls(httpUrl, sshUrl),
+                            ProjectUrls(httpUrl, sshUrl, webUrl),
                             forksCount,
                             starsCount,
                             updatedAt)

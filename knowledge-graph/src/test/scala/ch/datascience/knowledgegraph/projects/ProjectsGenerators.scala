@@ -22,7 +22,7 @@ import ch.datascience.generators.CommonGraphGenerators.{emails, names}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
+import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl, WebUrl}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, ForksCount, GitLabProject, ProjectUrls, StarsCount}
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
@@ -43,7 +43,7 @@ object ProjectsGenerators {
       date    = kgProject.created.date,
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
     ),
-    repoUrls   = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http),
+    repoUrls   = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http, gitLabProject.urls.web),
     forksCount = gitLabProject.forksCount,
     starsCount = gitLabProject.starsCount,
     updatedAt  = gitLabProject.updatedAt
@@ -68,21 +68,23 @@ object ProjectsGenerators {
   private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
     sshUrl  <- sshUrls
     httpUrl <- httpUrls
-  } yield ProjectUrls(httpUrl, sshUrl)
+    webUrl  <- webUrls
+  } yield ProjectUrls(httpUrl, sshUrl, webUrl)
 
   private implicit lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())
     projectPath <- projectPaths
   } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
 
-  private implicit lazy val forksCounts: Gen[ForksCount]  = nonNegativeInts() map (v => ForksCount.apply(v.value))
-  private implicit lazy val starsCounts: Gen[StarsCount]  = nonNegativeInts() map (v => StarsCount.apply(v.value))
-  private implicit lazy val updatedAts:  Gen[DateUpdated] = timestampsNotInTheFuture map DateUpdated.apply
-
   private implicit lazy val httpUrls: Gen[HttpUrl] = for {
     url         <- urls()
     projectPath <- projectPaths
   } yield HttpUrl(s"$url/$projectPath.git")
+
+  private implicit lazy val webUrls:     Gen[WebUrl]      = urls() map WebUrl.apply
+  private implicit lazy val forksCounts: Gen[ForksCount]  = nonNegativeInts() map (v => ForksCount.apply(v.value))
+  private implicit lazy val starsCounts: Gen[StarsCount]  = nonNegativeInts() map (v => StarsCount.apply(v.value))
+  private implicit lazy val updatedAts:  Gen[DateUpdated] = timestampsNotInTheFuture map DateUpdated.apply
 
   private implicit lazy val projectCreations: Gen[ProjectCreation] = for {
     created <- projectCreatedDates

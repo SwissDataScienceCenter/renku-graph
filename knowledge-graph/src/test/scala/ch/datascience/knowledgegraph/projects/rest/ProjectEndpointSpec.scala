@@ -34,7 +34,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
+import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl, WebUrl}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, ForksCount, StarsCount}
 import ch.datascience.logging.TestExecutionTimeRecorder
@@ -170,5 +170,6 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
     for {
       ssh  <- cursor.downField("ssh").as[SshUrl]
       http <- cursor.downField("http").as[HttpUrl]
-    } yield RepoUrls(ssh, http)
+      web  <- cursor.downField("web").as[WebUrl]
+    } yield RepoUrls(ssh, http, web)
 }

@@ -23,9 +23,9 @@ import java.net.{MalformedURLException, URL}
 import cats.data.Validated
 import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
 import ch.datascience.graph.model.users
-import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
+import ch.datascience.knowledgegraph.projects.model.RepoUrls._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, ForksCount, StarsCount}
-import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.constraints.{NonBlank, Url}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object model {
@@ -45,11 +45,19 @@ object model {
 
   final case class Creator(email: users.Email, name: users.Name)
 
-  final case class RepoUrls(ssh: SshUrl, http: HttpUrl)
+  final case class RepoUrls(ssh: SshUrl, http: HttpUrl, web: WebUrl)
 
   object RepoUrls {
 
-    class HttpUrl private (val value: String) extends AnyVal with StringTinyType
+    final class SshUrl private (val value: String) extends AnyVal with StringTinyType
+    implicit object SshUrl extends TinyTypeFactory[SshUrl](new SshUrl(_)) with NonBlank {
+      addConstraint(
+        check   = _ matches "^git@.*\\.git$",
+        message = url => s"$url is not a valid repository ssh url"
+      )
+    }
+
+    final class HttpUrl private (val value: String) extends AnyVal with StringTinyType
     implicit object HttpUrl extends TinyTypeFactory[HttpUrl](new HttpUrl(_)) with NonBlank {
       addConstraint(
         check = url =>
@@ -60,12 +68,7 @@ object model {
       )
     }
 
-    class SshUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object SshUrl extends TinyTypeFactory[SshUrl](new SshUrl(_)) with NonBlank {
-      addConstraint(
-        check   = _ matches "^git@.*\\.git$",
-        message = url => s"$url is not a valid repository ssh url"
-      )
-    }
+    final class WebUrl private (val value: String) extends AnyVal with StringTinyType
+    implicit object WebUrl extends TinyTypeFactory[WebUrl](new WebUrl(_)) with Url
   }
 }

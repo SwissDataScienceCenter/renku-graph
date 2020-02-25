@@ -298,7 +298,8 @@ Response body example:
   },
   "url": {
     "ssh": "git@renku.io:namespace/project-name.git",
-    "http": "https://renku.io/gitlab/namespace/project-name.git"
+    "http": "https://renku.io/gitlab/namespace/project-name.git",
+    "web": "https://renku.io/gitlab/namespace/project-name"
   },
   "forksCount": 1,
   "starsCount": 0,

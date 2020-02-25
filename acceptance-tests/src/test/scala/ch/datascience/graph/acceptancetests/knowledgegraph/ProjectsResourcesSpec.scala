@@ -110,25 +110,26 @@ object ProjectsResources {
 
   def fullJson(project: Project): Json = json"""
     {
-      "identifier": ${project.id.value}, 
-      "path": ${project.path.value}, 
-      "name": ${project.name.value},
+      "identifier":  ${project.id.value}, 
+      "path":        ${project.path.value}, 
+      "name":        ${project.name.value},
       "description": ${(project.maybeDescription getOrElse (throw new Exception("Description expected"))).value},
-      "visibility": ${project.visibility.value},
+      "visibility":  ${project.visibility.value},
       "created": {
         "dateCreated": ${project.created.date.value},
         "creator": {
-          "name": ${project.created.creator.name.value},
+          "name":  ${project.created.creator.name.value},
           "email": ${project.created.creator.email.value}
         }
       },
       "url": {
-        "ssh": ${project.repoUrls.ssh.value},
-        "http": ${project.repoUrls.http.value}
+        "ssh":  ${project.repoUrls.ssh.value},
+        "http": ${project.repoUrls.http.value},
+        "web":  ${project.repoUrls.web.value}
       },
       "forksCount": ${project.forksCount.value},
       "starsCount": ${project.starsCount.value},
-      "updatedAt": ${project.updatedAt.value}
+      "updatedAt":  ${project.updatedAt.value}
     }""" deepMerge {
     _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
