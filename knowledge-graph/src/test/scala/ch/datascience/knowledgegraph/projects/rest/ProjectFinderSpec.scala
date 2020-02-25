@@ -219,6 +219,7 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
     ),
     repoUrls   = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http),
     forksCount = gitLabProject.forksCount,
-    starsCount = gitLabProject.starsCount
+    starsCount = gitLabProject.starsCount,
+    updatedAt  = gitLabProject.updatedAt
   )
 }

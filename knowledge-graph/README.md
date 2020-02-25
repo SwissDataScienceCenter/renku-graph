@@ -302,6 +302,7 @@ Response body example:
   },
   "forksCount": 1,
   "starsCount": 0,
+  "updatedAt": "2001-10-06T10:48:29.457Z",
   "_links":[  
     {  
       "rel":"self",

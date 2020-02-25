@@ -27,9 +27,7 @@ import ch.datascience.graph.model.projects.{Description, Id, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, GitLabProject, ProjectUrls, StarsCount}
-import ch.datascience.tinytypes.constraints.NonNegativeInt
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, GitLabProject}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
 
@@ -44,21 +42,29 @@ trait GitLabProjectFinder[Interpretation[_]] {
 }
 
 object GitLabProjectFinder {
+  import java.time.Instant
+
+  import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonNegativeInt}
+  import ch.datascience.tinytypes.{InstantTinyType, IntTinyType, TinyTypeFactory}
 
   final case class GitLabProject(id:               Id,
                                  maybeDescription: Option[Description],
                                  visibility:       Visibility,
                                  urls:             ProjectUrls,
                                  forksCount:       ForksCount,
-                                 starsCount:       StarsCount)
+                                 starsCount:       StarsCount,
+                                 updatedAt:        DateUpdated)
 
   final case class ProjectUrls(http: HttpUrl, ssh: SshUrl)
 
-  class ForksCount private (val value: Int) extends AnyVal with IntTinyType
+  final class ForksCount private (val value: Int) extends AnyVal with IntTinyType
   implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt
 
-  class StarsCount private (val value: Int) extends AnyVal with IntTinyType
+  final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
   implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt
+
+  final class DateUpdated private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateUpdated extends TinyTypeFactory[DateUpdated](new DateUpdated(_)) with InstantNotInTheFuture
 }
 
 private class IOGitLabProjectFinder(
@@ -92,6 +98,9 @@ private class IOGitLabProjectFinder(
   }
 
   private implicit lazy val projectDecoder: EntityDecoder[IO, GitLabProject] = {
+    import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
+    import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, GitLabProject, ProjectUrls, StarsCount}
+
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
         id <- cursor.downField("id").as[Id]
@@ -105,7 +114,14 @@ private class IOGitLabProjectFinder(
         httpUrl    <- cursor.downField("http_url_to_repo").as[HttpUrl]
         forksCount <- cursor.downField("forks_count").as[ForksCount]
         starsCount <- cursor.downField("star_count").as[StarsCount]
-      } yield GitLabProject(id, maybeDescription, visibility, ProjectUrls(httpUrl, sshUrl), forksCount, starsCount)
+        updatedAt  <- cursor.downField("last_activity_at").as[DateUpdated]
+      } yield GitLabProject(id,
+                            maybeDescription,
+                            visibility,
+                            ProjectUrls(httpUrl, sshUrl),
+                            forksCount,
+                            starsCount,
+                            updatedAt)
 
     jsonOf[IO, GitLabProject]
   }

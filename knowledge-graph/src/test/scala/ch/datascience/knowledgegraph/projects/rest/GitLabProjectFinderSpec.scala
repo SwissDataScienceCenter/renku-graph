@@ -139,12 +139,13 @@ class GitLabProjectFinderSpec
   }
 
   private def projectJson(project: GitLabProject): Json = json"""{
-    "id": ${project.id.value},
-    "description": ${project.maybeDescription.map(_.value)},
-    "visibility": ${project.visibility.value},
-    "ssh_url_to_repo": ${project.urls.ssh.value},
+    "id":               ${project.id.value},
+    "description":      ${project.maybeDescription.map(_.value)},
+    "visibility":       ${project.visibility.value},
+    "ssh_url_to_repo":  ${project.urls.ssh.value},
     "http_url_to_repo": ${project.urls.http.value},
-    "forks_count": ${project.forksCount.value},
-    "star_count": ${project.starsCount.value}
+    "forks_count":      ${project.forksCount.value},
+    "star_count":       ${project.starsCount.value},
+    "last_activity_at": ${project.updatedAt.value}
   }"""
 }

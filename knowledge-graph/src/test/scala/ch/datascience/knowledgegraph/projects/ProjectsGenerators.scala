@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
 import ch.datascience.knowledgegraph.projects.model._
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, GitLabProject, ProjectUrls, StarsCount}
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, ForksCount, GitLabProject, ProjectUrls, StarsCount}
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import org.scalacheck.Gen
 
@@ -45,7 +45,8 @@ object ProjectsGenerators {
     ),
     repoUrls   = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http),
     forksCount = gitLabProject.forksCount,
-    starsCount = gitLabProject.starsCount
+    starsCount = gitLabProject.starsCount,
+    updatedAt  = gitLabProject.updatedAt
   )
 
   implicit lazy val kgProjects: Gen[KGProject] = for {
@@ -61,7 +62,8 @@ object ProjectsGenerators {
     urls             <- projectUrlObjects
     forksCount       <- forksCounts
     starsCount       <- starsCounts
-  } yield GitLabProject(id, maybeDescription, visibility, urls, forksCount, starsCount)
+    updatedAt        <- updatedAts
+  } yield GitLabProject(id, maybeDescription, visibility, urls, forksCount, starsCount, updatedAt)
 
   private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
     sshUrl  <- sshUrls
@@ -73,8 +75,9 @@ object ProjectsGenerators {
     projectPath <- projectPaths
   } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
 
-  private implicit lazy val forksCounts: Gen[ForksCount] = nonNegativeInts() map (v => ForksCount.apply(v.value))
-  private implicit lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount.apply(v.value))
+  private implicit lazy val forksCounts: Gen[ForksCount]  = nonNegativeInts() map (v => ForksCount.apply(v.value))
+  private implicit lazy val starsCounts: Gen[StarsCount]  = nonNegativeInts() map (v => StarsCount.apply(v.value))
+  private implicit lazy val updatedAts:  Gen[DateUpdated] = timestampsNotInTheFuture map DateUpdated.apply
 
   private implicit lazy val httpUrls: Gen[HttpUrl] = for {
     url         <- urls()

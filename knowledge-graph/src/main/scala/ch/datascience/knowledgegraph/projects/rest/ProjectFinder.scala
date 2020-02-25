@@ -71,7 +71,8 @@ class IOProjectFinder(
       ),
       repoUrls   = RepoUrls(gitLabProject.urls.ssh, gitLabProject.urls.http),
       forksCount = gitLabProject.forksCount,
-      starsCount = gitLabProject.starsCount
+      starsCount = gitLabProject.starsCount,
+      updatedAt  = gitLabProject.updatedAt
     )
 }
 

@@ -36,7 +36,7 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
 import ch.datascience.knowledgegraph.projects.model._
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, StarsCount}
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, ForksCount, StarsCount}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.syntax._
@@ -151,7 +151,8 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       urls             <- cursor.downField("url").as[RepoUrls]
       forksCount       <- cursor.downField("forksCount").as[ForksCount]
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
-    } yield Project(id, path, name, maybeDescription, visibility, created, urls, forksCount, starsCount)
+      updatedAt        <- cursor.downField("updatedAt").as[DateUpdated]
+    } yield Project(id, path, name, maybeDescription, visibility, created, urls, forksCount, starsCount, updatedAt)
 
   private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
     for {

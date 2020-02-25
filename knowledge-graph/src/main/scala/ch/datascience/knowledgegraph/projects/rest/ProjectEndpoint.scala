@@ -90,9 +90,10 @@ class ProjectEndpoint[Interpretation[_]: Effect](
           "dateCreated": ${project.created.date.value},
           "creator":     ${project.created.creator}
         },
-        "url": ${project.repoUrls},
+        "url":        ${project.repoUrls},
         "forksCount": ${project.forksCount.value},
-        "starsCount": ${project.starsCount.value}
+        "starsCount": ${project.starsCount.value},
+        "updatedAt":  ${project.updatedAt.value}
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))

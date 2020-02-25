@@ -113,7 +113,7 @@ object ProjectsResources {
       "identifier": ${project.id.value}, 
       "path": ${project.path.value}, 
       "name": ${project.name.value},
-      "description": ${project.maybeDescription.getOrElse(throw new Exception("Description expected")).value},
+      "description": ${(project.maybeDescription getOrElse (throw new Exception("Description expected"))).value},
       "visibility": ${project.visibility.value},
       "created": {
         "dateCreated": ${project.created.date.value},
@@ -127,7 +127,8 @@ object ProjectsResources {
         "http": ${project.repoUrls.http.value}
       },
       "forksCount": ${project.forksCount.value},
-      "starsCount": ${project.starsCount.value}
+      "starsCount": ${project.starsCount.value},
+      "updatedAt": ${project.updatedAt.value}
     }""" deepMerge {
     _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
