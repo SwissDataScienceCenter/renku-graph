@@ -53,7 +53,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project = projectsGen.generateOne.copy(
     maybeDescription = projectDescriptions.generateSome,
-    forks            = forksObjects.generateOne.copy(maybeParent = parentProjects.generateSome)
+    forking          = forksObjects.generateOne.copy(maybeParent = parentProjects.generateSome)
   )
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
@@ -131,12 +131,12 @@ object ProjectsResources {
         "web":    ${project.repoUrls.web.value},
         "readme": ${project.repoUrls.readme.value}
       },
-      "forks": {
-        "count": ${project.forks.count.value},
+      "forking": {
+        "forksCount": ${project.forking.count.value},
         "parent": {
-          "identifier": ${project.forks.maybeParent.getOrElse(throw new Exception("Parent expected")).id.value},
-          "path":       ${project.forks.maybeParent.getOrElse(throw new Exception("Parent expected")).path.value},
-          "name":       ${project.forks.maybeParent.getOrElse(throw new Exception("Parent expected")).name.value}
+          "identifier": ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).id.value},
+          "path":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).path.value},
+          "name":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).name.value}
         }
       },
       "starsCount": ${project.starsCount.value},

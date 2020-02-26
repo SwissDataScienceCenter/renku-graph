@@ -27,7 +27,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.config.GitLab
-import ch.datascience.knowledgegraph.projects.model.{Creator, Forks, ParentProject, Project, RepoUrls}
+import ch.datascience.knowledgegraph.projects.model.{Creator, Forking, ParentProject, Project, RepoUrls}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
@@ -91,8 +91,8 @@ class ProjectEndpoint[Interpretation[_]: Effect](
         "creator":     ${project.created.creator}
       },
       "updatedAt":  ${project.updatedAt.value},
-      "urls":        ${project.repoUrls},
-      "forks":      ${project.forks},
+      "urls":       ${project.repoUrls},
+      "forking":    ${project.forking},
       "starsCount": ${project.starsCount.value}
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
@@ -116,9 +116,9 @@ class ProjectEndpoint[Interpretation[_]: Effect](
     }"""
   }
 
-  private implicit lazy val forksEncoder: Encoder[Forks] = Encoder.instance[Forks] { forks =>
+  private implicit lazy val forksEncoder: Encoder[Forking] = Encoder.instance[Forking] { forks =>
     json"""{
-      "count": ${forks.count.value}
+      "forksCount": ${forks.count.value}
     }""" deepMerge (forks.maybeParent.map(parent => json"""{"parent": $parent}""") getOrElse Json.obj())
   }
 

@@ -37,7 +37,7 @@ object model {
                            visibility:       Visibility,
                            created:          Creation,
                            repoUrls:         RepoUrls,
-                           forks:            Forks,
+                           forking:          Forking,
                            starsCount:       StarsCount,
                            updatedAt:        DateUpdated)
 
@@ -45,7 +45,7 @@ object model {
 
   final case class Creator(email: users.Email, name: users.Name)
 
-  final case class Forks(count: ForksCount, maybeParent: Option[ParentProject])
+  final case class Forking(count: ForksCount, maybeParent: Option[ParentProject])
 
   final case class ParentProject(id: Id, path: Path, name: Name)
 

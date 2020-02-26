@@ -149,7 +149,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       visibility       <- cursor.downField("visibility").as[Visibility]
       created          <- cursor.downField("created").as[Creation]
       urls             <- cursor.downField("urls").as[RepoUrls]
-      forks            <- cursor.downField("forks").as[Forks]
+      forks            <- cursor.downField("forking").as[Forking]
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
       updatedAt        <- cursor.downField("updatedAt").as[DateUpdated]
     } yield Project(id, path, name, maybeDescription, visibility, created, urls, forks, starsCount, updatedAt)
@@ -166,11 +166,11 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       email <- cursor.downField("email").as[Email]
     } yield Creator(email, name)
 
-  private implicit lazy val forksDecoder: Decoder[Forks] = cursor =>
+  private implicit lazy val forkingDecoder: Decoder[Forking] = cursor =>
     for {
-      count       <- cursor.downField("count").as[ForksCount]
+      count       <- cursor.downField("forksCount").as[ForksCount]
       maybeParent <- cursor.downField("parent").as[Option[ParentProject]]
-    } yield Forks(count, maybeParent)
+    } yield Forking(count, maybeParent)
 
   private implicit lazy val parentDecoder: Decoder[ParentProject] = cursor =>
     for {

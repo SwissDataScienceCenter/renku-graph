@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Description, Id, Name, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
-import ch.datascience.knowledgegraph.projects.model.{Forks, ParentProject}
+import ch.datascience.knowledgegraph.projects.model.{Forking, ParentProject}
 import ch.datascience.knowledgegraph.projects.model.RepoUrls._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, GitLabProject}
 import io.chrisdavenport.log4cats.Logger
@@ -52,7 +52,7 @@ object GitLabProjectFinder {
                                  maybeDescription: Option[Description],
                                  visibility:       Visibility,
                                  urls:             ProjectUrls,
-                                 forks:            Forks,
+                                 forks:            Forking,
                                  starsCount:       StarsCount,
                                  updatedAt:        DateUpdated)
 
@@ -130,7 +130,7 @@ private class IOGitLabProjectFinder(
                             maybeDescription,
                             visibility,
                             ProjectUrls(httpUrl, sshUrl, webUrl, readmeUrl),
-                            Forks(forksCount, maybeParent),
+                            Forking(forksCount, maybeParent),
                             starsCount,
                             updatedAt)
 

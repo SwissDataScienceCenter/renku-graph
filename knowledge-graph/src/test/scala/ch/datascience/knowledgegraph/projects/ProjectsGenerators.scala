@@ -45,7 +45,7 @@ object ProjectsGenerators {
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
     ),
     repoUrls   = RepoUrls(urls.ssh, urls.http, urls.web, urls.readme),
-    forks      = gitLabProject.forks,
+    forking    = gitLabProject.forks,
     starsCount = gitLabProject.starsCount,
     updatedAt  = gitLabProject.updatedAt
   )
@@ -73,10 +73,10 @@ object ProjectsGenerators {
     readmeUrl <- readmeUrls
   } yield ProjectUrls(httpUrl, sshUrl, webUrl, readmeUrl)
 
-  implicit lazy val forksObjects: Gen[Forks] = for {
+  implicit lazy val forksObjects: Gen[Forking] = for {
     count       <- forksCounts
     maybeParent <- parentProjects.toGeneratorOfOptions
-  } yield Forks(count, maybeParent)
+  } yield Forking(count, maybeParent)
 
   implicit lazy val parentProjects: Gen[ParentProject] = for {
     id   <- projectIds

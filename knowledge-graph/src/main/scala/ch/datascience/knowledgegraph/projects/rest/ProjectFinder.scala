@@ -71,7 +71,7 @@ class IOProjectFinder(
         creator = Creator(kgProject.created.creator.email, kgProject.created.creator.name)
       ),
       repoUrls   = RepoUrls(urls.ssh, urls.http, urls.web, urls.readme),
-      forks      = gitLabProject.forks,
+      forking    = gitLabProject.forks,
       starsCount = gitLabProject.starsCount,
       updatedAt  = gitLabProject.updatedAt
     )

@@ -303,8 +303,8 @@ Response body example:
     "web":    "https://renku.io/gitlab/namespace/project-name",
     "readme": "https://renku.io/gitlab/namespace/project-name/blob/master/README.md"
   },
-  "forks": {
-    "count": 1,
+  "forking": {
+    "forksCount": 1,
     "parent": { // optional
       "identifier": 122,
       "path":       "namespace/parent-project",

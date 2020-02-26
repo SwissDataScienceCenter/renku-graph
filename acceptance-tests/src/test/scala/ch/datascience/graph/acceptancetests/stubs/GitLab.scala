@@ -167,12 +167,12 @@ object GitLab {
               "http_url_to_repo": ${project.repoUrls.http.value},
               "web_url":          ${project.repoUrls.web.value},
               "readme_url":       ${project.repoUrls.readme.value},
-              "forks_count":      ${project.forks.count.value},
+              "forks_count":      ${project.forking.count.value},
               "star_count":       ${project.starsCount.value},
               "last_activity_at": ${project.updatedAt.value}
             }"""
               .deepMerge(
-                project.forks.maybeParent
+                project.forking.maybeParent
                   .map(parent => Json.obj("forked_from_project" -> toJson(parent)))
                   .getOrElse(Json.obj())
               )
