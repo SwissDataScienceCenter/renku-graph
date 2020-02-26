@@ -125,7 +125,7 @@ object ProjectsResources {
           "email": ${project.created.creator.email.value}
         }
       },
-      "url": {
+      "urls": {
         "ssh":    ${project.repoUrls.ssh.value},
         "http":   ${project.repoUrls.http.value},
         "web":    ${project.repoUrls.web.value},

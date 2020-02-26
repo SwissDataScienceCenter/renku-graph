@@ -297,7 +297,7 @@ Response body example:
     }
   },
   "updatedAt":  "2001-10-06T10:48:29.457Z",
-  "url": {
+  "urls": {
     "ssh":    "git@renku.io:namespace/project-name.git",
     "http":   "https://renku.io/gitlab/namespace/project-name.git",
     "web":    "https://renku.io/gitlab/namespace/project-name",

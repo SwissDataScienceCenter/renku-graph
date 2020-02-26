@@ -91,7 +91,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
         "creator":     ${project.created.creator}
       },
       "updatedAt":  ${project.updatedAt.value},
-      "url":        ${project.repoUrls},
+      "urls":        ${project.repoUrls},
       "forks":      ${project.forks},
       "starsCount": ${project.starsCount.value}
     }""" deepMerge _links(

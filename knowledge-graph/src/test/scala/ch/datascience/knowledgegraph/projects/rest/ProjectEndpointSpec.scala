@@ -148,7 +148,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       visibility       <- cursor.downField("visibility").as[Visibility]
       created          <- cursor.downField("created").as[Creation]
-      urls             <- cursor.downField("url").as[RepoUrls]
+      urls             <- cursor.downField("urls").as[RepoUrls]
       forks            <- cursor.downField("forks").as[Forks]
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
       updatedAt        <- cursor.downField("updatedAt").as[DateUpdated]
