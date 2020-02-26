@@ -321,6 +321,13 @@ Response body example:
       "level": {"name": "Guest", "value": 10}
     }
   },
+  "statistics": {
+    "commitsCount":     1,
+    "storageSize":      1000,
+    "repositorySize":   1001,
+    "lfsObjectsSize":   0,
+    "jobArtifactsSize": 0
+  },
   "_links":[  
     {  
       "rel":"self",

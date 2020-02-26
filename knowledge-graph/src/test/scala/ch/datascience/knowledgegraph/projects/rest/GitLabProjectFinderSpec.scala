@@ -55,7 +55,7 @@ class GitLabProjectFinderSpec
     "return fetched project info if service responds with OK and a valid body - personal access token case" in new TestCase {
       forAll { (path: model.projects.Path, accessToken: PersonalAccessToken, project: GitLabProject) =>
         stubFor {
-          get(s"/api/v4/projects/${urlEncode(path.toString)}")
+          get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
             .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
             .willReturn(okJson(projectJson(project).noSpaces))
         }
@@ -67,7 +67,7 @@ class GitLabProjectFinderSpec
     "return fetched project info if service responds with OK and a valid body - oauth access token case" in new TestCase {
       forAll { (path: model.projects.Path, accessToken: OAuthAccessToken, project: GitLabProject) =>
         stubFor {
-          get(s"/api/v4/projects/${urlEncode(path.toString)}")
+          get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
             .withHeader("Authorization", equalTo(s"Bearer ${accessToken.value}"))
             .willReturn(okJson(projectJson(project).noSpaces))
         }
@@ -80,7 +80,7 @@ class GitLabProjectFinderSpec
       val path    = projectPaths.generateOne
       val project = gitLabProjects.generateOne.copy(maybeDescription = None)
       stubFor {
-        get(s"/api/v4/projects/${urlEncode(path.toString)}")
+        get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
           .willReturn(
             okJson(
               projectJson(project)
@@ -97,7 +97,7 @@ class GitLabProjectFinderSpec
 
       val path = projectPaths.generateOne
       stubFor {
-        get(s"/api/v4/projects/${urlEncode(path.toString)}")
+        get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
           .willReturn(notFound())
       }
 
@@ -108,26 +108,26 @@ class GitLabProjectFinderSpec
 
       val path = projectPaths.generateOne
       stubFor {
-        get(s"/api/v4/projects/${urlEncode(path.toString)}")
+        get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
           .willReturn(unauthorized().withBody("some error"))
       }
 
       intercept[Exception] {
         projectFinder.findProject(path, None).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)} returned ${Status.Unauthorized}; body: some error"
+      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)}?statistics=true returned ${Status.Unauthorized}; body: some error"
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
 
       val path = projectPaths.generateOne
       stubFor {
-        get(s"/api/v4/projects/${urlEncode(path.toString)}")
+        get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
           .willReturn(okJson("{}"))
       }
 
       intercept[Exception] {
         projectFinder.findProject(path, None).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)}?statistics=true returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
   }
 
@@ -159,6 +159,13 @@ class GitLabProjectFinderSpec
         "group_access": {
           "access_level": ${project.permissions.groupAccessLevel.value.value}
         }
+      },
+      "statistics": {
+        "commit_count":       ${project.statistics.commitsCount.value},
+        "storage_size":       ${project.statistics.storageSize.value},
+        "repository_size":    ${project.statistics.repositorySize.value},
+        "lfs_objects_size":   ${project.statistics.lsfObjectsSize.value},
+        "job_artifacts_size": ${project.statistics.jobArtifactsSize.value}
       }
     }""" deepMerge (project.forking.maybeParent.map {
       case ParentProject(id, path, name) => json"""{

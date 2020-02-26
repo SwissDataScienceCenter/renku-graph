@@ -149,6 +149,13 @@ object ProjectsResources {
         "groupAccess": {
           "level": {"name": ${project.permissions.groupAccessLevel.name.value}, "value": ${project.permissions.groupAccessLevel.value.value}}
         }
+      },
+      "statistics": {
+        "commitsCount":     ${project.statistics.commitsCount.value},
+        "storageSize":      ${project.statistics.storageSize.value},
+        "repositorySize":   ${project.statistics.repositorySize.value},
+        "lfsObjectsSize":   ${project.statistics.lsfObjectsSize.value},
+        "jobArtifactsSize": ${project.statistics.jobArtifactsSize.value}
       }
     }""" deepMerge {
     _links(

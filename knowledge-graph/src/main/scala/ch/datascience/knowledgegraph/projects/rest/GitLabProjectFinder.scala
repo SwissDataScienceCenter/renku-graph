@@ -52,7 +52,8 @@ object GitLabProjectFinder {
                                  tags:             Set[Tag],
                                  starsCount:       StarsCount,
                                  updatedAt:        DateUpdated,
-                                 permissions:      Permissions)
+                                 permissions:      Permissions,
+                                 statistics:       Statistics)
 }
 
 private class IOGitLabProjectFinder(
@@ -75,7 +76,7 @@ private class IOGitLabProjectFinder(
   def findProject(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): OptionT[IO, GitLabProject] =
     OptionT {
       for {
-        uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}")
+        uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}?statistics=true")
         project <- send(request(GET, uri, maybeAccessToken))(mapResponse)
       } yield project
     }
@@ -89,6 +90,7 @@ private class IOGitLabProjectFinder(
     import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
     import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
     import ch.datascience.knowledgegraph.projects.model.Project.StarsCount
+    import ch.datascience.knowledgegraph.projects.model.Statistics._
     import ch.datascience.knowledgegraph.projects.model.Urls
     import ch.datascience.knowledgegraph.projects.model.Urls._
 
@@ -104,6 +106,15 @@ private class IOGitLabProjectFinder(
         .as[Int]
         .flatMap(AccessLevel.from)
         .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+
+    implicit val statisticsDecoder: Decoder[Statistics] = cursor =>
+      for {
+        commitsCount     <- cursor.downField("commit_count").as[CommitsCount]
+        storageSize      <- cursor.downField("storage_size").as[StorageSize]
+        repositorySize   <- cursor.downField("repository_size").as[RepositorySize]
+        lfsSize          <- cursor.downField("lfs_objects_size").as[LsfObjectsSize]
+        jobArtifactsSize <- cursor.downField("job_artifacts_size").as[JobArtifactsSize]
+      } yield Statistics(commitsCount, storageSize, repositorySize, lfsSize, jobArtifactsSize)
 
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
@@ -125,6 +136,7 @@ private class IOGitLabProjectFinder(
         maybeParent        <- cursor.downField("forked_from_project").as[Option[ParentProject]]
         projectAccessLevel <- cursor.downField("permissions").downField("project_access").as[AccessLevel]
         groupAccessLevel   <- cursor.downField("permissions").downField("group_access").as[AccessLevel]
+        statistics         <- cursor.downField("statistics").as[Statistics]
       } yield GitLabProject(
         id,
         maybeDescription,
@@ -134,7 +146,8 @@ private class IOGitLabProjectFinder(
         tags.toSet,
         starsCount,
         updatedAt,
-        Permissions(projectAccessLevel, groupAccessLevel)
+        Permissions(projectAccessLevel, groupAccessLevel),
+        statistics
       )
 
     jsonOf[IO, GitLabProject]

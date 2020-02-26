@@ -74,7 +74,8 @@ class IOProjectFinder(
       forking     = gitLabProject.forking,
       tags        = gitLabProject.tags,
       starsCount  = gitLabProject.starsCount,
-      permissions = gitLabProject.permissions
+      permissions = gitLabProject.permissions,
+      statistics  = gitLabProject.statistics
     )
 }
 

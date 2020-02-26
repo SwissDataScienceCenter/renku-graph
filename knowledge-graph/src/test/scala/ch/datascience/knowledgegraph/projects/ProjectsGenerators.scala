@@ -25,6 +25,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
 import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
+import ch.datascience.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import ch.datascience.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -51,7 +52,8 @@ object ProjectsGenerators {
     forking     = gitLabProject.forking,
     tags        = gitLabProject.tags,
     starsCount  = gitLabProject.starsCount,
-    permissions = gitLabProject.permissions
+    permissions = gitLabProject.permissions,
+    statistics  = gitLabProject.statistics
   )
 
   implicit lazy val kgProjects: Gen[KGProject] = for {
@@ -70,7 +72,17 @@ object ProjectsGenerators {
     starsCount       <- starsCounts
     updatedAt        <- updatedAts
     permissions      <- permissionsObjects
-  } yield GitLabProject(id, maybeDescription, visibility, urls, forking, tags, starsCount, updatedAt, permissions)
+    statistics       <- statisticsObjects
+  } yield GitLabProject(id,
+                        maybeDescription,
+                        visibility,
+                        urls,
+                        forking,
+                        tags,
+                        starsCount,
+                        updatedAt,
+                        permissions,
+                        statistics)
 
   private implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl    <- sshUrls
@@ -130,4 +142,12 @@ object ProjectsGenerators {
   } yield Permissions(project, group)
 
   private implicit lazy val accessLevels: Gen[AccessLevel] = Gen.oneOf(AccessLevel.all.toList)
+
+  private implicit lazy val statisticsObjects: Gen[Statistics] = for {
+    commitsCount     <- nonNegativeInts() map (v => CommitsCount(v.value))
+    storageSize      <- nonNegativeInts() map (v => StorageSize(v.value))
+    repositorySize   <- nonNegativeInts() map (v => RepositorySize(v.value))
+    lfsSize          <- nonNegativeInts() map (v => LsfObjectsSize(v.value))
+    jobArtifactsSize <- nonNegativeInts() map (v => JobArtifactsSize(v.value))
+  } yield Statistics(commitsCount, storageSize, repositorySize, lfsSize, jobArtifactsSize)
 }

@@ -38,6 +38,7 @@ import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
 import ch.datascience.knowledgegraph.projects.model.Project._
+import ch.datascience.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import ch.datascience.knowledgegraph.projects.model.Urls._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
@@ -157,6 +158,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       tags             <- cursor.downField("tags").as[List[Tag]].map(_.toSet)
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
       permissions      <- cursor.downField("permissions").as[Permissions]
+      statistics       <- cursor.downField("statistics").as[Statistics]
     } yield Project(id,
                     path,
                     name,
@@ -168,7 +170,8 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
                     forks,
                     tags,
                     starsCount,
-                    permissions)
+                    permissions,
+                    statistics)
 
   private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
     for {
@@ -222,4 +225,13 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       if (accessLevel.name.value == name) accessLevel
       else throw new Exception(s"$name does not match $accessLevel")
     }
+
+  private implicit lazy val statisticsDecoder: Decoder[Statistics] = cursor =>
+    for {
+      commitsCount     <- cursor.downField("commitsCount").as[CommitsCount]
+      storageSize      <- cursor.downField("storageSize").as[StorageSize]
+      repositorySize   <- cursor.downField("repositorySize").as[RepositorySize]
+      lfsSize          <- cursor.downField("lfsObjectsSize").as[LsfObjectsSize]
+      jobArtifactsSize <- cursor.downField("jobArtifactsSize").as[JobArtifactsSize]
+    } yield Statistics(commitsCount, storageSize, repositorySize, lfsSize, jobArtifactsSize)
 }

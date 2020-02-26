@@ -178,6 +178,13 @@ object GitLab {
                 "group_access": {
                   "access_level": ${project.permissions.groupAccessLevel.value.value}
                 }
+              },
+              "statistics": {
+                "commit_count":       ${project.statistics.commitsCount.value},
+                "storage_size":       ${project.statistics.storageSize.value},
+                "repository_size":    ${project.statistics.repositorySize.value},
+                "lfs_objects_size":   ${project.statistics.lsfObjectsSize.value},
+                "job_artifacts_size": ${project.statistics.jobArtifactsSize.value}
               }
             }"""
               .deepMerge(

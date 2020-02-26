@@ -28,7 +28,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
-import ch.datascience.knowledgegraph.projects.model.{Creator, Forking, ParentProject, Permissions, Project, Urls}
+import ch.datascience.knowledgegraph.projects.model.{Creator, Forking, ParentProject, Permissions, Project, Statistics, Urls}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
@@ -96,7 +96,8 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       "forking":    ${project.forking},
       "tags":       ${project.tags.map(_.value).toList},
       "starsCount": ${project.starsCount.value},
-      "permissions":${project.permissions}
+      "permissions":${project.permissions},
+      "statistics": ${project.statistics}
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
@@ -146,6 +147,16 @@ class ProjectEndpoint[Interpretation[_]: Effect](
         "name":  ${level.name.value},
         "value": ${level.value.value}
       }
+    }"""
+  }
+
+  private implicit lazy val statisticsEncoder: Encoder[Statistics] = Encoder.instance[Statistics] { stats =>
+    json"""{
+      "commitsCount":     ${stats.commitsCount.value},
+      "storageSize":      ${stats.storageSize.value},
+      "repositorySize":   ${stats.repositorySize.value},
+      "lfsObjectsSize":   ${stats.lsfObjectsSize.value},
+      "jobArtifactsSize": ${stats.jobArtifactsSize.value}
     }"""
   }
 }
