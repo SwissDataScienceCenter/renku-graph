@@ -86,7 +86,7 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
     }
 
     "update the waitingEventsGauge with all the data just during the first update; " +
-      "next updates should contain non-zero values and zeros only for projects having non-zeros before" in new TestCase {
+      "next updates should contain non-zero values and zeros only for projects with non-zeros before" in new TestCase {
 
       val project1           = projectPaths.generateOne
       val project2           = projectPaths.generateOne
@@ -229,7 +229,7 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
       statusesGauge,
       totalGauge,
       interval              = 100 millis,
-      statusesInterval      = 100 millis,
+      statusesInterval      = 500 millis,
       waitingEventsInterval = 500 millis
     )
   }
