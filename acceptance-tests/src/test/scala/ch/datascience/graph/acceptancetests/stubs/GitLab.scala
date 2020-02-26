@@ -163,13 +163,21 @@ object GitLab {
               "id":               ${project.id.value},
               "description":      ${project.maybeDescription.map(_.value)},
               "visibility":       ${project.visibility.value},
-              "ssh_url_to_repo":  ${project.repoUrls.ssh.value},
-              "http_url_to_repo": ${project.repoUrls.http.value},
-              "web_url":          ${project.repoUrls.web.value},
-              "readme_url":       ${project.repoUrls.readme.value},
-              "forks_count":      ${project.forking.count.value},
+              "ssh_url_to_repo":  ${project.urls.ssh.value},
+              "http_url_to_repo": ${project.urls.http.value},
+              "web_url":          ${project.urls.web.value},
+              "readme_url":       ${project.urls.readme.value},
+              "forks_count":      ${project.forking.forksCount.value},
               "star_count":       ${project.starsCount.value},
-              "last_activity_at": ${project.updatedAt.value}
+              "last_activity_at": ${project.updatedAt.value},
+              "permissions": {
+                "project_access": {
+                  "access_level": ${project.permissions.projectAccessLevel.value.value}
+                },
+                "group_access": {
+                  "access_level": ${project.permissions.groupAccessLevel.value.value}
+                }
+              }
             }"""
               .deepMerge(
                 project.forking.maybeParent

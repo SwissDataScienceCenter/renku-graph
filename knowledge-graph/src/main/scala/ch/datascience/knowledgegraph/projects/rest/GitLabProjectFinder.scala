@@ -26,9 +26,9 @@ import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Description, Id, Name, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
-import ch.datascience.knowledgegraph.projects.model.{Forking, ParentProject}
-import ch.datascience.knowledgegraph.projects.model.RepoUrls._
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, GitLabProject}
+import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
+import ch.datascience.knowledgegraph.projects.model._
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
 
@@ -43,29 +43,15 @@ trait GitLabProjectFinder[Interpretation[_]] {
 }
 
 object GitLabProjectFinder {
-  import java.time.Instant
-
-  import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonNegativeInt}
-  import ch.datascience.tinytypes.{InstantTinyType, IntTinyType, TinyTypeFactory}
 
   final case class GitLabProject(id:               Id,
                                  maybeDescription: Option[Description],
                                  visibility:       Visibility,
-                                 urls:             ProjectUrls,
+                                 urls:             Urls,
                                  forks:            Forking,
                                  starsCount:       StarsCount,
-                                 updatedAt:        DateUpdated)
-
-  final case class ProjectUrls(http: HttpUrl, ssh: SshUrl, web: WebUrl, readme: ReadmeUrl)
-
-  final class ForksCount private (val value: Int) extends AnyVal with IntTinyType
-  implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt
-
-  final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
-  implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt
-
-  final class DateUpdated private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object DateUpdated extends TinyTypeFactory[DateUpdated](new DateUpdated(_)) with InstantNotInTheFuture
+                                 updatedAt:        DateUpdated,
+                                 permissions:      Permissions)
 }
 
 private class IOGitLabProjectFinder(
@@ -99,8 +85,11 @@ private class IOGitLabProjectFinder(
   }
 
   private implicit lazy val projectDecoder: EntityDecoder[IO, GitLabProject] = {
-    import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
-    import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{ForksCount, GitLabProject, ProjectUrls, StarsCount}
+    import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
+    import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
+    import ch.datascience.knowledgegraph.projects.model.Project.StarsCount
+    import ch.datascience.knowledgegraph.projects.model.Urls
+    import ch.datascience.knowledgegraph.projects.model.Urls._
 
     implicit val parentProjectDecoder: Decoder[ParentProject] = cursor =>
       for {
@@ -108,6 +97,12 @@ private class IOGitLabProjectFinder(
         path <- cursor.downField("path_with_namespace").as[projects.Path]
         name <- cursor.downField("name").as[Name]
       } yield ParentProject(id, path, name)
+
+    implicit val accessLevelDecoder: Decoder[AccessLevel] =
+      _.downField("access_level")
+        .as[Int]
+        .flatMap(AccessLevel.from)
+        .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
 
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
@@ -117,22 +112,27 @@ private class IOGitLabProjectFinder(
                              .as[Option[String]]
                              .map(blankToNone)
                              .flatMap(toOption[Description])
-        visibility  <- cursor.downField("visibility").as[Visibility]
-        sshUrl      <- cursor.downField("ssh_url_to_repo").as[SshUrl]
-        httpUrl     <- cursor.downField("http_url_to_repo").as[HttpUrl]
-        webUrl      <- cursor.downField("web_url").as[WebUrl]
-        readmeUrl   <- cursor.downField("readme_url").as[ReadmeUrl]
-        forksCount  <- cursor.downField("forks_count").as[ForksCount]
-        starsCount  <- cursor.downField("star_count").as[StarsCount]
-        updatedAt   <- cursor.downField("last_activity_at").as[DateUpdated]
-        maybeParent <- cursor.downField("forked_from_project").as[Option[ParentProject]]
-      } yield GitLabProject(id,
-                            maybeDescription,
-                            visibility,
-                            ProjectUrls(httpUrl, sshUrl, webUrl, readmeUrl),
-                            Forking(forksCount, maybeParent),
-                            starsCount,
-                            updatedAt)
+        visibility         <- cursor.downField("visibility").as[Visibility]
+        sshUrl             <- cursor.downField("ssh_url_to_repo").as[SshUrl]
+        httpUrl            <- cursor.downField("http_url_to_repo").as[HttpUrl]
+        webUrl             <- cursor.downField("web_url").as[WebUrl]
+        readmeUrl          <- cursor.downField("readme_url").as[ReadmeUrl]
+        forksCount         <- cursor.downField("forks_count").as[ForksCount]
+        starsCount         <- cursor.downField("star_count").as[StarsCount]
+        updatedAt          <- cursor.downField("last_activity_at").as[DateUpdated]
+        maybeParent        <- cursor.downField("forked_from_project").as[Option[ParentProject]]
+        projectAccessLevel <- cursor.downField("permissions").downField("project_access").as[AccessLevel]
+        groupAccessLevel   <- cursor.downField("permissions").downField("group_access").as[AccessLevel]
+      } yield GitLabProject(
+        id,
+        maybeDescription,
+        visibility,
+        Urls(sshUrl, httpUrl, webUrl, readmeUrl),
+        Forking(forksCount, maybeParent),
+        starsCount,
+        updatedAt,
+        Permissions(projectAccessLevel, groupAccessLevel)
+      )
 
     jsonOf[IO, GitLabProject]
   }

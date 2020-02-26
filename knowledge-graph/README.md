@@ -312,6 +312,14 @@ Response body example:
     }
   },
   "starsCount": 0,
+  "permissions": {
+    "projectAccess": {
+      "level": {"name": "Developer", "value": 30}
+    },
+    "groupAccess": {
+      "level": {"name": "Guest", "value": 10}
+    }
+  },
   "_links":[  
     {  
       "rel":"self",

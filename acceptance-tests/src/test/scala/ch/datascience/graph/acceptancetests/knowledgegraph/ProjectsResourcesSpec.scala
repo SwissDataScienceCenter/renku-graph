@@ -35,7 +35,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen, forksObjects, parentProjects}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen, forkings, parentProjects}
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
@@ -53,7 +53,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project = projectsGen.generateOne.copy(
     maybeDescription = projectDescriptions.generateSome,
-    forking          = forksObjects.generateOne.copy(maybeParent = parentProjects.generateSome)
+    forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome)
   )
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
@@ -125,14 +125,15 @@ object ProjectsResources {
           "email": ${project.created.creator.email.value}
         }
       },
+      "updatedAt":  ${project.updatedAt.value},
       "urls": {
-        "ssh":    ${project.repoUrls.ssh.value},
-        "http":   ${project.repoUrls.http.value},
-        "web":    ${project.repoUrls.web.value},
-        "readme": ${project.repoUrls.readme.value}
+        "ssh":    ${project.urls.ssh.value},
+        "http":   ${project.urls.http.value},
+        "web":    ${project.urls.web.value},
+        "readme": ${project.urls.readme.value}
       },
       "forking": {
-        "forksCount": ${project.forking.count.value},
+        "forksCount": ${project.forking.forksCount.value},
         "parent": {
           "identifier": ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).id.value},
           "path":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).path.value},
@@ -140,7 +141,14 @@ object ProjectsResources {
         }
       },
       "starsCount": ${project.starsCount.value},
-      "updatedAt":  ${project.updatedAt.value}
+      "permissions": {
+        "projectAccess": {
+          "level": {"name": ${project.permissions.projectAccessLevel.name.value}, "value": ${project.permissions.projectAccessLevel.value.value}}
+        },
+        "groupAccess": {
+          "level": {"name": ${project.permissions.groupAccessLevel.name.value}, "value": ${project.permissions.groupAccessLevel.value.value}}
+        }
+      }
     }""" deepMerge {
     _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),

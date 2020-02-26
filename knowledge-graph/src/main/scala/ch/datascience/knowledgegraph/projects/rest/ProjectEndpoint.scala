@@ -27,7 +27,8 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.config.GitLab
-import ch.datascience.knowledgegraph.projects.model.{Creator, Forking, ParentProject, Project, RepoUrls}
+import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
+import ch.datascience.knowledgegraph.projects.model.{Creator, Forking, ParentProject, Permissions, Project, Urls}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
@@ -91,9 +92,10 @@ class ProjectEndpoint[Interpretation[_]: Effect](
         "creator":     ${project.created.creator}
       },
       "updatedAt":  ${project.updatedAt.value},
-      "urls":       ${project.repoUrls},
+      "urls":       ${project.urls},
       "forking":    ${project.forking},
-      "starsCount": ${project.starsCount.value}
+      "starsCount": ${project.starsCount.value},
+      "permissions":${project.permissions}
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
@@ -107,7 +109,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
     }"""
   }
 
-  private implicit lazy val urlsEncoder: Encoder[RepoUrls] = Encoder.instance[RepoUrls] { urls =>
+  private implicit lazy val urlsEncoder: Encoder[Urls] = Encoder.instance[Urls] { urls =>
     json"""{
       "ssh":    ${urls.ssh.value},
       "http":   ${urls.http.value},
@@ -118,7 +120,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val forksEncoder: Encoder[Forking] = Encoder.instance[Forking] { forks =>
     json"""{
-      "forksCount": ${forks.count.value}
+      "forksCount": ${forks.forksCount.value}
     }""" deepMerge (forks.maybeParent.map(parent => json"""{"parent": $parent}""") getOrElse Json.obj())
   }
 
@@ -127,6 +129,22 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       "identifier": ${parent.id.value},
       "path":       ${parent.path.value},
       "name":       ${parent.name.value}
+    }"""
+  }
+
+  private implicit lazy val permissionsEncoder: Encoder[Permissions] = Encoder.instance[Permissions] { permissions =>
+    json"""{
+      "projectAccess": ${permissions.projectAccessLevel},
+      "groupAccess": ${permissions.groupAccessLevel}
+    }"""
+  }
+
+  private implicit lazy val accessLevelEncoder: Encoder[AccessLevel] = Encoder.instance[AccessLevel] { level =>
+    json"""{
+      "level": {
+        "name":  ${level.name.value},
+        "value": ${level.value.value}
+      }
     }"""
   }
 }

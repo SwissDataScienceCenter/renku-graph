@@ -22,7 +22,8 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.knowledgegraph.projects.model.RepoUrls._
+import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
+import ch.datascience.knowledgegraph.projects.model.Urls._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -64,6 +65,42 @@ class modelSpec extends WordSpec with ScalaCheckPropertyChecks {
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe s"$url is not a valid repository ssh url"
+    }
+  }
+
+  "AccessLevel.from" should {
+
+    val scenarios = Table(
+      ("level", "expected AccessLevel", "expected name"),
+      (10, AccessLevel.Guest, "Guest"),
+      (20, AccessLevel.Reporter, "Reporter"),
+      (30, AccessLevel.Developer, "Developer"),
+      (40, AccessLevel.Maintainer, "Maintainer"),
+      (50, AccessLevel.Owner, "Owner")
+    )
+    forAll(scenarios) { (level, expectedInstance, expectedName) =>
+      s"return $expectedInstance for $level level" in {
+        AccessLevel.from(level) shouldBe Right(expectedInstance)
+
+        expectedInstance.name.value  shouldBe expectedName
+        expectedInstance.value.value shouldBe level
+      }
+    }
+
+    "return an exception for an unknown level" in {
+      val Left(exception) = AccessLevel.from(0)
+
+      exception            shouldBe an[IllegalArgumentException]
+      exception.getMessage shouldBe "Unrecognized AccessLevel with value '0'"
+    }
+  }
+
+  "AccessLevel.toString" should {
+
+    "return concatenated value of name and value" in {
+      AccessLevel.all foreach { level =>
+        level.toString shouldBe s"${level.name} (${level.value})"
+      }
     }
   }
 }

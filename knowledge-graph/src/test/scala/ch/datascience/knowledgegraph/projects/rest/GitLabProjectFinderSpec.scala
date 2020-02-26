@@ -148,9 +148,17 @@ class GitLabProjectFinderSpec
       "http_url_to_repo": ${project.urls.http.value},
       "web_url":          ${project.urls.web.value},
       "readme_url":       ${project.urls.readme.value},
-      "forks_count":      ${project.forks.count.value},
+      "forks_count":      ${project.forks.forksCount.value},
       "star_count":       ${project.starsCount.value},
-      "last_activity_at": ${project.updatedAt.value}
+      "last_activity_at": ${project.updatedAt.value},
+      "permissions": {
+        "project_access": {
+          "access_level": ${project.permissions.projectAccessLevel.value.value}
+        },
+        "group_access": {
+          "access_level": ${project.permissions.groupAccessLevel.value.value}
+        }
+      }
     }""" deepMerge (project.forks.maybeParent.map {
       case ParentProject(id, path, name) => json"""{
         "forked_from_project": {

@@ -22,9 +22,12 @@ import ch.datascience.generators.CommonGraphGenerators.{emails, names}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
+import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
+import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
+import ch.datascience.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import ch.datascience.knowledgegraph.projects.model._
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, ForksCount, GitLabProject, ProjectUrls, StarsCount}
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import org.scalacheck.Gen
 
@@ -44,10 +47,11 @@ object ProjectsGenerators {
       date    = kgProject.created.date,
       creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
     ),
-    repoUrls   = RepoUrls(urls.ssh, urls.http, urls.web, urls.readme),
-    forking    = gitLabProject.forks,
-    starsCount = gitLabProject.starsCount,
-    updatedAt  = gitLabProject.updatedAt
+    updatedAt   = gitLabProject.updatedAt,
+    urls        = gitLabProject.urls,
+    forking     = gitLabProject.forks,
+    starsCount  = gitLabProject.starsCount,
+    permissions = gitLabProject.permissions
   )
 
   implicit lazy val kgProjects: Gen[KGProject] = for {
@@ -60,23 +64,26 @@ object ProjectsGenerators {
     id               <- projectIds
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     visibility       <- projectVisibilities
-    urls             <- projectUrlObjects
-    forks            <- forksObjects
+    urls             <- urlsObjects
+    forking          <- forkings
     starsCount       <- starsCounts
     updatedAt        <- updatedAts
-  } yield GitLabProject(id, maybeDescription, visibility, urls, forks, starsCount, updatedAt)
+    permissions      <- permissionsObjects
+  } yield GitLabProject(id, maybeDescription, visibility, urls, forking, starsCount, updatedAt, permissions)
 
-  private implicit lazy val projectUrlObjects: Gen[ProjectUrls] = for {
+  private implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl    <- sshUrls
     httpUrl   <- httpUrls
     webUrl    <- webUrls
     readmeUrl <- readmeUrls
-  } yield ProjectUrls(httpUrl, sshUrl, webUrl, readmeUrl)
+  } yield Urls(sshUrl, httpUrl, webUrl, readmeUrl)
 
-  implicit lazy val forksObjects: Gen[Forking] = for {
+  implicit lazy val forkings: Gen[Forking] = for {
     count       <- forksCounts
     maybeParent <- parentProjects.toGeneratorOfOptions
   } yield Forking(count, maybeParent)
+
+  private implicit lazy val forksCounts: Gen[ForksCount] = nonNegativeInts() map (v => ForksCount.apply(v.value))
 
   implicit lazy val parentProjects: Gen[ParentProject] = for {
     id   <- projectIds
@@ -99,10 +106,8 @@ object ProjectsGenerators {
     projectPath <- projectPaths
   } yield ReadmeUrl(s"$url/$projectPath/blob/master/README.md")
 
-  private implicit lazy val webUrls:     Gen[WebUrl]      = urls() map WebUrl.apply
-  private implicit lazy val forksCounts: Gen[ForksCount]  = nonNegativeInts() map (v => ForksCount.apply(v.value))
-  private implicit lazy val starsCounts: Gen[StarsCount]  = nonNegativeInts() map (v => StarsCount.apply(v.value))
-  private implicit lazy val updatedAts:  Gen[DateUpdated] = timestampsNotInTheFuture map DateUpdated.apply
+  private implicit lazy val webUrls:     Gen[WebUrl]     = urls() map WebUrl.apply
+  private implicit lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount.apply(v.value))
 
   private implicit lazy val projectCreations: Gen[ProjectCreation] = for {
     created <- projectCreatedDates
@@ -113,4 +118,13 @@ object ProjectsGenerators {
     email <- emails
     name  <- names
   } yield ProjectCreator(email, name)
+
+  private implicit lazy val updatedAts: Gen[DateUpdated] = timestampsNotInTheFuture map DateUpdated.apply
+
+  private implicit lazy val permissionsObjects: Gen[Permissions] = for {
+    project <- accessLevels
+    group   <- accessLevels
+  } yield Permissions(project, group)
+
+  private implicit lazy val accessLevels: Gen[AccessLevel] = Gen.oneOf(AccessLevel.all.toList)
 }

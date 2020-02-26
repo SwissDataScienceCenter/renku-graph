@@ -19,16 +19,24 @@
 package ch.datascience.knowledgegraph.projects
 
 import java.net.{MalformedURLException, URL}
+import java.time.Instant
 
 import cats.data.Validated
+import cats.implicits._
 import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
 import ch.datascience.graph.model.users
-import ch.datascience.knowledgegraph.projects.model.RepoUrls._
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{DateUpdated, ForksCount, StarsCount}
-import ch.datascience.tinytypes.constraints.{NonBlank, Url}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes._
+import ch.datascience.tinytypes.constraints._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
+import eu.timepit.refined.numeric.Positive
 
 object model {
+  import Forking.ForksCount
+  import Permissions.AccessLevel
+  import Project.{DateUpdated, StarsCount}
+  import Urls._
 
   final case class Project(id:               Id,
                            path:             Path,
@@ -36,22 +44,63 @@ object model {
                            maybeDescription: Option[Description],
                            visibility:       Visibility,
                            created:          Creation,
-                           repoUrls:         RepoUrls,
+                           updatedAt:        DateUpdated,
+                           urls:             Urls,
                            forking:          Forking,
                            starsCount:       StarsCount,
-                           updatedAt:        DateUpdated)
+                           permissions:      Permissions)
+
+  object Project {
+    final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
+    implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt
+
+    final class DateUpdated private (val value: Instant) extends AnyVal with InstantTinyType
+    implicit object DateUpdated extends TinyTypeFactory[DateUpdated](new DateUpdated(_)) with InstantNotInTheFuture
+  }
 
   final case class Creation(date: DateCreated, creator: Creator)
 
   final case class Creator(email: users.Email, name: users.Name)
 
-  final case class Forking(count: ForksCount, maybeParent: Option[ParentProject])
+  final case class Forking(forksCount: ForksCount, maybeParent: Option[ParentProject])
+
+  object Forking {
+    final class ForksCount private (val value: Int) extends AnyVal with IntTinyType
+    implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt
+  }
 
   final case class ParentProject(id: Id, path: Path, name: Name)
 
-  final case class RepoUrls(ssh: SshUrl, http: HttpUrl, web: WebUrl, readme: ReadmeUrl)
+  final case class Permissions(projectAccessLevel: AccessLevel, groupAccessLevel: AccessLevel)
 
-  object RepoUrls {
+  object Permissions {
+
+    sealed abstract class AccessLevel(val name: String Refined NonEmpty, val value: Int Refined Positive)
+        extends Product
+        with Serializable {
+      override lazy val toString: String = s"$name ($value)"
+    }
+
+    object AccessLevel {
+
+      def from(value: Int): Either[IllegalArgumentException, AccessLevel] = Either.fromOption(
+        all.find(_.value.value == value),
+        ifNone = new IllegalArgumentException(s"Unrecognized AccessLevel with value '$value'")
+      )
+
+      lazy val all: Set[AccessLevel] = Set(Guest, Reporter, Developer, Maintainer, Owner)
+
+      final case object Guest      extends AccessLevel(name = "Guest", value      = 10)
+      final case object Reporter   extends AccessLevel(name = "Reporter", value   = 20)
+      final case object Developer  extends AccessLevel(name = "Developer", value  = 30)
+      final case object Maintainer extends AccessLevel(name = "Maintainer", value = 40)
+      final case object Owner      extends AccessLevel(name = "Owner", value      = 50)
+    }
+  }
+
+  final case class Urls(ssh: SshUrl, http: HttpUrl, web: WebUrl, readme: ReadmeUrl)
+
+  object Urls {
 
     final class SshUrl private (val value: String) extends AnyVal with StringTinyType
     implicit object SshUrl extends TinyTypeFactory[SshUrl](new SshUrl(_)) with NonBlank {
