@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
-import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
+import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
 import ch.datascience.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -36,7 +36,6 @@ object ProjectsGenerators {
   implicit val projects: Gen[Project] = for {
     kgProject     <- kgProjects
     gitLabProject <- gitLabProjects
-    urls = gitLabProject.urls
   } yield Project(
     id               = gitLabProject.id,
     path             = kgProject.path,
@@ -49,7 +48,8 @@ object ProjectsGenerators {
     ),
     updatedAt   = gitLabProject.updatedAt,
     urls        = gitLabProject.urls,
-    forking     = gitLabProject.forks,
+    forking     = gitLabProject.forking,
+    tags        = gitLabProject.tags,
     starsCount  = gitLabProject.starsCount,
     permissions = gitLabProject.permissions
   )
@@ -66,10 +66,11 @@ object ProjectsGenerators {
     visibility       <- projectVisibilities
     urls             <- urlsObjects
     forking          <- forkings
+    tags             <- setOf(tagsObjects)
     starsCount       <- starsCounts
     updatedAt        <- updatedAts
     permissions      <- permissionsObjects
-  } yield GitLabProject(id, maybeDescription, visibility, urls, forking, starsCount, updatedAt, permissions)
+  } yield GitLabProject(id, maybeDescription, visibility, urls, forking, tags, starsCount, updatedAt, permissions)
 
   private implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl    <- sshUrls
@@ -91,6 +92,9 @@ object ProjectsGenerators {
     name <- projectNames
   } yield ParentProject(id, path, name)
 
+  private implicit lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount.apply(v.value))
+  private implicit lazy val tagsObjects: Gen[Tag]        = nonBlankStrings() map (v => Tag(v.value))
+
   private implicit lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())
     projectPath <- projectPaths
@@ -106,8 +110,7 @@ object ProjectsGenerators {
     projectPath <- projectPaths
   } yield ReadmeUrl(s"$url/$projectPath/blob/master/README.md")
 
-  private implicit lazy val webUrls:     Gen[WebUrl]     = urls() map WebUrl.apply
-  private implicit lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount.apply(v.value))
+  private implicit lazy val webUrls: Gen[WebUrl] = urls() map WebUrl.apply
 
   private implicit lazy val projectCreations: Gen[ProjectCreation] = for {
     created <- projectCreatedDates

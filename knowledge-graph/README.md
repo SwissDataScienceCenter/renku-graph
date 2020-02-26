@@ -311,6 +311,7 @@ Response body example:
       "name":       "Parent project name"
     }
   },
+  "tags": ["tag1", "tag2"],
   "starsCount": 0,
   "permissions": {
     "projectAccess": {

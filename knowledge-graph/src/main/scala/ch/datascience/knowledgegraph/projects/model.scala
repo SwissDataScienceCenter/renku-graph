@@ -35,7 +35,7 @@ import eu.timepit.refined.numeric.Positive
 object model {
   import Forking.ForksCount
   import Permissions.AccessLevel
-  import Project.{DateUpdated, StarsCount}
+  import Project._
   import Urls._
 
   final case class Project(id:               Id,
@@ -47,10 +47,14 @@ object model {
                            updatedAt:        DateUpdated,
                            urls:             Urls,
                            forking:          Forking,
+                           tags:             Set[Tag],
                            starsCount:       StarsCount,
                            permissions:      Permissions)
 
   object Project {
+    final class Tag private (val value: String) extends AnyVal with StringTinyType
+    implicit object Tag extends TinyTypeFactory[Tag](new Tag(_)) with NonBlank
+
     final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
     implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt
 

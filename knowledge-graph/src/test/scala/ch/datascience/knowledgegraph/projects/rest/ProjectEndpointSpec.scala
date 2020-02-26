@@ -37,7 +37,7 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
-import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
+import ch.datascience.knowledgegraph.projects.model.Project._
 import ch.datascience.knowledgegraph.projects.model.Urls._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
@@ -154,6 +154,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       updatedAt        <- cursor.downField("updatedAt").as[DateUpdated]
       urls             <- cursor.downField("urls").as[Urls]
       forks            <- cursor.downField("forking").as[Forking]
+      tags             <- cursor.downField("tags").as[List[Tag]].map(_.toSet)
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
       permissions      <- cursor.downField("permissions").as[Permissions]
     } yield Project(id,
@@ -165,6 +166,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
                     updatedAt,
                     urls,
                     forks,
+                    tags,
                     starsCount,
                     permissions)
 

@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Description, Id, Name, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
-import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
+import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import io.chrisdavenport.log4cats.Logger
@@ -48,7 +48,8 @@ object GitLabProjectFinder {
                                  maybeDescription: Option[Description],
                                  visibility:       Visibility,
                                  urls:             Urls,
-                                 forks:            Forking,
+                                 forking:          Forking,
+                                 tags:             Set[Tag],
                                  starsCount:       StarsCount,
                                  updatedAt:        DateUpdated,
                                  permissions:      Permissions)
@@ -118,6 +119,7 @@ private class IOGitLabProjectFinder(
         webUrl             <- cursor.downField("web_url").as[WebUrl]
         readmeUrl          <- cursor.downField("readme_url").as[ReadmeUrl]
         forksCount         <- cursor.downField("forks_count").as[ForksCount]
+        tags               <- cursor.downField("tag_list").as[List[Tag]]
         starsCount         <- cursor.downField("star_count").as[StarsCount]
         updatedAt          <- cursor.downField("last_activity_at").as[DateUpdated]
         maybeParent        <- cursor.downField("forked_from_project").as[Option[ParentProject]]
@@ -129,6 +131,7 @@ private class IOGitLabProjectFinder(
         visibility,
         Urls(sshUrl, httpUrl, webUrl, readmeUrl),
         Forking(forksCount, maybeParent),
+        tags.toSet,
         starsCount,
         updatedAt,
         Permissions(projectAccessLevel, groupAccessLevel)

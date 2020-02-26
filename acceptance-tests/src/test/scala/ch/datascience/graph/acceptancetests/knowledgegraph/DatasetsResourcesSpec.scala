@@ -39,7 +39,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{forkings, parentProjects, projects => projectsGen}
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
@@ -62,7 +62,10 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
 
-    val project          = projectsGen.generateOne
+    val project = projectsGen.generateOne.copy(
+      maybeDescription = projectDescriptions.generateSome,
+      forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome)
+    )
     val dataset1CommitId = commitIds.generateOne
     val dataset1Creation = addedToProject.generateOne.copy(
       agent = DatasetAgent(project.created.creator.email, project.created.creator.name)

@@ -94,6 +94,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       "updatedAt":  ${project.updatedAt.value},
       "urls":       ${project.urls},
       "forking":    ${project.forking},
+      "tags":       ${project.tags.map(_.value).toList},
       "starsCount": ${project.starsCount.value},
       "permissions":${project.permissions}
     }""" deepMerge _links(

@@ -140,6 +140,7 @@ object ProjectsResources {
           "name":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).name.value}
         }
       },
+      "tags": ${project.tags.map(_.value).toList},
       "starsCount": ${project.starsCount.value},
       "permissions": {
         "projectAccess": {

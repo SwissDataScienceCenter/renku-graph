@@ -168,6 +168,7 @@ object GitLab {
               "web_url":          ${project.urls.web.value},
               "readme_url":       ${project.urls.readme.value},
               "forks_count":      ${project.forking.forksCount.value},
+              "tag_list":         ${project.tags.map(_.value).toList},
               "star_count":       ${project.starsCount.value},
               "last_activity_at": ${project.updatedAt.value},
               "permissions": {

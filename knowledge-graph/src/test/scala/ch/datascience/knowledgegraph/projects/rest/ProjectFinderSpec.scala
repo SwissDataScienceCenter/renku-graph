@@ -220,7 +220,8 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
       ),
       updatedAt   = gitLabProject.updatedAt,
       urls        = gitLabProject.urls,
-      forking     = gitLabProject.forks,
+      forking     = gitLabProject.forking,
+      tags        = gitLabProject.tags,
       starsCount  = gitLabProject.starsCount,
       permissions = gitLabProject.permissions
     )
