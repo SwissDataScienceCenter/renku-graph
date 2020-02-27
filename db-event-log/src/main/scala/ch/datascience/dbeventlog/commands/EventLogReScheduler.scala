@@ -18,17 +18,20 @@
 
 package ch.datascience.dbeventlog.commands
 
+import java.time.Instant
+
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventStatus.{New, NonRecoverableFailure}
+import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import doobie.implicits._
 
 import scala.language.higherKinds
 
 class EventLogReScheduler[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB]
+    transactor: DbTransactor[Interpretation, EventLogDB],
+    now:        () => Instant = () => Instant.now
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
 
   def scheduleEventsForProcessing(): Interpretation[Unit] =
@@ -38,7 +41,7 @@ class EventLogReScheduler[Interpretation[_]](
 
   private def runUpdate() =
     sql"""|update event_log 
-          |set status = ${New: EventStatus}, execution_date = event_date, message = NULL
+          |set status = ${New: EventStatus}, execution_date = ${now()}, message = NULL
           |""".stripMargin.update.run
 }
 

@@ -18,6 +18,8 @@
 
 package ch.datascience.dbeventlog.commands
 
+import java.time.Instant
+
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventMessage, EventStatus, ExecutionDate}
 import EventStatus._
@@ -37,38 +39,32 @@ class EventLogReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with 
 
     s"set status to $New, execution_date to event_date and clean-up the message on all events" in new TestCase {
 
-      val event1Id   = commitEventIds.generateOne
-      val event1Date = committedDates.generateOne
-      addEvent(event1Id, EventStatus.Processing, timestampsNotInTheFuture.map(ExecutionDate.apply), event1Date)
-      val event2Id   = commitEventIds.generateOne
-      val event2Date = committedDates.generateOne
-      addEvent(event2Id, EventStatus.Processing, timestampsInTheFuture.map(ExecutionDate.apply), event2Date)
-      val event3Id   = commitEventIds.generateOne
-      val event3Date = committedDates.generateOne
-      addEvent(event3Id, EventStatus.TriplesStore, timestampsNotInTheFuture.map(ExecutionDate.apply), event3Date)
+      val event1Id = commitEventIds.generateOne
+      addEvent(event1Id, EventStatus.Processing, timestampsNotInTheFuture.map(ExecutionDate.apply))
+      val event2Id = commitEventIds.generateOne
+      addEvent(event2Id, EventStatus.Processing, timestampsInTheFuture.map(ExecutionDate.apply))
+      val event3Id = commitEventIds.generateOne
+      addEvent(event3Id, EventStatus.TriplesStore, timestampsNotInTheFuture.map(ExecutionDate.apply))
       val event4Id      = commitEventIds.generateOne
-      val event4Date    = committedDates.generateOne
       val event4Message = Some(eventMessages.generateOne)
       val event4ExecutionDate: Gen[ExecutionDate] = timestampsNotInTheFuture.map(ExecutionDate.apply)
-      addEvent(event4Id, NonRecoverableFailure, event4ExecutionDate, event4Date, event4Message)
-      val event5Id   = commitEventIds.generateOne
-      val event5Date = committedDates.generateOne
-      addEvent(event5Id, EventStatus.New, timestampsNotInTheFuture.map(ExecutionDate.apply), event5Date)
-      val event6Id   = commitEventIds.generateOne
-      val event6Date = committedDates.generateOne
-      addEvent(event6Id, RecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply), event6Date)
+      addEvent(event4Id, NonRecoverableFailure, event4ExecutionDate, maybeMessage = event4Message)
+      val event5Id = commitEventIds.generateOne
+      addEvent(event5Id, EventStatus.New, timestampsNotInTheFuture.map(ExecutionDate.apply))
+      val event6Id = commitEventIds.generateOne
+      addEvent(event6Id, RecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply))
 
       eventLog
         .scheduleEventsForProcessing()
         .unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = New).toSet shouldBe Set(
-        event1Id -> ExecutionDate(event1Date.value),
-        event2Id -> ExecutionDate(event2Date.value),
-        event3Id -> ExecutionDate(event3Date.value),
-        event4Id -> ExecutionDate(event4Date.value),
-        event5Id -> ExecutionDate(event5Date.value),
-        event6Id -> ExecutionDate(event6Date.value)
+        event1Id -> ExecutionDate(currentTime),
+        event2Id -> ExecutionDate(currentTime),
+        event3Id -> ExecutionDate(currentTime),
+        event4Id -> ExecutionDate(currentTime),
+        event5Id -> ExecutionDate(currentTime),
+        event6Id -> ExecutionDate(currentTime)
       )
       findEventMessage(event4Id) shouldBe None
     }
@@ -76,12 +72,15 @@ class EventLogReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with 
 
   private trait TestCase {
 
-    val eventLog = new EventLogReScheduler(transactor)
+    val currentTime         = Instant.now()
+    val currentTimeProvider = mockFunction[Instant]
+    currentTimeProvider.expects().returning(currentTime)
+    val eventLog = new EventLogReScheduler(transactor, currentTimeProvider)
 
     def addEvent(commitEventId: CommitEventId,
                  status:        EventStatus,
                  executionDate: Gen[ExecutionDate],
-                 committedDate: CommittedDate,
+                 committedDate: CommittedDate = committedDates.generateOne,
                  maybeMessage:  Option[EventMessage] = None): Unit =
       storeEvent(commitEventId,
                  status,
