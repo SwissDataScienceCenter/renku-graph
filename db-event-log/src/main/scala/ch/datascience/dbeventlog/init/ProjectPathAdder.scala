@@ -26,7 +26,6 @@ import ch.datascience.graph.model.events.ProjectId
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import doobie.implicits._
-import doobie.util.fragment.Fragment
 import io.chrisdavenport.log4cats.Logger
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}
@@ -38,6 +37,8 @@ private class ProjectPathAdder[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
+
+  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
   def run: Interpretation[Unit] =
     checkColumnExists flatMap {
@@ -55,11 +56,11 @@ private class ProjectPathAdder[Interpretation[_]](
 
   private def addColumn() = {
     for {
-      _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS project_path VARCHAR", transactor)
+      _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS project_path VARCHAR")
       projectIdsAndPaths <- findDistinctProjects
       _                  <- updatePaths(projectIdsAndPaths)
-      _                  <- execute(sql"ALTER TABLE event_log ALTER COLUMN project_path SET NOT NULL", transactor)
-      _                  <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON event_log(project_path)", transactor)
+      _                  <- execute(sql"ALTER TABLE event_log ALTER COLUMN project_path SET NOT NULL")
+      _                  <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON event_log(project_path)")
       _                  <- logger.info("'project_path' column added")
     } yield ()
   } recoverWith logging
@@ -99,11 +100,6 @@ private class ProjectPathAdder[Interpretation[_]](
         .transact(transactor.get)
         .map(_ => ())
   }
-
-  private def execute(sql: Fragment, transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] =
-    sql.update.run
-      .transact(transactor.get)
-      .map(_ => ())
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>

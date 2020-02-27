@@ -43,7 +43,8 @@ class CommitToEventLog[Interpretation[_]: Monad](
     commitEventsSource:    CommitEventsSourceBuilder[Interpretation],
     commitEventSender:     CommitEventSender[Interpretation],
     logger:                Logger[Interpretation],
-    executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+    clock:                 java.time.Clock = java.time.Clock.systemDefaultZone()
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
 
   import CommitToEventLog.SendingResult
@@ -58,7 +59,7 @@ class CommitToEventLog[Interpretation[_]: Monad](
     measureExecutionTime {
       for {
         maybeAccessToken   <- findAccessToken(startCommit.project.id)
-        commitEventsSource <- buildEventsSource(startCommit, maybeAccessToken)
+        commitEventsSource <- buildEventsSource(startCommit, maybeAccessToken, clock)
         sendingResults     <- commitEventsSource transformEventsWith sendEvent(startCommit) recoverWith findingEventException
       } yield sendingResults
     } flatMap logSummary(startCommit) recoverWith loggingError(startCommit)

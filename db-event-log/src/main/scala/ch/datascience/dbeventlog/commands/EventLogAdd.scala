@@ -56,8 +56,8 @@ class EventLogAdd[Interpretation[_]](
     import commitEvent._
     val currentTime = now()
     sql"""insert into 
-          event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
-          values ($id, ${project.id}, ${project.path}, ${EventStatus.New: EventStatus}, $currentTime, $currentTime, $committedDate, $eventBody)
+          event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body) 
+          values ($id, ${project.id}, ${project.path}, ${EventStatus.New: EventStatus}, $currentTime, $currentTime, $committedDate, $batchDate, $eventBody)
       """.update.run.map(_ => ())
   }
 }

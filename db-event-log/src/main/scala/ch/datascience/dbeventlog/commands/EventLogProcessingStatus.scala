@@ -24,6 +24,7 @@ import java.time.{Duration, Instant}
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
+import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus, ExecutionDate}
@@ -45,43 +46,45 @@ class EventLogProcessingStatus[Interpretation[_]](
   import EventLogProcessingStatus._
 
   def fetchStatus(projectId: ProjectId): OptionT[Interpretation, ProcessingStatus] =
-    for {
-      latestEvent           <- findTheLatestEvent(projectId)
-      events                <- addPreviousFromTheSameBatch(projectId, latestEvent, List(latestEvent))
-      maybeProcessingStatus <- toProcessingStatus(events)
-    } yield maybeProcessingStatus
+    findOldestNotProcessed(projectId)
+      .semiflatMap(toInProgressProcessingStatus(projectId))
+      .orElse(toAllDoneOrNoEvents(projectId))
 
-  private def findTheLatestEvent(projectId: ProjectId): OptionT[Interpretation, Event] = OptionT(sql"""
-      select event_id, status, execution_date 
-      from event_log
-      where project_id = $projectId
-      order by execution_date desc
-      limit 1
+  private def toInProgressProcessingStatus(projectId: ProjectId)(oldestInBatch: Event) =
+    for {
+      events           <- findAllFromTheSameBatch(projectId, oldestInBatch)
+      processingStatus <- toProcessingStatus(events)
+    } yield processingStatus
+
+  private def findOldestNotProcessed(projectId: ProjectId) = OptionT(sql"""
+    select event_id, status, execution_date
+    from event_log
+    where project_id = $projectId
+      and (status = ${EventStatus.New: EventStatus} or status = ${EventStatus.Processing: EventStatus} or status = ${EventStatus.RecoverableFailure: EventStatus})
+    order by execution_date asc
+    limit 1
   """.query[Event].option.transact(transactor.get))
 
-  private def addPreviousFromTheSameBatch(projectId:      ProjectId,
-                                          previousEvent:  Event,
-                                          previousEvents: List[Event]): OptionT[Interpretation, List[Event]] =
-    OptionT.liftF {
-      findPreviousFromTheSameBatch(projectId, previousEvent)
-        .flatMap(foundEvent => addPreviousFromTheSameBatch(projectId, foundEvent, previousEvents :+ foundEvent))
-        .getOrElse(previousEvents)
+  private def findAllFromTheSameBatch(projectId: ProjectId, oldestInBatch: Event) = sql"""
+    select event_id, status, execution_date
+    from event_log
+    where project_id = $projectId
+      and execution_date >= ${oldestInBatch.executionDate.value}
+  """.query[Event].to[List].transact(transactor.get)
+
+  private def toAllDoneOrNoEvents(projectId: ProjectId) =
+    countAllEvents(projectId) flatMap {
+      case 0     => OptionT.none[Interpretation, ProcessingStatus]
+      case other => OptionT.liftF(ProcessingStatus.from[Interpretation](other, other))
     }
 
-  private def findPreviousFromTheSameBatch(projectId: ProjectId, previousEvent: Event) = OptionT {
-    sql"""
-        select event_id, status, execution_date
-        from event_log
-        where project_id = $projectId
-          and event_id <> ${previousEvent.eventId}
-          and execution_date <= ${previousEvent.executionDate}
-          and execution_date >= ${previousEvent.executionDate.value minus MaxTimeDiffBetweenEventsInBatch}
-        order by execution_date desc
-        limit 1
-      """.query[Event].option.transact(transactor.get)
-  }
+  private def countAllEvents(projectId: ProjectId) = OptionT.liftF(sql"""
+    select count(*)
+    from event_log
+    where project_id = $projectId
+  """.query[Int].unique.transact(transactor.get))
 
-  private def toProcessingStatus(events: List[Event]) = OptionT.liftF {
+  private def toProcessingStatus(events: List[Event]) =
     events.foldLeft(0 -> 0) {
       case ((done, total), Event(_, status, _)) if status == TriplesStore || status == NonRecoverableFailure =>
         (done + 1) -> (total + 1)
@@ -89,7 +92,6 @@ class EventLogProcessingStatus[Interpretation[_]](
     } match {
       case (done, total) => ProcessingStatus.from(done, total)(ME)
     }
-  }
 }
 
 private object EventLogProcessingStatus {
@@ -116,7 +118,6 @@ final case class ProcessingStatus private (
 )
 
 object ProcessingStatus {
-  import cats.implicits._
 
   type Done     = Int Refined NonNegative
   type Total    = Int Refined NonNegative

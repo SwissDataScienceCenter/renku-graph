@@ -18,6 +18,8 @@
 
 package ch.datascience.webhookservice.eventprocessing.startcommit
 
+import java.time.Clock
+
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
@@ -26,7 +28,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands._
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.{CommitEvent, CommitId}
+import ch.datascience.graph.model.events.{BatchDate, CommitEvent, CommitId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder, IOCommitInfoFinder}
@@ -47,55 +49,60 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
   def buildEventsSource(startCommit:      StartCommit,
-                        maybeAccessToken: Option[AccessToken]): Interpretation[EventsFlowBuilder[Interpretation]] =
+                        maybeAccessToken: Option[AccessToken],
+                        clock:            Clock): Interpretation[EventsFlowBuilder[Interpretation]] =
     ME.pure {
       new EventsFlowBuilder[Interpretation] {
         override def transformEventsWith[O](transform: CommitEvent => Interpretation[O]): Interpretation[List[O]] =
-          new EventsFlow(startCommit, maybeAccessToken, transform).run()
+          new EventsFlow(startCommit, maybeAccessToken, transform, clock).run()
       }
     }
 
   private class EventsFlow[O](startCommit:      StartCommit,
                               maybeAccessToken: Option[AccessToken],
-                              transform:        CommitEvent => Interpretation[O]) {
+                              transform:        CommitEvent => Interpretation[O],
+                              clock:            Clock) {
 
     def run(): Interpretation[List[O]] = findEventAndTransform(List(startCommit.id), List.empty)
 
-    private def findEventAndTransform(commitIds: List[CommitId], transformResults: List[O]): Interpretation[List[O]] =
+    private def findEventAndTransform(commitIds:        List[CommitId],
+                                      transformResults: List[O],
+                                      batchDate:        BatchDate = BatchDate(clock)): Interpretation[List[O]] =
       commitIds match {
         case Nil => ME.pure(transformResults)
         case someCommitIds =>
           for {
-            commitEvents            <- findCommitEvents(someCommitIds)
+            commitEvents            <- findCommitEvents(someCommitIds, batchDate)
             currentTransformResults <- (commitEvents map transform).sequence
             parentCommitIds         <- ME.pure(commitEvents flatMap (_.parents))
             mergedResults           <- ME.pure(transformResults ++ currentTransformResults)
-            newResults              <- findEventAndTransform(parentCommitIds, mergedResults)
+            newResults              <- findEventAndTransform(parentCommitIds, mergedResults, batchDate)
           } yield newResults
       }
 
-    private def findCommitEvents(commitIds: List[CommitId]) =
+    private def findCommitEvents(commitIds: List[CommitId], batchDate: BatchDate) =
       for {
         validCommitIds           <- ME.pure(commitIds filterNot (_ == DontCareCommitId))
         commitIdsNotPresentInLog <- filterNotInLog(validCommitIds)
-        commitEvents             <- (commitIdsNotPresentInLog map findCommitEvent).sequence
+        commitEvents             <- (commitIdsNotPresentInLog map findCommitEvent(batchDate)).sequence
       } yield commitEvents
 
     private def filterNotInLog(commitIds: List[CommitId]) =
       if (commitIds.nonEmpty) filterNotExistingInLog(commitIds, startCommit.project.id)
       else ME.pure(List.empty[CommitId])
 
-    private def findCommitEvent(commitId: CommitId): Interpretation[CommitEvent] =
-      findCommitInfo(startCommit.project.id, commitId, maybeAccessToken) map toCommitEvent
+    private def findCommitEvent(batchDate: BatchDate)(commitId: CommitId): Interpretation[CommitEvent] =
+      findCommitInfo(startCommit.project.id, commitId, maybeAccessToken) map toCommitEvent(batchDate)
 
-    private def toCommitEvent(commitInfo: CommitInfo) = CommitEvent(
+    private def toCommitEvent(batchDate: BatchDate)(commitInfo: CommitInfo) = CommitEvent(
       id            = commitInfo.id,
       message       = commitInfo.message,
       committedDate = commitInfo.committedDate,
       author        = commitInfo.author,
       committer     = commitInfo.committer,
       parents       = commitInfo.parents.filterNot(_ == DontCareCommitId),
-      project       = startCommit.project
+      project       = startCommit.project,
+      batchDate     = batchDate
     )
   }
 }
