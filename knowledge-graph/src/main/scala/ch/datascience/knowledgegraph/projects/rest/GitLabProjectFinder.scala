@@ -101,10 +101,13 @@ private class IOGitLabProjectFinder(
         name <- cursor.downField("name").as[Name]
       } yield ParentProject(id, path, name)
 
-    implicit val accessLevelDecoder: Decoder[AccessLevel] =
+    implicit val maybeAccessLevelDecoder: Decoder[Option[AccessLevel]] =
       _.downField("access_level")
-        .as[Int]
-        .flatMap(AccessLevel.from)
+        .as[Option[Int]]
+        .flatMap {
+          case Some(level) => (AccessLevel from level) map Option.apply
+          case None        => Right(Option.empty[AccessLevel])
+        }
         .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
 
     implicit val statisticsDecoder: Decoder[Statistics] = cursor =>
@@ -116,27 +119,34 @@ private class IOGitLabProjectFinder(
         jobArtifactsSize <- cursor.downField("job_artifacts_size").as[JobArtifactsSize]
       } yield Statistics(commitsCount, storageSize, repositorySize, lfsSize, jobArtifactsSize)
 
+    val getOrFail: Option[AccessLevel] => Either[DecodingFailure, AccessLevel] =
+      Either.fromOption(_, DecodingFailure("permissions.project_access missing", Nil))
+
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        id <- cursor.downField("id").as[Id]
+        id                    <- cursor.downField("id").as[Id]
+        visibility            <- cursor.downField("visibility").as[Visibility]
+        sshUrl                <- cursor.downField("ssh_url_to_repo").as[SshUrl]
+        httpUrl               <- cursor.downField("http_url_to_repo").as[HttpUrl]
+        webUrl                <- cursor.downField("web_url").as[WebUrl]
+        readmeUrl             <- cursor.downField("readme_url").as[ReadmeUrl]
+        forksCount            <- cursor.downField("forks_count").as[ForksCount]
+        tags                  <- cursor.downField("tag_list").as[List[Tag]]
+        starsCount            <- cursor.downField("star_count").as[StarsCount]
+        updatedAt             <- cursor.downField("last_activity_at").as[DateUpdated]
+        maybeParent           <- cursor.downField("forked_from_project").as[Option[ParentProject]]
+        statistics            <- cursor.downField("statistics").as[Statistics]
+        maybeGroupAccessLevel <- cursor.downField("permissions").downField("group_access").as[Option[AccessLevel]]
+        projectAccessLevel <- cursor
+                               .downField("permissions")
+                               .downField("project_access")
+                               .as[Option[AccessLevel]]
+                               .flatMap(getOrFail)
         maybeDescription <- cursor
                              .downField("description")
                              .as[Option[String]]
                              .map(blankToNone)
                              .flatMap(toOption[Description])
-        visibility         <- cursor.downField("visibility").as[Visibility]
-        sshUrl             <- cursor.downField("ssh_url_to_repo").as[SshUrl]
-        httpUrl            <- cursor.downField("http_url_to_repo").as[HttpUrl]
-        webUrl             <- cursor.downField("web_url").as[WebUrl]
-        readmeUrl          <- cursor.downField("readme_url").as[ReadmeUrl]
-        forksCount         <- cursor.downField("forks_count").as[ForksCount]
-        tags               <- cursor.downField("tag_list").as[List[Tag]]
-        starsCount         <- cursor.downField("star_count").as[StarsCount]
-        updatedAt          <- cursor.downField("last_activity_at").as[DateUpdated]
-        maybeParent        <- cursor.downField("forked_from_project").as[Option[ParentProject]]
-        projectAccessLevel <- cursor.downField("permissions").downField("project_access").as[AccessLevel]
-        groupAccessLevel   <- cursor.downField("permissions").downField("group_access").as[AccessLevel]
-        statistics         <- cursor.downField("statistics").as[Statistics]
       } yield GitLabProject(
         id,
         maybeDescription,
@@ -146,7 +156,7 @@ private class IOGitLabProjectFinder(
         tags.toSet,
         starsCount,
         updatedAt,
-        Permissions(projectAccessLevel, groupAccessLevel),
+        Permissions(projectAccessLevel, maybeGroupAccessLevel),
         statistics
       )
 

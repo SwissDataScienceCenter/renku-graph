@@ -77,7 +77,7 @@ object model {
 
   final case class ParentProject(id: Id, path: Path, name: Name)
 
-  final case class Permissions(projectAccessLevel: AccessLevel, groupAccessLevel: AccessLevel)
+  final case class Permissions(projectAccessLevel: AccessLevel, maybeGroupAccessLevel: Option[AccessLevel])
 
   object Permissions {
 

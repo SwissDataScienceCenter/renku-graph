@@ -35,7 +35,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen, forkings, parentProjects}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen, _}
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
@@ -53,7 +53,8 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project = projectsGen.generateOne.copy(
     maybeDescription = projectDescriptions.generateSome,
-    forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome)
+    forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome),
+    permissions      = permissionsObjects.generateOne.copy(maybeGroupAccessLevel = accessLevels.generateSome)
   )
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
@@ -87,7 +88,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       `triples updates run`(Set(project.created.creator.email) + project.created.creator.email)
 
       And("the project exists in GitLab")
-      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project, withStatistics = true)
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}"
@@ -111,8 +112,10 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
 object ProjectsResources {
 
-  def fullJson(project: Project): Json = json"""
-    {
+  def fullJson(project: Project): Json = {
+    val groupAccessLevel = project.permissions.maybeGroupAccessLevel
+      .getOrElse(throw new Exception("groupAccessLevel expected"))
+    json"""{
       "identifier":  ${project.id.value}, 
       "path":        ${project.path.value}, 
       "name":        ${project.name.value},
@@ -147,7 +150,7 @@ object ProjectsResources {
           "level": {"name": ${project.permissions.projectAccessLevel.name.value}, "value": ${project.permissions.projectAccessLevel.value.value}}
         },
         "groupAccess": {
-          "level": {"name": ${project.permissions.groupAccessLevel.name.value}, "value": ${project.permissions.groupAccessLevel.value.value}}
+          "level": {"name": ${groupAccessLevel.name.value}, "value": ${groupAccessLevel.value.value}}
         }
       },
       "statistics": {
@@ -158,9 +161,10 @@ object ProjectsResources {
         "jobArtifactsSize": ${project.statistics.jobArtifactsSize.value}
       }
     }""" deepMerge {
-    _links(
-      Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
-      Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
-    )
+      _links(
+        Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
+        Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
+      )
+    }
   }
 }

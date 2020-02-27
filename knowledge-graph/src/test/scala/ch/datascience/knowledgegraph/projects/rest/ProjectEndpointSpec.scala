@@ -208,9 +208,9 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val permissionsDecoder: Decoder[Permissions] = cursor =>
     for {
-      projectAccessLevel <- cursor.downField("projectAccess").as[AccessLevel]
-      groupAccessLevel   <- cursor.downField("groupAccess").as[AccessLevel]
-    } yield Permissions(projectAccessLevel, groupAccessLevel)
+      projectAccessLevel    <- cursor.downField("projectAccess").as[AccessLevel]
+      maybeGroupAccessLevel <- cursor.downField("groupAccess").as[Option[AccessLevel]]
+    } yield Permissions(projectAccessLevel, maybeGroupAccessLevel)
 
   private implicit lazy val accessLevelDecoder: Decoder[AccessLevel] = cursor =>
     for {

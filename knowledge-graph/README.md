@@ -317,7 +317,7 @@ Response body example:
     "projectAccess": {
       "level": {"name": "Developer", "value": 30}
     },
-    "groupAccess": {
+    "groupAccess": { // optional
       "level": {"name": "Guest", "value": 10}
     }
   },

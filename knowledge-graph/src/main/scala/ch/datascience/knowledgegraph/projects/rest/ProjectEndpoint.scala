@@ -136,9 +136,10 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val permissionsEncoder: Encoder[Permissions] = Encoder.instance[Permissions] { permissions =>
     json"""{
-      "projectAccess": ${permissions.projectAccessLevel},
-      "groupAccess": ${permissions.groupAccessLevel}
-    }"""
+      "projectAccess": ${permissions.projectAccessLevel}
+    }""" deepMerge {
+      permissions.maybeGroupAccessLevel.map(access => json"""{"groupAccess": $access}""") getOrElse Json.obj()
+    }
   }
 
   private implicit lazy val accessLevelEncoder: Encoder[AccessLevel] = Encoder.instance[AccessLevel] { level =>

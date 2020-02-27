@@ -157,7 +157,7 @@ class GitLabProjectFinderSpec
           "access_level": ${project.permissions.projectAccessLevel.value.value}
         },
         "group_access": {
-          "access_level": ${project.permissions.groupAccessLevel.value.value}
+          "access_level": ${project.permissions.maybeGroupAccessLevel.map(_.value.value)}
         }
       },
       "statistics": {

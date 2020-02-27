@@ -146,7 +146,8 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:path returning OK with`(
-      project:            ProjectMetadata
+      project:            ProjectMetadata,
+      withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
 
     def toJson(parent: ParentProject) = json"""{
@@ -155,8 +156,9 @@ object GitLab {
       "name":                ${parent.name.value}
     }"""
 
+    val queryParams = if (withStatistics) "?statistics=true" else ""
     stubFor {
-      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
+      get(s"/api/v4/projects/${urlEncode(project.path.value)}$queryParams").withAccessTokenInHeader
         .willReturn(
           okJson(
             json"""{
@@ -176,7 +178,7 @@ object GitLab {
                   "access_level": ${project.permissions.projectAccessLevel.value.value}
                 },
                 "group_access": {
-                  "access_level": ${project.permissions.groupAccessLevel.value.value}
+                  "access_level": ${project.permissions.maybeGroupAccessLevel.map(_.value.value)}
                 }
               },
               "statistics": {

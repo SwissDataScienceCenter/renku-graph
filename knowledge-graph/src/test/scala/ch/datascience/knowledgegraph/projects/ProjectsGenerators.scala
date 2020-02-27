@@ -136,12 +136,12 @@ object ProjectsGenerators {
 
   private implicit lazy val updatedAts: Gen[DateUpdated] = timestampsNotInTheFuture map DateUpdated.apply
 
-  private implicit lazy val permissionsObjects: Gen[Permissions] = for {
-    project <- accessLevels
-    group   <- accessLevels
-  } yield Permissions(project, group)
+  implicit lazy val permissionsObjects: Gen[Permissions] = for {
+    project    <- accessLevels
+    maybeGroup <- accessLevels.toGeneratorOfOptions
+  } yield Permissions(project, maybeGroup)
 
-  private implicit lazy val accessLevels: Gen[AccessLevel] = Gen.oneOf(AccessLevel.all.toList)
+  implicit lazy val accessLevels: Gen[AccessLevel] = Gen.oneOf(AccessLevel.all.toList)
 
   private implicit lazy val statisticsObjects: Gen[Statistics] = for {
     commitsCount     <- nonNegativeInts() map (v => CommitsCount(v.value))
