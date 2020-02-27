@@ -27,7 +27,7 @@ private object modelSchema {
     name        = "node",
     description = "Lineage node",
     fields[Unit, Node](
-      Field("id", StringType, Some("Node identifier"), resolve     = _.value.id.toString),
+      Field("id", StringType, Some("Node identifier"), resolve     = _.value.location.toString),
       Field("location", StringType, Some("Node location"), resolve = _.value.location.toString),
       Field("label", StringType, Some("Node label"), resolve       = _.value.label.toString),
       Field(
