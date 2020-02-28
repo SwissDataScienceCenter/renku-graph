@@ -41,7 +41,7 @@ class EventLogReScheduler[Interpretation[_]](
 
   private def runUpdate() =
     sql"""|update event_log 
-          |set status = ${New: EventStatus}, execution_date = ${now()}, message = NULL
+          |set status = ${New: EventStatus}, execution_date = event_date, batch_date = ${now()}, message = NULL
           |""".stripMargin.update.run
 }
 

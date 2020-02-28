@@ -80,13 +80,13 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
 
   // format: off
   protected def findEvents(status:  EventStatus,
-                           orderBy: Fragment = fr"created_date asc"): List[(CommitEventId, ExecutionDate)] =
+                           orderBy: Fragment = fr"created_date asc"): List[(CommitEventId, ExecutionDate, BatchDate)] =
     execute {
-      (fr"""select event_id, project_id, execution_date
+      (fr"""select event_id, project_id, execution_date, batch_date
             from event_log
             where status = $status
             order by """ ++ orderBy)
-        .query[(CommitEventId, ExecutionDate)]
+        .query[(CommitEventId, ExecutionDate, BatchDate)]
         .to[List]
     }
   // format: on
