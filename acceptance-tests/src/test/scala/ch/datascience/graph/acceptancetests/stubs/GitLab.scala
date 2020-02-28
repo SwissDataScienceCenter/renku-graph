@@ -106,7 +106,8 @@ object GitLab {
 
   def `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(
       projectId:          Id,
-      commitId:           CommitId
+      commitId:           CommitId,
+      parentIds:          Set[CommitId] = Set.empty
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits/$commitId").withAccessTokenInHeader
@@ -119,7 +120,7 @@ object GitLab {
             "committer_email": ${emails.generateOne.value},
             "message":         ${nonEmptyStrings().generateOne},
             "committed_date":  ${committedDates.generateOne.value.toString},
-            "parent_ids":      []
+            "parent_ids":      ${parentIds.map(_.value).toList}
           }                         
         """.noSpaces))
     }

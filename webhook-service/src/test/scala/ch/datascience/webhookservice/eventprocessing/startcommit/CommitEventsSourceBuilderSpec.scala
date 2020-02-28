@@ -18,6 +18,8 @@
 
 package ch.datascience.webhookservice.eventprocessing.startcommit
 
+import java.time.{Clock, Instant, ZoneId}
+
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
@@ -211,12 +213,17 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
     val startCommit      = startCommits.generateOne
     val maybeAccessToken = Gen.option(accessTokens).generateOne
+    val fixedNow         = Instant.now
+    private val clock    = Clock.fixed(fixedNow, ZoneId.systemDefault)
 
-    val send: CommitEvent => Try[CommitId] = event => Try(event.id)
+    val send: CommitEvent => Try[CommitId] = event => {
+      event.batchDate.value shouldBe fixedNow
+      Try(event.id)
+    }
     val commitInfoFinder        = mock[CommitInfoFinder[Try]]
     val eventLogVerifyExistence = mock[TryEventLogVerifyExistence]
     private val sourceBuilder   = new CommitEventsSourceBuilder[Try](commitInfoFinder, eventLogVerifyExistence)
-    val Success(source)         = sourceBuilder.buildEventsSource(startCommit, maybeAccessToken)
+    val Success(source)         = sourceBuilder.buildEventsSource(startCommit, maybeAccessToken, clock)
 
     def givenFindingCommitInfoReturns(commitInfo: CommitInfo, otherInfos: Seq[CommitInfo]*): Unit =
       givenFindingCommitInfoReturns(commitInfo +: otherInfos.flatten: _*)

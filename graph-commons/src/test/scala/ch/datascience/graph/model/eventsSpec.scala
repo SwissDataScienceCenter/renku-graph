@@ -18,6 +18,8 @@
 
 package ch.datascience.graph.model
 
+import java.time.{Clock, Instant, ZoneId}
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
@@ -44,6 +46,23 @@ class CommitEventIdSpec extends WordSpec {
       val commitEventId = commitEventIds.generateOne
 
       commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
+    }
+  }
+}
+
+class BatchDateSpec extends WordSpec {
+
+  "apply()" should {
+
+    "instantiate a new BatchDate with current timestamp" in {
+      val systemZone = ZoneId.systemDefault
+      val fixedNow   = Instant.now
+
+      val clock = Clock.fixed(fixedNow, systemZone)
+
+      BatchDate(clock).value shouldBe fixedNow
+
+      Clock.system(systemZone)
     }
   }
 }

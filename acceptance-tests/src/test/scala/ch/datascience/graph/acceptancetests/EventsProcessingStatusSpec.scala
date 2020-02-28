@@ -115,16 +115,27 @@ class EventsProcessingStatusSpec
     `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
   }
 
-  private def sendEventsForProcessing(project: Project)(implicit accessToken: AccessToken) =
-    nonEmptyList(commitIds, minElements = numberOfEvents, maxElements = numberOfEvents).generateOne
-      .map { commitId =>
+  private def sendEventsForProcessing(project: Project)(implicit accessToken: AccessToken) = {
+    val allCommitIds = nonEmptyList(
+      commitIds,
+      minElements = numberOfEvents,
+      maxElements = numberOfEvents
+    ).generateOne
+
+    `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
+                                                                                            allCommitIds.head,
+                                                                                            allCommitIds.tail.toSet)
+    allCommitIds.map { commitId =>
+      // GitLab to return commit info about all the parent commits
+      if (commitId != allCommitIds.head)
         `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
 
-        // making the triples generation be happy and not throwing exceptions to the logs
-        `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+      // making the triples generation be happy and not throwing exceptions to the logs
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+    }
 
-        webhookServiceClient
-          .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project.id, commitId))
-          .status shouldBe Accepted
-      }
+    webhookServiceClient
+      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project.id, allCommitIds.head))
+      .status shouldBe Accepted
+  }
 }

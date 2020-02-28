@@ -18,24 +18,22 @@
 
 package ch.datascience.dbeventlog.commands
 
-import java.time.Instant
 import java.time.temporal.ChronoUnit._
 
 import cats.data.NonEmptyList
-import ch.datascience.dbeventlog.DbEventLogGenerators.{createdDates, eventBodies, eventStatuses}
+import ch.datascience.dbeventlog.DbEventLogGenerators._
+import ch.datascience.dbeventlog.EventStatus
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{commitEventIds, committedDates}
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.events.BatchDate
 import ch.datascience.graph.model.projects.Id
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-
-import scala.util.Random
 
 class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec {
 
@@ -45,19 +43,20 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
       s"where $TriplesStore and $NonRecoverableFailure events are counted as done " +
       "and all as total" in new TestCase {
 
-      storeEventsWithRecentTime(projectIds.generateOne, nonEmptyList(eventStatuses).generateOne)
+      storeEvents(projectIds.generateOne, batchDates.generateOne, nonEmptyList(eventStatuses).generateOne)
 
-      val doneEvents = nonEmptyList(
-        Gen.oneOf(TriplesStore, NonRecoverableFailure),
-        minElements = 10,
-        maxElements = 20
-      ).generateOne
       val toBeProcessedEvents = nonEmptyList(
         Gen.oneOf(New, Processing, RecoverableFailure),
         minElements = 10,
         maxElements = 20
       ).generateOne
-      storeEventsWithRecentTime(projectId, doneEvents ::: toBeProcessedEvents)
+      val doneEvents = nonEmptyList(
+        Gen.oneOf(TriplesStore, NonRecoverableFailure),
+        minElements = 10,
+        maxElements = 20
+      ).generateOne
+      val batchDate = batchDates.generateOne
+      storeEvents(projectId, batchDate, toBeProcessedEvents ::: doneEvents)
 
       val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
@@ -67,35 +66,43 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
       processingStatus.progress.value.floor shouldBe ((doneEvents.size.toDouble / expectedTotal) * 100).floor
     }
 
-    "return ProcessingStatus for the given project " +
-      "where events that get counted are only these close to the latest execution_date" in new TestCase {
+    "return ProcessingStatus for the latest batch only" in new TestCase {
 
-      val sameDateEvents = nonEmptyList(eventStatuses, minElements = 10, maxElements = 20).generateOne
-      storeEventsWithRecentTime(projectId, sameDateEvents)
+      val batch1Date     = batchDates.generateOne
+      val batch1Statuses = nonEmptyList(eventStatuses).generateOne
+      storeEvents(projectId, batch1Date, batch1Statuses)
 
-      spreadEventsInThePastAndStore(projectId, nonEmptyList(eventStatuses).generateOne)
-
-      storeEventsInTheFarPast(projectId, nonEmptyList(eventStatuses).generateOne)
-
-      val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
-
-      processingStatus.total.value shouldBe sameDateEvents.size
-    }
-
-    "return a ProcessingStatus for the given project " +
-      "even if the latest project's events were processed in the past" in new TestCase {
-
-      val newestSameDateEvents = nonEmptyList(eventStatuses, minElements = 10, maxElements = 20).generateOne
-      spreadEventsInThePastAndStore(projectId, newestSameDateEvents)
-
-      storeEventsInTheFarPast(projectId, nonEmptyList(eventStatuses).generateOne)
+      val batch2Date     = batchDates generateDifferentThan batch1Date
+      val batch2Statuses = nonEmptyList(eventStatuses).generateOne
+      storeEvents(projectId, batch2Date, batch2Statuses)
 
       val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
-      processingStatus.total.value shouldBe newestSameDateEvents.size
+      val latestBatchStatuses =
+        if ((batch1Date.value compareTo batch2Date.value) > 0) batch1Statuses
+        else batch2Statuses
+      processingStatus.total.value shouldBe latestBatchStatuses.size
     }
 
-    "return None if there were no events for the project id" in new TestCase {
+    "return ProcessingStatus with done=total=(events in the batch) " +
+      "if all events from the latest batch are processed" in new TestCase {
+
+      val olderBatchDate     = batchDates.generateOne
+      val olderBatchStatuses = nonEmptyList(eventStatuses).generateOne
+      storeEvents(projectId, olderBatchDate, olderBatchStatuses)
+
+      val newerBatchDate     = BatchDate(olderBatchDate.value plus (1, MINUTES))
+      val newerBatchStatuses = nonEmptyList(Gen.oneOf(TriplesStore, NonRecoverableFailure)).generateOne
+      storeEvents(projectId, newerBatchDate, newerBatchStatuses)
+
+      val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
+
+      processingStatus.total.value    shouldBe newerBatchStatuses.size
+      processingStatus.done.value     shouldBe newerBatchStatuses.size
+      processingStatus.progress.value shouldBe 100d
+    }
+
+    "return None if there are no events for the project id" in new TestCase {
       processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync() shouldBe None
     }
   }
@@ -104,37 +111,17 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
     val projectId              = projectIds.generateOne
     val processingStatusFinder = new IOEventLogProcessingStatus(transactor)
 
-    def storeEventsWithRecentTime(projectId: Id, statuses: NonEmptyList[EventStatus]) = statuses map {
-      storeEvent(
-        commitEventIds.generateOne.copy(projectId = projectId),
-        _,
-        ExecutionDate(Instant.now),
-        committedDates.generateOne,
-        eventBodies.generateOne,
-        createdDates.generateOne
-      )
-    }
-
-    def spreadEventsInThePastAndStore(projectId: Id, statuses: NonEmptyList[EventStatus]) = statuses map {
-      storeEvent(
-        commitEventIds.generateOne.copy(projectId = projectId),
-        _,
-        ExecutionDate(Instant.now.minus(17 + Random.nextInt(14), MINUTES)),
-        committedDates.generateOne,
-        eventBodies.generateOne,
-        createdDates.generateOne
-      )
-    }
-
-    def storeEventsInTheFarPast(projectId: Id, statuses: NonEmptyList[EventStatus]) = statuses map {
-      storeEvent(
-        commitEventIds.generateOne.copy(projectId = projectId),
-        _,
-        ExecutionDate(Instant.now.minus(2, DAYS)),
-        committedDates.generateOne,
-        eventBodies.generateOne,
-        createdDates.generateOne
-      )
-    }
+    def storeEvents(projectId: Id, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
+      statuses map {
+        storeEvent(
+          commitEventIds.generateOne.copy(projectId = projectId),
+          _,
+          executionDates.generateOne,
+          committedDates.generateOne,
+          eventBodies.generateOne,
+          createdDates.generateOne,
+          batchDate
+        )
+      }
   }
 }

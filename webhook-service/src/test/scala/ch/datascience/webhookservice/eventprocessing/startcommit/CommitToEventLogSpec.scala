@@ -18,6 +18,8 @@
 
 package ch.datascience.webhookservice.eventprocessing.startcommit
 
+import java.time.{Clock, Instant, ZoneId}
+
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
@@ -57,8 +59,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
         .returning(context pure maybeAccessToken)
 
       (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken]))
-        .expects(startCommit, maybeAccessToken)
+        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
+        .expects(startCommit, maybeAccessToken, clock)
         .returning(context pure eventsFlowBuilder)
 
       val commitEvents = commitEventsFrom(startCommit).generateOne
@@ -94,8 +96,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
         .returning(context pure maybeAccessToken)
 
       (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken]))
-        .expects(startCommit, maybeAccessToken)
+        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
+        .expects(startCommit, maybeAccessToken, clock)
         .returning(context pure eventsFlowBuilder)
 
       val commitEvents = List.empty[CommitEvent]
@@ -134,8 +136,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken]))
-        .expects(startCommit, maybeAccessToken)
+        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
+        .expects(startCommit, maybeAccessToken, clock)
         .returning(context raiseError exception)
 
       commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Failure(exception)
@@ -152,8 +154,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
         .returning(context.pure(maybeAccessToken))
 
       (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken]))
-        .expects(startCommit, maybeAccessToken)
+        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
+        .expects(startCommit, maybeAccessToken, clock)
         .returning(context pure eventsFlowBuilder)
 
       val exception = exceptions.generateOne
@@ -176,8 +178,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
         .returning(context.pure(maybeAccessToken))
 
       (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken]))
-        .expects(startCommit, maybeAccessToken)
+        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
+        .expects(startCommit, maybeAccessToken, clock)
         .returning(context pure eventsFlowBuilder)
 
       val exception = exceptions.generateOne
@@ -201,8 +203,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
         .returning(context.pure(maybeAccessToken))
 
       (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken]))
-        .expects(startCommit, maybeAccessToken)
+        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
+        .expects(startCommit, maybeAccessToken, clock)
         .returning(context pure eventsFlowBuilder)
 
       val commitEvents @ failingEvent +: passingEvents = commitEventsFrom(startCommit).generateOne
@@ -239,6 +241,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
     val startCommit = startCommits.generateOne
     val projectId   = startCommit.project.id
+    val batchDate   = BatchDate(Instant.now)
+    val clock       = Clock.fixed(batchDate.value, ZoneId.systemDefault)
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val commitEventSender     = mock[TryCommitEventSender]
@@ -251,7 +255,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
       commitEventsSource,
       commitEventSender,
       logger,
-      executionTimeRecorder
+      executionTimeRecorder,
+      clock
     )
 
     def successfulStoring(startCommit: StartCommit, commitEvents: Int, stored: Int, failed: Int): String =
@@ -295,7 +300,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
         author        = author,
         committer     = committer,
         parents       = parentsIds,
-        project       = project
+        project       = project,
+        batchDate     = batchDate
       )
   }
 }

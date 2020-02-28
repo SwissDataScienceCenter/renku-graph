@@ -24,7 +24,6 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.EventStatus.RecoverableFailure
 import ch.datascience.logging.ApplicationLogger
-import doobie.util.fragment.Fragment
 import io.chrisdavenport.log4cats.Logger
 
 import scala.language.higherKinds
@@ -32,11 +31,13 @@ import scala.util.control.NonFatal
 
 class EventLogDbInitializer[Interpretation[_]](
     projectPathAdder: ProjectPathAdder[Interpretation],
+    batchDateAdder:   BatchDateAdder[Interpretation],
     transactor:       DbTransactor[Interpretation, EventLogDB],
     logger:           Logger[Interpretation]
 )(implicit ME:        Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
+  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
   def run: Interpretation[Unit] = {
     for {
@@ -49,6 +50,7 @@ class EventLogDbInitializer[Interpretation[_]](
       _ <- execute(sql"UPDATE event_log set status=${RecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'")
       _ <- logger.info("Event Log database initialization success")
       _ <- projectPathAdder.run
+      _ <- batchDateAdder.run
     } yield ()
   } recoverWith logging
 
@@ -69,11 +71,6 @@ class EventLogDbInitializer[Interpretation[_]](
       .transact(transactor.get)
       .map(_ => ())
 
-  private def execute(sql: Fragment): Interpretation[Unit] =
-    sql.update.run
-      .transact(transactor.get)
-      .map(_ => ())
-
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
       logger.error(exception)("Event Log database initialization failure")
@@ -86,6 +83,7 @@ class IOEventLogDbInitializer(
 )(implicit contextShift: ContextShift[IO])
     extends EventLogDbInitializer[IO](
       new ProjectPathAdder[IO](transactor, ApplicationLogger),
+      new BatchDateAdder[IO](transactor, ApplicationLogger),
       transactor,
       ApplicationLogger
     )

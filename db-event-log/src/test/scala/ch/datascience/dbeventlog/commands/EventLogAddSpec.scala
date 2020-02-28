@@ -58,8 +58,8 @@ class EventLogAddSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
       eventLogAdd.storeNewEvent(commitEvent2, event2Body).unsafeRunSync shouldBe ((): Unit)
 
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-      save2Event1 shouldBe (commitEvent.commitEventId, ExecutionDate(now))
-      save2Event2 shouldBe (commitEvent2.commitEventId, ExecutionDate(nowForEvent2))
+      save2Event1 shouldBe (commitEvent.commitEventId, ExecutionDate(now), commitEvent.batchDate)
+      save2Event2 shouldBe (commitEvent2.commitEventId, ExecutionDate(nowForEvent2), commitEvent2.batchDate)
     }
 
     "add a new event if there is another event with the same id but for a different project" in new TestCase {
@@ -68,7 +68,7 @@ class EventLogAddSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
       eventLogAdd.storeNewEvent(commitEvent, eventBody).unsafeRunSync shouldBe ((): Unit)
 
       val save1Event1 +: Nil = findEvents(status = New)
-      save1Event1 shouldBe (commitEvent.commitEventId, ExecutionDate(now))
+      save1Event1 shouldBe (commitEvent.commitEventId, ExecutionDate(now), commitEvent.batchDate)
 
       // Save 2 - the same event id but different project
       val commitEvent2 = commitEvents.generateOne.copy(id = commitEvent.id)
@@ -78,8 +78,8 @@ class EventLogAddSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
       eventLogAdd.storeNewEvent(commitEvent2, event2Body).unsafeRunSync shouldBe ((): Unit)
 
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-      save2Event1 shouldBe (commitEvent.commitEventId, ExecutionDate(now))
-      save2Event2 shouldBe (commitEvent2.commitEventId, ExecutionDate(nowForEvent2))
+      save2Event1 shouldBe (commitEvent.commitEventId, ExecutionDate(now), commitEvent.batchDate)
+      save2Event2 shouldBe (commitEvent2.commitEventId, ExecutionDate(nowForEvent2), commitEvent2.batchDate)
     }
 
     "do nothing if there is an event with the same id and project in the db already" in new TestCase {
