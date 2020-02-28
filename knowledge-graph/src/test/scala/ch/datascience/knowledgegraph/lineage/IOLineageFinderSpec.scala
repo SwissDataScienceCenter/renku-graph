@@ -49,18 +49,12 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
         .unsafeRunSync() shouldBe Some(
         Lineage(
           edges = Set(
-            Edge(`sha3 zhbikes`.toNodeId, `sha8 renku run`.toNodeId),
-            Edge(`sha7 plot_data`.toNodeId, `sha9 renku run`.toNodeId),
-            Edge(`sha7 plot_data`.toNodeId, `sha12 step1 renku update`.toNodeId),
-            Edge(`sha7 clean_data`.toNodeId, `sha8 renku run`.toNodeId),
-            Edge(`sha7 clean_data`.toNodeId, `sha12 step2 renku update`.toNodeId),
-            Edge(`sha8 renku run`.toNodeId, `sha8 parquet`.toNodeId),
-            Edge(`sha8 parquet`.toNodeId, `sha9 renku run`.toNodeId),
-            Edge(`sha9 renku run`.toNodeId, `sha9 plot_data`.toNodeId),
-            Edge(`sha10 zhbikes`.toNodeId, `sha12 step2 renku update`.toNodeId),
-            Edge(`sha12 parquet`.toNodeId, `sha12 step1 renku update`.toNodeId),
-            Edge(`sha12 step1 renku update`.toNodeId, `sha12 step2 grid_plot`.toNodeId),
-            Edge(`sha12 step2 renku update`.toNodeId, `sha12 parquet`.toNodeId)
+            Edge(`sha3 zhbikes`.toNodeLocation, `sha8 renku run`.toNodeLocation),
+            Edge(`sha7 plot_data`.toNodeLocation, `sha9 renku run`.toNodeLocation),
+            Edge(`sha7 clean_data`.toNodeLocation, `sha8 renku run`.toNodeLocation),
+            Edge(`sha8 renku run`.toNodeLocation, `sha8 parquet`.toNodeLocation),
+            Edge(`sha8 parquet`.toNodeLocation, `sha9 renku run`.toNodeLocation),
+            Edge(`sha9 renku run`.toNodeLocation, `sha9 plot_data`.toNodeLocation)
           ),
           nodes = Set(
             `sha3 zhbikes`.toNode,
@@ -69,12 +63,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
             `sha8 renku run`.toNode,
             `sha8 parquet`.toNode,
             `sha9 renku run`.toNode,
-            `sha9 plot_data`.toNode,
-            `sha10 zhbikes`.toNode,
-            `sha12 step1 renku update`.toNode,
-            `sha12 step2 grid_plot`.toNode,
-            `sha12 step2 renku update`.toNode,
-            `sha12 parquet`.toNode
+            `sha9 plot_data`.toNode
           )
         )
       )
@@ -106,10 +95,9 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
   }
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {
-    lazy val toNodeId: Node.Id = Node.Id(nodeDef.id)
+    lazy val toNodeLocation: Node.Location = Node.Location(nodeDef.location)
     lazy val toNode: Node = Node(
-      nodeDef.toNodeId,
-      Node.Location(nodeDef.location),
+      toNodeLocation,
       Node.Label(nodeDef.label),
       nodeDef.types.map(Node.Type.apply)
     )
