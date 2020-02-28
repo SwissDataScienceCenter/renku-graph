@@ -18,6 +18,8 @@
 
 package ch.datascience.graph.model
 
+import java.time.{Clock, Instant, ZoneId}
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonNegativeInts
 import ch.datascience.graph.model.EventsGenerators._
@@ -64,6 +66,23 @@ class ProjectIdSpec extends WordSpec with ScalaCheckPropertyChecks {
       an[IllegalArgumentException] shouldBe thrownBy {
         ProjectId(-1).value
       }
+    }
+  }
+}
+
+class BatchDateSpec extends WordSpec {
+
+  "apply()" should {
+
+    "instantiate a new BatchDate with current timestamp" in {
+      val systemZone = ZoneId.systemDefault
+      val fixedNow   = Instant.now
+
+      val clock = Clock.fixed(fixedNow, systemZone)
+
+      BatchDate(clock).value shouldBe fixedNow
+
+      Clock.system(systemZone)
     }
   }
 }

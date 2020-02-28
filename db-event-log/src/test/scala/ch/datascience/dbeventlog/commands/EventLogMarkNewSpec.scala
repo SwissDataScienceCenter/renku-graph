@@ -24,7 +24,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{commitEventIds, committedDates}
+import ch.datascience.graph.model.EventsGenerators.{batchDates, commitEventIds, committedDates}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -37,25 +37,34 @@ class EventLogMarkNewSpec extends WordSpec with InMemoryEventLogDbSpec with Mock
       s"if the event has status $Processing" in new TestCase {
 
       val eventId = commitEventIds.generateOne
-      storeEvent(eventId,
-                 EventStatus.Processing,
-                 executionDates.generateOne,
-                 committedDates.generateOne,
-                 eventBodies.generateOne)
-      storeEvent(commitEventIds.generateOne.copy(id = eventId.id),
-                 EventStatus.Processing,
-                 executionDates.generateOne,
-                 committedDates.generateOne,
-                 eventBodies.generateOne)
-      storeEvent(commitEventIds.generateOne,
-                 EventStatus.Processing,
-                 executionDates.generateOne,
-                 committedDates.generateOne,
-                 eventBodies.generateOne)
+      storeEvent(
+        eventId,
+        EventStatus.Processing,
+        executionDates.generateOne,
+        committedDates.generateOne,
+        eventBodies.generateOne,
+        batchDate = eventBatchDate
+      )
+      storeEvent(
+        commitEventIds.generateOne.copy(id = eventId.id),
+        EventStatus.Processing,
+        executionDates.generateOne,
+        committedDates.generateOne,
+        eventBodies.generateOne,
+        batchDate = eventBatchDate
+      )
+      storeEvent(
+        commitEventIds.generateOne,
+        EventStatus.Processing,
+        executionDates.generateOne,
+        committedDates.generateOne,
+        eventBodies.generateOne,
+        batchDate = eventBatchDate
+      )
 
       eventLogMarkNew.markEventNew(eventId).unsafeRunSync() shouldBe ((): Unit)
 
-      findEvents(status = New) shouldBe List((eventId, ExecutionDate(now)))
+      findEvents(status = New) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
     }
 
     s"fail when updating event with status different than $Processing" in new TestCase {
@@ -63,18 +72,24 @@ class EventLogMarkNewSpec extends WordSpec with InMemoryEventLogDbSpec with Mock
       val eventId       = commitEventIds.generateOne
       val eventStatus   = eventStatuses generateDifferentThan Processing
       val executionDate = executionDates.generateOne
-      storeEvent(eventId, eventStatus, executionDate, committedDates.generateOne, eventBodies.generateOne)
+      storeEvent(eventId,
+                 eventStatus,
+                 executionDate,
+                 committedDates.generateOne,
+                 eventBodies.generateOne,
+                 batchDate = eventBatchDate)
 
       intercept[RuntimeException] {
         eventLogMarkNew.markEventNew(eventId).unsafeRunSync()
       }.getMessage shouldBe s"Event with $eventId couldn't be marked as $New; either no event or not with status $Processing"
 
-      findEvents(status = eventStatus) shouldBe List((eventId, executionDate))
+      findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
     }
   }
 
   private trait TestCase {
 
+    val eventBatchDate  = batchDates.generateOne
     val currentTime     = mockFunction[Instant]
     val eventLogMarkNew = new EventLogMarkNew(transactor, currentTime)
 

@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import java.time.Instant
+import java.time.{Clock, Instant}
 
 import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.graph.model.users.{Email, Username}
@@ -34,7 +34,8 @@ object events {
       committedDate: CommittedDate,
       author:        User,
       committer:     User,
-      parents:       List[CommitId]
+      parents:       List[CommitId],
+      batchDate:     BatchDate
   )
 
   object CommitEvent {
@@ -66,6 +67,11 @@ object events {
 
   final class CommittedDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object CommittedDate extends TinyTypeFactory[CommittedDate](new CommittedDate(_)) with InstantNotInTheFuture
+
+  final class BatchDate private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) with InstantNotInTheFuture {
+    def apply(clock: Clock): BatchDate = apply(clock.instant())
+  }
 
   final class ProjectId private (val value: Int) extends AnyVal with IntTinyType
   implicit object ProjectId extends TinyTypeFactory[ProjectId](new ProjectId(_)) with NonNegativeInt

@@ -43,6 +43,7 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
          | created_date timestamp NOT NULL,
          | execution_date timestamp NOT NULL,
          | event_date timestamp NOT NULL,
+         | batch_date timestamp NOT NULL,
          | event_body text NOT NULL,
          | message varchar,
          | PRIMARY KEY (event_id, project_id)
@@ -60,31 +61,32 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                            eventDate:     CommittedDate,
                            eventBody:     EventBody,
                            createdDate:   CreatedDate = CreatedDate(Instant.now),
+                           batchDate:     BatchDate = BatchDate(Instant.now),
                            projectPath:   ProjectPath = projectPaths.generateOne,
                            maybeMessage:  Option[EventMessage] = None): Unit = execute {
     maybeMessage match {
       case None =>
         sql"""|insert into
-              |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body)
-              |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody)
+              |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
+              |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody)
       """.stripMargin.update.run.map(_ => ())
       case Some(message) =>
         sql"""|insert into
-              |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body, message)
-              |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $eventBody, $message)
+              |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body, message)
+              |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody, $message)
       """.stripMargin.update.run.map(_ => ())
     }
   }
 
   // format: off
   protected def findEvents(status:  EventStatus,
-                           orderBy: Fragment = fr"created_date asc"): List[(CommitEventId, ExecutionDate)] =
+                           orderBy: Fragment = fr"created_date asc"): List[(CommitEventId, ExecutionDate, BatchDate)] =
     execute {
-      (fr"""select event_id, project_id, execution_date
+      (fr"""select event_id, project_id, execution_date, batch_date
             from event_log
             where status = $status
             order by """ ++ orderBy)
-        .query[(CommitEventId, ExecutionDate)]
+        .query[(CommitEventId, ExecutionDate, BatchDate)]
         .to[List]
     }
   // format: on

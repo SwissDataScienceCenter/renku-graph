@@ -45,6 +45,9 @@ package object commands {
   implicit val eventDateGet: Get[CommittedDate] = Get[Instant].tmap(CommittedDate.apply)
   implicit val eventDatePut: Put[CommittedDate] = Put[Instant].contramap(_.value)
 
+  implicit val batchDateGet: Get[BatchDate] = Get[Instant].tmap(BatchDate.apply)
+  implicit val batchDatePut: Put[BatchDate] = Put[Instant].contramap(_.value)
+
   implicit val eventMessageGet: Get[EventMessage] = Get[String].tmap(EventMessage.apply)
   implicit val eventMessagePut: Put[EventMessage] = Put[String].contramap(_.value)
 

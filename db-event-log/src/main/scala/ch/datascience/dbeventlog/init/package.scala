@@ -16,15 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.testing
+package ch.datascience.dbeventlog
 
-import org.scalatest.concurrent.AbstractPatienceConfiguration
-import org.scalatest.time.{Millis, Minute, Span}
+import cats.effect.Bracket
+import cats.implicits._
+import ch.datascience.db.DbTransactor
+import doobie.implicits._
+import doobie.util.fragment.Fragment
 
-trait AcceptanceTestPatience extends AbstractPatienceConfiguration {
+import scala.language.higherKinds
 
-  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout  = scaled(Span(1, Minute)),
-    interval = scaled(Span(1000, Millis))
-  )
+package object init {
+
+  def execute[Interpretation[_]](
+      sql:               Fragment
+  )(implicit transactor: DbTransactor[Interpretation, EventLogDB],
+    ME:                  Bracket[Interpretation, Throwable]): Interpretation[Unit] =
+    sql.update.run.transact(transactor.get).map(_ => ())
 }
