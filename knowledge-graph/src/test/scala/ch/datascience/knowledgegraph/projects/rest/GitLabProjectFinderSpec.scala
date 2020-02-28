@@ -31,6 +31,7 @@ import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.ParentProject
+import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -156,9 +157,7 @@ class GitLabProjectFinderSpec
         "project_access": {
           "access_level": ${project.permissions.projectAccessLevel.value.value}
         },
-        "group_access": {
-          "access_level": ${project.permissions.maybeGroupAccessLevel.map(_.value.value)}
-        }
+        "group_access": ${project.permissions.maybeGroupAccessLevel.map(toJson)}
       },
       "statistics": {
         "commit_count":       ${project.statistics.commitsCount.value},
@@ -176,4 +175,8 @@ class GitLabProjectFinderSpec
         }
       }"""
     } getOrElse Json.obj())
+
+  private def toJson(accessLevel: AccessLevel): Json = json"""{
+    "access_level": ${accessLevel.value.value}
+  }"""
 }

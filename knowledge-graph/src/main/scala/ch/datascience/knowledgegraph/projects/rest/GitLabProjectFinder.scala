@@ -102,13 +102,18 @@ private class IOGitLabProjectFinder(
       } yield ParentProject(id, path, name)
 
     implicit val maybeAccessLevelDecoder: Decoder[Option[AccessLevel]] =
-      _.downField("access_level")
-        .as[Option[Int]]
-        .flatMap {
-          case Some(level) => (AccessLevel from level) map Option.apply
-          case None        => Right(Option.empty[AccessLevel])
-        }
-        .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+      _.as[Option[Json]].flatMap {
+        case None => Right(Option.empty[AccessLevel])
+        case Some(json) =>
+          json.hcursor
+            .downField("access_level")
+            .as[Option[Int]]
+            .flatMap {
+              case Some(level) => (AccessLevel from level) map Option.apply
+              case None        => Right(Option.empty[AccessLevel])
+            }
+            .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+      }
 
     implicit val statisticsDecoder: Decoder[Statistics] = cursor =>
       for {
