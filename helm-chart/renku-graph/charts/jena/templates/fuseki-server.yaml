@@ -8,7 +8,6 @@ metadata:
     chart: {{ template "jena.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
-type: Opaque
 data:
   fuseki-server.sh: |-
     #!/bin/sh

@@ -31,7 +31,7 @@ spec:
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: EVENT_LOG_POSTGRES_HOST
-              value: "{{ template "postgresql.fullname" . }}:5432"
+              value: "{{ .Values.postgresqlHost }}:5432"
             - name: EVENT_LOG_POSTGRES_USER
               value: {{ .Values.global.graph.dbEventLog.postgresUser }}
             - name: EVENT_LOG_POSTGRES_PASSWORD
