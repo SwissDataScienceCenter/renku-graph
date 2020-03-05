@@ -78,7 +78,7 @@ class EventLogEventsHandlingSpec
 
       And(s"the relevant Event got marked as $TriplesStore in the Log")
       eventually {
-        EventLog.findEvents(projectId, status = TriplesStore) shouldBe List(commitId)
+        EventLog.findEvents(projectId, status = TriplesStore) should contain(commitId)
       }
     }
   }

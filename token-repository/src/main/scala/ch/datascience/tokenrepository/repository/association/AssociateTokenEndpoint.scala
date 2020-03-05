@@ -24,7 +24,7 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
@@ -43,7 +43,7 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 
   import tokenAssociator._
 
-  def associateToken(projectId: ProjectId, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def associateToken(projectId: Id, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
       accessToken <- request.as[AccessToken] recoverWith badRequest
       _           <- associate(projectId, accessToken)
@@ -61,7 +61,7 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
       ME.raiseError(BadRequestError(exception))
   }
 
-  private def httpResponse(projectId: ProjectId): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private def httpResponse(projectId: Id): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case BadRequestError(exception) =>
       BadRequest(ErrorMessage(exception))
     case NonFatal(exception) =>

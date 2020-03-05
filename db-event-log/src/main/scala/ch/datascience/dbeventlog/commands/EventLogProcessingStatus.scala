@@ -27,7 +27,7 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.Id
 import doobie.implicits._
 import eu.timepit.refined.api.RefType.applyRef
 import eu.timepit.refined.api.Refined
@@ -41,11 +41,11 @@ class EventLogProcessingStatus[Interpretation[_]](
     now:        () => Instant = () => Instant.now
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
 
-  def fetchStatus(projectId: ProjectId): OptionT[Interpretation, ProcessingStatus] = OptionT {
+  def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus] = OptionT {
     latestBatchStatues(projectId) flatMap toProcessingStatus
   }
 
-  private def latestBatchStatues(projectId: ProjectId) = sql"""
+  private def latestBatchStatues(projectId: Id) = sql"""
     select log.status
     from event_log log
     inner join (
@@ -54,7 +54,7 @@ class EventLogProcessingStatus[Interpretation[_]](
         where project_id = $projectId
         order by batch_date desc
         limit 1
-      ) max_batch_date on log.batch_date = max_batch_date.batch_date  
+      ) max_batch_date on log.batch_date = max_batch_date.batch_date
     where log.project_id = $projectId
   """.query[EventStatus].to[List].transact(transactor.get)
 

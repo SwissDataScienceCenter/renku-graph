@@ -33,11 +33,11 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait KGProjectFinder[Interpretation[_]] {
-  def findProject(path: ProjectPath): Interpretation[Option[KGProject]]
+  def findProject(path: Path): Interpretation[Option[KGProject]]
 }
 
 object KGProjectFinder {
-  final case class KGProject(path: ProjectPath, name: Name, created: ProjectCreation)
+  final case class KGProject(path: Path, name: Name, created: ProjectCreation)
 
   final case class ProjectCreation(date: DateCreated, creator: ProjectCreator)
 
@@ -59,12 +59,12 @@ private class IOKGProjectFinder(
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
-  override def findProject(path: ProjectPath): IO[Option[KGProject]] = {
+  override def findProject(path: Path): IO[Option[KGProject]] = {
     implicit val decoder: Decoder[List[KGProject]] = recordsDecoder(path)
     queryExpecting[List[KGProject]](using = query(path)) flatMap toSingleProject
   }
 
-  private def query(path: ProjectPath) = SparqlQuery(
+  private def query(path: Path) = SparqlQuery(
     name = "project by id",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
@@ -77,10 +77,10 @@ private class IOKGProjectFinder(
         |  {
         |    SELECT ?creatorResource
         |    WHERE {
-        |      ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
-        |                                                                 schema:creator ?creatorResource .
+        |      ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
+        |                                                            schema:creator ?creatorResource .
         |      ?commit rdf:type prov:Activity ;
-        |              schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} ;
+        |              schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} ;
         |              prov:agent ?creatorResource ;
         |              prov:startedAtTime ?commitCreatedDate .
         |    }
@@ -88,9 +88,9 @@ private class IOKGProjectFinder(
         |    LIMIT 1
         |  }
         |  {
-        |    ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
-        |                                                               schema:name ?name ;
-        |                                                               schema:dateCreated ?dateCreated .
+        |    ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
+        |                                                          schema:name ?name ;
+        |                                                          schema:dateCreated ?dateCreated .
         |    ?creatorResource rdf:type <http://schema.org/Person> ;
         |                     schema:email ?creatorEmail ;
         |                     schema:name ?creatorName .
@@ -99,7 +99,7 @@ private class IOKGProjectFinder(
         |""".stripMargin
   )
 
-  private def recordsDecoder(path: ProjectPath): Decoder[List[KGProject]] = {
+  private def recordsDecoder(path: Path): Decoder[List[KGProject]] = {
     import Decoder._
     import ch.datascience.graph.model.projects._
     import ch.datascience.graph.model.users.{Email, Name => UserName}

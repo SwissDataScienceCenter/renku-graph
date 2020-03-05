@@ -25,7 +25,7 @@ import ch.datascience.dbeventlog.commands._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CommitEvent
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
@@ -114,9 +114,9 @@ class ProjectPathAdderSpec extends WordSpec with DbInitSpec {
               }
            }""".noSpaces
 
-  private def findProjectPaths: Set[ProjectPath] =
+  private def findProjectPaths: Set[Path] =
     sql"select project_path from event_log"
-      .query[ProjectPath]
+      .query[Path]
       .to[List]
       .transact(transactor.get)
       .unsafeRunSync()

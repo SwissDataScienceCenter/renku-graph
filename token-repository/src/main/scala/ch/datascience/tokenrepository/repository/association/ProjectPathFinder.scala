@@ -21,8 +21,7 @@ package ch.datascience.tokenrepository.repository.association
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.tokenrepository.config.GitLab
 import io.chrisdavenport.log4cats.Logger
@@ -33,9 +32,9 @@ import scala.language.higherKinds
 
 trait ProjectPathFinder[Interpretation[_]] {
   def findProjectPath(
-      projectId:        ProjectId,
+      projectId:        projects.Id,
       maybeAccessToken: Option[AccessToken]
-  ): Interpretation[Option[ProjectPath]]
+  ): Interpretation[Option[projects.Path]]
 }
 
 private class IOProjectPathFinder(
@@ -55,21 +54,21 @@ private class IOProjectPathFinder(
   import org.http4s._
   import org.http4s.dsl.io._
 
-  def findProjectPath(projectId: ProjectId, maybeAccessToken: Option[AccessToken]): IO[Option[ProjectPath]] =
+  def findProjectPath(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): IO[Option[projects.Path]] =
     for {
       uri     <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
       project <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield project
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[ProjectPath]]] = {
-    case (Ok, _, response)    => response.as[ProjectPath].map(Option.apply)
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[projects.Path]]] = {
+    case (Ok, _, response)    => response.as[projects.Path].map(Option.apply)
     case (NotFound, _, _)     => None.pure[IO]
     case (Unauthorized, _, _) => None.pure[IO]
   }
 
-  private implicit lazy val projectPathDecoder: EntityDecoder[IO, ProjectPath] = {
-    lazy val decoder: Decoder[ProjectPath] = _.downField("path_with_namespace").as[ProjectPath]
-    jsonOf[IO, ProjectPath](implicitly[Sync[IO]], decoder)
+  private implicit lazy val projectPathDecoder: EntityDecoder[IO, projects.Path] = {
+    lazy val decoder: Decoder[projects.Path] = _.downField("path_with_namespace").as[projects.Path]
+    jsonOf[IO, projects.Path](implicitly[Sync[IO]], decoder)
   }
 }
 

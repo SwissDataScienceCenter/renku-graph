@@ -22,7 +22,7 @@ import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLab
 import io.chrisdavenport.log4cats.Logger
@@ -36,7 +36,7 @@ import scala.language.higherKinds
 
 trait LatestCommitFinder[Interpretation[_]] {
   def findLatestCommit(
-      projectId:        ProjectId,
+      projectId:        Id,
       maybeAccessToken: Option[AccessToken]
   ): OptionT[Interpretation, CommitInfo]
 }
@@ -56,7 +56,7 @@ class IOLatestCommitFinder(
   import org.http4s.{Request, Response}
 
   override def findLatestCommit(
-      projectId:        ProjectId,
+      projectId:        Id,
       maybeAccessToken: Option[AccessToken]
   ): OptionT[IO, CommitInfo] = OptionT {
     for {

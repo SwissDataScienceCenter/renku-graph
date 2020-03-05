@@ -22,8 +22,7 @@ import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
@@ -35,7 +34,7 @@ private class PersistedTokensFinder[Interpretation[_]](
 
   import doobie.implicits._
 
-  def findToken(projectId: ProjectId): OptionT[Interpretation, EncryptedAccessToken] = OptionT {
+  def findToken(projectId: Id): OptionT[Interpretation, EncryptedAccessToken] = OptionT {
     sql"select token from projects_tokens where project_id = ${projectId.value}"
       .query[String]
       .option
@@ -43,7 +42,7 @@ private class PersistedTokensFinder[Interpretation[_]](
       .flatMap(toSerializedAccessToken)
   }
 
-  def findToken(projectPath: ProjectPath): OptionT[Interpretation, EncryptedAccessToken] = OptionT {
+  def findToken(projectPath: Path): OptionT[Interpretation, EncryptedAccessToken] = OptionT {
     sql"select token from projects_tokens where project_path = ${projectPath.value}"
       .query[String]
       .option

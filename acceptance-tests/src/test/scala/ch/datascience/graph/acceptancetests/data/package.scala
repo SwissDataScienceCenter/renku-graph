@@ -21,9 +21,10 @@ package ch.datascience.graph.acceptancetests
 import ch.datascience.config.renku
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
-import ch.datascience.graph.model.EventsGenerators.projectIds
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{ProjectId, Project => GitLabProject}
+import ch.datascience.graph.model.events.{Project => GitLabProject}
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.FusekiBaseUrl
 
@@ -34,7 +35,7 @@ package object data {
 
   implicit class ProjectOps(project: Project) {
 
-    def toGitLabProject(id: ProjectId = projectIds.generateOne): GitLabProject = GitLabProject(
+    def toGitLabProject(id: Id = projectIds.generateOne): GitLabProject = GitLabProject(
       id,
       project.path
     )

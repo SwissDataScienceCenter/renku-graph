@@ -27,7 +27,9 @@ import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{BatchDate, ProjectId}
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.events.BatchDate
+import ch.datascience.graph.model.projects.Id
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
@@ -109,7 +111,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
     val projectId              = projectIds.generateOne
     val processingStatusFinder = new IOEventLogProcessingStatus(transactor)
 
-    def storeEvents(projectId: ProjectId, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
+    def storeEvents(projectId: Id, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
       statuses map {
         storeEvent(
           commitEventIds.generateOne.copy(projectId = projectId),

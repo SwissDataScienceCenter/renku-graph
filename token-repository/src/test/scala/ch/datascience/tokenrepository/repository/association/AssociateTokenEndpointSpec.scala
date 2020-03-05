@@ -23,8 +23,8 @@ import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
@@ -45,7 +45,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
 
       val accessToken = personalAccessTokens.generateOne
       (tokensAssociator
-        .associate(_: ProjectId, _: AccessToken))
+        .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(context.pure(()))
 
@@ -65,7 +65,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
       val accessToken = oauthAccessTokens.generateOne
 
       (tokensAssociator
-        .associate(_: ProjectId, _: AccessToken))
+        .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(context.pure(()))
 
@@ -99,7 +99,7 @@ class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (tokensAssociator
-        .associate(_: ProjectId, _: AccessToken))
+        .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(context.raiseError(exception))
 

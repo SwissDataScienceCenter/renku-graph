@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
@@ -43,7 +43,7 @@ private trait ProjectHookCreator[Interpretation[_]] {
 private object ProjectHookCreator {
 
   final case class ProjectHook(
-      projectId:           ProjectId,
+      projectId:           Id,
       projectHookUrl:      ProjectHookUrl,
       serializedHookToken: SerializedHookToken
   )

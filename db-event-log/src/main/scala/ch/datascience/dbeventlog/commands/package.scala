@@ -20,18 +20,18 @@ package ch.datascience.dbeventlog
 import java.time.Instant
 
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{Id, Path}
 import doobie.util._
 
 package object commands {
   implicit val eventIdGet: Get[CommitId] = Get[String].tmap(CommitId.apply)
   implicit val eventIdPut: Put[CommitId] = Put[String].contramap(_.value)
 
-  implicit val projectIdGet: Get[ProjectId] = Get[Int].tmap(ProjectId.apply)
-  implicit val projectIdPut: Put[ProjectId] = Put[Int].contramap(_.value)
+  implicit val projectIdGet: Get[Id] = Get[Int].tmap(Id.apply)
+  implicit val projectIdPut: Put[Id] = Put[Int].contramap(_.value)
 
-  implicit val projectPathGet: Get[ProjectPath] = Get[String].tmap(ProjectPath.apply)
-  implicit val projectPathPut: Put[ProjectPath] = Put[String].contramap(_.value)
+  implicit val projectPathGet: Get[Path] = Get[String].tmap(Path.apply)
+  implicit val projectPathPut: Put[Path] = Put[String].contramap(_.value)
 
   implicit val eventBodyGet: Get[EventBody] = Get[String].tmap(EventBody.apply)
   implicit val eventBodyPut: Put[EventBody] = Put[String].contramap(_.value)
@@ -54,7 +54,7 @@ package object commands {
   implicit val eventStatusGet: Get[EventStatus] = Get[String].tmap(EventStatus.apply)
   implicit val eventStatusPut: Put[EventStatus] = Put[String].contramap(_.value)
 
-  implicit val commitEventIdRead: Read[CommitEventId] = Read[(CommitId, ProjectId)].map {
+  implicit val commitEventIdRead: Read[CommitEventId] = Read[(CommitId, Id)].map {
     case (commitId, projectId) => CommitEventId(commitId, projectId)
   }
 }

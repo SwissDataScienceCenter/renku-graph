@@ -23,22 +23,22 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, Project, ProjectId}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.knowledgegraph.projects.model.{Project => ProjectMetadata}
-import ch.datascience.webhookservice.project.ProjectVisibility
+import ch.datascience.knowledgegraph.projects.model.{ParentProject, Project => ProjectMetadata}
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.Json
 import io.circe.literal._
 
 object GitLab {
 
   def `GET <gitlab>/api/v4/projects/:id returning OK`(
-      projectId:          ProjectId,
-      projectVisibility:  ProjectVisibility
+      projectId:          Id,
+      projectVisibility:  Visibility
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
@@ -53,7 +53,7 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(
-      projectId:          ProjectId
+      projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     val webhookUrl = s"${webhookServiceClient.baseUrl}/webhooks/events"
     stubFor {
@@ -64,7 +64,7 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(
-      projectId:          ProjectId
+      projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId/hooks").withAccessTokenInHeader
@@ -74,7 +74,7 @@ object GitLab {
   }
 
   def `POST <gitlab>/api/v4/projects/:id/hooks returning CREATED`(
-      projectId:          ProjectId
+      projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       post(s"/api/v4/projects/$projectId/hooks").withAccessTokenInHeader
@@ -84,7 +84,7 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:id/repository/commits returning OK with a commit`(
-      projectId:          ProjectId
+      projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits?per_page=1").withAccessTokenInHeader
@@ -105,7 +105,7 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(
-      projectId:          ProjectId,
+      projectId:          Id,
       commitId:           CommitId,
       parentIds:          Set[CommitId] = Set.empty
   )(implicit accessToken: AccessToken): Unit = {
@@ -133,8 +133,8 @@ object GitLab {
     `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(project.id, project.path)
 
   def `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(
-      projectId:          ProjectId,
-      projectPath:        ProjectPath
+      projectId:          Id,
+      projectPath:        Path
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
@@ -147,14 +147,57 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:path returning OK with`(
-      project:            ProjectMetadata
+      project:            ProjectMetadata,
+      withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
+
+    def toJson(parent: ParentProject) = json"""{
+      "id":                  ${parent.id.value},
+      "path_with_namespace": ${parent.path.value},
+      "name":                ${parent.name.value}
+    }"""
+
+    val queryParams = if (withStatistics) "?statistics=true" else ""
     stubFor {
-      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
-        .willReturn(okJson(json"""{
-          "ssh_url_to_repo":  ${project.repoUrls.ssh.value},
-          "http_url_to_repo": ${project.repoUrls.http.value}
-        }""".noSpaces))
+      get(s"/api/v4/projects/${urlEncode(project.path.value)}$queryParams").withAccessTokenInHeader
+        .willReturn(
+          okJson(
+            json"""{
+              "id":               ${project.id.value},
+              "description":      ${project.maybeDescription.map(_.value)},
+              "visibility":       ${project.visibility.value},
+              "ssh_url_to_repo":  ${project.urls.ssh.value},
+              "http_url_to_repo": ${project.urls.http.value},
+              "web_url":          ${project.urls.web.value},
+              "readme_url":       ${project.urls.readme.value},
+              "forks_count":      ${project.forking.forksCount.value},
+              "tag_list":         ${project.tags.map(_.value).toList},
+              "star_count":       ${project.starsCount.value},
+              "last_activity_at": ${project.updatedAt.value},
+              "permissions": {
+                "project_access": {
+                  "access_level": ${project.permissions.projectAccessLevel.value.value}
+                },
+                "group_access": {
+                  "access_level": ${project.permissions.maybeGroupAccessLevel.map(_.value.value)}
+                }
+              },
+              "statistics": {
+                "commit_count":       ${project.statistics.commitsCount.value},
+                "storage_size":       ${project.statistics.storageSize.value},
+                "repository_size":    ${project.statistics.repositorySize.value},
+                "lfs_objects_size":   ${project.statistics.lsfObjectsSize.value},
+                "job_artifacts_size": ${project.statistics.jobArtifactsSize.value}
+              }
+            }"""
+              .deepMerge(
+                project.forking.maybeParent
+                  .map(parent => Json.obj("forked_from_project" -> toJson(parent)))
+                  .getOrElse(Json.obj())
+              )
+              .noSpaces
+          )
+        )
     }
     ()
   }

@@ -24,8 +24,7 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
@@ -65,8 +64,8 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
       InternalServerError(errorMessage)
   }
 
-  implicit val findById:   ProjectId => OptionT[Interpretation, AccessToken]   = tokenFinder.findToken
-  implicit val findByPath: ProjectPath => OptionT[Interpretation, AccessToken] = tokenFinder.findToken
+  implicit val findById:   projects.Id => OptionT[Interpretation, AccessToken]   = tokenFinder.findToken
+  implicit val findByPath: projects.Path => OptionT[Interpretation, AccessToken] = tokenFinder.findToken
 }
 
 object IOFetchTokenEndpoint {

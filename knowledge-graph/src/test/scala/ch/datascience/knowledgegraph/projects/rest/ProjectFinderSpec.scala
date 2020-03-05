@@ -25,7 +25,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
@@ -47,19 +47,19 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
 
       val kgProject = kgProjects.generateOne.copy(path = path)
       (kgProjectFinder
-        .findProject(_: ProjectPath))
+        .findProject(_: Path))
         .expects(path)
         .returning(Some(kgProject).pure[IO])
 
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .findAccessToken(_: Path)(_: Path => String))
         .expects(path, projectPathToPath)
         .returning(Some(accessToken).pure[IO])
 
       val gitLabProject = gitLabProjects.generateOne
       (gitLabProjectFinder
-        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .findProject(_: Path, _: Option[AccessToken]))
         .expects(path, Some(accessToken))
         .returning(OptionT.some[IO](gitLabProject))
 
@@ -69,19 +69,19 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
     "return None if there's no project for the path in the KG" in new TestCase {
 
       (kgProjectFinder
-        .findProject(_: ProjectPath))
+        .findProject(_: Path))
         .expects(path)
         .returning(Option.empty[KGProject].pure[IO])
 
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .findAccessToken(_: Path)(_: Path => String))
         .expects(path, projectPathToPath)
         .returning(Some(accessToken).pure[IO])
 
       val gitLabProject = gitLabProjects.generateOne
       (gitLabProjectFinder
-        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .findProject(_: Path, _: Option[AccessToken]))
         .expects(path, Some(accessToken))
         .returning(OptionT.some[IO](gitLabProject))
 
@@ -92,18 +92,18 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
 
       val kgProject = kgProjects.generateOne.copy(path = path)
       (kgProjectFinder
-        .findProject(_: ProjectPath))
+        .findProject(_: Path))
         .expects(path)
         .returning(Some(kgProject).pure[IO])
 
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .findAccessToken(_: Path)(_: Path => String))
         .expects(path, projectPathToPath)
         .returning(Some(accessToken).pure[IO])
 
       (gitLabProjectFinder
-        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .findProject(_: Path, _: Option[AccessToken]))
         .expects(path, Some(accessToken))
         .returning(OptionT.none[IO, GitLabProject])
 
@@ -114,12 +114,12 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
 
       val kgProject = kgProjects.generateOne.copy(path = path)
       (kgProjectFinder
-        .findProject(_: ProjectPath))
+        .findProject(_: Path))
         .expects(path)
         .returning(Some(kgProject).pure[IO])
 
       (accessTokenFinder
-        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .findAccessToken(_: Path)(_: Path => String))
         .expects(path, projectPathToPath)
         .returning(Option.empty[AccessToken].pure[IO])
 
@@ -130,18 +130,18 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (kgProjectFinder
-        .findProject(_: ProjectPath))
+        .findProject(_: Path))
         .expects(path)
         .returning(exception.raiseError[IO, Option[KGProject]])
 
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .findAccessToken(_: Path)(_: Path => String))
         .expects(path, projectPathToPath)
         .returning(Some(accessToken).pure[IO])
 
       (gitLabProjectFinder
-        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .findProject(_: Path, _: Option[AccessToken]))
         .expects(path, Some(accessToken))
         .returning(OptionT.none[IO, GitLabProject])
         .noMoreThanOnce()
@@ -155,13 +155,13 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
 
       val kgProject = kgProjects.generateOne.copy(path = path)
       (kgProjectFinder
-        .findProject(_: ProjectPath))
+        .findProject(_: Path))
         .expects(path)
         .returning(Some(kgProject).pure[IO])
 
       val exception = exceptions.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .findAccessToken(_: Path)(_: Path => String))
         .expects(path, projectPathToPath)
         .returning(exception.raiseError[IO, Option[AccessToken]])
 
@@ -174,19 +174,19 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
 
       val kgProject = kgProjects.generateOne.copy(path = path)
       (kgProjectFinder
-        .findProject(_: ProjectPath))
+        .findProject(_: Path))
         .expects(path)
         .returning(Some(kgProject).pure[IO])
 
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: ProjectPath)(_: ProjectPath => String))
+        .findAccessToken(_: Path)(_: Path => String))
         .expects(path, projectPathToPath)
         .returning(Some(accessToken).pure[IO])
 
       val exception = exceptions.generateOne
       (gitLabProjectFinder
-        .findProject(_: ProjectPath, _: Option[AccessToken]))
+        .findProject(_: Path, _: Option[AccessToken]))
         .expects(path, Some(accessToken))
         .returning(OptionT.liftF(exception.raiseError[IO, GitLabProject]))
 
@@ -207,13 +207,23 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
     val projectFinder       = new IOProjectFinder(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
   }
 
-  private def projectFrom(kgProject: KGProject, gitLabProject: GitLabProject) = Project(
-    path = kgProject.path,
-    name = kgProject.name,
-    created = Creation(
-      date    = kgProject.created.date,
-      creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
-    ),
-    repoUrls = RepoUrls(ssh = gitLabProject.urls.ssh, http = gitLabProject.urls.http)
-  )
+  private def projectFrom(kgProject: KGProject, gitLabProject: GitLabProject) =
+    Project(
+      id               = gitLabProject.id,
+      path             = kgProject.path,
+      name             = kgProject.name,
+      maybeDescription = gitLabProject.maybeDescription,
+      visibility       = gitLabProject.visibility,
+      created = Creation(
+        date    = kgProject.created.date,
+        creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
+      ),
+      updatedAt   = gitLabProject.updatedAt,
+      urls        = gitLabProject.urls,
+      forking     = gitLabProject.forking,
+      tags        = gitLabProject.tags,
+      starsCount  = gitLabProject.starsCount,
+      permissions = gitLabProject.permissions,
+      statistics  = gitLabProject.statistics
+    )
 }

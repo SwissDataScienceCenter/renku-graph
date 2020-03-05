@@ -30,7 +30,7 @@ import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.interpreters.{TestDbTransactor, TestLogger}
 import ch.datascience.metrics.MetricsRegistry
@@ -86,7 +86,7 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
     }
 
     "update the waitingEventsGauge with all the data just during the first update; " +
-      "next updates should contain non-zero values and zeros only for projects having non-zeros before" in new TestCase {
+      "next updates should contain non-zero values and zeros only for projects with non-zeros before" in new TestCase {
 
       val project1           = projectPaths.generateOne
       val project2           = projectPaths.generateOne
@@ -105,7 +105,7 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
           List(waitingEventsCall1, waitingEventsCall2, waitingEventsCall3).asJava
         )
 
-        override def waitingEvents: IO[Map[ProjectPath, Long]] =
+        override def waitingEvents: IO[Map[Path, Long]] =
           Option(waitingEventsQueue.poll())
             .getOrElse(waitingEventsCall3)
             .pure[IO]
@@ -145,7 +145,7 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
       val exception2 = exceptions.generateOne
       (eventLogStats.waitingEvents _)
         .expects()
-        .returning(exception2.raiseError[IO, Map[ProjectPath, Long]])
+        .returning(exception2.raiseError[IO, Map[Path, Long]])
       val statuses = statuesGen.generateOne
       (eventLogStats.statuses _)
         .expects()
@@ -229,7 +229,7 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
       statusesGauge,
       totalGauge,
       interval              = 100 millis,
-      statusesInterval      = 100 millis,
+      statusesInterval      = 500 millis,
       waitingEventsInterval = 500 millis
     )
   }
@@ -241,7 +241,7 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
     } yield status -> count.value
   }.map(_.toMap)
 
-  private lazy val waitingEventsGen: Gen[Map[ProjectPath, Long]] = nonEmptySet {
+  private lazy val waitingEventsGen: Gen[Map[Path, Long]] = nonEmptySet {
     for {
       path  <- projectPaths
       count <- nonNegativeLongs()

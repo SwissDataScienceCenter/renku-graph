@@ -25,8 +25,8 @@ import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in 
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
+import ch.datascience.graph.model
 import ch.datascience.graph.model.EventsGenerators.projects
-import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.entities.bundles.exemplarLineageFlow.NodeDef
@@ -44,7 +44,7 @@ import scala.collection.Set
 class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
-  private val project               = projects.generateOne.copy(path = ProjectPath("namespace/lineage-project"))
+  private val project               = projects.generateOne.copy(path = model.projects.Path("namespace/lineage-project"))
   private val (jsons, examplarData) = exemplarLineageFlow(project.path)
   import examplarData._
 

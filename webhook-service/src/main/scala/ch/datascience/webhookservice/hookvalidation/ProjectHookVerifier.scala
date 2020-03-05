@@ -22,7 +22,7 @@ import ProjectHookVerifier.HookIdentifier
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.project.ProjectHookUrl
@@ -42,7 +42,7 @@ private trait ProjectHookVerifier[Interpretation[_]] {
 private object ProjectHookVerifier {
 
   final case class HookIdentifier(
-      projectId:      ProjectId,
+      projectId:      Id,
       projectHookUrl: ProjectHookUrl
   )
 }

@@ -26,7 +26,7 @@ import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
-import ch.datascience.graph.model.projects.{DateCreated, FilePath, ProjectPath}
+import ch.datascience.graph.model.projects.{DateCreated, FilePath, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
 import ch.datascience.rdfstore.entities.DataSetPart.dataSetParts
 import ch.datascience.rdfstore.entities.Person.persons
@@ -47,7 +47,7 @@ object bundles extends Schemas {
       committer:     Person        = Person(names.generateOne, emails.generateOne),
       schemaVersion: SchemaVersion = schemaVersions.generateOne
   )(
-      projectPath:         ProjectPath = projectPaths.generateOne,
+      projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
       projectCreator:      Person = committer
@@ -72,7 +72,7 @@ object bundles extends Schemas {
       committer:     Person        = Person(names.generateOne, emails.generateOne),
       schemaVersion: SchemaVersion = schemaVersions.generateOne
   )(
-      projectPath:        ProjectPath          = projectPaths.generateOne,
+      projectPath:        Path                 = projectPaths.generateOne,
       projectName:        projects.Name        = projectNames.generateOne,
       projectDateCreated: projects.DateCreated = DateCreated(committedDate.value),
       projectCreator:     Person               = committer
@@ -184,7 +184,7 @@ object bundles extends Schemas {
     }
 
     def apply(
-        projectPath:         ProjectPath = projectPaths.generateOne,
+        projectPath:         Path = projectPaths.generateOne,
         schemaVersion:       SchemaVersion = schemaVersions.generateOne
     )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExamplarData) = {
 

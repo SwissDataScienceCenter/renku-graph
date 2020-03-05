@@ -31,6 +31,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.IOAccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
@@ -434,9 +435,9 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       executionTimeRecorder
     )
 
-    def givenFetchingAccessToken(forProjectId: ProjectId) =
+    def givenFetchingAccessToken(forProjectId: Id) =
       (accessTokenFinder
-        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .findAccessToken(_: Id)(_: Id => String))
         .expects(forProjectId, projectIdToPath)
 
     def generateTriples(forCommits: NonEmptyList[Commit]): NonEmptyList[(Commit, JsonLDTriples)] =
