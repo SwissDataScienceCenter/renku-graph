@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets
 
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 
 object model {
@@ -39,7 +39,7 @@ object model {
 
   final case class DatasetPart(name: PartName, atLocation: PartLocation)
 
-  final case class DatasetProject(path: ProjectPath, name:           projects.Name, created: AddedToProject)
+  final case class DatasetProject(path: Path, name:                  projects.Name, created: AddedToProject)
   final case class AddedToProject(date: DateCreatedInProject, agent: DatasetAgent)
   final case class DatasetAgent(email:  Email, name:                 UserName)
 }

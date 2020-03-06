@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.deletion
 
 import cats.effect.Bracket
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
 import scala.language.higherKinds
@@ -31,7 +31,7 @@ class TokenRemover[Interpretation[_]](
 
   import doobie.implicits._
 
-  def delete(projectId: ProjectId): Interpretation[Unit] =
+  def delete(projectId: Id): Interpretation[Unit] =
     sql"""
           delete 
           from projects_tokens 
@@ -40,7 +40,7 @@ class TokenRemover[Interpretation[_]](
       .map(failIfMultiUpdate(projectId))
       .transact(transactor.get)
 
-  private def failIfMultiUpdate(projectId: ProjectId): Int => Unit = {
+  private def failIfMultiUpdate(projectId: Id): Int => Unit = {
     case 0 => ()
     case 1 => ()
     case n => throw new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")

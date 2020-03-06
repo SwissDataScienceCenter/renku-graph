@@ -18,8 +18,7 @@
 
 package ch.datascience.graph.http.server
 
-import ch.datascience.graph.model.events.{ProjectId => ProjectIdType}
-import ch.datascience.graph.model.projects.{ProjectPath => ProjectPathType}
+import ch.datascience.graph.model.projects
 
 import scala.util.Try
 
@@ -27,15 +26,15 @@ object binders {
 
   object ProjectId {
 
-    def unapply(value: String): Option[ProjectIdType] =
+    def unapply(value: String): Option[projects.Id] =
       Try {
-        ProjectIdType(value.toInt)
+        projects.Id(value.toInt)
       }.toOption
   }
 
   object ProjectPath {
 
-    def unapply(value: String): Option[ProjectPathType] =
-      ProjectPathType.from(value).toOption
+    def unapply(value: String): Option[projects.Path] =
+      projects.Path.from(value).toOption
   }
 }

@@ -48,6 +48,6 @@ object QueryFields {
 
   private val filePathArgument = Argument(
     name         = "filePath",
-    argumentType = FilePath.toScalarType(description = "File path")
+    argumentType = FilePath.toScalarType(name = "FilePath", description = "File path")
   )
 }

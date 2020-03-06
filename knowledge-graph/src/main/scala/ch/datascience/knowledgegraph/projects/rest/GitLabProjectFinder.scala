@@ -22,11 +22,13 @@ import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.{Description, Id, Name, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.knowledgegraph.config.GitLab
-import ch.datascience.knowledgegraph.projects.model.RepoUrls.{HttpUrl, SshUrl}
-import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.{GitLabProject, ProjectUrls}
+import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
+import ch.datascience.knowledgegraph.projects.model._
+import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
 
@@ -35,14 +37,23 @@ import scala.language.higherKinds
 
 trait GitLabProjectFinder[Interpretation[_]] {
   def findProject(
-      projectPath:      ProjectPath,
+      projectPath:      projects.Path,
       maybeAccessToken: Option[AccessToken]
   ): OptionT[Interpretation, GitLabProject]
 }
 
 object GitLabProjectFinder {
-  final case class GitLabProject(urls: ProjectUrls)
-  final case class ProjectUrls(http:   HttpUrl, ssh: SshUrl)
+
+  final case class GitLabProject(id:               Id,
+                                 maybeDescription: Option[Description],
+                                 visibility:       Visibility,
+                                 urls:             Urls,
+                                 forking:          Forking,
+                                 tags:             Set[Tag],
+                                 starsCount:       StarsCount,
+                                 updatedAt:        DateUpdated,
+                                 permissions:      Permissions,
+                                 statistics:       Statistics)
 }
 
 private class IOGitLabProjectFinder(
@@ -62,10 +73,10 @@ private class IOGitLabProjectFinder(
   import org.http4s._
   import org.http4s.dsl.io._
 
-  def findProject(projectPath: ProjectPath, maybeAccessToken: Option[AccessToken]): OptionT[IO, GitLabProject] =
+  def findProject(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): OptionT[IO, GitLabProject] =
     OptionT {
       for {
-        uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}")
+        uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}?statistics=true")
         project <- send(request(GET, uri, maybeAccessToken))(mapResponse)
       } yield project
     }
@@ -76,11 +87,83 @@ private class IOGitLabProjectFinder(
   }
 
   private implicit lazy val projectDecoder: EntityDecoder[IO, GitLabProject] = {
+    import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
+    import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
+    import ch.datascience.knowledgegraph.projects.model.Project.StarsCount
+    import ch.datascience.knowledgegraph.projects.model.Statistics._
+    import ch.datascience.knowledgegraph.projects.model.Urls
+    import ch.datascience.knowledgegraph.projects.model.Urls._
+
+    implicit val parentProjectDecoder: Decoder[ParentProject] = cursor =>
+      for {
+        id   <- cursor.downField("id").as[Id]
+        path <- cursor.downField("path_with_namespace").as[projects.Path]
+        name <- cursor.downField("name").as[Name]
+      } yield ParentProject(id, path, name)
+
+    implicit val maybeAccessLevelDecoder: Decoder[Option[AccessLevel]] =
+      _.as[Option[Json]].flatMap {
+        case None => Right(Option.empty[AccessLevel])
+        case Some(json) =>
+          json.hcursor
+            .downField("access_level")
+            .as[Option[Int]]
+            .flatMap {
+              case Some(level) => (AccessLevel from level) map Option.apply
+              case None        => Right(Option.empty[AccessLevel])
+            }
+            .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+      }
+
+    implicit val statisticsDecoder: Decoder[Statistics] = cursor =>
+      for {
+        commitsCount     <- cursor.downField("commit_count").as[CommitsCount]
+        storageSize      <- cursor.downField("storage_size").as[StorageSize]
+        repositorySize   <- cursor.downField("repository_size").as[RepositorySize]
+        lfsSize          <- cursor.downField("lfs_objects_size").as[LsfObjectsSize]
+        jobArtifactsSize <- cursor.downField("job_artifacts_size").as[JobArtifactsSize]
+      } yield Statistics(commitsCount, storageSize, repositorySize, lfsSize, jobArtifactsSize)
+
+    val getOrFail: Option[AccessLevel] => Either[DecodingFailure, AccessLevel] =
+      Either.fromOption(_, DecodingFailure("permissions.project_access missing", Nil))
+
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        sshUrl  <- cursor.downField("ssh_url_to_repo").as[SshUrl]
-        httpUrl <- cursor.downField("http_url_to_repo").as[HttpUrl]
-      } yield GitLabProject(ProjectUrls(httpUrl, sshUrl))
+        id                    <- cursor.downField("id").as[Id]
+        visibility            <- cursor.downField("visibility").as[Visibility]
+        sshUrl                <- cursor.downField("ssh_url_to_repo").as[SshUrl]
+        httpUrl               <- cursor.downField("http_url_to_repo").as[HttpUrl]
+        webUrl                <- cursor.downField("web_url").as[WebUrl]
+        readmeUrl             <- cursor.downField("readme_url").as[ReadmeUrl]
+        forksCount            <- cursor.downField("forks_count").as[ForksCount]
+        tags                  <- cursor.downField("tag_list").as[List[Tag]]
+        starsCount            <- cursor.downField("star_count").as[StarsCount]
+        updatedAt             <- cursor.downField("last_activity_at").as[DateUpdated]
+        maybeParent           <- cursor.downField("forked_from_project").as[Option[ParentProject]]
+        statistics            <- cursor.downField("statistics").as[Statistics]
+        maybeGroupAccessLevel <- cursor.downField("permissions").downField("group_access").as[Option[AccessLevel]]
+        projectAccessLevel <- cursor
+                               .downField("permissions")
+                               .downField("project_access")
+                               .as[Option[AccessLevel]]
+                               .flatMap(getOrFail)
+        maybeDescription <- cursor
+                             .downField("description")
+                             .as[Option[String]]
+                             .map(blankToNone)
+                             .flatMap(toOption[Description])
+      } yield GitLabProject(
+        id,
+        maybeDescription,
+        visibility,
+        Urls(sshUrl, httpUrl, webUrl, readmeUrl),
+        Forking(forksCount, maybeParent),
+        tags.toSet,
+        starsCount,
+        updatedAt,
+        Permissions(projectAccessLevel, maybeGroupAccessLevel),
+        statistics
+      )
 
     jsonOf[IO, GitLabProject]
   }

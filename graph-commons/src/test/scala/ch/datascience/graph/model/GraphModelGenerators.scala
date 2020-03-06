@@ -20,16 +20,23 @@ package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.{FilePath, ProjectPath, ProjectResource}
+import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
-import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf, uuid}
+import org.scalacheck.Gen.{alphaChar, choose, const, frequency, numChar, oneOf, uuid}
 
 object GraphModelGenerators {
 
+  implicit val projectIds: Gen[Id] = for {
+    min <- choose(1, 1000)
+    max <- choose(1001, 100000)
+    id  <- choose(min, max)
+  } yield Id(id)
   implicit val projectNames:        Gen[projects.Name]        = nonEmptyStrings() map projects.Name.apply
+  implicit val projectDescriptions: Gen[projects.Description] = paragraphs() map (v => projects.Description(v.value))
+  implicit val projectVisibilities: Gen[Visibility]           = Gen.oneOf(Visibility.all.toList)
   implicit val projectCreatedDates: Gen[projects.DateCreated] = timestampsNotInTheFuture map projects.DateCreated.apply
-  implicit val projectPaths: Gen[ProjectPath] = {
+  implicit val projectPaths: Gen[Path] = {
     val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> const('_'))
     val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf('_', '.', '-'))
     val partsGenerator = for {
@@ -41,12 +48,12 @@ object GraphModelGenerators {
       minSegments    = 2,
       maxSegments    = 5,
       partsGenerator = partsGenerator
-    ) map ProjectPath.apply
+    ) map Path.apply
   }
-  implicit val projectResources: Gen[ProjectResource] = for {
+  implicit val projectResources: Gen[ResourceId] = for {
     url  <- httpUrls()
     path <- projectPaths
-  } yield ProjectResource.from(s"$url/projects/$path").fold(throw _, identity)
+  } yield ResourceId.from(s"$url/projects/$path").fold(throw _, identity)
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIdentifiers: Gen[Identifier] = Gen

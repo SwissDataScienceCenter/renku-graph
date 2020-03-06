@@ -19,8 +19,7 @@
 package ch.datascience.tokenrepository.repository
 
 import ch.datascience.db.DbSpec
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import doobie.implicits._
 import org.scalatest.TestSuite
@@ -34,7 +33,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     sql"TRUNCATE TABLE projects_tokens".update.run.map(_ => ())
   }
 
-  protected def insert(projectId: ProjectId, projectPath: ProjectPath, encryptedToken: EncryptedAccessToken): Unit =
+  protected def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =
     execute {
       sql"""insert into 
             projects_tokens (project_id, project_path, token) 
@@ -48,14 +47,14 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     case _ => fail("insertion problem")
   }
 
-  protected def findToken(projectPath: ProjectPath): Option[String] =
+  protected def findToken(projectPath: Path): Option[String] =
     sql"select token from projects_tokens where project_path = ${projectPath.value}"
       .query[String]
       .option
       .transact(transactor.get)
       .unsafeRunSync()
 
-  protected def findToken(projectId: ProjectId): Option[String] =
+  protected def findToken(projectId: Id): Option[String] =
     sql"select token from projects_tokens where project_id = ${projectId.value}"
       .query[String]
       .option

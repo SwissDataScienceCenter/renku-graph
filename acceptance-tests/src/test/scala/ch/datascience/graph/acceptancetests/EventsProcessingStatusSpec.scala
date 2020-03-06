@@ -31,11 +31,11 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, projects => projectsGen}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.{Project, ProjectId}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.events.Project
+import ch.datascience.graph.model.projects.Visibility.Public
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
-import ch.datascience.webhookservice.project.ProjectVisibility.Public
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -104,8 +104,8 @@ class EventsProcessingStatusSpec
   }
 
   private def givenHookValidationToHookExists(
-      projectId:          ProjectId,
-      projectPath:        ProjectPath
+      projectId:          Id,
+      projectPath:        Path
   )(implicit accessToken: AccessToken): Unit = {
     `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(projectId, projectPath)
     tokenRepositoryClient
@@ -115,16 +115,27 @@ class EventsProcessingStatusSpec
     `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
   }
 
-  private def sendEventsForProcessing(project: Project)(implicit accessToken: AccessToken) =
-    nonEmptyList(commitIds, minElements = numberOfEvents, maxElements = numberOfEvents).generateOne
-      .map { commitId =>
+  private def sendEventsForProcessing(project: Project)(implicit accessToken: AccessToken) = {
+    val allCommitIds = nonEmptyList(
+      commitIds,
+      minElements = numberOfEvents,
+      maxElements = numberOfEvents
+    ).generateOne
+
+    `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
+                                                                                            allCommitIds.head,
+                                                                                            allCommitIds.tail.toSet)
+    allCommitIds.map { commitId =>
+      // GitLab to return commit info about all the parent commits
+      if (commitId != allCommitIds.head)
         `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
 
-        // making the triples generation be happy and not throwing exceptions to the logs
-        `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+      // making the triples generation be happy and not throwing exceptions to the logs
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+    }
 
-        webhookServiceClient
-          .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project.id, commitId))
-          .status shouldBe Accepted
-      }
+    webhookServiceClient
+      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project.id, allCommitIds.head))
+      .status shouldBe Accepted
+  }
 }

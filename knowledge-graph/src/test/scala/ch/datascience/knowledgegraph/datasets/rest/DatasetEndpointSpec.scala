@@ -29,7 +29,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.Rel.Self
@@ -76,7 +76,7 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
         val Right(projectsJsons) = response.as[Json].unsafeRunSync.hcursor.downField("isPartOf").as[List[Json]]
         projectsJsons should have size dataset.projects.size
         projectsJsons.foreach { json =>
-          (json.hcursor.downField("path").as[ProjectPath], json._links)
+          (json.hcursor.downField("path").as[Path], json._links)
             .mapN {
               case (path, links) =>
                 links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
@@ -179,7 +179,7 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val datasetProjectDecoder: Decoder[DatasetProject] = (cursor: HCursor) =>
     for {
-      path    <- cursor.downField("path").as[ProjectPath]
+      path    <- cursor.downField("path").as[Path]
       name    <- cursor.downField("name").as[projects.Name]
       created <- cursor.downField("created").as[AddedToProject]
     } yield DatasetProject(path, name, created)

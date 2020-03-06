@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs}
-import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
+import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait ProjectDatasetsFinder[Interpretation[_]] {
-  def findProjectDatasets(projectPath: ProjectPath): Interpretation[List[(Identifier, Name, SameAs)]]
+  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier, Name, SameAs)]]
 }
 
 private class IOProjectDatasetsFinder(
@@ -46,10 +46,10 @@ private class IOProjectDatasetsFinder(
 
   import IOProjectDatasetsFinder._
 
-  def findProjectDatasets(projectPath: ProjectPath): IO[List[(Identifier, Name, SameAs)]] =
+  def findProjectDatasets(projectPath: Path): IO[List[(Identifier, Name, SameAs)]] =
     queryExpecting[List[(Identifier, Name, SameAs)]](using = query(projectPath))
 
-  private def query(path: ProjectPath) = SparqlQuery(
+  private def query(path: Path) = SparqlQuery(
     name = "ds projects",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
@@ -60,7 +60,7 @@ private class IOProjectDatasetsFinder(
         |WHERE {
         |  {
         |    ?datasetId rdf:type <http://schema.org/Dataset>;
-        |               schema:isPartOf ${ProjectResource(renkuBaseUrl, path).showAs[RdfResource]};
+        |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |               schema:identifier ?identifier;
         |               schema:name ?name.
         |  } {

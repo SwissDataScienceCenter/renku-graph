@@ -24,8 +24,8 @@ import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.projectIds
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
@@ -55,7 +55,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(accessToken))
 
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(HookExists))
 
@@ -77,7 +77,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(accessToken))
 
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(context.pure(HookMissing))
 
@@ -115,7 +115,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
 
       val errorMessage = ErrorMessage("some error")
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(IO.raiseError(new Exception(errorMessage.toString())))
 
@@ -137,7 +137,7 @@ class HookValidationEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(accessToken))
 
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(IO.raiseError(UnauthorizedException))
 

@@ -39,14 +39,13 @@ object LineageGenerators {
   )
 
   implicit val nodes: Gen[Node] = for {
-    id       <- nodeIds
     location <- nodeLocations
     label    <- nodeLabels
     types    <- nodeTypesSet
-  } yield Node(id, location, label, types)
+  } yield Node(location, label, types)
 
   implicit val edges: Gen[Edge] = for {
-    sourceNodeId <- nodeIds
-    targetNodeId <- nodeIds
-  } yield Edge(sourceNodeId, targetNodeId)
+    sourceNode <- nodeLocations
+    targetNode <- nodeLocations
+  } yield Edge(sourceNode, targetNode)
 }

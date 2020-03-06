@@ -29,8 +29,9 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.{CommitId, Project}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
@@ -60,7 +61,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(repositoryDirectory))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -103,7 +104,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(repositoryDirectory))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -142,7 +143,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       val accessToken                    = accessTokens.generateOne
       override lazy val maybeAccessToken = Some(accessToken)
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -187,7 +188,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.raiseError(exception))
 
@@ -214,7 +215,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       val accessToken                    = accessTokens.generateOne
       override lazy val maybeAccessToken = Some(accessToken)
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -248,7 +249,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(repositoryDirectory))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -284,7 +285,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(repositoryDirectory))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -325,7 +326,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.pure(repositoryDirectory))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: ProjectPath, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -365,7 +366,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
     val successfulCommandResult = CommandResult(exitCode = 0, chunks = Nil)
 
     lazy val repositoryName   = nonEmptyStrings().generateOne
-    lazy val projectPath      = ProjectPath(s"user/$repositoryName")
+    lazy val projectPath      = projects.Path(s"user/$repositoryName")
     lazy val maybeAccessToken = Gen.option(accessTokens).generateOne
     lazy val gitRepositoryUrl = serviceUrls.generateOne / maybeAccessToken
       .map(_.value)

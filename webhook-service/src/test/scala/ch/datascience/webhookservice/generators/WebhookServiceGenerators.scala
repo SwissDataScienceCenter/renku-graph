@@ -46,8 +46,6 @@ object WebhookServiceGenerators {
     projectId <- projectIds
   } yield HookToken(projectId)
 
-  implicit val projectVisibilities: Gen[ProjectVisibility] = Gen.oneOf(ProjectVisibility.all.toList)
-
   implicit val projectInfos: Gen[ProjectInfo] = for {
     id         <- projectIds
     visibility <- projectVisibilities

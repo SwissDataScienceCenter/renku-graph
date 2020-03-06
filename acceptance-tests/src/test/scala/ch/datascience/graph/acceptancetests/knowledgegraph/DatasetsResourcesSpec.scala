@@ -40,7 +40,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{accessLevels, forkings, parentProjects, permissionsObjects, projects => projectsGen}
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
@@ -63,7 +63,11 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
 
-    val project          = projectsGen.generateOne
+    val project = projectsGen.generateOne.copy(
+      maybeDescription = projectDescriptions.generateSome,
+      forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome),
+      permissions      = permissionsObjects.generateOne.copy(maybeGroupAccessLevel = accessLevels.generateSome)
+    )
     val dataset1CommitId = commitIds.generateOne
     val dataset1Creation = addedToProject.generateOne.copy(
       agent = DatasetAgent(project.created.creator.email, project.created.creator.name)
@@ -134,7 +138,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       )
 
       And("the project exists in GitLab")
-      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project, withStatistics = true)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"

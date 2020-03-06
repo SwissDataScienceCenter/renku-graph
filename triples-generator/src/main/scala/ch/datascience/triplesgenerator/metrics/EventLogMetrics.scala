@@ -24,7 +24,7 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.commands.{EventLogStats, IOEventLogStats}
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.MetricsRegistry
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Gauge
@@ -66,7 +66,7 @@ class EventLogMetrics(
     case (status, count) => statusesGauge.labels(status.toString).set(count)
   }
 
-  private def updateWaitingEvents(previousState: Map[ProjectPath, Long] = Map.empty): IO[Unit] = {
+  private def updateWaitingEvents(previousState: Map[Path, Long] = Map.empty): IO[Unit] = {
     for {
       waitingEvents <- eventLogStats.waitingEvents
       newState = removeZeroCountProjects(waitingEvents, previousState)
@@ -75,8 +75,7 @@ class EventLogMetrics(
     } yield ()
   } recoverWith logAndRetry(continueWith = updateWaitingEvents())
 
-  private def removeZeroCountProjects(currentEvents: Map[ProjectPath, Long],
-                                      previousState: Map[ProjectPath, Long]): Map[ProjectPath, Long] =
+  private def removeZeroCountProjects(currentEvents: Map[Path, Long], previousState: Map[Path, Long]): Map[Path, Long] =
     if (previousState.isEmpty) currentEvents
     else {
       val currentZeros  = currentEvents.filter(_._2 == 0).keySet
@@ -86,7 +85,7 @@ class EventLogMetrics(
       currentEvents.filterNot { case (project, _) => zerosToDelete contains project }
     }
 
-  private lazy val toWaitingEventsGauge: ((ProjectPath, Long)) => Unit = {
+  private lazy val toWaitingEventsGauge: ((Path, Long)) => Unit = {
     case (path, count) => waitingEventsGauge.labels(path.toString).set(count)
   }
 

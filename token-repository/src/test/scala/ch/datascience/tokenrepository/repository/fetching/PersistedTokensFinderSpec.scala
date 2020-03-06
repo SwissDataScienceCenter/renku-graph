@@ -19,8 +19,7 @@
 package ch.datascience.tokenrepository.repository.fetching
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import org.scalatest.Matchers._

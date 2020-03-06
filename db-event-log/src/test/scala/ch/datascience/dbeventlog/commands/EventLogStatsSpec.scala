@@ -25,8 +25,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.{CommitEventId, CommitId, ProjectId}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.events.{CommitEventId, CommitId}
+import ch.datascience.graph.model.projects.{Id, Path}
 import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -74,10 +74,10 @@ class EventLogStatsSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaC
 
   private val stats = new EventLogStatsImpl(transactor)
 
-  private def store: ((ProjectPath, CommitId, EventStatus)) => Unit = {
+  private def store: ((Path, CommitId, EventStatus)) => Unit = {
     case (projectPath, commitId, status) =>
       storeEvent(
-        CommitEventId(commitId, ProjectId(Math.abs(projectPath.value.hashCode))),
+        CommitEventId(commitId, Id(Math.abs(projectPath.value.hashCode))),
         status,
         executionDates.generateOne,
         committedDates.generateOne,
@@ -93,7 +93,7 @@ class EventLogStatsSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaC
                committedDates.generateOne,
                eventBodies.generateOne)
 
-  private def generateEventsFor(projectPaths: List[ProjectPath]) =
+  private def generateEventsFor(projectPaths: List[Path]) =
     projectPaths flatMap { projectPath =>
       nonEmptyList(commitIdsAndStatuses, maxElements = 20).generateOne.toList.map {
         case (commitId, status) => (projectPath, commitId, status)

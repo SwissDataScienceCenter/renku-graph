@@ -23,9 +23,10 @@ import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
+import ch.datascience.graph.model.projects._
 import ch.datascience.tinytypes.constraints.{RelativePath, Url}
 import eu.timepit.refined.auto._
+import io.circe.{DecodingFailure, Json}
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -33,12 +34,30 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Try
 
-class ProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
+class IdSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  "ProjectPath" should {
+  "instantiation" should {
+
+    "be successful for non-negative values" in {
+      forAll(nonNegativeInts()) { id =>
+        Id(id.value).value shouldBe id.value
+      }
+    }
+
+    "fail for negative ids" in {
+      an[IllegalArgumentException] shouldBe thrownBy {
+        Id(-1).value
+      }
+    }
+  }
+}
+
+class PathSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "Path" should {
 
     "be a RelativePath" in {
-      ProjectPath shouldBe a[RelativePath]
+      Path shouldBe a[RelativePath]
     }
   }
 
@@ -46,25 +65,25 @@ class ProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "be successful for relative paths with min number of 2 segments" in {
       forAll(relativePaths(minSegments = 2, maxSegments = 22, partsGenerator)) { path =>
-        ProjectPath(path).value shouldBe path
+        Path(path).value shouldBe path
       }
     }
 
     "fail for relative paths of single segment" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        ProjectPath(nonBlankStrings().generateOne.value)
+        Path(nonBlankStrings().generateOne.value)
       }
     }
 
     "fail when ending with a /" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        ProjectPath(relativePaths(minSegments = 2, maxSegments = 22).generateOne + "/")
+        Path(relativePaths(minSegments = 2, maxSegments = 22).generateOne + "/")
       }
     }
 
     "fail for absolute URLs" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        ProjectPath(httpUrls().generateOne)
+        Path(httpUrls().generateOne)
       }
     }
   }
@@ -79,14 +98,42 @@ class ProjectPathSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class ProjectResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
+class VisibilitySpec extends WordSpec {
+
+  "Visibility" should {
+
+    "define cases for 'private', 'public' and 'internal'" in {
+      Visibility.all.map(_.value) should contain only ("private", "public", "internal")
+    }
+  }
+
+  "projectVisibilityDecoder" should {
+
+    Visibility.all foreach { visibility =>
+      s"deserialize $visibility" in {
+        Json.fromString(visibility.value).as[Visibility] shouldBe Right(visibility)
+      }
+    }
+
+    "fail for unknown value" in {
+      Json.fromString("unknown").as[Visibility] shouldBe Left(
+        DecodingFailure(
+          s"'unknown' is not a valid project visibility. Allowed values are: ${Visibility.all.mkString(", ")}",
+          Nil
+        )
+      )
+    }
+  }
+}
+
+class ResourceIdSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   import GraphModelGenerators.projectPaths
 
-  "ProjectResource" should {
+  "ResourceId" should {
 
     "be a RelativePath" in {
-      ProjectResource shouldBe an[Url]
+      ResourceId shouldBe an[Url]
     }
   }
 
@@ -94,19 +141,19 @@ class ProjectResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "be successful for URLs ending with a project path" in {
       forAll(httpUrls(pathGenerator)) { url =>
-        ProjectResource(url).value shouldBe url
+        ResourceId(url).value shouldBe url
       }
     }
 
     "fail for relative paths" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        ProjectResource(projectPaths.generateOne.value)
+        ResourceId(projectPaths.generateOne.value)
       }
     }
 
     "fail when ending with a /" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        ProjectResource(httpUrls(pathGenerator).generateOne + "/")
+        ResourceId(httpUrls(pathGenerator).generateOne + "/")
       }
     }
   }
@@ -114,8 +161,8 @@ class ProjectResourceSpec extends WordSpec with ScalaCheckPropertyChecks {
   "toProjectPath converter" should {
 
     "convert any Project Resource to ProjectPath" in {
-      forAll { (renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath) =>
-        ProjectResource(renkuBaseUrl, projectPath).as[Try, ProjectPath] shouldBe projectPath.pure[Try]
+      forAll { (renkuBaseUrl: RenkuBaseUrl, projectPath: Path) =>
+        ResourceId(renkuBaseUrl, projectPath).as[Try, Path] shouldBe projectPath.pure[Try]
       }
     }
   }

@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{CommitEventId, CommittedDate}
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
@@ -48,6 +48,9 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
       (projectPathAdder.run _)
         .expects()
         .returning(IO.unit)
+      (batchDateAdder.run _)
+        .expects()
+        .returning(IO.unit)
 
       dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
@@ -62,6 +65,9 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
       tableExists() shouldBe false
 
       (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
+      (batchDateAdder.run _)
         .expects()
         .returning(IO.unit)
 
@@ -81,6 +87,9 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
       (projectPathAdder.run _)
         .expects()
         .returning(IO.unit)
+      (batchDateAdder.run _)
+        .expects()
+        .returning(IO.unit)
 
       dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
@@ -98,6 +107,9 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
       tableExists() shouldBe true
 
       (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
+      (batchDateAdder.run _)
         .expects()
         .returning(IO.unit)
 
@@ -131,16 +143,38 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
         dbInitializer.run.unsafeRunSync()
       } shouldBe exception
     }
+
+    "fails if adding the batch_date column fails" in new TestCase {
+
+      if (!tableExists()) createTable()
+
+      tableExists() shouldBe true
+
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
+      val exception = exceptions.generateOne
+      (batchDateAdder.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      intercept[Exception] {
+        dbInitializer.run.unsafeRunSync()
+      } shouldBe exception
+    }
   }
 
   private trait TestCase {
     val projectPathAdder = mock[IOProjectPathAdder]
+    val batchDateAdder   = mock[IOBatchDateAdder]
     val logger           = TestLogger[IO]()
-    val dbInitializer    = new EventLogDbInitializer[IO](projectPathAdder, transactor, logger)
+    val dbInitializer    = new EventLogDbInitializer[IO](projectPathAdder, batchDateAdder, transactor, logger)
   }
 
   private class IOProjectPathAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])
       extends ProjectPathAdder[IO](transactor, logger)
+  private class IOBatchDateAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])
+      extends BatchDateAdder[IO](transactor, logger)
 
   private def storeEvent(commitEventId: CommitEventId = commitEventIds.generateOne,
                          eventStatus:   String        = eventStatuses.generateOne.value,
@@ -148,7 +182,7 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
                          eventDate:     CommittedDate = committedDates.generateOne,
                          eventBody:     EventBody     = eventBodies.generateOne,
                          createdDate:   CreatedDate   = createdDates.generateOne,
-                         projectPath:   ProjectPath   = projectPaths.generateOne): Unit = execute {
+                         projectPath:   Path          = projectPaths.generateOne): Unit = execute {
     sql"""|insert into 
           |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
           |values (${commitEventId.id.value}, ${commitEventId.projectId.value}, $eventStatus, ${createdDate.value}, ${executionDate.value}, ${eventDate.value}, ${eventBody.value})

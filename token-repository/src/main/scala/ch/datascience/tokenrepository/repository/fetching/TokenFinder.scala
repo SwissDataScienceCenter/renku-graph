@@ -22,8 +22,7 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository._
 
@@ -36,13 +35,13 @@ private class TokenFinder[Interpretation[_]](
 
   import accessTokenCrypto._
 
-  def findToken(projectPath: ProjectPath): OptionT[Interpretation, AccessToken] =
+  def findToken(projectPath: Path): OptionT[Interpretation, AccessToken] =
     for {
       encryptedToken <- tokenInRepoFinder.findToken(projectPath)
       accessToken    <- OptionT.liftF(decrypt(encryptedToken))
     } yield accessToken
 
-  def findToken(projectId: ProjectId): OptionT[Interpretation, AccessToken] =
+  def findToken(projectId: Id): OptionT[Interpretation, AccessToken] =
     for {
       encryptedToken <- tokenInRepoFinder.findToken(projectId)
       accessToken    <- OptionT.liftF(decrypt(encryptedToken))

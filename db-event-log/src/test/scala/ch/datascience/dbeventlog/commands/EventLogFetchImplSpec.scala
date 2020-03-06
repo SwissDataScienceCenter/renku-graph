@@ -28,7 +28,9 @@ import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitEventId, ProjectId}
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.{BatchDate, CommitEventId}
+import ch.datascience.graph.model.projects.Id
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
@@ -111,31 +113,35 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
 
       val projectId = projectIds.generateOne
 
-      val event1Id   = commitEventIds.generateOne.copy(projectId = projectId)
-      val event1Body = eventBodies.generateOne
-      storeNewEvent(event1Id, ExecutionDate(now minus (5, SEC)), event1Body)
+      val event1Id        = commitEventIds.generateOne.copy(projectId = projectId)
+      val event1Body      = eventBodies.generateOne
+      val event1BatchDate = batchDates.generateOne
+      storeNewEvent(event1Id, ExecutionDate(now minus (5, SEC)), event1Body, batchDate = event1BatchDate)
 
       val event2Id   = commitEventIds.generateOne.copy(projectId = projectId)
       val event2Body = eventBodies.generateOne
       storeNewEvent(event2Id, ExecutionDate(now plus (5, H)), event2Body)
 
-      val event3Id   = commitEventIds.generateOne.copy(projectId = projectId)
-      val event3Body = eventBodies.generateOne
+      val event3Id        = commitEventIds.generateOne.copy(projectId = projectId)
+      val event3Body      = eventBodies.generateOne
+      val event3BatchDate = batchDates.generateOne
       storeEvent(event3Id,
                  EventStatus.RecoverableFailure,
                  ExecutionDate(now minus (5, H)),
                  committedDates.generateOne,
-                 event3Body)
+                 event3Body,
+                 batchDate = event3BatchDate)
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(event3Body)
 
-      findEvents(EventStatus.Processing) shouldBe List(event3Id -> executionDate)
+      findEvents(EventStatus.Processing) shouldBe List((event3Id, executionDate, event3BatchDate))
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(event1Body)
 
-      findEvents(EventStatus.Processing) shouldBe List(event1Id -> executionDate, event3Id -> executionDate)
+      findEvents(EventStatus.Processing) shouldBe List((event1Id, executionDate, event1BatchDate),
+                                                       (event3Id, executionDate, event3BatchDate))
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
@@ -143,17 +149,21 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
     s"find event with the $Processing status " +
       "and execution date older than RenkuLogTimeout + 1 min" in new TestCase {
 
-      val eventId   = commitEventIds.generateOne
-      val eventBody = eventBodies.generateOne
-      storeEvent(eventId,
-                 EventStatus.Processing,
-                 ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN)),
-                 committedDates.generateOne,
-                 eventBody)
+      val eventId        = commitEventIds.generateOne
+      val eventBody      = eventBodies.generateOne
+      val eventBatchDate = batchDates.generateOne
+      storeEvent(
+        eventId,
+        EventStatus.Processing,
+        ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN)),
+        committedDates.generateOne,
+        eventBody,
+        batchDate = eventBatchDate
+      )
 
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody)
 
-      findEvents(EventStatus.Processing) shouldBe List(eventId -> executionDate)
+      findEvents(EventStatus.Processing) shouldBe List((eventId, executionDate, eventBatchDate))
     }
 
     s"find no event when there there's one with $Processing status " +
@@ -223,10 +233,13 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
     val executionDate = ExecutionDate(now)
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def executionDateDifferentiated(by: ProjectId, allProjects: NonEmptyList[ProjectId]) =
+    def executionDateDifferentiated(by: Id, allProjects: NonEmptyList[Id]) =
       ExecutionDate(now minus (1000 - (allProjects.toList.indexOf(by) * 10), SEC))
   }
 
-  private def storeNewEvent(commitEventId: CommitEventId, executionDate: ExecutionDate, eventBody: EventBody): Unit =
-    storeEvent(commitEventId, New, executionDate, committedDates.generateOne, eventBody)
+  private def storeNewEvent(commitEventId: CommitEventId,
+                            executionDate: ExecutionDate,
+                            eventBody:     EventBody,
+                            batchDate:     BatchDate = batchDates.generateOne): Unit =
+    storeEvent(commitEventId, New, executionDate, committedDates.generateOne, eventBody, batchDate = batchDate)
 }

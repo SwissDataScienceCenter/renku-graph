@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{ProjectPath, ProjectResource}
+import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.knowledgegraph.datasets.model.{AddedToProject, DatasetAgent, DatasetProject}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
@@ -153,15 +153,15 @@ private object ProjectsFinder {
     import ch.datascience.graph.model.users.{Email, Name => UserName}
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    def toProjectPath(projectPath: ProjectResource) =
+    def toProjectPath(projectPath: ResourceId) =
       projectPath
-        .as[Try, ProjectPath]
+        .as[Try, Path]
         .toEither
         .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
 
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
-        path        <- cursor.downField("projectId").downField("value").as[ProjectResource].flatMap(toProjectPath)
+        path        <- cursor.downField("projectId").downField("value").as[ResourceId].flatMap(toProjectPath)
         name        <- cursor.downField("projectName").downField("value").as[projects.Name]
         dateCreated <- cursor.downField("minDateCreated").downField("value").as[DateCreatedInProject]
         agentEmail  <- cursor.downField("agentEmail").downField("value").as[Email]

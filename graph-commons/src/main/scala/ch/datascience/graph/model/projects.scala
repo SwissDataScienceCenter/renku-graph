@@ -26,8 +26,11 @@ import ch.datascience.tinytypes.constraints._
 
 object projects {
 
-  class ProjectPath private (val value: String) extends AnyVal with RelativePathTinyType
-  implicit object ProjectPath extends TinyTypeFactory[ProjectPath](new ProjectPath(_)) with RelativePath {
+  final class Id private (val value: Int) extends AnyVal with IntTinyType
+  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt
+
+  class Path private (val value: String) extends AnyVal with RelativePathTinyType
+  implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
     addConstraint(
@@ -36,21 +39,21 @@ object projects {
     )
   }
 
-  class ProjectResource private (val value: String) extends AnyVal with StringTinyType
-  implicit object ProjectResource extends TinyTypeFactory[ProjectResource](new ProjectResource(_)) with Url {
-    private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${ProjectPath.regexValidator.drop(1)}"
+  class ResourceId private (val value: String) extends AnyVal with StringTinyType
+  implicit object ResourceId extends TinyTypeFactory[ResourceId](new ResourceId(_)) with Url {
+    private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Path.regexValidator.drop(1)}"
     addConstraint(
       _ matches regexValidator,
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
 
-    def apply(renkuBaseUrl: RenkuBaseUrl, projectPath: ProjectPath): ProjectResource =
-      ProjectResource((renkuBaseUrl / "projects" / projectPath).value)
+    def apply(renkuBaseUrl: RenkuBaseUrl, projectPath: Path): ResourceId =
+      ResourceId((renkuBaseUrl / "projects" / projectPath).value)
 
     private val pathExtractor = "^.*\\/projects\\/(.*)$".r
-    implicit lazy val projectPathConverter: TinyTypeConverter[ProjectResource, ProjectPath] = {
-      case ProjectResource(pathExtractor(path)) => ProjectPath.from(path)
-      case illegalValue                         => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
+    implicit lazy val projectPathConverter: TinyTypeConverter[ResourceId, Path] = {
+      case ResourceId(pathExtractor(path)) => Path.from(path)
+      case illegalValue                    => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
     }
   }
 
@@ -62,4 +65,32 @@ object projects {
 
   final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
   object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
+
+  final class Description private (val value: String) extends AnyVal with StringTinyType
+  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
+
+  sealed trait Visibility extends StringTinyType with Product with Serializable
+
+  object Visibility {
+
+    val all: Set[Visibility] = Set(Public, Private, Internal)
+
+    sealed trait TokenProtected extends Visibility
+    final case object Public    extends Visibility { override val value: String = "public" }
+    final case object Private   extends TokenProtected { override val value: String = "private" }
+    final case object Internal  extends TokenProtected { override val value: String = "internal" }
+
+    import io.circe.Decoder
+
+    implicit lazy val visibilityDecoder: Decoder[Visibility] =
+      Decoder.decodeString.flatMap { decoded =>
+        all.find(_.value == decoded) match {
+          case Some(value) => Decoder.const(value)
+          case None =>
+            Decoder.failedWithMessage(
+              s"'$decoded' is not a valid project visibility. Allowed values are: ${all.mkString(", ")}"
+            )
+        }
+      }
+  }
 }

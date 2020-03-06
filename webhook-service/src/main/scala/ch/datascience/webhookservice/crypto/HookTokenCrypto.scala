@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.model.HookToken
@@ -66,7 +66,7 @@ class HookTokenCrypto[Interpretation[_]](
     }
 
   private implicit val hookTokenDecoder: Decoder[HookToken] = (cursor: HCursor) =>
-    cursor.downField("projectId").as[ProjectId].map(HookToken)
+    cursor.downField("projectId").as[Id].map(HookToken)
 
   private def deserialize(json: String): Interpretation[HookToken] = ME.fromEither {
     parse(json)

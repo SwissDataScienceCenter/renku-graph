@@ -26,7 +26,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ExecutionTimeRecorder
@@ -50,7 +50,7 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 
   import accessTokenFinder._
 
-  def createHook(projectId: ProjectId, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def createHook(projectId: Id, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
       accessToken    <- findAccessToken(request)
       creationResult <- hookCreator.createHook(projectId, accessToken)

@@ -23,11 +23,11 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs}
-import ch.datascience.graph.model.projects.ProjectPath
 import ch.datascience.http.rest.Links
 import Links._
 import ch.datascience.config.renku
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.projects
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
@@ -51,7 +51,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  def getProjectDatasets(projectPath: ProjectPath): Interpretation[Response[Interpretation]] =
+  def getProjectDatasets(projectPath: projects.Path): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       projectDatasetsFinder
         .findProjectDatasets(projectPath)
@@ -60,7 +60,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     } map logExecutionTimeWhen(finishedSuccessfully(projectPath))
 
   private def httpResult(
-      projectPath: ProjectPath
+      projectPath: projects.Path
   ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
@@ -68,7 +68,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
       InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(projectPath: ProjectPath): PartialFunction[Response[Interpretation], String] = {
+  private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[Interpretation], String] = {
     case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
   }
 

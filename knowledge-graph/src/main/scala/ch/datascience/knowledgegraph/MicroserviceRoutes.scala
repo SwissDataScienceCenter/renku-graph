@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph
 import cats.data.{Validated, ValidatedNel}
 import cats.effect.{Clock, ConcurrentEffect}
 import cats.implicits._
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.PagingRequest.Decoders._
@@ -94,8 +94,8 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
     private implicit val ME: MonadError[F, Throwable] = implicitly[MonadError[F, Throwable]]
 
-    lazy val toProjectPath: Either[F[Response[F]], ProjectPath] =
-      ProjectPath
+    lazy val toProjectPath: Either[F[Response[F]], model.projects.Path] =
+      model.projects.Path
         .from(parts.mkString("/"))
         .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")).pure[F])
   }

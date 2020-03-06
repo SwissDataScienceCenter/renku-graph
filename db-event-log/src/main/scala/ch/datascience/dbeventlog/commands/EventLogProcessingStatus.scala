@@ -18,18 +18,17 @@
 
 package ch.datascience.dbeventlog.commands
 
-import java.time.temporal.ChronoUnit._
-import java.time.{Duration, Instant}
+import java.time.Instant
 
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
+import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.{EventLogDB, EventStatus, ExecutionDate}
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
+import ch.datascience.graph.model.projects.Id
 import doobie.implicits._
-import doobie.util.Read
 import eu.timepit.refined.api.RefType.applyRef
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -42,64 +41,32 @@ class EventLogProcessingStatus[Interpretation[_]](
     now:        () => Instant = () => Instant.now
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
 
-  import EventLogProcessingStatus._
-
-  def fetchStatus(projectId: ProjectId): OptionT[Interpretation, ProcessingStatus] =
-    for {
-      latestEvent           <- findTheLatestEvent(projectId)
-      events                <- addPreviousFromTheSameBatch(projectId, latestEvent, List(latestEvent))
-      maybeProcessingStatus <- toProcessingStatus(events)
-    } yield maybeProcessingStatus
-
-  private def findTheLatestEvent(projectId: ProjectId): OptionT[Interpretation, Event] = OptionT(sql"""
-      select event_id, status, execution_date 
-      from event_log
-      where project_id = $projectId
-      order by execution_date desc
-      limit 1
-  """.query[Event].option.transact(transactor.get))
-
-  private def addPreviousFromTheSameBatch(projectId:      ProjectId,
-                                          previousEvent:  Event,
-                                          previousEvents: List[Event]): OptionT[Interpretation, List[Event]] =
-    OptionT.liftF {
-      findPreviousFromTheSameBatch(projectId, previousEvent)
-        .flatMap(foundEvent => addPreviousFromTheSameBatch(projectId, foundEvent, previousEvents :+ foundEvent))
-        .getOrElse(previousEvents)
-    }
-
-  private def findPreviousFromTheSameBatch(projectId: ProjectId, previousEvent: Event) = OptionT {
-    sql"""
-        select event_id, status, execution_date
-        from event_log
-        where project_id = $projectId
-          and event_id <> ${previousEvent.eventId}
-          and execution_date <= ${previousEvent.executionDate}
-          and execution_date >= ${previousEvent.executionDate.value minus MaxTimeDiffBetweenEventsInBatch}
-        order by execution_date desc
-        limit 1
-      """.query[Event].option.transact(transactor.get)
+  def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus] = OptionT {
+    latestBatchStatues(projectId) flatMap toProcessingStatus
   }
 
-  private def toProcessingStatus(events: List[Event]) = OptionT.liftF {
-    events.foldLeft(0 -> 0) {
-      case ((done, total), Event(_, status, _)) if status == TriplesStore || status == NonRecoverableFailure =>
+  private def latestBatchStatues(projectId: Id) = sql"""
+    select log.status
+    from event_log log
+    inner join (
+        select batch_date
+        from event_log
+        where project_id = $projectId
+        order by batch_date desc
+        limit 1
+      ) max_batch_date on log.batch_date = max_batch_date.batch_date
+    where log.project_id = $projectId
+  """.query[EventStatus].to[List].transact(transactor.get)
+
+  private def toProcessingStatus(statuses: List[EventStatus]) =
+    statuses.foldLeft(0 -> 0) {
+      case ((done, total), status) if status == TriplesStore || status == NonRecoverableFailure =>
         (done + 1) -> (total + 1)
       case ((done, total), _) => done -> (total + 1)
     } match {
-      case (done, total) => ProcessingStatus.from(done, total)(ME)
+      case (0, 0)        => Option.empty[ProcessingStatus].pure[Interpretation]
+      case (done, total) => ProcessingStatus.from(done, total)(ME) map Option.apply
     }
-  }
-}
-
-private object EventLogProcessingStatus {
-  val MaxTimeDiffBetweenEventsInBatch = Duration.of(15, MINUTES)
-
-  implicit val eventRead: Read[Event] = Read[(CommitId, EventStatus, ExecutionDate)].map {
-    case (eventId, status, createdDate) => Event(eventId, status, createdDate)
-  }
-
-  final case class Event(eventId: CommitId, status: EventStatus, executionDate: ExecutionDate)
 }
 
 class IOEventLogProcessingStatus(
@@ -116,7 +83,6 @@ final case class ProcessingStatus private (
 )
 
 object ProcessingStatus {
-  import cats.implicits._
 
   type Done     = Int Refined NonNegative
   type Total    = Int Refined NonNegative

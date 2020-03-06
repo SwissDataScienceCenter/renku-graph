@@ -27,8 +27,8 @@ import ch.datascience.dbeventlog.DbEventLogGenerators.processingStatuses
 import ch.datascience.dbeventlog.commands.{IOEventLogProcessingStatus, ProcessingStatus}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
@@ -54,13 +54,13 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
     "return OK with the progress status for the given projectId if the webhook exists" in new TestCase {
 
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.pure(HookExists))
 
       val processingStatus = processingStatuses.generateOne
       (eventsProcessingStatus
-        .fetchStatus(_: ProjectId))
+        .fetchStatus(_: Id))
         .expects(projectId)
         .returning(OptionT.some(processingStatus))
 
@@ -83,12 +83,12 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
       "but there are no events in the Event Log yet" in new TestCase {
 
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.pure(HookExists))
 
       (eventsProcessingStatus
-        .fetchStatus(_: ProjectId))
+        .fetchStatus(_: Id))
         .expects(projectId)
         .returning(OptionT.none[IO, ProcessingStatus])
 
@@ -105,7 +105,7 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
     "return NOT_FOUND if the webhook does not exist" in new TestCase {
 
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.pure(HookMissing))
 
@@ -119,7 +119,7 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
     "return NOT_FOUND if no Access Token found" in new TestCase {
 
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.raiseError(NoAccessTokenException("error")))
 
@@ -134,7 +134,7 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.raiseError(exception))
 
@@ -148,13 +148,13 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
     "return INTERNAL_SERVER_ERROR when finding progress status fails" in new TestCase {
 
       (hookValidator
-        .validateHook(_: ProjectId, _: Option[AccessToken]))
+        .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.pure(HookExists))
 
       val exception = exceptions.generateOne
       (eventsProcessingStatus
-        .fetchStatus(_: ProjectId))
+        .fetchStatus(_: Id))
         .expects(projectId)
         .returning(OptionT.liftF(context.raiseError(exception)))
 

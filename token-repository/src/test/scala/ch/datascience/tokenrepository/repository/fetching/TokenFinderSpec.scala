@@ -24,10 +24,8 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
@@ -48,7 +46,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findToken(_: ProjectId))
+        .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.some(encryptedToken))
 
@@ -66,7 +64,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
       val projectId = projectIds.generateOne
 
       (tokenInRepoFinder
-        .findToken(_: ProjectId))
+        .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.none[Try, EncryptedAccessToken])
 
@@ -79,7 +77,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (tokenInRepoFinder
-        .findToken(_: ProjectId))
+        .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.liftF[Try, EncryptedAccessToken](context.raiseError(exception)))
 
@@ -92,7 +90,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findToken(_: ProjectId))
+        .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.some(encryptedToken))
 
@@ -114,7 +112,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findToken(_: ProjectPath))
+        .findToken(_: Path))
         .expects(projectPath)
         .returning(OptionT.some(encryptedToken))
 
@@ -132,7 +130,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
       val projectPath = projectPaths.generateOne
 
       (tokenInRepoFinder
-        .findToken(_: ProjectPath))
+        .findToken(_: Path))
         .expects(projectPath)
         .returning(OptionT.none[Try, EncryptedAccessToken])
 
@@ -145,7 +143,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (tokenInRepoFinder
-        .findToken(_: ProjectPath))
+        .findToken(_: Path))
         .expects(projectPath)
         .returning(OptionT.liftF[Try, EncryptedAccessToken](context.raiseError(exception)))
 
@@ -158,7 +156,7 @@ class TokenFinderSpec extends WordSpec with MockFactory {
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findToken(_: ProjectPath))
+        .findToken(_: Path))
         .expects(projectPath)
         .returning(OptionT.some(encryptedToken))
 

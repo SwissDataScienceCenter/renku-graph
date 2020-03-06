@@ -19,9 +19,9 @@
 package ch.datascience.rdfstore.entities
 
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.projects.{DateCreated, Name, ProjectPath, ProjectResource}
+import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId}
 
-final case class Project(path:        ProjectPath,
+final case class Project(path:        Path,
                          name:        Name,
                          dateCreated: DateCreated,
                          creator:     Person,
@@ -35,7 +35,7 @@ object Project {
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Project] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
-      EntityId of ProjectResource(renkuBaseUrl, entity.path),
+      EntityId of ResourceId(renkuBaseUrl, entity.path),
       EntityTypes of (prov / "Location", schema / "Project"),
       schema / "name"          -> entity.name.asJsonLD,
       schema / "dateCreated"   -> entity.dateCreated.asJsonLD,
@@ -45,6 +45,6 @@ object Project {
     )
   }
 
-  private implicit val projectResourceToEntityId: ProjectResource => EntityId =
+  private implicit val projectResourceToEntityId: ResourceId => EntityId =
     resource => EntityId of resource.value
 }

@@ -26,7 +26,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.ProjectId
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -66,7 +66,7 @@ private class HookCreator[Interpretation[_]](
   import projectHookValidator._
   import projectInfoFinder._
 
-  def createHook(projectId: ProjectId, accessToken: AccessToken): Interpretation[CreationResult] = {
+  def createHook(projectId: Id, accessToken: AccessToken): Interpretation[CreationResult] = {
     for {
       hookValidation      <- right(validateHook(projectId, Some(accessToken)))
       _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
@@ -80,7 +80,7 @@ private class HookCreator[Interpretation[_]](
 
   private def leftIfProjectHookExists(
       hookValidation: HookValidationResult,
-      projectId:      ProjectId,
+      projectId:      Id,
       projectHookUrl: ProjectHookUrl
   ): EitherT[Interpretation, HookAlreadyCreated, Unit] = EitherT.cond[Interpretation](
     test  = hookValidation == HookMissing,
@@ -88,7 +88,7 @@ private class HookCreator[Interpretation[_]](
     right = ()
   )
 
-  private def loggingError(projectId: ProjectId): PartialFunction[Throwable, Interpretation[CreationResult]] = {
+  private def loggingError(projectId: Id): PartialFunction[Throwable, Interpretation[CreationResult]] = {
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
       ME.raiseError(exception)
@@ -107,7 +107,7 @@ private object HookCreator {
   }
 
   private case class HookAlreadyCreated(
-      projectId:      ProjectId,
+      projectId:      Id,
       projectHookUrl: ProjectHookUrl
   )
 }

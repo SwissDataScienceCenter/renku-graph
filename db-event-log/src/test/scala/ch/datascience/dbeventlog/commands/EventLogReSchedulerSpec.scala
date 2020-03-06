@@ -18,6 +18,8 @@
 
 package ch.datascience.dbeventlog.commands
 
+import java.time.Instant
+
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventMessage, EventStatus, ExecutionDate}
 import EventStatus._
@@ -25,7 +27,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CommitEventId, CommittedDate}
+import ch.datascience.graph.model.events.{BatchDate, CommitEventId, CommittedDate}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -35,7 +37,7 @@ class EventLogReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with 
 
   "scheduleEventsForProcessing" should {
 
-    s"set status to $New, execution_date to event_date and clean-up the message on all events" in new TestCase {
+    s"set status to $New, batch_date to the current time, execution_date to event_date and clean-up the message on all events" in new TestCase {
 
       val event1Id   = commitEventIds.generateOne
       val event1Date = committedDates.generateOne
@@ -63,12 +65,12 @@ class EventLogReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with 
         .unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = New).toSet shouldBe Set(
-        event1Id -> ExecutionDate(event1Date.value),
-        event2Id -> ExecutionDate(event2Date.value),
-        event3Id -> ExecutionDate(event3Date.value),
-        event4Id -> ExecutionDate(event4Date.value),
-        event5Id -> ExecutionDate(event5Date.value),
-        event6Id -> ExecutionDate(event6Date.value)
+        (event1Id, ExecutionDate(event1Date.value), BatchDate(currentTime)),
+        (event2Id, ExecutionDate(event2Date.value), BatchDate(currentTime)),
+        (event3Id, ExecutionDate(event3Date.value), BatchDate(currentTime)),
+        (event4Id, ExecutionDate(event4Date.value), BatchDate(currentTime)),
+        (event5Id, ExecutionDate(event5Date.value), BatchDate(currentTime)),
+        (event6Id, ExecutionDate(event6Date.value), BatchDate(currentTime))
       )
       findEventMessage(event4Id) shouldBe None
     }
@@ -76,7 +78,10 @@ class EventLogReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with 
 
   private trait TestCase {
 
-    val eventLog = new EventLogReScheduler(transactor)
+    val currentTime                 = Instant.now()
+    private val currentTimeProvider = mockFunction[Instant]
+    currentTimeProvider.expects().returning(currentTime)
+    val eventLog = new EventLogReScheduler(transactor, currentTimeProvider)
 
     def addEvent(commitEventId: CommitEventId,
                  status:        EventStatus,

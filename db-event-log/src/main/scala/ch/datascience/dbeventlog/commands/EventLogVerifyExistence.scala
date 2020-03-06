@@ -23,7 +23,8 @@ import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.model.events.{CommitId, ProjectId}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects.Id
 import doobie.implicits._
 import doobie.util.fragments.in
 
@@ -33,13 +34,13 @@ class EventLogVerifyExistence[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB]
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
 
-  def filterNotExistingInLog(eventIds: List[CommitId], projectId: ProjectId): Interpretation[List[CommitId]] =
+  def filterNotExistingInLog(eventIds: List[CommitId], projectId: Id): Interpretation[List[CommitId]] =
     eventIds match {
       case Nil          => ME.pure(List.empty)
       case head +: tail => checkInDB(NonEmptyList.of(head, tail: _*), projectId)
     }
 
-  private def checkInDB(eventIds: NonEmptyList[CommitId], projectId: ProjectId) = {
+  private def checkInDB(eventIds: NonEmptyList[CommitId], projectId: Id) = {
     fr"""
     select event_id
     from event_log

@@ -32,24 +32,24 @@ object model {
     def from[Interpretation[_]](edges: Set[Edge], nodes: Set[Node])(
         implicit ME:                   MonadError[Interpretation, Throwable]
     ): Interpretation[Lineage] = {
-      val idsFromEdges = collectNodesIds(edges)
-      val idsFromNodes = nodes.map(_.id)
-      if (idsFromEdges == idsFromNodes) ME.pure(Lineage(edges, nodes))
-      else if ((idsFromNodes diff idsFromEdges).nonEmpty)
+      val allEdgesLocations = collectLocations(edges)
+      val allNodesLocations = nodes.map(_.location)
+      if (allEdgesLocations == allNodesLocations) ME.pure(Lineage(edges, nodes))
+      else if ((allNodesLocations diff allEdgesLocations).nonEmpty)
         ME.raiseError(new IllegalArgumentException("There are orphan nodes"))
       else
         ME.raiseError(new IllegalArgumentException("There are edges with no nodes definitions"))
     }
 
-    private def collectNodesIds(edges: Set[Edge]): Set[Node.Id] =
-      edges.foldLeft(Set.empty[Node.Id]) {
+    private def collectLocations(edges: Set[Edge]): Set[Node.Location] =
+      edges.foldLeft(Set.empty[Node.Location]) {
         case (acc, Edge(source, target)) => acc + source + target
       }
   }
 
-  final case class Edge(source: Node.Id, target: Node.Id)
+  final case class Edge(source: Node.Location, target: Node.Location)
 
-  final case class Node(id: Node.Id, location: Node.Location, label: Node.Label, types: Set[Node.Type])
+  final case class Node(location: Node.Location, label: Node.Label, types: Set[Node.Type])
 
   object Node {
     import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}

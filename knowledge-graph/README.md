@@ -284,18 +284,49 @@ Finds details of the project with the given `namespace/name`.
 Response body example:
 ```
 {
-  "path": "namespace/project-name", 
-  "name": "Some project name",
+  "identifier":  123,
+  "path":        "namespace/project-name", 
+  "name":        "Some project name",
+  "description": "This is a longer text describing the project", // optional
+  "visibility":  "public|private|internal",
   "created": {
     "dateCreated": "2001-09-05T10:48:29.457Z",
     "creator": {
-      "name": "author name",
+      "name":  "author name",
       "email": "author@mail.org"
     }
   },
-  "url": {
-    "ssh": "git@renku.io:namespace/project-name.git",
-    "http": "https://renku.io/gitlab/namespace/project-name.git"
+  "updatedAt":  "2001-10-06T10:48:29.457Z",
+  "urls": {
+    "ssh":    "git@renku.io:namespace/project-name.git",
+    "http":   "https://renku.io/gitlab/namespace/project-name.git",
+    "web":    "https://renku.io/gitlab/namespace/project-name",
+    "readme": "https://renku.io/gitlab/namespace/project-name/blob/master/README.md"
+  },
+  "forking": {
+    "forksCount": 1,
+    "parent": { // optional
+      "identifier": 122,
+      "path":       "namespace/parent-project",
+      "name":       "Parent project name"
+    }
+  },
+  "tags": ["tag1", "tag2"],
+  "starsCount": 0,
+  "permissions": {
+    "projectAccess": {
+      "level": {"name": "Developer", "value": 30}
+    },
+    "groupAccess": { // optional
+      "level": {"name": "Guest", "value": 10}
+    }
+  },
+  "statistics": {
+    "commitsCount":     1,
+    "storageSize":      1000,
+    "repositorySize":   1001,
+    "lfsObjectsSize":   0,
+    "jobArtifactsSize": 0
   },
   "_links":[  
     {  

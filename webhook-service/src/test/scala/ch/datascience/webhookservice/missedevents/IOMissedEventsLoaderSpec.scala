@@ -27,6 +27,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
@@ -144,7 +145,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
       latestEventsList.headOption.foreach { event =>
         (accessTokenFinder
-          .findAccessToken(_: ProjectId)(_: ProjectId => String))
+          .findAccessToken(_: Id)(_: Id => String))
           .expects(event.projectId, projectIdToPath)
           .returning(context.raiseError(exception))
       }
@@ -299,18 +300,18 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
 
     def givenFetchLatestCommit(latestEvent: CommitEventId, maybeAccessToken: Option[AccessToken]) =
       (latestCommitFinder
-        .findLatestCommit(_: ProjectId, _: Option[AccessToken]))
+        .findLatestCommit(_: Id, _: Option[AccessToken]))
         .expects(latestEvent.projectId, maybeAccessToken)
 
-    def givenAccessToken(projectId: ProjectId, maybeAccessToken: Option[AccessToken]) =
+    def givenAccessToken(projectId: Id, maybeAccessToken: Option[AccessToken]) =
       (accessTokenFinder
-        .findAccessToken(_: ProjectId)(_: ProjectId => String))
+        .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
         .returning(context.pure(maybeAccessToken))
 
     def givenFindingProjectInfo(latestEvent: CommitEventId, maybeAccessToken: Option[AccessToken]) =
       (projectInfoFinder
-        .findProjectInfo(_: ProjectId, _: Option[AccessToken]))
+        .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(latestEvent.projectId, maybeAccessToken)
 
     def givenStoring(pushEvent: StartCommit) =

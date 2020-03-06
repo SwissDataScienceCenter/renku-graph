@@ -27,7 +27,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit
@@ -79,13 +79,13 @@ class RenkuLogTriplesGenerator private[renkulog] (
     lazy val toRight: EitherT[IO, GenerationRecoverableError, Right] = right[GenerationRecoverableError](io)
   }
 
-  private def createRepositoryDirectory(projectPath: ProjectPath): IO[Path] =
+  private def createRepositoryDirectory(projectPath: projects.Path): IO[Path] =
     contextShift.shift *> mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
 
   private def tempDirectoryName(repositoryName: String) =
     workDirectory / s"$repositoryName-${randomLong()}"
 
-  private def repositoryNameFrom(projectPath: ProjectPath): String = projectPath.value match {
+  private def repositoryNameFrom(projectPath: projects.Path): String = projectPath.value match {
     case repositoryDirectoryFinder(folderName) => folderName
   }
 

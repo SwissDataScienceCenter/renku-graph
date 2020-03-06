@@ -20,8 +20,7 @@ package ch.datascience.graph.tokenrepository
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.graph.model.events.ProjectId
-import ch.datascience.graph.model.projects.ProjectPath
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import io.chrisdavenport.log4cats.Logger
 
@@ -63,8 +62,8 @@ class IOAccessTokenFinder(
 
 object IOAccessTokenFinder {
   import ch.datascience.http.client.UrlEncoder.urlEncode
-  implicit val projectPathToPath: ProjectPath => String = path => urlEncode(path.value)
-  implicit val projectIdToPath:   ProjectId => String   = _.toString
+  implicit val projectPathToPath: Path => String = path => urlEncode(path.value)
+  implicit val projectIdToPath:   Id => String   = _.toString
 
   def apply(
       logger:                  Logger[IO]

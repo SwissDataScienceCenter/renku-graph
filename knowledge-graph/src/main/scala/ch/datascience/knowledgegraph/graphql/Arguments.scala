@@ -34,14 +34,20 @@ object Arguments {
     case class TinyTypeCoercionViolation(message: NonBlank) extends ValueCoercionViolation(message.value)
 
     def toScalarType(
+        name:        NonBlank,
+        description: NonBlank
+    ): ScalarType[TT] = toScalarType(name, description, Refined.unsafeApply(s"$name has invalid value"))
+
+    def toScalarType(
+        name:             NonBlank,
         description:      NonBlank,
-        exceptionMessage: NonBlank = Refined.unsafeApply(s"${typeFactory.shortTypeName} has invalid value")
+        exceptionMessage: NonBlank
     ): ScalarType[TT] = {
 
       import cats.implicits._
 
       ScalarType[TT](
-        name         = typeFactory.shortTypeName,
+        name         = name.value,
         description  = Some(description.value),
         coerceOutput = valueOutput,
         coerceUserInput = {

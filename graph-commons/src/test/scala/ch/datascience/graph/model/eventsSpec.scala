@@ -18,13 +18,13 @@
 
 package ch.datascience.graph.model
 
+import java.time.{Clock, Instant, ZoneId}
+
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonNegativeInts
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class CommitEventSpec extends WordSpec {
 
@@ -50,20 +50,19 @@ class CommitEventIdSpec extends WordSpec {
   }
 }
 
-class ProjectIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class BatchDateSpec extends WordSpec {
 
-  "instantiation" should {
+  "apply()" should {
 
-    "be successful for non-negative values" in {
-      forAll(nonNegativeInts()) { id =>
-        ProjectId(id.value).value shouldBe id.value
-      }
-    }
+    "instantiate a new BatchDate with current timestamp" in {
+      val systemZone = ZoneId.systemDefault
+      val fixedNow   = Instant.now
 
-    "fail for negative ids" in {
-      an[IllegalArgumentException] shouldBe thrownBy {
-        ProjectId(-1).value
-      }
+      val clock = Clock.fixed(fixedNow, systemZone)
+
+      BatchDate(clock).value shouldBe fixedNow
+
+      Clock.system(systemZone)
     }
   }
 }
