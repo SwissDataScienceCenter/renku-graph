@@ -28,7 +28,8 @@ import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.knowledgegraph.projects.model.{ParentProject, Project => ProjectMetadata}
+import ch.datascience.knowledgegraph.projects.model.Permissions._
+import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project => ProjectMetadata}
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
@@ -151,11 +152,34 @@ object GitLab {
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
 
-    def toJson(parent: ParentProject) = json"""{
-      "id":                  ${parent.id.value},
-      "path_with_namespace": ${parent.path.value},
-      "name":                ${parent.name.value}
-    }"""
+    implicit class ParentProjectOps(parent: ParentProject) {
+      lazy val toJson: Json = json"""{
+        "id":                  ${parent.id.value},
+        "path_with_namespace": ${parent.path.value},
+        "name":                ${parent.name.value}
+      }"""
+    }
+
+    implicit class PermissionsOps(permissions: Permissions) {
+      lazy val toJson: Json = permissions match {
+        case ProjectAndGroupPermissions(project, group) => json"""{
+          "project_access": ${toJson(project)},
+          "group_access":   ${toJson(group)}
+        }"""
+        case ProjectPermissions(project)                => json"""{
+          "project_access": ${toJson(project)},
+          "group_access":   ${Json.Null}
+        }"""
+        case GroupPermissions(group)                    => json"""{
+          "project_access": ${Json.Null},
+          "group_access":   ${toJson(group)}
+        }"""
+      }
+
+      private def toJson(accessLevel: AccessLevel): Json = json"""{
+        "access_level": ${accessLevel.value.value}
+      }"""
+    }
 
     val queryParams = if (withStatistics) "?statistics=true" else ""
     stubFor {
@@ -174,14 +198,7 @@ object GitLab {
               "tag_list":         ${project.tags.map(_.value).toList},
               "star_count":       ${project.starsCount.value},
               "last_activity_at": ${project.updatedAt.value},
-              "permissions": {
-                "project_access": {
-                  "access_level": ${project.permissions.projectAccessLevel.value.value}
-                },
-                "group_access": {
-                  "access_level": ${project.permissions.maybeGroupAccessLevel.map(_.value.value)}
-                }
-              },
+              "permissions":      ${project.permissions.toJson},
               "statistics": {
                 "commit_count":       ${project.statistics.commitsCount.value},
                 "storage_size":       ${project.statistics.storageSize.value},
@@ -192,7 +209,7 @@ object GitLab {
             }"""
               .deepMerge(
                 project.forking.maybeParent
-                  .map(parent => Json.obj("forked_from_project" -> toJson(parent)))
+                  .map(parent => Json.obj("forked_from_project" -> parent.toJson))
                   .getOrElse(Json.obj())
               )
               .noSpaces

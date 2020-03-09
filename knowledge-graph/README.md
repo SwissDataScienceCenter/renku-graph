@@ -314,7 +314,7 @@ Response body example:
   "tags": ["tag1", "tag2"],
   "starsCount": 0,
   "permissions": {
-    "projectAccess": {
+    "projectAccess": { // optional
       "level": {"name": "Developer", "value": 30}
     },
     "groupAccess": { // optional

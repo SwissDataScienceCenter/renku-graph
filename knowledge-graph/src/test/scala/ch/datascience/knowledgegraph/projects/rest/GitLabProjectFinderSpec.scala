@@ -30,8 +30,8 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.ParentProject
-import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
+import ch.datascience.knowledgegraph.projects.model.Permissions._
+import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions}
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -153,12 +153,7 @@ class GitLabProjectFinderSpec
       "tag_list":         ${project.tags.map(_.value).toList},
       "star_count":       ${project.starsCount.value},
       "last_activity_at": ${project.updatedAt.value},
-      "permissions": {
-        "project_access": {
-          "access_level": ${project.permissions.projectAccessLevel.value.value}
-        },
-        "group_access": ${project.permissions.maybeGroupAccessLevel.map(toJson)}
-      },
+      "permissions":      ${toJson(project.permissions)},
       "statistics": {
         "commit_count":       ${project.statistics.commitsCount.value},
         "storage_size":       ${project.statistics.storageSize.value},
@@ -175,6 +170,21 @@ class GitLabProjectFinderSpec
         }
       }"""
     } getOrElse Json.obj())
+
+  private lazy val toJson: Permissions => Json = {
+    case ProjectAndGroupPermissions(project, group) => json"""{
+      "project_access": ${toJson(project)},
+      "group_access":   ${toJson(group)}
+    }"""
+    case ProjectPermissions(project)                => json"""{
+      "project_access": ${toJson(project)},
+      "group_access":   ${Json.Null}
+    }"""
+    case GroupPermissions(group)                    => json"""{
+      "project_access": ${Json.Null},
+      "group_access":   ${toJson(group)}
+    }"""
+  }
 
   private def toJson(accessLevel: AccessLevel): Json = json"""{
     "access_level": ${accessLevel.value.value}

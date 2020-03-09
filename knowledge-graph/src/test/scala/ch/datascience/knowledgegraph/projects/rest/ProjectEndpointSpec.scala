@@ -36,7 +36,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
-import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
+import ch.datascience.knowledgegraph.projects.model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
 import ch.datascience.knowledgegraph.projects.model.Project._
 import ch.datascience.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import ch.datascience.knowledgegraph.projects.model.Urls._
@@ -206,11 +206,20 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       readme <- cursor.downField("readme").as[ReadmeUrl]
     } yield Urls(ssh, http, web, readme)
 
-  private implicit lazy val permissionsDecoder: Decoder[Permissions] = cursor =>
+  private implicit lazy val permissionsDecoder: Decoder[Permissions] = cursor => {
+    def maybeAccessLevel(name: String) = cursor.downField(name).as[Option[AccessLevel]]
+
     for {
-      projectAccessLevel    <- cursor.downField("projectAccess").as[AccessLevel]
-      maybeGroupAccessLevel <- cursor.downField("groupAccess").as[Option[AccessLevel]]
-    } yield Permissions(projectAccessLevel, maybeGroupAccessLevel)
+      maybeProjectAccessLevel <- maybeAccessLevel("projectAccess").map(_.map(ProjectAccessLevel))
+      maybeGroupAccessLevel   <- maybeAccessLevel("groupAccess").map(_.map(GroupAccessLevel))
+      permissions <- (maybeProjectAccessLevel, maybeGroupAccessLevel) match {
+                      case (Some(project), Some(group)) => Right(Permissions(project, group))
+                      case (Some(project), None)        => Right(Permissions(project))
+                      case (None, Some(group))          => Right(Permissions(group))
+                      case _                            => Left(DecodingFailure("Neither projectAccess nor groupAccess", Nil))
+                    }
+    } yield permissions
+  }
 
   private implicit lazy val accessLevelDecoder: Decoder[AccessLevel] = cursor =>
     for {
