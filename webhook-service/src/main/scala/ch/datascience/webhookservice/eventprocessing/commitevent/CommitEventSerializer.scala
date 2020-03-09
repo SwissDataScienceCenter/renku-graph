@@ -20,8 +20,8 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
 import ch.datascience.graph.model.events._
-import io.circe.Json
 import io.circe.literal._
+import io.circe.{Encoder, Json}
 
 import scala.language.higherKinds
 import scala.util.Try
@@ -32,23 +32,26 @@ private class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[I
     Try(toJson(commitEvent).noSpaces)
   }
 
-  private def toJson(commitEvent: CommitEvent): Json = json"""
-    {
-      "id":            ${commitEvent.id.value},
-      "message":       ${commitEvent.message.value},
-      "committedDate": ${commitEvent.committedDate.toString},
-      "author": {
-        "username":    ${commitEvent.author.username.value},
-        "email"   :    ${commitEvent.author.email.value}
-      },
-      "committer": {
-        "username":    ${commitEvent.committer.username.value},
-        "email":       ${commitEvent.committer.email.value}
-      }, 
-      "parents":       ${commitEvent.parents.map(_.value).toArray},
-      "project": {
-        "id":          ${commitEvent.project.id.value},
-        "path":        ${commitEvent.project.path.value}
-      }
+  private def toJson(commitEvent: CommitEvent): Json = json"""{
+    "id":            ${commitEvent.id.value},
+    "message":       ${commitEvent.message.value},
+    "committedDate": ${commitEvent.committedDate.toString},
+    "author":        ${commitEvent.author},
+    "committer":     ${commitEvent.committer}, 
+    "parents":       ${commitEvent.parents.map(_.value).toArray},
+    "project": {
+      "id":          ${commitEvent.project.id.value},
+      "path":        ${commitEvent.project.path.value}
+    }
+  }"""
+
+  private implicit def personEncoder[E <: Person]: Encoder[E] = Encoder.instance[E] {
+    case person: Person.WithEmail => json"""{
+      "username": ${person.username.value},
+      "email"   : ${person.email.value}
     }"""
+    case person: Person           => json"""{
+      "username": ${person.username.value}
+    }"""
+  }
 }
