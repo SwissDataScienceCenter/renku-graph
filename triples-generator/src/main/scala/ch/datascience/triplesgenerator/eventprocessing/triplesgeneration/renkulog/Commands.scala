@@ -144,6 +144,19 @@ private object Commands {
 
     import scala.util.Try
 
+    def migrate(commit: Commit, destinationDirectory: Path): IO[Unit] =
+      IO(%%('renku, 'migrate, "--no-commit")(destinationDirectory))
+        .flatMap(_ => IO.unit)
+        .recoverWith {
+          case NonFatal(exception) =>
+            IO.raiseError {
+              new Exception(
+                s"'renku migrate' failed for commit: ${commit.id}, project: ${commit.project.id}",
+                exception
+              )
+            }
+        }
+
     def log[T <: Commit](
         commit:                 T,
         destinationDirectory:   Path

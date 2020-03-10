@@ -71,6 +71,7 @@ class RenkuLogTriplesGenerator private[renkulog] (
       repositoryUrl <- findRepositoryUrl(commit.project.path, maybeAccessToken).toRight
       _             <- git clone (repositoryUrl, repoDirectory, workDirectory)
       _             <- (git checkout (commit.id, repoDirectory)).toRight
+      _             <- (renku migrate (commit, repoDirectory)).toRight
       triples       <- findTriples(commit, repoDirectory).toRight
     } yield triples
   }.value
