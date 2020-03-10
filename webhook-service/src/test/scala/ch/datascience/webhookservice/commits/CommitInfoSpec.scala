@@ -89,6 +89,27 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
       )
     }
 
+    "decode invalid emails to Nones" in {
+      val commitInfo        = commitInfos.generateOne
+      val authorUsername    = usernames.generateOne
+      val committerUsername = usernames.generateOne
+      json"""{
+        "id":              ${commitInfo.id.value},
+        "author_name":     ${authorUsername.value},
+        "author_email":    "author invalid email",
+        "committer_name":  ${committerUsername.value},
+        "committer_email": "committer invalid email",
+        "message":         ${commitInfo.message.value},
+        "committed_date":  ${commitInfo.committedDate.value},
+        "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
+      }""".as[CommitInfo] shouldBe Right(
+        commitInfo.copy(
+          author    = Author.withUsername(authorUsername),
+          committer = Committer.withUsername(committerUsername)
+        )
+      )
+    }
+
     "fail if there are blanks for author username and email" in {
       val commitInfo = commitInfos.generateOne
 

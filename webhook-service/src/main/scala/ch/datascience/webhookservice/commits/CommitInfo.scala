@@ -32,6 +32,7 @@ case class CommitInfo(
 
 object CommitInfo {
 
+  import cats.implicits._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
 
@@ -41,7 +42,7 @@ object CommitInfo {
       lazy val toMaybeUsername: Decoder.Result[Option[Username]] =
         cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Username])
       lazy val toMaybeEmail: Decoder.Result[Option[Email]] =
-        cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Email])
+        cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Email]).leftFlatMap(_ => Right(None))
     }
 
     for {
