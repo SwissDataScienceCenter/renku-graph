@@ -127,7 +127,7 @@ Response body example:
   "identifier" : "6f622603-2129-4058-ad29-3ff927481461",
   "name" : "dataset name",
   "url" : "http://host/url1",  // optional property
-  "sameAs" : "http://host/url1",  // optional property
+  "sameAs" : "http://host/url1",
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
   "published" : {
     "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
@@ -314,7 +314,7 @@ Response body example:
   "tags": ["tag1", "tag2"],
   "starsCount": 0,
   "permissions": {
-    "projectAccess": {
+    "projectAccess": { // optional
       "level": {"name": "Developer", "value": 30}
     },
     "groupAccess": { // optional
@@ -356,22 +356,24 @@ Response body example:
 ```
 [  
    {  
-      "identifier":"9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
-      "name":"rmDaYfpehl",
-      "_links":[  
+      "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
+      "name": "rmDaYfpehl",
+      "sameAs": "http://host/url1",
+      "_links": [  
          {  
-            "rel":"details",
-            "href":"http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
+            "rel": "details",
+            "href": "http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
          }
       ]
    },
    {  
-      "identifier":"a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
-      "name":"a",
-      "_links":[  
+      "identifier": "a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
+      "name": "a",
+      "sameAs": "http://host/url2",
+      "_links": [  
          {  
-            "rel":"details",
-            "href":"http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+            "rel": "details",
+            "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
          }
       ]
    }

@@ -22,7 +22,7 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
-import ch.datascience.graph.model.datasets.{Identifier, Name}
+import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs}
 import ch.datascience.http.rest.Links
 import Links._
 import ch.datascience.config.renku
@@ -72,16 +72,17 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
   }
 
-  private implicit val datasetEncoder: Encoder[(Identifier, Name)] = Encoder.instance[(Identifier, Name)] {
-    case (id, name) =>
-      json"""
-      {
-        "identifier": ${id.toString},
-        "name": ${name.toString}
-      }""" deepMerge _links(
-        Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
-      )
-  }
+  private implicit val datasetEncoder: Encoder[(Identifier, Name, SameAs)] =
+    Encoder.instance[(Identifier, Name, SameAs)] {
+      case (id, name, sameAs) =>
+        json"""{
+          "identifier": ${id.toString},
+          "name": ${name.toString},
+          "sameAs": ${sameAs.toString}
+        }""" deepMerge _links(
+          Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
+        )
+    }
 }
 
 object IOProjectDatasetsEndpoint {

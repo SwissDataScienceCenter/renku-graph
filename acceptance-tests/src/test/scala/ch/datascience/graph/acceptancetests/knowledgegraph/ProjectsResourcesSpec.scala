@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
@@ -36,7 +37,8 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen, _}
-import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupPermissions, ProjectAndGroupPermissions, ProjectPermissions}
+import ch.datascience.knowledgegraph.projects.model.{Permissions, Project}
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import io.circe.Json
@@ -53,8 +55,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project = projectsGen.generateOne.copy(
     maybeDescription = projectDescriptions.generateSome,
-    forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome),
-    permissions      = permissionsObjects.generateOne.copy(maybeGroupAccessLevel = accessLevels.generateSome)
+    forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome)
   )
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
@@ -78,8 +79,9 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           projectName        = project.name,
           projectDateCreated = project.created.date
         )(
-          datasetIdentifier = dataset.id,
-          datasetName       = dataset.name
+          datasetIdentifier  = dataset.id,
+          datasetName        = dataset.name,
+          maybeDatasetSameAs = dataset.sameAs.some
         )
       )
 
@@ -112,59 +114,69 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
 object ProjectsResources {
 
-  def fullJson(project: Project): Json = {
-    val groupAccessLevel = project.permissions.maybeGroupAccessLevel
-      .getOrElse(throw new Exception("groupAccessLevel expected"))
-    json"""{
-      "identifier":  ${project.id.value}, 
-      "path":        ${project.path.value}, 
-      "name":        ${project.name.value},
-      "description": ${(project.maybeDescription getOrElse (throw new Exception("Description expected"))).value},
-      "visibility":  ${project.visibility.value},
-      "created": {
-        "dateCreated": ${project.created.date.value},
-        "creator": {
-          "name":  ${project.created.creator.name.value},
-          "email": ${project.created.creator.email.value}
-        }
-      },
-      "updatedAt":  ${project.updatedAt.value},
-      "urls": {
-        "ssh":    ${project.urls.ssh.value},
-        "http":   ${project.urls.http.value},
-        "web":    ${project.urls.web.value},
-        "readme": ${project.urls.readme.value}
-      },
-      "forking": {
-        "forksCount": ${project.forking.forksCount.value},
-        "parent": {
-          "identifier": ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).id.value},
-          "path":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).path.value},
-          "name":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).name.value}
-        }
-      },
-      "tags": ${project.tags.map(_.value).toList},
-      "starsCount": ${project.starsCount.value},
-      "permissions": {
-        "projectAccess": {
-          "level": {"name": ${project.permissions.projectAccessLevel.name.value}, "value": ${project.permissions.projectAccessLevel.value.value}}
-        },
-        "groupAccess": {
-          "level": {"name": ${groupAccessLevel.name.value}, "value": ${groupAccessLevel.value.value}}
-        }
-      },
-      "statistics": {
-        "commitsCount":     ${project.statistics.commitsCount.value},
-        "storageSize":      ${project.statistics.storageSize.value},
-        "repositorySize":   ${project.statistics.repositorySize.value},
-        "lfsObjectsSize":   ${project.statistics.lsfObjectsSize.value},
-        "jobArtifactsSize": ${project.statistics.jobArtifactsSize.value}
+  def fullJson(project: Project): Json = json"""{
+    "identifier":  ${project.id.value}, 
+    "path":        ${project.path.value}, 
+    "name":        ${project.name.value},
+    "description": ${(project.maybeDescription getOrElse (throw new Exception("Description expected"))).value},
+    "visibility":  ${project.visibility.value},
+    "created": {
+      "dateCreated": ${project.created.date.value},
+      "creator": {
+        "name":  ${project.created.creator.name.value},
+        "email": ${project.created.creator.email.value}
       }
-    }""" deepMerge {
-      _links(
-        Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
-        Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
-      )
+    },
+    "updatedAt":  ${project.updatedAt.value},
+    "urls": {
+      "ssh":    ${project.urls.ssh.value},
+      "http":   ${project.urls.http.value},
+      "web":    ${project.urls.web.value},
+      "readme": ${project.urls.readme.value}
+    },
+    "forking": {
+      "forksCount": ${project.forking.forksCount.value},
+      "parent": {
+        "identifier": ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).id.value},
+        "path":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).path.value},
+        "name":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).name.value}
+      }
+    },
+    "tags": ${project.tags.map(_.value).toList},
+    "starsCount": ${project.starsCount.value},
+    "permissions": ${toJson(project.permissions)},
+    "statistics": {
+      "commitsCount":     ${project.statistics.commitsCount.value},
+      "storageSize":      ${project.statistics.storageSize.value},
+      "repositorySize":   ${project.statistics.repositorySize.value},
+      "lfsObjectsSize":   ${project.statistics.lsfObjectsSize.value},
+      "jobArtifactsSize": ${project.statistics.jobArtifactsSize.value}
     }
+  }""" deepMerge {
+    _links(
+      Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
+      Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
+    )
+  }
+
+  private lazy val toJson: Permissions => Json = {
+    case ProjectAndGroupPermissions(projectAccessLevel, groupAccessLevel) => json"""{
+      "projectAccess": {
+        "level": {"name": ${projectAccessLevel.name.value}, "value": ${projectAccessLevel.value.value}}
+      },
+      "groupAccess": {
+        "level": {"name": ${groupAccessLevel.name.value}, "value": ${groupAccessLevel.value.value}}
+      }
+    }"""
+    case ProjectPermissions(projectAccessLevel)                           => json"""{
+      "projectAccess": {
+        "level": {"name": ${projectAccessLevel.name.value}, "value": ${projectAccessLevel.value.value}}
+      }
+    }"""
+    case GroupPermissions(groupAccessLevel)                               => json"""{
+      "groupAccess": {
+        "level": {"name": ${groupAccessLevel.name.value}, "value": ${groupAccessLevel.value.value}}
+      }
+    }"""
   }
 }

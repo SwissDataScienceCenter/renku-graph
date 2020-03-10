@@ -27,8 +27,8 @@ object model {
 
   final case class Dataset(id:               Identifier,
                            name:             Name,
+                           sameAs:           SameAs,
                            maybeUrl:         Option[Url],
-                           maybeSameAs:      Option[SameAs],
                            maybeDescription: Option[Description],
                            published:        DatasetPublishing,
                            parts:            List[DatasetPart],

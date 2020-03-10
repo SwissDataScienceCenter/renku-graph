@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{Identifier, Name}
+import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait ProjectDatasetsFinder[Interpretation[_]] {
-  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier, Name)]]
+  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier, Name, SameAs)]]
 }
 
 private class IOProjectDatasetsFinder(
@@ -46,8 +46,8 @@ private class IOProjectDatasetsFinder(
 
   import IOProjectDatasetsFinder._
 
-  def findProjectDatasets(projectPath: Path): IO[List[(Identifier, Name)]] =
-    queryExpecting[List[(Identifier, Name)]](using = query(projectPath))
+  def findProjectDatasets(projectPath: Path): IO[List[(Identifier, Name, SameAs)]] =
+    queryExpecting[List[(Identifier, Name, SameAs)]](using = query(projectPath))
 
   private def query(path: Path) = SparqlQuery(
     name = "ds projects",
@@ -56,12 +56,42 @@ private class IOProjectDatasetsFinder(
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name
+    s"""|SELECT DISTINCT ?identifier ?name (?topmostSameAs AS ?sameAs)
         |WHERE {
-        |  ?dataset schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} .
-        |  ?dataset rdf:type <http://schema.org/Dataset> ;
-        |           schema:identifier ?identifier ;
-        |           schema:name ?name .
+        |  {
+        |    ?datasetId rdf:type <http://schema.org/Dataset>;
+        |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |               schema:identifier ?identifier;
+        |               schema:name ?name.
+        |  } {
+        |    SELECT ?datasetId ?topmostSameAs
+        |    WHERE {
+        |      {
+        |        {
+        |          ?datasetId schema:sameAs+/schema:url ?l1.
+        |          FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
+        |          BIND (?l1 AS ?topmostSameAs)
+        |        } UNION {
+        |          ?datasetId rdf:type <http://schema.org/Dataset>.
+        |          FILTER NOT EXISTS { ?datasetId schema:sameAs ?l1 }
+        |          BIND (?datasetId AS ?topmostSameAs)
+        |        }
+        |      } UNION {
+        |        ?datasetId schema:sameAs+/schema:url ?l1.
+        |        ?l1 schema:sameAs+/schema:url ?l2
+        |        FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
+        |        BIND (?l2 AS ?topmostSameAs)
+        |      } UNION {
+        |        ?datasetId schema:sameAs+/schema:url ?l1.
+        |        ?l1 schema:sameAs+/schema:url ?l2.
+        |        ?l2 schema:sameAs+/schema:url ?l3
+        |        FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
+        |        BIND (?l3 AS ?topmostSameAs)
+        |      }
+        |    }
+        |    GROUP BY ?datasetId ?topmostSameAs
+        |    HAVING (COUNT(*) > 0)
+        |  }
         |}
         |""".stripMargin
   )
@@ -70,16 +100,17 @@ private class IOProjectDatasetsFinder(
 private object IOProjectDatasetsFinder {
   import io.circe.Decoder
 
-  private implicit val recordsDecoder: Decoder[List[(Identifier, Name)]] = {
+  private implicit val recordsDecoder: Decoder[List[(Identifier, Name, SameAs)]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val recordDecoder: Decoder[(Identifier, Name)] = { cursor =>
+    implicit val recordDecoder: Decoder[(Identifier, Name, SameAs)] = { cursor =>
       for {
-        id   <- cursor.downField("identifier").downField("value").as[Identifier]
-        name <- cursor.downField("name").downField("value").as[Name]
-      } yield id -> name
+        id     <- cursor.downField("identifier").downField("value").as[Identifier]
+        name   <- cursor.downField("name").downField("value").as[Name]
+        sameAs <- cursor.downField("sameAs").downField("value").as[SameAs]
+      } yield (id, name, sameAs)
     }
 
-    _.downField("results").downField("bindings").as(decodeList[(Identifier, Name)])
+    _.downField("results").downField("bindings").as(decodeList[(Identifier, Name, SameAs)])
   }
 }

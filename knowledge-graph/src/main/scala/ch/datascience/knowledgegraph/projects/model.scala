@@ -25,6 +25,7 @@ import cats.data.Validated
 import cats.implicits._
 import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
 import ch.datascience.graph.model.users
+import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupAccessLevel, ProjectAccessLevel}
 import ch.datascience.knowledgegraph.projects.model.Statistics._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -77,13 +78,33 @@ object model {
 
   final case class ParentProject(id: Id, path: Path, name: Name)
 
-  final case class Permissions(projectAccessLevel: AccessLevel, maybeGroupAccessLevel: Option[AccessLevel])
+  sealed trait Permissions extends Product with Serializable
 
   object Permissions {
 
-    sealed abstract class AccessLevel(val name: String Refined NonEmpty, val value: Int Refined Positive)
-        extends Product
-        with Serializable {
+    final case class ProjectPermissions(projectAccessLevel:         ProjectAccessLevel) extends Permissions
+    final case class GroupPermissions(groupAccessLevel:             GroupAccessLevel) extends Permissions
+    final case class ProjectAndGroupPermissions(projectAccessLevel: ProjectAccessLevel,
+                                                groupAccessLevel:   GroupAccessLevel)
+        extends Permissions
+
+    def apply(accessLevel:        ProjectAccessLevel): Permissions = ProjectPermissions(accessLevel)
+    def apply(accessLevel:        GroupAccessLevel): Permissions = GroupPermissions(accessLevel)
+    def apply(projectAccessLevel: ProjectAccessLevel, groupAccessLevel: GroupAccessLevel): Permissions =
+      ProjectAndGroupPermissions(projectAccessLevel, groupAccessLevel)
+
+    final case class ProjectAccessLevel(accessLevel: AccessLevel) extends AccessLevel {
+      override val name:  Refined[String, NonEmpty] = accessLevel.name
+      override val value: Refined[Int, Positive]    = accessLevel.value
+    }
+    final case class GroupAccessLevel(accessLevel: AccessLevel) extends AccessLevel {
+      override val name:  Refined[String, NonEmpty] = accessLevel.name
+      override val value: Refined[Int, Positive]    = accessLevel.value
+    }
+
+    sealed trait AccessLevel extends Product with Serializable {
+      val name:  String Refined NonEmpty
+      val value: Int Refined Positive
       override lazy val toString: String = s"$name ($value)"
     }
 
@@ -94,13 +115,16 @@ object model {
         ifNone = new IllegalArgumentException(s"Unrecognized AccessLevel with value '$value'")
       )
 
-      lazy val all: Set[AccessLevel] = Set(Guest, Reporter, Developer, Maintainer, Owner)
+      sealed abstract class AbstractAccessLevel(val name: String Refined NonEmpty, val value: Int Refined Positive)
+          extends AccessLevel
 
-      final case object Guest      extends AccessLevel(name = "Guest", value      = 10)
-      final case object Reporter   extends AccessLevel(name = "Reporter", value   = 20)
-      final case object Developer  extends AccessLevel(name = "Developer", value  = 30)
-      final case object Maintainer extends AccessLevel(name = "Maintainer", value = 40)
-      final case object Owner      extends AccessLevel(name = "Owner", value      = 50)
+      final case object Guest      extends AbstractAccessLevel(name = "Guest", value      = 10)
+      final case object Reporter   extends AbstractAccessLevel(name = "Reporter", value   = 20)
+      final case object Developer  extends AbstractAccessLevel(name = "Developer", value  = 30)
+      final case object Maintainer extends AbstractAccessLevel(name = "Maintainer", value = 40)
+      final case object Owner      extends AbstractAccessLevel(name = "Owner", value      = 50)
+
+      lazy val all: Set[AccessLevel] = Set(Guest, Reporter, Developer, Maintainer, Owner)
     }
   }
 

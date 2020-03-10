@@ -32,18 +32,18 @@ object DatasetsGenerators {
 
   implicit val datasets: Gen[Dataset] = datasets()
 
-  def datasets(maybeSameAs: Gen[Option[SameAs]]               = Gen.option(datasetSameAs),
-               projects:    Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] =
+  def datasets(sameAs:   Gen[SameAs]                       = datasetSameAs,
+               projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] =
     for {
       id               <- datasetIdentifiers
       name             <- datasetNames
       maybeUrl         <- Gen.option(datasetUrls)
-      maybeSameAs      <- maybeSameAs
+      sameas           <- sameAs
       maybeDescription <- Gen.option(datasetDescriptions)
       published        <- datasetPublishingInfos
       part             <- listOf(datasetPart)
       projects         <- projects
-    } yield Dataset(id, name, maybeUrl, maybeSameAs, maybeDescription, published, part, projects.toList)
+    } yield Dataset(id, name, sameas, maybeUrl, maybeDescription, published, part, projects.toList)
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
     maybeEmail       <- Gen.option(emails)

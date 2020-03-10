@@ -88,7 +88,7 @@ private class IOGitLabProjectFinder(
 
   private implicit lazy val projectDecoder: EntityDecoder[IO, GitLabProject] = {
     import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
-    import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
+    import ch.datascience.knowledgegraph.projects.model.Permissions._
     import ch.datascience.knowledgegraph.projects.model.Project.StarsCount
     import ch.datascience.knowledgegraph.projects.model.Statistics._
     import ch.datascience.knowledgegraph.projects.model.Urls
@@ -124,29 +124,37 @@ private class IOGitLabProjectFinder(
         jobArtifactsSize <- cursor.downField("job_artifacts_size").as[JobArtifactsSize]
       } yield Statistics(commitsCount, storageSize, repositorySize, lfsSize, jobArtifactsSize)
 
-    val getOrFail: Option[AccessLevel] => Either[DecodingFailure, AccessLevel] =
-      Either.fromOption(_, DecodingFailure("permissions.project_access missing", Nil))
+    implicit val permissionsDecoder: Decoder[Permissions] = cursor => {
+
+      def maybeAccessLevel(name: String) = cursor.downField(name).as[Option[AccessLevel]]
+
+      for {
+        maybeProjectAccessLevel <- maybeAccessLevel("project_access").map(_.map(ProjectAccessLevel))
+        maybeGroupAccessLevel   <- maybeAccessLevel("group_access").map(_.map(GroupAccessLevel))
+        permissions <- (maybeProjectAccessLevel, maybeGroupAccessLevel) match {
+                        case (Some(project), Some(group)) => Right(Permissions(project, group))
+                        case (Some(project), None)        => Right(Permissions(project))
+                        case (None, Some(group))          => Right(Permissions(group))
+                        case _                            => Left(DecodingFailure("permissions has neither project_access nor group_access", Nil))
+                      }
+      } yield permissions
+    }
 
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        id                    <- cursor.downField("id").as[Id]
-        visibility            <- cursor.downField("visibility").as[Visibility]
-        sshUrl                <- cursor.downField("ssh_url_to_repo").as[SshUrl]
-        httpUrl               <- cursor.downField("http_url_to_repo").as[HttpUrl]
-        webUrl                <- cursor.downField("web_url").as[WebUrl]
-        readmeUrl             <- cursor.downField("readme_url").as[ReadmeUrl]
-        forksCount            <- cursor.downField("forks_count").as[ForksCount]
-        tags                  <- cursor.downField("tag_list").as[List[Tag]]
-        starsCount            <- cursor.downField("star_count").as[StarsCount]
-        updatedAt             <- cursor.downField("last_activity_at").as[DateUpdated]
-        maybeParent           <- cursor.downField("forked_from_project").as[Option[ParentProject]]
-        statistics            <- cursor.downField("statistics").as[Statistics]
-        maybeGroupAccessLevel <- cursor.downField("permissions").downField("group_access").as[Option[AccessLevel]]
-        projectAccessLevel <- cursor
-                               .downField("permissions")
-                               .downField("project_access")
-                               .as[Option[AccessLevel]]
-                               .flatMap(getOrFail)
+        id          <- cursor.downField("id").as[Id]
+        visibility  <- cursor.downField("visibility").as[Visibility]
+        sshUrl      <- cursor.downField("ssh_url_to_repo").as[SshUrl]
+        httpUrl     <- cursor.downField("http_url_to_repo").as[HttpUrl]
+        webUrl      <- cursor.downField("web_url").as[WebUrl]
+        readmeUrl   <- cursor.downField("readme_url").as[ReadmeUrl]
+        forksCount  <- cursor.downField("forks_count").as[ForksCount]
+        tags        <- cursor.downField("tag_list").as[List[Tag]]
+        starsCount  <- cursor.downField("star_count").as[StarsCount]
+        updatedAt   <- cursor.downField("last_activity_at").as[DateUpdated]
+        maybeParent <- cursor.downField("forked_from_project").as[Option[ParentProject]]
+        statistics  <- cursor.downField("statistics").as[Statistics]
+        permissions <- cursor.downField("permissions").as[Permissions]
         maybeDescription <- cursor
                              .downField("description")
                              .as[Option[String]]
@@ -161,7 +169,7 @@ private class IOGitLabProjectFinder(
         tags.toSet,
         starsCount,
         updatedAt,
-        Permissions(projectAccessLevel, maybeGroupAccessLevel),
+        permissions,
         statistics
       )
 
