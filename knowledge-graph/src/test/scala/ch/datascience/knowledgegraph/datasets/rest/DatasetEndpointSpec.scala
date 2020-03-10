@@ -150,13 +150,13 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
     for {
       id               <- cursor.downField("identifier").as[Identifier]
       name             <- cursor.downField("name").as[Name]
+      sameAs           <- cursor.downField("sameAs").as[SameAs]
       maybeUrl         <- cursor.downField("url").as[Option[Url]]
-      maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       published        <- cursor.downField("published").as[DatasetPublishing]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
-    } yield Dataset(id, name, maybeUrl, maybeSameAs, maybeDescription, published, parts, projects)
+    } yield Dataset(id, name, sameAs, maybeUrl, maybeDescription, published, parts, projects)
 
   private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>
     for {

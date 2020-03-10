@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
-import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
+import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
 import ch.datascience.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import ch.datascience.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
@@ -136,10 +136,15 @@ object ProjectsGenerators {
 
   private implicit lazy val updatedAts: Gen[DateUpdated] = timestampsNotInTheFuture map DateUpdated.apply
 
-  implicit lazy val permissionsObjects: Gen[Permissions] = for {
-    project    <- accessLevels
-    maybeGroup <- accessLevels.toGeneratorOfOptions
-  } yield Permissions(project, maybeGroup)
+  implicit lazy val permissionsObjects: Gen[Permissions] =
+    Gen.oneOf(
+      accessLevels map ProjectAccessLevel.apply map ProjectPermissions.apply,
+      accessLevels map GroupAccessLevel.apply map GroupPermissions.apply,
+      for {
+        project <- accessLevels map ProjectAccessLevel.apply
+        group   <- accessLevels map GroupAccessLevel.apply
+      } yield ProjectAndGroupPermissions(project, group)
+    )
 
   implicit lazy val accessLevels: Gen[AccessLevel] = Gen.oneOf(AccessLevel.all.toList)
 

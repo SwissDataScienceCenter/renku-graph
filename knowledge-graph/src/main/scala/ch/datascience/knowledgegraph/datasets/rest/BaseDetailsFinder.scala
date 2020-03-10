@@ -54,17 +54,52 @@ private class BaseDetailsFinder(
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?url ?sameAs ?description ?publishedDate
+    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?url (?topmostSameAs AS ?sameAs) ?description ?publishedDate
         |WHERE {
-        |  ?dataset schema:identifier "$identifier" ;
-        |           schema:identifier ?identifier ;
-        |           rdf:type <http://schema.org/Dataset> ;
-        |           schema:name ?name .
-        |  OPTIONAL { ?dataset schema:url ?url } .
-        |  OPTIONAL { ?dataset schema:sameAs/schema:url ?sameAs } .
-        |  OPTIONAL { ?dataset schema:description ?description } .
-        |  OPTIONAL { ?dataset schema:datePublished ?publishedDate } .
-        |}""".stripMargin
+        |  {
+        |    SELECT ?topmostSameAs
+        |    WHERE {
+        |      {
+        |        ?l0 rdf:type <http://schema.org/Dataset>;
+        |            schema:identifier "$identifier"
+        |      } {
+        |        {
+        |          {
+        |            ?l0 schema:sameAs+/schema:url ?l1.
+        |            FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
+        |            BIND (?l1 AS ?topmostSameAs)
+        |          } UNION {
+        |            ?l0 rdf:type <http://schema.org/Dataset>.
+        |            FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
+        |            BIND (?l0 AS ?topmostSameAs)
+        |          }
+        |        } UNION {
+        |          ?l0 schema:sameAs+/schema:url ?l1.
+        |          ?l1 schema:sameAs+/schema:url ?l2
+        |          FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
+        |          BIND (?l2 AS ?topmostSameAs)
+        |        } UNION {
+        |          ?l0 schema:sameAs+/schema:url ?l1.
+        |          ?l1 schema:sameAs+/schema:url ?l2.
+        |          ?l2 schema:sameAs+/schema:url ?l3
+        |          FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
+        |          BIND (?l3 AS ?topmostSameAs)
+        |        }
+        |      }
+        |    }
+        |    GROUP BY ?topmostSameAs
+        |    HAVING (COUNT(*) > 0)
+        |  } {
+        |    ?datasetId schema:identifier "$identifier" ;
+        |               schema:identifier ?identifier ;
+        |               rdf:type <http://schema.org/Dataset> ;
+        |               schema:name ?name .
+        |    OPTIONAL { ?datasetId schema:url ?url } .
+        |    OPTIONAL { ?datasetId schema:description ?description } .
+        |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate } .
+        |  }
+        |}
+        |""".stripMargin
   )
 
   private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
@@ -88,7 +123,8 @@ private object BaseDetailsFinder {
 
     val dataset: Decoder[Dataset] = { cursor =>
       for {
-        id                 <- extract[Identifier]("identifier", from = cursor)
+        id                 <- extract[String]("datasetId", from = cursor)
+        identifier         <- extract[Identifier]("identifier", from = cursor)
         name               <- extract[Name]("name", from = cursor)
         maybeUrl           <- extract[Option[String]]("url", from = cursor).map(blankToNone).flatMap(toOption[Url])
         maybeSameAs        <- extract[Option[String]]("sameAs", from = cursor).map(blankToNone).flatMap(toOption[SameAs])
@@ -97,10 +133,10 @@ private object BaseDetailsFinder {
                              .map(blankToNone)
                              .flatMap(toOption[Description])
       } yield Dataset(
-        id,
+        identifier,
         name,
+        maybeSameAs getOrElse SameAs(id),
         maybeUrl,
-        maybeSameAs,
         maybeDescription,
         DatasetPublishing(maybePublishedDate, Set.empty),
         parts    = List.empty,

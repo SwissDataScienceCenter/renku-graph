@@ -27,8 +27,8 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.config.GitLab
-import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
-import ch.datascience.knowledgegraph.projects.model.{Creator, Forking, ParentProject, Permissions, Project, Statistics, Urls}
+import ch.datascience.knowledgegraph.projects.model.Permissions._
+import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
@@ -134,12 +134,17 @@ class ProjectEndpoint[Interpretation[_]: Effect](
     }"""
   }
 
-  private implicit lazy val permissionsEncoder: Encoder[Permissions] = Encoder.instance[Permissions] { permissions =>
-    json"""{
-      "projectAccess": ${permissions.projectAccessLevel}
-    }""" deepMerge {
-      permissions.maybeGroupAccessLevel.map(access => json"""{"groupAccess": $access}""") getOrElse Json.obj()
-    }
+  private implicit lazy val permissionsEncoder: Encoder[Permissions] = Encoder.instance[Permissions] {
+    case ProjectAndGroupPermissions(projectAccessLevel, groupAccessLevel) => json"""{
+      "projectAccess": ${projectAccessLevel.accessLevel},
+      "groupAccess":   ${groupAccessLevel.accessLevel}
+    }"""
+    case ProjectPermissions(accessLevel)                                  => json"""{
+      "projectAccess": ${accessLevel.accessLevel}
+    }"""
+    case GroupPermissions(accessLevel)                                    => json"""{
+      "groupAccess": ${accessLevel.accessLevel}
+    }"""
   }
 
   private implicit lazy val accessLevelEncoder: Encoder[AccessLevel] = Encoder.instance[AccessLevel] { level =>
