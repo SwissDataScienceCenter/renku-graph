@@ -154,15 +154,14 @@ class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalSe
   private def commitsJson(from: CommitInfo) =
     Json.arr(commitJson(from)).noSpaces
 
-  private def commitJson(commitInfo: CommitInfo) = json"""
-    {
-      "id":              ${commitInfo.id.value},
-      "author_name":     ${commitInfo.author.username.value},
-      "author_email":    ${commitInfo.author.email.value},
-      "committer_name":  ${commitInfo.committer.username.value},
-      "committer_email": ${commitInfo.committer.email.value},
-      "message":         ${commitInfo.message.value},
-      "committed_date":  ${commitInfo.committedDate.value},
-      "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
-    }"""
+  private def commitJson(commitInfo: CommitInfo) = json"""{
+    "id":              ${commitInfo.id.value},
+    "author_name":     ${commitInfo.author.username.value},
+    "author_email":    ${commitInfo.author.emailToJson},
+    "committer_name":  ${commitInfo.committer.username.value},
+    "committer_email": ${commitInfo.committer.emailToJson},
+    "message":         ${commitInfo.message.value},
+    "committed_date":  ${commitInfo.committedDate.value},
+    "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
+  }"""
 }

@@ -27,7 +27,20 @@ object users {
   implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonBlank
 
   final class Email private (val value: String) extends AnyVal with StringTinyType
-  implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank
+  implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank {
+
+    addConstraint(
+      check = _.split('@').toList match {
+        case head +: tail +: Nil => head.trim.nonEmpty && tail.trim.nonEmpty
+        case _                   => false
+      },
+      message = value => s"'$value' is not a valid email"
+    )
+
+    implicit class EmailOps(email: Email) {
+      lazy val extractUsername: Username = Username(email.value.split('@').head)
+    }
+  }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank

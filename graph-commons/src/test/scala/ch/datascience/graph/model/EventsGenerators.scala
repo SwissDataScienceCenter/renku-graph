@@ -32,10 +32,23 @@ object EventsGenerators {
   implicit val committedDates: Gen[CommittedDate] = timestampsNotInTheFuture map CommittedDate.apply
   implicit val batchDates:     Gen[BatchDate]     = timestampsNotInTheFuture map BatchDate.apply
 
-  implicit val users: Gen[User] = for {
-    username <- usernames
-    email    <- emails
-  } yield User(username, email)
+  implicit val authors: Gen[Author] = Gen.oneOf(
+    usernames map Author.withUsername,
+    emails map Author.withEmail,
+    for {
+      username <- usernames
+      email    <- emails
+    } yield Author(username, email)
+  )
+
+  implicit val committers: Gen[Committer] = Gen.oneOf(
+    usernames map Committer.withUsername,
+    emails map Committer.withEmail,
+    for {
+      username <- usernames
+      email    <- emails
+    } yield Committer(username, email)
+  )
 
   implicit val projects: Gen[Project] = for {
     projectId <- projectIds
@@ -62,8 +75,8 @@ object EventsGenerators {
     project       <- projects
     message       <- commitMessages
     committedDate <- committedDates
-    author        <- users
-    committer     <- users
+    author        <- authors
+    committer     <- committers
     parentsIds    <- parentsIdsLists()
     batchDate     <- batchDates
   } yield CommitEvent(commitId, project, message, committedDate, author, committer, parentsIds, batchDate)

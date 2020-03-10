@@ -290,8 +290,8 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
       for {
         message       <- commitMessages
         committedDate <- committedDates
-        author        <- users
-        committer     <- users
+        author        <- authors
+        committer     <- committers
         parentsIds    <- parentsIdsLists()
       } yield CommitEvent(
         id            = commitId,

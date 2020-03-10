@@ -25,30 +25,47 @@ case class CommitInfo(
     id:            CommitId,
     message:       CommitMessage,
     committedDate: CommittedDate,
-    author:        User,
-    committer:     User,
+    author:        Author,
+    committer:     Committer,
     parents:       List[CommitId]
 )
 
 object CommitInfo {
 
+  import cats.implicits._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
 
-  private[commits] implicit val commitInfoDecoder: Decoder[CommitInfo] = (cursor: HCursor) =>
+  private[commits] implicit val commitInfoDecoder: Decoder[CommitInfo] = (cursor: HCursor) => {
+
+    implicit class CursorOps(cursor: ACursor) {
+      lazy val toMaybeUsername: Decoder.Result[Option[Username]] =
+        cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Username])
+      lazy val toMaybeEmail: Decoder.Result[Option[Email]] =
+        cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Email]).leftFlatMap(_ => Right(None))
+    }
+
     for {
       id             <- cursor.downField("id").as[CommitId]
-      authorName     <- cursor.downField("author_name").as[Username]
-      authorEmail    <- cursor.downField("author_email").as[Email]
-      committerName  <- cursor.downField("committer_name").as[Username]
-      committerEmail <- cursor.downField("committer_email").as[Email]
       message        <- cursor.downField("message").as[CommitMessage]
       committedDate  <- cursor.downField("committed_date").as[CommittedDate]
       parents        <- cursor.downField("parent_ids").as[List[CommitId]]
-    } yield CommitInfo(id,
-                       message,
-                       committedDate,
-                       author    = User(authorName, authorEmail),
-                       committer = User(committerName, committerEmail),
-                       parents)
+      authorName     <- cursor.downField("author_name").toMaybeUsername
+      authorEmail    <- cursor.downField("author_email").toMaybeEmail
+      committerName  <- cursor.downField("committer_name").toMaybeUsername
+      committerEmail <- cursor.downField("committer_email").toMaybeEmail
+      author <- (authorName, authorEmail) match {
+                 case (Some(name), Some(email)) => Right(Author(name, email))
+                 case (Some(name), None)        => Right(Author.withUsername(name))
+                 case (None, Some(email))       => Right(Author.withEmail(email))
+                 case _                         => Left(DecodingFailure("Neither author name nor email", Nil))
+               }
+      committer <- (committerName, committerEmail) match {
+                    case (Some(name), Some(email)) => Right(Committer(name, email))
+                    case (Some(name), None)        => Right(Committer.withUsername(name))
+                    case (None, Some(email))       => Right(Committer.withEmail(email))
+                    case _                         => Left(DecodingFailure("Neither committer name nor email", Nil))
+                  }
+    } yield CommitInfo(id, message, committedDate, author, committer, parents)
+  }
 }

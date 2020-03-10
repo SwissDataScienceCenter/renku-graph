@@ -22,40 +22,35 @@ import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.events
+import ch.datascience.graph.model.events.CommitEvent
 import io.circe.Json
 import io.circe.parser._
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Try
 
-class CommitEventSerializerSpec extends WordSpec with MockFactory {
+class CommitEventSerializerSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "serialiseToJsonString" should {
 
     "return a single line json if serialization was successful" in new TestCase {
-
-      val commitEvent = commitEvents.generateOne
-
-      serializer.serialiseToJsonString(commitEvent).map(parse) shouldBe json(
-        "id"            -> Json.fromString(commitEvent.id.value),
-        "message"       -> Json.fromString(commitEvent.message.value),
-        "committedDate" -> Json.fromString(commitEvent.committedDate.toString),
-        "author" -> Json.obj(
-          "username" -> Json.fromString(commitEvent.author.username.value),
-          "email"    -> Json.fromString(commitEvent.author.email.value)
-        ),
-        "committer" -> Json.obj(
-          "username" -> Json.fromString(commitEvent.committer.username.value),
-          "email"    -> Json.fromString(commitEvent.committer.email.value)
-        ),
-        "parents" -> Json.fromValues(commitEvent.parents.map(parent => Json.fromString(parent.value))),
-        "project" -> Json.obj(
-          "id"   -> Json.fromInt(commitEvent.project.id.value),
-          "path" -> Json.fromString(commitEvent.project.path.value)
+      forAll { commitEvent: CommitEvent =>
+        serializer.serialiseToJsonString(commitEvent).map(parse) shouldBe json(
+          "id"            -> Json.fromString(commitEvent.id.value),
+          "message"       -> Json.fromString(commitEvent.message.value),
+          "committedDate" -> Json.fromString(commitEvent.committedDate.toString),
+          "author"        -> commitEvent.author.toJson,
+          "committer"     -> commitEvent.committer.toJson,
+          "parents"       -> Json.fromValues(commitEvent.parents.map(parent => Json.fromString(parent.value))),
+          "project" -> Json.obj(
+            "id"   -> Json.fromInt(commitEvent.project.id.value),
+            "path" -> Json.fromString(commitEvent.project.path.value)
+          )
         )
-      )
+      }
     }
   }
 
@@ -66,6 +61,18 @@ class CommitEventSerializerSpec extends WordSpec with MockFactory {
 
     def json(fields: (String, Json)*) = context.pure {
       Right(Json.obj(fields: _*))
+    }
+  }
+
+  private implicit class PersonOps(person: events.Person) {
+    lazy val toJson: Json = person match {
+      case person: events.Person.WithEmail =>
+        Json.obj(
+          "username" -> Json.fromString(person.username.value),
+          "email"    -> Json.fromString(person.email.value)
+        )
+      case person: events.Person => Json.obj("username" -> Json.fromString(person.username.value))
+      case _ => Json.Null
     }
   }
 }
