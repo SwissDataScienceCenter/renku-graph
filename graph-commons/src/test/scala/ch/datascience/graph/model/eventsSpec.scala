@@ -20,11 +20,14 @@ package ch.datascience.graph.model
 
 import java.time.{Clock, Instant, ZoneId}
 
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.users.Email
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class CommitEventSpec extends WordSpec {
 
@@ -63,6 +66,30 @@ class BatchDateSpec extends WordSpec {
       BatchDate(clock).value shouldBe fixedNow
 
       Clock.system(systemZone)
+    }
+  }
+}
+
+class AuthorSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "withEmail" should {
+
+    "instantiate a new Author with username extracted from the email" in {
+      forAll { email: Email =>
+        Author.withEmail(email) shouldBe Author(email.extractUsername, email)
+      }
+    }
+  }
+}
+
+class CommitterSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "withEmail" should {
+
+    "instantiate a new Committer with username extracted from the email" in {
+      forAll { email: Email =>
+        Committer.withEmail(email) shouldBe Committer(email.extractUsername, email)
+      }
     }
   }
 }

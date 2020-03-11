@@ -150,17 +150,16 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
     val commitId      = commitIds.generateOne
     val commitMessage = commitMessages.generateOne
     val committedDate = CommittedDate(LocalDateTime.of(2012, 9, 20, 9, 6, 12).atOffset(ZoneOffset.ofHours(3)).toInstant)
-    val author        = users.generateOne
-    val committer     = users.generateOne
+    val author        = authors.generateOne
+    val committer     = committers.generateOne
     val parents       = parentsIdsLists().generateOne
 
-    lazy val responseJson = json"""
-    {
+    lazy val responseJson = json"""{
       "id":              ${commitId.value},
       "author_name":     ${author.username.value},
-      "author_email":    ${author.email.value},
+      "author_email":    ${author.emailToJson},
       "committer_name":  ${committer.username.value},
-      "committer_email": ${committer.email.value},
+      "committer_email": ${committer.emailToJson},
       "message":         ${commitMessage.value},
       "committed_date":  "2012-09-20T09:06:12+03:00",
       "parent_ids":      ${parents.map(_.value).toArray}

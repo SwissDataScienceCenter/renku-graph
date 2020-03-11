@@ -59,8 +59,8 @@ object WebhookServiceGenerators {
     id            <- commitIds
     message       <- commitMessages
     committedDate <- committedDates
-    author        <- users
-    committer     <- users
+    author        <- authors
+    committer     <- committers
     parents       <- listOf(commitIds)
   } yield CommitInfo(id, message, committedDate, author, committer, parents)
 }
