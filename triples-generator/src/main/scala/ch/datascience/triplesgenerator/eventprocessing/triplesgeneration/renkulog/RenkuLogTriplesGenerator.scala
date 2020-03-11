@@ -55,8 +55,9 @@ class RenkuLogTriplesGenerator private[renkulog] (
   private val workDirectory: Path = root / "tmp"
   private val repositoryDirectoryFinder = ".*/(.*)$".r
 
-  def generateTriples(commit:           Commit,
-                      maybeAccessToken: Option[AccessToken]): EitherT[IO, GenerationRecoverableError, JsonLDTriples] =
+  override def generateTriples(
+      commit:                  Commit
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, GenerationRecoverableError, JsonLDTriples] =
     EitherT {
       createRepositoryDirectory(commit.project.path)
         .bracket(cloneCheckoutGenerate(commit, maybeAccessToken))(deleteDirectory)

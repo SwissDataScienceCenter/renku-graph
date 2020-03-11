@@ -68,15 +68,15 @@ class RemoteTriplesGenerator(
   import org.http4s.dsl.io._
 
   override def generateTriples(
-      commit:           Commit,
-      maybeAccessToken: Option[AccessToken]
-  ): EitherT[IO, GenerationRecoverableError, JsonLDTriples] = EitherT.right {
-    for {
-      uri           <- validateUri(s"$serviceUrl/projects/${commit.project.id}/commits/${commit.id}")
-      triplesInJson <- send(request(GET, uri))(mapResponse)
-      triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
-    } yield triples
-  }
+      commit:                  Commit
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, GenerationRecoverableError, JsonLDTriples] =
+    EitherT.right {
+      for {
+        uri           <- validateUri(s"$serviceUrl/projects/${commit.project.id}/commits/${commit.id}")
+        triplesInJson <- send(request(GET, uri))(mapResponse)
+        triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
+      } yield triples
+    }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {
     case (Ok, _, response)    => response.as[Json]

@@ -21,9 +21,11 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 import CurationGenerators._
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.http.client.AccessToken
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -41,7 +43,7 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
         .expects(CuratedTriples(triples, updates = Nil))
         .returning(context.pure(updatedTriples))
 
-      curator.curate(triples) shouldBe context.pure(updatedTriples)
+      curator.curate(commit, triples) shouldBe context.pure(updatedTriples)
     }
 
     "pass the curation step failure when it happened" in new TestCase {
@@ -51,7 +53,7 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
         .expects(CuratedTriples(triples, updates = Nil))
         .returning(context.raiseError(exception))
 
-      curator.curate(triples) shouldBe context.raiseError(exception)
+      curator.curate(commit, triples) shouldBe context.raiseError(exception)
     }
   }
 
@@ -59,6 +61,8 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
     val context = MonadError[Try, Throwable]
 
     val triples = jsonLDTriples.generateOne
+    val commit  = commits.generateOne
+    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     class TryPersonDetailsUpdater extends PersonDetailsUpdater[Try]
     val personDetailsUpdater = mock[TryPersonDetailsUpdater]

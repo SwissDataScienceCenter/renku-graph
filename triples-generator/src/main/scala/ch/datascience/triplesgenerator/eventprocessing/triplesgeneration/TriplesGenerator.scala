@@ -34,9 +34,8 @@ import scala.language.higherKinds
 
 trait TriplesGenerator[Interpretation[_]] {
   def generateTriples(
-      commit:           Commit,
-      maybeAccessToken: Option[AccessToken]
-  ): EitherT[Interpretation, GenerationRecoverableError, JsonLDTriples]
+      commit:                  Commit
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, GenerationRecoverableError, JsonLDTriples]
 }
 
 object TriplesGenerator {

@@ -76,24 +76,24 @@ class CommitEventProcessor[Interpretation[_]](
       for {
         commits          <- deserialiseToCommitEvents(eventBody)
         maybeAccessToken <- findAccessToken(commits.head.project.id) recoverWith rollback(commits.head)
-        uploadingResults <- allToTriplesAndUpload(commits, maybeAccessToken)
+        uploadingResults <- allToTriplesAndUpload(commits)(maybeAccessToken)
       } yield uploadingResults
     } flatMap logSummary recoverWith logEventProcessingError(eventBody)
 
   private def allToTriplesAndUpload(
-      commits:          NonEmptyList[Commit],
-      maybeAccessToken: Option[AccessToken]
-  ): Interpretation[NonEmptyList[UploadingResult]] =
+      commits:                 NonEmptyList[Commit]
+  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[NonEmptyList[UploadingResult]] =
     commits
-      .map(toTriplesAndUpload(_, maybeAccessToken))
+      .map(toTriplesAndUpload)
       .sequence
       .flatMap(updateEventLog)
 
-  private def toTriplesAndUpload(commit:           Commit,
-                                 maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
+  private def toTriplesAndUpload(
+      commit:                  Commit
+  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
-      rawTriples     <- generateTriples(commit, maybeAccessToken)
-      curatedTriples <- EitherT.right[GenerationRecoverableError](curate(rawTriples))
+      rawTriples     <- generateTriples(commit)
+      curatedTriples <- EitherT.right[GenerationRecoverableError](curate(commit, rawTriples))
       result         <- EitherT.right[GenerationRecoverableError](upload(curatedTriples) map toUploadingResult(commit))
     } yield result
   }.value map (_.fold(toRecoverableError(commit), identity)) recoverWith nonRecoverableFailure(commit)

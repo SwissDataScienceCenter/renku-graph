@@ -16,26 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package ch.datascience.triplesgenerator.eventprocessing
 
-import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.graph.model.EventsGenerators.{commitIds, projects}
+import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import org.scalacheck.Gen
 
-import scala.language.higherKinds
+private object EventProcessingGenerators {
 
-class TriplesCurator[Interpretation[_]](
-    personDetailsUpdater: PersonDetailsUpdater[Interpretation]
-) {
-
-  def curate(commit:  Commit,
-             triples: JsonLDTriples)(implicit maybeAccessToken: Option[AccessToken]): Interpretation[CuratedTriples] =
-    personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil))
-}
-
-object IOTriplesCurator {
-
-  import cats.effect.IO
-
-  def apply(): TriplesCurator[IO] = new TriplesCurator[IO](new PersonDetailsUpdater[IO]())
+  implicit val commits: Gen[Commit] = for {
+    commitId      <- commitIds
+    project       <- projects
+    maybeParentId <- Gen.option(commitIds)
+  } yield maybeParentId match {
+    case None           => CommitWithoutParent(commitId, project)
+    case Some(parentId) => CommitWithParent(commitId, parentId, project)
+  }
 }
