@@ -20,15 +20,18 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.effect.IO
 import ch.datascience.graph.model.events.Project
+import ch.datascience.graph.model.users
 
 import scala.language.higherKinds
 
 private trait KGInfoFinder[Interpretation[_]] {
-  def findProject(project: Project): Interpretation[Option[KGProject]]
+  def findProject(project: Project):     Interpretation[Option[KGProject]]
+  def findCreatorId(email: users.Email): Interpretation[Option[users.ResourceId]]
 }
 
 private class IOKGInfoFinder extends KGInfoFinder[IO] {
-  override def findProject(project: Project): IO[Option[KGProject]] = IO.pure(None)
+  override def findProject(project: Project):     IO[Option[KGProject]]        = IO.pure(None)
+  override def findCreatorId(email: users.Email): IO[Option[users.ResourceId]] = IO.pure(None)
 }
 
 private object IOKGInfoFinder {

@@ -58,59 +58,46 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
     )
   }
 
-  def creatorDelete(resourceId: ResourceId, maybeCreatorEmail: Option[Email]): List[Update] = {
-    val rdfResource     = resourceId.showAs[RdfResource]
-    val creatorResource = findCreatorId(maybeCreatorEmail)
-    List(
-      Update(
-        s"Deleting Project $rdfResource schema:creator",
-        SparqlQuery(
-          name = "upload - project creator delete",
-          Set("PREFIX schema: <http://schema.org/>"),
-          s"""|DELETE { $rdfResource schema:creator ?creatorId }
-              |WHERE  { $rdfResource schema:creator ?creatorId }
-              |""".stripMargin
-        )
-      ).some,
-      maybeCreatorEmail map { _ =>
-        Update(
-          s"Deleting Creator $creatorResource schema:name and schema:email",
-          SparqlQuery(
-            name = "upload - creator details delete",
-            Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>", "PREFIX schema: <http://schema.org/>"),
-            s"""|DELETE { $creatorResource ?p ?s }
-                |WHERE  { 
-                |  $creatorResource rdf:type <http://schema.org/Person>;
-                |    ?p ?s.
-                |  FILTER (?p IN (schema:name, schema:email))
-                | }
-                |""".stripMargin
-          )
-        )
-      }
-    ).flatten
+  def unlinkCreator(resourceId: ResourceId): List[Update] = List {
+    val rdfResource = resourceId.showAs[RdfResource]
+    Update(
+      s"Deleting Project $rdfResource schema:creator",
+      SparqlQuery(
+        name = "upload - project creator unlink",
+        Set("PREFIX schema: <http://schema.org/>"),
+        s"""|DELETE { $rdfResource schema:creator ?creatorId }
+            |WHERE  { $rdfResource schema:creator ?creatorId }
+            |""".stripMargin
+      )
+    )
   }
-
-  private lazy val findCreatorId: Option[Email] => String = {
-    case None => s"<_:${java.util.UUID.randomUUID()}>"
-    case Some(email) =>
-      val username     = email.extractUsername.value
-      val encodedEmail = email.value.replace(username, sparqlEncode(username))
-      s"<mailto:$encodedEmail>"
+  def linkCreator(resourceId: ResourceId, newResourceId: users.ResourceId): List[Update] = List {
+    val rdfResource     = resourceId.showAs[RdfResource]
+    val creatorResource = newResourceId.showAs[RdfResource]
+    Update(
+      s"Inserting Project $rdfResource schema:creator",
+      SparqlQuery(
+        name = "upload - project creator link",
+        Set("PREFIX schema: <http://schema.org/>"),
+        s"""INSERT DATA { $rdfResource schema:creator $creatorResource }"""
+      )
+    )
   }
 
   def creatorInsert(resourceId: ResourceId, maybeCreatorEmail: Option[Email], maybeCreatorName: Option[users.Name]) = {
     val rdfResource     = resourceId.showAs[RdfResource]
     val creatorResource = findCreatorId(maybeCreatorEmail)
     List(
-      Update(
-        s"Inserting Project $rdfResource schema:creator",
-        SparqlQuery(
-          name = "upload - project creator insert",
-          Set("PREFIX schema: <http://schema.org/>"),
-          s"""INSERT DATA { $rdfResource schema:creator $creatorResource }"""
+      maybeCreatorEmail orElse maybeCreatorName map { _ =>
+        Update(
+          s"Inserting Project $rdfResource schema:creator",
+          SparqlQuery(
+            name = "upload - project creator insert",
+            Set("PREFIX schema: <http://schema.org/>"),
+            s"""INSERT DATA { $rdfResource schema:creator $creatorResource }"""
+          )
         )
-      ).some,
+      },
       maybeCreatorEmail map { email =>
         Update(
           s"Inserting Creator $creatorResource schema:email",
@@ -138,6 +125,14 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
         )
       }
     ).flatten
+  }
+
+  private lazy val findCreatorId: Option[Email] => String = {
+    case None => s"<_:${java.util.UUID.randomUUID()}>"
+    case Some(email) =>
+      val username     = email.extractUsername.value
+      val encodedEmail = email.value.replace(username, sparqlEncode(username))
+      s"<mailto:$encodedEmail>"
   }
 
   def dateCreatedDelete(resourceId: ResourceId) = List {

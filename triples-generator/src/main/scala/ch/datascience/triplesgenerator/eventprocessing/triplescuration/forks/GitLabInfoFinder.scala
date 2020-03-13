@@ -25,12 +25,14 @@ import ch.datascience.http.client.AccessToken
 import scala.language.higherKinds
 
 private trait GitLabInfoFinder[Interpretation[_]] {
+
   def findProject(
       project:                 Project
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[Option[GitLabProject]]
 }
 
 private class IOGitLabInfoFinder extends GitLabInfoFinder[IO] {
+
   override def findProject(project: Project)(
       implicit maybeAccessToken:    Option[AccessToken]
   ): IO[Option[GitLabProject]] = IO.pure(None)

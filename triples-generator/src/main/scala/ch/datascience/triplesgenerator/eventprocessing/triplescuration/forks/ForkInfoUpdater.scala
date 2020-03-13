@@ -23,6 +23,7 @@ import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{Path, ResourceId}
+import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
@@ -49,44 +50,119 @@ private[triplescuration] class IOForkInfoUpdater(
       commit:                  Commit,
       givenCuratedTriples:     CuratedTriples
   )(implicit maybeAccessToken: Option[AccessToken]): IO[CuratedTriples] =
-    (gitLab.findProject(commit.project), kg.findProject(commit.project)) parMapN {
-      case `both forks are the same`() => givenCuratedTriples
-      case `both forks are different`(projectResource, gitLabForkPath) =>
+    (gitLab.findProject(commit.project), kg.findProject(commit.project)).parMapN {
+      case `forks are the same`() => givenCuratedTriples.pure[IO]
+      case `forks are different, email and date same`(projectResource, gitLabForkPath) =>
         givenCuratedTriples
           .add(wasDerivedFromDelete(projectResource))
           .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
-      case _ => givenCuratedTriples
-    }
+          .pure[IO]
+      case `forks and emails are different`(projectResource, gitLabForkPath, newEmail, gitLabProject) =>
+        kg.findCreatorId(newEmail) map {
+          case Some(existingNewUserResource) =>
+            givenCuratedTriples
+              .add(wasDerivedFromDelete(projectResource))
+              .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
+              .add(unlinkCreator(projectResource))
+              .add(linkCreator(projectResource, existingNewUserResource))
+              .add(dateCreatedDelete(projectResource))
+              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+          case _ =>
+            givenCuratedTriples
+              .add(wasDerivedFromDelete(projectResource))
+              .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
+              .add(unlinkCreator(projectResource))
+              .add(creatorInsert(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+              .add(dateCreatedDelete(projectResource))
+              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+        }
+      case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
+        givenCuratedTriples
+          .add(wasDerivedFromDelete(projectResource))
+          .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
+          .add(unlinkCreator(projectResource))
+          .add(creatorInsert(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+          .add(dateCreatedDelete(projectResource))
+          .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+          .pure[IO]
+      case _ => givenCuratedTriples.pure[IO]
+    }.flatten
 
-  private object `both forks are the same` {
+  private object `forks are the same` {
     def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Boolean = tuple match {
       case (Some(gitLabProject), Some(kgProject)) => gitLabProject hasSameForkAs kgProject
       case _                                      => false
     }
   }
 
-  private object `both forks are different` {
+  private object `forks are different, email and date same` {
     def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Option[(ResourceId, Path)] = tuple match {
       case (Some(gitLabProject), Some(kgProject)) =>
-        (kgProject.maybeParentResourceId.flatMap(_.getPath) -> gitLabProject.maybeParentPath)
+        (kgProject.maybeParentPath -> gitLabProject.maybeParentPath)
           .mapN {
-            case (kgFork, gitLabFork) if kgFork != gitLabFork => Option(kgProject.resourceId -> gitLabFork)
-            case _                                            => Option.empty[(ResourceId, Path)]
+            case (kgFork, gitLabFork)
+                if kgFork != gitLabFork && (gitLabProject hasEmailSameAs kgProject) && (gitLabProject hasDateSameAs kgProject) =>
+              Option((kgProject.resourceId, gitLabFork))
+            case _ => Option.empty[(ResourceId, Path)]
           }
           .getOrElse(Option.empty[(ResourceId, Path)])
       case _ => None
     }
   }
 
+  private object `forks and emails are different` {
+    def unapply(
+        tuple: (Option[GitLabProject], Option[KGProject])
+    ): Option[(ResourceId, Path, Email, GitLabProject)] = tuple match {
+      case (Some(gitLabProject), Some(kgProject)) =>
+        (kgProject.maybeParentPath,
+         gitLabProject.maybeParentPath,
+         kgProject.creator.maybeEmail,
+         gitLabProject.maybeEmail)
+          .mapN {
+            case (kgFork, gitLabFork, kgEmail, gitLabEmail) if kgFork != gitLabFork && gitLabEmail != kgEmail =>
+              Option((kgProject.resourceId, gitLabFork, gitLabEmail, gitLabProject))
+            case _ => Option.empty[(ResourceId, Path, Email, GitLabProject)]
+          }
+          .getOrElse(Option.empty[(ResourceId, Path, Email, GitLabProject)])
+      case _ => None
+    }
+  }
+
+  private object `not only forks are different` {
+    def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Option[(ResourceId, Path, GitLabProject)] =
+      tuple match {
+        case (Some(gitLabProject), Some(kgProject)) =>
+          (kgProject.maybeParentPath, gitLabProject.maybeParentPath)
+            .mapN {
+              case (kgFork, gitLabFork) if kgFork != gitLabFork =>
+                Option((kgProject.resourceId, gitLabFork, gitLabProject))
+              case _ => Option.empty[(ResourceId, Path, GitLabProject)]
+            }
+            .getOrElse(Option.empty[(ResourceId, Path, GitLabProject)])
+        case _ => None
+      }
+  }
+
+  private implicit class KGProjectOps(kgProject: KGProject) {
+    lazy val maybeParentPath: Option[Path] = kgProject.maybeParentResourceId.flatMap(_.getPath)
+  }
+
   private implicit class GitLabProjectOps(gitLabProject: GitLabProject) {
+
+    lazy val maybeEmail = gitLabProject.maybeCreator.flatMap(_.maybeEmail)
+    lazy val maybeName  = gitLabProject.maybeCreator.flatMap(_.maybeName)
 
     def hasSameForkAs(kgProject: KGProject): Boolean =
       kgProject.maybeParentResourceId.flatMap(_.getPath) == gitLabProject.maybeParentPath
 
-    def hasOtherForkThan(kgProject: KGProject): Boolean =
-      (kgProject.maybeParentResourceId.flatMap(_.getPath) -> gitLabProject.maybeParentPath)
-        .mapN { case (kgFork, gitLabFork) => kgFork != gitLabFork }
+    def hasEmailSameAs(kgProject: KGProject): Boolean =
+      (kgProject.creator.maybeEmail -> gitLabProject.maybeCreator.flatMap(_.maybeEmail))
+        .mapN { case (kgEmail, gitLabEmail) => kgEmail == gitLabEmail }
         .getOrElse(false)
+
+    def hasDateSameAs(kgProject: KGProject): Boolean =
+      kgProject.dateCreated == gitLabProject.dateCreated
   }
 
   private implicit class ResourceIdOps(resourceId: ResourceId) {
