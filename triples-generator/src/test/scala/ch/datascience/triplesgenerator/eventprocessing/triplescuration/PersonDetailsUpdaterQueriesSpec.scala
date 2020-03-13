@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.users.{Email, Id, Name}
+import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.PersonDetailsUpdater.{prepareUpdates, Person => UpdaterPerson}
@@ -53,7 +53,7 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
 
         val updates = prepareUpdates(
           Set(
-            UpdaterPerson(Id(person1Id.value), Set(name1Updated), Set(email1))
+            UpdaterPerson(ResourceId(person1Id.value), Set(name1Updated), Set(email1))
           )
         )
 
@@ -86,7 +86,7 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
 
         val updates = prepareUpdates(
           Set(
-            UpdaterPerson(Id(person1Id.value), Set(name1Updated), Set.empty)
+            UpdaterPerson(ResourceId(person1Id.value), Set(name1Updated), Set.empty)
           )
         )
 

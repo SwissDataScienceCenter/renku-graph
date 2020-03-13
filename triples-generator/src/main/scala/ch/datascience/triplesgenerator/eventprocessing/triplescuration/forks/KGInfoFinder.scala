@@ -16,17 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
-import cats.MonadError
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.ForkInfoUpdater
+import cats.effect.IO
+import ch.datascience.graph.model.events.Project
 
-import scala.util.Try
+import scala.language.higherKinds
 
-object interpreters {
-  abstract class TryTriplesCurator(
-      personDetailsUpdater: PersonDetailsUpdater[Try],
-      forkInfoUpdater:      ForkInfoUpdater[Try]
-  )(implicit ME:            MonadError[Try, Throwable])
-      extends TriplesCurator[Try](personDetailsUpdater, forkInfoUpdater)
+private trait KGInfoFinder[Interpretation[_]] {
+  def findProject(project: Project): Interpretation[Option[KGProject]]
+}
+
+private class IOKGInfoFinder extends KGInfoFinder[IO] {
+  override def findProject(project: Project): IO[Option[KGProject]] = IO.pure(None)
+}
+
+private object IOKGInfoFinder {
+  def apply(): IO[KGInfoFinder[IO]] = IO.pure(new IOKGInfoFinder)
 }

@@ -229,6 +229,7 @@ object IOCommitEventProcessor {
     for {
       uploader              <- IOUploader(ApplicationLogger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(ApplicationLogger)
+      triplesCurator        <- IOTriplesCurator()
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
                                                          maybeHistogram = Some(eventsProcessingTimes))
@@ -236,7 +237,7 @@ object IOCommitEventProcessor {
       new CommitEventsDeserialiser[IO](),
       accessTokenFinder,
       triplesGenerator,
-      IOTriplesCurator(),
+      triplesCurator,
       uploader,
       new IOEventLogMarkDone(transactor),
       new IOEventLogMarkNew(transactor),

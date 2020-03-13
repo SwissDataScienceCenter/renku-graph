@@ -24,7 +24,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.users.{Affiliation, Email, Id, Name}
+import ch.datascience.graph.model.users.{Affiliation, Email, Name, ResourceId}
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -102,7 +102,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
         root.`@type`.each.string.getAll(json) match {
           case types if types.contains("http://schema.org/Person") =>
             collected add Person(
-              root.`@id`.as[Id].getOption(json).getOrElse(fail("Person '@id' not found")),
+              root.`@id`.as[ResourceId].getOption(json).getOrElse(fail("Person '@id' not found")),
               extractValue[Name]("http://schema.org/name")(json).headOption,
               extractValue[Email]("http://schema.org/email")(json).headOption,
               extractValue[Affiliation]("http://schema.org/affiliation")(json).headOption
@@ -118,7 +118,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
       root.selectDynamic(property).each.`@value`.as[T].getAll(json)
   }
 
-  private case class Person(id:               Id,
+  private case class Person(id:               ResourceId,
                             maybeName:        Option[Name],
                             maybeEmail:       Option[Email],
                             maybeAffiliation: Option[Affiliation])
@@ -126,7 +126,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
   private lazy val maybeUpdatePerson: entities.Person => Option[UpdatePerson] = { person =>
     person.maybeEmail map { email =>
       val entityId = person.asJsonLD.entityId getOrElse (throw new Exception(s"Cannot find entity id for $person"))
-      UpdatePerson(Id(entityId.toString), Set(person.name), Set(email))
+      UpdatePerson(ResourceId(entityId.toString), Set(person.name), Set(email))
     }
   }
 

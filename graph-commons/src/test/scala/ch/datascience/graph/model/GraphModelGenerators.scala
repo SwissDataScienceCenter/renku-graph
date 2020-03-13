@@ -50,7 +50,7 @@ object GraphModelGenerators {
       partsGenerator = partsGenerator
     ) map Path.apply
   }
-  implicit val projectResources: Gen[ResourceId] = for {
+  implicit val projectResourceIds: Gen[ResourceId] = for {
     url  <- httpUrls()
     path <- projectPaths
   } yield ResourceId.from(s"$url/projects/$path").fold(throw _, identity)

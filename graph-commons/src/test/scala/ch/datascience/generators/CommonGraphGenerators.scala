@@ -19,7 +19,7 @@
 package ch.datascience.generators
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.util.Base64
+import java.util.{Base64, UUID}
 
 import cats.implicits._
 import ch.datascience.config.renku
@@ -30,8 +30,8 @@ import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
+import ch.datascience.graph.model.users._
+import ch.datascience.graph.model.{SchemaVersion, users}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
@@ -70,6 +70,15 @@ object CommonGraphGenerators {
     first  <- nonEmptyStrings()
     second <- nonEmptyStrings()
   } yield Name(s"$first $second")
+
+  implicit val userResourceIds: Gen[users.ResourceId] = userResourceIds(emails.toGeneratorOfOptions)
+  def userResourceIds(maybeEmail:    Option[Email]): Gen[users.ResourceId] = userResourceIds(Gen.const(maybeEmail))
+  def userResourceIds(maybeEmailGen: Gen[Option[Email]]): Gen[users.ResourceId] =
+    for {
+      maybeEmail <- maybeEmailGen
+    } yield users.ResourceId
+      .from(maybeEmail.map(email => s"mailto:$email").getOrElse(s"_:${UUID.randomUUID()}"))
+      .fold(throw _, identity)
 
   implicit val aesCryptoSecrets: Gen[AesCrypto.Secret] =
     stringsOfLength(16)

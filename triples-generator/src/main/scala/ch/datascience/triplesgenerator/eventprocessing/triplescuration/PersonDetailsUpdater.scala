@@ -20,9 +20,8 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import ch.datascience.graph.model.users.{Email, Id, Name}
+import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
-import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
 import io.circe.Decoder.decodeList
 import io.circe.Encoder.encodeList
@@ -50,7 +49,7 @@ private class PersonDetailsUpdater[Interpretation[_]]()(implicit ME: MonadError[
 }
 
 private object PersonDetailsUpdater {
-  final case class Person(id: Id, names: Set[Name], emails: Set[Email])
+  final case class Person(id: ResourceId, names: Set[Name], emails: Set[Email])
 
   private object removePersonsAttributes extends (JsonLDTriples => (JsonLDTriples, Set[Person])) {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -68,7 +67,7 @@ private object PersonDetailsUpdater {
       root.`@type`.each.string.getAll(json) match {
         case types if types.contains("http://schema.org/Person") => {
           for {
-            entityId <- json.get[Id]("@id") flatMap skipBlankNodes
+            entityId <- json.get[ResourceId]("@id") flatMap skipBlankNodes
             personNames  = json.getValues[Name]("http://schema.org/name")
             noNamesJson  = json remove "http://schema.org/name"
             personEmails = noNamesJson.getValues[Email]("http://schema.org/email")
@@ -80,7 +79,7 @@ private object PersonDetailsUpdater {
         case _ => json
       }
 
-    private lazy val skipBlankNodes: Id => Option[Id] = id =>
+    private lazy val skipBlankNodes: ResourceId => Option[ResourceId] = id =>
       if (id.value startsWith "_") None
       else Some(id)
 
@@ -130,7 +129,7 @@ private object PersonDetailsUpdater {
         ).flatten
     }
 
-    private def namesDelete(id: Id) = Some {
+    private def namesDelete(id: ResourceId) = Some {
       val resource = id.asResource
       Update(
         s"Deleting Person $resource schema:name",
@@ -143,7 +142,7 @@ private object PersonDetailsUpdater {
         )
       )
     }
-    private def namesInsert(id: Id, names: Set[Name]) =
+    private def namesInsert(id: ResourceId, names: Set[Name]) =
       if (names.isEmpty) None
       else
         Some {
@@ -159,7 +158,7 @@ private object PersonDetailsUpdater {
           )
         }
 
-    private def emailsDelete(id: Id) = Some {
+    private def emailsDelete(id: ResourceId) = Some {
       val resource = id.asResource
       Update(
         s"Deleting Person $resource schema:email",
@@ -173,7 +172,7 @@ private object PersonDetailsUpdater {
       )
     }
 
-    private def emailsInsert(id: Id, emails: Set[Email]) =
+    private def emailsInsert(id: ResourceId, emails: Set[Email]) =
       if (emails.isEmpty) None
       else
         Some {
@@ -189,7 +188,7 @@ private object PersonDetailsUpdater {
           )
         }
 
-    private def labelsDelete(id: Id) = Some {
+    private def labelsDelete(id: ResourceId) = Some {
       val resource = id.asResource
       Update(
         s"Deleting Person $resource rdfs:label",
@@ -203,15 +202,7 @@ private object PersonDetailsUpdater {
       )
     }
 
-    private def `INSERT DATA`[TT <: TinyType { type V = String }](resource: String,
-                                                                  property: String,
-                                                                  values:   NonEmptyList[TT]): String =
-      values
-        .map(tt => s"$property '${sparqlEncode(tt.value)}'")
-        .toList
-        .mkString(s"INSERT DATA { $resource ", " ; ", " }")
-
-    private implicit class IdOps(id: Id) {
+    private implicit class IdOps(id: ResourceId) {
       private val localPartExtractor = "^mailto:(.*)@.*$".r
 
       lazy val asResource: String = id.value match {

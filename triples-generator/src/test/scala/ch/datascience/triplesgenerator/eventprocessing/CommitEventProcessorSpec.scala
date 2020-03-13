@@ -233,7 +233,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(commit1, maybeAccessToken)
         .returning(rightT[Try, GenerationRecoverableError](rawTriples))
 
-      val curatedTriples = curatedTriplesObjects().generateOne
+      val curatedTriples = curatedTriplesObjects.generateOne
       (triplesCurator
         .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit1, rawTriples, maybeAccessToken)
@@ -280,7 +280,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
           .expects(commit1, maybeAccessToken)
           .returning(rightT[Try, GenerationRecoverableError](rawTriples))
 
-        val curatedTriples = curatedTriplesObjects().generateOne
+        val curatedTriples = curatedTriplesObjects.generateOne
         (triplesCurator
           .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
           .expects(commit1, rawTriples, maybeAccessToken)
@@ -450,7 +450,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(commit, maybeAccessToken)
         .returning(rightT[Try, GenerationRecoverableError](triples))
 
-      val curatedTriples = curatedTriplesObjects().generateOne
+      val curatedTriples = curatedTriplesObjects.generateOne
       (triplesCurator
         .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, triples, maybeAccessToken)

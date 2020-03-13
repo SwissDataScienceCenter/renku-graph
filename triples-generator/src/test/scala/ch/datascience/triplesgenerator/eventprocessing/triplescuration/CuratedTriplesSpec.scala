@@ -18,27 +18,24 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
-import ch.datascience.generators.Generators._
-import ch.datascience.rdfstore.SparqlQuery
+import CurationGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
-import eu.timepit.refined.auto._
-import org.scalacheck.Gen
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-object CurationGenerators {
+class CuratedTriplesSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  implicit lazy val curatedTriplesObjects: Gen[CuratedTriples] = curatedTriplesObjects(
-    nonEmptyList(curationUpdates).map(_.toList)
-  )
+  "add" should {
 
-  def curatedTriplesObjects(updatesGenerator: Gen[List[Update]]): Gen[CuratedTriples] =
-    for {
-      triples <- jsonLDTriples
-      updates <- updatesGenerator
-    } yield CuratedTriples(triples, updates)
-
-  implicit lazy val curationUpdates: Gen[Update] = for {
-    name    <- nonBlankStrings(minLength = 5)
-    message <- sentences() map (v => SparqlQuery("curation update", Set.empty, v.value))
-  } yield Update(name, message)
+    "append the given updates to what's already in the curated triples" in {
+      forAll { (curatedTriples: CuratedTriples, updates: List[Update]) =>
+        curatedTriples.add(updates) shouldBe CuratedTriples(
+          curatedTriples.triples,
+          curatedTriples.updates ++ updates
+        )
+      }
+    }
+  }
 }

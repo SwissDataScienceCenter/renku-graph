@@ -18,24 +18,40 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
+import cats.MonadError
+import cats.effect.ContextShift
+import cats.implicits._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.{ForkInfoUpdater, IOForkInfoUpdater}
 
 import scala.language.higherKinds
 
 class TriplesCurator[Interpretation[_]](
-    personDetailsUpdater: PersonDetailsUpdater[Interpretation]
-) {
+    personDetailsUpdater: PersonDetailsUpdater[Interpretation],
+    forkInfoUpdater:      ForkInfoUpdater[Interpretation]
+)(implicit ME:            MonadError[Interpretation, Throwable]) {
+
+  import forkInfoUpdater._
 
   def curate(commit:  Commit,
              triples: JsonLDTriples)(implicit maybeAccessToken: Option[AccessToken]): Interpretation[CuratedTriples] =
-    personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil))
+    for {
+      triplesWithPersonDetails <- personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil))
+      triplesWithForkInfo      <- updateForkInfo(commit, triplesWithPersonDetails)
+    } yield triplesWithForkInfo
 }
 
 object IOTriplesCurator {
 
   import cats.effect.IO
 
-  def apply(): TriplesCurator[IO] = new TriplesCurator[IO](new PersonDetailsUpdater[IO]())
+  def apply()(implicit cs: ContextShift[IO]): IO[TriplesCurator[IO]] =
+    for {
+      forkInfoUpdater <- IOForkInfoUpdater()
+    } yield new TriplesCurator[IO](
+      new PersonDetailsUpdater[IO](),
+      forkInfoUpdater
+    )
 }
