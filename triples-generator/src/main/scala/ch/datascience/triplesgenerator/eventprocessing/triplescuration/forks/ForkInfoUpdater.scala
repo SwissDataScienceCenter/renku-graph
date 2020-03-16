@@ -54,72 +54,57 @@ private[triplescuration] class IOForkInfoUpdater(
       case `forks are the same`() => givenCuratedTriples.pure[IO]
       case `forks are different, email and date same`(projectResource, gitLabForkPath) =>
         givenCuratedTriples
-          .add(wasDerivedFromDelete(projectResource))
-          .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
+          .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
           .pure[IO]
       case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
         OptionT
           .fromOption[IO](gitLabProject.maybeEmail)
           .flatMapF(kg.findCreatorId)
-          .map { existingNewUserResource =>
+          .map { existingUserResource =>
             givenCuratedTriples
-              .add(wasDerivedFromDelete(projectResource))
-              .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
-              .add(unlinkCreator(projectResource))
-              .add(linkCreator(projectResource, existingNewUserResource))
-              .add(dateCreatedDelete(projectResource))
-              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+              .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+              .add(swapCreator(projectResource, existingUserResource))
+              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
           }
           .getOrElse {
             givenCuratedTriples
-              .add(wasDerivedFromDelete(projectResource))
-              .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
-              .add(unlinkCreator(projectResource))
-              .add(creatorInsert(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-              .add(dateCreatedDelete(projectResource))
-              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+              .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+              .add(addAndSwapCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
           }
       case `no fork in the KG project`(projectResource, gitLabForkPath, gitLabProject) =>
         OptionT
           .fromOption[IO](gitLabProject.maybeEmail)
           .flatMapF(kg.findCreatorId)
-          .map { existingNewUserResource =>
+          .map { existingUserResource =>
             givenCuratedTriples
-              .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
-              .add(unlinkCreator(projectResource))
-              .add(linkCreator(projectResource, existingNewUserResource))
-              .add(dateCreatedDelete(projectResource))
-              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+              .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
+              .add(swapCreator(projectResource, existingUserResource))
+              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
           }
           .getOrElse {
             givenCuratedTriples
-              .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
-              .add(unlinkCreator(projectResource))
-              .add(creatorInsert(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-              .add(dateCreatedDelete(projectResource))
-              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+              .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
+              .add(addAndSwapCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
           }
       case `no fork in the GitLab project`(projectResource, gitLabProject) =>
         OptionT
           .fromOption[IO](gitLabProject.maybeEmail)
           .flatMapF(kg.findCreatorId)
-          .map { existingNewUserResource =>
+          .map { existingUserResource =>
             givenCuratedTriples
-              .add(wasDerivedFromDelete(projectResource))
-              .add(unlinkCreator(projectResource))
-              .add(linkCreator(projectResource, existingNewUserResource))
-              .add(dateCreatedDelete(projectResource))
-              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+              .add(deleteWasDerivedFrom(projectResource))
+              .add(swapCreator(projectResource, existingUserResource))
+              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
           }
           .getOrElse {
             givenCuratedTriples
-              .add(wasDerivedFromDelete(projectResource))
-              .add(unlinkCreator(projectResource))
-              .add(creatorInsert(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-              .add(dateCreatedDelete(projectResource))
-              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+              .add(deleteWasDerivedFrom(projectResource))
+              .add(addAndSwapCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
           }
-      case _ => throw new Exception("boom!")
+      case _ => givenCuratedTriples.pure[IO]
     }.flatten
 
   private object `forks are the same` {

@@ -52,6 +52,30 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
     }
+
+    "do nothing if no projects in GitLab and in KG" in new TestCase {
+
+      given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
+      given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).doesNotExistsInKG
+
+      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+    }
+
+    "do nothing if no projects in GitLab" in new TestCase {
+
+      given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
+      given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).existsInKG
+
+      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+    }
+
+    "do nothing if no projects in KG" in new TestCase {
+
+      given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).existsInGitLab
+      given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).doesNotExistsInKG
+
+      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+    }
   }
 
   "updateForkInfo - cases when forks in KG and in GitLab" should {
@@ -87,19 +111,12 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         )
       }.existsInKG
 
-      val wasDerivedFromDelete = (updatesCreator.wasDerivedFromDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-
-      val wasDerivedFromInsert = (updatesCreator.wasDerivedFromInsert _)
+      val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromDelete,
-          wasDerivedFromInsert
-        ).flatten
+        updates = givenCuratedTriples.updates ++ wasDerivedFromRecreate
       )
     }
 
@@ -121,40 +138,28 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         )
       }.existsInKG
 
-      val wasDerivedFromDelete = (updatesCreator.wasDerivedFromDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val wasDerivedFromInsert = (updatesCreator.wasDerivedFromInsert _)
+      val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
       val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
       given(
         newCreatorId = Some(newCreatorId),
         forEmail     = emailInGitLab
       ).existsInKG
-      val creatorLink = (updatesCreator.linkCreator _)
+      val creatorUpdates = (updatesCreator.swapCreator _)
         .expects(kgProject.resourceId, newCreatorId)
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromDelete,
-          wasDerivedFromInsert,
-          creatorUnlink,
-          creatorLink,
-          dateCreatedDelete,
-          dateCreatedInsert
+          wasDerivedFromRecreate,
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -177,38 +182,26 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         )
       }.existsInKG
 
-      val wasDerivedFromDelete = (updatesCreator.wasDerivedFromDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val wasDerivedFromInsert = (updatesCreator.wasDerivedFromInsert _)
+      val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
       given(newCreatorId = None, forEmail = emailInGitLab).existsInKG
-      val creatorInsert = (updatesCreator.creatorInsert _)
+      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromDelete,
-          wasDerivedFromInsert,
-          creatorUnlink,
-          creatorInsert,
-          dateCreatedDelete,
-          dateCreatedInsert
+          wasDerivedFromRecreate,
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -228,37 +221,25 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
-      val wasDerivedFromDelete = (updatesCreator.wasDerivedFromDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val wasDerivedFromInsert = (updatesCreator.wasDerivedFromInsert _)
+      val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val creatorInsert = (updatesCreator.creatorInsert _)
+      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromDelete,
-          wasDerivedFromInsert,
-          creatorUnlink,
-          creatorInsert,
-          dateCreatedDelete,
-          dateCreatedInsert
+          wasDerivedFromRecreate,
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -278,37 +259,25 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
-      val wasDerivedFromDelete = (updatesCreator.wasDerivedFromDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val wasDerivedFromInsert = (updatesCreator.wasDerivedFromInsert _)
+      val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val creatorInsert = (updatesCreator.creatorInsert _)
+      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromDelete,
-          wasDerivedFromInsert,
-          creatorUnlink,
-          creatorInsert,
-          dateCreatedDelete,
-          dateCreatedInsert
+          wasDerivedFromRecreate,
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -331,36 +300,28 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
       }.existsInKG
 
-      val wasDerivedFromInsert = (updatesCreator.wasDerivedFromInsert _)
+      val wasDerivedFromInsert = (updatesCreator.insertWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
       val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
       given(
         newCreatorId = Some(newCreatorId),
         forEmail     = emailInGitLab
       ).existsInKG
-      val creatorLink = (updatesCreator.linkCreator _)
+      val creatorUpdates = (updatesCreator.swapCreator _)
         .expects(kgProject.resourceId, newCreatorId)
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
           wasDerivedFromInsert,
-          creatorUnlink,
-          creatorLink,
-          dateCreatedDelete,
-          dateCreatedInsert
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -381,34 +342,26 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
       }.existsInKG
 
-      val wasDerivedFromInsert = (updatesCreator.wasDerivedFromInsert _)
+      val wasDerivedFromInsert = (updatesCreator.insertWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
       given(newCreatorId = None, forEmail = emailInGitLab).existsInKG
-      val creatorInsert = (updatesCreator.creatorInsert _)
+      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
           wasDerivedFromInsert,
-          creatorUnlink,
-          creatorInsert,
-          dateCreatedDelete,
-          dateCreatedInsert
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -428,33 +381,25 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
       }.existsInKG
 
-      val wasDerivedFromInsert = (updatesCreator.wasDerivedFromInsert _)
+      val wasDerivedFromInsert = (updatesCreator.insertWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val creatorInsert = (updatesCreator.creatorInsert _)
+      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
           wasDerivedFromInsert,
-          creatorUnlink,
-          creatorInsert,
-          dateCreatedDelete,
-          dateCreatedInsert
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -473,33 +418,25 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
       }.existsInKG
 
-      val wasDerivedFromInsert = (updatesCreator.wasDerivedFromInsert _)
+      val wasDerivedFromInsert = (updatesCreator.insertWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val creatorInsert = (updatesCreator.creatorInsert _)
+      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
           wasDerivedFromInsert,
-          creatorUnlink,
-          creatorInsert,
-          dateCreatedDelete,
-          dateCreatedInsert
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -522,36 +459,28 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
-      val wasDerivedFromDelete = (updatesCreator.wasDerivedFromDelete _)
+      val wasDerivedFromDelete = (updatesCreator.deleteWasDerivedFrom _)
         .expects(kgProject.resourceId)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
       val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
       given(
         newCreatorId = Some(newCreatorId),
         forEmail     = emailInGitLab
       ).existsInKG
-      val creatorLink = (updatesCreator.linkCreator _)
+      val creatorUpdates = (updatesCreator.swapCreator _)
         .expects(kgProject.resourceId, newCreatorId)
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
           wasDerivedFromDelete,
-          creatorUnlink,
-          creatorLink,
-          dateCreatedDelete,
-          dateCreatedInsert
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -572,34 +501,26 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
-      val wasDerivedFromDelete = (updatesCreator.wasDerivedFromDelete _)
+      val wasDerivedFromDelete = (updatesCreator.deleteWasDerivedFrom _)
         .expects(kgProject.resourceId)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
       given(newCreatorId = None, forEmail = emailInGitLab).existsInKG
-      val creatorInsert = (updatesCreator.creatorInsert _)
+      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
           wasDerivedFromDelete,
-          creatorUnlink,
-          creatorInsert,
-          dateCreatedDelete,
-          dateCreatedInsert
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -618,33 +539,25 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
-      val wasDerivedFromDelete = (updatesCreator.wasDerivedFromDelete _)
+      val wasDerivedFromDelete = (updatesCreator.deleteWasDerivedFrom _)
         .expects(kgProject.resourceId)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val creatorInsert = (updatesCreator.creatorInsert _)
+      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
           wasDerivedFromDelete,
-          creatorUnlink,
-          creatorInsert,
-          dateCreatedDelete,
-          dateCreatedInsert
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -663,33 +576,25 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
-      val wasDerivedFromDelete = (updatesCreator.wasDerivedFromDelete _)
+      val wasDerivedFromDelete = (updatesCreator.deleteWasDerivedFrom _)
         .expects(kgProject.resourceId)
         .returningUpdates
 
-      val creatorUnlink = (updatesCreator.unlinkCreator _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val creatorInsert = (updatesCreator.creatorInsert _)
+      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
         .returningUpdates
 
-      val dateCreatedDelete = (updatesCreator.dateCreatedDelete _)
-        .expects(kgProject.resourceId)
-        .returningUpdates
-      val dateCreatedInsert = (updatesCreator.dateCreatedInsert _)
+      val recreateDateCreated = (updatesCreator.recreateDateCreated _)
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
         updates = givenCuratedTriples.updates ++ List(
           wasDerivedFromDelete,
-          creatorUnlink,
-          creatorInsert,
-          dateCreatedDelete,
-          dateCreatedInsert
+          creatorUpdates,
+          recreateDateCreated
         ).flatten
       )
     }
@@ -715,6 +620,13 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
           .returning(Option(gitLabProject).pure[IO])
         gitLabProject
       }
+
+      lazy val doesNotExistsInGitLab = {
+        (gitLabInfoFinder
+          .findProject(_: Project)(_: Option[AccessToken]))
+          .expects(commit.project, maybeAccessToken)
+          .returning(Option.empty.pure[IO])
+      }
     }
 
     def given(kgProject: KGProject) = new {
@@ -724,6 +636,13 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
           .expects(commit.project)
           .returning(Option(kgProject).pure[IO])
         kgProject
+      }
+
+      lazy val doesNotExistsInKG = {
+        (kgInfoFinder
+          .findProject(_: Project))
+          .expects(commit.project)
+          .returning(Option.empty.pure[IO])
       }
     }
 

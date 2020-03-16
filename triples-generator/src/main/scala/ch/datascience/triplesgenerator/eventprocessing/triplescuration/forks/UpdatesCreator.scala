@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
-import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId}
 import ch.datascience.graph.model.users
@@ -31,7 +30,10 @@ import eu.timepit.refined.auto._
 
 private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
 
-  def wasDerivedFromDelete(resourceId: ResourceId) = List {
+  def recreateWasDerivedFrom(resourceId: ResourceId, forkPath: Path) =
+    deleteWasDerivedFrom(resourceId) ++ insertWasDerivedFrom(resourceId, forkPath)
+
+  def deleteWasDerivedFrom(resourceId: ResourceId) = List {
     val rdfResource = resourceId.showAs[RdfResource]
     Update(
       s"Deleting Project $rdfResource prov:wasDerivedFrom",
@@ -45,7 +47,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
     )
   }
 
-  def wasDerivedFromInsert(resourceId: ResourceId, forkPath: Path) = List {
+  def insertWasDerivedFrom(resourceId: ResourceId, forkPath: Path) = List {
     val rdfResource  = resourceId.showAs[RdfResource]
     val forkResource = ResourceId(renkuBaseUrl, forkPath).showAs[RdfResource]
     Update(
@@ -58,7 +60,15 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
     )
   }
 
-  def unlinkCreator(resourceId: ResourceId): List[Update] = List {
+  def swapCreator(resourceId: ResourceId, newResourceId: users.ResourceId): List[Update] =
+    unlinkCreator(resourceId) ++ linkCreator(resourceId, newResourceId)
+
+  def addAndSwapCreator(resourceId:        ResourceId,
+                        maybeCreatorEmail: Option[Email],
+                        maybeCreatorName:  Option[users.Name]): List[Update] =
+    unlinkCreator(resourceId) ++ insertCreator(resourceId, maybeCreatorEmail, maybeCreatorName)
+
+  private def unlinkCreator(resourceId: ResourceId): List[Update] = List {
     val rdfResource = resourceId.showAs[RdfResource]
     Update(
       s"Deleting Project $rdfResource schema:creator",
@@ -71,7 +81,8 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
       )
     )
   }
-  def linkCreator(resourceId: ResourceId, newResourceId: users.ResourceId): List[Update] = List {
+
+  private def linkCreator(resourceId: ResourceId, newResourceId: users.ResourceId): List[Update] = List {
     val rdfResource     = resourceId.showAs[RdfResource]
     val creatorResource = newResourceId.showAs[RdfResource]
     Update(
@@ -84,7 +95,9 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
     )
   }
 
-  def creatorInsert(resourceId: ResourceId, maybeCreatorEmail: Option[Email], maybeCreatorName: Option[users.Name]) = {
+  private def insertCreator(resourceId:        ResourceId,
+                            maybeCreatorEmail: Option[Email],
+                            maybeCreatorName:  Option[users.Name]) = {
     val rdfResource     = resourceId.showAs[RdfResource]
     val creatorResource = findCreatorId(maybeCreatorEmail)
     List(
@@ -135,28 +148,26 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
       s"<mailto:$encodedEmail>"
   }
 
-  def dateCreatedDelete(resourceId: ResourceId) = List {
+  def recreateDateCreated(resourceId: ResourceId, dateCreated: DateCreated) = {
     val rdfResource = resourceId.showAs[RdfResource]
-    Update(
-      s"Deleting Project $rdfResource schema:dateCreated",
-      SparqlQuery(
-        name = "upload - project dateCreated delete",
-        Set("PREFIX schema: <http://schema.org/>"),
-        s"""|DELETE { $rdfResource schema:dateCreated ?date }
-            |WHERE  { $rdfResource schema:dateCreated ?date }
-            |""".stripMargin
-      )
-    )
-  }
-
-  def dateCreatedInsert(resourceId: ResourceId, dateCreated: DateCreated) = List {
-    val rdfResource = resourceId.showAs[RdfResource]
-    Update(
-      s"Inserting Project $rdfResource schema:dateCreated",
-      SparqlQuery(
-        name = "upload - project dateCreated insert",
-        Set("PREFIX schema: <http://schema.org/>"),
-        s"""INSERT DATA { $rdfResource schema:dateCreated '$dateCreated' }"""
+    List(
+      Update(
+        s"Deleting Project $rdfResource schema:dateCreated",
+        SparqlQuery(
+          name = "upload - project dateCreated delete",
+          Set("PREFIX schema: <http://schema.org/>"),
+          s"""|DELETE { $rdfResource schema:dateCreated ?date }
+              |WHERE  { $rdfResource schema:dateCreated ?date }
+              |""".stripMargin
+        )
+      ),
+      Update(
+        s"Inserting Project $rdfResource schema:dateCreated",
+        SparqlQuery(
+          name = "upload - project dateCreated insert",
+          Set("PREFIX schema: <http://schema.org/>"),
+          s"""INSERT DATA { $rdfResource schema:dateCreated '$dateCreated' }"""
+        )
       )
     )
   }
