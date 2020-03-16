@@ -99,6 +99,26 @@ private[triplescuration] class IOForkInfoUpdater(
               .add(dateCreatedDelete(projectResource))
               .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
           }
+      case `no fork in the GitLab project`(projectResource, gitLabProject) =>
+        OptionT
+          .fromOption[IO](gitLabProject.maybeEmail)
+          .flatMapF(kg.findCreatorId)
+          .map { existingNewUserResource =>
+            givenCuratedTriples
+              .add(wasDerivedFromDelete(projectResource))
+              .add(unlinkCreator(projectResource))
+              .add(linkCreator(projectResource, existingNewUserResource))
+              .add(dateCreatedDelete(projectResource))
+              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+          }
+          .getOrElse {
+            givenCuratedTriples
+              .add(wasDerivedFromDelete(projectResource))
+              .add(unlinkCreator(projectResource))
+              .add(creatorInsert(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+              .add(dateCreatedDelete(projectResource))
+              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+          }
       case _ => throw new Exception("boom!")
     }.flatten
 
@@ -144,6 +164,15 @@ private[triplescuration] class IOForkInfoUpdater(
       tuple match {
         case (Some(gitLabProject), Some(kgProject)) if kgProject.maybeParentResourceId.isEmpty =>
           gitLabProject.maybeParentPath map (gitLabFork => (kgProject.resourceId, gitLabFork, gitLabProject))
+        case _ => None
+      }
+  }
+
+  private object `no fork in the GitLab project` {
+    def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Option[(ResourceId, GitLabProject)] =
+      tuple match {
+        case (Some(gitLabProject), Some(kgProject)) if gitLabProject.maybeParentPath.isEmpty =>
+          Option((kgProject.resourceId, gitLabProject))
         case _ => None
       }
   }
