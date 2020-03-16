@@ -79,7 +79,27 @@ private[triplescuration] class IOForkInfoUpdater(
               .add(dateCreatedDelete(projectResource))
               .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
           }
-      case _ => givenCuratedTriples.pure[IO]
+      case `no fork in the KG project`(projectResource, gitLabForkPath, gitLabProject) =>
+        OptionT
+          .fromOption[IO](gitLabProject.maybeEmail)
+          .flatMapF(kg.findCreatorId)
+          .map { existingNewUserResource =>
+            givenCuratedTriples
+              .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
+              .add(unlinkCreator(projectResource))
+              .add(linkCreator(projectResource, existingNewUserResource))
+              .add(dateCreatedDelete(projectResource))
+              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+          }
+          .getOrElse {
+            givenCuratedTriples
+              .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
+              .add(unlinkCreator(projectResource))
+              .add(creatorInsert(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+              .add(dateCreatedDelete(projectResource))
+              .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
+          }
+      case _ => throw new Exception("boom!")
     }.flatten
 
   private object `forks are the same` {
@@ -115,6 +135,15 @@ private[triplescuration] class IOForkInfoUpdater(
               case _ => Option.empty[(ResourceId, Path, GitLabProject)]
             }
             .getOrElse(Option.empty[(ResourceId, Path, GitLabProject)])
+        case _ => None
+      }
+  }
+
+  private object `no fork in the KG project` {
+    def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Option[(ResourceId, Path, GitLabProject)] =
+      tuple match {
+        case (Some(gitLabProject), Some(kgProject)) if kgProject.maybeParentResourceId.isEmpty =>
+          gitLabProject.maybeParentPath map (gitLabFork => (kgProject.resourceId, gitLabFork, gitLabProject))
         case _ => None
       }
   }
