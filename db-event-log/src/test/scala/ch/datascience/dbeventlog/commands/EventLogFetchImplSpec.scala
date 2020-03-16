@@ -60,11 +60,11 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
     }
 
     s"return true if there are events with with status $Processing " +
-      "and execution date older than the given RenkuLogTimeout + 1 min" in new TestCase {
+      "and execution date older than the given RenkuLogTimeout + 5 min" in new TestCase {
       storeEvent(
         commitEventIds.generateOne,
         EventStatus.Processing,
-        ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN)),
+        ExecutionDate(now minus (maxProcessingTime.toMinutes + 5, MIN)),
         committedDates.generateOne,
         eventBodies.generateOne
       )
@@ -147,7 +147,7 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
     }
 
     s"find event with the $Processing status " +
-      "and execution date older than RenkuLogTimeout + 1 min" in new TestCase {
+      "and execution date older than RenkuLogTimeout + 5 min" in new TestCase {
 
       val eventId        = commitEventIds.generateOne
       val eventBody      = eventBodies.generateOne
@@ -155,7 +155,7 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
       storeEvent(
         eventId,
         EventStatus.Processing,
-        ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN)),
+        ExecutionDate(now minus (maxProcessingTime.toMinutes + 5, MIN)),
         committedDates.generateOne,
         eventBody,
         batchDate = eventBatchDate

@@ -85,51 +85,36 @@ private object Commands {
         %%('git, 'clone, url.toString, destinationDir.toString)(workDir)
   ) {
     import cats.data.EitherT
-    import cats.data.EitherT._
+    import cats.implicits._
     import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
-    def checkout(
-        commitId:            CommitId,
-        repositoryDirectory: Path
-    ): IO[CommandResult] = IO {
-      %%('git, 'checkout, commitId.value)(repositoryDirectory)
-    }
+    def checkout(commitId: CommitId, repositoryDirectory: Path): IO[Unit] =
+      IO {
+        %%('git, 'checkout, commitId.value)(repositoryDirectory)
+      }.map(_ => ())
 
     def clone(
         repositoryUrl:        ServiceUrl,
         destinationDirectory: Path,
         workDirectory:        Path
-    ): EitherT[IO, GenerationRecoverableError, CommandResult] =
-      for {
-        result <- doClone(repositoryUrl, destinationDirectory, workDirectory).toRightT
-        errorOrResult <- if (result.exitCode == 0) result.toRightT
-                        else recoverableErrorToLeft(result)
-
-      } yield errorOrResult
+    ): EitherT[IO, GenerationRecoverableError, Unit] =
+      EitherT[IO, GenerationRecoverableError, Unit] {
+        IO {
+          doClone(repositoryUrl, destinationDirectory, workDirectory)
+        }.map(_ => ().asRight[GenerationRecoverableError])
+          .recoverWith(relevantError)
+      }
 
     private val recoverableErrors = Set("SSL_ERROR_SYSCALL", "the remote end hung up unexpectedly")
-
-    private def recoverableErrorToLeft(result: CommandResult) =
-      for {
-        currentMessage <- result.out.string.toRightT
-        errorOrResult <- if (recoverableErrors exists (currentMessage contains _))
-                          GenerationRecoverableError(currentMessage).toLeftT
-                        else currentMessage.raiseError
-      } yield errorOrResult
-
-    private implicit class CommandResultOps(value: CommandResult) {
-      lazy val toRightT: EitherT[IO, GenerationRecoverableError, CommandResult] =
-        rightT[IO, GenerationRecoverableError](value)
-    }
-
-    private implicit class ErrorOps(value: GenerationRecoverableError) {
-      lazy val toLeftT: EitherT[IO, GenerationRecoverableError, CommandResult] = leftT[IO, CommandResult](value)
-    }
-
-    private implicit class StringOps(value: String) {
-      lazy val toRightT: EitherT[IO, GenerationRecoverableError, String] = rightT[IO, GenerationRecoverableError](value)
-      lazy val raiseError: EitherT[IO, GenerationRecoverableError, CommandResult] =
-        EitherT[IO, GenerationRecoverableError, CommandResult](IO.raiseError(new Exception(value)))
+    private lazy val relevantError: PartialFunction[Throwable, IO[Either[GenerationRecoverableError, Unit]]] = {
+      case ShelloutException(result) =>
+        def errorMessage(message: String) = s"git clone failed with: $message"
+        IO(result.out.string) flatMap {
+          case err if recoverableErrors exists err.contains =>
+            GenerationRecoverableError(errorMessage(err)).asLeft[Unit].pure[IO]
+          case err =>
+            new Exception(errorMessage(err)).raiseError[IO, Either[GenerationRecoverableError, Unit]]
+        }
     }
   }
 
