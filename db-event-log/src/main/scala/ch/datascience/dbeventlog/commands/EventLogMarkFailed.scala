@@ -98,7 +98,7 @@ object ExecutionDateCalculator {
     (_, _, now) => ExecutionDate(now)
 
   implicit val recoverableFailureCalculator: StatusBasedCalculator[RecoverableFailure] =
-    (_, _, now) => ExecutionDate(now plus (1, MINUTES))
+    (_, _, now) => ExecutionDate(now plus (10, MINUTES))
 }
 
 class IOEventLogMarkFailed(

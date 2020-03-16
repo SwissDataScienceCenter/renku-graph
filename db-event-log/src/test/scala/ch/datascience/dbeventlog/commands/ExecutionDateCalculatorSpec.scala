@@ -50,7 +50,7 @@ class ExecutionDateCalculatorSpec extends WordSpec with MockFactory with ScalaCh
         executionDateCalculator.newExecutionDate[RecoverableFailure](
           CreatedDate(timestamp minus (createdDateOffset.value, SECONDS)),
           ExecutionDate(timestamp)
-        ) shouldBe ExecutionDate(now plus (1, MINUTES))
+        ) shouldBe ExecutionDate(now plus (10, MINUTES))
       }
     }
   }

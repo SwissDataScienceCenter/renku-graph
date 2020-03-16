@@ -36,9 +36,9 @@ triplesGenerator:
   reProvisioningInitialDelay: 1 second
   gitlab:
     rateLimit: 30/sec
-  generationProcessInitialDelay: 10 seconds
+  generationProcessInitialDelay: 20 seconds
   ## a demanded number of concurrent triples generation processes
-  generationProcessesNumber: 4
+  generationProcessesNumber: 3
   threadsNumber: 6
   dbEventLog:
     connectionPool: 2

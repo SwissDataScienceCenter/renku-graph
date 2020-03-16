@@ -68,12 +68,12 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
-        .returning(IO.pure(successfulCommandResult))
+        .returning(IO.unit)
 
       (renku
         .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
@@ -111,12 +111,12 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
-        .returning(IO.pure(successfulCommandResult))
+        .returning(IO.unit)
 
       val commitWithParent = toCommitWithParent(commitWithoutParent)
       (renku
@@ -151,7 +151,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(EitherT.leftT[IO, CommandResult](exception))
+        .returning(EitherT.leftT[IO, Unit](exception))
 
       (file
         .deleteDirectory(_: Path))
@@ -223,7 +223,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(EitherT.liftF[IO, GenerationRecoverableError, CommandResult](IO.raiseError(exception)))
+        .returning(EitherT.liftF[IO, GenerationRecoverableError, Unit](IO.raiseError(exception)))
 
       (file
         .deleteDirectory(_: Path))
@@ -256,7 +256,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](()))
 
       val exception = exceptions.generateOne
       (git
@@ -292,12 +292,12 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
-        .returning(IO.pure(successfulCommandResult))
+        .returning(IO.unit)
 
       val exception = exceptions.generateOne
       (renku
@@ -333,12 +333,12 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](successfulCommandResult))
+        .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
-        .returning(IO.pure(successfulCommandResult))
+        .returning(IO.unit)
 
       (renku
         .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
@@ -363,8 +363,6 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
   private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   private trait TestCase {
-    val successfulCommandResult = CommandResult(exitCode = 0, chunks = Nil)
-
     lazy val repositoryName   = nonEmptyStrings().generateOne
     lazy val projectPath      = projects.Path(s"user/$repositoryName")
     lazy val maybeAccessToken = Gen.option(accessTokens).generateOne
