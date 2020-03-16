@@ -19,11 +19,11 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.MonadError
+import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{Path, ResourceId}
-import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
@@ -57,9 +57,11 @@ private[triplescuration] class IOForkInfoUpdater(
           .add(wasDerivedFromDelete(projectResource))
           .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
           .pure[IO]
-      case `forks and emails are different`(projectResource, gitLabForkPath, newEmail, gitLabProject) =>
-        kg.findCreatorId(newEmail) map {
-          case Some(existingNewUserResource) =>
+      case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
+        OptionT
+          .fromOption[IO](gitLabProject.maybeEmail)
+          .flatMapF(kg.findCreatorId)
+          .map { existingNewUserResource =>
             givenCuratedTriples
               .add(wasDerivedFromDelete(projectResource))
               .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
@@ -67,7 +69,8 @@ private[triplescuration] class IOForkInfoUpdater(
               .add(linkCreator(projectResource, existingNewUserResource))
               .add(dateCreatedDelete(projectResource))
               .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
-          case _ =>
+          }
+          .getOrElse {
             givenCuratedTriples
               .add(wasDerivedFromDelete(projectResource))
               .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
@@ -75,16 +78,7 @@ private[triplescuration] class IOForkInfoUpdater(
               .add(creatorInsert(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
               .add(dateCreatedDelete(projectResource))
               .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
-        }
-      case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
-        givenCuratedTriples
-          .add(wasDerivedFromDelete(projectResource))
-          .add(wasDerivedFromInsert(projectResource, gitLabForkPath))
-          .add(unlinkCreator(projectResource))
-          .add(creatorInsert(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-          .add(dateCreatedDelete(projectResource))
-          .add(dateCreatedInsert(projectResource, gitLabProject.dateCreated))
-          .pure[IO]
+          }
       case _ => givenCuratedTriples.pure[IO]
     }.flatten
 
@@ -106,25 +100,6 @@ private[triplescuration] class IOForkInfoUpdater(
             case _ => Option.empty[(ResourceId, Path)]
           }
           .getOrElse(Option.empty[(ResourceId, Path)])
-      case _ => None
-    }
-  }
-
-  private object `forks and emails are different` {
-    def unapply(
-        tuple: (Option[GitLabProject], Option[KGProject])
-    ): Option[(ResourceId, Path, Email, GitLabProject)] = tuple match {
-      case (Some(gitLabProject), Some(kgProject)) =>
-        (kgProject.maybeParentPath,
-         gitLabProject.maybeParentPath,
-         kgProject.creator.maybeEmail,
-         gitLabProject.maybeEmail)
-          .mapN {
-            case (kgFork, gitLabFork, kgEmail, gitLabEmail) if kgFork != gitLabFork && gitLabEmail != kgEmail =>
-              Option((kgProject.resourceId, gitLabFork, gitLabEmail, gitLabProject))
-            case _ => Option.empty[(ResourceId, Path, Email, GitLabProject)]
-          }
-          .getOrElse(Option.empty[(ResourceId, Path, Email, GitLabProject)])
       case _ => None
     }
   }
