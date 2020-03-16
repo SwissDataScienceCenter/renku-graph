@@ -76,6 +76,36 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
     }
+
+    "fail if finding GitLab project fails" in new TestCase {
+
+      given(kgProjects().generateOne).existsInKG
+
+      val exception = exceptions.generateOne
+      (gitLabInfoFinder
+        .findProject(_: Project)(_: Option[AccessToken]))
+        .expects(commit.project, maybeAccessToken)
+        .returning(exception.raiseError[IO, Option[GitLabProject]])
+
+      intercept[Exception] {
+        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+      } shouldBe exception
+    }
+
+    "fail if finding KG project fails" in new TestCase {
+
+      given(gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne).existsInGitLab
+
+      val exception = exceptions.generateOne
+      (kgInfoFinder
+        .findProject(_: Project))
+        .expects(commit.project)
+        .returning(exception.raiseError[IO, Option[KGProject]])
+
+      intercept[Exception] {
+        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+      } shouldBe exception
+    }
   }
 
   "updateForkInfo - cases when forks in KG and in GitLab" should {
@@ -281,6 +311,32 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         ).flatten
       )
     }
+
+    "fail if finding Person with an email in the KG fails" in new TestCase {
+
+      val emailInGitLab = emails.generateOne
+      given {
+        gitLabProjects(projectPaths.generateOne).generateOne.copy(
+          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+        )
+      }.existsInGitLab
+
+      given {
+        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
+          creator = kgCreator(emails.generateSome).generateOne
+        )
+      }.existsInKG
+
+      val exception = exceptions.generateOne
+      (kgInfoFinder
+        .findCreatorId(_: Email))
+        .expects(emailInGitLab)
+        .returning(exception.raiseError[IO, Option[users.ResourceId]])
+
+      intercept[Exception] {
+        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync()
+      } shouldBe exception
+    }
   }
 
   "updateForkInfo - cases when fork only in GitLab" should {
@@ -440,6 +496,30 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         ).flatten
       )
     }
+
+    "fail if finding Person with an email in the KG fails" in new TestCase {
+
+      val emailInGitLab = emails.generateOne
+      given {
+        gitLabProjects(projectPaths.generateOne).generateOne.copy(
+          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+        )
+      }.existsInGitLab
+
+      given {
+        kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
+      }.existsInKG
+
+      val exception = exceptions.generateOne
+      (kgInfoFinder
+        .findCreatorId(_: Email))
+        .expects(emailInGitLab)
+        .returning(exception.raiseError[IO, Option[users.ResourceId]])
+
+      intercept[Exception] {
+        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync()
+      } shouldBe exception
+    }
   }
 
   "updateForkInfo - cases when fork only in KG" should {
@@ -597,6 +677,30 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
           recreateDateCreated
         ).flatten
       )
+    }
+
+    "fail if finding Person with an email in the KG fails" in new TestCase {
+
+      val emailInGitLab = emails.generateOne
+      given {
+        gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne.copy(
+          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+        )
+      }.existsInGitLab
+
+      given {
+        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
+      }.existsInKG
+
+      val exception = exceptions.generateOne
+      (kgInfoFinder
+        .findCreatorId(_: Email))
+        .expects(emailInGitLab)
+        .returning(exception.raiseError[IO, Option[users.ResourceId]])
+
+      intercept[Exception] {
+        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync()
+      } shouldBe exception
     }
   }
 
