@@ -21,10 +21,9 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 import java.time.Instant
 
 import cats.implicits._
-import ch.datascience.generators.CommonGraphGenerators
 import ch.datascience.generators.CommonGraphGenerators.emails
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths}
+import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
 import ch.datascience.graph.model.projects.{DateCreated, ResourceId}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
@@ -32,19 +31,17 @@ import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.{Person, Project}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import io.renku.jsonld.syntax._
-import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
+class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore {
 
   "deleteWasDerivedFrom" should {
 
     "generate query deleting 'prov:wasDerivedFrom' triple from a given project" in new TestCase {
-      val maybeParent @ Some(parent) = projects().generateSome
-      val child1                     = projects(maybeParentProject = maybeParent).generateOne
-      val child2                     = projects(maybeParentProject = maybeParent).generateOne
+      val maybeParent @ Some(parent) = entitiesProjects().generateSome
+      val child1                     = entitiesProjects(maybeParentProject = maybeParent).generateOne
+      val child2                     = entitiesProjects(maybeParentProject = maybeParent).generateOne
 
       loadToStore(child1.asJsonLD, child2.asJsonLD)
 
@@ -67,9 +64,9 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
   "insertWasDerivedFrom" should {
 
     "generate query inserting 'prov:wasDerivedFrom' triple to a given project" in new TestCase {
-      val maybeParent @ Some(parent) = projects().generateSome
-      val child1                     = projects(maybeParentProject = None).generateOne
-      val child2                     = projects(maybeParentProject = None).generateOne
+      val maybeParent @ Some(parent) = entitiesProjects().generateSome
+      val child1                     = entitiesProjects(maybeParentProject = None).generateOne
+      val child2                     = entitiesProjects(maybeParentProject = None).generateOne
 
       loadToStore(child1.asJsonLD, child2.asJsonLD, parent.asJsonLD)
 
@@ -92,10 +89,10 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
   "recreateWasDerivedFrom" should {
 
     "generate queries deleting and inserting 'prov:wasDerivedFrom' triple to a given project" in new TestCase {
-      val maybeParent1 @ Some(parent1) = projects().generateSome
-      val maybeParent2 @ Some(parent2) = projects().generateSome
-      val child1                       = projects(maybeParentProject = maybeParent1).generateOne
-      val child2                       = projects(maybeParentProject = maybeParent2).generateOne
+      val maybeParent1 @ Some(parent1) = entitiesProjects().generateSome
+      val maybeParent2 @ Some(parent2) = entitiesProjects().generateSome
+      val child1                       = entitiesProjects(maybeParentProject = maybeParent1).generateOne
+      val child2                       = entitiesProjects(maybeParentProject = maybeParent2).generateOne
 
       loadToStore(child1.asJsonLD, child2.asJsonLD)
 
@@ -122,8 +119,8 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
     "change change Project's link to a Person to the given one" in new TestCase {
       val creator1 = creators(emails.generateSome).generateOne
       val creator2 = creators(Some(Email("y9Cr+ygoi83@zwpm"))).generateOne
-      val project1 = projects(creator1).generateOne
-      val project2 = projects(creator2).generateOne
+      val project1 = entitiesProjects(creator1).generateOne
+      val project2 = entitiesProjects(creator2).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
@@ -146,8 +143,8 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
     "create a new Person and link it to the given Project" in new TestCase {
       val creator1 = creators().generateOne
       val creator2 = creators().generateOne
-      val project1 = projects(creator1).generateOne
-      val project2 = projects(creator2).generateOne
+      val project1 = entitiesProjects(creator1).generateOne
+      val project2 = entitiesProjects(creator2).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
@@ -170,8 +167,8 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
   "recreateDateCreated" should {
 
     "create a new Person and link it to the given Project" in new TestCase {
-      val project1 = projects().generateOne
-      val project2 = projects().generateOne
+      val project1 = entitiesProjects().generateOne
+      val project2 = entitiesProjects().generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
@@ -210,19 +207,6 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
   private implicit class UpdatesRunner(updates: List[CuratedTriples.Update]) {
     lazy val run = (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
   }
-
-  private def creators(maybeEmail: Option[Email] = emails.generateOption): Gen[Person] =
-    for {
-      name <- CommonGraphGenerators.names
-    } yield Person(name, maybeEmail)
-
-  private def projects(creator:            Person          = creators().generateOne,
-                       maybeParentProject: Option[Project] = None): Gen[Project] =
-    for {
-      path        <- projectPaths
-      name        <- projectNames
-      createdDate <- projectCreatedDates
-    } yield Project(path, name, createdDate, creator, maybeParentProject)
 
   private def findDerivedFrom: Set[(String, Option[String])] =
     runQuery(s"""|SELECT ?id ?maybeParentId

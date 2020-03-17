@@ -18,12 +18,14 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.CommonGraphGenerators
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users.Email
+import ch.datascience.rdfstore.entities.{Person, Project}
 import org.scalacheck.Gen
 
 package object forks {
@@ -68,4 +70,17 @@ package object forks {
       resourceId <- userResourceIds(maybeEmail)
       maybeName  <- names.toGeneratorOfOptions
     } yield KGCreator(resourceId, maybeEmail, maybeName)
+
+  def entitiesProjects(creator:            Person          = creators().generateOne,
+                       maybeParentProject: Option[Project] = None): Gen[Project] =
+    for {
+      path        <- projectPaths
+      name        <- projectNames
+      createdDate <- projectCreatedDates
+    } yield Project(path, name, createdDate, creator, maybeParentProject)
+
+  def creators(maybeEmail: Option[Email] = emails.generateOption): Gen[Person] =
+    for {
+      name <- CommonGraphGenerators.names
+    } yield Person(name, maybeEmail)
 }

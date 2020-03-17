@@ -30,19 +30,14 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IOKGProjectFinderSpec
-    extends WordSpec
-    with InMemoryRdfStore
-    with ExternalServiceStubbing
-    with ScalaCheckPropertyChecks {
+class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
   "findProject" should {
 

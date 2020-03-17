@@ -25,9 +25,11 @@ import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private[triplescuration] trait ForkInfoUpdater[Interpretation[_]] {
@@ -50,7 +52,7 @@ private[triplescuration] class IOForkInfoUpdater(
       commit:                  Commit,
       givenCuratedTriples:     CuratedTriples
   )(implicit maybeAccessToken: Option[AccessToken]): IO[CuratedTriples] =
-    (gitLab.findProject(commit.project), kg.findProject(commit.project)).parMapN {
+    (gitLab.findProject(commit.project), kg.findProject(commit.project.path)).parMapN {
       case `forks are the same`() => givenCuratedTriples.pure[IO]
       case `forks are different, email and date same`(projectResource, gitLabForkPath) =>
         givenCuratedTriples
@@ -190,11 +192,14 @@ private[triplescuration] class IOForkInfoUpdater(
 }
 
 private[triplescuration] object IOForkInfoUpdater {
+  import cats.effect.Timer
 
-  def apply()(implicit cs: ContextShift[IO]): IO[ForkInfoUpdater[IO]] =
+  def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ForkInfoUpdater[IO]] =
     for {
       renkuBaseUrl     <- RenkuBaseUrl[IO]()
       gitLabInfoFinder <- IOGitLabInfoFinder()
-      kgInfoFinder     <- IOKGInfoFinder()
+      kgInfoFinder     <- IOKGInfoFinder(timeRecorder)
     } yield new IOForkInfoUpdater(gitLabInfoFinder, kgInfoFinder, new UpdatesCreator(renkuBaseUrl))
 }

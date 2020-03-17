@@ -19,13 +19,13 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
-import cats.effect.ContextShift
 import cats.implicits._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.{ForkInfoUpdater, IOForkInfoUpdater}
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 class TriplesCurator[Interpretation[_]](
@@ -45,11 +45,13 @@ class TriplesCurator[Interpretation[_]](
 
 object IOTriplesCurator {
 
-  import cats.effect.IO
+  import cats.effect.{ContextShift, IO, Timer}
 
-  def apply()(implicit cs: ContextShift[IO]): IO[TriplesCurator[IO]] =
+  def apply(
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[TriplesCurator[IO]] =
     for {
-      forkInfoUpdater <- IOForkInfoUpdater()
+      forkInfoUpdater <- IOForkInfoUpdater(timeRecorder)
     } yield new TriplesCurator[IO](
       new PersonDetailsUpdater[IO](),
       forkInfoUpdater

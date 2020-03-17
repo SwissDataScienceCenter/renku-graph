@@ -98,8 +98,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (kgInfoFinder
-        .findProject(_: Project))
-        .expects(commit.project)
+        .findProject(_: Path))
+        .expects(commit.project.path)
         .returning(exception.raiseError[IO, Option[KGProject]])
 
       intercept[Exception] {
@@ -736,16 +736,16 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
     def given(kgProject: KGProject) = new {
       lazy val existsInKG: KGProject = {
         (kgInfoFinder
-          .findProject(_: Project))
-          .expects(commit.project)
+          .findProject(_: Path))
+          .expects(commit.project.path)
           .returning(Option(kgProject).pure[IO])
         kgProject
       }
 
       lazy val doesNotExistsInKG = {
         (kgInfoFinder
-          .findProject(_: Project))
-          .expects(commit.project)
+          .findProject(_: Path))
+          .expects(commit.project.path)
           .returning(Option.empty.pure[IO])
       }
     }
