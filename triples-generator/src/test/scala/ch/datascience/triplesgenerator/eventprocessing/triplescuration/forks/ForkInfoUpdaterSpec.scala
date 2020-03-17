@@ -217,7 +217,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .returningUpdates
 
       given(newCreatorId = None, forEmail = emailInGitLab).existsInKG
-      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
+      val creatorUpdates = (updatesCreator.addNewCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
@@ -255,7 +255,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
+      val creatorUpdates = (updatesCreator.addNewCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
@@ -293,7 +293,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
+      val creatorUpdates = (updatesCreator.addNewCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
@@ -403,7 +403,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .returningUpdates
 
       given(newCreatorId = None, forEmail = emailInGitLab).existsInKG
-      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
+      val creatorUpdates = (updatesCreator.addNewCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
@@ -441,7 +441,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
+      val creatorUpdates = (updatesCreator.addNewCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
@@ -478,7 +478,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
+      val creatorUpdates = (updatesCreator.addNewCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
@@ -586,7 +586,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .returningUpdates
 
       given(newCreatorId = None, forEmail = emailInGitLab).existsInKG
-      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
+      val creatorUpdates = (updatesCreator.addNewCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
@@ -623,7 +623,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId)
         .returningUpdates
 
-      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
+      val creatorUpdates = (updatesCreator.addNewCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))
@@ -660,7 +660,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId)
         .returningUpdates
 
-      val creatorUpdates = (updatesCreator.addAndSwapCreator _)
+      val creatorUpdates = (updatesCreator.addNewCreator _)
         .expects(kgProject.resourceId,
                  gitLabProject.maybeCreator.flatMap(_.maybeEmail),
                  gitLabProject.maybeCreator.flatMap(_.maybeName))

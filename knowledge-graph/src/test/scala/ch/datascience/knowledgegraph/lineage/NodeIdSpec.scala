@@ -16,9 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.views
+package ch.datascience.knowledgegraph.lineage
 
-/*
- * This is a marker trait to be used with TinyTypes so they can be rendered as an RdfResource which is `<url>`
- */
-trait RdfResource
+import LineageGenerators._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.knowledgegraph.lineage.model.Node
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+class NodeIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "showAs[RdfResource]" should {
+
+    "wrap the Node.Id in <>" in {
+      forAll { resourceId: Node.Id =>
+        resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value}>"
+      }
+    }
+  }
+}

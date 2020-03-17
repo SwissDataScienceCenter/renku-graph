@@ -18,12 +18,14 @@
 
 package ch.datascience.graph.model
 
+import GraphModelGenerators._
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects._
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes.constraints.{RelativePath, Url}
 import eu.timepit.refined.auto._
 import io.circe.{DecodingFailure, Json}
@@ -128,8 +130,6 @@ class VisibilitySpec extends WordSpec {
 
 class ResourceIdSpec extends WordSpec with ScalaCheckPropertyChecks {
 
-  import GraphModelGenerators.projectPaths
-
   "ResourceId" should {
 
     "be a RelativePath" in {
@@ -163,6 +163,15 @@ class ResourceIdSpec extends WordSpec with ScalaCheckPropertyChecks {
     "convert any Project Resource to ProjectPath" in {
       forAll { (renkuBaseUrl: RenkuBaseUrl, projectPath: Path) =>
         ResourceId(renkuBaseUrl, projectPath).as[Try, Path] shouldBe projectPath.pure[Try]
+      }
+    }
+  }
+
+  "showAs[RdfResource]" should {
+
+    "wrap the ResourceId in <>" in {
+      forAll { resourceId: ResourceId =>
+        resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value}>"
       }
     }
   }

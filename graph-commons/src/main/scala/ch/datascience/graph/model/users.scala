@@ -18,13 +18,25 @@
 
 package ch.datascience.graph.model
 
+import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}
 
 object users {
 
   final class ResourceId private (val value: String) extends AnyVal with StringTinyType
-  implicit object ResourceId extends TinyTypeFactory[ResourceId](new ResourceId(_)) with NonBlank
+  implicit object ResourceId extends TinyTypeFactory[ResourceId](new ResourceId(_)) with NonBlank {
+
+    implicit object UsersResourceIdRdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
+      private val localPartExtractor = "^mailto:(.*)@.*$".r
+
+      override def render(id: ResourceId): String = id.value match {
+        case localPartExtractor(localPart) => s"<${id.value.replace(localPart, sparqlEncode(localPart))}>"
+        case otherId                       => s"<$otherId>"
+      }
+    }
+  }
 
   final class Email private (val value: String) extends AnyVal with StringTinyType
   implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank {

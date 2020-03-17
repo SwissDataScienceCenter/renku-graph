@@ -63,9 +63,9 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
   def swapCreator(resourceId: ResourceId, newResourceId: users.ResourceId): List[Update] =
     unlinkCreator(resourceId) ++ linkCreator(resourceId, newResourceId)
 
-  def addAndSwapCreator(resourceId:        ResourceId,
-                        maybeCreatorEmail: Option[Email],
-                        maybeCreatorName:  Option[users.Name]): List[Update] =
+  def addNewCreator(resourceId:        ResourceId,
+                    maybeCreatorEmail: Option[Email],
+                    maybeCreatorName:  Option[users.Name]): List[Update] =
     unlinkCreator(resourceId) ++ insertCreator(resourceId, maybeCreatorEmail, maybeCreatorName)
 
   private def unlinkCreator(resourceId: ResourceId): List[Update] = List {

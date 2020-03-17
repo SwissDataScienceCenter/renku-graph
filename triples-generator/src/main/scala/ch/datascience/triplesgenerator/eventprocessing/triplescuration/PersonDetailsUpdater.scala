@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 import cats.MonadError
 import cats.data.NonEmptyList
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
 import io.circe.Decoder.decodeList
@@ -113,7 +114,6 @@ private object PersonDetailsUpdater {
 
   private[triplescuration] object prepareUpdates extends (Set[Person] => List[Update]) {
 
-    import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
     import eu.timepit.refined.auto._
 
     override def apply(persons: Set[Person]): List[Update] = persons.toList flatMap updates
@@ -130,7 +130,7 @@ private object PersonDetailsUpdater {
     }
 
     private def namesDelete(id: ResourceId) = Some {
-      val resource = id.asResource
+      val resource = id.showAs[RdfResource]
       Update(
         s"Deleting Person $resource schema:name",
         SparqlQuery(
@@ -146,7 +146,7 @@ private object PersonDetailsUpdater {
       if (names.isEmpty) None
       else
         Some {
-          val resource = id.asResource
+          val resource = id.showAs[RdfResource]
           Update(
             s"Inserting Person $resource schema:name",
             SparqlQuery(
@@ -159,7 +159,7 @@ private object PersonDetailsUpdater {
         }
 
     private def emailsDelete(id: ResourceId) = Some {
-      val resource = id.asResource
+      val resource = id.showAs[RdfResource]
       Update(
         s"Deleting Person $resource schema:email",
         SparqlQuery(
@@ -176,7 +176,7 @@ private object PersonDetailsUpdater {
       if (emails.isEmpty) None
       else
         Some {
-          val resource = id.asResource
+          val resource = id.showAs[RdfResource]
           Update(
             s"Inserting Person $resource schema:email",
             SparqlQuery(
@@ -189,7 +189,7 @@ private object PersonDetailsUpdater {
         }
 
     private def labelsDelete(id: ResourceId) = Some {
-      val resource = id.asResource
+      val resource = id.showAs[RdfResource]
       Update(
         s"Deleting Person $resource rdfs:label",
         SparqlQuery(
@@ -200,15 +200,6 @@ private object PersonDetailsUpdater {
               |""".stripMargin
         )
       )
-    }
-
-    private implicit class IdOps(id: ResourceId) {
-      private val localPartExtractor = "^mailto:(.*)@.*$".r
-
-      lazy val asResource: String = id.value match {
-        case localPartExtractor(localPart) => s"<${id.value.replace(localPart, sparqlEncode(localPart))}>"
-        case otherId                       => s"<$otherId>"
-      }
     }
   }
 }

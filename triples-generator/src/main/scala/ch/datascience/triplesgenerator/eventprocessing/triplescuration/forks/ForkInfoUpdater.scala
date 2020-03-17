@@ -69,7 +69,7 @@ private[triplescuration] class IOForkInfoUpdater(
           .getOrElse {
             givenCuratedTriples
               .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
-              .add(addAndSwapCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+              .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
               .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
           }
       case `no fork in the KG project`(projectResource, gitLabForkPath, gitLabProject) =>
@@ -85,7 +85,7 @@ private[triplescuration] class IOForkInfoUpdater(
           .getOrElse {
             givenCuratedTriples
               .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
-              .add(addAndSwapCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+              .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
               .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
           }
       case `no fork in the GitLab project`(projectResource, gitLabProject) =>
@@ -101,7 +101,7 @@ private[triplescuration] class IOForkInfoUpdater(
           .getOrElse {
             givenCuratedTriples
               .add(deleteWasDerivedFrom(projectResource))
-              .add(addAndSwapCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+              .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
               .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
           }
       case _ => givenCuratedTriples.pure[IO]

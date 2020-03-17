@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users.Email
@@ -27,7 +28,7 @@ import org.scalacheck.Gen
 
 package object forks {
 
-  private val renkuBaseUrl = renkuBaseUrls.generateOne
+  implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
   def gitLabProjects(parentPath: Path): Gen[GitLabProject] = gitLabProjects(
     maybeParentPaths = Gen.const(parentPath).toGeneratorOfSomes
