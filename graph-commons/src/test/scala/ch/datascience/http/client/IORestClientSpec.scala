@@ -18,9 +18,14 @@
 
 package ch.datascience.http.client
 
+import java.net.ConnectException
+
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.control.Throttler
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.http.client.RestClientError._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
@@ -144,23 +149,9 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
 
       verifyThrottling()
 
-      intercept[Exception] {
+      intercept[UnexpectedResponseException] {
         client.callRemote.unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.NotFound}; body: some body"
-    }
-
-    "fail if remote responds with a body which doesn't match the response mapping rules" in new TestCase {
-
-      stubFor {
-        get("/resource")
-          .willReturn(ok("non int"))
-      }
-
-      verifyThrottling()
-
-      intercept[Exception] {
-        client.callRemote.unsafeRunSync()
-      }.getMessage shouldBe s"""GET $hostUrl/resource returned ${Status.Ok}; error: For input string: "non int""""
     }
 
     "fail if remote responds with an empty body and status which doesn't match the response mapping rules" in new TestCase {
@@ -172,18 +163,52 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
 
       verifyThrottling()
 
-      intercept[Exception] {
+      intercept[UnexpectedResponseException] {
         client.callRemote.unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.NoContent}; body: "
+    }
+
+    "fail if remote responds with a BAD_REQUEST and it's not mapped in the given response mapping rules" in new TestCase {
+
+      val responseBody = nonBlankStrings().generateOne
+      stubFor {
+        get("/resource")
+          .willReturn(aResponse.withStatus(Status.BadRequest.code).withBody(responseBody))
+      }
+
+      verifyThrottling()
+
+      intercept[BadRequestException] {
+        client.callRemote.unsafeRunSync()
+      }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.BadRequest}; body: $responseBody"
+    }
+
+    "fail if remote responds with a body which causes exception during mapping" in new TestCase {
+
+      stubFor {
+        get("/resource")
+          .willReturn(ok("non int"))
+      }
+
+      verifyThrottling()
+
+      val exception = intercept[MappingException] {
+        client.callRemote.unsafeRunSync()
+      }
+
+      exception.getMessage shouldBe s"""GET $hostUrl/resource returned ${Status.Ok}; error: For input string: "non int""""
+      exception.getCause   shouldBe a[NumberFormatException]
     }
 
     "fail after retrying if there is a persistent connectivity problem" in {
       val logger = TestLogger[IO]()
 
-      intercept[Exception] {
+      val exception = intercept[ConnectivityException] {
         new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, logger, None).callRemote
           .unsafeRunSync()
-      }.getMessage shouldBe s"GET http://localhost:1024/resource error: Connection refused"
+      }
+      exception.getMessage shouldBe s"GET http://localhost:1024/resource error: Connection refused"
+      exception.getCause   shouldBe a[ConnectException]
 
       logger.loggedOnly(
         Warn("GET http://localhost:1024/resource timed out -> retrying attempt 1 error: Connection refused"),
