@@ -23,15 +23,17 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.knowledgegraph.projects.model.Permissions._
-import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project => ProjectMetadata}
+import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project}
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 import io.circe.literal._
 
@@ -148,7 +150,7 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:path returning OK with`(
-      project:            ProjectMetadata,
+      project:            Project,
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
 
@@ -182,23 +184,27 @@ object GitLab {
     }
 
     val queryParams = if (withStatistics) "?statistics=true" else ""
+    val creatorId: Int Refined Positive = positiveInts().generateOne
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}$queryParams").withAccessTokenInHeader
         .willReturn(
           okJson(
             json"""{
-              "id":               ${project.id.value},
-              "description":      ${project.maybeDescription.map(_.value)},
-              "visibility":       ${project.visibility.value},
-              "ssh_url_to_repo":  ${project.urls.ssh.value},
-              "http_url_to_repo": ${project.urls.http.value},
-              "web_url":          ${project.urls.web.value},
-              "readme_url":       ${project.urls.readme.value},
-              "forks_count":      ${project.forking.forksCount.value},
-              "tag_list":         ${project.tags.map(_.value).toList},
-              "star_count":       ${project.starsCount.value},
-              "last_activity_at": ${project.updatedAt.value},
-              "permissions":      ${project.permissions.toJson},
+              "id":                   ${project.id.value},
+              "description":          ${project.maybeDescription.map(_.value)},
+              "visibility":           ${project.visibility.value},
+              "path_with_namespace":  ${project.path.value},
+              "ssh_url_to_repo":      ${project.urls.ssh.value},
+              "http_url_to_repo":     ${project.urls.http.value},
+              "web_url":              ${project.urls.web.value},
+              "readme_url":           ${project.urls.readme.value},
+              "forks_count":          ${project.forking.forksCount.value},
+              "tag_list":             ${project.tags.map(_.value).toList},
+              "star_count":           ${project.starsCount.value},
+              "creator_id":           ${creatorId.value},
+              "created_at":           ${project.created.date.value},
+              "last_activity_at":     ${project.updatedAt.value},
+              "permissions":          ${project.permissions.toJson},
               "statistics": {
                 "commit_count":       ${project.statistics.commitsCount.value},
                 "storage_size":       ${project.statistics.storageSize.value},
@@ -214,6 +220,16 @@ object GitLab {
               )
               .noSpaces
           )
+        )
+    }
+
+    stubFor {
+      get(s"/api/v4/users/$creatorId").withAccessTokenInHeader
+        .willReturn(
+          okJson(json"""{
+            "name":         ${project.created.creator.name.value},
+            "public_email": ${project.created.creator.email.value}
+          }""".noSpaces)
         )
     }
     ()

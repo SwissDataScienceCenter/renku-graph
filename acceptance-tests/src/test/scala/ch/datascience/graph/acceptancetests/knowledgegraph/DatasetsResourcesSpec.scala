@@ -40,7 +40,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{forkings, parentProjects, projects => projectsGen}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
@@ -63,7 +63,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
 
-    val project = projectsGen.generateOne.copy(
+    val project = projects.generateOne.copy(
       maybeDescription = projectDescriptions.generateSome,
       forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome)
     )
@@ -128,7 +128,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         )
       )
 
-      `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
+      `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
 
       `triples updates run`(
         List(dataset1, dataset2)
@@ -186,17 +186,17 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
       val text             = nonBlankStrings(minLength = 10).generateOne
-      val dataset1Projects = nonEmptyList(projectsGen).generateOne.toList
+      val dataset1Projects = nonEmptyList(projects).generateOne.toList
       val dataset1 = datasets.generateOne.copy(
         name     = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
         projects = dataset1Projects map toDatasetProject
       )
-      val dataset2Projects = nonEmptyList(projectsGen).generateOne.toList
+      val dataset2Projects = nonEmptyList(projects).generateOne.toList
       val dataset2 = datasets.generateOne.copy(
         maybeDescription = Some(sentenceContaining(text).map(_.value).map(Description.apply).generateOne),
         projects         = dataset2Projects map toDatasetProject
       )
-      val dataset3Projects = nonEmptyList(projectsGen).generateOne.toList
+      val dataset3Projects = nonEmptyList(projects).generateOne.toList
       val dataset3 = {
         val dataset = datasets.generateOne
         dataset.copy(
@@ -209,7 +209,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           projects = dataset3Projects map toDatasetProject
         )
       }
-      val dataset4Projects = List(projectsGen.generateOne)
+      val dataset4Projects = List(projects.generateOne)
       val dataset4 = datasets.generateOne.copy(
         projects = dataset4Projects map toDatasetProject
       )
@@ -283,13 +283,13 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       val commitId      = commitIds.generateOne
       val committedDate = committedDates.generateOne
       val datasetJsonLD = toDataSetCommit(firstProject, commitId, committedDate, dataset)
-      `data in the RDF store`(firstProject.toGitLabProject(), commitId, datasetJsonLD)
+      `data in the RDF store`(firstProject, commitId, datasetJsonLD)
       `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
 
       otherProjects foreach { project =>
         val commitId = commitIds.generateOne
         `data in the RDF store`(
-          project.toGitLabProject(),
+          project,
           commitId,
           toDataSetCommit(project,
                           commitId,
@@ -332,12 +332,11 @@ object DatasetsResources {
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
-  def briefJson(dataset: Dataset): Json = json"""
-    {
-      "identifier": ${dataset.id.value}, 
-      "name": ${dataset.name.value},
-      "sameAs": ${dataset.sameAs.value}
-    }""" deepMerge {
+  def briefJson(dataset: Dataset): Json = json"""{
+    "identifier": ${dataset.id.value}, 
+    "name": ${dataset.name.value},
+    "sameAs": ${dataset.sameAs.value}
+  }""" deepMerge {
     _links(
       Link(Rel("details"), Href(renkuResourcesUrl / "datasets" / dataset.id))
     )

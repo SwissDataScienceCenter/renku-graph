@@ -29,10 +29,10 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.users.Email
-import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.http.client.AccessToken
+import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.jsonld.JsonLD
@@ -64,6 +64,8 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
     givenAccessTokenPresentFor(project)
 
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
+
+    `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 

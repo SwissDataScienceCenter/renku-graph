@@ -31,7 +31,7 @@ import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
 
-class WebhookValidationEnpointSpec extends FeatureSpec with GivenWhenThen with GraphServices {
+class WebhookValidationEndpointSpec extends FeatureSpec with GivenWhenThen with GraphServices {
 
   feature("Existence of a Graph Services hook can be validated") {
 

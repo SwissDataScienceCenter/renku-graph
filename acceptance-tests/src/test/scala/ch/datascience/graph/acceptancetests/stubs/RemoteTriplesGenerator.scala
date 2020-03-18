@@ -20,7 +20,8 @@ package ch.datascience.graph.acceptancetests.stubs
 
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.bundles._
 import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
 import io.renku.jsonld.JsonLD

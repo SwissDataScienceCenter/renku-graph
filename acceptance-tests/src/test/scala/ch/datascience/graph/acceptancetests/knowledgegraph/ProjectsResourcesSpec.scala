@@ -36,7 +36,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen, _}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupPermissions, ProjectAndGroupPermissions, ProjectPermissions}
 import ch.datascience.knowledgegraph.projects.model.{Permissions, Project}
 import ch.datascience.rdfstore.entities.Person
@@ -53,7 +53,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   import ProjectsResources._
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
-  private val project = projectsGen.generateOne.copy(
+  private val project = projects.generateOne.copy(
     maybeDescription = projectDescriptions.generateSome,
     forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome)
   )
@@ -84,8 +84,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           maybeDatasetSameAs = dataset.sameAs.some
         )
       )
-
-      `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
+      `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
 
       `triples updates run`(Set(project.created.creator.email) + project.created.creator.email)
 

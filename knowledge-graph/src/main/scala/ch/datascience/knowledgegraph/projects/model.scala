@@ -25,7 +25,6 @@ import cats.data.Validated
 import cats.implicits._
 import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
 import ch.datascience.graph.model.users
-import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupAccessLevel, ProjectAccessLevel}
 import ch.datascience.knowledgegraph.projects.model.Statistics._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -36,7 +35,6 @@ import eu.timepit.refined.numeric.Positive
 
 object model {
   import Forking.ForksCount
-  import Permissions.AccessLevel
   import Project._
   import Urls._
 

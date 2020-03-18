@@ -26,8 +26,8 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model
-import ch.datascience.graph.model.EventsGenerators.projects
 import ch.datascience.http.client.AccessToken
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.entities.bundles.exemplarLineageFlow.NodeDef
 import io.circe.Json

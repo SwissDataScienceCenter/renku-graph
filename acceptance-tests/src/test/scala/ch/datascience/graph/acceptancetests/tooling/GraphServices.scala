@@ -66,8 +66,8 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
 
 object GraphServices {
 
-  import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
   import ch.datascience._
+  import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
 
   implicit lazy val executionContext: ExecutionContext = ExecutionContext.global
   implicit lazy val contextShift:     ContextShift[IO] = IO.contextShift(executionContext)

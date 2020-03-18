@@ -29,12 +29,13 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, projects => projectsGen}
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.Project
 import ch.datascience.graph.model.projects.Visibility.Public
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -59,7 +60,7 @@ class EventsProcessingStatusSpec
 
     scenario("As a user I would like to see progress of events processing for my project") {
 
-      val project   = projectsGen.generateOne
+      val project   = projects.generateOne
       val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
@@ -132,6 +133,9 @@ class EventsProcessingStatusSpec
 
       // making the triples generation be happy and not throwing exceptions to the logs
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+
+      // assuring there's project info in GitLab for the triples curation process
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
     }
 
     webhookServiceClient

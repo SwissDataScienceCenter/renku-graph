@@ -21,9 +21,10 @@ package ch.datascience.graph.acceptancetests.data
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
+import ch.datascience.knowledgegraph.projects.model.Project
 import io.circe.Json
 import io.circe.literal._
 
@@ -32,15 +33,14 @@ object GitLab {
   def pushEvent(projectId: Id, commitId: CommitId): Json =
     pushEvent(projects.generateOne.copy(id = projectId), commitId)
 
-  def pushEvent(project: Project, commitId: CommitId): Json = json"""
-      {
-        "after":         ${commitId.value},
-        "user_id":       ${positiveInts().generateOne.value}, 
-        "user_username": ${nonEmptyStrings().generateOne},
-        "user_email":    ${emails.generateOne.value},
-        "project": {
-          "id":                  ${project.id.value},
-          "path_with_namespace": ${project.path.value}
-        }
-      }"""
+  def pushEvent(project: Project, commitId: CommitId): Json = json"""{
+    "after":         ${commitId.value},
+    "user_id":       ${positiveInts().generateOne.value}, 
+    "user_username": ${nonEmptyStrings().generateOne},
+    "user_email":    ${emails.generateOne.value},
+    "project": {
+      "id":                  ${project.id.value},
+      "path_with_namespace": ${project.path.value}
+    }
+  }"""
 }
