@@ -12,6 +12,10 @@ import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import ch.datascience.generators.CommonGraphGenerators.emails
+import ch.datascience.graph.model.users
+import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.views.RdfResource
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class KGInfoFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
@@ -41,6 +45,27 @@ class KGInfoFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPro
     }
   }
 
+  "findCreatorId" should {
+
+    "return ResourceId of a Person with the given email" in new TestCase {
+      forAll { email: Email =>
+        val person = entitiesPersons(email.some).generateOne
+
+        loadToStore(person.asJsonLD, entitiesPersons().generateOne.asJsonLD)
+
+        val Some(resourceId) = finder.findCreatorId(email).unsafeRunSync()
+
+        findPerson(resourceId) should contain theSameElementsAs Set(
+          person.name.value -> email.value
+        )
+      }
+    }
+
+    "return no ResourceId if there's no Person with the given email" in new TestCase {
+      finder.findCreatorId(emails.generateOne).unsafeRunSync() shouldBe None
+    }
+  }
+
   private trait TestCase {
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
@@ -51,4 +76,16 @@ class KGInfoFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPro
     maybeParent <- entitiesProjects(maybeParentProject = None).toGeneratorOfOptions
     project     <- entitiesProjects(maybeParentProject = maybeParent)
   } yield project
+
+  private def findPerson(resourceId: users.ResourceId): Set[(String, String)] =
+    runQuery(s"""|SELECT ?name ?email
+                 |WHERE {
+                 |  ${resourceId.showAs[RdfResource]} rdf:type schema:Person;
+                 |                                    schema:name ?name;
+                 |                                    schema:email ?email 
+                 |}
+                 |""".stripMargin)
+      .unsafeRunSync()
+      .map(row => (row("name"), row("email")))
+      .toSet
 }

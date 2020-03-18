@@ -71,7 +71,7 @@ package object forks {
       maybeName  <- names.toGeneratorOfOptions
     } yield KGCreator(resourceId, maybeEmail, maybeName)
 
-  def entitiesProjects(creator:            Person          = creators().generateOne,
+  def entitiesProjects(creator:            Person          = entitiesPersons().generateOne,
                        maybeParentProject: Option[Project] = None): Gen[Project] =
     for {
       path        <- projectPaths
@@ -79,7 +79,7 @@ package object forks {
       createdDate <- projectCreatedDates
     } yield Project(path, name, createdDate, creator, maybeParentProject)
 
-  def creators(maybeEmail: Option[Email] = emails.generateOption): Gen[Person] =
+  def entitiesPersons(maybeEmail: Option[Email] = emails.generateOption): Gen[Person] =
     for {
       name <- CommonGraphGenerators.names
     } yield Person(name, maybeEmail)
