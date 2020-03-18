@@ -20,17 +20,16 @@ package ch.datascience.knowledgegraph.projects.rest
 
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Description, Id, Name, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import io.chrisdavenport.log4cats.Logger
-import org.http4s.circe.jsonOf
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -71,6 +70,7 @@ private class IOGitLabProjectFinder(
   import io.circe._
   import org.http4s.Method.GET
   import org.http4s._
+  import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
   def findProject(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): OptionT[IO, GitLabProject] =

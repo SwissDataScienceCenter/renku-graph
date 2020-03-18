@@ -24,7 +24,6 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.Project
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
@@ -83,8 +82,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (gitLabInfoFinder
-        .findProject(_: Project)(_: Option[AccessToken]))
-        .expects(commit.project, maybeAccessToken)
+        .findProject(_: Path)(_: Option[AccessToken]))
+        .expects(commit.project.path, maybeAccessToken)
         .returning(exception.raiseError[IO, Option[GitLabProject]])
 
       intercept[Exception] {
@@ -719,16 +718,16 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
     def given(gitLabProject: GitLabProject) = new {
       lazy val existsInGitLab: GitLabProject = {
         (gitLabInfoFinder
-          .findProject(_: Project)(_: Option[AccessToken]))
-          .expects(commit.project, maybeAccessToken)
+          .findProject(_: Path)(_: Option[AccessToken]))
+          .expects(commit.project.path, maybeAccessToken)
           .returning(Option(gitLabProject).pure[IO])
         gitLabProject
       }
 
       lazy val doesNotExistsInGitLab = {
         (gitLabInfoFinder
-          .findProject(_: Project)(_: Option[AccessToken]))
-          .expects(commit.project, maybeAccessToken)
+          .findProject(_: Path)(_: Option[AccessToken]))
+          .expects(commit.project.path, maybeAccessToken)
           .returning(Option.empty.pure[IO])
       }
     }

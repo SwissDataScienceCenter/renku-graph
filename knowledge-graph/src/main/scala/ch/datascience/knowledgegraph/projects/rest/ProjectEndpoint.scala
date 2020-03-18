@@ -20,13 +20,12 @@ package ch.datascience.knowledgegraph.projects.rest
 
 import cats.effect._
 import cats.implicits._
-import ch.datascience.config.renku
+import ch.datascience.config.{GitLab, renku}
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
-import ch.datascience.knowledgegraph.config.GitLab
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}

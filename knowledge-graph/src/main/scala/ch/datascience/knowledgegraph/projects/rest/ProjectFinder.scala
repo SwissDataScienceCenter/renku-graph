@@ -26,7 +26,7 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import IOAccessTokenFinder._
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
-import ch.datascience.knowledgegraph.config.GitLab
+import ch.datascience.config.GitLab
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject

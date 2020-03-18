@@ -38,18 +38,13 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
 import org.http4s.Status
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class GitLabProjectFinderSpec
-    extends WordSpec
-    with MockFactory
-    with ExternalServiceStubbing
-    with ScalaCheckPropertyChecks {
+class GitLabProjectFinderSpec extends WordSpec with ExternalServiceStubbing with ScalaCheckPropertyChecks {
 
   "findProject" should {
 

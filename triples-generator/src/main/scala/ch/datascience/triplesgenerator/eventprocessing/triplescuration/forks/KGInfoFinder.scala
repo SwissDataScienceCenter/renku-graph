@@ -133,9 +133,9 @@ private class IOKGInfoFinder(
 private object IOKGInfoFinder {
   def apply(
       timeRecorder:            SparqlQueryTimeRecorder[IO],
+      logger:                  Logger[IO],
       rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-      logger:                  Logger[IO] = ApplicationLogger
+      renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO]()
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[KGInfoFinder[IO]] =

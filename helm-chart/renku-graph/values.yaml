@@ -14,6 +14,8 @@ tokenRepository:
     limits:
       memory: 250Mi
   jvmXmx: 100m
+  gitlab:
+    rateLimit: 50/sec
   connectionPool: 2
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
@@ -79,6 +81,8 @@ knowledgeGraph:
   resources:
     limits:
       memory: 500Mi
+  gitlab:
+    rateLimit: 100/sec
   jvmXmx: 200m
   threadsNumber: 3
   services:

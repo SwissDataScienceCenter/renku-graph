@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect._
 import cats.implicits._
+import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
@@ -31,7 +32,6 @@ import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.commits._
-import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import ch.datascience.webhookservice.project.ProjectInfo

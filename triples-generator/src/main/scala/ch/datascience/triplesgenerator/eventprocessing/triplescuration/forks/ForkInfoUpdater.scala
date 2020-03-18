@@ -28,6 +28,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -52,7 +53,7 @@ private[triplescuration] class IOForkInfoUpdater(
       commit:                  Commit,
       givenCuratedTriples:     CuratedTriples
   )(implicit maybeAccessToken: Option[AccessToken]): IO[CuratedTriples] =
-    (gitLab.findProject(commit.project), kg.findProject(commit.project.path)).parMapN {
+    (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path)).parMapN {
       case `forks are the same`() => givenCuratedTriples.pure[IO]
       case `forks are different, email and date same`(projectResource, gitLabForkPath) =>
         givenCuratedTriples
@@ -193,13 +194,17 @@ private[triplescuration] class IOForkInfoUpdater(
 
 private[triplescuration] object IOForkInfoUpdater {
   import cats.effect.Timer
+  import ch.datascience.config.GitLab
+  import ch.datascience.control.Throttler
 
   def apply(
+      gitLabThrottler:         Throttler[IO, GitLab],
+      logger:                  Logger[IO],
       timeRecorder:            SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ForkInfoUpdater[IO]] =
     for {
       renkuBaseUrl     <- RenkuBaseUrl[IO]()
-      gitLabInfoFinder <- IOGitLabInfoFinder()
-      kgInfoFinder     <- IOKGInfoFinder(timeRecorder)
+      gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
+      kgInfoFinder     <- IOKGInfoFinder(timeRecorder, logger)
     } yield new IOForkInfoUpdater(gitLabInfoFinder, kgInfoFinder, new UpdatesCreator(renkuBaseUrl))
 }

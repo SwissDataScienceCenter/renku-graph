@@ -24,6 +24,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.{ForkInfoUpdater, IOForkInfoUpdater}
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -45,13 +46,17 @@ class TriplesCurator[Interpretation[_]](
 
 object IOTriplesCurator {
 
+  import ch.datascience.config.GitLab
+  import ch.datascience.control.Throttler
   import cats.effect.{ContextShift, IO, Timer}
 
   def apply(
+      gitLabThrottler:         Throttler[IO, GitLab],
+      logger:                  Logger[IO],
       timeRecorder:            SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[TriplesCurator[IO]] =
     for {
-      forkInfoUpdater <- IOForkInfoUpdater(timeRecorder)
+      forkInfoUpdater <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
     } yield new TriplesCurator[IO](
       new PersonDetailsUpdater[IO](),
       forkInfoUpdater

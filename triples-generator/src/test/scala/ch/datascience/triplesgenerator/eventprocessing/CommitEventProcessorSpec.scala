@@ -23,6 +23,7 @@ import cats.data.EitherT.{leftT, rightT}
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
+import ch.datascience.control.Throttler
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
@@ -394,11 +395,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(eventsProcessingTimesBuilder, *)
         .returning(IO.pure(eventsProcessingTimes))
 
-      IOCommitEventProcessor(mock[TestDbTransactor[EventLogDB]],
-                             mock[TriplesGenerator[IO]],
-                             metricsRegistry,
-                             new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(TestLogger())))
-        .unsafeRunSync()
+      IOCommitEventProcessor(
+        mock[TestDbTransactor[EventLogDB]],
+        mock[TriplesGenerator[IO]],
+        metricsRegistry,
+        Throttler.noThrottling,
+        new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(TestLogger()))
+      ).unsafeRunSync()
     }
   }
 

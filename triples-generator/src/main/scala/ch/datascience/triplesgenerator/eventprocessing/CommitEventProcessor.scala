@@ -210,6 +210,8 @@ class CommitEventProcessor[Interpretation[_]](
 }
 
 object IOCommitEventProcessor {
+  import ch.datascience.config.GitLab
+  import ch.datascience.control.Throttler
 
   private[triplesgenerator] lazy val eventsProcessingTimesBuilder =
     Histogram
@@ -222,6 +224,7 @@ object IOCommitEventProcessor {
       transactor:          DbTransactor[IO, EventLogDB],
       triplesGenerator:    TriplesGenerator[IO],
       metricsRegistry:     MetricsRegistry[IO],
+      gitLabThrottler:     Throttler[IO, GitLab],
       timeRecorder:        SparqlQueryTimeRecorder[IO]
   )(implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext,
@@ -229,7 +232,7 @@ object IOCommitEventProcessor {
     for {
       uploader              <- IOUploader(ApplicationLogger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(ApplicationLogger)
-      triplesCurator        <- IOTriplesCurator(timeRecorder)
+      triplesCurator        <- IOTriplesCurator(gitLabThrottler, ApplicationLogger, timeRecorder)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
                                                          maybeHistogram = Some(eventsProcessingTimes))
