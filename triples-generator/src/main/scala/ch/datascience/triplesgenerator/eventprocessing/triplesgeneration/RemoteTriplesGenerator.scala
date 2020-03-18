@@ -27,6 +27,7 @@ import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import com.typesafe.config.Config
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
@@ -57,7 +58,6 @@ class RemoteTriplesGenerator(
     extends IORestClient[RemoteTriplesGenerator](Throttler.noThrottling, logger)
     with TriplesGenerator[IO] {
 
-  import TriplesGenerator.GenerationRecoverableError
   import cats.data.EitherT
   import cats.effect._
   import ch.datascience.http.client.RestClientError.UnauthorizedException
@@ -69,7 +69,7 @@ class RemoteTriplesGenerator(
 
   override def generateTriples(
       commit:                  Commit
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, GenerationRecoverableError, JsonLDTriples] =
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
     EitherT.right {
       for {
         uri           <- validateUri(s"$serviceUrl/projects/${commit.project.id}/commits/${commit.id}")

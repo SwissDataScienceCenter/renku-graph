@@ -28,9 +28,11 @@ import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.RestClientError.{BadRequestException, ConnectivityException, MappingException, UnauthorizedException, UnexpectedResponseException}
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators.{curatedTriplesObjects, curationUpdates}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import eu.timepit.refined.auto._
 import org.scalamock.handlers.CallHandler
 import org.scalamock.scalatest.MockFactory
@@ -49,7 +51,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).existsInGitLab
       given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).existsInKG
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(givenCuratedTriples)
     }
 
     "do nothing if no projects in GitLab and in KG" in new TestCase {
@@ -57,7 +59,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
       given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).doesNotExistsInKG
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(givenCuratedTriples)
     }
 
     "do nothing if no projects in GitLab" in new TestCase {
@@ -65,7 +67,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
       given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).existsInKG
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(givenCuratedTriples)
     }
 
     "do nothing if no projects in KG" in new TestCase {
@@ -73,37 +75,74 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).existsInGitLab
       given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).doesNotExistsInKG
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(givenCuratedTriples)
     }
 
-    "fail if finding GitLab project fails" in new TestCase {
+    Set(
+      BadRequestException(nonBlankStrings().generateOne),
+      MappingException(nonBlankStrings().generateOne, exceptions.generateOne),
+      UnauthorizedException
+    ) foreach { exception =>
+      s"fail if finding GitLab project fails with ${exception.getClass}" in new TestCase {
 
-      given(kgProjects().generateOne).existsInKG
+        given(kgProjects().generateOne).existsInKG
 
-      val exception = exceptions.generateOne
-      (gitLabInfoFinder
-        .findProject(_: Path)(_: Option[AccessToken]))
-        .expects(commit.project.path, maybeAccessToken)
-        .returning(exception.raiseError[IO, Option[GitLabProject]])
+        (gitLabInfoFinder
+          .findProject(_: Path)(_: Option[AccessToken]))
+          .expects(commit.project.path, maybeAccessToken)
+          .returning(exception.raiseError[IO, Option[GitLabProject]])
 
-      intercept[Exception] {
-        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
-      } shouldBe exception
+        intercept[Exception] {
+          updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync()
+        } shouldBe exception
+      }
+
+      s"fail if finding KG project fails with ${exception.getClass}" in new TestCase {
+
+        given(gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne).existsInGitLab
+
+        (kgInfoFinder
+          .findProject(_: Path))
+          .expects(commit.project.path)
+          .returning(exception.raiseError[IO, Option[KGProject]])
+
+        intercept[Exception] {
+          updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync()
+        } shouldBe exception
+      }
     }
 
-    "fail if finding KG project fails" in new TestCase {
+    Set(
+      UnexpectedResponseException(nonBlankStrings().generateOne),
+      ConnectivityException(nonBlankStrings().generateOne, exceptions.generateOne)
+    ) foreach { exception =>
+      s"return $CurationRecoverableError if finding GitLab project fails with ${exception.getClass.getSimpleName}" in new TestCase {
 
-      given(gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne).existsInGitLab
+        given(kgProjects().generateOne).existsInKG
 
-      val exception = exceptions.generateOne
-      (kgInfoFinder
-        .findProject(_: Path))
-        .expects(commit.project.path)
-        .returning(exception.raiseError[IO, Option[KGProject]])
+        (gitLabInfoFinder
+          .findProject(_: Path)(_: Option[AccessToken]))
+          .expects(commit.project.path, maybeAccessToken)
+          .returning(exception.raiseError[IO, Option[GitLabProject]])
 
-      intercept[Exception] {
-        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
-      } shouldBe exception
+        updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Left {
+          CurationRecoverableError("Problem with finding fork info", exception)
+        }
+      }
+
+      s"return $CurationRecoverableError if finding KG project fails ${exception.getClass.getSimpleName}" in new TestCase {
+
+        given(gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne).existsInGitLab
+
+        (kgInfoFinder
+          .findProject(_: Path))
+          .expects(commit.project.path)
+          .returning(exception.raiseError[IO, Option[KGProject]])
+
+        updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Left {
+          CurationRecoverableError("Problem with finding fork info", exception)
+        }
+      }
     }
   }
 
@@ -115,7 +154,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       given(gitLabProjects(commonFork).generateOne).existsInGitLab
       given(kgProjects(commonFork).generateOne).existsInKG
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(givenCuratedTriples)
     }
 
     "recreate wasDerivedFrom only " +
@@ -144,8 +183,10 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ wasDerivedFromRecreate
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ wasDerivedFromRecreate
+        )
       )
     }
 
@@ -184,12 +225,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromRecreate,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromRecreate,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -226,12 +269,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromRecreate,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromRecreate,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -264,12 +309,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromRecreate,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromRecreate,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -302,12 +349,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromRecreate,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromRecreate,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -333,7 +382,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .returning(exception.raiseError[IO, Option[users.ResourceId]])
 
       intercept[Exception] {
-        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync()
+        updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -372,12 +421,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromInsert,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromInsert,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -412,12 +463,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromInsert,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromInsert,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -450,12 +503,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromInsert,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromInsert,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -487,12 +542,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromInsert,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromInsert,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -516,7 +573,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .returning(exception.raiseError[IO, Option[users.ResourceId]])
 
       intercept[Exception] {
-        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync()
+        updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -555,12 +612,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromDelete,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromDelete,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -595,12 +654,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromDelete,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromDelete,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -632,12 +693,14 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromDelete,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromDelete,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
+        )
       )
     }
 
@@ -669,37 +732,15 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         .expects(kgProject.resourceId, gitLabProject.dateCreated)
         .returningUpdates
 
-      updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync() shouldBe givenCuratedTriples.copy(
-        updates = givenCuratedTriples.updates ++ List(
-          wasDerivedFromDelete,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "fail if finding Person with an email in the KG fails" in new TestCase {
-
-      val emailInGitLab = emails.generateOne
-      given {
-        gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          updates = givenCuratedTriples.updates ++ List(
+            wasDerivedFromDelete,
+            creatorUpdates,
+            recreateDateCreated
+          ).flatten
         )
-      }.existsInGitLab
-
-      given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
-      }.existsInKG
-
-      val exception = exceptions.generateOne
-      (kgInfoFinder
-        .findCreatorId(_: Email))
-        .expects(emailInGitLab)
-        .returning(exception.raiseError[IO, Option[users.ResourceId]])
-
-      intercept[Exception] {
-        updater.updateForkInfo(commit, givenCuratedTriples).unsafeRunSync()
-      } shouldBe exception
+      )
     }
   }
 

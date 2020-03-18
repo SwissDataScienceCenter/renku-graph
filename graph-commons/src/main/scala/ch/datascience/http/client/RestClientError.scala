@@ -24,13 +24,13 @@ object RestClientError {
 
   final case class UnexpectedResponseException(message: String) extends Exception(message) with RestClientError
 
-  final case class MappingException(message: String, cause: Throwable)
-      extends Exception(message, cause)
-      with RestClientError
-
   final case class BadRequestException(message: String) extends Exception(message) with RestClientError
 
   final case class ConnectivityException(message: String, cause: Throwable)
+      extends Exception(message, cause)
+      with RestClientError
+
+  final case class MappingException(message: String, cause: Throwable)
       extends Exception(message, cause)
       with RestClientError
 

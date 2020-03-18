@@ -42,9 +42,11 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.IOCommitEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.interpreters.TryTriplesCurator
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
@@ -117,7 +119,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       (triplesFinder
         .generateTriples(_: Commit)(_: Option[AccessToken]))
         .expects(commit2, maybeAccessToken)
-        .returning(EitherT.liftF[Try, GenerationRecoverableError, JsonLDTriples](context.raiseError(exception2)))
+        .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception2)))
 
       expectEventMarkedFailed(commit2.commitEventId, NonRecoverableFailure, exception2)
 
@@ -144,7 +146,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       (triplesFinder
         .generateTriples(_: Commit)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
-        .returning(EitherT.liftF[Try, GenerationRecoverableError, JsonLDTriples](context.raiseError(exception)))
+        .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception)))
 
       expectEventMarkedFailed(commit.commitEventId, NonRecoverableFailure, exception)
 
@@ -181,6 +183,39 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       logSummary(commits, uploaded = 0, failed = 1)
     }
 
+    s"succeed and mark event with $RecoverableFailure if curating triples fails with $CurationRecoverableError" in new TestCase {
+
+      val commits       = commitsLists(size = Gen.const(1)).generateOne
+      val commit +: Nil = commits.toList
+
+      (eventsDeserialiser
+        .deserialiseToCommitEvents(_: EventBody))
+        .expects(eventBody)
+        .returning(context.pure(commits))
+
+      givenFetchingAccessToken(forProjectId = commits.head.project.id)
+        .returning(context.pure(maybeAccessToken))
+
+      val rawTriples = jsonLDTriples.generateOne
+      (triplesFinder
+        .generateTriples(_: Commit)(_: Option[AccessToken]))
+        .expects(commit, maybeAccessToken)
+        .returning(rightT[Try, ProcessingRecoverableError](rawTriples))
+
+      val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
+      (triplesCurator
+        .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
+        .expects(commit, rawTriples, maybeAccessToken)
+        .returning(leftT[Try, CuratedTriples](exception))
+
+      expectEventMarkedFailed(commit.commitEventId, RecoverableFailure, exception)
+
+      eventProcessor(eventBody) shouldBe context.unit
+
+      logError(commits.head, exception.getMessage)
+      logSummary(commits, uploaded = 0, failed = 1)
+    }
+
     s"succeed and mark event with $NonRecoverableFailure if curating triples fails" in new TestCase {
 
       val commits       = commitsLists(size = Gen.const(1)).generateOne
@@ -198,13 +233,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       (triplesFinder
         .generateTriples(_: Commit)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
-        .returning(rightT[Try, GenerationRecoverableError](rawTriples))
+        .returning(rightT[Try, ProcessingRecoverableError](rawTriples))
 
       val exception = exceptions.generateOne
       (triplesCurator
         .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, rawTriples, maybeAccessToken)
-        .returning(context.raiseError(exception))
+        .returning(EitherT.liftF[Try, ProcessingRecoverableError, CuratedTriples](context.raiseError(exception)))
 
       expectEventMarkedFailed(commit.commitEventId, NonRecoverableFailure, exception)
 
@@ -232,13 +267,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       (triplesFinder
         .generateTriples(_: Commit)(_: Option[AccessToken]))
         .expects(commit1, maybeAccessToken)
-        .returning(rightT[Try, GenerationRecoverableError](rawTriples))
+        .returning(rightT[Try, ProcessingRecoverableError](rawTriples))
 
       val curatedTriples = curatedTriplesObjects.generateOne
       (triplesCurator
         .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit1, rawTriples, maybeAccessToken)
-        .returning(context.pure(curatedTriples))
+        .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
       val uploadingError = nonEmptyStrings().map(DeliveryFailure.apply).generateOne
       (uploader
@@ -250,7 +285,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       (triplesFinder
         .generateTriples(_: Commit)(_: Option[AccessToken]))
         .expects(commit2, maybeAccessToken)
-        .returning(EitherT.liftF[Try, GenerationRecoverableError, JsonLDTriples](context.raiseError(exception2)))
+        .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception2)))
 
       expectEventMarkedFailed(commit1.commitEventId, RecoverableFailure, uploadingError)
 
@@ -279,13 +314,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         (triplesFinder
           .generateTriples(_: Commit)(_: Option[AccessToken]))
           .expects(commit1, maybeAccessToken)
-          .returning(rightT[Try, GenerationRecoverableError](rawTriples))
+          .returning(rightT[Try, ProcessingRecoverableError](rawTriples))
 
         val curatedTriples = curatedTriplesObjects.generateOne
         (triplesCurator
           .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
           .expects(commit1, rawTriples, maybeAccessToken)
-          .returning(context.pure(curatedTriples))
+          .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
         (uploader
           .upload(_: CuratedTriples))
@@ -296,7 +331,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         (triplesFinder
           .generateTriples(_: Commit)(_: Option[AccessToken]))
           .expects(commit2, maybeAccessToken)
-          .returning(EitherT.liftF[Try, GenerationRecoverableError, JsonLDTriples](context.raiseError(exception2)))
+          .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception2)))
 
         expectEventMarkedFailed(commit1.commitEventId, NonRecoverableFailure, failure)
 
@@ -451,13 +486,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       (triplesFinder
         .generateTriples(_: Commit)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
-        .returning(rightT[Try, GenerationRecoverableError](triples))
+        .returning(rightT[Try, ProcessingRecoverableError](triples))
 
       val curatedTriples = curatedTriplesObjects.generateOne
       (triplesCurator
         .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, triples, maybeAccessToken)
-        .returning(context.pure(curatedTriples))
+        .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
       (uploader
         .upload(_: CuratedTriples))

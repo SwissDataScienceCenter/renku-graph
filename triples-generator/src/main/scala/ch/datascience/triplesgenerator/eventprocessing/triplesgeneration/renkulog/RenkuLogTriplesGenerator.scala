@@ -32,6 +32,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.Commit._
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
@@ -57,7 +58,7 @@ class RenkuLogTriplesGenerator private[renkulog] (
 
   override def generateTriples(
       commit:                  Commit
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, GenerationRecoverableError, JsonLDTriples] =
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
     EitherT {
       createRepositoryDirectory(commit.project.path)
         .bracket(cloneCheckoutGenerate(commit, maybeAccessToken))(deleteDirectory)
@@ -67,7 +68,7 @@ class RenkuLogTriplesGenerator private[renkulog] (
   private def cloneCheckoutGenerate(
       commit:           Commit,
       maybeAccessToken: Option[AccessToken]
-  )(repoDirectory:      Path): IO[Either[GenerationRecoverableError, JsonLDTriples]] = {
+  )(repoDirectory:      Path): IO[Either[ProcessingRecoverableError, JsonLDTriples]] = {
     for {
       repositoryUrl <- findRepositoryUrl(commit.project.path, maybeAccessToken).toRight
       _             <- git clone (repositoryUrl, repoDirectory, workDirectory)
@@ -101,7 +102,7 @@ class RenkuLogTriplesGenerator private[renkulog] (
 
   private def meaningfulError(
       maybeAccessToken: Option[AccessToken]
-  ): PartialFunction[Throwable, IO[Either[GenerationRecoverableError, JsonLDTriples]]] = {
+  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, JsonLDTriples]]] = {
     case NonFatal(exception) =>
       IO.raiseError {
         (Option(exception.getMessage) -> maybeAccessToken)

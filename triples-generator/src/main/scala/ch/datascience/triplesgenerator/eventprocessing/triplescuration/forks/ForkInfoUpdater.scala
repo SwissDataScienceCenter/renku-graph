@@ -19,15 +19,18 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.MonadError
-import cats.data.OptionT
+import cats.data.{EitherT, OptionT}
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -37,7 +40,7 @@ private[triplescuration] trait ForkInfoUpdater[Interpretation[_]] {
   def updateForkInfo(
       commit:                  Commit,
       givenCuratedTriples:     CuratedTriples
-  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[CuratedTriples]
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, CuratedTriples]
 }
 
 private[triplescuration] class IOForkInfoUpdater(
@@ -52,63 +55,68 @@ private[triplescuration] class IOForkInfoUpdater(
   def updateForkInfo(
       commit:                  Commit,
       givenCuratedTriples:     CuratedTriples
-  )(implicit maybeAccessToken: Option[AccessToken]): IO[CuratedTriples] =
-    (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path)).parMapN {
-      case `forks are the same`() => givenCuratedTriples.pure[IO]
-      case `forks are different, email and date same`(projectResource, gitLabForkPath) =>
-        givenCuratedTriples
-          .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
-          .pure[IO]
-      case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
-        OptionT
-          .fromOption[IO](gitLabProject.maybeEmail)
-          .flatMapF(kg.findCreatorId)
-          .map { existingUserResource =>
-            givenCuratedTriples
-              .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
-              .add(swapCreator(projectResource, existingUserResource))
-              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
-          }
-          .getOrElse {
-            givenCuratedTriples
-              .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
-              .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
-          }
-      case `no fork in the KG project`(projectResource, gitLabForkPath, gitLabProject) =>
-        OptionT
-          .fromOption[IO](gitLabProject.maybeEmail)
-          .flatMapF(kg.findCreatorId)
-          .map { existingUserResource =>
-            givenCuratedTriples
-              .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
-              .add(swapCreator(projectResource, existingUserResource))
-              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
-          }
-          .getOrElse {
-            givenCuratedTriples
-              .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
-              .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
-          }
-      case `no fork in the GitLab project`(projectResource, gitLabProject) =>
-        OptionT
-          .fromOption[IO](gitLabProject.maybeEmail)
-          .flatMapF(kg.findCreatorId)
-          .map { existingUserResource =>
-            givenCuratedTriples
-              .add(deleteWasDerivedFrom(projectResource))
-              .add(swapCreator(projectResource, existingUserResource))
-              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
-          }
-          .getOrElse {
-            givenCuratedTriples
-              .add(deleteWasDerivedFrom(projectResource))
-              .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-              .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
-          }
-      case _ => givenCuratedTriples.pure[IO]
-    }.flatten
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, CuratedTriples] = EitherT {
+    (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path))
+      .parMapN {
+        case `forks are the same`() => givenCuratedTriples.pure[IO]
+        case `forks are different, email and date same`(projectResource, gitLabForkPath) =>
+          givenCuratedTriples
+            .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+            .pure[IO]
+        case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
+          OptionT
+            .fromOption[IO](gitLabProject.maybeEmail)
+            .flatMapF(kg.findCreatorId)
+            .map { existingUserResource =>
+              givenCuratedTriples
+                .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+                .add(swapCreator(projectResource, existingUserResource))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+            }
+            .getOrElse {
+              givenCuratedTriples
+                .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+                .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+            }
+        case `no fork in the KG project`(projectResource, gitLabForkPath, gitLabProject) =>
+          OptionT
+            .fromOption[IO](gitLabProject.maybeEmail)
+            .flatMapF(kg.findCreatorId)
+            .map { existingUserResource =>
+              givenCuratedTriples
+                .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
+                .add(swapCreator(projectResource, existingUserResource))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+            }
+            .getOrElse {
+              givenCuratedTriples
+                .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
+                .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+            }
+        case `no fork in the GitLab project`(projectResource, gitLabProject) =>
+          OptionT
+            .fromOption[IO](gitLabProject.maybeEmail)
+            .flatMapF(kg.findCreatorId)
+            .map { existingUserResource =>
+              givenCuratedTriples
+                .add(deleteWasDerivedFrom(projectResource))
+                .add(swapCreator(projectResource, existingUserResource))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+            }
+            .getOrElse {
+              givenCuratedTriples
+                .add(deleteWasDerivedFrom(projectResource))
+                .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+            }
+        case _ => givenCuratedTriples.pure[IO]
+      }
+      .flatten
+      .map(_.asRight[ProcessingRecoverableError])
+      .recover(maybeToRecoverableError)
+  }
 
   private object `forks are the same` {
     def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Boolean = tuple match {
@@ -189,6 +197,14 @@ private[triplescuration] class IOForkInfoUpdater(
   private implicit class ResourceIdOps(resourceId: ResourceId) {
     import scala.util.Try
     lazy val getPath: Option[Path] = resourceId.as[Try, Path].toOption
+  }
+
+  private lazy val maybeToRecoverableError
+      : PartialFunction[Throwable, Either[ProcessingRecoverableError, CuratedTriples]] = {
+    case e: UnexpectedResponseException =>
+      Left[ProcessingRecoverableError, CuratedTriples](CurationRecoverableError("Problem with finding fork info", e))
+    case e: ConnectivityException =>
+      Left[ProcessingRecoverableError, CuratedTriples](CurationRecoverableError("Problem with finding fork info", e))
   }
 }
 

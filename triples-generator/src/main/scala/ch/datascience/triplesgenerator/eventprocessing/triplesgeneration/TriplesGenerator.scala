@@ -25,7 +25,7 @@ import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
 import ch.datascience.triplesgenerator.eventprocessing.Commit
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.{Config, ConfigFactory}
 
@@ -35,12 +35,14 @@ import scala.language.higherKinds
 trait TriplesGenerator[Interpretation[_]] {
   def generateTriples(
       commit:                  Commit
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, GenerationRecoverableError, JsonLDTriples]
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, JsonLDTriples]
 }
 
 object TriplesGenerator {
 
-  final case class GenerationRecoverableError(message: String) extends Exception(message)
+  final case class GenerationRecoverableError(message: String)
+      extends Exception(message)
+      with ProcessingRecoverableError
 
   def apply(
       triplesGeneration:   TriplesGeneration,

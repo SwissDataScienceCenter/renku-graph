@@ -19,13 +19,16 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import CurationGenerators._
+import cats.data.EitherT
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.ForkInfoUpdater
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -48,9 +51,9 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
       (forkInfoUpdater
         .updateForkInfo(_: Commit, _: CuratedTriples)(_: Option[AccessToken]))
         .expects(commit, triplesWithPersonDetails, maybeAccessToken)
-        .returning(triplesWithForkInfo.pure[Try])
+        .returning(triplesWithForkInfo.toRightT)
 
-      curator.curate(commit, triples) shouldBe triplesWithForkInfo.pure[Try]
+      curator.curate(commit, triples).value shouldBe Right(triplesWithForkInfo).pure[Try]
     }
 
     "fail with the failure from the person details update" in new TestCase {
@@ -60,7 +63,7 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
         .expects(CuratedTriples(triples, updates = Nil))
         .returning(exception.raiseError[Try, CuratedTriples])
 
-      curator.curate(commit, triples) shouldBe exception.raiseError[Try, CuratedTriples]
+      curator.curate(commit, triples).value shouldBe exception.raiseError[Try, CuratedTriples]
     }
 
     "fail with the failure from the fork info update" in new TestCase {
@@ -74,9 +77,25 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
       (forkInfoUpdater
         .updateForkInfo(_: Commit, _: CuratedTriples)(_: Option[AccessToken]))
         .expects(commit, triplesWithPersonDetails, maybeAccessToken)
-        .returning(exception.raiseError[Try, CuratedTriples])
+        .returning(exception.toEitherTError)
 
-      curator.curate(commit, triples) shouldBe exception.raiseError[Try, CuratedTriples]
+      curator.curate(commit, triples).value shouldBe exception.raiseError[Try, CuratedTriples]
+    }
+
+    s"return $CurationRecoverableError if forkInfoUpdater returns one" in new TestCase {
+
+      val triplesWithPersonDetails = curatedTriplesObjects.generateOne
+      (personDetailsUpdater.curate _)
+        .expects(CuratedTriples(triples, updates = Nil))
+        .returning(triplesWithPersonDetails.pure[Try])
+
+      val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
+      (forkInfoUpdater
+        .updateForkInfo(_: Commit, _: CuratedTriples)(_: Option[AccessToken]))
+        .expects(commit, triplesWithPersonDetails, maybeAccessToken)
+        .returning(exception.toLeftT)
+
+      curator.curate(commit, triples).value shouldBe Left(exception).pure[Try]
     }
   }
 
@@ -90,5 +109,22 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
     val personDetailsUpdater = mock[TryPersonDetailsUpdater]
     val forkInfoUpdater      = mock[ForkInfoUpdater[Try]]
     val curator              = new TriplesCurator[Try](personDetailsUpdater, forkInfoUpdater)
+  }
+
+  private implicit class TriplesOps(out: CuratedTriples) {
+    lazy val toRightT: EitherT[Try, ProcessingRecoverableError, CuratedTriples] =
+      EitherT.rightT[Try, ProcessingRecoverableError](out)
+  }
+
+  private implicit class ExceptionOps(exception: Exception) {
+    lazy val toEitherTError: EitherT[Try, ProcessingRecoverableError, CuratedTriples] =
+      EitherT[Try, ProcessingRecoverableError, CuratedTriples](
+        exception.raiseError[Try, Either[ProcessingRecoverableError, CuratedTriples]]
+      )
+  }
+
+  private implicit class RecoverableErrorOps(exception: ProcessingRecoverableError) {
+    lazy val toLeftT: EitherT[Try, ProcessingRecoverableError, CuratedTriples] =
+      EitherT.leftT[Try, CuratedTriples](exception)
   }
 }

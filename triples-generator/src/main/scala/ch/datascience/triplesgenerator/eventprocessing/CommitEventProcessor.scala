@@ -33,9 +33,9 @@ import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
 import io.chrisdavenport.log4cats.Logger
@@ -93,8 +93,8 @@ class CommitEventProcessor[Interpretation[_]](
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
       rawTriples     <- generateTriples(commit)
-      curatedTriples <- EitherT.right[GenerationRecoverableError](curate(commit, rawTriples))
-      result         <- EitherT.right[GenerationRecoverableError](upload(curatedTriples) map toUploadingResult(commit))
+      curatedTriples <- curate(commit, rawTriples)
+      result         <- EitherT.right[ProcessingRecoverableError](upload(curatedTriples) map toUploadingResult(commit))
     } yield result
   }.value map (_.fold(toRecoverableError(commit), identity)) recoverWith nonRecoverableFailure(commit)
 
@@ -111,7 +111,7 @@ class CommitEventProcessor[Interpretation[_]](
       NonRecoverableError(commit, error: Throwable)
   }
 
-  private def toRecoverableError(commit: Commit): GenerationRecoverableError => UploadingResult = { error =>
+  private def toRecoverableError(commit: Commit): ProcessingRecoverableError => UploadingResult = { error =>
     logger.error(s"${logMessageCommon(commit)} ${error.message}")
     RecoverableError(commit, error)
   }
@@ -207,6 +207,10 @@ class CommitEventProcessor[Interpretation[_]](
     case class RecoverableError(commit:    Commit, cause: Throwable) extends UploadingError
     case class NonRecoverableError(commit: Commit, cause: Throwable) extends UploadingError
   }
+}
+
+object CommitEventProcessor {
+  trait ProcessingRecoverableError extends Exception { val message: String }
 }
 
 object IOCommitEventProcessor {
