@@ -165,8 +165,8 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
         s"Inserting Project $rdfResource schema:dateCreated",
         SparqlQuery(
           name = "upload - project dateCreated insert",
-          Set("PREFIX schema: <http://schema.org/>"),
-          s"""INSERT DATA { $rdfResource schema:dateCreated '$dateCreated' }"""
+          Set("PREFIX schema: <http://schema.org/>", "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>"),
+          s"""INSERT DATA { $rdfResource schema:dateCreated '$dateCreated'^^xsd:dateTime }"""
         )
       )
     )

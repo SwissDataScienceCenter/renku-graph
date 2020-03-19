@@ -24,7 +24,6 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
@@ -51,10 +50,10 @@ private class IOKGInfoFinder(
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import Decoder._
+  import SparqlValueEncoder.sparqlEncode
   import ch.datascience.graph.model.projects._
   import ch.datascience.graph.model.users.{Email, Name => UserName}
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  import SparqlValueEncoder.sparqlEncode
 
   override def findProject(path: Path): IO[Option[KGProject]] = {
     implicit val decoder: Decoder[List[KGProject]] = recordsDecoder(projectDecoder)
