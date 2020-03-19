@@ -23,6 +23,7 @@ import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.db.EventLog
+import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
@@ -30,7 +31,6 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects.Visibility.Public
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
@@ -54,7 +54,7 @@ class EventsProcessingStatusSpec
     with Eventually
     with AcceptanceTestPatience {
 
-  private val numberOfEvents: Int Refined Positive = 10
+  private val numberOfEvents: Int Refined Positive = 5
 
   feature("Status of events processing for a given project") {
 
@@ -69,7 +69,7 @@ class EventsProcessingStatusSpec
       webhookServiceClient.GET(s"projects/$projectId/events/status").status shouldBe NotFound
 
       When("there is a webhook but no events in the Event Log")
-      givenHookValidationToHookExists(projectId, projectPaths.generateOne)
+      givenHookValidationToHookExists(projectId, project.path)
 
       Then("the status endpoint should return OK with done = total = 0")
       val noEventsResponse = webhookServiceClient GET s"projects/$projectId/events/status"
@@ -123,9 +123,14 @@ class EventsProcessingStatusSpec
       maxElements = numberOfEvents
     ).generateOne
 
+    givenAccessTokenPresentFor(project)
+
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
                                                                                             allCommitIds.head,
                                                                                             allCommitIds.tail.toSet)
+    // assuring there's project info in GitLab for the triples curation process
+    `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+
     allCommitIds.map { commitId =>
       // GitLab to return commit info about all the parent commits
       if (commitId != allCommitIds.head)
@@ -133,13 +138,10 @@ class EventsProcessingStatusSpec
 
       // making the triples generation be happy and not throwing exceptions to the logs
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
-
-      // assuring there's project info in GitLab for the triples curation process
-      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
     }
 
     webhookServiceClient
-      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project.id, allCommitIds.head))
+      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, allCommitIds.head))
       .status shouldBe Accepted
   }
 }

@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import ch.datascience.dbeventlog.EventStatus
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -85,7 +86,8 @@ class PushEventsConsumptionSpec
 
       // wait for the Event Log to be emptied
       eventually {
-        EventLog.findEvents(projectId, status = New) shouldBe List.empty
+        EventLog.findEvents(projectId, status = New)                    shouldBe empty
+        EventLog.findEvents(projectId, status = EventStatus.Processing) shouldBe empty
       }
     }
   }

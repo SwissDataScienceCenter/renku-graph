@@ -19,6 +19,7 @@
 package ch.datascience.graph.acceptancetests.flows
 
 import AccessTokenPresence._
+import ch.datascience.dbeventlog.EventStatus
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
@@ -92,6 +93,10 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
               |""".stripMargin
         )
         .exists(_.get("label").exists(_ contains commitId.value)) shouldBe true
+    }
+
+    eventually {
+      EventLog.findEvents(projectId, status = EventStatus.Processing) shouldBe empty
     }
   }
 
