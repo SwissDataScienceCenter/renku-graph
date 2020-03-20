@@ -65,7 +65,7 @@ object model {
 
   final case class Creation(date: DateCreated, creator: Creator)
 
-  final case class Creator(email: users.Email, name: users.Name)
+  final case class Creator(maybeEmail: Option[users.Email], name: users.Name)
 
   final case class Forking(forksCount: ForksCount, maybeParent: Option[ParentProject])
 
@@ -74,7 +74,7 @@ object model {
     implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt
   }
 
-  final case class ParentProject(id: Id, path: Path, name: Name)
+  final case class ParentProject(path: Path, name: Name, created: Creation)
 
   sealed trait Permissions extends Product with Serializable
 

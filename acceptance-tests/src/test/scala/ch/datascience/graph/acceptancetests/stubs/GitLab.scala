@@ -162,9 +162,7 @@ object GitLab {
 
     implicit class ParentProjectOps(parent: ParentProject) {
       lazy val toJson: Json = json"""{
-        "id":                  ${parent.id.value},
-        "path_with_namespace": ${parent.path.value},
-        "name":                ${parent.name.value}
+        "path_with_namespace": ${parent.path.value}
       }"""
     }
 
@@ -234,7 +232,7 @@ object GitLab {
         .willReturn(
           okJson(json"""{
             "name":         ${project.created.creator.name.value},
-            "public_email": ${project.created.creator.email.value}
+            "public_email": ${project.created.creator.maybeEmail.map(_.value)}
           }""".noSpaces)
         )
     }

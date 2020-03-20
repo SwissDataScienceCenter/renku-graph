@@ -39,7 +39,7 @@ object model {
 
   final case class DatasetPart(name: PartName, atLocation: PartLocation)
 
-  final case class DatasetProject(path: Path, name:                  projects.Name, created: AddedToProject)
-  final case class AddedToProject(date: DateCreatedInProject, agent: DatasetAgent)
-  final case class DatasetAgent(email:  Email, name:                 UserName)
+  final case class DatasetProject(path:     Path, name:                  projects.Name, created: AddedToProject)
+  final case class AddedToProject(date:     DateCreatedInProject, agent: DatasetAgent)
+  final case class DatasetAgent(maybeEmail: Option[Email], name:         UserName)
 }

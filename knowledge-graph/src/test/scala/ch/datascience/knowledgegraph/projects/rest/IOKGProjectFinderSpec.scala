@@ -18,21 +18,20 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
-import java.time.temporal.ChronoUnit.DAYS
-
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommittedDate
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
+import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.Parent
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -41,18 +40,20 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
 
   "findProject" should {
 
-    "return details of the project with the given path" in new TestCase {
-      forAll { project: KGProject =>
+    "return details of the project with the given path when there's no parent parent" in new TestCase {
+      forAll(kgProjects(parentsGen = emptyOptionOf[Parent])) { project =>
         val projectCreator = project.created.creator
         loadToStore(
           fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne),
           fileCommit(
             commitId      = commitIds.generateOne,
-            committedDate = CommittedDate(project.created.date.value),
-            committer     = Person(projectCreator.name, projectCreator.email)
+            committedDate = CommittedDate(project.created.date.value)
           )(
-            projectPath = project.path,
-            projectName = project.name
+            projectPath        = project.path,
+            projectName        = project.name,
+            projectDateCreated = project.created.date,
+            projectCreator     = Person(projectCreator.name, projectCreator.maybeEmail),
+            maybeParent        = None
           )
         )
 
@@ -60,33 +61,30 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
       }
     }
 
-    "return details of the project with the given path if there are forks of it" in new TestCase {
-      val project             = kgProjects.generateOne
-      val projectCreationDate = committedDates.generateOne
-      val projectCreator      = Person(project.created.creator.name, project.created.creator.email)
-      val forkCreator         = Person(names.generateOne, emails.generateOne)
-      loadToStore(
-        fileCommit(
-          commitId      = commitIds.generateOne,
-          committedDate = projectCreationDate,
-          committer     = projectCreator
-        )(
-          projectPath        = project.path,
-          projectName        = project.name,
-          projectDateCreated = project.created.date
-        ),
-        fileCommit(
-          commitId      = commitIds.generateOne,
-          committedDate = CommittedDate(projectCreationDate.value.plus(2, DAYS)),
-          committer     = forkCreator
-        )(
-          projectPath        = project.path,
-          projectName        = project.name,
-          projectDateCreated = project.created.date
+    "return details of the project with the given path if it has a parent project" in new TestCase {
+      forAll(kgProjects(parentsGen = parents.toGeneratorOfSomes)) { project =>
+        loadToStore(
+          fileCommit(
+            commitId = commitIds.generateOne
+          )(
+            projectPath        = project.path,
+            projectName        = project.name,
+            projectDateCreated = project.created.date,
+            projectCreator     = entities.Person(project.created.creator.name, project.created.creator.maybeEmail),
+            maybeParent = project.maybeParent.map { parent =>
+              entities.Project(
+                parent.resourceId.toUnsafe[Path],
+                parent.name,
+                parent.created.date,
+                creator            = entities.Person(parent.created.creator.name, parent.created.creator.maybeEmail),
+                maybeParentProject = None
+              )
+            }
+          )
         )
-      )
 
-      metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project)
+        metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project)
+      }
     }
 
     "return None if there's no project with the given path" in new TestCase {

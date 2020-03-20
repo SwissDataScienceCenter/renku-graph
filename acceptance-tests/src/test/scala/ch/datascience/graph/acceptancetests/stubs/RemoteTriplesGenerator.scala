@@ -44,7 +44,7 @@ object RemoteTriplesGenerator {
         projectPath        = project.path,
         projectName        = project.name,
         projectDateCreated = project.created.date,
-        projectCreator     = Person(project.created.creator.name, project.created.creator.email)
+        projectCreator     = Person(project.created.creator.name, project.created.creator.maybeEmail)
       )
     )
 

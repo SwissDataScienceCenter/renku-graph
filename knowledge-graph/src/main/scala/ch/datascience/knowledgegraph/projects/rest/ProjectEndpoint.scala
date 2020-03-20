@@ -105,9 +105,8 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val creatorEncoder: Encoder[Creator] = Encoder.instance[Creator] { creator =>
     json"""{
-      "name":  ${creator.name.value},
-      "email": ${creator.email.value}
-    }"""
+      "name":  ${creator.name.value}
+    }""" deepMerge (creator.maybeEmail.map(email => json"""{"email": ${email.value}}""") getOrElse Json.obj())
   }
 
   private implicit lazy val urlsEncoder: Encoder[Urls] = Encoder.instance[Urls] { urls =>
@@ -119,7 +118,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
     }"""
   }
 
-  private implicit lazy val forksEncoder: Encoder[Forking] = Encoder.instance[Forking] { forks =>
+  private implicit lazy val forkingEncoder: Encoder[Forking] = Encoder.instance[Forking] { forks =>
     json"""{
       "forksCount": ${forks.forksCount.value}
     }""" deepMerge (forks.maybeParent.map(parent => json"""{"parent": $parent}""") getOrElse Json.obj())
@@ -127,9 +126,12 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val parentProjectEncoder: Encoder[ParentProject] = Encoder.instance[ParentProject] { parent =>
     json"""{
-      "identifier": ${parent.id.value},
       "path":       ${parent.path.value},
-      "name":       ${parent.name.value}
+      "name":       ${parent.name.value},
+      "created": {
+        "dateCreated": ${parent.created.date.value},
+        "creator":     ${parent.created.creator}
+      }
     }"""
   }
 

@@ -24,8 +24,9 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Description, Id, Name, Visibility}
+import ch.datascience.graph.model.projects.{Description, Id, Visibility}
 import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -47,7 +48,7 @@ object GitLabProjectFinder {
                                  maybeDescription: Option[Description],
                                  visibility:       Visibility,
                                  urls:             Urls,
-                                 forking:          Forking,
+                                 forksCount:       ForksCount,
                                  tags:             Set[Tag],
                                  starsCount:       StarsCount,
                                  updatedAt:        DateUpdated,
@@ -93,13 +94,6 @@ private class IOGitLabProjectFinder(
     import ch.datascience.knowledgegraph.projects.model.Statistics._
     import ch.datascience.knowledgegraph.projects.model.Urls
     import ch.datascience.knowledgegraph.projects.model.Urls._
-
-    implicit val parentProjectDecoder: Decoder[ParentProject] = cursor =>
-      for {
-        id   <- cursor.downField("id").as[Id]
-        path <- cursor.downField("path_with_namespace").as[projects.Path]
-        name <- cursor.downField("name").as[Name]
-      } yield ParentProject(id, path, name)
 
     implicit val maybeAccessLevelDecoder: Decoder[Option[AccessLevel]] =
       _.as[Option[Json]].flatMap {
@@ -152,7 +146,6 @@ private class IOGitLabProjectFinder(
         tags        <- cursor.downField("tag_list").as[List[Tag]]
         starsCount  <- cursor.downField("star_count").as[StarsCount]
         updatedAt   <- cursor.downField("last_activity_at").as[DateUpdated]
-        maybeParent <- cursor.downField("forked_from_project").as[Option[ParentProject]]
         statistics  <- cursor.downField("statistics").as[Statistics]
         permissions <- cursor.downField("permissions").as[Permissions]
         maybeDescription <- cursor
@@ -165,7 +158,7 @@ private class IOGitLabProjectFinder(
         maybeDescription,
         visibility,
         Urls(sshUrl, httpUrl, webUrl, readmeUrl),
-        Forking(forksCount, maybeParent),
+        forksCount,
         tags.toSet,
         starsCount,
         updatedAt,

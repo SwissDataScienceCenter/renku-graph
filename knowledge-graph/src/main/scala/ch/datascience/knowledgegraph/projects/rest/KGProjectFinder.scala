@@ -37,11 +37,13 @@ trait KGProjectFinder[Interpretation[_]] {
 }
 
 object KGProjectFinder {
-  final case class KGProject(path: Path, name: Name, created: ProjectCreation)
+  final case class KGProject(path: Path, name: Name, created: ProjectCreation, maybeParent: Option[Parent])
 
   final case class ProjectCreation(date: DateCreated, creator: ProjectCreator)
 
-  final case class ProjectCreator(email: users.Email, name: users.Name)
+  final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation)
+
+  final case class ProjectCreator(maybeEmail: Option[users.Email], name: users.Name)
 }
 
 private class IOKGProjectFinder(
@@ -56,6 +58,7 @@ private class IOKGProjectFinder(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with KGProjectFinder[IO] {
 
+  import cats.implicits._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
@@ -72,28 +75,24 @@ private class IOKGProjectFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX prov: <http://www.w3.org/ns/prov#>"
     ),
-    s"""|SELECT DISTINCT ?name ?dateCreated ?creatorName ?creatorEmail
+    s"""|SELECT DISTINCT ?name ?dateCreated ?creatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail
         |WHERE {
-        |  {
-        |    SELECT ?creatorResource
-        |    WHERE {
-        |      ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
-        |                                                            schema:creator ?creatorResource .
-        |      ?commit rdf:type prov:Activity ;
-        |              schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} ;
-        |              prov:agent ?creatorResource ;
-        |              prov:startedAtTime ?commitCreatedDate .
-        |    }
-        |    ORDER BY ASC(?commitCreatedDate)
-        |    LIMIT 1
-        |  }
-        |  {
-        |    ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} rdf:type <http://schema.org/Project> ;
-        |                                                          schema:name ?name ;
-        |                                                          schema:dateCreated ?dateCreated .
-        |    ?creatorResource rdf:type <http://schema.org/Person> ;
-        |                     schema:email ?creatorEmail ;
-        |                     schema:name ?creatorName .
+        |  BIND (${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} AS ?projectId)
+        |  ?projectId rdf:type <http://schema.org/Project>;
+        |             schema:creator ?creatorResource;
+        |             schema:name ?name;
+        |             schema:dateCreated ?dateCreated.
+        |  ?creatorResource rdf:type <http://schema.org/Person>;
+        |                   schema:name ?creatorName.
+        |  OPTIONAL { ?creatorResource schema:email ?maybeCreatorEmail }
+        |  OPTIONAL { 
+        |    ?projectId prov:wasDerivedFrom ?maybeParentId.
+        |    ?maybeParentId rdf:type <http://schema.org/Project>;
+        |                   schema:creator ?maybeParentCreatorResource;
+        |                   schema:name ?maybeParentName;
+        |                   schema:dateCreated ?maybeParentDateCreated.
+        |    ?maybeParentCreatorResource schema:name ?maybeParentCreatorName
+        |    OPTIONAL { ?maybeParentCreatorResource schema:email ?maybeParentCreatorEmail }
         |  }
         |}
         |""".stripMargin
@@ -102,19 +101,33 @@ private class IOKGProjectFinder(
   private def recordsDecoder(path: Path): Decoder[List[KGProject]] = {
     import Decoder._
     import ch.datascience.graph.model.projects._
-    import ch.datascience.graph.model.users.{Email, Name => UserName}
+    import ch.datascience.graph.model.users
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     val project: Decoder[KGProject] = { cursor =>
       for {
-        name         <- cursor.downField("name").downField("value").as[Name]
-        dateCreated  <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-        creatorName  <- cursor.downField("creatorName").downField("value").as[UserName]
-        creatorEmail <- cursor.downField("creatorEmail").downField("value").as[Email]
+        name                   <- cursor.downField("name").downField("value").as[Name]
+        dateCreated            <- cursor.downField("dateCreated").downField("value").as[DateCreated]
+        creatorName            <- cursor.downField("creatorName").downField("value").as[users.Name]
+        maybeCreatorEmail      <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[users.Email]]
+        maybeParentId          <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
+        maybeParentName        <- cursor.downField("maybeParentName").downField("value").as[Option[Name]]
+        maybeParentDateCreated <- cursor.downField("maybeParentDateCreated").downField("value").as[Option[DateCreated]]
+        maybeParentCreatorName <- cursor.downField("maybeParentCreatorName").downField("value").as[Option[users.Name]]
+        maybeParentCreatorEmail <- cursor
+                                    .downField("maybeParentCreatorEmail")
+                                    .downField("value")
+                                    .as[Option[users.Email]]
       } yield KGProject(
         path,
         name,
-        ProjectCreation(dateCreated, ProjectCreator(creatorEmail, creatorName))
+        ProjectCreation(dateCreated, ProjectCreator(maybeCreatorEmail, creatorName)),
+        maybeParent = (maybeParentId, maybeParentName, maybeParentDateCreated, maybeParentCreatorName) mapN {
+          case (parentId, name, dateCreated, parentCreatorName) =>
+            Parent(parentId,
+                   name,
+                   ProjectCreation(dateCreated, ProjectCreator(maybeParentCreatorEmail, parentCreatorName)))
+        }
       )
     }
 

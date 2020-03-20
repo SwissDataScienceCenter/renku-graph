@@ -50,17 +50,20 @@ object bundles extends Schemas {
       projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-      projectCreator:      Person = committer
+      projectCreator:      Person = committer,
+      maybeParent:         Option[Project] = None
   )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     ArtifactEntity(
-      Generation(filePath,
-                 Activity(
-                   commitId,
-                   committedDate,
-                   committer,
-                   Project(projectPath, projectName, projectDateCreated, projectCreator),
-                   Agent(schemaVersion)
-                 ))
+      Generation(
+        filePath,
+        Activity(
+          commitId,
+          committedDate,
+          committer,
+          Project(projectPath, projectName, projectDateCreated, projectCreator, maybeParent),
+          Agent(schemaVersion)
+        )
+      )
     ).asJsonLD
 
   def randomDataSetCommit(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
@@ -75,7 +78,8 @@ object bundles extends Schemas {
       projectPath:        Path                 = projectPaths.generateOne,
       projectName:        projects.Name        = projectNames.generateOne,
       projectDateCreated: projects.DateCreated = DateCreated(committedDate.value),
-      projectCreator:     Person               = committer
+      projectCreator:     Person               = committer,
+      maybeParent:        Option[Project]      = None
   )(
       datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
       datasetName:               Name = datasetNames.generateOne,
@@ -87,7 +91,7 @@ object bundles extends Schemas {
       datasetCreators:           Set[Person] = setOf(persons).generateOne,
       datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
   )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
-    val project: Project = Project(projectPath, projectName, projectDateCreated, projectCreator)
+    val project: Project = Project(projectPath, projectName, projectDateCreated, projectCreator, maybeParent)
     DataSet(
       datasetIdentifier,
       datasetName,

@@ -29,10 +29,11 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.config.GitLab
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
-import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
+import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{KGProject, Parent}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
+import scala.util.Try
 
 trait ProjectFinder[Interpretation[_]] {
   def findProject(path: Path): Interpretation[Option[Project]]
@@ -67,16 +68,28 @@ class IOProjectFinder(
       visibility       = gitLabProject.visibility,
       created = Creation(
         date    = kgProject.created.date,
-        creator = Creator(kgProject.created.creator.email, kgProject.created.creator.name)
+        creator = Creator(kgProject.created.creator.maybeEmail, kgProject.created.creator.name)
       ),
       updatedAt   = gitLabProject.updatedAt,
       urls        = gitLabProject.urls,
-      forking     = gitLabProject.forking,
+      forking     = Forking(gitLabProject.forksCount, kgProject.maybeParent.toParentProject),
       tags        = gitLabProject.tags,
       starsCount  = gitLabProject.starsCount,
       permissions = gitLabProject.permissions,
       statistics  = gitLabProject.statistics
     )
+
+  private implicit class ParentOps(maybeParent: Option[Parent]) {
+    lazy val toParentProject: Option[ParentProject] =
+      (maybeParent -> maybeParent.flatMap(_.resourceId.as[Try, Path].toOption)) mapN {
+        case (parent, path) =>
+          ParentProject(
+            path,
+            parent.name,
+            Creation(parent.created.date, Creator(parent.created.creator.maybeEmail, parent.created.creator.name))
+          )
+      }
+  }
 }
 
 private object IOProjectFinder {

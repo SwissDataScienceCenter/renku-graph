@@ -125,7 +125,7 @@ class DatasetEndpoint[Interpretation[_]: Effect](
       "created": {
         "dateCreated": ${project.created.date},
         "agent": {
-          "email": ${project.created.agent.email},
+          "email": ${project.created.agent.maybeEmail},
           "name": ${project.created.agent.name}
         }
       }

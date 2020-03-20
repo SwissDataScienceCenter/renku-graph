@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph.datasets
 import cats.Order
 import cats.data.NonEmptyList
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.SameAs
@@ -76,7 +77,7 @@ object DatasetsGenerators {
   } yield AddedToProject(createdDate, agent)
 
   private implicit lazy val datasetAgents: Gen[DatasetAgent] = for {
-    email <- emails
-    name  <- names
-  } yield DatasetAgent(email, name)
+    maybeEmail <- emails.toGeneratorOfOptions
+    name       <- names
+  } yield DatasetAgent(maybeEmail, name)
 }

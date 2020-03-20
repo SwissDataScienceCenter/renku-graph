@@ -18,7 +18,10 @@
 
 package ch.datascience.graph.model
 
+import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
 import eu.timepit.refined.auto._
@@ -50,10 +53,11 @@ object GraphModelGenerators {
       partsGenerator = partsGenerator
     ) map Path.apply
   }
-  implicit val projectResourceIds: Gen[ResourceId] = for {
-    url  <- httpUrls()
-    path <- projectPaths
-  } yield ResourceId.from(s"$url/projects/$path").fold(throw _, identity)
+  implicit val projectResourceIds: Gen[ResourceId] = projectResourceIds()(renkuBaseUrls.generateOne)
+  def projectResourceIds()(implicit renkuBaseUrl: RenkuBaseUrl): Gen[ResourceId] =
+    for {
+      path <- projectPaths
+    } yield ResourceId.from(s"$renkuBaseUrl/projects/$path").fold(throw _, identity)
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIdentifiers: Gen[Identifier] = Gen
