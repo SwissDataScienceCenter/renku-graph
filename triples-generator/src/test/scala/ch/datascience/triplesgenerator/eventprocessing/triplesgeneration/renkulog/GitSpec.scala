@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
-import ammonite.ops.{Bytes, CommandResult, Path}
+import ammonite.ops.{Bytes, CommandResult, Path, ShelloutException}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -35,74 +35,60 @@ class GitSpec extends WordSpec with MockFactory {
 
     "return successful CommandResult when no errors" in new TestCase {
 
-      val commandResult = CommandResult(exitCode = 0, chunks = Seq.empty)
-
       cloneCommand
         .expects(repositoryUrl, destDirectory, workDirectory)
-        .returning(commandResult)
+        .returning(CommandResult(exitCode = 0, chunks = Seq.empty))
 
-      git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Right(commandResult)
+      git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Right(())
     }
 
     ("SSL_ERROR_SYSCALL": NonBlank) +: ("the remote end hung up unexpectedly": NonBlank) +: Nil foreach {
       recoverableError =>
-        s"$GenerationRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
+        s"return $GenerationRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
 
           val errorMessage = sentenceContaining(recoverableError).generateOne.value
-          val commandResult = CommandResult(
-            exitCode = 1,
-            chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
-          )
-
           cloneCommand
             .expects(repositoryUrl, destDirectory, workDirectory)
-            .returning(commandResult)
+            .throwing(ShelloutException {
+              CommandResult(
+                exitCode = 1,
+                chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
+              )
+            })
 
           git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Left(
-            GenerationRecoverableError(errorMessage)
+            GenerationRecoverableError(s"git clone failed with: $errorMessage")
           )
         }
     }
 
-    "fail if command fails with a message not containing SSL_ERROR_SYSCALL" in new TestCase {
+    "fail if command fails with an unknown message" in new TestCase {
 
-      val errorMessage = nonBlankStrings().generateOne.value
-      val commandResult = CommandResult(
-        exitCode = 1,
-        chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
-      )
-
+      val commandException = ShelloutException {
+        CommandResult(
+          exitCode = 1,
+          chunks   = Seq(Left(new Bytes(nonBlankStrings().generateOne.value.getBytes())))
+        )
+      }
       cloneCommand
         .expects(repositoryUrl, destDirectory, workDirectory)
-        .returning(commandResult)
+        .throwing(commandException)
 
       intercept[Exception] {
         git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync()
-      }.getMessage shouldBe errorMessage
-    }
-
-    "fail if executing the command fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      cloneCommand
-        .expects(repositoryUrl, destDirectory, workDirectory)
-        .throwing(exception)
-
-      intercept[Exception] {
-        git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync()
-      } shouldBe exception
+      }.getMessage shouldBe s"git clone failed with: ${commandException.result.out.string}"
     }
 
     "fail if finding command's message fails" in new TestCase {
 
-      val commandResult = CommandResult(
-        exitCode = 1,
-        chunks   = Nil
-      )
-
       cloneCommand
         .expects(repositoryUrl, destDirectory, workDirectory)
-        .returning(commandResult)
+        .throwing(ShelloutException {
+          CommandResult(
+            exitCode = 1,
+            chunks   = Nil
+          )
+        })
 
       intercept[Exception] {
         git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync()

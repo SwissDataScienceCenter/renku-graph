@@ -48,7 +48,7 @@ class EventLogFetchImpl[Interpretation[_]](
 )(implicit ME:       Bracket[Interpretation, Throwable])
     extends EventLogFetch[Interpretation] {
 
-  private lazy val MaxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 1
+  private lazy val MaxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
 
   override def isEventToProcess: Interpretation[Boolean] =
     findOldestEvent.transact(transactor.get).map(_.isDefined)
