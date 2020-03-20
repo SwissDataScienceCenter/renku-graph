@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.projects
 
 import java.time.temporal.ChronoUnit.DAYS
 
-import ch.datascience.generators.CommonGraphGenerators.{emails, names, renkuBaseUrls}
+import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.config.RenkuBaseUrl
@@ -153,8 +153,8 @@ object ProjectsGenerators {
   } yield ProjectCreation(created, creator)
 
   implicit lazy val projectCreators: Gen[ProjectCreator] = for {
-    maybeEmail <- emails.toGeneratorOfOptions
-    name       <- names
+    maybeEmail <- userEmails.toGeneratorOfOptions
+    name       <- userNames
   } yield ProjectCreator(maybeEmail, name)
 
   private implicit lazy val updatedAts: Gen[DateUpdated] = timestampsNotInTheFuture map DateUpdated.apply

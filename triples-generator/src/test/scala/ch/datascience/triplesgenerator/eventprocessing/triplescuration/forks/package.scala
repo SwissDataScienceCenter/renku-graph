@@ -18,8 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import ch.datascience.generators.CommonGraphGenerators
-import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -50,9 +49,9 @@ package object forks {
     maybeParentResourceIds = Gen.const(ResourceId(renkuBaseUrl, parentPath)).toGeneratorOfSomes
   )
 
-  def gitLabCreator(maybeEmail: Option[Email] = emails.generateOption): Gen[GitLabCreator] =
+  def gitLabCreator(maybeEmail: Option[Email] = userEmails.generateOption): Gen[GitLabCreator] =
     for {
-      maybeName <- names.toGeneratorOfOptions
+      maybeName <- userNames.toGeneratorOfOptions
     } yield GitLabCreator(maybeEmail, maybeName)
 
   def kgProjects(
@@ -65,10 +64,10 @@ package object forks {
       dateCreated           <- projectCreatedDates
     } yield KGProject(resourceId, maybeParentResourceId, creator, dateCreated)
 
-  def kgCreator(maybeEmail: Option[Email] = emails.generateOption): Gen[KGCreator] =
+  def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption): Gen[KGCreator] =
     for {
       resourceId <- userResourceIds(maybeEmail)
-      maybeName  <- names.toGeneratorOfOptions
+      maybeName  <- userNames.toGeneratorOfOptions
     } yield KGCreator(resourceId, maybeEmail, maybeName)
 
   def entitiesProjects(creator:            Person          = entitiesPersons().generateOne,
@@ -79,8 +78,8 @@ package object forks {
       createdDate <- projectCreatedDates
     } yield Project(path, name, createdDate, creator, maybeParentProject)
 
-  def entitiesPersons(maybeEmail: Option[Email] = emails.generateOption): Gen[Person] =
+  def entitiesPersons(maybeEmail: Option[Email] = userEmails.generateOption): Gen[Person] =
     for {
-      name <- CommonGraphGenerators.names
+      name <- userNames
     } yield Person(name, maybeEmail)
 }

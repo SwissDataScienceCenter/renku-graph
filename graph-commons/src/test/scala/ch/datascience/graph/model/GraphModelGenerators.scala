@@ -18,17 +18,51 @@
 
 package ch.datascience.graph.model
 
+import java.util.UUID
+
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
+import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, choose, const, frequency, numChar, oneOf, uuid}
 
 object GraphModelGenerators {
+
+  implicit val usernames:        Gen[users.Username]    = nonEmptyStrings() map Username.apply
+  implicit val userAffiliations: Gen[users.Affiliation] = nonEmptyStrings() map Affiliation.apply
+
+  implicit val userEmails: Gen[users.Email] = {
+    val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~".toList))
+    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~.".toList))
+    val beforeAts = for {
+      firstChar  <- firstCharGen
+      otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
+    } yield s"$firstChar${otherChars.toList.mkString("")}"
+
+    for {
+      beforeAt <- beforeAts
+      afterAt  <- nonEmptyStrings()
+    } yield Email(s"$beforeAt@$afterAt")
+  }
+
+  implicit val userNames: Gen[users.Name] = for {
+    first  <- nonEmptyStrings()
+    second <- nonEmptyStrings()
+  } yield Name(s"$first $second")
+
+  implicit val userResourceIds: Gen[users.ResourceId] = userResourceIds(userEmails.toGeneratorOfOptions)
+  def userResourceIds(maybeEmail:    Option[Email]): Gen[users.ResourceId] = userResourceIds(Gen.const(maybeEmail))
+  def userResourceIds(maybeEmailGen: Gen[Option[Email]]): Gen[users.ResourceId] =
+    for {
+      maybeEmail <- maybeEmailGen
+    } yield users.ResourceId
+      .from(maybeEmail.map(email => s"mailto:$email").getOrElse(s"_:${UUID.randomUUID()}"))
+      .fold(throw _, identity)
 
   implicit val projectIds: Gen[Id] = for {
     min <- choose(1, 1000)
@@ -70,7 +104,7 @@ object GraphModelGenerators {
       } yield s"$first.$second/zenodo.$third"
     )
     .map(Identifier.apply)
-  implicit val datasetNames:          Gen[Name]          = nonEmptyStrings() map Name.apply
+  implicit val datasetNames:          Gen[datasets.Name] = nonEmptyStrings() map datasets.Name.apply
   implicit val datasetDescriptions:   Gen[Description]   = paragraphs() map (_.value) map Description.apply
   implicit val datasetUrls:           Gen[Url]           = validatedUrls map (_.value) map Url.apply
   implicit val datasetSameAs:         Gen[SameAs]        = validatedUrls map (_.value) map SameAs.apply

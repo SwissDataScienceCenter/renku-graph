@@ -21,12 +21,10 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 import java.time.Instant
 
 import cats.implicits._
-import ch.datascience.generators.CommonGraphGenerators.emails
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, userEmails}
 import ch.datascience.graph.model.projects.{DateCreated, ResourceId}
 import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.{Person, Project}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
@@ -117,8 +115,8 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore {
   "swapCreator" should {
 
     "change change Project's link to a Person to the given one" in new TestCase {
-      val creator1 = entitiesPersons(emails.generateSome).generateOne
-      val creator2 = entitiesPersons(emails.generateSome).generateOne
+      val creator1 = entitiesPersons(userEmails.generateSome).generateOne
+      val creator2 = entitiesPersons(userEmails.generateSome).generateOne
       val project1 = entitiesProjects(creator1).generateOne
       val project2 = entitiesProjects(creator2).generateOne
 

@@ -18,9 +18,9 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes.constraints.NonBlank

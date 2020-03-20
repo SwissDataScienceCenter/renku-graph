@@ -48,10 +48,10 @@ class PersonDetailsUpdaterSpec extends WordSpec {
 
     "remove properties from all the Person entities found in the given Json except those which id starts with '_'" +
       "and create SPARQL updates for them" in new TestCase {
-      val projectCreatorName  = names.generateOne
-      val projectCreatorEmail = emails.generateOne
-      val committerName       = names.generateOne
-      val committerEmail      = emails.generateOne
+      val projectCreatorName  = userNames.generateOne
+      val projectCreatorEmail = userEmails.generateOne
+      val committerName       = userNames.generateOne
+      val committerEmail      = userEmails.generateOne
       val datasetCreatorsSet = nonEmptyList(entities.Person.persons, minElements = 5, maxElements = 10)
         .retryUntil(atLeastOneWithoutEmail)
         .generateOne

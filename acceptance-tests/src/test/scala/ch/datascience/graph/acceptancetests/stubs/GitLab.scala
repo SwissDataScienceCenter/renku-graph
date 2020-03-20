@@ -18,11 +18,11 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.userEmails
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 import ch.datascience.http.client.AccessToken
@@ -103,9 +103,9 @@ object GitLab {
           {
             "id":              ${commitId.value},
             "author_name":     ${nonEmptyStrings().generateOne},
-            "author_email":    ${emails.generateOne.value},
+            "author_email":    ${userEmails.generateOne.value},
             "committer_name":  ${nonEmptyStrings().generateOne},
-            "committer_email": ${emails.generateOne.value},
+            "committer_email": ${userEmails.generateOne.value},
             "message":         ${nonEmptyStrings().generateOne},
             "committed_date":  ${committedDates.generateOne.value.toString},
             "parent_ids":      []
@@ -125,9 +125,9 @@ object GitLab {
         .willReturn(okJson(json"""{
           "id":              ${commitId.value},
           "author_name":     ${nonEmptyStrings().generateOne},
-          "author_email":    ${emails.generateOne.value},
+          "author_email":    ${userEmails.generateOne.value},
           "committer_name":  ${nonEmptyStrings().generateOne},
-          "committer_email": ${emails.generateOne.value},
+          "committer_email": ${userEmails.generateOne.value},
           "message":         ${nonEmptyStrings().generateOne},
           "committed_date":  ${committedDates.generateOne.value.toString},
           "parent_ids":      ${parentIds.map(_.value).toList}

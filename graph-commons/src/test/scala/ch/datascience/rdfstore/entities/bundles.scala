@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.generators.CommonGraphGenerators.{emails, names, schemaVersions}
+import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{listOf, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
@@ -44,7 +44,7 @@ object bundles extends Schemas {
       filePath:      FilePath      = filePaths.generateOne,
       commitId:      CommitId      = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person        = Person(names.generateOne, emails.generateOne),
+      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
       schemaVersion: SchemaVersion = schemaVersions.generateOne
   )(
       projectPath:         Path = projectPaths.generateOne,
@@ -72,7 +72,7 @@ object bundles extends Schemas {
   def dataSetCommit(
       commitId:      CommitId      = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person        = Person(names.generateOne, emails.generateOne),
+      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
       schemaVersion: SchemaVersion = schemaVersions.generateOne
   )(
       projectPath:        Path                 = projectPaths.generateOne,
@@ -192,7 +192,7 @@ object bundles extends Schemas {
         schemaVersion:       SchemaVersion = schemaVersions.generateOne
     )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExamplarData) = {
 
-      val projectCreator = Person(names.generateOne, emails.generateOne)
+      val projectCreator = Person(userNames.generateOne, userEmails.generateOne)
       val project        = Project(projectPath, projectNames.generateOne, projectCreatedDates.generateOne, projectCreator)
       val agent          = Agent(schemaVersion)
       val dataSetId      = datasets.Identifier("d67a1653-0b6e-463b-89a0-afe72a53c8bb")

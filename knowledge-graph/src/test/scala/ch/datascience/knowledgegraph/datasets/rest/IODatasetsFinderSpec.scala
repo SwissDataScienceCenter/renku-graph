@@ -793,9 +793,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       published = dataset3Orig.published.copy(
         creators = Set(
           DatasetCreator(
-            emails.generateOption,
+            userEmails.generateOption,
             sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne,
-            affiliations.generateOption
+            userAffiliations.generateOption
           )
         )
       )
@@ -827,9 +827,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         published = dataset.published.copy(
           creators = Set(
             DatasetCreator(
-              emails.generateOption,
+              userEmails.generateOption,
               sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne,
-              affiliations.generateOption
+              userAffiliations.generateOption
             )
           )
         )

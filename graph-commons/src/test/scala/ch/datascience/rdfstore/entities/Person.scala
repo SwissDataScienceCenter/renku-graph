@@ -20,6 +20,7 @@ package ch.datascience.rdfstore.entities
 
 import java.util.UUID
 
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name}
 import org.scalacheck.Gen
 
@@ -55,11 +56,9 @@ object Person {
     case None        => EntityId of s"_:${UUID.randomUUID()}"
   }
 
-  import ch.datascience.generators.CommonGraphGenerators.{affiliations, emails, names}
-
   val persons: Gen[Person] = for {
-    name             <- names
-    maybeEmail       <- Gen.option(emails)
-    maybeAffiliation <- Gen.option(affiliations)
+    name             <- userNames
+    maybeEmail       <- Gen.option(userEmails)
+    maybeAffiliation <- Gen.option(userAffiliations)
   } yield Person(name, maybeEmail, maybeAffiliation)
 }

@@ -18,9 +18,9 @@
 
 package ch.datascience.graph.acceptancetests.data
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
+import ch.datascience.graph.model.GraphModelGenerators.userEmails
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.knowledgegraph.projects.model.Project
 import io.circe.Json
@@ -32,7 +32,7 @@ object GitLab {
     "after":         ${commitId.value},
     "user_id":       ${positiveInts().generateOne.value}, 
     "user_username": ${nonEmptyStrings().generateOne},
-    "user_email":    ${emails.generateOne.value},
+    "user_email":    ${userEmails.generateOne.value},
     "project": {
       "id":                  ${project.id.value},
       "path_with_namespace": ${project.path.value}

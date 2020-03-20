@@ -18,8 +18,8 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.blankStrings
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import io.circe.literal._
@@ -34,7 +34,7 @@ class CreatorsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
   "dataset creator decoder" should {
 
     "decode result-set with a blank affiliation to a DatasetCreator object" in {
-      forAll(emails, names, blankStrings()) { (email, name, affiliation) =>
+      forAll(userEmails, userNames, blankStrings()) { (email, name, affiliation) =>
         resultSet(email, name, affiliation).as[List[DatasetCreator]] shouldBe Right {
           List(DatasetCreator(Some(email), name, None))
         }
@@ -42,7 +42,7 @@ class CreatorsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
 
     "decode result-set with a non-blank affiliation to a DatasetCreator object" in {
-      forAll(emails, names, affiliations) { (email, name, affiliation) =>
+      forAll(userEmails, userNames, userAffiliations) { (email, name, affiliation) =>
         resultSet(email, name, affiliation.toString).as[List[DatasetCreator]] shouldBe Right {
           List(DatasetCreator(Some(email), name, Some(affiliation)))
         }

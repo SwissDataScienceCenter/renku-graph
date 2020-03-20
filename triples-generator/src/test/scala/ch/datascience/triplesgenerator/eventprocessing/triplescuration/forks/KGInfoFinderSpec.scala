@@ -23,6 +23,9 @@ import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.ResourceId
+import ch.datascience.graph.model.users
+import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
@@ -30,10 +33,6 @@ import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
-import ch.datascience.generators.CommonGraphGenerators.emails
-import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.Email
-import ch.datascience.graph.model.views.RdfResource
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class KGInfoFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
@@ -80,7 +79,7 @@ class KGInfoFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPro
     }
 
     "return no ResourceId if there's no Person with the given email" in new TestCase {
-      finder.findCreatorId(emails.generateOne).unsafeRunSync() shouldBe None
+      finder.findCreatorId(userEmails.generateOne).unsafeRunSync() shouldBe None
     }
   }
 

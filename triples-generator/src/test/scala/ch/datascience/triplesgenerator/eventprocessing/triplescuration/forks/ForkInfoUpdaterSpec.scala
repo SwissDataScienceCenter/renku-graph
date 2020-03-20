@@ -162,7 +162,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       "but emails and dateCreated are the same" in new TestCase {
 
       val forkInGitLab        = projectPaths.generateOne
-      val emailInGitLab       = emails.generateSome
+      val emailInGitLab       = userEmails.generateSome
       val dateCreatedInGitLab = projectCreatedDates.generateOne
 
       val gitLabProject = given {
@@ -195,7 +195,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       "and there is a Person with the new email already in the KG" in new TestCase {
 
       val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = emails.generateOne
+      val emailInGitLab = userEmails.generateOne
       val gitLabProject = given {
         gitLabProjects(forkInGitLab).generateOne.copy(
           maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
@@ -204,7 +204,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       val kgProject = given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          creator = kgCreator(emails.generateSome).generateOne
+          creator = kgCreator(userEmails.generateSome).generateOne
         )
       }.existsInKG
 
@@ -241,7 +241,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       "and there is no Person with the new email in the KG" in new TestCase {
 
       val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = emails.generateOne
+      val emailInGitLab = userEmails.generateOne
       val gitLabProject = given {
         gitLabProjects(forkInGitLab).generateOne.copy(
           maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
@@ -250,7 +250,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       val kgProject = given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          creator = kgCreator(emails.generateSome).generateOne
+          creator = kgCreator(userEmails.generateSome).generateOne
         )
       }.existsInKG
 
@@ -287,7 +287,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       val forkInGitLab = projectPaths.generateOne
       val gitLabProject = given {
         gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = names.generateSome))
+          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = userNames.generateSome))
         )
       }.existsInGitLab
 
@@ -362,7 +362,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
     "fail if finding Person with an email in the KG fails" in new TestCase {
 
-      val emailInGitLab = emails.generateOne
+      val emailInGitLab = userEmails.generateOne
       given {
         gitLabProjects(projectPaths.generateOne).generateOne.copy(
           maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
@@ -371,7 +371,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          creator = kgCreator(emails.generateSome).generateOne
+          creator = kgCreator(userEmails.generateSome).generateOne
         )
       }.existsInKG
 
@@ -393,7 +393,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       "if there's a Person with the new email already in the KG" in new TestCase {
 
       val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = emails.generateOne
+      val emailInGitLab = userEmails.generateOne
       val gitLabProject = given {
         gitLabProjects(forkInGitLab).generateOne.copy(
           maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
@@ -437,7 +437,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       "if there is no Person with the new email in the KG yet" in new TestCase {
 
       val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = emails.generateOne
+      val emailInGitLab = userEmails.generateOne
       val gitLabProject = given {
         gitLabProjects(forkInGitLab).generateOne.copy(
           maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
@@ -481,7 +481,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       val forkInGitLab = projectPaths.generateOne
       val gitLabProject = given {
         gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = names.generateSome))
+          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = userNames.generateSome))
         )
       }.existsInGitLab
 
@@ -555,7 +555,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
     "fail if finding Person with an email in the KG fails" in new TestCase {
 
-      val emailInGitLab = emails.generateOne
+      val emailInGitLab = userEmails.generateOne
       given {
         gitLabProjects(projectPaths.generateOne).generateOne.copy(
           maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
@@ -584,7 +584,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       "if there's a Person with the new email already in the KG" in new TestCase {
 
       val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = emails.generateOne
+      val emailInGitLab = userEmails.generateOne
       val gitLabProject = given {
         gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne.copy(
           maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
@@ -628,7 +628,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       "if there is no Person with the new email in the KG yet" in new TestCase {
 
       val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = emails.generateOne
+      val emailInGitLab = userEmails.generateOne
       val gitLabProject = given {
         gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne.copy(
           maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
@@ -671,7 +671,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       val forkInGitLab = projectPaths.generateOne
       val gitLabProject = given {
         gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = names.generateSome))
+          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = userNames.generateSome))
         )
       }.existsInGitLab
 
