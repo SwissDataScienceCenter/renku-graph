@@ -24,6 +24,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{DateCreated, Path}
+import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import io.chrisdavenport.log4cats.Logger
 
@@ -98,9 +99,18 @@ private class IOGitLabInfoFinder(
 
     implicit val decoder: Decoder[GitLabCreator] = cursor =>
       for {
-        maybeName  <- cursor.downField("name").as[Option[users.Name]]
-        maybeEmail <- cursor.downField("public_email").as[Option[users.Email]]
-      } yield GitLabCreator(maybeEmail, maybeName)
+        maybeName <- cursor.downField("name").as[Option[users.Name]]
+        maybeEmail <- cursor
+                       .downField("email")
+                       .as[Option[String]]
+                       .map(blankToNone)
+                       .flatMap(toOption[Email])
+        maybePublicEmail <- cursor
+                             .downField("public_email")
+                             .as[Option[String]]
+                             .map(blankToNone)
+                             .flatMap(toOption[Email])
+      } yield GitLabCreator(maybeEmail orElse maybePublicEmail, maybeName)
 
     jsonOf[IO, GitLabCreator]
   }
