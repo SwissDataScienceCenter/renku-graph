@@ -64,7 +64,7 @@ private[triplescuration] class IOForkInfoUpdater(
           givenCuratedTriples
             .transformTriples(projectPropertiesRemover)
             .pure[IO]
-        case `forks are different, email and date same`(projectResource, gitLabForkPath) =>
+        case `forks are different, creators and dates same`(projectResource, gitLabForkPath) =>
           givenCuratedTriples
             .transformTriples(projectPropertiesRemover)
             .addUpdates(recreateWasDerivedFrom(projectResource, gitLabForkPath))
@@ -145,19 +145,22 @@ private[triplescuration] class IOForkInfoUpdater(
     }
   }
 
-  private object `forks are different, email and date same` {
+  private object `forks are different, creators and dates same` {
     def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Option[(ResourceId, Path)] = tuple match {
       case (Some(gitLabProject), Some(kgProject)) =>
         (kgProject.maybeParentPath -> gitLabProject.maybeParentPath)
           .mapN {
-            case (kgFork, gitLabFork)
-                if kgFork != gitLabFork && (gitLabProject hasEmailSameAs kgProject) && (gitLabProject hasDateSameAs kgProject) =>
+            case (kgFork, gitLabFork) if kgFork != gitLabFork && `users and dates are same`(gitLabProject, kgProject) =>
               Option((kgProject.resourceId, gitLabFork))
             case _ => Option.empty[(ResourceId, Path)]
           }
           .getOrElse(Option.empty[(ResourceId, Path)])
       case _ => None
     }
+
+    private def `users and dates are same`(gitLabProject: GitLabProject, kgProject: KGProject): Boolean =
+      (gitLabProject hasDateSameAs kgProject) &&
+        ((gitLabProject hasEmailSameAs kgProject) || ((gitLabProject hasNoEmailAs kgProject) && (gitLabProject hasUserNameSameAs kgProject)))
   }
 
   private object `not only forks are different` {
@@ -210,6 +213,14 @@ private[triplescuration] class IOForkInfoUpdater(
     def hasEmailSameAs(kgProject: KGProject): Boolean =
       (kgProject.creator.maybeEmail -> gitLabProject.maybeCreator.flatMap(_.maybeEmail))
         .mapN { case (kgEmail, gitLabEmail) => kgEmail == gitLabEmail }
+        .getOrElse(false)
+
+    def hasNoEmailAs(kgProject: KGProject): Boolean =
+      gitLabProject.maybeEmail.isEmpty && kgProject.creator.maybeEmail.isEmpty
+
+    def hasUserNameSameAs(kgProject: KGProject): Boolean =
+      (kgProject.creator.maybeName -> gitLabProject.maybeCreator.flatMap(_.maybeName))
+        .mapN { case (kgName, gitLabName) => kgName == gitLabName }
         .getOrElse(false)
 
     def hasDateSameAs(kgProject: KGProject): Boolean =

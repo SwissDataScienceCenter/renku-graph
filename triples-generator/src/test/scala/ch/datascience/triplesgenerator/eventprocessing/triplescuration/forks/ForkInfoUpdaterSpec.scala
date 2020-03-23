@@ -167,19 +167,56 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       "but emails and dateCreated are the same" in new TestCase {
 
       val forkInGitLab        = projectPaths.generateOne
-      val emailInGitLab       = userEmails.generateSome
+      val commonEmail         = userEmails.generateSome
       val dateCreatedInGitLab = projectCreatedDates.generateOne
 
       val gitLabProject = given {
         gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(emailInGitLab).generateSome,
+          maybeCreator = gitLabCreator(commonEmail).generateSome,
           dateCreated  = dateCreatedInGitLab
         )
       }.existsInGitLab
 
       val kgProject = given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          creator     = kgCreator(emailInGitLab).generateOne,
+          creator     = kgCreator(commonEmail).generateOne,
+          dateCreated = dateCreatedInGitLab
+        )
+      }.existsInKG
+
+      val transformedTriples = givenTriplesTransformationCalled()
+
+      val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
+        .expects(kgProject.resourceId, forkInGitLab)
+        .returningUpdates
+
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(
+          triples = transformedTriples,
+          updates = givenCuratedTriples.updates ++ wasDerivedFromRecreate
+        )
+      )
+    }
+
+    "remove project attributes " +
+      "and recreate wasDerivedFrom " +
+      "if forks are different " +
+      "but user names and dateCreated are the same in the absence of emails" in new TestCase {
+
+      val forkInGitLab        = projectPaths.generateOne
+      val commonUserName      = userNames.generateSome
+      val dateCreatedInGitLab = projectCreatedDates.generateOne
+
+      val gitLabProject = given {
+        gitLabProjects(forkInGitLab).generateOne.copy(
+          maybeCreator = gitLabCreator(maybeEmail = None, maybeName = commonUserName).generateSome,
+          dateCreated  = dateCreatedInGitLab
+        )
+      }.existsInGitLab
+
+      val kgProject = given {
+        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
+          creator     = kgCreator(maybeEmail = None, maybeName = commonUserName).generateOne,
           dateCreated = dateCreatedInGitLab
         )
       }.existsInKG

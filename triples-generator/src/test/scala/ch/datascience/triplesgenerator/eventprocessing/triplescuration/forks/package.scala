@@ -23,6 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Path, ResourceId}
+import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.{Person, Project}
@@ -51,10 +52,9 @@ package object forks {
     maybeParentResourceIds = Gen.const(ResourceId(renkuBaseUrl, parentPath)).toGeneratorOfSomes
   )
 
-  def gitLabCreator(maybeEmail: Option[Email] = userEmails.generateOption): Gen[GitLabCreator] =
-    for {
-      maybeName <- userNames.toGeneratorOfOptions
-    } yield GitLabCreator(maybeEmail, maybeName)
+  def gitLabCreator(maybeEmail: Option[Email]      = userEmails.generateOption,
+                    maybeName:  Option[users.Name] = userNames.generateOption): Gen[GitLabCreator] =
+    GitLabCreator(maybeEmail, maybeName)
 
   def kgProjects(
       maybeParentResourceIds: Gen[Option[ResourceId]] = projectResourceIds.toGeneratorOfOptions
@@ -66,10 +66,10 @@ package object forks {
       dateCreated           <- projectCreatedDates
     } yield KGProject(resourceId, maybeParentResourceId, creator, dateCreated)
 
-  def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption): Gen[KGCreator] =
+  def kgCreator(maybeEmail: Option[Email]      = userEmails.generateOption,
+                maybeName:  Option[users.Name] = userNames.generateOption): Gen[KGCreator] =
     for {
       resourceId <- userResourceIds(maybeEmail)
-      maybeName  <- userNames.toGeneratorOfOptions
     } yield KGCreator(resourceId, maybeEmail, maybeName)
 
   implicit val entitiesProjects: Gen[Project] = entitiesProjects(
