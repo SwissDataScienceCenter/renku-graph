@@ -29,6 +29,7 @@ import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{BadRequestException, ConnectivityException, MappingException, UnauthorizedException, UnexpectedResponseException}
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators.{curatedTriplesObjects, curationUpdates}
@@ -148,16 +149,20 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
   "updateForkInfo - cases when forks in KG and in GitLab" should {
 
-    "do nothing if forks are the same" in new TestCase {
+    "only remove project attributes if forks are the same" in new TestCase {
 
       val commonFork = projectPaths.generateOne
       given(gitLabProjects(commonFork).generateOne).existsInGitLab
       given(kgProjects(commonFork).generateOne).existsInKG
+      val transformedTriples = givenTriplesTransformationCalled()
 
-      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(givenCuratedTriples)
+      updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.copy(triples = transformedTriples)
+      )
     }
 
-    "recreate wasDerivedFrom only " +
+    "remove project attributes " +
+      "and recreate wasDerivedFrom " +
       "if forks are different " +
       "but emails and dateCreated are the same" in new TestCase {
 
@@ -179,18 +184,22 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         )
       }.existsInKG
 
+      val transformedTriples = givenTriplesTransformationCalled()
+
       val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ wasDerivedFromRecreate
         )
       )
     }
 
-    "recreate wasDerivedFrom and dateCreated and link a new creator " +
+    "remove project attributes, " +
+      "recreate wasDerivedFrom and dateCreated and link a new creator " +
       "if many fields are different" +
       "and there is a Person with the new email already in the KG" in new TestCase {
 
@@ -207,6 +216,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
           creator = kgCreator(userEmails.generateSome).generateOne
         )
       }.existsInKG
+
+      val transformedTriples = givenTriplesTransformationCalled()
 
       val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
@@ -227,6 +238,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromRecreate,
             creatorUpdates,
@@ -236,7 +248,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       )
     }
 
-    "recreate wasDerivedFrom and dateCreated and create and link a new creator " +
+    "remove project attributes, " +
+      "recreate wasDerivedFrom and dateCreated and create and link a new creator " +
       "if many fields are different " +
       "and there is no Person with the new email in the KG" in new TestCase {
 
@@ -253,6 +266,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
           creator = kgCreator(userEmails.generateSome).generateOne
         )
       }.existsInKG
+
+      val transformedTriples = givenTriplesTransformationCalled()
 
       val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
@@ -271,6 +286,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromRecreate,
             creatorUpdates,
@@ -280,7 +296,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       )
     }
 
-    "recreate wasDerivedFrom and dateCreated and create and link a new creator " +
+    "remove project attributes, " +
+      "recreate wasDerivedFrom and dateCreated and create and link a new creator " +
       "if many fields are different " +
       "and there's only creator username in GitLab" in new TestCase {
 
@@ -295,6 +312,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
+      val transformedTriples = givenTriplesTransformationCalled()
+
       val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
@@ -311,6 +330,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromRecreate,
             creatorUpdates,
@@ -320,7 +340,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       )
     }
 
-    "recreate wasDerivedFrom and dateCreated and effectively only unlink creator " +
+    "remove project attributes, " +
+      "recreate wasDerivedFrom and dateCreated and effectively only unlink creator " +
       "if many fields are different " +
       "and email and name do not exist in GitLab" in new TestCase {
 
@@ -335,6 +356,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
+      val transformedTriples = givenTriplesTransformationCalled()
+
       val wasDerivedFromRecreate = (updatesCreator.recreateWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
@@ -351,6 +374,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromRecreate,
             creatorUpdates,
@@ -389,7 +413,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
   "updateForkInfo - cases when fork only in GitLab" should {
 
-    "create wasDerivedFrom and dateCreated and link a new creator " +
+    "remove project attributes, " +
+      "create wasDerivedFrom and dateCreated and link a new creator " +
       "if there's a Person with the new email already in the KG" in new TestCase {
 
       val forkInGitLab  = projectPaths.generateOne
@@ -403,6 +428,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       val kgProject = given {
         kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
       }.existsInKG
+
+      val transformedTriples = givenTriplesTransformationCalled()
 
       val wasDerivedFromInsert = (updatesCreator.insertWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
@@ -423,6 +450,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromInsert,
             creatorUpdates,
@@ -432,7 +460,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       )
     }
 
-    "create wasDerivedFrom, dateCreated and creator " +
+    "remove project attributes, " +
+      "create wasDerivedFrom, dateCreated and creator " +
       "and link the new creator to the project in KG " +
       "if there is no Person with the new email in the KG yet" in new TestCase {
 
@@ -447,6 +476,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       val kgProject = given {
         kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
       }.existsInKG
+
+      val transformedTriples = givenTriplesTransformationCalled()
 
       val wasDerivedFromInsert = (updatesCreator.insertWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
@@ -465,6 +496,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromInsert,
             creatorUpdates,
@@ -474,7 +506,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       )
     }
 
-    "create wasDerivedFrom, dateCreated and creator " +
+    "remove project attributes, " +
+      "create wasDerivedFrom, dateCreated and creator " +
       "and link the new creator to the project in KG " +
       "if there's only creator username in GitLab" in new TestCase {
 
@@ -489,6 +522,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
       }.existsInKG
 
+      val transformedTriples = givenTriplesTransformationCalled()
+
       val wasDerivedFromInsert = (updatesCreator.insertWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
@@ -505,6 +540,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromInsert,
             creatorUpdates,
@@ -514,7 +550,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       )
     }
 
-    "create wasDerivedFrom and dateCreated and effectively only unlink the creator " +
+    "remove project attributes, " +
+      "create wasDerivedFrom and dateCreated and effectively only unlink the creator " +
       "if creator email and name cannot be found in GitLab" in new TestCase {
 
       val forkInGitLab = projectPaths.generateOne
@@ -528,6 +565,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
       }.existsInKG
 
+      val transformedTriples = givenTriplesTransformationCalled()
+
       val wasDerivedFromInsert = (updatesCreator.insertWasDerivedFrom _)
         .expects(kgProject.resourceId, forkInGitLab)
         .returningUpdates
@@ -544,6 +583,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromInsert,
             creatorUpdates,
@@ -580,7 +620,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
   "updateForkInfo - cases when fork only in KG" should {
 
-    "remove the wasDerivedFrom triple, recreate dateCreated and link a new creator " +
+    "remove project attributes, " +
+      "remove the wasDerivedFrom triple, recreate dateCreated and link a new creator " +
       "if there's a Person with the new email already in the KG" in new TestCase {
 
       val forkInGitLab  = projectPaths.generateOne
@@ -594,6 +635,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       val kgProject = given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
+
+      val transformedTriples = givenTriplesTransformationCalled()
 
       val wasDerivedFromDelete = (updatesCreator.deleteWasDerivedFrom _)
         .expects(kgProject.resourceId)
@@ -614,6 +657,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromDelete,
             creatorUpdates,
@@ -623,7 +667,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       )
     }
 
-    "remove the wasDerivedFrom triple, recreate dateCreated and creator " +
+    "remove project attributes, " +
+      "remove the wasDerivedFrom triple, recreate dateCreated and creator " +
       "and link the new creator to the project in KG " +
       "if there is no Person with the new email in the KG yet" in new TestCase {
 
@@ -638,6 +683,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       val kgProject = given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
+
+      val transformedTriples = givenTriplesTransformationCalled()
 
       val wasDerivedFromDelete = (updatesCreator.deleteWasDerivedFrom _)
         .expects(kgProject.resourceId)
@@ -656,6 +703,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromDelete,
             creatorUpdates,
@@ -665,7 +713,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       )
     }
 
-    "remove the wasDerivedFrom triple, recreate dateCreated and create and link a new creator " +
+    "remove project attributes, " +
+      "remove the wasDerivedFrom triple, recreate dateCreated and create and link a new creator " +
       "if there's only creator username in GitLab" in new TestCase {
 
       val forkInGitLab = projectPaths.generateOne
@@ -679,6 +728,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
+      val transformedTriples = givenTriplesTransformationCalled()
+
       val wasDerivedFromDelete = (updatesCreator.deleteWasDerivedFrom _)
         .expects(kgProject.resourceId)
         .returningUpdates
@@ -695,6 +746,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromDelete,
             creatorUpdates,
@@ -704,7 +756,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       )
     }
 
-    "remove the wasDerivedFrom triple, recreate dateCreated and effectively only unlink the creator " +
+    "remove project attributes, " +
+      "remove the wasDerivedFrom triple, recreate dateCreated and effectively only unlink the creator " +
       "if creator email and name cannot be found in GitLab" in new TestCase {
 
       val forkInGitLab = projectPaths.generateOne
@@ -718,6 +771,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
       }.existsInKG
 
+      val transformedTriples = givenTriplesTransformationCalled()
+
       val wasDerivedFromDelete = (updatesCreator.deleteWasDerivedFrom _)
         .expects(kgProject.resourceId)
         .returningUpdates
@@ -734,6 +789,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       updater.updateForkInfo(commit, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
         givenCuratedTriples.copy(
+          triples = transformedTriples,
           updates = givenCuratedTriples.updates ++ List(
             wasDerivedFromDelete,
             creatorUpdates,
@@ -750,11 +806,18 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val commit              = commits.generateOne
     val givenCuratedTriples = curatedTriplesObjects.generateOne
+    val triplesTransformer  = mockFunction[JsonLDTriples, JsonLDTriples]
 
     val gitLabInfoFinder = mock[GitLabInfoFinder[IO]]
     val kgInfoFinder     = mock[KGInfoFinder[IO]]
     val updatesCreator   = mock[UpdatesCreator]
-    val updater          = new IOForkInfoUpdater(gitLabInfoFinder, kgInfoFinder, updatesCreator)
+    val updater          = new IOForkInfoUpdater(gitLabInfoFinder, kgInfoFinder, updatesCreator, triplesTransformer)
+
+    def givenTriplesTransformationCalled() = {
+      val transformedTriples = jsonLDTriples.generateOne
+      triplesTransformer.expects(givenCuratedTriples.triples).returning(transformedTriples)
+      transformedTriples
+    }
 
     def given(gitLabProject: GitLabProject) = new {
       lazy val existsInGitLab: GitLabProject = {

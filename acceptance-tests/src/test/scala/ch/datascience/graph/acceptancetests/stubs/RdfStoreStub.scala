@@ -47,7 +47,7 @@ object RdfStoreStub {
   def givenRenkuDatasetExists(): Unit = {
     stubFor {
       get("/$/datasets/renku")
-        .willReturn(ok("{}"))
+        .willReturn(ok())
     }
     ()
   }

@@ -18,18 +18,20 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import ch.datascience.generators.CommonGraphGenerators.{fusekiBaseUrls, renkuBaseUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users.Email
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.{Person, Project}
 import org.scalacheck.Gen
 
 package object forks {
 
-  implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+  implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
+  implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
   def gitLabProjects(parentPath: Path): Gen[GitLabProject] = gitLabProjects(
     maybeParentPaths = Gen.const(parentPath).toGeneratorOfSomes
@@ -70,6 +72,10 @@ package object forks {
       maybeName  <- userNames.toGeneratorOfOptions
     } yield KGCreator(resourceId, maybeEmail, maybeName)
 
+  implicit val entitiesProjects: Gen[Project] = entitiesProjects(
+    creator            = entitiesPersons(userEmails.generateSome).generateOne,
+    maybeParentProject = entitiesProjects(entitiesPersons(userEmails.generateSome).generateOne).generateOption
+  )
   def entitiesProjects(creator:            Person          = entitiesPersons().generateOne,
                        maybeParentProject: Option[Project] = None): Gen[Project] =
     for {

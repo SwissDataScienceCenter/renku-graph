@@ -30,7 +30,6 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
 import io.renku.jsonld.syntax._
-import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -88,11 +87,6 @@ class KGInfoFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPro
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val finder               = new IOKGInfoFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
   }
-
-  private implicit val projectsGen: Gen[entities.Project] = for {
-    maybeParent <- entitiesProjects(maybeParentProject = None).toGeneratorOfOptions
-    project     <- entitiesProjects(maybeParentProject = maybeParent)
-  } yield project
 
   private def findPerson(resourceId: users.ResourceId): Set[(String, String)] =
     runQuery(s"""|SELECT ?name ?email

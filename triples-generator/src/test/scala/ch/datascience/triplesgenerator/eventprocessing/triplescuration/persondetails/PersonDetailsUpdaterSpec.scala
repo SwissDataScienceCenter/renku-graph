@@ -16,20 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
+import PersonDetailsUpdater.{Person => UpdatePerson}
 import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name, ResourceId}
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.PersonDetailsUpdater.{Person => UpdatePerson, _}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import eu.timepit.refined.auto._
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root
@@ -78,7 +80,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
       curatedPersons.filter(blankIds)    shouldBe allPersons.filter(blankIds)
       curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
 
-      curatedTriples.updates should contain theSameElementsAs prepareUpdates(
+      curatedTriples.updates should contain theSameElementsAs updatesCreator.prepareUpdates(
         (
           datasetCreatorsSet.map(maybeUpdatePerson) +
             maybeUpdatePerson(entities.Person(projectCreatorName, projectCreatorEmail)) +
@@ -89,9 +91,11 @@ class PersonDetailsUpdaterSpec extends WordSpec {
   }
 
   private trait TestCase {
+    implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
     implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
-    val curator = new PersonDetailsUpdater[Try]()
+    val updatesCreator = new UpdatesCreator
+    val curator        = new PersonDetailsUpdater[Try](updatesCreator)
   }
 
   private implicit class TriplesOps(triples: JsonLDTriples) {

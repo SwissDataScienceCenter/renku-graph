@@ -16,26 +16,26 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
+import PersonDetailsUpdater.{Person => UpdaterPerson}
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.Person
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.PersonDetailsUpdater.{prepareUpdates, Person => UpdaterPerson}
 import io.circe.Json
 import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
+class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
   "prepareUpdates" should {
 
-    "generate query changing person's name and removing label - case when email present" in {
+    "generate query changing person's name and removing label - case when email present" in new TestCase {
       forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
         val person1Json = Person(name1, email1).asJsonLD
         val person1Id   = person1Json.entityId.get
@@ -51,7 +51,7 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
 
         val name1Updated = userNames.generateOne
 
-        val updates = prepareUpdates(
+        val updates = updatesCreator.prepareUpdates(
           Set(
             UpdaterPerson(ResourceId(person1Id.value), Set(name1Updated), Set(email1))
           )
@@ -68,7 +68,7 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
       }
     }
 
-    "generate query changing person's name and email and removing label - case when email removed" in {
+    "generate query changing person's name and email and removing label - case when email removed" in new TestCase {
       forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
         val person1Json = Person(name1, email1).asJsonLD
         val person1Id   = person1Json.entityId.get
@@ -84,7 +84,7 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
 
         val name1Updated = userNames.generateOne
 
-        val updates = prepareUpdates(
+        val updates = updatesCreator.prepareUpdates(
           Set(
             UpdaterPerson(ResourceId(person1Id.value), Set(name1Updated), Set.empty)
           )
@@ -114,6 +114,10 @@ class PersonDetailsUpdaterQueriesSpec extends WordSpec with InMemoryRdfStore wit
       .unsafeRunSync()
       .map(row => (row("id"), row.get("name"), row.get("email"), row.get("label")))
       .toSet
+
+  private trait TestCase {
+    val updatesCreator = new UpdatesCreator
+  }
 
   private implicit class JsonOps(json: Json) {
     import io.circe.optics.JsonPath._

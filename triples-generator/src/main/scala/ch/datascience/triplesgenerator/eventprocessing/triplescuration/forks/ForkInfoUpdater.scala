@@ -26,7 +26,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
@@ -44,10 +44,11 @@ private[triplescuration] trait ForkInfoUpdater[Interpretation[_]] {
 }
 
 private[triplescuration] class IOForkInfoUpdater(
-    gitLab:         GitLabInfoFinder[IO],
-    kg:             KGInfoFinder[IO],
-    updatesCreator: UpdatesCreator
-)(implicit ME:      MonadError[IO, Throwable], cs: ContextShift[IO])
+    gitLab:                   GitLabInfoFinder[IO],
+    kg:                       KGInfoFinder[IO],
+    updatesCreator:           UpdatesCreator,
+    projectPropertiesRemover: JsonLDTriples => JsonLDTriples
+)(implicit ME:                MonadError[IO, Throwable], cs: ContextShift[IO])
     extends ForkInfoUpdater[IO] {
 
   import updatesCreator._
@@ -58,10 +59,15 @@ private[triplescuration] class IOForkInfoUpdater(
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, CuratedTriples] = EitherT {
     (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path))
       .parMapN {
-        case `forks are the same`() => givenCuratedTriples.pure[IO]
+        case `no forks in GitLab and KG`() => givenCuratedTriples.pure[IO]
+        case `forks are the same`() =>
+          givenCuratedTriples
+            .transformTriples(projectPropertiesRemover)
+            .pure[IO]
         case `forks are different, email and date same`(projectResource, gitLabForkPath) =>
           givenCuratedTriples
-            .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+            .transformTriples(projectPropertiesRemover)
+            .addUpdates(recreateWasDerivedFrom(projectResource, gitLabForkPath))
             .pure[IO]
         case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
           OptionT
@@ -69,15 +75,17 @@ private[triplescuration] class IOForkInfoUpdater(
             .flatMapF(kg.findCreatorId)
             .map { existingUserResource =>
               givenCuratedTriples
-                .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
-                .add(swapCreator(projectResource, existingUserResource))
-                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .transformTriples(projectPropertiesRemover)
+                .addUpdates(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+                .addUpdates(swapCreator(projectResource, existingUserResource))
+                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
             .getOrElse {
               givenCuratedTriples
-                .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
-                .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .transformTriples(projectPropertiesRemover)
+                .addUpdates(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+                .addUpdates(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
         case `no fork in the KG project`(projectResource, gitLabForkPath, gitLabProject) =>
           OptionT
@@ -85,15 +93,17 @@ private[triplescuration] class IOForkInfoUpdater(
             .flatMapF(kg.findCreatorId)
             .map { existingUserResource =>
               givenCuratedTriples
-                .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
-                .add(swapCreator(projectResource, existingUserResource))
-                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .transformTriples(projectPropertiesRemover)
+                .addUpdates(insertWasDerivedFrom(projectResource, gitLabForkPath))
+                .addUpdates(swapCreator(projectResource, existingUserResource))
+                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
             .getOrElse {
               givenCuratedTriples
-                .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
-                .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .transformTriples(projectPropertiesRemover)
+                .addUpdates(insertWasDerivedFrom(projectResource, gitLabForkPath))
+                .addUpdates(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
         case `no fork in the GitLab project`(projectResource, gitLabProject) =>
           OptionT
@@ -101,21 +111,31 @@ private[triplescuration] class IOForkInfoUpdater(
             .flatMapF(kg.findCreatorId)
             .map { existingUserResource =>
               givenCuratedTriples
-                .add(deleteWasDerivedFrom(projectResource))
-                .add(swapCreator(projectResource, existingUserResource))
-                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .transformTriples(projectPropertiesRemover)
+                .addUpdates(deleteWasDerivedFrom(projectResource))
+                .addUpdates(swapCreator(projectResource, existingUserResource))
+                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
             .getOrElse {
               givenCuratedTriples
-                .add(deleteWasDerivedFrom(projectResource))
-                .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .transformTriples(projectPropertiesRemover)
+                .addUpdates(deleteWasDerivedFrom(projectResource))
+                .addUpdates(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
         case _ => givenCuratedTriples.pure[IO]
       }
       .flatten
       .map(_.asRight[ProcessingRecoverableError])
       .recover(maybeToRecoverableError)
+  }
+
+  private object `no forks in GitLab and KG` {
+    def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Boolean = tuple match {
+      case (Some(gitLabProject), Some(kgProject)) =>
+        kgProject.maybeParentResourceId.isEmpty && gitLabProject.maybeParentPath.isEmpty
+      case _ => false
+    }
   }
 
   private object `forks are the same` {
@@ -183,7 +203,9 @@ private[triplescuration] class IOForkInfoUpdater(
     lazy val maybeName  = gitLabProject.maybeCreator.flatMap(_.maybeName)
 
     def hasSameForkAs(kgProject: KGProject): Boolean =
-      kgProject.maybeParentResourceId.flatMap(_.getPath) == gitLabProject.maybeParentPath
+      (kgProject.maybeParentResourceId.flatMap(_.getPath), gitLabProject.maybeParentPath)
+        .mapN(_ == _)
+        .getOrElse(false)
 
     def hasEmailSameAs(kgProject: KGProject): Boolean =
       (kgProject.creator.maybeEmail -> gitLabProject.maybeCreator.flatMap(_.maybeEmail))
@@ -222,5 +244,6 @@ private[triplescuration] object IOForkInfoUpdater {
       renkuBaseUrl     <- RenkuBaseUrl[IO]()
       gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
       kgInfoFinder     <- IOKGInfoFinder(timeRecorder, logger)
-    } yield new IOForkInfoUpdater(gitLabInfoFinder, kgInfoFinder, new UpdatesCreator(renkuBaseUrl))
+      triplesTransformer = new ProjectPropertiesRemover
+    } yield new IOForkInfoUpdater(gitLabInfoFinder, kgInfoFinder, new UpdatesCreator(renkuBaseUrl), triplesTransformer)
 }

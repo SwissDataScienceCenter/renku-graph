@@ -16,14 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
 import cats.MonadError
-import cats.data.NonEmptyList
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import io.circe.Decoder.decodeList
 import io.circe.Encoder.encodeList
 import io.circe.optics.JsonOptics._
@@ -33,9 +31,12 @@ import monocle.function.Plated
 
 import scala.language.higherKinds
 
-private class PersonDetailsUpdater[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable]) {
+private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
+    updatesCreator: UpdatesCreator
+)(implicit ME:      MonadError[Interpretation, Throwable]) {
 
   import PersonDetailsUpdater._
+  import updatesCreator._
 
   def curate(curatedTriples: CuratedTriples): Interpretation[CuratedTriples] = ME.catchNonFatal(
     removePersonsAttributes
@@ -49,7 +50,12 @@ private class PersonDetailsUpdater[Interpretation[_]]()(implicit ME: MonadError[
   )
 }
 
-private object PersonDetailsUpdater {
+private[triplescuration] object PersonDetailsUpdater {
+
+  def apply[Interpretation[_]]()(
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): PersonDetailsUpdater[Interpretation] = new PersonDetailsUpdater[Interpretation](new UpdatesCreator)
+
   final case class Person(id: ResourceId, names: Set[Name], emails: Set[Email])
 
   private object removePersonsAttributes extends (JsonLDTriples => (JsonLDTriples, Set[Person])) {
@@ -109,97 +115,6 @@ private object PersonDetailsUpdater {
       }
 
       def remove(property: String): Json = root.obj.modify(_.remove(property))(json)
-    }
-  }
-
-  private[triplescuration] object prepareUpdates extends (Set[Person] => List[Update]) {
-
-    import eu.timepit.refined.auto._
-
-    override def apply(persons: Set[Person]): List[Update] = persons.toList flatMap updates
-
-    private lazy val updates: Person => List[Update] = {
-      case Person(id, names, emails) =>
-        List(
-          namesDelete(id),
-          namesInsert(id, names),
-          emailsDelete(id),
-          emailsInsert(id, emails),
-          labelsDelete(id)
-        ).flatten
-    }
-
-    private def namesDelete(id: ResourceId) = Some {
-      val resource = id.showAs[RdfResource]
-      Update(
-        s"Deleting Person $resource schema:name",
-        SparqlQuery(
-          name = "upload - person name delete",
-          Set("PREFIX schema: <http://schema.org/>"),
-          s"""|DELETE { $resource schema:name ?name }
-              |WHERE  { $resource schema:name ?name }
-              |""".stripMargin
-        )
-      )
-    }
-    private def namesInsert(id: ResourceId, names: Set[Name]) =
-      if (names.isEmpty) None
-      else
-        Some {
-          val resource = id.showAs[RdfResource]
-          Update(
-            s"Inserting Person $resource schema:name",
-            SparqlQuery(
-              name = "upload - person name insert",
-              Set("PREFIX schema: <http://schema.org/>"),
-              s"""|${`INSERT DATA`(resource, "schema:name", NonEmptyList.fromListUnsafe(names.toList))}
-                  |""".stripMargin
-            )
-          )
-        }
-
-    private def emailsDelete(id: ResourceId) = Some {
-      val resource = id.showAs[RdfResource]
-      Update(
-        s"Deleting Person $resource schema:email",
-        SparqlQuery(
-          name = "upload - person email delete",
-          Set("PREFIX schema: <http://schema.org/>"),
-          s"""|DELETE { $resource schema:email ?email }
-              |WHERE  { $resource schema:email ?email }
-              |""".stripMargin
-        )
-      )
-    }
-
-    private def emailsInsert(id: ResourceId, emails: Set[Email]) =
-      if (emails.isEmpty) None
-      else
-        Some {
-          val resource = id.showAs[RdfResource]
-          Update(
-            s"Inserting Person $resource schema:email",
-            SparqlQuery(
-              name = "upload - person email insert",
-              Set("PREFIX schema: <http://schema.org/>"),
-              s"""|${`INSERT DATA`(resource, "schema:email", NonEmptyList.fromListUnsafe(emails.toList))}
-                  |""".stripMargin
-            )
-          )
-        }
-
-    private def labelsDelete(id: ResourceId) = Some {
-      val resource = id.showAs[RdfResource]
-      Update(
-        s"Deleting Person $resource rdfs:label",
-        SparqlQuery(
-          name = "upload - person label delete",
-          Set("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"),
-          s"""|DELETE { $resource rdfs:label ?label }
-              |WHERE  { $resource rdfs:label ?label }
-              |""".stripMargin
-        )
-      )
     }
   }
 }

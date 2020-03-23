@@ -30,6 +30,7 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.Proc
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.ForkInfoUpdater
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{PersonDetailsUpdater, UpdatesCreator}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -105,7 +106,7 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
     val triples = jsonLDTriples.generateOne
     val commit  = commits.generateOne
 
-    class TryPersonDetailsUpdater extends PersonDetailsUpdater[Try]
+    class TryPersonDetailsUpdater(updatesCreator: UpdatesCreator) extends PersonDetailsUpdater[Try](updatesCreator)
     val personDetailsUpdater = mock[TryPersonDetailsUpdater]
     val forkInfoUpdater      = mock[ForkInfoUpdater[Try]]
     val curator              = new TriplesCurator[Try](personDetailsUpdater, forkInfoUpdater)

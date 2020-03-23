@@ -26,6 +26,7 @@ import ch.datascience.triplesgenerator.eventprocessing.Commit
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.{ForkInfoUpdater, IOForkInfoUpdater}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -73,7 +74,7 @@ object IOTriplesCurator {
     for {
       forkInfoUpdater <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
     } yield new TriplesCurator[IO](
-      new PersonDetailsUpdater[IO](),
+      PersonDetailsUpdater[IO](),
       forkInfoUpdater
     )
 }
