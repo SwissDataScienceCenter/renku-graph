@@ -133,22 +133,22 @@ object model {
                               jobArtifactsSize: JobArtifactsSize)
 
   object Statistics {
-    final class CommitsCount private (val value: Int) extends AnyVal with IntTinyType
-    implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeInt
+    final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
+    implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong
 
-    final class StorageSize private (val value: Int) extends AnyVal with IntTinyType
-    implicit object StorageSize extends TinyTypeFactory[StorageSize](new StorageSize(_)) with NonNegativeInt
+    final class StorageSize private (val value: Long) extends AnyVal with LongTinyType
+    implicit object StorageSize extends TinyTypeFactory[StorageSize](new StorageSize(_)) with NonNegativeLong
 
-    final class RepositorySize private (val value: Int) extends AnyVal with IntTinyType
-    implicit object RepositorySize extends TinyTypeFactory[RepositorySize](new RepositorySize(_)) with NonNegativeInt
+    final class RepositorySize private (val value: Long) extends AnyVal with LongTinyType
+    implicit object RepositorySize extends TinyTypeFactory[RepositorySize](new RepositorySize(_)) with NonNegativeLong
 
-    final class LsfObjectsSize private (val value: Int) extends AnyVal with IntTinyType
-    implicit object LsfObjectsSize extends TinyTypeFactory[LsfObjectsSize](new LsfObjectsSize(_)) with NonNegativeInt
+    final class LsfObjectsSize private (val value: Long) extends AnyVal with LongTinyType
+    implicit object LsfObjectsSize extends TinyTypeFactory[LsfObjectsSize](new LsfObjectsSize(_)) with NonNegativeLong
 
-    final class JobArtifactsSize private (val value: Int) extends AnyVal with IntTinyType
+    final class JobArtifactsSize private (val value: Long) extends AnyVal with LongTinyType
     implicit object JobArtifactsSize
         extends TinyTypeFactory[JobArtifactsSize](new JobArtifactsSize(_))
-        with NonNegativeInt
+        with NonNegativeLong
   }
 
   final case class Urls(ssh: SshUrl, http: HttpUrl, web: WebUrl, readme: ReadmeUrl)
