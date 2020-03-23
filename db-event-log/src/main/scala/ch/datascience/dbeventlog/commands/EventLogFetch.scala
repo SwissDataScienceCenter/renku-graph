@@ -29,6 +29,7 @@ import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
 import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.graph.model.events.CommitEventId
+import ch.datascience.graph.model.projects
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
 import doobie.util.fragments._
@@ -58,8 +59,11 @@ class EventLogFetchImpl[Interpretation[_]](
 
   private def findEventAndUpdateForProcessing() =
     for {
-      maybeIdAndProjectAndBody <- findProjectsOldestEvents map selectRandom
-      maybeBody                <- markAsProcessing(maybeIdAndProjectAndBody)
+      maybeProjectId <- findProjectsWithEventsInQueue map selectRandom
+      maybeIdAndProjectAndBody <- maybeProjectId
+                                   .map(findOldestEvent)
+                                   .getOrElse(Free.pure[ConnectionOp, Option[EventIdAndBody]](None))
+      maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
     } yield maybeBody
 
   // format: off
@@ -74,22 +78,30 @@ class EventLogFetchImpl[Interpretation[_]](
   // format: on
 
   // format: off
-  private def findProjectsOldestEvents = {
+  private def findProjectsWithEventsInQueue = {
+    fr"""select distinct project_id
+         from event_log
+         where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
+               or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})"""
+  }.query[projects.Id].to[List]
+  // format: on
+
+  // format: off
+  private def findOldestEvent(id: projects.Id) = {
     fr"""select event_log.event_id, event_log.project_id, event_log.event_body
-         from event_log, (select  project_id, min(execution_date) as oldest_execution_date
-                          from event_log
-                          where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-                            or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
-                          group by project_id) oldest_events
-         where event_log.project_id = oldest_events.project_id 
-           and event_log.execution_date = oldest_events.oldest_execution_date"""
-  }.query[EventIdAndBody].to[List]
+         from event_log
+         where project_id = $id and 
+           (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
+             or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
+         order by execution_date asc
+         limit 1"""
+  }.query[EventIdAndBody].option
   // format: on
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
 
-  private lazy val selectRandom: List[EventIdAndBody] => Option[EventIdAndBody] = {
+  private lazy val selectRandom: List[projects.Id] => Option[projects.Id] = {
     case Nil           => None
     case single +: Nil => Some(single)
     case many          => many.get(Random.nextInt(many.size))
