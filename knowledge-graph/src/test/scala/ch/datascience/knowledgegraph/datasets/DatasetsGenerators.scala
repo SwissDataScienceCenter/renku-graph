@@ -42,7 +42,7 @@ object DatasetsGenerators {
       sameas           <- sameAs
       maybeDescription <- Gen.option(datasetDescriptions)
       published        <- datasetPublishingInfos
-      part             <- listOf(datasetPart)
+      part             <- listOf(datasetParts)
       projects         <- projects
     } yield Dataset(id, name, sameas, maybeUrl, maybeDescription, published, part, projects.toList)
 
@@ -60,7 +60,7 @@ object DatasetsGenerators {
   private implicit lazy val datasetCreatorsOrdering: Order[DatasetCreator] =
     (creator1: DatasetCreator, creator2: DatasetCreator) => creator1.name.value compareTo creator2.name.value
 
-  private implicit lazy val datasetPart: Gen[DatasetPart] = for {
+  private implicit lazy val datasetParts: Gen[DatasetPart] = for {
     name     <- datasetPartNames
     location <- datasetPartLocations
   } yield DatasetPart(name, location)
