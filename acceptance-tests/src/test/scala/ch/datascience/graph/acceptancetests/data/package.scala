@@ -19,25 +19,12 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.config.renku
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{Project => GitLabProject}
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.FusekiBaseUrl
 
 package object data {
   val currentSchemaVersion:   SchemaVersion      = SchemaVersion("0.5.0")
   val renkuResourcesUrl:      renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
   implicit val fusekiBaseUrl: FusekiBaseUrl      = RDFStore.fusekiBaseUrl
-
-  implicit class ProjectOps(project: Project) {
-
-    def toGitLabProject(id: Id = projectIds.generateOne): GitLabProject = GitLabProject(
-      id,
-      project.path
-    )
-  }
 }

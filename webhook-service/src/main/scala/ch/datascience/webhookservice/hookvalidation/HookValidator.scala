@@ -21,6 +21,7 @@ package ch.datascience.webhookservice.hookvalidation
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
+import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.{Id, Visibility}
@@ -28,7 +29,6 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository._
@@ -51,8 +51,8 @@ class HookValidator[Interpretation[_]](
   import HookValidator.HookValidationResult._
   import HookValidator._
   import IOAccessTokenFinder._
-  import Visibility._
   import Token._
+  import Visibility._
   import accessTokenAssociator._
   import accessTokenFinder._
   import accessTokenRemover._

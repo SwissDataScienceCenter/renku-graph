@@ -93,7 +93,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync() shouldBe Right(
+      triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync() shouldBe Right(
         triples
       )
     }
@@ -143,7 +143,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithParent, maybeAccessToken).value.unsafeRunSync() shouldBe Right(triples)
+      triplesGenerator.generateTriples(commitWithParent)(maybeAccessToken).value.unsafeRunSync() shouldBe Right(triples)
     }
 
     s"return $GenerationRecoverableError if cloning the repo returns such error" in new TestCase {
@@ -153,8 +153,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
-      val accessToken                    = accessTokens.generateOne
-      override lazy val maybeAccessToken = Some(accessToken)
+      implicit override lazy val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
@@ -172,7 +171,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync() shouldBe Left(
+      triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Left(
         exception
       )
     }
@@ -186,7 +185,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.raiseError(exception))
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -212,7 +211,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -225,8 +224,8 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .expects(repositoryDirectory)
         .returning(IO.pure(repositoryDirectory))
 
-      val accessToken                    = accessTokens.generateOne
-      override lazy val maybeAccessToken = Some(accessToken)
+      val accessToken = accessTokens.generateOne
+      implicit override lazy val maybeAccessToken: Option[AccessToken] = Some(accessToken)
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
@@ -245,7 +244,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync()
       }
 
       actual.getMessage should startWith("Triples generation failed: ")
@@ -284,7 +283,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -371,7 +370,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception
@@ -417,7 +416,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception

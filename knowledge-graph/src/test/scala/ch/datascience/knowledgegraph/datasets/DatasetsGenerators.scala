@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph.datasets
 import cats.Order
 import cats.data.NonEmptyList
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.SameAs
@@ -41,14 +42,14 @@ object DatasetsGenerators {
       sameas           <- sameAs
       maybeDescription <- Gen.option(datasetDescriptions)
       published        <- datasetPublishingInfos
-      part             <- listOf(datasetPart)
+      part             <- listOf(datasetParts)
       projects         <- projects
     } yield Dataset(id, name, sameas, maybeUrl, maybeDescription, published, part, projects.toList)
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
-    maybeEmail       <- Gen.option(emails)
-    name             <- names
-    maybeAffiliation <- Gen.option(affiliations)
+    maybeEmail       <- Gen.option(userEmails)
+    name             <- userNames
+    maybeAffiliation <- Gen.option(userAffiliations)
   } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
 
   implicit lazy val datasetPublishingInfos: Gen[DatasetPublishing] = for {
@@ -59,7 +60,7 @@ object DatasetsGenerators {
   private implicit lazy val datasetCreatorsOrdering: Order[DatasetCreator] =
     (creator1: DatasetCreator, creator2: DatasetCreator) => creator1.name.value compareTo creator2.name.value
 
-  private implicit lazy val datasetPart: Gen[DatasetPart] = for {
+  private implicit lazy val datasetParts: Gen[DatasetPart] = for {
     name     <- datasetPartNames
     location <- datasetPartLocations
   } yield DatasetPart(name, location)
@@ -76,7 +77,7 @@ object DatasetsGenerators {
   } yield AddedToProject(createdDate, agent)
 
   private implicit lazy val datasetAgents: Gen[DatasetAgent] = for {
-    email <- emails
-    name  <- names
-  } yield DatasetAgent(email, name)
+    maybeEmail <- userEmails.toGeneratorOfOptions
+    name       <- userNames
+  } yield DatasetAgent(maybeEmail, name)
 }

@@ -216,11 +216,19 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
       visibility       = gitLabProject.visibility,
       created = Creation(
         date    = kgProject.created.date,
-        creator = Creator(email = kgProject.created.creator.email, name = kgProject.created.creator.name)
+        creator = Creator(kgProject.created.creator.maybeEmail, kgProject.created.creator.name)
       ),
-      updatedAt   = gitLabProject.updatedAt,
-      urls        = gitLabProject.urls,
-      forking     = gitLabProject.forking,
+      updatedAt = gitLabProject.updatedAt,
+      urls      = gitLabProject.urls,
+      forking = Forking(
+        gitLabProject.forksCount,
+        kgProject.maybeParent.map { parent =>
+          ParentProject(parent.resourceId.toUnsafe[Path],
+                        parent.name,
+                        Creation(parent.created.date,
+                                 Creator(parent.created.creator.maybeEmail, parent.created.creator.name)))
+        }
+      ),
       tags        = gitLabProject.tags,
       starsCount  = gitLabProject.starsCount,
       permissions = gitLabProject.permissions,

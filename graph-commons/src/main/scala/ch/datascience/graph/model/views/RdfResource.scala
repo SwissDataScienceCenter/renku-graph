@@ -18,15 +18,7 @@
 
 package ch.datascience.graph.model.views
 
-import ch.datascience.tinytypes.{Renderer, TinyType}
-
 /*
  * This is a marker trait to be used with TinyTypes so they can be rendered as an RdfResource which is `<url>`
  */
 trait RdfResource
-
-object RdfResource {
-  implicit object RdfResourceRenderer extends Renderer[RdfResource, TinyType] {
-    override def render(value: TinyType): String = s"<$value>"
-  }
-}

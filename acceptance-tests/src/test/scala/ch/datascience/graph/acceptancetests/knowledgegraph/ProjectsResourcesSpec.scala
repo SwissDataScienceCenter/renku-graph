@@ -31,14 +31,16 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{projects => projectsGen, _}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupPermissions, ProjectAndGroupPermissions, ProjectPermissions}
-import ch.datascience.knowledgegraph.projects.model.{Permissions, Project}
+import ch.datascience.knowledgegraph.projects.model._
+import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import io.circe.Json
@@ -53,10 +55,23 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
   import ProjectsResources._
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
-  private val project = projectsGen.generateOne.copy(
-    maybeDescription = projectDescriptions.generateSome,
-    forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome)
-  )
+  private val parentProject = {
+    val initParent = parents.generateOne
+    ParentProject(
+      initParent.resourceId.toUnsafe[Path],
+      initParent.name,
+      Creation(initParent.created.date, Creator(initParent.created.creator.maybeEmail, initParent.created.creator.name))
+    )
+  }
+  private val project = {
+    val initProject = projects.generateOne
+    initProject.copy(
+      maybeDescription = projectDescriptions.generateSome,
+      forking = initProject.forking.copy(
+        maybeParent = parentProject.some
+      )
+    )
+  }
   private val dataset1CommitId = commitIds.generateOne
   private val dataset = datasets.generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
@@ -72,22 +87,30 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       val jsonLDTriples = JsonLD.arr(
         dataSetCommit(
           commitId      = dataset1CommitId,
-          committer     = Person(project.created.creator.name, project.created.creator.email),
+          committer     = Person(project.created.creator.name, project.created.creator.maybeEmail),
           schemaVersion = currentSchemaVersion
         )(
-          project.path,
+          projectPath        = project.path,
           projectName        = project.name,
-          projectDateCreated = project.created.date
+          projectDateCreated = project.created.date,
+          projectCreator     = Person(project.created.creator.name, project.created.creator.maybeEmail),
+          maybeParent = entities
+            .Project(
+              parentProject.path,
+              parentProject.name,
+              parentProject.created.date,
+              creator = entities.Person(parentProject.created.creator.name, parentProject.created.creator.maybeEmail)
+            )
+            .some
         )(
           datasetIdentifier  = dataset.id,
           datasetName        = dataset.name,
           maybeDatasetSameAs = dataset.sameAs.some
         )
       )
+      `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
 
-      `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
-
-      `triples updates run`(Set(project.created.creator.email) + project.created.creator.email)
+      `triples updates run`(Set(project.created.creator.maybeEmail, parentProject.created.creator.maybeEmail).flatten)
 
       And("the project exists in GitLab")
       `GET <gitlab>/api/v4/projects/:path returning OK with`(project, withStatistics = true)
@@ -122,28 +145,18 @@ object ProjectsResources {
     "visibility":  ${project.visibility.value},
     "created": {
       "dateCreated": ${project.created.date.value},
-      "creator": {
-        "name":  ${project.created.creator.name.value},
-        "email": ${project.created.creator.email.value}
-      }
+      "creator":     ${project.created.creator.toJson}
     },
-    "updatedAt":  ${project.updatedAt.value},
+    "updatedAt":   ${project.updatedAt.value},
     "urls": {
-      "ssh":    ${project.urls.ssh.value},
-      "http":   ${project.urls.http.value},
-      "web":    ${project.urls.web.value},
-      "readme": ${project.urls.readme.value}
+      "ssh":       ${project.urls.ssh.value},
+      "http":      ${project.urls.http.value},
+      "web":       ${project.urls.web.value},
+      "readme":    ${project.urls.readme.value}
     },
-    "forking": {
-      "forksCount": ${project.forking.forksCount.value},
-      "parent": {
-        "identifier": ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).id.value},
-        "path":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).path.value},
-        "name":       ${project.forking.maybeParent.getOrElse(throw new Exception("Parent expected")).name.value}
-      }
-    },
-    "tags": ${project.tags.map(_.value).toList},
-    "starsCount": ${project.starsCount.value},
+    "forking":     ${project.forking.toJson},
+    "tags":        ${project.tags.map(_.value).toList},
+    "starsCount":  ${project.starsCount.value},
     "permissions": ${toJson(project.permissions)},
     "statistics": {
       "commitsCount":     ${project.statistics.commitsCount.value},
@@ -157,6 +170,37 @@ object ProjectsResources {
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
     )
+  }
+
+  private implicit class ForkingOps(forking: Forking) {
+    import ch.datascience.json.JsonOps._
+
+    lazy val toJson: Json = json"""{
+      "forksCount": ${forking.forksCount.value}
+    }""" addIfDefined ("parent" -> forking.maybeParent.map(_.toJson))
+  }
+
+  private implicit class ParentOps(parent: ParentProject) {
+    lazy val toJson: Json = json"""{
+      "path":       ${parent.path.value},
+      "name":       ${parent.name.value},
+      "created": {
+        "dateCreated": ${parent.created.date.value},
+        "creator": ${parent.created.creator.toJson}
+      }
+    }"""
+  }
+
+  private implicit class ProjectOps(project: Project) {
+    lazy val parent: ParentProject = project.forking.maybeParent.getOrElse(throw new Exception("Parent expected"))
+  }
+
+  private implicit class CreatorOps(creator: Creator) {
+    import ch.datascience.json.JsonOps._
+
+    lazy val toJson: Json = json"""{
+      "name":  ${creator.name.value}
+    }""" addIfDefined ("email" -> creator.maybeEmail.map(_.value))
   }
 
   private lazy val toJson: Permissions => Json = {

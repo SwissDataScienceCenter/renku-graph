@@ -18,21 +18,63 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import ch.datascience.rdfstore.JsonLDTriples
+import cats.MonadError
+import cats.data.EitherT
+import ch.datascience.http.client.AccessToken
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
+import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.{ForkInfoUpdater, IOForkInfoUpdater}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater
+import io.chrisdavenport.log4cats.Logger
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 class TriplesCurator[Interpretation[_]](
-    personDetailsUpdater: PersonDetailsUpdater[Interpretation]
-) {
+    personDetailsUpdater: PersonDetailsUpdater[Interpretation],
+    forkInfoUpdater:      ForkInfoUpdater[Interpretation]
+)(implicit ME:            MonadError[Interpretation, Throwable]) {
 
-  def curate(triples: JsonLDTriples): Interpretation[CuratedTriples] =
-    personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil))
+  import forkInfoUpdater._
+
+  def curate(
+      commit:  Commit,
+      triples: JsonLDTriples
+  )(
+      implicit maybeAccessToken: Option[AccessToken]
+  ): EitherT[Interpretation, ProcessingRecoverableError, CuratedTriples] =
+    for {
+      triplesWithPersonDetails <- personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil)).toRight
+      triplesWithForkInfo      <- updateForkInfo(commit, triplesWithPersonDetails)
+    } yield triplesWithForkInfo
+
+  private implicit class InterpretationOps(out: Interpretation[CuratedTriples]) {
+    lazy val toRight: EitherT[Interpretation, CurationRecoverableError, CuratedTriples] =
+      EitherT.right[CurationRecoverableError](out)
+  }
 }
 
 object IOTriplesCurator {
 
-  import cats.effect.IO
+  import cats.effect.{ContextShift, IO, Timer}
+  import ch.datascience.config.GitLab
+  import ch.datascience.control.Throttler
 
-  def apply(): TriplesCurator[IO] = new TriplesCurator[IO](new PersonDetailsUpdater[IO]())
+  final case class CurationRecoverableError(message: String, cause: Throwable)
+      extends Exception(message, cause)
+      with ProcessingRecoverableError
+
+  def apply(
+      gitLabThrottler:         Throttler[IO, GitLab],
+      logger:                  Logger[IO],
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[TriplesCurator[IO]] =
+    for {
+      forkInfoUpdater <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
+    } yield new TriplesCurator[IO](
+      PersonDetailsUpdater[IO](),
+      forkInfoUpdater
+    )
 }

@@ -100,7 +100,7 @@ class UploaderSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
-    val curatedTriples = curatedTriplesObjects().generateOne
+    val curatedTriples = curatedTriplesObjects.generateOne
 
     val triplesUploader = mock[TriplesUploader[Try]]
     val updatesUploader = mock[UpdatesUploader[Try]]

@@ -51,7 +51,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           loadToStore(
             dataSetCommit(
               committedDate = project1DatasetCreationDate,
-              committer     = Person(addedToProject1.agent.name, addedToProject1.agent.email)
+              committer     = Person(addedToProject1.agent.name, addedToProject1.agent.maybeEmail)
             )(
               project1.path,
               project1.name
@@ -84,7 +84,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             ),
             dataSetCommit( // to simulate adding the same data-set to another project
               committedDate = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value)),
-              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
             )(
               project2.path,
               project2.name
@@ -118,7 +118,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           loadToStore(
             dataSetCommit(
               committedDate = CommittedDate(addedToProject1.date.value),
-              committer     = Person(addedToProject1.agent.name, addedToProject1.agent.email)
+              committer     = Person(addedToProject1.agent.name, addedToProject1.agent.maybeEmail)
             )(
               project1.path,
               project1.name
@@ -151,7 +151,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             ),
             dataSetCommit( // to simulate adding first project's data-set to another project
               committedDate = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value)),
-              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
             )(
               project2.path,
               project2.name
@@ -185,7 +185,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
         loadToStore(
           dataSetCommit(
             committedDate = CommittedDate(addedToProject.date.value),
-            committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+            committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
           )(
             project.path,
             project.name
@@ -234,7 +234,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
         loadToStore(
           dataSetCommit(
             committedDate = CommittedDate(addedToProject.date.value),
-            committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+            committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
           )(
             project.path,
             project.name
@@ -293,7 +293,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           loadToStore(
             dataSetCommit(
               committedDate = project1DatasetCreationDate,
-              committer     = Person(addedToProject1.agent.name, addedToProject1.agent.email)
+              committer     = Person(addedToProject1.agent.name, addedToProject1.agent.maybeEmail)
             )(
               project1.path,
               project1.name
@@ -310,7 +310,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             dataSetCommit( // to simulate adding the same data-set to another project
               commitId      = project2DatasetCommit,
               committedDate = project2DatasetCommitDate,
-              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
             )(
               project2.path,
               project2.name
@@ -327,7 +327,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             dataSetCommit( // to simulate forking project2
               commitId      = project2DatasetCommit,
               committedDate = project2DatasetCommitDate,
-              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
             )(
               project2Fork.path,
               project2Fork.name
@@ -373,7 +373,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           loadToStore(
             dataSetCommit(
               committedDate = project1DatasetCreationDate,
-              committer     = Person(addedToProject1.agent.name, addedToProject1.agent.email)
+              committer     = Person(addedToProject1.agent.name, addedToProject1.agent.maybeEmail)
             )(
               project1.path,
               project1.name
@@ -390,7 +390,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             dataSetCommit( // to simulate adding first project's data-set to another project
               commitId      = project2DatasetCommit,
               committedDate = project2DatasetCommitDate,
-              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
             )(
               project2.path,
               project2.name
@@ -407,7 +407,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             dataSetCommit( // to simulate forking project2
               commitId      = project2DatasetCommit,
               committedDate = project2DatasetCommitDate,
-              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.email)
+              committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
             )(
               project2Fork.path,
               project2Fork.name
@@ -446,7 +446,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             dataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
-              committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+              committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
             )(
               sourceProject.path,
               sourceProject.name
@@ -463,7 +463,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             dataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
-              committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+              committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
             )(
               forkProject.path,
               forkProject.name
@@ -501,7 +501,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             dataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
-              committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+              committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
             )(
               sourceProject.path,
               sourceProject.name
@@ -518,7 +518,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             dataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
-              committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+              committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
             )(
               forkProject.path,
               forkProject.name
@@ -554,7 +554,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           val grandparentProjectDataSet = dataSetCommit(
             commitId      = commitId,
             committedDate = datasetCreationDate,
-            committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+            committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
           )(
             grandparentProject.path,
             grandparentProject.name
@@ -571,7 +571,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           val parentProjectDataSet = dataSetCommit(
             commitId      = commitId,
             committedDate = datasetCreationDate,
-            committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+            committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
           )(
             parentProject.path,
             parentProject.name
@@ -591,7 +591,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             dataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
-              committer     = Person(addedToProject.agent.name, addedToProject.agent.email)
+              committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
             )(
               childProject.path,
               childProject.name
@@ -849,7 +849,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       case project +: Nil =>
         dataSetCommit(
           committedDate = CommittedDate(project.created.date.value),
-          committer     = Person(project.created.agent.name, project.created.agent.email)
+          committer     = Person(project.created.agent.name, project.created.agent.maybeEmail)
         )(
           projectPath = project.path,
           projectName = project.name

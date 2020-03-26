@@ -16,20 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
+import PersonDetailsUpdater.{Person => UpdatePerson}
 import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.users.{Affiliation, Email, Id, Name}
+import ch.datascience.graph.model.users.{Affiliation, Email, Name, ResourceId}
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.PersonDetailsUpdater.{Person => UpdatePerson, _}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import eu.timepit.refined.auto._
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root
@@ -48,10 +50,10 @@ class PersonDetailsUpdaterSpec extends WordSpec {
 
     "remove properties from all the Person entities found in the given Json except those which id starts with '_'" +
       "and create SPARQL updates for them" in new TestCase {
-      val projectCreatorName  = names.generateOne
-      val projectCreatorEmail = emails.generateOne
-      val committerName       = names.generateOne
-      val committerEmail      = emails.generateOne
+      val projectCreatorName  = userNames.generateOne
+      val projectCreatorEmail = userEmails.generateOne
+      val committerName       = userNames.generateOne
+      val committerEmail      = userEmails.generateOne
       val datasetCreatorsSet = nonEmptyList(entities.Person.persons, minElements = 5, maxElements = 10)
         .retryUntil(atLeastOneWithoutEmail)
         .generateOne
@@ -78,7 +80,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
       curatedPersons.filter(blankIds)    shouldBe allPersons.filter(blankIds)
       curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
 
-      curatedTriples.updates should contain theSameElementsAs prepareUpdates(
+      curatedTriples.updates should contain theSameElementsAs updatesCreator.prepareUpdates(
         (
           datasetCreatorsSet.map(maybeUpdatePerson) +
             maybeUpdatePerson(entities.Person(projectCreatorName, projectCreatorEmail)) +
@@ -89,9 +91,11 @@ class PersonDetailsUpdaterSpec extends WordSpec {
   }
 
   private trait TestCase {
+    implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
     implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
-    val curator = new PersonDetailsUpdater[Try]()
+    val updatesCreator = new UpdatesCreator
+    val curator        = new PersonDetailsUpdater[Try](updatesCreator)
   }
 
   private implicit class TriplesOps(triples: JsonLDTriples) {
@@ -102,7 +106,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
         root.`@type`.each.string.getAll(json) match {
           case types if types.contains("http://schema.org/Person") =>
             collected add Person(
-              root.`@id`.as[Id].getOption(json).getOrElse(fail("Person '@id' not found")),
+              root.`@id`.as[ResourceId].getOption(json).getOrElse(fail("Person '@id' not found")),
               extractValue[Name]("http://schema.org/name")(json).headOption,
               extractValue[Email]("http://schema.org/email")(json).headOption,
               extractValue[Affiliation]("http://schema.org/affiliation")(json).headOption
@@ -118,7 +122,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
       root.selectDynamic(property).each.`@value`.as[T].getAll(json)
   }
 
-  private case class Person(id:               Id,
+  private case class Person(id:               ResourceId,
                             maybeName:        Option[Name],
                             maybeEmail:       Option[Email],
                             maybeAffiliation: Option[Affiliation])
@@ -126,7 +130,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
   private lazy val maybeUpdatePerson: entities.Person => Option[UpdatePerson] = { person =>
     person.maybeEmail map { email =>
       val entityId = person.asJsonLD.entityId getOrElse (throw new Exception(s"Cannot find entity id for $person"))
-      UpdatePerson(Id(entityId.toString), Set(person.name), Set(email))
+      UpdatePerson(ResourceId(entityId.toString), Set(person.name), Set(email))
     }
   }
 

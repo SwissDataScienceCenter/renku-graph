@@ -21,6 +21,7 @@ package ch.datascience.webhookservice.missedevents
 import cats.MonadError
 import cats.effect._
 import cats.implicits._
+import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
@@ -29,7 +30,6 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.tokenrepository.{IOAccessTokenFinder, TokenRepositoryUrl}
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.webhookservice.commits.IOLatestCommitFinder
-import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
 import ch.datascience.webhookservice.project.IOProjectInfoFinder
 
