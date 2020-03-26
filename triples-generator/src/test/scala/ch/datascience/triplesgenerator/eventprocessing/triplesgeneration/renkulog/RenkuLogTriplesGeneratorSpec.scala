@@ -324,7 +324,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent, maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe "Triples generation failed"
       actual.getCause   shouldBe exception

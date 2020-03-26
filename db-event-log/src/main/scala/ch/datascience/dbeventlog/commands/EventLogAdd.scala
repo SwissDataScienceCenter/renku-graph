@@ -20,13 +20,16 @@ package ch.datascience.dbeventlog.commands
 
 import java.time.Instant
 
+import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
 import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.EventStatus.{New, Processing, RecoverableFailure}
 import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventStatus}
 import ch.datascience.graph.model.events._
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
+import doobie.util.fragments.in
 
 import scala.language.higherKinds
 
@@ -39,18 +42,38 @@ class EventLogAdd[Interpretation[_]](
     insertIfNotDuplicate(commitEvent, eventBody).transact(transactor.get)
 
   private def insertIfNotDuplicate(commitEvent: CommitEvent, eventBody: EventBody) =
+    checkIfInLog(commitEvent) flatMap {
+      case Some(_) => Free.pure[ConnectionOp, Unit](())
+      case None    => addToLog(commitEvent, eventBody)
+    }
+
+  private def addToLog(commitEvent: CommitEvent, eventBody: EventBody) =
     for {
-      maybeEventId <- checkIfExists(commitEvent)
-      _            <- if (maybeEventId.isEmpty) insert(commitEvent, eventBody) else Free.pure[ConnectionOp, Unit](())
+      updatedCommitEvent <- eventuallyAddToExistingBatch(commitEvent)
+      _                  <- insert(updatedCommitEvent, eventBody)
     } yield ()
 
-  private def checkIfExists(commitEvent: CommitEvent) =
-    sql"""
-         |select event_id 
-         |from event_log 
-         |where event_id = ${commitEvent.id} and project_id = ${commitEvent.project.id}""".stripMargin
+  private def eventuallyAddToExistingBatch(commitEvent: CommitEvent) = findBatchInQueue(commitEvent) map {
+    case Some(batchDateUnderProcessing) => commitEvent.copy(batchDate = batchDateUnderProcessing)
+    case _                              => commitEvent
+  }
+
+  private def checkIfInLog(commitEvent: CommitEvent) =
+    sql"""|select event_id 
+          |from event_log 
+          |where event_id = ${commitEvent.id} and project_id = ${commitEvent.project.id}""".stripMargin
       .query[String]
       .option
+
+  // format: off
+  private def findBatchInQueue(commitEvent: CommitEvent) = { fr"""
+    select batch_date 
+    from event_log 
+    where project_id = ${commitEvent.project.id} and """ ++ `status IN`(New, RecoverableFailure, Processing) ++ fr"""
+    order by batch_date desc
+    limit 1"""
+    }.query[BatchDate].option
+  // format: on
 
   private def insert(commitEvent: CommitEvent, eventBody: EventBody) = {
     import commitEvent._
@@ -60,6 +83,9 @@ class EventLogAdd[Interpretation[_]](
           values ($id, ${project.id}, ${project.path}, ${EventStatus.New: EventStatus}, $currentTime, $currentTime, $committedDate, $batchDate, $eventBody)
       """.update.run.map(_ => ())
   }
+
+  private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
+    in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
 }
 
 class IOEventLogAdd(
