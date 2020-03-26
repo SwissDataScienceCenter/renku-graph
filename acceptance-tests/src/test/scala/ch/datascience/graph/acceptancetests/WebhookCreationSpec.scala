@@ -20,13 +20,17 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
+import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Visibility.Public
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
 import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.Matchers._
@@ -56,7 +60,8 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
 
     scenario("No Graph Services webhook on the project in GitLab") {
 
-      val projectId = projectIds.generateOne
+      val project   = projects.generateOne
+      val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
       Given("project is present in GitLab")
@@ -68,8 +73,15 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
       Given("project creation in GitLab returning CREATED")
       `POST <gitlab>/api/v4/projects/:id/hooks returning CREATED`(projectId)
 
-      Given("some Commit for the project exists in GitLab")
-      `GET <gitlab>/api/v4/projects/:id/repository/commits returning OK with a commit`(projectId)
+      Given("some Commit exists for the project in GitLab")
+      givenAccessTokenPresentFor(project)
+      val commitId = commitIds.generateOne
+      `GET <gitlab>/api/v4/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
+      `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
+
+      // making the triples generation be happy and not throwing exceptions to the logs
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
       When("user does POST webhook-service/projects/:id/webhooks")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks", Some(accessToken))

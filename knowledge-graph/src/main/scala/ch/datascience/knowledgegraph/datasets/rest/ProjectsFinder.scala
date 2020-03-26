@@ -56,7 +56,7 @@ private class ProjectsFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX prov: <http://www.w3.org/ns/prov#>"
     ),
-    s"""|SELECT ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
+    s"""|SELECT ?projectId ?projectName ?minDateCreated ?maybeAgentEmail ?agentName
         |WHERE {
         |  {
         |    SELECT ?l0 ?projectId (MIN(?dateCreated) AS ?minDateCreated)
@@ -135,11 +135,11 @@ private class ProjectsFinder(
         |    ?projectId rdf:type <http://schema.org/Project> ;
         |               schema:name ?projectName .
         |    ?agentId rdf:type <http://schema.org/Person> ;
-        |             schema:email ?agentEmail ;
-        |             schema:name ?agentName .
+        |             schema:name ?agentName.
+        |    OPTIONAL { ?agentId schema:email ?maybeAgentEmail }
         |  }
         |}
-        |GROUP BY ?projectId ?projectName ?minDateCreated ?agentEmail ?agentName
+        |GROUP BY ?projectId ?projectName ?minDateCreated ?maybeAgentEmail ?agentName
         |ORDER BY ASC(?projectName)
         |""".stripMargin
   )
@@ -161,12 +161,12 @@ private object ProjectsFinder {
 
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
-        path        <- cursor.downField("projectId").downField("value").as[ResourceId].flatMap(toProjectPath)
-        name        <- cursor.downField("projectName").downField("value").as[projects.Name]
-        dateCreated <- cursor.downField("minDateCreated").downField("value").as[DateCreatedInProject]
-        agentEmail  <- cursor.downField("agentEmail").downField("value").as[Email]
-        agentName   <- cursor.downField("agentName").downField("value").as[UserName]
-      } yield DatasetProject(path, name, AddedToProject(dateCreated, DatasetAgent(agentEmail, agentName)))
+        path            <- cursor.downField("projectId").downField("value").as[ResourceId].flatMap(toProjectPath)
+        name            <- cursor.downField("projectName").downField("value").as[projects.Name]
+        dateCreated     <- cursor.downField("minDateCreated").downField("value").as[DateCreatedInProject]
+        maybeAgentEmail <- cursor.downField("maybeAgentEmail").downField("value").as[Option[Email]]
+        agentName       <- cursor.downField("agentName").downField("value").as[UserName]
+      } yield DatasetProject(path, name, AddedToProject(dateCreated, DatasetAgent(maybeAgentEmail, agentName)))
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetProject])

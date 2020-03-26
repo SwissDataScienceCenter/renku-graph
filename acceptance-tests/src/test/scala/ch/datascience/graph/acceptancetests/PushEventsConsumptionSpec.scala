@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import ch.datascience.dbeventlog.EventStatus
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -27,8 +28,9 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
-import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.http.client.AccessToken
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.literal._
 import org.http4s.Status._
@@ -58,18 +60,20 @@ class PushEventsConsumptionSpec
       // making the triples generation be happy and not throwing exceptions to the logs
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
+      And("project exists in GitLab")
+      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+
       And("access token is present")
       givenAccessTokenPresentFor(project)
 
       When("user does POST webhook-service/webhooks/events happens")
-      val payload  = json"""
-        {
-          "after": ${commitId.value},
-          "project": {
-            "id":                  ${projectId.value},
-            "path_with_namespace": ${project.path.value}
-          }
-        }"""
+      val payload  = json"""{
+        "after": ${commitId.value},
+        "project": {
+          "id":                  ${projectId.value},
+          "path_with_namespace": ${project.path.value}
+        }
+      }"""
       val response = webhookServiceClient.POST("webhooks/events", HookToken(projectId), payload)
 
       Then("he should get ACCEPTED response back")
@@ -82,7 +86,8 @@ class PushEventsConsumptionSpec
 
       // wait for the Event Log to be emptied
       eventually {
-        EventLog.findEvents(projectId, status = New) shouldBe List.empty
+        EventLog.findEvents(projectId, status = New)                    shouldBe empty
+        EventLog.findEvents(projectId, status = EventStatus.Processing) shouldBe empty
       }
     }
   }

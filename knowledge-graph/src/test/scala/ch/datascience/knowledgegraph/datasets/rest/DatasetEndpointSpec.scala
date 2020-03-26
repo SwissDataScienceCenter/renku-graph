@@ -186,8 +186,8 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val datasetInProjectCreationDecoder: Decoder[AddedToProject] = (cursor: HCursor) =>
     for {
-      date       <- cursor.downField("dateCreated").as[DateCreatedInProject]
-      agentEmail <- cursor.downField("agent").downField("email").as[Email]
-      agentName  <- cursor.downField("agent").downField("name").as[UserName]
-    } yield AddedToProject(date, DatasetAgent(agentEmail, agentName))
+      date            <- cursor.downField("dateCreated").as[DateCreatedInProject]
+      maybeAgentEmail <- cursor.downField("agent").downField("email").as[Option[Email]]
+      agentName       <- cursor.downField("agent").downField("name").as[UserName]
+    } yield AddedToProject(date, DatasetAgent(maybeAgentEmail, agentName))
 }

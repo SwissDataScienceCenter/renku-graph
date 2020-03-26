@@ -40,7 +40,7 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.{forkings, parentProjects, projects => projectsGen}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
@@ -63,13 +63,16 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
 
-    val project = projectsGen.generateOne.copy(
-      maybeDescription = projectDescriptions.generateSome,
-      forking          = forkings.generateOne.copy(maybeParent = parentProjects.generateSome)
-    )
+    val project = {
+      val initProject = projects.generateOne
+      initProject.copy(
+        maybeDescription = projectDescriptions.generateSome,
+        forking          = initProject.forking.copy(maybeParent = None)
+      )
+    }
     val dataset1CommitId = commitIds.generateOne
     val dataset1Creation = addedToProject.generateOne.copy(
-      agent = DatasetAgent(project.created.creator.email, project.created.creator.name)
+      agent = DatasetAgent(project.created.creator.maybeEmail, project.created.creator.name)
     )
     val dataset1 = datasets.generateOne.copy(
       maybeDescription = Some(datasetDescriptions.generateOne),
@@ -91,13 +94,13 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         dataSetCommit(
           commitId      = dataset1CommitId,
           committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.email),
+          committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail),
           schemaVersion = currentSchemaVersion
         )(
           projectPath        = project.path,
           projectName        = project.name,
           projectDateCreated = project.created.date,
-          projectCreator     = Person(project.created.creator.name, project.created.creator.email)
+          projectCreator     = Person(project.created.creator.name, project.created.creator.maybeEmail)
         )(
           datasetIdentifier         = dataset1.id,
           datasetName               = dataset1.name,
@@ -110,13 +113,13 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         dataSetCommit(
           commitId      = dataset2CommitId,
           committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.email),
+          committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
           schemaVersion = currentSchemaVersion
         )(
           projectPath        = project.path,
           projectName        = project.name,
           projectDateCreated = project.created.date,
-          projectCreator     = Person(project.created.creator.name, project.created.creator.email)
+          projectCreator     = Person(project.created.creator.name, project.created.creator.maybeEmail)
         )(
           datasetIdentifier         = dataset2.id,
           datasetName               = dataset2.name,
@@ -128,12 +131,12 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         )
       )
 
-      `data in the RDF store`(project.toGitLabProject(), dataset1CommitId, jsonLDTriples)
+      `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
 
       `triples updates run`(
-        List(dataset1, dataset2)
-          .flatMap(_.published.creators.flatMap(_.maybeEmail))
-          .toSet + dataset1Creation.agent.email + dataset2Creation.agent.email + project.created.creator.email
+        (List(dataset1, dataset2)
+          .flatMap(_.published.creators.map(_.maybeEmail))
+          .toSet + dataset1Creation.agent.maybeEmail + dataset2Creation.agent.maybeEmail + project.created.creator.maybeEmail).flatten
       )
 
       And("the project exists in GitLab")
@@ -186,17 +189,17 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
       val text             = nonBlankStrings(minLength = 10).generateOne
-      val dataset1Projects = nonEmptyList(projectsGen).generateOne.toList
+      val dataset1Projects = nonEmptyList(projects).generateOne.toList
       val dataset1 = datasets.generateOne.copy(
         name     = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
         projects = dataset1Projects map toDatasetProject
       )
-      val dataset2Projects = nonEmptyList(projectsGen).generateOne.toList
+      val dataset2Projects = nonEmptyList(projects).generateOne.toList
       val dataset2 = datasets.generateOne.copy(
         maybeDescription = Some(sentenceContaining(text).map(_.value).map(Description.apply).generateOne),
         projects         = dataset2Projects map toDatasetProject
       )
-      val dataset3Projects = nonEmptyList(projectsGen).generateOne.toList
+      val dataset3Projects = nonEmptyList(projects).generateOne.toList
       val dataset3 = {
         val dataset = datasets.generateOne
         dataset.copy(
@@ -209,7 +212,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           projects = dataset3Projects map toDatasetProject
         )
       }
-      val dataset4Projects = List(projectsGen.generateOne)
+      val dataset4Projects = List(projects.generateOne)
       val dataset4 = datasets.generateOne.copy(
         projects = dataset4Projects map toDatasetProject
       )
@@ -283,13 +286,13 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       val commitId      = commitIds.generateOne
       val committedDate = committedDates.generateOne
       val datasetJsonLD = toDataSetCommit(firstProject, commitId, committedDate, dataset)
-      `data in the RDF store`(firstProject.toGitLabProject(), commitId, datasetJsonLD)
+      `data in the RDF store`(firstProject, commitId, datasetJsonLD)
       `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
 
       otherProjects foreach { project =>
         val commitId = commitIds.generateOne
         `data in the RDF store`(
-          project.toGitLabProject(),
+          project,
           commitId,
           toDataSetCommit(project,
                           commitId,
@@ -332,12 +335,11 @@ object DatasetsResources {
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
-  def briefJson(dataset: Dataset): Json = json"""
-    {
-      "identifier": ${dataset.id.value}, 
-      "name": ${dataset.name.value},
-      "sameAs": ${dataset.sameAs.value}
-    }""" deepMerge {
+  def briefJson(dataset: Dataset): Json = json"""{
+    "identifier": ${dataset.id.value}, 
+    "name": ${dataset.name.value},
+    "sameAs": ${dataset.sameAs.value}
+  }""" deepMerge {
     _links(
       Link(Rel("details"), Href(renkuResourcesUrl / "datasets" / dataset.id))
     )

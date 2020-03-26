@@ -18,10 +18,11 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.generators.CommonGraphGenerators.emails
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.users.{Email, ResourceId}
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes.constraints.NonBlank
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
@@ -89,5 +90,28 @@ class EmailSpec extends WordSpec with ScalaCheckPropertyChecks {
       beforeAt <- beforeAts
       afterAt  <- nonEmptyStrings()
     } yield s"$beforeAt@$afterAt"
+  }
+}
+
+class UsersResourceIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  import ch.datascience.rdfstore.SparqlValueEncoder._
+
+  "showAs[RdfResource]" should {
+
+    "wrap the ResourceId in <> if the id doesn't contain email" in {
+      forAll(userResourceIds(maybeEmail = None)) { resourceId =>
+        resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value}>"
+      }
+    }
+
+    "encrypt the local part of the email ResourceId and wrap it in <>" in {
+      forAll { email: Email =>
+        val username   = email.extractUsername.value
+        val resourceId = ResourceId(s"mailto:$email")
+
+        resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value.replace(username, sparqlEncode(username))}>"
+      }
+    }
   }
 }

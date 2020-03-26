@@ -27,9 +27,11 @@ import org.scalacheck.Gen
 
 object CurationGenerators {
 
-  def curatedTriplesObjects(
-      updatesGenerator: Gen[List[Update]] = nonEmptyList(curationUpdates).map(_.toList)
-  ): Gen[CuratedTriples] =
+  implicit lazy val curatedTriplesObjects: Gen[CuratedTriples] = curatedTriplesObjects(
+    nonEmptyList(curationUpdates).map(_.toList)
+  )
+
+  def curatedTriplesObjects(updatesGenerator: Gen[List[Update]]): Gen[CuratedTriples] =
     for {
       triples <- jsonLDTriples
       updates <- updatesGenerator

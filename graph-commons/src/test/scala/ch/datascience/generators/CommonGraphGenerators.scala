@@ -31,7 +31,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
@@ -43,33 +42,10 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import org.scalacheck.Gen
-import org.scalacheck.Gen.{alphaChar, frequency, numChar, oneOf}
 
 import scala.util.Try
 
 object CommonGraphGenerators {
-
-  implicit val usernames:    Gen[Username]    = nonEmptyStrings() map Username.apply
-  implicit val affiliations: Gen[Affiliation] = nonEmptyStrings() map Affiliation.apply
-
-  implicit val emails: Gen[Email] = {
-    val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~".toList))
-    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~.".toList))
-    val beforeAts = for {
-      firstChar  <- firstCharGen
-      otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
-    } yield s"$firstChar${otherChars.toList.mkString("")}"
-
-    for {
-      beforeAt <- beforeAts
-      afterAt  <- nonEmptyStrings()
-    } yield Email(s"$beforeAt@$afterAt")
-  }
-
-  implicit val names: Gen[Name] = for {
-    first  <- nonEmptyStrings()
-    second <- nonEmptyStrings()
-  } yield Name(s"$first $second")
 
   implicit val aesCryptoSecrets: Gen[AesCrypto.Secret] =
     stringsOfLength(16)

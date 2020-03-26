@@ -16,6 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.config
+package ch.datascience.triplesgenerator.eventprocessing
 
-sealed trait GitLab
+import ch.datascience.graph.model.EventsGenerators.{commitIds, projects}
+import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import org.scalacheck.Gen
+
+private object EventProcessingGenerators {
+
+  implicit val commits: Gen[Commit] = for {
+    commitId      <- commitIds
+    project       <- projects
+    maybeParentId <- Gen.option(commitIds)
+  } yield maybeParentId match {
+    case None           => CommitWithoutParent(commitId, project)
+    case Some(parentId) => CommitWithParent(commitId, parentId, project)
+  }
+}

@@ -19,12 +19,12 @@
 package ch.datascience.webhookservice.commits
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import ch.datascience.webhookservice.config.GitLab
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}

@@ -23,6 +23,7 @@ import java.time.Clock
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
+import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
@@ -32,7 +33,6 @@ import ch.datascience.graph.model.events.{BatchDate, CommitEvent, CommitId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder, IOCommitInfoFinder}
-import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.startcommit.CommitEventsSourceBuilder.EventsFlowBuilder
 

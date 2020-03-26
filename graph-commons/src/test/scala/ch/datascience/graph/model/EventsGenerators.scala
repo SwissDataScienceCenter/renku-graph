@@ -34,19 +34,19 @@ object EventsGenerators {
 
   implicit val authors: Gen[Author] = Gen.oneOf(
     usernames map Author.withUsername,
-    emails map Author.withEmail,
+    userEmails map Author.withEmail,
     for {
       username <- usernames
-      email    <- emails
+      email    <- userEmails
     } yield Author(username, email)
   )
 
   implicit val committers: Gen[Committer] = Gen.oneOf(
     usernames map Committer.withUsername,
-    emails map Committer.withEmail,
+    userEmails map Committer.withEmail,
     for {
       username <- usernames
-      email    <- emails
+      email    <- userEmails
     } yield Committer(username, email)
   )
 

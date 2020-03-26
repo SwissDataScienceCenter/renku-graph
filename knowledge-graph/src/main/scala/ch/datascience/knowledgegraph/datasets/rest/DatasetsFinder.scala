@@ -29,7 +29,9 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.tinytypes.constraints.NonNegativeInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -83,7 +85,7 @@ private class IODatasetsFinder(
   }
 
   private def sparqlQuery(maybePhrase: Option[Phrase], sort: Sort.By): SparqlQuery = SparqlQuery(
-    name = "ds free-text search",
+    name = queryName(maybePhrase, "ds free-text search"),
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
@@ -327,7 +329,7 @@ private class IODatasetsFinder(
   )
 
   private def countQuery(maybePhrase: Option[Phrase]): SparqlQuery = SparqlQuery(
-    name = "ds free-text search - count",
+    name = queryName(maybePhrase, "ds free-text search - count"),
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX schema: <http://schema.org/>",
@@ -444,6 +446,12 @@ private class IODatasetsFinder(
     dataset =>
       findCreators(dataset.id)
         .map(creators => dataset.copy(published = dataset.published.copy(creators = creators)))
+
+  private def queryName(maybePhrase: Option[Phrase], name: String Refined NonEmpty): String Refined NonEmpty =
+    maybePhrase match {
+      case Some(phrase) if phrase.value.trim != "*" => name
+      case _                                        => Refined.unsafeApply(s"$name *")
+    }
 }
 
 private object IODatasetsFinder {

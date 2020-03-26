@@ -21,6 +21,7 @@ package ch.datascience.graph.model
 import java.time.Instant
 
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 
@@ -54,6 +55,10 @@ object projects {
     implicit lazy val projectPathConverter: TinyTypeConverter[ResourceId, Path] = {
       case ResourceId(pathExtractor(path)) => Path.from(path)
       case illegalValue                    => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
+    }
+
+    implicit object RdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
+      override def render(value: ResourceId): String = s"<$value>"
     }
   }
 
