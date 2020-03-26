@@ -20,8 +20,8 @@ package ch.datascience.graph.acceptancetests.flows
 
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.tokenRepositoryClient
-import ch.datascience.graph.model.events.Project
 import ch.datascience.http.client.AccessToken
+import ch.datascience.knowledgegraph.projects.model.Project
 import io.circe.syntax._
 import org.http4s.Status._
 import org.scalatest.Assertion

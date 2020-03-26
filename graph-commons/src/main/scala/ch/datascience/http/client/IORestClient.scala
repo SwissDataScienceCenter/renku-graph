@@ -25,7 +25,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.http.client.RestClientError.{MappingError, UnexpectedResponseError}
+import ch.datascience.http.client.RestClientError.{BadRequestException, ConnectivityException, MappingException, UnexpectedResponseException}
 import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -33,6 +33,7 @@ import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
+import org.http4s.Status.BadRequest
 import org.http4s._
 import org.http4s.client.Client
 import org.http4s.client.blaze.BlazeClientBuilder
@@ -119,21 +120,30 @@ abstract class IORestClient[ThrottlingTarget](
 
   private def processResponse[ResultType](request:     Request[IO],
                                           mapResponse: ResponseMapping[ResultType])(response: Response[IO]) =
-    (mapResponse orElse raiseUnexpectedResponseError)(response.status, request, response)
+    (mapResponse orElse raiseBadRequest orElse raiseUnexpectedResponse)(response.status, request, response)
       .recoverWith(mappingError(request, response))
 
-  private def raiseUnexpectedResponseError[T]: PartialFunction[(Status, Request[IO], Response[IO]), IO[T]] = {
+  private def raiseBadRequest[T]: PartialFunction[(Status, Request[IO], Response[IO]), IO[T]] = {
+    case (_, request, response) if response.status == BadRequest =>
+      response
+        .as[String]
+        .flatMap { bodyAsString =>
+          IO.raiseError(BadRequestException(LogMessage(request, response, bodyAsString)))
+        }
+  }
+
+  private def raiseUnexpectedResponse[T]: PartialFunction[(Status, Request[IO], Response[IO]), IO[T]] = {
     case (_, request, response) =>
       response
         .as[String]
         .flatMap { bodyAsString =>
-          IO.raiseError(UnexpectedResponseError(LogMessage(request, response, bodyAsString)))
+          IO.raiseError(UnexpectedResponseException(LogMessage(request, response, bodyAsString)))
         }
   }
 
   private def mappingError[T](request: Request[IO], response: Response[IO]): PartialFunction[Throwable, IO[T]] = {
     case error: RestClientError => IO.raiseError(error)
-    case NonFatal(cause) => IO.raiseError(MappingError(LogMessage(request, response, cause), cause))
+    case NonFatal(cause) => IO.raiseError(MappingException(LogMessage(request, response, cause), cause))
   }
 
   private def connectionError[T](httpClient:  Client[IO],
@@ -148,7 +158,7 @@ abstract class IORestClient[ThrottlingTarget](
           logger.warn(LogMessage(request.request, s"timed out -> retrying attempt $attempt", exception))
           timer.sleep(retryInterval) *> callRemote(httpClient, request, mapResponse, attempt + 1)
         case other =>
-          throttler.release *> IO.raiseError(new Exception(LogMessage(request.request, other), other))
+          throttler.release *> IO.raiseError(ConnectivityException(LogMessage(request.request, other), other))
       }
   }
 

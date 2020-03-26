@@ -18,19 +18,20 @@
 
 package ch.datascience.http.client
 
-trait RestClientError extends Exception
+sealed trait RestClientError extends Exception
 
 object RestClientError {
 
-  final case class UnexpectedResponseError(
-      message: String
-  ) extends Exception(message)
+  final case class UnexpectedResponseException(message: String) extends Exception(message) with RestClientError
+
+  final case class BadRequestException(message: String) extends Exception(message) with RestClientError
+
+  final case class ConnectivityException(message: String, cause: Throwable)
+      extends Exception(message, cause)
       with RestClientError
 
-  final case class MappingError(
-      message: String,
-      cause:   Throwable
-  ) extends Exception(message, cause)
+  final case class MappingException(message: String, cause: Throwable)
+      extends Exception(message, cause)
       with RestClientError
 
   final case object UnauthorizedException extends RuntimeException("Unauthorized") with RestClientError

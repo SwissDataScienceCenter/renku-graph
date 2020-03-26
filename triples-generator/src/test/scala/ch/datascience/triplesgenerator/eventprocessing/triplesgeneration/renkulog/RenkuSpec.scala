@@ -24,11 +24,9 @@ import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.Commit
-import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Renku
-import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -95,14 +93,5 @@ class RenkuSpec extends WordSpec {
         blocking(Thread sleep (renkuLogTimeout.value * 10).toMillis)
         CommandResult(exitCode = 0, chunks = Nil)
       }
-  }
-
-  private val commits: Gen[Commit] = for {
-    commitId      <- commitIds
-    project       <- projects
-    maybeParentId <- Gen.option(commitIds)
-  } yield maybeParentId match {
-    case None           => CommitWithoutParent(commitId, project)
-    case Some(parentId) => CommitWithParent(commitId, parentId, project)
   }
 }

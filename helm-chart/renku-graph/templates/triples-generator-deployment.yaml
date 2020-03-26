@@ -28,6 +28,8 @@ spec:
           env:
             - name: RENKU_DOMAIN
               value: {{ .Values.global.renku.domain }}
+            - name: RENKU_BASE_URL
+              value: https://{{ .Values.global.renku.domain }}
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: EVENT_LOG_POSTGRES_HOST

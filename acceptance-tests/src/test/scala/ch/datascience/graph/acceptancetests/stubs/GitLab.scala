@@ -18,24 +18,34 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.GraphModelGenerators.userEmails
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.knowledgegraph.projects.model.Permissions._
-import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project => ProjectMetadata}
-import com.github.tomakehurst.wiremock.client.MappingBuilder
+import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project}
+import ch.datascience.logging.IOLogger
+import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 import io.circe.literal._
+import org.slf4j.LoggerFactory
 
 object GitLab {
+
+  private val logger = new IOLogger(LoggerFactory.getLogger("test"))
+  private val port: Int Refined Positive = 2048
 
   def `GET <gitlab>/api/v4/projects/:id returning OK`(
       projectId:          Id,
@@ -43,12 +53,11 @@ object GitLab {
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
-        .willReturn(okJson(json"""
-          {
-            "id":                  ${projectId.value}, 
-            "visibility":          ${projectVisibility.value}, 
-            "path_with_namespace": ${relativePaths(minSegments = 2, maxSegments = 2).generateOne}
-          }""".noSpaces))
+        .willReturn(okJson(json"""{
+          "id":                  ${projectId.value}, 
+          "visibility":          ${projectVisibility.value}, 
+          "path_with_namespace": ${relativePaths(minSegments = 2, maxSegments = 2).generateOne}
+        }""".noSpaces))
     }
     ()
   }
@@ -85,17 +94,18 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:id/repository/commits returning OK with a commit`(
-      projectId:          Id
+      projectId:          Id,
+      commitId:           CommitId
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits?per_page=1").withAccessTokenInHeader
         .willReturn(okJson(json"""[
           {
-            "id":              ${commitIds.generateOne.value},
+            "id":              ${commitId.value},
             "author_name":     ${nonEmptyStrings().generateOne},
-            "author_email":    ${emails.generateOne.value},
+            "author_email":    ${userEmails.generateOne.value},
             "committer_name":  ${nonEmptyStrings().generateOne},
-            "committer_email": ${emails.generateOne.value},
+            "committer_email": ${userEmails.generateOne.value},
             "message":         ${nonEmptyStrings().generateOne},
             "committed_date":  ${committedDates.generateOne.value.toString},
             "parent_ids":      []
@@ -112,18 +122,16 @@ object GitLab {
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits/$commitId").withAccessTokenInHeader
-        .willReturn(okJson(json"""
-          {
-            "id":              ${commitId.value},
-            "author_name":     ${nonEmptyStrings().generateOne},
-            "author_email":    ${emails.generateOne.value},
-            "committer_name":  ${nonEmptyStrings().generateOne},
-            "committer_email": ${emails.generateOne.value},
-            "message":         ${nonEmptyStrings().generateOne},
-            "committed_date":  ${committedDates.generateOne.value.toString},
-            "parent_ids":      ${parentIds.map(_.value).toList}
-          }                         
-        """.noSpaces))
+        .willReturn(okJson(json"""{
+          "id":              ${commitId.value},
+          "author_name":     ${nonEmptyStrings().generateOne},
+          "author_email":    ${userEmails.generateOne.value},
+          "committer_name":  ${nonEmptyStrings().generateOne},
+          "committer_email": ${userEmails.generateOne.value},
+          "message":         ${nonEmptyStrings().generateOne},
+          "committed_date":  ${committedDates.generateOne.value.toString},
+          "parent_ids":      ${parentIds.map(_.value).toList}
+        }""".noSpaces))
     }
     ()
   }
@@ -148,15 +156,13 @@ object GitLab {
   }
 
   def `GET <gitlab>/api/v4/projects/:path returning OK with`(
-      project:            ProjectMetadata,
+      project:            Project,
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
 
     implicit class ParentProjectOps(parent: ParentProject) {
       lazy val toJson: Json = json"""{
-        "id":                  ${parent.id.value},
-        "path_with_namespace": ${parent.path.value},
-        "name":                ${parent.name.value}
+        "path_with_namespace": ${parent.path.value}
       }"""
     }
 
@@ -182,23 +188,27 @@ object GitLab {
     }
 
     val queryParams = if (withStatistics) "?statistics=true" else ""
+    val creatorId: Int Refined Positive = positiveInts().generateOne
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}$queryParams").withAccessTokenInHeader
         .willReturn(
           okJson(
             json"""{
-              "id":               ${project.id.value},
-              "description":      ${project.maybeDescription.map(_.value)},
-              "visibility":       ${project.visibility.value},
-              "ssh_url_to_repo":  ${project.urls.ssh.value},
-              "http_url_to_repo": ${project.urls.http.value},
-              "web_url":          ${project.urls.web.value},
-              "readme_url":       ${project.urls.readme.value},
-              "forks_count":      ${project.forking.forksCount.value},
-              "tag_list":         ${project.tags.map(_.value).toList},
-              "star_count":       ${project.starsCount.value},
-              "last_activity_at": ${project.updatedAt.value},
-              "permissions":      ${project.permissions.toJson},
+              "id":                   ${project.id.value},
+              "description":          ${project.maybeDescription.map(_.value)},
+              "visibility":           ${project.visibility.value},
+              "path_with_namespace":  ${project.path.value},
+              "ssh_url_to_repo":      ${project.urls.ssh.value},
+              "http_url_to_repo":     ${project.urls.http.value},
+              "web_url":              ${project.urls.web.value},
+              "readme_url":           ${project.urls.readme.value},
+              "forks_count":          ${project.forking.forksCount.value},
+              "tag_list":             ${project.tags.map(_.value).toList},
+              "star_count":           ${project.starsCount.value},
+              "creator_id":           ${creatorId.value},
+              "created_at":           ${project.created.date.value},
+              "last_activity_at":     ${project.updatedAt.value},
+              "permissions":          ${project.permissions.toJson},
               "statistics": {
                 "commit_count":       ${project.statistics.commitsCount.value},
                 "storage_size":       ${project.statistics.storageSize.value},
@@ -216,6 +226,16 @@ object GitLab {
           )
         )
     }
+
+    stubFor {
+      get(s"/api/v4/users/$creatorId").withAccessTokenInHeader
+        .willReturn(
+          okJson(json"""{
+            "name":         ${project.created.creator.name.value},
+            "public_email": ${project.created.creator.maybeEmail.map(_.value)}
+          }""".noSpaces)
+        )
+    }
     ()
   }
 
@@ -225,4 +245,21 @@ object GitLab {
       case OAuthAccessToken(token)    => builder.withHeader("Authorization", equalTo(s"Bearer $token"))
     }
   }
+
+  private val server = {
+    val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port.value))
+    newServer.start()
+    WireMock.configureFor(newServer.port())
+    logger.info(s"GitLab stub started")
+    newServer
+  }
+
+  def shutdown(): Unit = {
+    server.stop()
+    server.shutdownServer()
+    logger.info(s"GitLab stub stopped")
+    ()
+  }
+
+  lazy val externalServiceBaseUrl: String = s"http://localhost:${server.port()}"
 }

@@ -33,9 +33,9 @@ import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
 import io.chrisdavenport.log4cats.Logger
@@ -76,25 +76,25 @@ class CommitEventProcessor[Interpretation[_]](
       for {
         commits          <- deserialiseToCommitEvents(eventBody)
         maybeAccessToken <- findAccessToken(commits.head.project.id) recoverWith rollback(commits.head)
-        uploadingResults <- allToTriplesAndUpload(commits, maybeAccessToken)
+        uploadingResults <- allToTriplesAndUpload(commits)(maybeAccessToken)
       } yield uploadingResults
     } flatMap logSummary recoverWith logEventProcessingError(eventBody)
 
   private def allToTriplesAndUpload(
-      commits:          NonEmptyList[Commit],
-      maybeAccessToken: Option[AccessToken]
-  ): Interpretation[NonEmptyList[UploadingResult]] =
+      commits:                 NonEmptyList[Commit]
+  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[NonEmptyList[UploadingResult]] =
     commits
-      .map(toTriplesAndUpload(_, maybeAccessToken))
+      .map(toTriplesAndUpload)
       .sequence
       .flatMap(updateEventLog)
 
-  private def toTriplesAndUpload(commit:           Commit,
-                                 maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
+  private def toTriplesAndUpload(
+      commit:                  Commit
+  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
-      rawTriples     <- generateTriples(commit, maybeAccessToken)
-      curatedTriples <- EitherT.right[GenerationRecoverableError](curate(rawTriples))
-      result         <- EitherT.right[GenerationRecoverableError](upload(curatedTriples) map toUploadingResult(commit))
+      rawTriples     <- generateTriples(commit)
+      curatedTriples <- curate(commit, rawTriples)
+      result         <- EitherT.right[ProcessingRecoverableError](upload(curatedTriples) map toUploadingResult(commit))
     } yield result
   }.value map (_.fold(toRecoverableError(commit), identity)) recoverWith nonRecoverableFailure(commit)
 
@@ -111,7 +111,7 @@ class CommitEventProcessor[Interpretation[_]](
       NonRecoverableError(commit, error: Throwable)
   }
 
-  private def toRecoverableError(commit: Commit): GenerationRecoverableError => UploadingResult = { error =>
+  private def toRecoverableError(commit: Commit): ProcessingRecoverableError => UploadingResult = { error =>
     logger.error(s"${logMessageCommon(commit)} ${error.message}")
     RecoverableError(commit, error)
   }
@@ -209,7 +209,13 @@ class CommitEventProcessor[Interpretation[_]](
   }
 }
 
+object CommitEventProcessor {
+  trait ProcessingRecoverableError extends Exception { val message: String }
+}
+
 object IOCommitEventProcessor {
+  import ch.datascience.config.GitLab
+  import ch.datascience.control.Throttler
 
   private[triplesgenerator] lazy val eventsProcessingTimesBuilder =
     Histogram
@@ -222,6 +228,7 @@ object IOCommitEventProcessor {
       transactor:          DbTransactor[IO, EventLogDB],
       triplesGenerator:    TriplesGenerator[IO],
       metricsRegistry:     MetricsRegistry[IO],
+      gitLabThrottler:     Throttler[IO, GitLab],
       timeRecorder:        SparqlQueryTimeRecorder[IO]
   )(implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext,
@@ -229,6 +236,7 @@ object IOCommitEventProcessor {
     for {
       uploader              <- IOUploader(ApplicationLogger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(ApplicationLogger)
+      triplesCurator        <- IOTriplesCurator(gitLabThrottler, ApplicationLogger, timeRecorder)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
                                                          maybeHistogram = Some(eventsProcessingTimes))
@@ -236,7 +244,7 @@ object IOCommitEventProcessor {
       new CommitEventsDeserialiser[IO](),
       accessTokenFinder,
       triplesGenerator,
-      IOTriplesCurator(),
+      triplesCurator,
       uploader,
       new IOEventLogMarkDone(transactor),
       new IOEventLogMarkNew(transactor),

@@ -181,9 +181,9 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val creatorDecoder: Decoder[Creator] = cursor =>
     for {
-      name  <- cursor.downField("name").as[UserName]
-      email <- cursor.downField("email").as[Email]
-    } yield Creator(email, name)
+      name       <- cursor.downField("name").as[UserName]
+      maybeEmail <- cursor.downField("email").as[Option[Email]]
+    } yield Creator(maybeEmail, name)
 
   private implicit lazy val forkingDecoder: Decoder[Forking] = cursor =>
     for {
@@ -193,10 +193,10 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val parentDecoder: Decoder[ParentProject] = cursor =>
     for {
-      id   <- cursor.downField("identifier").as[Id]
-      path <- cursor.downField("path").as[Path]
-      name <- cursor.downField("name").as[Name]
-    } yield ParentProject(id, path, name)
+      path    <- cursor.downField("path").as[Path]
+      name    <- cursor.downField("name").as[Name]
+      created <- cursor.downField("created").as[Creation]
+    } yield ParentProject(path, name, created)
 
   private implicit lazy val urlsDecoder: Decoder[Urls] = cursor =>
     for {

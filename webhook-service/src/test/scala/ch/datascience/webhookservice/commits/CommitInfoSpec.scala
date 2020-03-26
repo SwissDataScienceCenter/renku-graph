@@ -18,9 +18,9 @@
 
 package ch.datascience.webhookservice.commits
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{Author, Committer}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators.commitInfos
 import io.circe.literal._
@@ -70,8 +70,8 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "decode valid JSON with blank usernames to a CommitInfo object" in {
       val commitInfo     = commitInfos.generateOne
-      val authorEmail    = emails.generateOne
-      val committerEmail = emails.generateOne
+      val authorEmail    = userEmails.generateOne
+      val committerEmail = userEmails.generateOne
       json"""{
         "id":              ${commitInfo.id.value},
         "author_name":     ${blankStrings().generateOne},
@@ -118,7 +118,7 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
         "author_name":     ${blankStrings().generateOne},
         "author_email":    ${blankStrings().generateOne},
         "committer_name":  ${usernames.generateOne.value},
-        "committer_email": ${emails.generateOne.value},
+        "committer_email": ${userEmails.generateOne.value},
         "message":         ${commitInfo.message.value},
         "committed_date":  ${commitInfo.committedDate.value},
         "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
@@ -133,7 +133,7 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
       val Left(exception) = json"""{
         "id":              ${commitInfo.id.value},
         "author_name":     ${usernames.generateOne.value},
-        "author_email":    ${emails.generateOne.value},
+        "author_email":    ${userEmails.generateOne.value},
         "committer_name":  ${blankStrings().generateOne},
         "committer_email": ${blankStrings().generateOne},
         "message":         ${commitInfo.message.value},

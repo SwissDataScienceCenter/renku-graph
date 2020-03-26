@@ -56,7 +56,14 @@ object model {
     import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
     final class Id private (val value: String) extends AnyVal with StringTinyType
-    object Id extends TinyTypeFactory[Id](new Id(_)) with NonBlank
+    object Id extends TinyTypeFactory[Id](new Id(_)) with NonBlank {
+      import ch.datascience.graph.model.views.RdfResource
+      import ch.datascience.tinytypes.Renderer
+
+      implicit object RdfResourceRenderer extends Renderer[RdfResource, Id] {
+        override def render(value: Id): String = s"<$value>"
+      }
+    }
 
     final class Label private (val value: String) extends AnyVal with StringTinyType
     object Label extends TinyTypeFactory[Label](new Label(_)) with NonBlank
