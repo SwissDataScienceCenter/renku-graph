@@ -35,9 +35,10 @@ class EventLogAddSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
 
   "storeNewEvent" should {
 
-    "add a new event if there is no event with the given id for the given project" in new TestCase {
+    "add a new event if there is no event with the given id for the given project " +
+      "and there's no batch waiting or under processing" in new TestCase {
 
-      // Save 1
+      // storeNewEvent 1
       eventLogAdd.storeNewEvent(commitEvent, eventBody).unsafeRunSync shouldBe ((): Unit)
 
       storedEvent(commitEvent.commitEventId) shouldBe (
@@ -50,7 +51,7 @@ class EventLogAddSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
         None
       )
 
-      // Save 2 - different event id and different project
+      // storeNewEvent 2 - different event id and different project
       val commitEvent2 = commitEvents.generateOne
       val event2Body   = eventBodies.generateOne
       val nowForEvent2 = Instant.now()
@@ -60,6 +61,28 @@ class EventLogAddSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
       save2Event1 shouldBe (commitEvent.commitEventId, ExecutionDate(now), commitEvent.batchDate)
       save2Event2 shouldBe (commitEvent2.commitEventId, ExecutionDate(nowForEvent2), commitEvent2.batchDate)
+    }
+
+    "add a new event if there is no event with the given id for the given project " +
+      "and there's a batch for that project waiting and under processing" in new TestCase {
+
+      // storeNewEvent 1
+      eventLogAdd.storeNewEvent(commitEvent, eventBody).unsafeRunSync shouldBe ((): Unit)
+
+      findEvents(status = New).head shouldBe (
+        commitEvent.commitEventId, ExecutionDate(now), commitEvent.batchDate
+      )
+
+      // storeNewEvent 2 - different event id and batch date but same project
+      val commitEvent2 = commitEvent.copy(id = commitIds.generateOne, batchDate = batchDates.generateOne)
+      val event2Body   = eventBodies.generateOne
+      val nowForEvent2 = Instant.now()
+      currentTime.expects().returning(nowForEvent2)
+      eventLogAdd.storeNewEvent(commitEvent2, event2Body).unsafeRunSync shouldBe ((): Unit)
+
+      val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
+      save2Event1 shouldBe (commitEvent.commitEventId, ExecutionDate(now), commitEvent.batchDate)
+      save2Event2 shouldBe (commitEvent2.commitEventId, ExecutionDate(nowForEvent2), commitEvent.batchDate)
     }
 
     "add a new event if there is another event with the same id but for a different project" in new TestCase {
