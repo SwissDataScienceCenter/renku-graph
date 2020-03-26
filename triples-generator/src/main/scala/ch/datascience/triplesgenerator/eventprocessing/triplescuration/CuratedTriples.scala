@@ -25,4 +25,15 @@ final case class CuratedTriples(triples: JsonLDTriples, updates: List[Update])
 
 object CuratedTriples {
   final case class Update(name: String, query: SparqlQuery)
+
+  implicit class CuratedTriplesOps(curatedTriples: CuratedTriples) {
+
+    def transformTriples(f: JsonLDTriples => JsonLDTriples): CuratedTriples = curatedTriples.copy(
+      triples = f(curatedTriples.triples)
+    )
+
+    def addUpdates(updates: Seq[Update]): CuratedTriples = curatedTriples.copy(
+      updates = curatedTriples.updates ++ updates
+    )
+  }
 }

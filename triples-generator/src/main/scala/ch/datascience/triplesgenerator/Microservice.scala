@@ -22,7 +22,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
+import ch.datascience.config.GitLab
 import ch.datascience.config.sentry.SentryInitializer
+import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
@@ -66,6 +68,8 @@ object Microservice extends IOMicroservice {
         fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
         triplesGeneration        <- TriplesGeneration[IO]()
         metricsRegistry          <- MetricsRegistry()
+        gitLabRateLimit          <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+        gitLabThrottler          <- Throttler[IO, GitLab](gitLabRateLimit)
         sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
         reProvisioning           <- IOReProvisioning(triplesGeneration, transactor, sparqlTimeRecorder)
         triplesGenerator         <- TriplesGenerator(triplesGeneration)
@@ -75,6 +79,7 @@ object Microservice extends IOMicroservice {
         commitEventProcessor <- IOCommitEventProcessor(transactor,
                                                        triplesGenerator,
                                                        metricsRegistry,
+                                                       gitLabThrottler,
                                                        sparqlTimeRecorder)
         eventProcessorRunner <- new EventsSource[IO](DbEventProcessorRunner(_, eventsFetcher))
                                  .withEventsProcessor(commitEventProcessor)

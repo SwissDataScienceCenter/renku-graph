@@ -38,18 +38,13 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
 import org.http4s.Status
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class GitLabProjectFinderSpec
-    extends WordSpec
-    with MockFactory
-    with ExternalServiceStubbing
-    with ScalaCheckPropertyChecks {
+class GitLabProjectFinderSpec extends WordSpec with ExternalServiceStubbing with ScalaCheckPropertyChecks {
 
   "findProject" should {
 
@@ -140,36 +135,27 @@ class GitLabProjectFinderSpec
     val projectFinder = new IOGitLabProjectFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
-  private def projectJson(project: GitLabProject): Json =
-    json"""{
-      "id":               ${project.id.value},
-      "description":      ${project.maybeDescription.map(_.value)},
-      "visibility":       ${project.visibility.value},
-      "ssh_url_to_repo":  ${project.urls.ssh.value},
-      "http_url_to_repo": ${project.urls.http.value},
-      "web_url":          ${project.urls.web.value},
-      "readme_url":       ${project.urls.readme.value},
-      "forks_count":      ${project.forking.forksCount.value},
-      "tag_list":         ${project.tags.map(_.value).toList},
-      "star_count":       ${project.starsCount.value},
-      "last_activity_at": ${project.updatedAt.value},
-      "permissions":      ${toJson(project.permissions)},
-      "statistics": {
-        "commit_count":       ${project.statistics.commitsCount.value},
-        "storage_size":       ${project.statistics.storageSize.value},
-        "repository_size":    ${project.statistics.repositorySize.value},
-        "lfs_objects_size":   ${project.statistics.lsfObjectsSize.value},
-        "job_artifacts_size": ${project.statistics.jobArtifactsSize.value}
-      }
-    }""" deepMerge (project.forking.maybeParent.map {
-      case ParentProject(id, path, name) => json"""{
-        "forked_from_project": {
-          "id":                  ${id.value},
-          "path_with_namespace": ${path.value},
-          "name":                ${name.value}
-        }
-      }"""
-    } getOrElse Json.obj())
+  private def projectJson(project: GitLabProject): Json = json"""{
+    "id":               ${project.id.value},
+    "description":      ${project.maybeDescription.map(_.value)},
+    "visibility":       ${project.visibility.value},
+    "ssh_url_to_repo":  ${project.urls.ssh.value},
+    "http_url_to_repo": ${project.urls.http.value},
+    "web_url":          ${project.urls.web.value},
+    "readme_url":       ${project.urls.readme.value},
+    "forks_count":      ${project.forksCount.value},
+    "tag_list":         ${project.tags.map(_.value).toList},
+    "star_count":       ${project.starsCount.value},
+    "last_activity_at": ${project.updatedAt.value},
+    "permissions":      ${toJson(project.permissions)},
+    "statistics": {
+      "commit_count":       ${project.statistics.commitsCount.value},
+      "storage_size":       ${project.statistics.storageSize.value},
+      "repository_size":    ${project.statistics.repositorySize.value},
+      "lfs_objects_size":   ${project.statistics.lsfObjectsSize.value},
+      "job_artifacts_size": ${project.statistics.jobArtifactsSize.value}
+    }
+  }"""
 
   private lazy val toJson: Permissions => Json = {
     case ProjectAndGroupPermissions(project, group) => json"""{

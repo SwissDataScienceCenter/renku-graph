@@ -21,6 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.startcommit
 import cats.effect._
 import cats.implicits._
 import cats.{Monad, MonadError}
+import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
@@ -29,7 +30,6 @@ import ch.datascience.graph.model.events.CommitEvent
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.commitevent._
 import io.chrisdavenport.log4cats.Logger

@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.effect._
 import cats.implicits._
+import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
@@ -30,7 +31,6 @@ import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.webhookservice.config.GitLab
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook

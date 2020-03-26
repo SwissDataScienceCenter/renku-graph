@@ -16,6 +16,6 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.config
+package ch.datascience.config
 
 sealed trait GitLab

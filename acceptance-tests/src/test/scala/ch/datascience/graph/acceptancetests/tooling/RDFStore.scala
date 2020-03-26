@@ -20,14 +20,18 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
+import ch.datascience.logging.IOLogger
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdfconnection.RDFConnectionFactory
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
 object RDFStore {
+
+  private val logger = new IOLogger(LoggerFactory.getLogger("test"))
 
   private val jenaPort: Int           = 3030
   val fusekiBaseUrl:    FusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$jenaPort")
@@ -74,6 +78,7 @@ object RDFStore {
                     .start()
                 }.start
         _ <- jenaFiber.put(fiber)
+        _ <- logger.info(s"RDF store started")
       } yield ()
 
     def stop(): IO[Unit] = {
@@ -85,6 +90,7 @@ object RDFStore {
           for {
             _           <- fiber.join.map(_.stop())
             cancelToken <- fiber.cancel
+            _           <- logger.info(s"RDF store stopped")
           } yield cancelToken
       }
     }

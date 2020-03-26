@@ -20,9 +20,9 @@ package ch.datascience.graph.model
 
 import java.time.{Clock, Instant, ZoneId}
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.users.Email
 import org.scalatest.Matchers._

@@ -25,7 +25,6 @@ import cats.data.Validated
 import cats.implicits._
 import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
 import ch.datascience.graph.model.users
-import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupAccessLevel, ProjectAccessLevel}
 import ch.datascience.knowledgegraph.projects.model.Statistics._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -36,7 +35,6 @@ import eu.timepit.refined.numeric.Positive
 
 object model {
   import Forking.ForksCount
-  import Permissions.AccessLevel
   import Project._
   import Urls._
 
@@ -67,7 +65,7 @@ object model {
 
   final case class Creation(date: DateCreated, creator: Creator)
 
-  final case class Creator(email: users.Email, name: users.Name)
+  final case class Creator(maybeEmail: Option[users.Email], name: users.Name)
 
   final case class Forking(forksCount: ForksCount, maybeParent: Option[ParentProject])
 
@@ -76,7 +74,7 @@ object model {
     implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt
   }
 
-  final case class ParentProject(id: Id, path: Path, name: Name)
+  final case class ParentProject(path: Path, name: Name, created: Creation)
 
   sealed trait Permissions extends Product with Serializable
 
@@ -135,22 +133,22 @@ object model {
                               jobArtifactsSize: JobArtifactsSize)
 
   object Statistics {
-    final class CommitsCount private (val value: Int) extends AnyVal with IntTinyType
-    implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeInt
+    final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
+    implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong
 
-    final class StorageSize private (val value: Int) extends AnyVal with IntTinyType
-    implicit object StorageSize extends TinyTypeFactory[StorageSize](new StorageSize(_)) with NonNegativeInt
+    final class StorageSize private (val value: Long) extends AnyVal with LongTinyType
+    implicit object StorageSize extends TinyTypeFactory[StorageSize](new StorageSize(_)) with NonNegativeLong
 
-    final class RepositorySize private (val value: Int) extends AnyVal with IntTinyType
-    implicit object RepositorySize extends TinyTypeFactory[RepositorySize](new RepositorySize(_)) with NonNegativeInt
+    final class RepositorySize private (val value: Long) extends AnyVal with LongTinyType
+    implicit object RepositorySize extends TinyTypeFactory[RepositorySize](new RepositorySize(_)) with NonNegativeLong
 
-    final class LsfObjectsSize private (val value: Int) extends AnyVal with IntTinyType
-    implicit object LsfObjectsSize extends TinyTypeFactory[LsfObjectsSize](new LsfObjectsSize(_)) with NonNegativeInt
+    final class LsfObjectsSize private (val value: Long) extends AnyVal with LongTinyType
+    implicit object LsfObjectsSize extends TinyTypeFactory[LsfObjectsSize](new LsfObjectsSize(_)) with NonNegativeLong
 
-    final class JobArtifactsSize private (val value: Int) extends AnyVal with IntTinyType
+    final class JobArtifactsSize private (val value: Long) extends AnyVal with LongTinyType
     implicit object JobArtifactsSize
         extends TinyTypeFactory[JobArtifactsSize](new JobArtifactsSize(_))
-        with NonNegativeInt
+        with NonNegativeLong
   }
 
   final case class Urls(ssh: SshUrl, http: HttpUrl, web: WebUrl, readme: ReadmeUrl)

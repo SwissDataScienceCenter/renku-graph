@@ -19,11 +19,11 @@
 package ch.datascience.tokenrepository.repository.association
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.config.GitLab
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import ch.datascience.tokenrepository.config.GitLab
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
 

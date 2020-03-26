@@ -20,21 +20,15 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect._
 import cats.effect.concurrent.Semaphore
+import ch.datascience.graph.acceptancetests.stubs.GitLab
 import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
-import ch.datascience.stubbing.ExternalServiceStubbing
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.ExecutionContext
 
-trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
+trait GraphServices extends BeforeAndAfterAll {
   this: Suite =>
-
-  import eu.timepit.refined.auto._
-
-  protected override val maybeFixedPort: Option[Int Refined Positive] = Some(2048)
 
   protected implicit lazy val executionContext: ExecutionContext = GraphServices.executionContext
   protected implicit lazy val contextShift:     ContextShift[IO] = GraphServices.contextShift
@@ -66,8 +60,8 @@ trait GraphServices extends BeforeAndAfterAll with ExternalServiceStubbing {
 
 object GraphServices {
 
-  import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
   import ch.datascience._
+  import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
 
   implicit lazy val executionContext: ExecutionContext = ExecutionContext.global
   implicit lazy val contextShift:     ContextShift[IO] = IO.contextShift(executionContext)
@@ -95,5 +89,6 @@ object GraphServices {
 
   sys.addShutdownHook {
     servicesRunner.stopAllServices()
+    GitLab.shutdown()
   }
 }

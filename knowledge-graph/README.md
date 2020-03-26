@@ -165,7 +165,7 @@ Response body example:
       "created" : {
         "dateCreated" : "1970-05-12T06:06:41.448Z",
         "agent" : {
-          "email" : "n@ulQdsXl",
+          "email" : "n@ulQdsXl",                  // optional property
           "name" : "v imzn"
         }
       }
@@ -182,7 +182,7 @@ Response body example:
       "created" : {
         "dateCreated" : "1970-06-12T06:06:41.448Z",
         "agent" : {
-          "email" : "name@ulQdsXl",
+          "email" : "name@ulQdsXl",               // optional property
           "name" : "v imzn"
         }
       }
@@ -293,7 +293,7 @@ Response body example:
     "dateCreated": "2001-09-05T10:48:29.457Z",
     "creator": {
       "name":  "author name",
-      "email": "author@mail.org"
+      "email": "author@mail.org" // optional
     }
   },
   "updatedAt":  "2001-10-06T10:48:29.457Z",
@@ -306,9 +306,15 @@ Response body example:
   "forking": {
     "forksCount": 1,
     "parent": { // optional
-      "identifier": 122,
       "path":       "namespace/parent-project",
-      "name":       "Parent project name"
+      "name":       "Parent project name",
+      "created": {
+        "dateCreated": "2001-09-04T10:48:29.457Z",
+        "creator": {
+          "name":  "parent author name", 
+          "email": "parent.author@mail.org" // optional
+        }
+      }
     }
   },
   "tags": ["tag1", "tag2"],

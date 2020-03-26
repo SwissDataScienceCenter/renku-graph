@@ -21,11 +21,12 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId}
 
-final case class Project(path:        Path,
-                         name:        Name,
-                         dateCreated: DateCreated,
-                         creator:     Person,
-                         version:     SchemaVersion = SchemaVersion("1"))
+final case class Project(path:               Path,
+                         name:               Name,
+                         dateCreated:        DateCreated,
+                         creator:            Person,
+                         maybeParentProject: Option[Project] = None,
+                         version:            SchemaVersion = SchemaVersion("1"))
 
 object Project {
 
@@ -41,7 +42,8 @@ object Project {
       schema / "dateCreated"   -> entity.dateCreated.asJsonLD,
       schema / "dateUpdated"   -> entity.dateCreated.asJsonLD,
       schema / "creator"       -> entity.creator.asJsonLD,
-      schema / "schemaVersion" -> entity.version.asJsonLD
+      schema / "schemaVersion" -> entity.version.asJsonLD,
+      prov / "wasDerivedFrom"  -> entity.maybeParentProject.asJsonLD
     )
   }
 
