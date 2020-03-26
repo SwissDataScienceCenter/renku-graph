@@ -43,7 +43,7 @@ triplesGenerator:
   generationProcessesNumber: 3
   threadsNumber: 6
   dbEventLog:
-    connectionPool: 2
+    connectionPool: 6
 
 webhookService:
   image:
@@ -64,7 +64,7 @@ webhookService:
     rateLimit: 100/sec
   threadsNumber: 3
   dbEventLog:
-    connectionPool: 2
+    connectionPool: 4
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
