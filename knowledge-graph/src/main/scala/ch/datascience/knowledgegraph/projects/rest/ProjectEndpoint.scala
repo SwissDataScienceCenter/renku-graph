@@ -86,10 +86,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       "path":       ${project.path.value},
       "name":       ${project.name.value},
       "visibility": ${project.visibility.value},
-      "created": {
-        "dateCreated": ${project.created.date.value},
-        "creator":     ${project.created.creator}
-      },
+      "created":    ${project.created},
       "updatedAt":  ${project.updatedAt.value},
       "urls":       ${project.urls},
       "forking":    ${project.forking},
@@ -126,13 +123,16 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val parentProjectEncoder: Encoder[ParentProject] = Encoder.instance[ParentProject] { parent =>
     json"""{
-      "path":       ${parent.path.value},
-      "name":       ${parent.name.value},
-      "created": {
-        "dateCreated": ${parent.created.date.value},
-        "creator":     ${parent.created.creator}
-      }
-    }"""
+      "path":    ${parent.path.value},
+      "name":    ${parent.name.value},
+      "created": ${parent.created}
+    }""" deepMerge (parent.created.maybeCreator.map(creator => json"""{"creator": $creator}""") getOrElse Json.obj())
+  }
+
+  private implicit lazy val creationEncoder: Encoder[Creation] = Encoder.instance[Creation] { created =>
+    json"""{
+      "dateCreated": ${created.date.value}
+    }""" deepMerge (created.maybeCreator.map(creator => json"""{"creator": $creator}""") getOrElse Json.obj())
   }
 
   private implicit lazy val permissionsEncoder: Encoder[Permissions] = Encoder.instance[Permissions] {

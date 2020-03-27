@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.MonadError
+import cats.implicits._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.Path
@@ -67,15 +68,17 @@ private class IOKGInfoFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX prov: <http://www.w3.org/ns/prov#>"
     ),
-    s"""|SELECT DISTINCT ?projectId ?maybeParentProjectId ?dateCreated ?creatorResourceId ?maybeCreatorName ?maybeCreatorEmail
+    s"""|SELECT DISTINCT ?projectId ?maybeParentProjectId ?dateCreated ?maybeCreatorId ?maybeCreatorName ?maybeCreatorEmail
         |WHERE {
         |  BIND (${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} AS ?projectId)
         |  ?projectId rdf:type <http://schema.org/Project>;
-        |             schema:dateCreated ?dateCreated;
-        |             schema:creator ?creatorResourceId.
-        |  ?creatorResourceId rdf:type <http://schema.org/Person>.
-        |  OPTIONAL { ?creatorResourceId schema:name ?maybeCreatorName }
-        |  OPTIONAL { ?creatorResourceId schema:email ?maybeCreatorEmail }
+        |             schema:dateCreated ?dateCreated.
+        |  OPTIONAL { 
+        |    ?projectId schema:creator ?maybeCreatorId.
+        |    ?maybeCreatorId rdf:type <http://schema.org/Person>;
+        |                    schema:name ?maybeCreatorName.
+        |    OPTIONAL { ?maybeCreatorId schema:email ?maybeCreatorEmail }
+        |  }           
         |  OPTIONAL { ?projectId prov:wasDerivedFrom ?maybeParentProjectId }
         |}
         |""".stripMargin
@@ -105,16 +108,16 @@ private class IOKGInfoFinder(
 
   private val projectDecoder: Decoder[KGProject] = { cursor =>
     for {
-      resourceId           <- cursor.downField("projectId").downField("value").as[ResourceId]
-      maybeParentProjectId <- cursor.downField("maybeParentProjectId").downField("value").as[Option[ResourceId]]
-      dateCreated          <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-      creatorResourceId    <- cursor.downField("creatorResourceId").downField("value").as[users.ResourceId]
-      maybeCreatorName     <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
-      maybeCreatorEmail    <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[Email]]
+      resourceId             <- cursor.downField("projectId").downField("value").as[ResourceId]
+      maybeParentProjectId   <- cursor.downField("maybeParentProjectId").downField("value").as[Option[ResourceId]]
+      dateCreated            <- cursor.downField("dateCreated").downField("value").as[DateCreated]
+      maybeCreatorResourceId <- cursor.downField("maybeCreatorId").downField("value").as[Option[users.ResourceId]]
+      maybeCreatorName       <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
+      maybeCreatorEmail      <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[Email]]
     } yield KGProject(
       resourceId,
       maybeParentProjectId,
-      KGCreator(creatorResourceId, maybeCreatorEmail, maybeCreatorName),
+      (maybeCreatorResourceId -> maybeCreatorName) mapN (KGCreator(_, maybeCreatorEmail, _)),
       dateCreated
     )
   }

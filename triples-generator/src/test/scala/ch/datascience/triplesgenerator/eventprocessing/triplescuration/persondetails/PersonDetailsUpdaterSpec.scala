@@ -63,8 +63,8 @@ class PersonDetailsUpdaterSpec extends WordSpec {
         dataSetCommit(
           committer = entities.Person(committerName, committerEmail)
         )(
-          projectPath    = projectPaths.generateOne,
-          projectCreator = entities.Person(projectCreatorName, projectCreatorEmail)
+          projectPath         = projectPaths.generateOne,
+          maybeProjectCreator = entities.Person(projectCreatorName, projectCreatorEmail).some
         )(
           datasetCreators = datasetCreatorsSet
         ).toJson

@@ -63,7 +63,7 @@ object model {
     implicit object DateUpdated extends TinyTypeFactory[DateUpdated](new DateUpdated(_)) with InstantNotInTheFuture
   }
 
-  final case class Creation(date: DateCreated, creator: Creator)
+  final case class Creation(date: DateCreated, maybeCreator: Option[Creator])
 
   final case class Creator(maybeEmail: Option[users.Email], name: users.Name)
 

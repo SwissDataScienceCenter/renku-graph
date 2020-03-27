@@ -198,6 +198,8 @@ private[triplescuration] class IOForkInfoUpdater(
 
   private implicit class KGProjectOps(kgProject: KGProject) {
     lazy val maybeParentPath: Option[Path] = kgProject.maybeParentResourceId.flatMap(_.getPath)
+    lazy val maybeEmail = kgProject.maybeCreator.flatMap(_.maybeEmail)
+    lazy val maybeName  = kgProject.maybeCreator.map(_.name)
   }
 
   private implicit class GitLabProjectOps(gitLabProject: GitLabProject) {
@@ -211,15 +213,15 @@ private[triplescuration] class IOForkInfoUpdater(
         .getOrElse(false)
 
     def hasEmailSameAs(kgProject: KGProject): Boolean =
-      (kgProject.creator.maybeEmail -> gitLabProject.maybeCreator.flatMap(_.maybeEmail))
+      (kgProject.maybeEmail -> gitLabProject.maybeEmail)
         .mapN { case (kgEmail, gitLabEmail) => kgEmail == gitLabEmail }
         .getOrElse(false)
 
     def hasNoEmailAs(kgProject: KGProject): Boolean =
-      gitLabProject.maybeEmail.isEmpty && kgProject.creator.maybeEmail.isEmpty
+      gitLabProject.maybeEmail.isEmpty && kgProject.maybeEmail.isEmpty
 
     def hasUserNameSameAs(kgProject: KGProject): Boolean =
-      (kgProject.creator.maybeName -> gitLabProject.maybeCreator.flatMap(_.maybeName))
+      (kgProject.maybeName -> gitLabProject.maybeName)
         .mapN { case (kgName, gitLabName) => kgName == gitLabName }
         .getOrElse(false)
 

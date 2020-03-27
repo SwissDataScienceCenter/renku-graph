@@ -50,7 +50,7 @@ object bundles extends Schemas {
       projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-      projectCreator:      Person = committer,
+      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeParent:         Option[Project] = None
   )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     ArtifactEntity(
@@ -60,7 +60,7 @@ object bundles extends Schemas {
           commitId,
           committedDate,
           committer,
-          Project(projectPath, projectName, projectDateCreated, projectCreator, maybeParent),
+          Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent),
           Agent(schemaVersion)
         )
       )
@@ -75,11 +75,11 @@ object bundles extends Schemas {
       committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
       schemaVersion: SchemaVersion = schemaVersions.generateOne
   )(
-      projectPath:        Path                 = projectPaths.generateOne,
-      projectName:        projects.Name        = projectNames.generateOne,
-      projectDateCreated: projects.DateCreated = DateCreated(committedDate.value),
-      projectCreator:     Person               = committer,
-      maybeParent:        Option[Project]      = None
+      projectPath:         Path                 = projectPaths.generateOne,
+      projectName:         projects.Name        = projectNames.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
+      maybeParent:         Option[Project]      = None
   )(
       datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
       datasetName:               Name = datasetNames.generateOne,
@@ -91,7 +91,7 @@ object bundles extends Schemas {
       datasetCreators:           Set[Person] = setOf(persons).generateOne,
       datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
   )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
-    val project: Project = Project(projectPath, projectName, projectDateCreated, projectCreator, maybeParent)
+    val project: Project = Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent)
     DataSet(
       datasetIdentifier,
       datasetName,
@@ -191,11 +191,10 @@ object bundles extends Schemas {
         projectPath:         Path = projectPaths.generateOne,
         schemaVersion:       SchemaVersion = schemaVersions.generateOne
     )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExamplarData) = {
-
-      val projectCreator = Person(userNames.generateOne, userEmails.generateOne)
-      val project        = Project(projectPath, projectNames.generateOne, projectCreatedDates.generateOne, projectCreator)
-      val agent          = Agent(schemaVersion)
-      val dataSetId      = datasets.Identifier("d67a1653-0b6e-463b-89a0-afe72a53c8bb")
+      val project =
+        Project(projectPath, projectNames.generateOne, projectCreatedDates.generateOne, projectCreators.generateOption)
+      val agent     = Agent(schemaVersion)
+      val dataSetId = datasets.Identifier("d67a1653-0b6e-463b-89a0-afe72a53c8bb")
 
       val commit3Id  = CommitId("000003")
       val commit7Id  = CommitId("000007")
@@ -476,4 +475,9 @@ object bundles extends Schemas {
       ) -> examplarData
     }
   }
+
+  private val projectCreators: Gen[Person] = for {
+    name  <- userNames
+    email <- userEmails
+  } yield Person(name, email)
 }

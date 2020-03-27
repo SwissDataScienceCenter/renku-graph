@@ -179,8 +179,8 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       val kgProject = given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          creator     = kgCreator(commonEmail).generateOne,
-          dateCreated = dateCreatedInGitLab
+          maybeCreator = kgCreator(commonEmail).generateSome,
+          dateCreated  = dateCreatedInGitLab
         )
       }.existsInKG
 
@@ -204,20 +204,20 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
       "but user names and dateCreated are the same in the absence of emails" in new TestCase {
 
       val forkInGitLab        = projectPaths.generateOne
-      val commonUserName      = userNames.generateSome
+      val commonUserName      = userNames.generateOne
       val dateCreatedInGitLab = projectCreatedDates.generateOne
 
       val gitLabProject = given {
         gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None, maybeName = commonUserName).generateSome,
+          maybeCreator = gitLabCreator(maybeEmail = None, maybeName = commonUserName.some).generateSome,
           dateCreated  = dateCreatedInGitLab
         )
       }.existsInGitLab
 
       val kgProject = given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          creator     = kgCreator(maybeEmail = None, maybeName = commonUserName).generateOne,
-          dateCreated = dateCreatedInGitLab
+          maybeCreator = kgCreator(maybeEmail = None, name = commonUserName).generateSome,
+          dateCreated  = dateCreatedInGitLab
         )
       }.existsInKG
 
@@ -250,7 +250,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       val kgProject = given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          creator = kgCreator(userEmails.generateSome).generateOne
+          maybeCreator = kgCreator(userEmails.generateSome).generateSome
         )
       }.existsInKG
 
@@ -300,7 +300,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       val kgProject = given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          creator = kgCreator(userEmails.generateSome).generateOne
+          maybeCreator = kgCreator(userEmails.generateSome).generateSome
         )
       }.existsInKG
 
@@ -432,7 +432,7 @@ class ForkInfoUpdaterSpec extends WordSpec with MockFactory {
 
       given {
         kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          creator = kgCreator(userEmails.generateSome).generateOne
+          maybeCreator = kgCreator(userEmails.generateSome).generateSome
         )
       }.existsInKG
 

@@ -49,11 +49,11 @@ class ProjectPropertiesRemoverSpec extends WordSpec with ScalaCheckPropertyCheck
           JsonLD
             .arr(
               fileCommit()(
-                projectPath        = project.path,
-                projectName        = project.name,
-                projectDateCreated = project.dateCreated,
-                projectCreator     = project.creator,
-                maybeParent        = project.maybeParentProject
+                projectPath         = project.path,
+                projectName         = project.name,
+                projectDateCreated  = project.dateCreated,
+                maybeProjectCreator = project.maybeCreator,
+                maybeParent         = project.maybeParentProject
               ),
               project.asJsonLD
             )
@@ -65,13 +65,13 @@ class ProjectPropertiesRemoverSpec extends WordSpec with ScalaCheckPropertyCheck
           TransformedProject(
             project,
             project.dateCreated.some,
-            project.creator.asJsonLD.entityId
+            project.maybeCreator.asJsonLD.entityId
           ).some,
           project.maybeParentProject.map { parent =>
             TransformedProject(
               parent,
               parent.dateCreated.some,
-              parent.creator.asJsonLD.entityId
+              parent.maybeCreator.asJsonLD.entityId
             )
           }
         ).flatten

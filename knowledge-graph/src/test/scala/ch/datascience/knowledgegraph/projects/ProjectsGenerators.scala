@@ -50,8 +50,8 @@ object ProjectsGenerators {
     maybeDescription = gitLabProject.maybeDescription,
     visibility       = gitLabProject.visibility,
     created = Creation(
-      date    = kgProject.created.date,
-      creator = Creator(maybeEmail = kgProject.created.creator.maybeEmail, name = kgProject.created.creator.name)
+      date         = kgProject.created.date,
+      maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
     ),
     updatedAt = gitLabProject.updatedAt,
     urls      = gitLabProject.urls,
@@ -61,7 +61,8 @@ object ProjectsGenerators {
         ParentProject(
           parent.resourceId.toUnsafe[Path],
           parent.name,
-          Creation(parent.created.date, Creator(parent.created.creator.maybeEmail, parent.created.creator.name))
+          Creation(parent.created.date,
+                   parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name)))
         )
       }
     ),
@@ -148,9 +149,9 @@ object ProjectsGenerators {
   private implicit lazy val webUrls: Gen[WebUrl] = urls() map WebUrl.apply
 
   implicit lazy val projectCreations: Gen[ProjectCreation] = for {
-    created <- projectCreatedDates
-    creator <- projectCreators
-  } yield ProjectCreation(created, creator)
+    created      <- projectCreatedDates
+    maybeCreator <- projectCreators.toGeneratorOfOptions
+  } yield ProjectCreation(created, maybeCreator)
 
   implicit lazy val projectCreators: Gen[ProjectCreator] = for {
     maybeEmail <- userEmails.toGeneratorOfOptions

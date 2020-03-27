@@ -72,7 +72,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     }
     val dataset1CommitId = commitIds.generateOne
     val dataset1Creation = addedToProject.generateOne.copy(
-      agent = DatasetAgent(project.created.creator.maybeEmail, project.created.creator.name)
+      agent = DatasetAgent(project.created.maybeCreator.flatMap(_.maybeEmail),
+                           project.created.maybeCreator.map(_.name).getOrElse(userNames.generateOne))
     )
     val dataset1 = datasets.generateOne.copy(
       maybeDescription = Some(datasetDescriptions.generateOne),
@@ -97,10 +98,10 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail),
           schemaVersion = currentSchemaVersion
         )(
-          projectPath        = project.path,
-          projectName        = project.name,
-          projectDateCreated = project.created.date,
-          projectCreator     = Person(project.created.creator.name, project.created.creator.maybeEmail)
+          projectPath         = project.path,
+          projectName         = project.name,
+          projectDateCreated  = project.created.date,
+          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail))
         )(
           datasetIdentifier         = dataset1.id,
           datasetName               = dataset1.name,
@@ -116,10 +117,10 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
           schemaVersion = currentSchemaVersion
         )(
-          projectPath        = project.path,
-          projectName        = project.name,
-          projectDateCreated = project.created.date,
-          projectCreator     = Person(project.created.creator.name, project.created.creator.maybeEmail)
+          projectPath         = project.path,
+          projectName         = project.name,
+          projectDateCreated  = project.created.date,
+          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail))
         )(
           datasetIdentifier         = dataset2.id,
           datasetName               = dataset2.name,
@@ -136,7 +137,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       `triples updates run`(
         (List(dataset1, dataset2)
           .flatMap(_.published.creators.map(_.maybeEmail))
-          .toSet + dataset1Creation.agent.maybeEmail + dataset2Creation.agent.maybeEmail + project.created.creator.maybeEmail).flatten
+          .toSet + dataset1Creation.agent.maybeEmail + dataset2Creation.agent.maybeEmail + project.created.maybeCreator
+          .flatMap(_.maybeEmail)).flatten
       )
 
       And("the project exists in GitLab")

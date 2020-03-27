@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
+import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
@@ -188,7 +189,7 @@ object GitLab {
     }
 
     val queryParams = if (withStatistics) "?statistics=true" else ""
-    val creatorId: Int Refined Positive = positiveInts().generateOne
+    val maybeCreatorId: Option[Int Refined Positive] = project.created.maybeCreator.map(_ => positiveInts().generateOne)
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}$queryParams").withAccessTokenInHeader
         .willReturn(
@@ -205,7 +206,6 @@ object GitLab {
               "forks_count":          ${project.forking.forksCount.value},
               "tag_list":             ${project.tags.map(_.value).toList},
               "star_count":           ${project.starsCount.value},
-              "creator_id":           ${creatorId.value},
               "created_at":           ${project.created.date.value},
               "last_activity_at":     ${project.updatedAt.value},
               "permissions":          ${project.permissions.toJson},
@@ -222,19 +222,26 @@ object GitLab {
                   .map(parent => Json.obj("forked_from_project" -> parent.toJson))
                   .getOrElse(Json.obj())
               )
+              .deepMerge(
+                maybeCreatorId
+                  .map(creatorId => json"""{"creator_id": ${creatorId.value}}""")
+                  .getOrElse(Json.obj())
+              )
               .noSpaces
           )
         )
     }
 
-    stubFor {
-      get(s"/api/v4/users/$creatorId").withAccessTokenInHeader
-        .willReturn(
-          okJson(json"""{
-            "name":         ${project.created.creator.name.value},
-            "public_email": ${project.created.creator.maybeEmail.map(_.value)}
-          }""".noSpaces)
-        )
+    (project.created.maybeCreator -> maybeCreatorId) mapN { (creator, creatorId) =>
+      stubFor {
+        get(s"/api/v4/users/$creatorId").withAccessTokenInHeader
+          .willReturn(
+            okJson(json"""{
+              "name":         ${creator.name.value},
+              "public_email": ${creator.maybeEmail.map(_.value)}
+            }""".noSpaces)
+          )
+      }
     }
     ()
   }

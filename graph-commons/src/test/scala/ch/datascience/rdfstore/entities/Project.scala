@@ -24,7 +24,7 @@ import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId}
 final case class Project(path:               Path,
                          name:               Name,
                          dateCreated:        DateCreated,
-                         creator:            Person,
+                         maybeCreator:       Option[Person],
                          maybeParentProject: Option[Project] = None,
                          version:            SchemaVersion = SchemaVersion("1"))
 
@@ -41,7 +41,7 @@ object Project {
       schema / "name"          -> entity.name.asJsonLD,
       schema / "dateCreated"   -> entity.dateCreated.asJsonLD,
       schema / "dateUpdated"   -> entity.dateCreated.asJsonLD,
-      schema / "creator"       -> entity.creator.asJsonLD,
+      schema / "creator"       -> entity.maybeCreator.asJsonLD,
       schema / "schemaVersion" -> entity.version.asJsonLD,
       prov / "wasDerivedFrom"  -> entity.maybeParentProject.asJsonLD
     )

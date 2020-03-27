@@ -176,7 +176,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
   private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
     for {
       date    <- cursor.downField("dateCreated").as[DateCreated]
-      creator <- cursor.downField("creator").as[Creator]
+      creator <- cursor.downField("creator").as[Option[Creator]]
     } yield Creation(date, creator)
 
   private implicit lazy val creatorDecoder: Decoder[Creator] = cursor =>
