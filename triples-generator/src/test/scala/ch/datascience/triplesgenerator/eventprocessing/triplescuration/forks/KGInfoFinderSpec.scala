@@ -28,7 +28,7 @@ import ch.datascience.graph.model.users.Email
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -38,8 +38,10 @@ class KGInfoFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPro
 
   "findProject" should {
 
-    "return details of the project from the KG if it exists" in new TestCase {
-      forAll { entitiesProject: entities.Project =>
+    "return details of the project from the KG if it exists and it has creator" in new TestCase {
+      forAll(entitiesPersons(userEmails.toGeneratorOfSomes)) { person =>
+        val entitiesProject = entitiesProjects(person.some).generateOne
+
         loadToStore(entitiesProject.asJsonLD)
 
         val Some(kgProject) = finder.findProject(entitiesProject.path).unsafeRunSync()
@@ -48,9 +50,24 @@ class KGInfoFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPro
         kgProject.maybeParentResourceId shouldBe entitiesProject.maybeParentProject.map(
           parent => ResourceId(renkuBaseUrl, parent.path)
         )
-        kgProject.dateCreated        shouldBe entitiesProject.dateCreated
-        kgProject.creator.maybeEmail shouldBe entitiesProject.creator.maybeEmail
-        kgProject.creator.maybeName  shouldBe entitiesProject.creator.name.some
+        kgProject.dateCreated                        shouldBe entitiesProject.dateCreated
+        kgProject.maybeCreator.flatMap(_.maybeEmail) shouldBe person.maybeEmail
+        kgProject.maybeCreator.map(_.name)           shouldBe person.name.some
+      }
+    }
+
+    "return details of the project from the KG if it exists and it has no creator" in new TestCase {
+      forAll(entitiesProjects(maybeCreator = None)) { entitiesProject =>
+        loadToStore(entitiesProject.asJsonLD)
+
+        val Some(kgProject) = finder.findProject(entitiesProject.path).unsafeRunSync()
+
+        kgProject.resourceId shouldBe ResourceId(renkuBaseUrl, entitiesProject.path)
+        kgProject.maybeParentResourceId shouldBe entitiesProject.maybeParentProject.map(
+          parent => ResourceId(renkuBaseUrl, parent.path)
+        )
+        kgProject.dateCreated  shouldBe entitiesProject.dateCreated
+        kgProject.maybeCreator shouldBe None
       }
     }
 

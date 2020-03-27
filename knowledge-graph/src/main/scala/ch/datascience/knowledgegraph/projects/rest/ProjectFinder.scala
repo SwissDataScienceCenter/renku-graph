@@ -67,8 +67,8 @@ class IOProjectFinder(
       maybeDescription = gitLabProject.maybeDescription,
       visibility       = gitLabProject.visibility,
       created = Creation(
-        date    = kgProject.created.date,
-        creator = Creator(kgProject.created.creator.maybeEmail, kgProject.created.creator.name)
+        date         = kgProject.created.date,
+        maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
       ),
       updatedAt   = gitLabProject.updatedAt,
       urls        = gitLabProject.urls,
@@ -86,7 +86,8 @@ class IOProjectFinder(
           ParentProject(
             path,
             parent.name,
-            Creation(parent.created.date, Creator(parent.created.creator.maybeEmail, parent.created.creator.name))
+            Creation(parent.created.date,
+                     parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name)))
           )
       }
   }

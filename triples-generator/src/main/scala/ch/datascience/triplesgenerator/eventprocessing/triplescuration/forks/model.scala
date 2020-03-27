@@ -31,7 +31,7 @@ final case class GitLabCreator(maybeEmail: Option[Email], maybeName: Option[user
 
 final case class KGProject(resourceId:            ResourceId,
                            maybeParentResourceId: Option[ResourceId],
-                           creator:               KGCreator,
+                           maybeCreator:          Option[KGCreator],
                            dateCreated:           DateCreated)
 
-final case class KGCreator(resourceId: users.ResourceId, maybeEmail: Option[Email], maybeName: Option[users.Name])
+final case class KGCreator(resourceId: users.ResourceId, maybeEmail: Option[Email], name: users.Name)

@@ -27,9 +27,8 @@ import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.Parent
+import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{Parent, ProjectCreator}
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
 import org.scalatest.Matchers._
@@ -40,20 +39,20 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
 
   "findProject" should {
 
-    "return details of the project with the given path when there's no parent parent" in new TestCase {
+    "return details of the project with the given path when there's no parent" in new TestCase {
       forAll(kgProjects(parentsGen = emptyOptionOf[Parent])) { project =>
-        val projectCreator = project.created.creator
+        val maybeProjectCreator = project.created.maybeCreator
         loadToStore(
           fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne),
           fileCommit(
             commitId      = commitIds.generateOne,
             committedDate = CommittedDate(project.created.date.value)
           )(
-            projectPath        = project.path,
-            projectName        = project.name,
-            projectDateCreated = project.created.date,
-            projectCreator     = Person(projectCreator.name, projectCreator.maybeEmail),
-            maybeParent        = None
+            projectPath         = project.path,
+            projectName         = project.name,
+            projectDateCreated  = project.created.date,
+            maybeProjectCreator = maybeProjectCreator.toMaybePerson,
+            maybeParent         = None
           )
         )
 
@@ -67,16 +66,16 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
           fileCommit(
             commitId = commitIds.generateOne
           )(
-            projectPath        = project.path,
-            projectName        = project.name,
-            projectDateCreated = project.created.date,
-            projectCreator     = entities.Person(project.created.creator.name, project.created.creator.maybeEmail),
+            projectPath         = project.path,
+            projectName         = project.name,
+            projectDateCreated  = project.created.date,
+            maybeProjectCreator = project.created.maybeCreator.toMaybePerson,
             maybeParent = project.maybeParent.map { parent =>
               entities.Project(
                 parent.resourceId.toUnsafe[Path],
                 parent.name,
                 parent.created.date,
-                creator            = entities.Person(parent.created.creator.name, parent.created.creator.maybeEmail),
+                maybeCreator       = parent.created.maybeCreator.toMaybePerson,
                 maybeParentProject = None
               )
             }
@@ -96,5 +95,11 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val metadataFinder       = new IOKGProjectFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+  }
+
+  private implicit class ProjectCreatorOps(maybeCreator: Option[ProjectCreator]) {
+    lazy val toMaybePerson: Option[entities.Person] = maybeCreator.map { creator =>
+      entities.Person(creator.name, creator.maybeEmail)
+    }
   }
 }

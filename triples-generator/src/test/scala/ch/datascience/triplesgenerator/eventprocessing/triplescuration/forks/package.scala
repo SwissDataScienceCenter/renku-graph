@@ -62,30 +62,31 @@ package object forks {
     for {
       resourceId            <- projectResourceIds
       maybeParentResourceId <- maybeParentResourceIds
-      creator               <- kgCreator()
+      maybeCreator          <- kgCreator().toGeneratorOfOptions
       dateCreated           <- projectCreatedDates
-    } yield KGProject(resourceId, maybeParentResourceId, creator, dateCreated)
+    } yield KGProject(resourceId, maybeParentResourceId, maybeCreator, dateCreated)
 
-  def kgCreator(maybeEmail: Option[Email]      = userEmails.generateOption,
-                maybeName:  Option[users.Name] = userNames.generateOption): Gen[KGCreator] =
+  def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption,
+                name:       users.Name    = userNames.generateOne): Gen[KGCreator] =
     for {
       resourceId <- userResourceIds(maybeEmail)
-    } yield KGCreator(resourceId, maybeEmail, maybeName)
+    } yield KGCreator(resourceId, maybeEmail, name)
 
   implicit val entitiesProjects: Gen[Project] = entitiesProjects(
-    creator            = entitiesPersons(userEmails.generateSome).generateOne,
-    maybeParentProject = entitiesProjects(entitiesPersons(userEmails.generateSome).generateOne).generateOption
+    maybeCreator       = entitiesPersons(userEmails.generateSome).generateOption,
+    maybeParentProject = entitiesProjects(entitiesPersons(userEmails.generateSome).generateOption).generateOption
   )
-  def entitiesProjects(creator:            Person          = entitiesPersons().generateOne,
+  def entitiesProjects(maybeCreator:       Option[Person]  = entitiesPersons().generateOption,
                        maybeParentProject: Option[Project] = None): Gen[Project] =
     for {
       path        <- projectPaths
       name        <- projectNames
       createdDate <- projectCreatedDates
-    } yield Project(path, name, createdDate, creator, maybeParentProject)
+    } yield Project(path, name, createdDate, maybeCreator, maybeParentProject)
 
-  def entitiesPersons(maybeEmail: Option[Email] = userEmails.generateOption): Gen[Person] =
+  def entitiesPersons(maybeEmailGen: Gen[Option[Email]] = userEmails.toGeneratorOfOptions): Gen[Person] =
     for {
-      name <- userNames
+      name       <- userNames
+      maybeEmail <- maybeEmailGen
     } yield Person(name, maybeEmail)
 }

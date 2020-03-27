@@ -37,9 +37,10 @@ trait KGProjectFinder[Interpretation[_]] {
 }
 
 object KGProjectFinder {
+
   final case class KGProject(path: Path, name: Name, created: ProjectCreation, maybeParent: Option[Parent])
 
-  final case class ProjectCreation(date: DateCreated, creator: ProjectCreator)
+  final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
 
   final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation)
 
@@ -75,24 +76,29 @@ private class IOKGProjectFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX prov: <http://www.w3.org/ns/prov#>"
     ),
-    s"""|SELECT DISTINCT ?name ?dateCreated ?creatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail
+    s"""|SELECT DISTINCT ?name ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail
         |WHERE {
         |  BIND (${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} AS ?projectId)
         |  ?projectId rdf:type <http://schema.org/Project>;
-        |             schema:creator ?creatorResource;
         |             schema:name ?name;
         |             schema:dateCreated ?dateCreated.
-        |  ?creatorResource rdf:type <http://schema.org/Person>;
-        |                   schema:name ?creatorName.
-        |  OPTIONAL { ?creatorResource schema:email ?maybeCreatorEmail }
+        |  OPTIONAL {
+        |    ?projectId schema:creator ?maybeCreatorId.
+        |    ?maybeCreatorId rdf:type <http://schema.org/Person>;
+        |                    schema:name ?maybeCreatorName.
+        |    OPTIONAL { ?maybeCreatorId schema:email ?maybeCreatorEmail }
+        |  }
         |  OPTIONAL { 
         |    ?projectId prov:wasDerivedFrom ?maybeParentId.
         |    ?maybeParentId rdf:type <http://schema.org/Project>;
-        |                   schema:creator ?maybeParentCreatorResource;
         |                   schema:name ?maybeParentName;
         |                   schema:dateCreated ?maybeParentDateCreated.
-        |    ?maybeParentCreatorResource schema:name ?maybeParentCreatorName
-        |    OPTIONAL { ?maybeParentCreatorResource schema:email ?maybeParentCreatorEmail }
+        |    OPTIONAL {
+        |      ?maybeParentId schema:creator ?maybeParentCreatorId.
+        |      ?maybeParentCreatorId rdf:type <http://schema.org/Person>;
+        |                            schema:name ?maybeParentCreatorName.
+        |      OPTIONAL { ?maybeParentCreatorId schema:email ?maybeParentCreatorEmail }
+        |    }
         |  }
         |}
         |""".stripMargin
@@ -108,7 +114,7 @@ private class IOKGProjectFinder(
       for {
         name                   <- cursor.downField("name").downField("value").as[Name]
         dateCreated            <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-        creatorName            <- cursor.downField("creatorName").downField("value").as[users.Name]
+        maybeCreatorName       <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
         maybeCreatorEmail      <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[users.Email]]
         maybeParentId          <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
         maybeParentName        <- cursor.downField("maybeParentName").downField("value").as[Option[Name]]
@@ -121,12 +127,13 @@ private class IOKGProjectFinder(
       } yield KGProject(
         path,
         name,
-        ProjectCreation(dateCreated, ProjectCreator(maybeCreatorEmail, creatorName)),
-        maybeParent = (maybeParentId, maybeParentName, maybeParentDateCreated, maybeParentCreatorName) mapN {
-          case (parentId, name, dateCreated, parentCreatorName) =>
+        ProjectCreation(dateCreated, maybeCreatorName map (name => ProjectCreator(maybeCreatorEmail, name))),
+        maybeParent = (maybeParentId, maybeParentName, maybeParentDateCreated) mapN {
+          case (parentId, name, dateCreated) =>
             Parent(parentId,
                    name,
-                   ProjectCreation(dateCreated, ProjectCreator(maybeParentCreatorEmail, parentCreatorName)))
+                   ProjectCreation(dateCreated,
+                                   maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))))
         }
       )
     }

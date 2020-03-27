@@ -291,7 +291,7 @@ Response body example:
   "visibility":  "public|private|internal",
   "created": {
     "dateCreated": "2001-09-05T10:48:29.457Z",
-    "creator": {
+    "creator": { // optional
       "name":  "author name",
       "email": "author@mail.org" // optional
     }
@@ -310,7 +310,7 @@ Response body example:
       "name":       "Parent project name",
       "created": {
         "dateCreated": "2001-09-04T10:48:29.457Z",
-        "creator": {
+        "creator": { // optional
           "name":  "parent author name", 
           "email": "parent.author@mail.org" // optional
         }

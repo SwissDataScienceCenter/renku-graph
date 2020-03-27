@@ -41,10 +41,10 @@ object RemoteTriplesGenerator {
         commitId      = commitId,
         schemaVersion = schemaVersion
       )(
-        projectPath        = project.path,
-        projectName        = project.name,
-        projectDateCreated = project.created.date,
-        projectCreator     = Person(project.created.creator.name, project.created.creator.maybeEmail)
+        projectPath         = project.path,
+        projectName         = project.name,
+        projectDateCreated  = project.created.date,
+        maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail))
       )
     )
 

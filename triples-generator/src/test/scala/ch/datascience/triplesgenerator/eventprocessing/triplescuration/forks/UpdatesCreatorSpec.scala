@@ -114,11 +114,11 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore {
 
   "swapCreator" should {
 
-    "change change Project's link to a Person to the given one" in new TestCase {
+    "change Project's link to a Person to the given one" in new TestCase {
       val creator1 = entitiesPersons(userEmails.generateSome).generateOne
       val creator2 = entitiesPersons(userEmails.generateSome).generateOne
-      val project1 = entitiesProjects(creator1).generateOne
-      val project2 = entitiesProjects(creator2).generateOne
+      val project1 = entitiesProjects(creator1.some).generateOne
+      val project2 = entitiesProjects(creator2.some).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
@@ -141,8 +141,8 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore {
     "create a new Person and link it to the given Project" in new TestCase {
       val creator1 = entitiesPersons().generateOne
       val creator2 = entitiesPersons().generateOne
-      val project1 = entitiesProjects(creator1).generateOne
-      val project2 = entitiesProjects(creator2).generateOne
+      val project1 = entitiesProjects(creator1.some).generateOne
+      val project2 = entitiesProjects(creator2.some).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 

@@ -60,7 +60,8 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     ParentProject(
       initParent.resourceId.toUnsafe[Path],
       initParent.name,
-      Creation(initParent.created.date, Creator(initParent.created.creator.maybeEmail, initParent.created.creator.name))
+      Creation(initParent.created.date,
+               initParent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name)))
     )
   }
   private val project = {
@@ -87,19 +88,19 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       val jsonLDTriples = JsonLD.arr(
         dataSetCommit(
           commitId      = dataset1CommitId,
-          committer     = Person(project.created.creator.name, project.created.creator.maybeEmail),
           schemaVersion = currentSchemaVersion
         )(
-          projectPath        = project.path,
-          projectName        = project.name,
-          projectDateCreated = project.created.date,
-          projectCreator     = Person(project.created.creator.name, project.created.creator.maybeEmail),
+          projectPath         = project.path,
+          projectName         = project.name,
+          projectDateCreated  = project.created.date,
+          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
           maybeParent = entities
             .Project(
               parentProject.path,
               parentProject.name,
               parentProject.created.date,
-              creator = entities.Person(parentProject.created.creator.name, parentProject.created.creator.maybeEmail)
+              maybeCreator =
+                parentProject.created.maybeCreator.map(creator => entities.Person(creator.name, creator.maybeEmail))
             )
             .some
         )(
@@ -110,7 +111,10 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       )
       `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
 
-      `triples updates run`(Set(project.created.creator.maybeEmail, parentProject.created.creator.maybeEmail).flatten)
+      `triples updates run`(
+        Set(project.created.maybeCreator.flatMap(_.maybeEmail),
+            parentProject.created.maybeCreator.flatMap(_.maybeEmail)).flatten
+      )
 
       And("the project exists in GitLab")
       `GET <gitlab>/api/v4/projects/:path returning OK with`(project, withStatistics = true)
@@ -143,10 +147,7 @@ object ProjectsResources {
     "name":        ${project.name.value},
     "description": ${(project.maybeDescription getOrElse (throw new Exception("Description expected"))).value},
     "visibility":  ${project.visibility.value},
-    "created": {
-      "dateCreated": ${project.created.date.value},
-      "creator":     ${project.created.creator.toJson}
-    },
+    "created":     ${project.created.toJson},
     "updatedAt":   ${project.updatedAt.value},
     "urls": {
       "ssh":       ${project.urls.ssh.value},
@@ -172,6 +173,14 @@ object ProjectsResources {
     )
   }
 
+  private implicit class CreationOps(created: Creation) {
+    import ch.datascience.json.JsonOps._
+
+    lazy val toJson: Json = json"""{
+      "dateCreated": ${created.date.value}
+    }""" addIfDefined ("creator" -> created.maybeCreator.map(_.toJson))
+  }
+
   private implicit class ForkingOps(forking: Forking) {
     import ch.datascience.json.JsonOps._
 
@@ -182,12 +191,9 @@ object ProjectsResources {
 
   private implicit class ParentOps(parent: ParentProject) {
     lazy val toJson: Json = json"""{
-      "path":       ${parent.path.value},
-      "name":       ${parent.name.value},
-      "created": {
-        "dateCreated": ${parent.created.date.value},
-        "creator": ${parent.created.creator.toJson}
-      }
+      "path":    ${parent.path.value},
+      "name":    ${parent.name.value},
+      "created": ${parent.created.toJson}
     }"""
   }
 

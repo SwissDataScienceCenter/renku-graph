@@ -56,19 +56,30 @@ private class IOGitLabInfoFinder(
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  private type ProjectAndCreator = (GitLabProject, Int)
+  private type ProjectAndCreatorId = (GitLabProject, Option[Int])
 
   override def findProject(
       path:                    projects.Path
   )(implicit maybeAccessToken: Option[AccessToken]): IO[Option[GitLabProject]] = {
     for {
-      projectsUri          <- OptionT.liftF(validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}"))
-      (project, creatorId) <- OptionT(send(request(GET, projectsUri, maybeAccessToken))(mapTo[ProjectAndCreator]))
-      usersUri             <- OptionT.liftF(validateUri(s"$gitLabUrl/api/v4/users/$creatorId"))
-      maybeCreator <- OptionT(send(request(GET, usersUri, maybeAccessToken))(mapTo[GitLabCreator]))
-                       .flatTransform(Option(_).pure[IO])
+      projectsUri               <- OptionT.liftF(validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}"))
+      (project, maybeCreatorId) <- send(request(GET, projectsUri, maybeAccessToken))(mapTo[ProjectAndCreatorId]).toOptionT
+      maybeCreator              <- fetchCreator(maybeCreatorId, maybeAccessToken)
     } yield project.copy(maybeCreator = maybeCreator)
   }.value
+
+  private def fetchCreator(maybeCreatorId:   Option[Int],
+                           maybeAccessToken: Option[AccessToken]): OptionT[IO, Option[GitLabCreator]] =
+    maybeCreatorId match {
+      case None => OptionT.some[IO](Option.empty[GitLabCreator])
+      case Some(creatorId) =>
+        OptionT.liftF {
+          for {
+            usersUri     <- validateUri(s"$gitLabUrl/api/v4/users/$creatorId")
+            maybeCreator <- send(request(GET, usersUri, maybeAccessToken))(mapTo[GitLabCreator])
+          } yield maybeCreator
+        }
+    }
 
   private def mapTo[OUT](
       implicit decoder: EntityDecoder[IO, OUT]
@@ -77,21 +88,21 @@ private class IOGitLabInfoFinder(
     case (NotFound, _, _)  => None.pure[IO]
   }
 
-  private implicit lazy val projectDecoder: EntityDecoder[IO, ProjectAndCreator] = {
+  private implicit lazy val projectDecoder: EntityDecoder[IO, ProjectAndCreatorId] = {
 
     lazy val parentPathDecoder: Decoder[projects.Path] = _.downField("path_with_namespace").as[projects.Path]
 
-    implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
+    implicit val decoder: Decoder[ProjectAndCreatorId] = cursor =>
       for {
-        path        <- cursor.downField("path_with_namespace").as[projects.Path]
-        dateCreated <- cursor.downField("created_at").as[DateCreated]
-        creatorId   <- cursor.downField("creator_id").as[Int]
+        path           <- cursor.downField("path_with_namespace").as[projects.Path]
+        dateCreated    <- cursor.downField("created_at").as[DateCreated]
+        maybeCreatorId <- cursor.downField("creator_id").as[Option[Int]]
         maybeParentPath <- cursor
                             .downField("forked_from_project")
                             .as[Option[projects.Path]](decodeOption(parentPathDecoder))
-      } yield GitLabProject(path, maybeParentPath, maybeCreator = None, dateCreated) -> creatorId
+      } yield GitLabProject(path, maybeParentPath, maybeCreator = None, dateCreated) -> maybeCreatorId
 
-    jsonOf[IO, ProjectAndCreator]
+    jsonOf[IO, ProjectAndCreatorId]
   }
 
   private implicit lazy val creatorDecoder: EntityDecoder[IO, GitLabCreator] = {
@@ -113,6 +124,10 @@ private class IOGitLabInfoFinder(
       } yield GitLabCreator(maybeEmail orElse maybePublicEmail, maybeName)
 
     jsonOf[IO, GitLabCreator]
+  }
+
+  private implicit class IOOptionOps[T](io: IO[Option[T]]) {
+    lazy val toOptionT: OptionT[IO, T] = OptionT(io)
   }
 }
 

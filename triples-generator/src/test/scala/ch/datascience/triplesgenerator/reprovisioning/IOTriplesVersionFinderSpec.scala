@@ -28,10 +28,10 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.{Activity, Agent, Person, Project}
+import ch.datascience.rdfstore.entities.{Activity, Agent, Project}
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -86,14 +86,12 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
     val triplesVersionFinder       = new IOTriplesVersionFinder(rdfStoreConfig, schemaVersion, logger, sparqlTimeRecorder)
   }
 
-  private def commitActivity(schemaVersion: SchemaVersion, commitId: CommitId = commitIds.generateOne) = {
-    val committer: Person = persons.generateOne
+  private def commitActivity(schemaVersion: SchemaVersion, commitId: CommitId = commitIds.generateOne) =
     Activity(
       commitIds.generateOne,
       committedDates.generateOne,
-      committer,
-      Project(projectPaths.generateOne, projectNames.generateOne, projectCreatedDates.generateOne, committer),
+      persons.generateOne,
+      Project(projectPaths.generateOne, projectNames.generateOne, projectCreatedDates.generateOne, maybeCreator = None),
       Agent(schemaVersion)
     ).asJsonLD
-  }
 }
