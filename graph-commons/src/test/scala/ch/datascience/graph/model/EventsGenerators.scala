@@ -18,7 +18,6 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events._

@@ -21,6 +21,7 @@ package ch.datascience.dbeventlog.commands
 import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN, SECONDS => SEC}
 import java.time.{Duration, Instant}
 
+import cats.implicits._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
@@ -39,7 +40,7 @@ import org.scalatest.WordSpec
 
 import scala.language.postfixOps
 
-class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "isEventToProcess" should {
 
@@ -107,7 +108,7 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
 
   "popEventToProcess" should {
 
-    "find event with execution date farthest in the past " +
+    "return an event with execution date farthest in the past " +
       s"and status $New or $RecoverableFailure " +
       s"and mark it as $Processing" in new TestCase {
 
@@ -146,7 +147,7 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
 
-    s"find event with the $Processing status " +
+    s"return an event with the $Processing status " +
       "and execution date older than RenkuLogTimeout + 5 min" in new TestCase {
 
       val eventId        = commitEventIds.generateOne
@@ -166,7 +167,7 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
       findEvents(EventStatus.Processing) shouldBe List((eventId, executionDate, eventBatchDate))
     }
 
-    s"find no event when there there's one with $Processing status " +
+    s"return no event when there there's one with $Processing status " +
       "but execution date from less than RenkuLogTimeout + 1 min" in new TestCase {
 
       storeEvent(
@@ -180,7 +181,7 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
 
-    "find no events when there are no events matching the criteria" in new TestCase {
+    "return no events when there are no events matching the criteria" in new TestCase {
 
       storeNewEvent(
         commitEventIds.generateOne,
@@ -191,8 +192,8 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
       eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
     }
 
-    "find events not always from the same project " +
-      "even if some projects events' farthest execution dates are later" in new TestCase {
+    "return events from various projects " +
+      "even if some projects have events with execution dates far in the past" in new TestCase {
 
       val allProjectIds = nonEmptyList(projectIds, minElements = 2).generateOne
       val eventIdsBodiesDates = for {
@@ -208,9 +209,9 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      val eventsFetcher = new EventLogFetchImpl(transactor, renkuLogTimeout)
+      override val eventLogFetch = new EventLogFetchImpl(transactor, renkuLogTimeout)
       eventIdsBodiesDates.toList foreach { _ =>
-        eventsFetcher.popEventToProcess.unsafeRunSync() shouldBe a[Some[_]]
+        eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe a[Some[_]]
       }
 
       val commitEventsByExecutionOrder = findEvents(
@@ -220,13 +221,49 @@ class EventLogFetchImplSpec extends WordSpec with InMemoryEventLogDbSpec with Mo
       val commitEventsByExecutionDate = eventIdsBodiesDates.map(_._1)
       commitEventsByExecutionOrder.map(_.projectId) should not be commitEventsByExecutionDate.map(_.projectId).toList
     }
+
+    "return events from various projects " +
+      "even if there are events with execution dates far in the past " +
+      s"and $Processing status " in new TestCase {
+
+      val projectId1 = projectIds.generateOne
+      storeEvent(
+        CommitEventId(commitIds.generateOne, projectId1),
+        EventStatus.Processing,
+        ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN)),
+        committedDates.generateOne,
+        eventBodies.generateOne
+      )
+      val projectId2 = projectIds.generateOne
+      storeEvent(
+        CommitEventId(commitIds.generateOne, projectId2),
+        EventStatus.New,
+        ExecutionDate(now minus (1, MIN)),
+        committedDates.generateOne,
+        eventBodies.generateOne
+      )
+
+      findEvents(EventStatus.Processing).map(_._1.projectId) shouldBe List(projectId1)
+
+      override val eventLogFetch = new EventLogFetchImpl(
+        transactor,
+        renkuLogTimeout,
+        pickRandomlyFrom = _ => projectId2.some
+      )
+      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe a[Some[_]]
+
+      findEvents(
+        status  = Processing,
+        orderBy = fr"execution_date asc"
+      ).map(_._1.projectId) should contain theSameElementsAs List(projectId1, projectId2)
+    }
   }
 
   private trait TestCase {
 
     val currentTime       = mockFunction[Instant]
     val renkuLogTimeout   = renkuLogTimeouts.generateOne
-    val maxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 1
+    val maxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
     val eventLogFetch     = new EventLogFetchImpl(transactor, renkuLogTimeout, currentTime)
 
     val now           = Instant.now()
