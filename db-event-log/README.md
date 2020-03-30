@@ -26,11 +26,11 @@ The event-log is a part of multi-module sbt project thus it has to be built from
 - build the docker image
 
 ```bash
-docker build -f event-log/Dockerfile -t event-log .
+docker build -f db-event-log/Dockerfile -t event-log .
 ```
 
 - run the service
 
 ```bash
-docker run --rm -p 9005:9005 event-log
+docker run --rm -p 9005:9005 db-event-log
 ```
