@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.MonadError
 import cats.effect.{IO, Timer}
 import cats.implicits._
-import ch.datascience.dbeventlog.commands.{EventLogFetch, IOEventLogReScheduler}
+import ch.datascience.dbeventlog.commands.IOEventLogReScheduler
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
@@ -41,10 +41,6 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
 
     "clear the RDF Store and reschedule for processing all Commit Events in the Log if store outdated" in new TestCase {
       inSequence {
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
-
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
           .returning(context.pure(false))
@@ -64,81 +60,22 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
     }
 
     "do nothing if there all RDF store is up to date" in new TestCase {
-      inSequence {
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
-
-        (triplesVersionFinder.triplesUpToDate _)
-          .expects()
-          .returning(context.pure(true))
-      }
+      (triplesVersionFinder.triplesUpToDate _)
+        .expects()
+        .returning(context.pure(true))
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("All projects' triples up to date"))
-    }
-
-    "wait with re-provisioning until there are no events under processing" in new TestCase {
-      inSequence {
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(true))
-
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
-
-        (triplesVersionFinder.triplesUpToDate _)
-          .expects()
-          .returning(context.pure(true))
-      }
-
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
-
-      logger.loggedOnly(Info("All projects' triples up to date"))
-    }
-
-    "do not fail but simply retry if checking if there are events being processed fails" in new TestCase {
-      val exception = exceptions.generateOne
-
-      inSequence {
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.raiseError(exception))
-
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
-
-        (triplesVersionFinder.triplesUpToDate _)
-          .expects()
-          .returning(context.pure(true))
-      }
-
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
-
-      logger.loggedOnly(
-        Error("Re-provisioning failure", exception),
-        Info("All projects' triples up to date")
-      )
     }
 
     "do not fail but simply retry if checking if RDF store is up to date fails" in new TestCase {
       val exception = exceptions.generateOne
 
       inSequence {
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
-
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
           .returning(context.raiseError(exception))
-
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
 
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
@@ -157,10 +94,6 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
 
       inSequence {
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
-
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
           .returning(context.pure(false))
@@ -168,10 +101,6 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(context.raiseError(exception))
-
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
 
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
@@ -198,10 +127,6 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
 
       inSequence {
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
-
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
           .returning(context.pure(false))
@@ -213,10 +138,6 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
         (eventLogReScheduler.scheduleEventsForProcessing _)
           .expects()
           .returning(context.raiseError(exception))
-
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
 
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
@@ -240,15 +161,9 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
     }
 
     "start re-provisioning after the initial delay" in new TestCase {
-      inSequence {
-        (eventLogFetch.isEventToProcess _)
-          .expects()
-          .returning(context.pure(false))
-
-        (triplesVersionFinder.triplesUpToDate _)
-          .expects()
-          .returning(context.pure(true))
-      }
+      (triplesVersionFinder.triplesUpToDate _)
+        .expects()
+        .returning(context.pure(true))
 
       val someInitialDelay: ReProvisioningDelay = ReProvisioningDelay(500 millis)
 
@@ -258,7 +173,6 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
         triplesVersionFinder,
         triplesRemover,
         eventLogReScheduler,
-        eventLogFetch,
         someInitialDelay,
         executionTimeRecorder,
         logger,
@@ -279,7 +193,6 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
     val triplesVersionFinder  = mock[TriplesVersionFinder[IO]]
     val triplesRemover        = mock[TriplesRemover[IO]]
     val eventLogReScheduler   = mock[IOEventLogReScheduler]
-    val eventLogFetch         = mock[EventLogFetch[IO]]
     val initialDelay          = ReProvisioningDelay(durations(100 millis).generateOne)
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder(logger)
@@ -287,7 +200,6 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
       triplesVersionFinder,
       triplesRemover,
       eventLogReScheduler,
-      eventLogFetch,
       initialDelay,
       executionTimeRecorder,
       logger,
