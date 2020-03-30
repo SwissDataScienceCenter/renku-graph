@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "eventLog.fullname" . }}
+  labels:
+    app: {{ template "eventLog.name" . }}
+    chart: {{ template "graph.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '9005'
+spec:
+  type: {{ .Values.eventLog.service.type }}
+  ports:
+    - port: {{ .Values.eventLog.service.port }}
+      targetPort: http-event-log
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ template "eventLog.name" . }}
+    release: {{ .Release.Name }}

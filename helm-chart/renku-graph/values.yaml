@@ -91,6 +91,21 @@ knowledgeGraph:
       ## Renku resource are available at: https://{global.renku.domain}/knowledge-graph
       resourcesPath: "/knowledge-graph"
 
+eventLog:
+  image:
+    repository: renku/db-event-log
+    tag: 'latest'
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 9005
+  resources:
+    limits:
+      memory: 250Mi
+  jvmXmx: 250m
+  threadsNumber: 6
+  connectionPool: 10
+
 sentry:
   enabled: false
   url: '' # Sentry url
