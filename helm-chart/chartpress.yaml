@@ -23,3 +23,7 @@ charts:
         contextPath: ..
         dockerfilePath: ../knowledge-graph/Dockerfile
         valuesPath: knowledgeGraph.image
+      event-log:
+        contextPath: ..
+        dockerfilePath: ../db-event-log/Dockerfile
+        valuesPath: eventLog.image
