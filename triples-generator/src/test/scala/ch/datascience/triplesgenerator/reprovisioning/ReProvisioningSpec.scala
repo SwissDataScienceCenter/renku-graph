@@ -181,7 +181,7 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
 
       val endTime = System.currentTimeMillis()
 
-      (endTime - startTime) should be > someInitialDelay.value.toMillis
+      (endTime - startTime) should be >= someInitialDelay.value.toMillis
     }
   }
 
