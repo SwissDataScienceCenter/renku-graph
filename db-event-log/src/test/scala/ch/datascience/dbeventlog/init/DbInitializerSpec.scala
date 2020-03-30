@@ -36,7 +36,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactory {
+class DbInitializerSpec extends WordSpec with DbInitSpec with MockFactory {
 
   "run" should {
 
@@ -168,7 +168,7 @@ class EventLogDbInitializerSpec extends WordSpec with DbInitSpec with MockFactor
     val projectPathAdder = mock[IOProjectPathAdder]
     val batchDateAdder   = mock[IOBatchDateAdder]
     val logger           = TestLogger[IO]()
-    val dbInitializer    = new EventLogDbInitializer[IO](projectPathAdder, batchDateAdder, transactor, logger)
+    val dbInitializer    = new DbInitializer[IO](projectPathAdder, batchDateAdder, transactor, logger)
   }
 
   private class IOProjectPathAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])

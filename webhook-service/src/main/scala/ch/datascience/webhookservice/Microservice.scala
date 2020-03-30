@@ -25,7 +25,6 @@ import ch.datascience.config.GitLab
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.db.DbTransactorResource
-import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
@@ -100,7 +99,6 @@ object Microservice extends IOMicroservice {
 
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,
-                     new IOEventLogDbInitializer(transactor),
                      new IOEventsSynchronizationScheduler(transactor,
                                                           tokenRepositoryUrl,
                                                           gitLabUrl,
@@ -113,7 +111,6 @@ object Microservice extends IOMicroservice {
 }
 
 class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],
-                         eventLogDbInitializer:          IOEventLogDbInitializer,
                          eventsSynchronizationScheduler: EventsSynchronizationScheduler[IO],
                          httpServer:                     HttpServer[IO])(implicit contextShift: ContextShift[IO]) {
   import cats.implicits._
@@ -121,7 +118,6 @@ class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],
   def run(args: List[String]): IO[ExitCode] =
     for {
       _ <- sentryInitializer.run
-      _ <- eventLogDbInitializer.run
       _ <- List(httpServer.run.start, eventsSynchronizationScheduler.run).sequence
     } yield ExitCode.Success
 }

@@ -22,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.effect._
 import ch.datascience.dbeventlog.commands.EventLogStats
-import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
@@ -44,13 +43,9 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   "run" should {
 
     "return Success ExitCode if " +
-      "Sentry, Event Log db and RDF dataset initialize fine and " +
+      "Sentry and RDF dataset initialisation are fine and " +
       "the re-provisioning, the Event Processor and the http server start up" in new TestCase {
       (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventLogDbInitializer.run _)
         .expects()
         .returning(IO.unit)
 
@@ -88,27 +83,8 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if Event Log db verification fails" in new TestCase {
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      val exception = exceptions.generateOne
-      (eventLogDbInitializer.run _)
-        .expects()
-        .returning(IO.raiseError(exception))
-
-      intercept[Exception] {
-        microserviceRunner.run(Nil).unsafeRunSync()
-      } shouldBe exception
-    }
-
     "fail if RDF dataset verification fails" in new TestCase {
       (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventLogDbInitializer.run _)
         .expects()
         .returning(IO.unit)
 
@@ -124,10 +100,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
     "fail if starting the Http Server fails" in new TestCase {
       (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventLogDbInitializer.run _)
         .expects()
         .returning(IO.unit)
 
@@ -162,10 +134,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (eventLogDbInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
       (datasetInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -192,10 +160,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
     "return Success ExitCode even if Event Log Metrics fails" in new TestCase {
       (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventLogDbInitializer.run _)
         .expects()
         .returning(IO.unit)
 
@@ -228,10 +192,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (eventLogDbInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
       (datasetInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -258,16 +218,14 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val sentryInitializer     = mock[IOSentryInitializer]
-    val eventLogDbInitializer = mock[IOEventLogDbInitializer]
-    val datasetInitializer    = mock[IOFusekiDatasetInitializer]
-    val reProvisioning        = mock[IOReProvisioning]
-    val eventProcessorRunner  = mock[IOEventProcessorRunner]
-    val eventLogMetrics       = mock[IOEventLogMetrics]
-    val httpServer            = mock[IOHttpServer]
+    val sentryInitializer    = mock[IOSentryInitializer]
+    val datasetInitializer   = mock[IOFusekiDatasetInitializer]
+    val reProvisioning       = mock[IOReProvisioning]
+    val eventProcessorRunner = mock[IOEventProcessorRunner]
+    val eventLogMetrics      = mock[IOEventLogMetrics]
+    val httpServer           = mock[IOHttpServer]
     val microserviceRunner = new MicroserviceRunner(
       sentryInitializer,
-      eventLogDbInitializer,
       datasetInitializer,
       reProvisioning,
       eventProcessorRunner,

@@ -35,7 +35,7 @@ triplesGenerator:
       memory: 2000Mi
   jvmXmx: 1G
   renkuLogTimeout: 60 minutes
-  reProvisioningInitialDelay: 1 second
+  reProvisioningInitialDelay: 1 minute
   gitlab:
     rateLimit: 30/sec
   generationProcessInitialDelay: 2 minutes

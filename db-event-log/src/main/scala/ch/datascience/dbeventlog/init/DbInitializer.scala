@@ -29,7 +29,7 @@ import io.chrisdavenport.log4cats.Logger
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class EventLogDbInitializer[Interpretation[_]](
+class DbInitializer[Interpretation[_]](
     projectPathAdder: ProjectPathAdder[Interpretation],
     batchDateAdder:   BatchDateAdder[Interpretation],
     transactor:       DbTransactor[Interpretation, EventLogDB],
@@ -78,12 +78,13 @@ class EventLogDbInitializer[Interpretation[_]](
   }
 }
 
-class IOEventLogDbInitializer(
-    transactor:          DbTransactor[IO, EventLogDB]
+class IODbInitializer(
+    transactor:          DbTransactor[IO, EventLogDB],
+    logger:              Logger[IO]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogDbInitializer[IO](
-      new ProjectPathAdder[IO](transactor, ApplicationLogger),
-      new BatchDateAdder[IO](transactor, ApplicationLogger),
+    extends DbInitializer[IO](
+      new ProjectPathAdder[IO](transactor, logger),
+      new BatchDateAdder[IO](transactor, logger),
       transactor,
-      ApplicationLogger
+      logger
     )

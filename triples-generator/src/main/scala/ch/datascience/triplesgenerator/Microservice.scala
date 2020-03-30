@@ -27,7 +27,6 @@ import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
-import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
@@ -85,7 +84,6 @@ object Microservice extends IOMicroservice {
                                  .withEventsProcessor(commitEventProcessor)
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,
-                     new IOEventLogDbInitializer(transactor),
                      fusekiDatasetInitializer,
                      reProvisioning,
                      eventProcessorRunner,
@@ -99,7 +97,6 @@ object Microservice extends IOMicroservice {
 
 private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
-    eventLogDbInitializer:    IOEventLogDbInitializer,
     datasetInitializer:       FusekiDatasetInitializer[IO],
     reProvisioning:           ReProvisioning[IO],
     eventProcessorRunner:     EventProcessorRunner[IO],
@@ -111,7 +108,6 @@ private class MicroserviceRunner(
   def run(args: List[String]): IO[ExitCode] =
     for {
       _        <- sentryInitializer.run
-      _        <- eventLogDbInitializer.run
       _        <- datasetInitializer.run
       _        <- reProvisioning.run.start.map(gatherCancelToken)
       _        <- eventProcessorRunner.run.start.map(gatherCancelToken)

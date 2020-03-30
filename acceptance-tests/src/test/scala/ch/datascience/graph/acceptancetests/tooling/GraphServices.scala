@@ -39,10 +39,12 @@ trait GraphServices extends BeforeAndAfterAll {
   protected val tokenRepositoryClient:  ServiceClient        = GraphServices.tokenRepositoryClient
   protected val triplesGeneratorClient: ServiceClient        = GraphServices.triplesGeneratorClient
   protected val knowledgeGraphClient:   KnowledgeGraphClient = GraphServices.knowledgeGraphClient
+  protected val eventLogClient:         ServiceClient        = GraphServices.eventLogClient
   protected val webhookService:         ServiceRun           = GraphServices.webhookService
   protected val tokenRepository:        ServiceRun           = GraphServices.tokenRepository
   protected val triplesGenerator:       ServiceRun           = GraphServices.triplesGenerator
   protected val knowledgeGraph:         ServiceRun           = GraphServices.knowledgeGraph
+  protected val eventLog:               ServiceRun           = GraphServices.eventLog
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -52,7 +54,8 @@ trait GraphServices extends BeforeAndAfterAll {
         webhookService,
         tokenRepository,
         triplesGenerator,
-        knowledgeGraph
+        knowledgeGraph,
+        eventLog
       )
       .unsafeRunSync()
   }
@@ -71,10 +74,12 @@ object GraphServices {
   val triplesGeneratorClient = TriplesGeneratorClient()
   val tokenRepositoryClient  = TokenRepositoryClient()
   val knowledgeGraphClient   = KnowledgeGraphClient()
+  val eventLogClient         = EventLogClient()
 
   val webhookService  = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
   val tokenRepository = ServiceRun("token-repository", tokenrepository.Microservice, tokenRepositoryClient)
   val knowledgeGraph  = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
+  val eventLog        = ServiceRun("event-log", dbeventlog.Microservice, eventLogClient)
   val triplesGenerator = ServiceRun(
     "triples-generator",
     service          = triplesgenerator.Microservice,

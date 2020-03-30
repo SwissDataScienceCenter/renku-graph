@@ -128,6 +128,15 @@ object KnowledgeGraphClient {
   }
 }
 
+object EventLogClient {
+  def apply()(implicit executionContext: ExecutionContext,
+              contextShift:              ContextShift[IO],
+              timer:                     Timer[IO]): ServiceClient =
+    new ServiceClient {
+      override val baseUrl: String Refined Url = "http://localhost:9005"
+    }
+}
+
 abstract class ServiceClient(implicit executionContext: ExecutionContext,
                              contextShift:              ContextShift[IO],
                              timer:                     Timer[IO])
