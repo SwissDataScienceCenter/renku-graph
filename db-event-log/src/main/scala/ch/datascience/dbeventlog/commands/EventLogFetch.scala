@@ -43,10 +43,11 @@ trait EventLogFetch[Interpretation[_]] {
 }
 
 class EventLogFetchImpl[Interpretation[_]](
-    transactor:      DbTransactor[Interpretation, EventLogDB],
-    renkuLogTimeout: RenkuLogTimeout,
-    now:             () => Instant = () => Instant.now
-)(implicit ME:       Bracket[Interpretation, Throwable])
+    transactor:       DbTransactor[Interpretation, EventLogDB],
+    renkuLogTimeout:  RenkuLogTimeout,
+    now:              () => Instant = () => Instant.now,
+    pickRandomlyFrom: List[projects.Id] => Option[projects.Id] = ids => ids.get(Random nextInt ids.size)
+)(implicit ME:        Bracket[Interpretation, Throwable])
     extends EventLogFetch[Interpretation] {
 
   private lazy val MaxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
@@ -90,9 +91,11 @@ class EventLogFetchImpl[Interpretation[_]](
   private def findOldestEvent(id: projects.Id) = {
     fr"""select event_log.event_id, event_log.project_id, event_log.event_body
          from event_log
-         where project_id = $id and 
-           (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
+         where project_id = $id
+           and (
+             (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
              or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
+           )
          order by execution_date asc
          limit 1"""
   }.query[EventIdAndBody].option
@@ -104,7 +107,7 @@ class EventLogFetchImpl[Interpretation[_]](
   private lazy val selectRandom: List[projects.Id] => Option[projects.Id] = {
     case Nil           => None
     case single +: Nil => Some(single)
-    case many          => many.get(Random.nextInt(many.size))
+    case many          => pickRandomlyFrom(many)
   }
 
   private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventBody]] = {

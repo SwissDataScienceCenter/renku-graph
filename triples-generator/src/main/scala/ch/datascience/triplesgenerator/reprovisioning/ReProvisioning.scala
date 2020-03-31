@@ -23,7 +23,7 @@ import cats.effect.Timer
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogReScheduler, IOEventLogFetch}
+import ch.datascience.dbeventlog.commands.EventLogReScheduler
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
@@ -40,14 +40,12 @@ class ReProvisioning[Interpretation[_]](
     triplesVersionFinder:  TriplesVersionFinder[Interpretation],
     triplesRemover:        TriplesRemover[Interpretation],
     eventLogReScheduler:   EventLogReScheduler[Interpretation],
-    eventLogFetch:         EventLogFetch[Interpretation],
     reProvisioningDelay:   ReProvisioningDelay,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation],
     sleepWhenBusy:         FiniteDuration
 )(implicit ME:             MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
 
-  import eventLogFetch._
   import eventLogReScheduler._
   import executionTimeRecorder._
   import triplesRemover._
@@ -57,16 +55,10 @@ class ReProvisioning[Interpretation[_]](
     timer.sleep(reProvisioningDelay.value) *> startReProvisioning
 
   private def startReProvisioning: Interpretation[Unit] =
-    isEventToProcess flatMap {
-      case false => reProvisionIfNeeded
-      case true  => (timer sleep sleepWhenBusy) *> startReProvisioning
-    } recoverWith tryAgain
-
-  private def reProvisionIfNeeded: Interpretation[Unit] =
     triplesUpToDate.flatMap {
       case false => triggerReProvisioning
       case true  => logger.info("All projects' triples up to date")
-    }
+    } recoverWith tryAgain
 
   private def triggerReProvisioning =
     measureExecutionTime {
@@ -122,12 +114,10 @@ object IOReProvisioning {
       initialDelay <- find[IO, FiniteDuration]("re-provisioning-initial-delay", configuration)
                        .flatMap(delay => ME.fromEither(ReProvisioningDelay.from(delay)))
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-      eventsFetcher         <- IOEventLogFetch(dbTransactor)
     } yield new ReProvisioning[IO](
       new IOTriplesVersionFinder(rdfStoreConfig, schemaVersion, logger, timeRecorder),
       new IOTriplesRemover(rdfStoreConfig, logger, timeRecorder),
       new EventLogReScheduler[IO](dbTransactor),
-      eventsFetcher,
       initialDelay,
       executionTimeRecorder,
       logger,

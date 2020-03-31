@@ -126,7 +126,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       "path":    ${parent.path.value},
       "name":    ${parent.name.value},
       "created": ${parent.created}
-    }""" deepMerge (parent.created.maybeCreator.map(creator => json"""{"creator": $creator}""") getOrElse Json.obj())
+    }"""
   }
 
   private implicit lazy val creationEncoder: Encoder[Creation] = Encoder.instance[Creation] { created =>

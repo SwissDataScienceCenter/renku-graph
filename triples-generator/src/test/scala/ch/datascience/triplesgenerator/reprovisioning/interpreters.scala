@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogFetch, EventLogReScheduler}
+import ch.datascience.dbeventlog.commands.EventLogReScheduler
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
@@ -31,7 +31,6 @@ import scala.util.Try
 class IOReProvisioning(triplesFinder:         TriplesVersionFinder[IO],
                        triplesRemover:        TriplesRemover[IO],
                        eventLogReScheduler:   EventLogReScheduler[IO],
-                       eventLogFetch:         EventLogFetch[IO],
                        reProvisioningDelay:   ReProvisioningDelay,
                        executionTimeRecorder: ExecutionTimeRecorder[IO],
                        logger:                Logger[IO],
@@ -39,7 +38,6 @@ class IOReProvisioning(triplesFinder:         TriplesVersionFinder[IO],
     extends ReProvisioning[IO](triplesFinder,
                                triplesRemover,
                                eventLogReScheduler,
-                               eventLogFetch,
                                reProvisioningDelay,
                                executionTimeRecorder,
                                logger,
