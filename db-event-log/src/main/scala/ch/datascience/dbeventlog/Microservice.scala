@@ -18,10 +18,13 @@
 
 package ch.datascience.dbeventlog
 
+import java.util.concurrent.ConcurrentHashMap
+
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.init.IODbInitializer
+import ch.datascience.dbeventlog.metrics.{EventLogMetrics, IOEventLogMetrics}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -42,6 +45,7 @@ object Microservice extends IOMicroservice {
       for {
         sentryInitializer <- SentryInitializer[IO]
         metricsRegistry   <- MetricsRegistry()
+        eventLogMetrics   <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
         routes <- new MicroserviceRoutes[IO](
                    new RoutesMetrics[IO](metricsRegistry)
                  ).routes
@@ -50,22 +54,32 @@ object Microservice extends IOMicroservice {
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,
                      new IODbInitializer(transactor, ApplicationLogger),
-                     httpServer
+                     eventLogMetrics,
+                     httpServer,
+                     subProcessesCancelTokens
                    ) run args
       } yield exitCode
     }
 }
 
 private class MicroserviceRunner(
-    sentryInitializer:     SentryInitializer[IO],
-    eventLogDbInitializer: IODbInitializer,
-    httpServer:            HttpServer[IO]
-) {
+    sentryInitializer:        SentryInitializer[IO],
+    eventLogDbInitializer:    IODbInitializer,
+    metrics:                  EventLogMetrics,
+    httpServer:               HttpServer[IO],
+    subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
+)(implicit contextShift:      ContextShift[IO]) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
       _      <- sentryInitializer.run
       _      <- eventLogDbInitializer.run
+      _      <- metrics.run.start.map(gatherCancelToken)
       result <- httpServer.run
     } yield result
+
+  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
+    subProcessesCancelTokens.put(fiber.cancel, ())
+    fiber
+  }
 }

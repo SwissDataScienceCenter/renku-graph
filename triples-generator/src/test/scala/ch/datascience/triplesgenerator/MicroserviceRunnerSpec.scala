@@ -21,17 +21,13 @@ package ch.datascience.triplesgenerator
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.effect._
-import ch.datascience.dbeventlog.commands.EventLogStats
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessorRunner
 import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
-import ch.datascience.triplesgenerator.metrics.EventLogMetrics
 import ch.datascience.triplesgenerator.reprovisioning.IOReProvisioning
-import io.chrisdavenport.log4cats.Logger
-import io.prometheus.client.Gauge
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -58,10 +54,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
 
       (eventProcessorRunner.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventLogMetrics.run _)
         .expects()
         .returning(IO.unit)
 
@@ -111,10 +103,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (eventLogMetrics.run _)
-        .expects()
-        .returning(IO.unit)
-
       (reProvisioning.run _)
         .expects()
         .returning(IO.unit)
@@ -143,39 +131,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.raiseError(exception))
 
-      (eventLogMetrics.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (reProvisioning.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (httpServer.run _)
-        .expects()
-        .returning(IO.pure(ExitCode.Success))
-
-      microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
-    }
-
-    "return Success ExitCode even if Event Log Metrics fails" in new TestCase {
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (datasetInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventProcessorRunner.run _)
-        .expects()
-        .returning(IO.unit)
-
-      val exception = exceptions.generateOne
-      (eventLogMetrics.run _)
-        .expects()
-        .returning(IO.raiseError(exception))
-
       (reProvisioning.run _)
         .expects()
         .returning(IO.unit)
@@ -200,10 +155,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (eventLogMetrics.run _)
-        .expects()
-        .returning(IO.unit)
-
       (httpServer.run _)
         .expects()
         .returning(IO.pure(ExitCode.Success))
@@ -222,14 +173,12 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
     val datasetInitializer   = mock[IOFusekiDatasetInitializer]
     val reProvisioning       = mock[IOReProvisioning]
     val eventProcessorRunner = mock[IOEventProcessorRunner]
-    val eventLogMetrics      = mock[IOEventLogMetrics]
     val httpServer           = mock[IOHttpServer]
     val microserviceRunner = new MicroserviceRunner(
       sentryInitializer,
       datasetInitializer,
       reProvisioning,
       eventProcessorRunner,
-      eventLogMetrics,
       httpServer,
       new ConcurrentHashMap[CancelToken[IO], Unit]()
     )
@@ -237,11 +186,4 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
   private implicit val cs:    ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val timer: Timer[IO]        = IO.timer(ExecutionContext.global)
-
-  class IOEventLogMetrics(eventLogStats:      EventLogStats[IO],
-                          logger:             Logger[IO],
-                          waitingEventsGauge: Gauge,
-                          statusesGauge:      Gauge,
-                          totalGauge:         Gauge)
-      extends EventLogMetrics(eventLogStats, logger, waitingEventsGauge, statusesGauge, totalGauge)
 }

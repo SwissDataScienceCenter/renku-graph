@@ -29,7 +29,6 @@ import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.commands.IOEventLogFetch
 import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
@@ -37,7 +36,6 @@ import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.init._
-import ch.datascience.triplesgenerator.metrics.{EventLogMetrics, IOEventLogMetrics}
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning}
 import pureconfig._
 
@@ -74,7 +72,6 @@ object Microservice extends IOMicroservice {
         triplesGenerator         <- TriplesGenerator(triplesGeneration)
         routes                   <- new MicroserviceRoutes[IO](new RoutesMetrics[IO](metricsRegistry)).routes
         eventsFetcher            <- IOEventLogFetch(transactor)
-        eventLogMetrics          <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
         commitEventProcessor <- IOCommitEventProcessor(transactor,
                                                        triplesGenerator,
                                                        metricsRegistry,
@@ -87,7 +84,6 @@ object Microservice extends IOMicroservice {
                      fusekiDatasetInitializer,
                      reProvisioning,
                      eventProcessorRunner,
-                     eventLogMetrics,
                      new HttpServer[IO](serverPort = 9002, routes),
                      subProcessesCancelTokens
                    ) run args
@@ -100,7 +96,6 @@ private class MicroserviceRunner(
     datasetInitializer:       FusekiDatasetInitializer[IO],
     reProvisioning:           ReProvisioning[IO],
     eventProcessorRunner:     EventProcessorRunner[IO],
-    eventLogMetrics:          EventLogMetrics,
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
@@ -111,7 +106,6 @@ private class MicroserviceRunner(
       _        <- datasetInitializer.run
       _        <- reProvisioning.run.start.map(gatherCancelToken)
       _        <- eventProcessorRunner.run.start.map(gatherCancelToken)
-      _        <- eventLogMetrics.run.start.map(gatherCancelToken)
       exitCode <- httpServer.run
     } yield exitCode
 

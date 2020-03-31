@@ -18,22 +18,33 @@
 
 package ch.datascience.dbeventlog
 
+import java.util.concurrent.ConcurrentHashMap
+
 import cats.MonadError
 import cats.effect._
+import ch.datascience.dbeventlog.commands.EventLogStats
 import ch.datascience.dbeventlog.init.IODbInitializer
+import ch.datascience.dbeventlog.metrics.EventLogMetrics
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
+import io.chrisdavenport.log4cats.Logger
+import io.prometheus.client.Gauge
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.FiniteDuration
 
 class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
   "run" should {
 
-    "return Success Exit Code if Sentry and the DB initialisation are fine and http server starts up" in new TestCase {
+    "return Success Exit Code " +
+      "if Sentry, DB and metrics initialisation are fine " +
+      "and http server starts up" in new TestCase {
 
       (sentryInitializer.run _)
         .expects()
@@ -42,6 +53,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       (dbInitializer.run _)
         .expects()
         .returning(context.unit)
+
+      (metrics.run _)
+        .expects()
+        .returning(IO.unit)
 
       (httpServer.run _)
         .expects()
@@ -88,6 +103,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(context.unit)
 
+      (metrics.run _)
+        .expects()
+        .returning(IO.unit)
+
       val exception = exceptions.generateOne
       (httpServer.run _)
         .expects()
@@ -97,14 +116,64 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         runner.run(Nil).unsafeRunSync()
       } shouldBe exception
     }
+
+    "return Success ExitCode even if Event Log Metrics initialisation fails" in new TestCase {
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (dbInitializer.run _)
+        .expects()
+        .returning(context.unit)
+
+      val exception = exceptions.generateOne
+      (metrics.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      (httpServer.run _)
+        .expects()
+        .returning(context.pure(ExitCode.Success))
+
+      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+    }
   }
+
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
     val sentryInitializer = mock[IOSentryInitializer]
     val dbInitializer     = mock[IODbInitializer]
+    val metrics           = mock[TestEventLogMetrics]
     val httpServer        = mock[IOHttpServer]
-    val runner            = new MicroserviceRunner(sentryInitializer, dbInitializer, httpServer)
+    val runner = new MicroserviceRunner(sentryInitializer,
+                                        dbInitializer,
+                                        metrics,
+                                        httpServer,
+                                        new ConcurrentHashMap[CancelToken[IO], Unit]())
+
+    class TestEventLogMetrics(
+        eventLogStats:         EventLogStats[IO],
+        logger:                Logger[IO],
+        waitingEventsGauge:    Gauge,
+        statusesGauge:         Gauge,
+        totalGauge:            Gauge,
+        interval:              FiniteDuration,
+        statusesInterval:      FiniteDuration,
+        waitingEventsInterval: FiniteDuration
+    )(implicit ME:             MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
+        extends EventLogMetrics(
+          eventLogStats,
+          logger,
+          waitingEventsGauge,
+          statusesGauge,
+          totalGauge,
+          interval,
+          statusesInterval,
+          waitingEventsInterval
+        )
   }
 }

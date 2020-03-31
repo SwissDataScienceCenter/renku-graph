@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.metrics
+package ch.datascience.dbeventlog.metrics
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -29,7 +29,7 @@ import ch.datascience.dbeventlog.commands.EventLogStats
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.interpreters.{TestDbTransactor, TestLogger}

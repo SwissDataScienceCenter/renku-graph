@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.metrics
+package ch.datascience.dbeventlog.metrics
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
