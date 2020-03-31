@@ -56,6 +56,7 @@ lazy val dbEventLog = Project(
   graphCommons % "compile->compile",
   graphCommons % "test->test"
 ).enablePlugins(
+  JavaAppPackaging,
   AutomateHeaderPlugin
 )
 

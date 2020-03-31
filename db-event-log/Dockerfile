@@ -14,10 +14,10 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositor
 
 FROM openjdk:8-jre-alpine3.9
 
-WORKDIR /opt/token-repository
+WORKDIR /opt/db-event-log
 
 # Add artifacts from builder
-COPY --from=builder /work/token-repository/target/universal/stage .
+COPY --from=builder /work/db-event-log/target/universal/stage .
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
