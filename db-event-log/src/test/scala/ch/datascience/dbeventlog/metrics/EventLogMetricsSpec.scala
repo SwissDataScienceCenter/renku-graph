@@ -25,7 +25,6 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.commands.EventLogStats
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -53,13 +52,13 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
     "update the gauges with the fetched values" in new TestCase {
 
       val waitingEvents = waitingEventsGen.generateOne
-      (eventLogStats.waitingEvents _)
+      (statsFinder.waitingEvents _)
         .expects()
         .returning(waitingEvents.pure[IO])
         .atLeastOnce()
 
       val statuses = statuesGen.generateOne
-      (eventLogStats.statuses _)
+      (statsFinder.statuses _)
         .expects()
         .returning(statuses.pure[IO])
         .atLeastOnce()
@@ -97,7 +96,7 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
                                    project3 -> positiveLongs().generateOne.value)
       val waitingEventsCall3 = Map(project1 -> 0L, project2 -> 0L, project3 -> positiveLongs().generateOne.value)
 
-      override lazy val eventLogStats: EventLogStats[IO] = new EventLogStats[IO] {
+      override lazy val statsFinder: StatsFinder[IO] = new StatsFinder[IO] {
 
         override def statuses: IO[Map[EventStatus, Long]] = statuesGen.generateOne.pure[IO]
 
@@ -139,20 +138,20 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
 
     "log an eventual error and continue collecting the metrics" in new TestCase {
       val exception1 = exceptions.generateOne
-      (eventLogStats.statuses _)
+      (statsFinder.statuses _)
         .expects()
         .returning(exception1.raiseError[IO, Map[EventStatus, Long]])
       val exception2 = exceptions.generateOne
-      (eventLogStats.waitingEvents _)
+      (statsFinder.waitingEvents _)
         .expects()
         .returning(exception2.raiseError[IO, Map[Path, Long]])
       val statuses = statuesGen.generateOne
-      (eventLogStats.statuses _)
+      (statsFinder.statuses _)
         .expects()
         .returning(statuses.pure[IO])
         .atLeastOnce()
       val waitingEvents = waitingEventsGen.generateOne
-      (eventLogStats.waitingEvents _)
+      (statsFinder.waitingEvents _)
         .expects()
         .returning(waitingEvents.pure[IO])
         .atLeastOnce()
@@ -220,10 +219,10 @@ class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with
   }
 
   private trait TestCase extends TestGauges {
-    lazy val eventLogStats: EventLogStats[IO] = mock[EventLogStats[IO]]
+    lazy val statsFinder: StatsFinder[IO] = mock[StatsFinder[IO]]
     lazy val logger = TestLogger[IO]()
     lazy val metrics = new EventLogMetrics(
-      eventLogStats,
+      statsFinder,
       logger,
       waitingEventsGauge,
       statusesGauge,

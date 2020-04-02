@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.metrics
 
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
+import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -32,7 +33,7 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EventLogStatsSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaCheckPropertyChecks {
+class StatsFinderSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaCheckPropertyChecks {
 
   "statuses" should {
 
@@ -72,7 +73,7 @@ class EventLogStatsSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaC
     }
   }
 
-  private val stats = new EventLogStatsImpl(transactor)
+  private val stats = new StatsFinderImpl(transactor)
 
   private def store: ((Path, EventId, EventStatus)) => Unit = {
     case (projectPath, eventId, status) =>

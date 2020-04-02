@@ -22,7 +22,6 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.commands.{EventLogStats, IOEventLogStats}
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.MetricsRegistry
@@ -34,7 +33,7 @@ import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
 class EventLogMetrics(
-    eventLogStats:         EventLogStats[IO],
+    statsFinder:           StatsFinder[IO],
     logger:                Logger[IO],
     waitingEventsGauge:    Gauge,
     statusesGauge:         Gauge,
@@ -55,7 +54,7 @@ class EventLogMetrics(
 
   private def updateStatuses(): IO[Unit] = {
     for {
-      statuses <- eventLogStats.statuses
+      statuses <- statsFinder.statuses
       _ = statuses foreach toStatusesGauge
       _ = totalGauge set statuses.values.sum
       _ <- (timer sleep statusesInterval) *> updateStatuses()
@@ -68,7 +67,7 @@ class EventLogMetrics(
 
   private def updateWaitingEvents(previousState: Map[Path, Long] = Map.empty): IO[Unit] = {
     for {
-      waitingEvents <- eventLogStats.waitingEvents
+      waitingEvents <- statsFinder.waitingEvents
       newState = removeZeroCountProjects(waitingEvents, previousState)
       _        = newState foreach toWaitingEventsGauge
       _ <- (timer sleep waitingEventsInterval) *> updateWaitingEvents(newState)
@@ -139,5 +138,5 @@ object IOEventLogMetrics {
       waitingEventsGauge <- metricsRegistry.register[Gauge, Gauge.Builder](waitingEventsGaugeBuilder)
       statusesGauge      <- metricsRegistry.register[Gauge, Gauge.Builder](statusesGaugeBuilder)
       totalGauge         <- metricsRegistry.register[Gauge, Gauge.Builder](totalGaugeBuilder)
-    } yield new EventLogMetrics(new IOEventLogStats(transactor), logger, waitingEventsGauge, statusesGauge, totalGauge)
+    } yield new EventLogMetrics(new IOStatsFinder(transactor), logger, waitingEventsGauge, statusesGauge, totalGauge)
 }

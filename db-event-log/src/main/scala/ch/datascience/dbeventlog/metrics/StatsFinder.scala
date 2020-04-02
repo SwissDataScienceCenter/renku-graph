@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.metrics
 
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
@@ -28,15 +28,17 @@ import doobie.implicits._
 
 import scala.language.higherKinds
 
-trait EventLogStats[Interpretation[_]] {
+trait StatsFinder[Interpretation[_]] {
   def statuses:      Interpretation[Map[EventStatus, Long]]
   def waitingEvents: Interpretation[Map[Path, Long]]
 }
 
-class EventLogStatsImpl[Interpretation[_]](
+private class StatsFinderImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventLogStats[Interpretation] {
+    extends StatsFinder[Interpretation] {
+
+  import TypesSerializers._
 
   override def statuses: Interpretation[Map[EventStatus, Long]] =
     sql"""select status, count(event_id) from event_log group by status;""".stripMargin
@@ -68,7 +70,7 @@ class EventLogStatsImpl[Interpretation[_]](
       .map(_.toMap)
 }
 
-class IOEventLogStats(
+private class IOStatsFinder(
     transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogStatsImpl[IO](transactor)
+    extends StatsFinderImpl[IO](transactor)

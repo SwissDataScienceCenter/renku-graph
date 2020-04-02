@@ -22,9 +22,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.MonadError
 import cats.effect._
-import ch.datascience.dbeventlog.commands.EventLogStats
 import ch.datascience.dbeventlog.init.IODbInitializer
-import ch.datascience.dbeventlog.metrics.EventLogMetrics
+import ch.datascience.dbeventlog.metrics.{EventLogMetrics, StatsFinder}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
@@ -156,7 +155,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
                                         new ConcurrentHashMap[CancelToken[IO], Unit]())
 
     class TestEventLogMetrics(
-        eventLogStats:         EventLogStats[IO],
+        statsFinder:           StatsFinder[IO],
         logger:                Logger[IO],
         waitingEventsGauge:    Gauge,
         statusesGauge:         Gauge,
@@ -166,7 +165,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         waitingEventsInterval: FiniteDuration
     )(implicit ME:             MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
         extends EventLogMetrics(
-          eventLogStats,
+          statsFinder,
           logger,
           waitingEventsGauge,
           statusesGauge,
