@@ -29,12 +29,12 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.commands._
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.{BatchDate, CommitEvent, CommitId}
+import ch.datascience.graph.model.events.{BatchDate, CommitId, EventId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder, IOCommitInfoFinder}
-import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.startcommit.CommitEventsSourceBuilder.EventsFlowBuilder
+import ch.datascience.webhookservice.eventprocessing.{CommitEvent, StartCommit}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -88,8 +88,13 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
       } yield commitEvents
 
     private def filterNotInLog(commitIds: List[CommitId]) =
-      if (commitIds.nonEmpty) filterNotExistingInLog(commitIds, startCommit.project.id)
-      else ME.pure(List.empty[CommitId])
+      if (commitIds.nonEmpty)
+        filterNotExistingInLog(commitIds map toEventId, startCommit.project.id).map(_ map toCommitId)
+      else
+        ME.pure(List.empty[CommitId])
+
+    private lazy val toEventId:  CommitId => EventId = id => EventId(id.value)
+    private lazy val toCommitId: EventId => CommitId = id => CommitId(id.value)
 
     private def findCommitEvent(batchDate: BatchDate)(commitId: CommitId): Interpretation[CommitEvent] =
       findCommitInfo(startCommit.project.id, commitId, maybeAccessToken) map toCommitEvent(batchDate)

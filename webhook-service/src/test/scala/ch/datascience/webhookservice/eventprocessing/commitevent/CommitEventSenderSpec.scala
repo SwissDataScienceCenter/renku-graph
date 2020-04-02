@@ -19,39 +19,66 @@
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
-import cats.effect.Bracket
-import cats.implicits._
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.commands.EventLogAdd
-import ch.datascience.dbeventlog.{EventBody, EventLogDB}
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events._
+import ch.datascience.graph.config.EventLogUrl
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.webhookservice.eventprocessing.CommitEvent
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
+import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.Encoder
+import io.circe.literal._
+import io.circe.syntax._
+import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.ExecutionContext.Implicits.global
 
-class CommitEventSenderSpec extends WordSpec with MockFactory {
+class CommitEventSenderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
 
   "send" should {
 
-    "succeed when delivering the event to the Event Log was successful" in new TestCase {
+    Created +: Ok +: Nil foreach { status =>
+      s"succeed when delivering the event to the Event Log got $status" in new TestCase {
 
-      val serializedEvent = serialize(commitEvent)
+        val eventBody = serialize(commitEvent)
+        (eventSerializer
+          .serialiseToJsonString(_: CommitEvent))
+          .expects(commitEvent)
+          .returning(context.pure(eventBody))
+
+        stubFor {
+          post("/events")
+            .withRequestBody(equalToJson(commitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        eventSender.send(commitEvent).unsafeRunSync() shouldBe ((): Unit)
+      }
+    }
+
+    s"fail when delivering the event to the Event Log got $BadRequest" in new TestCase {
+
+      val eventBody = serialize(commitEvent)
       (eventSerializer
         .serialiseToJsonString(_: CommitEvent))
         .expects(commitEvent)
-        .returning(context.pure(serializedEvent))
+        .returning(context.pure(eventBody))
 
-      (eventAdd
-        .storeNewEvent(_: CommitEvent, _: EventBody))
-        .expects(commitEvent, EventBody(serializedEvent))
-        .returning(context.unit)
+      val status = BadRequest
+      stubFor {
+        post("/events")
+          .withRequestBody(equalToJson(commitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
+          .willReturn(aResponse().withStatus(status.code))
+      }
 
-      eventSender.send(commitEvent) shouldBe Success(())
+      intercept[Exception] {
+        eventSender.send(commitEvent).unsafeRunSync()
+      }.getMessage shouldBe s"POST $eventLogUrl/events returned $status; body: "
     }
 
     "fail when event serialization fails" in new TestCase {
@@ -62,42 +89,37 @@ class CommitEventSenderSpec extends WordSpec with MockFactory {
         .expects(commitEvent)
         .returning(context.raiseError(exception))
 
-      eventSender.send(commitEvent) shouldBe Failure(exception)
-    }
-
-    "fail when delivering the event to the Event Log fails" in new TestCase {
-
-      val serializedEvent = serialize(commitEvent)
-      (eventSerializer
-        .serialiseToJsonString(_: CommitEvent))
-        .expects(commitEvent)
-        .returning(context.pure(serializedEvent))
-
-      val exception = exceptions.generateOne
-      (eventAdd
-        .storeNewEvent(_: CommitEvent, _: EventBody))
-        .expects(commitEvent, EventBody(serializedEvent))
-        .returning(context.raiseError(exception))
-
-      eventSender.send(commitEvent) shouldBe Failure(exception)
+      intercept[Exception] {
+        eventSender.send(commitEvent).unsafeRunSync()
+      } shouldBe exception
     }
   }
 
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
+
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
+    val context = MonadError[IO, Throwable]
 
     val commitEvent = commitEvents.generateOne
 
-    class TestCommitEventSerializer extends CommitEventSerializer[Try]
-    class TestEventLogAdd(
-        transactor: DbTransactor[Try, EventLogDB]
-    )(implicit ME:  Bracket[Try, Throwable])
-        extends EventLogAdd[Try](transactor)
+    val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
+    class TestCommitEventSerializer extends CommitEventSerializer[IO]
     val eventSerializer = mock[TestCommitEventSerializer]
-    val eventAdd        = mock[TestEventLogAdd]
-    val eventSender     = new CommitEventSender[Try](eventSerializer, eventAdd)
+    val eventSender     = new IOCommitEventSender(eventLogUrl, eventSerializer, TestLogger())
   }
 
-  private def serialize(commitEvent: CommitEvent): String =
-    s"""{id: "${commitEvent.id.toString}"}"""
+  private def commitEventEncoder(eventBody: String): Encoder[CommitEvent] = Encoder.instance[CommitEvent] { event =>
+    json"""{
+      "id":        ${event.id.value},
+      "project": {
+        "id":      ${event.project.id.value},
+        "path":    ${event.project.path.value}
+      },
+      "date":      ${event.committedDate.value},
+      "batchDate": ${event.batchDate.value},
+      "body":      $eventBody
+    }"""
+  }
+  private def serialize(commitEvent: CommitEvent): String = s"""{id: "${commitEvent.id.toString}"}"""
 }

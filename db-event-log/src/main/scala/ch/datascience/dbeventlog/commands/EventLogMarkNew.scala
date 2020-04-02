@@ -25,7 +25,7 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus.{New, Processing}
 import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
-import ch.datascience.graph.model.events.CommitEventId
+import ch.datascience.graph.model.events.CompoundEventId
 import doobie.implicits._
 
 import scala.language.higherKinds
@@ -35,19 +35,19 @@ class EventLogMarkNew[Interpretation[_]](
     now:        () => Instant = () => Instant.now
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
 
-  def markEventNew(commitEventId: CommitEventId): Interpretation[Unit] =
+  def markEventNew(commitEventId: CompoundEventId): Interpretation[Unit] =
     for {
       updatedRecords <- update(commitEventId, newStatus = New).transact(transactor.get)
       _              <- failIfNoRecordsUpdated(commitEventId)(updatedRecords)
     } yield ()
 
-  private def update(commitEventId: CommitEventId, newStatus: EventStatus) =
+  private def update(commitEventId: CompoundEventId, newStatus: EventStatus) =
     sql"""update event_log 
          |set status = $newStatus, execution_date = ${now()}
          |where event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus}
          |""".stripMargin.update.run
 
-  private def failIfNoRecordsUpdated(commitEventId: CommitEventId): Int => Interpretation[Unit] = {
+  private def failIfNoRecordsUpdated(commitEventId: CompoundEventId): Int => Interpretation[Unit] = {
     case 1 => ME.unit
     case _ =>
       ME.raiseError(

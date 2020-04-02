@@ -30,13 +30,13 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.events.{CommitId, Project}
+import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.eventprocessing.Commit
-import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.{CommitEvent, Project}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -78,12 +78,12 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
 
       (renku
-        .migrate(_: Commit, _: Path))
+        .migrate(_: CommitEvent, _: Path))
         .expects(commitWithoutParent, repositoryDirectory)
         .returning(IO.unit)
 
       (renku
-        .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
+        .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
         .returning(IO.pure(triples))
 
@@ -128,12 +128,12 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
 
       val commitWithParent = toCommitWithParent(commitWithoutParent)
       (renku
-        .migrate(_: Commit, _: Path))
+        .migrate(_: CommitEvent, _: Path))
         .expects(commitWithParent, repositoryDirectory)
         .returning(IO.unit)
 
       (renku
-        .log(_: CommitWithParent, _: Path)(_: (CommitWithParent, Path) => CommandResult))
+        .log(_: CommitEventWithParent, _: Path)(_: (CommitEventWithParent, Path) => CommandResult))
         .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
         .returning(IO.pure(triples))
 
@@ -313,7 +313,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (renku
-        .migrate(_: Commit, _: Path))
+        .migrate(_: CommitEvent, _: Path))
         .expects(commitWithoutParent, repositoryDirectory)
         .returning(IO.raiseError(exception))
 
@@ -353,13 +353,13 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
 
       (renku
-        .migrate(_: Commit, _: Path))
+        .migrate(_: CommitEvent, _: Path))
         .expects(commitWithoutParent, repositoryDirectory)
         .returning(IO.unit)
 
       val exception = exceptions.generateOne
       (renku
-        .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
+        .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
         .returning(IO.raiseError(exception))
 
@@ -399,12 +399,12 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
 
       (renku
-        .migrate(_: Commit, _: Path))
+        .migrate(_: CommitEvent, _: Path))
         .expects(commitWithoutParent, repositoryDirectory)
         .returning(IO.unit)
 
       (renku
-        .log(_: CommitWithoutParent, _: Path)(_: (CommitWithoutParent, Path) => CommandResult))
+        .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
         .returning(IO.pure(triples))
 
@@ -432,14 +432,18 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
     lazy val gitRepositoryUrl = serviceUrls.generateOne / maybeAccessToken
       .map(_.value)
       .getOrElse("path") / s"$projectPath.git"
-    lazy val commitWithoutParent @ CommitWithoutParent(commitId, _) =
-      CommitWithoutParent(commitIds.generateOne, Project(projectIds.generateOne, projectPath))
 
-    def toCommitWithParent(commitWithoutParent: CommitWithoutParent): CommitWithParent =
-      CommitWithParent(
-        commitWithoutParent.id,
-        commitIds.generateOne,
-        commitWithoutParent.project
+    lazy val commitWithoutParent @ CommitEventWithoutParent(_, _, commitId) = {
+      val commitId = commitIds.generateOne
+      CommitEventWithoutParent(EventId(commitId.value), Project(projectIds.generateOne, projectPath), commitId)
+    }
+
+    def toCommitWithParent(commitWithoutParent: CommitEventWithoutParent): CommitEventWithParent =
+      CommitEventWithParent(
+        commitWithoutParent.eventId,
+        commitWithoutParent.project,
+        commitWithoutParent.commitId,
+        commitIds.generateOne
       )
 
     val pathDifferentiator: Int = Gen.choose(1, 100).generateOne

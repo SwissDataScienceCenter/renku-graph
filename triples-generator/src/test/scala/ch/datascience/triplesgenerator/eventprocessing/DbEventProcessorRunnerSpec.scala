@@ -21,11 +21,11 @@ package ch.datascience.triplesgenerator.eventprocessing
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 
 import cats.effect._
-import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.EventBody
 import ch.datascience.dbeventlog.commands.EventLogFetch
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.events.EventBody
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import com.typesafe.config.ConfigFactory

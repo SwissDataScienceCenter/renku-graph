@@ -70,7 +70,6 @@ class ServicesRunner(
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }
-
   }
 
   private def verifyServiceReady(serviceRun: ServiceRun)(implicit timer: Timer[IO]): IO[Unit] =

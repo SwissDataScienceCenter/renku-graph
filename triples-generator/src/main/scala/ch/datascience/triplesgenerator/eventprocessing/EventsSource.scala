@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
-import ch.datascience.dbeventlog.EventBody
+import ch.datascience.graph.model.events.EventBody
 
 import scala.language.higherKinds
 

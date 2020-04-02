@@ -25,7 +25,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
 import ch.datascience.dbeventlog.commands.ExecutionDateCalculator.StatusBasedCalculator
-import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.events
 import doobie.implicits._
 
 import scala.language.higherKinds
@@ -37,12 +37,12 @@ class EventLogMarkFailed[Interpretation[_]](
 
   import executionDateCalculator._
 
-  def markEventFailed(commitEventId: CommitEventId,
+  def markEventFailed(commitEventId: events.CompoundEventId,
                       status:        FailureStatus,
                       maybeMessage:  Option[EventMessage]): Interpretation[Unit] =
     findEventAndUpdate(commitEventId, status, maybeMessage).transact(transactor.get)
 
-  private def findEventAndUpdate(commitEventId: CommitEventId,
+  private def findEventAndUpdate(commitEventId: events.CompoundEventId,
                                  status:        FailureStatus,
                                  maybeMessage:  Option[EventMessage]) =
     for {
@@ -51,7 +51,7 @@ class EventLogMarkFailed[Interpretation[_]](
       _ <- updateEvent(commitEventId, status, executionDate, maybeMessage)
     } yield ()
 
-  private def findEventDates(commitEventId: CommitEventId): doobie.ConnectionIO[(CreatedDate, ExecutionDate)] =
+  private def findEventDates(commitEventId: events.CompoundEventId): doobie.ConnectionIO[(CreatedDate, ExecutionDate)] =
     sql"""
          |select created_date, execution_date
          |from event_log
@@ -67,7 +67,7 @@ class EventLogMarkFailed[Interpretation[_]](
     }
   }
 
-  private def updateEvent(commitEventId: CommitEventId,
+  private def updateEvent(commitEventId: events.CompoundEventId,
                           newStatus:     FailureStatus,
                           executionDate: ExecutionDate,
                           maybeMessage:  Option[EventMessage]) =

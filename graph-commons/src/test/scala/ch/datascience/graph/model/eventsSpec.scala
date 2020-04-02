@@ -21,34 +21,50 @@ package ch.datascience.graph.model
 import java.time.{Clock, Instant, ZoneId}
 
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.users.Email
+import ch.datascience.tinytypes.constraints.NonBlank
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-
-class CommitEventSpec extends WordSpec {
-
-  "commitEventId" should {
-
-    "return CommitEventId comprised of id and project.id" in {
-      val commitEvent = commitEvents.generateOne
-
-      commitEvent.commitEventId shouldBe CommitEventId(commitEvent.id, commitEvent.project.id)
-    }
-  }
-}
 
 class CommitEventIdSpec extends WordSpec {
 
   "toString" should {
 
     "be of format 'id = <eventId>, projectId = <projectId>'" in {
-      val commitEventId = commitEventIds.generateOne
+      val commitEventId = compoundEventIds.generateOne
 
       commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
+    }
+  }
+}
+
+class EventBodySpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "EventBody" should {
+
+    "have the NonBlank constraint" in {
+      EventBody shouldBe an[NonBlank]
+    }
+
+    "be instantiatable from any non-blank string" in {
+      forAll(nonEmptyStrings()) { body =>
+        EventBody.from(body).map(_.value) shouldBe Right(body)
+      }
+    }
+  }
+}
+
+class CompoundEventIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "toString" should {
+
+    "be of format 'id = <eventId>, projectId = <projectId>'" in {
+      forAll { commitEventId: CompoundEventId =>
+        commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
+      }
     }
   }
 }
@@ -66,30 +82,6 @@ class BatchDateSpec extends WordSpec {
       BatchDate(clock).value shouldBe fixedNow
 
       Clock.system(systemZone)
-    }
-  }
-}
-
-class AuthorSpec extends WordSpec with ScalaCheckPropertyChecks {
-
-  "withEmail" should {
-
-    "instantiate a new Author with username extracted from the email" in {
-      forAll { email: Email =>
-        Author.withEmail(email) shouldBe Author(email.extractUsername, email)
-      }
-    }
-  }
-}
-
-class CommitterSpec extends WordSpec with ScalaCheckPropertyChecks {
-
-  "withEmail" should {
-
-    "instantiate a new Committer with username extracted from the email" in {
-      forAll { email: Email =>
-        Committer.withEmail(email) shouldBe Committer(email.extractUsername, email)
-      }
     }
   }
 }

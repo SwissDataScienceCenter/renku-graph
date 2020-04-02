@@ -20,65 +20,12 @@ package ch.datascience.graph.model
 
 import java.time.{Clock, Instant}
 
-import ch.datascience.graph.model.users.{Email, Username}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 
 object events {
 
-  final case class CommitEvent(
-      id:            CommitId,
-      project:       Project,
-      message:       CommitMessage,
-      committedDate: CommittedDate,
-      author:        Author,
-      committer:     Committer,
-      parents:       List[CommitId],
-      batchDate:     BatchDate
-  )
-
-  object CommitEvent {
-
-    implicit class CommitEventOps(commitEvent: CommitEvent) {
-      lazy val commitEventId: CommitEventId = CommitEventId(commitEvent.id, commitEvent.project.id)
-    }
-  }
-
-  final case class Project(id: projects.Id, path: projects.Path)
-
-  sealed trait Person extends Product with Serializable {
-    def username: Username
-  }
-
-  object Person {
-    sealed trait WithEmail { self: Person =>
-      def email: Email
-    }
-  }
-
-  import Person._
-
-  sealed trait Author extends Person
-  object Author {
-    final case class FullAuthor(username:         Username, email: Email) extends Author with WithEmail
-    final case class AuthorWithUsername(username: Username) extends Author
-
-    def apply(username:        Username, email: Email): Author = FullAuthor(username, email)
-    def withUsername(username: Username): Author = AuthorWithUsername(username)
-    def withEmail(email:       Email): Author = FullAuthor(email.extractUsername, email)
-  }
-
-  sealed trait Committer extends Person
-  object Committer {
-    final case class FullCommitter(username:         Username, email: Email) extends Committer with WithEmail
-    final case class CommitterWithUsername(username: Username) extends Committer
-
-    def apply(username:        Username, email: Email): Committer = FullCommitter(username, email)
-    def withUsername(username: Username): Committer = CommitterWithUsername(username)
-    def withEmail(email:       Email): Committer = FullCommitter(email.extractUsername, email)
-  }
-
-  final case class CommitEventId(id: CommitId, projectId: projects.Id) {
+  final case class CompoundEventId(id: EventId, projectId: projects.Id) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }
 
@@ -90,6 +37,12 @@ object events {
 
   final class CommittedDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object CommittedDate extends TinyTypeFactory[CommittedDate](new CommittedDate(_)) with InstantNotInTheFuture
+
+  final class EventId private (val value: String) extends AnyVal with StringTinyType
+  implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
+
+  final class EventBody private (val value: String) extends AnyVal with StringTinyType
+  implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank
 
   final class BatchDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) with InstantNotInTheFuture {

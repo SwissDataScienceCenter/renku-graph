@@ -22,12 +22,11 @@ import java.time.Instant
 
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.dbeventlog.CreatedDate
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.commands._
+import ch.datascience.dbeventlog.{CreatedDate, Event}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{BatchDate, CommitEvent}
+import ch.datascience.graph.model.events.BatchDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
@@ -58,10 +57,10 @@ class BatchDateAdderSpec extends WordSpec with DbInitSpec {
       }
       checkColumnExists shouldBe false
 
-      val event1            = commitEvents.generateOne
+      val event1            = events.generateOne
       val event1CreatedDate = createdDates.generateOne
       storeEvent(event1, event1CreatedDate)
-      val event2            = commitEvents.generateOne
+      val event2            = events.generateOne
       val event2CreatedDate = createdDates.generateOne
       storeEvent(event2, event2CreatedDate)
 
@@ -96,24 +95,24 @@ class BatchDateAdderSpec extends WordSpec with DbInitSpec {
       .recover { case _ => false }
       .unsafeRunSync()
 
-  private def storeEvent(commitEvent: CommitEvent, createdDate: CreatedDate): Unit = execute {
+  private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute {
     sql"""insert into 
          |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
          |values (
-         |${commitEvent.id}, 
-         |${commitEvent.project.id}, 
+         |${event.id}, 
+         |${event.project.id}, 
          |${eventStatuses.generateOne}, 
          |$createdDate,
          |${executionDates.generateOne}, 
-         |${committedDates.generateOne}, 
-         |${toJson(commitEvent)})
+         |${event.date}, 
+         |${toJsonBody(event)})
       """.stripMargin.update.run.map(_ => ())
   }
 
-  private def toJson(commitEvent: CommitEvent): String = json"""{
+  private def toJsonBody(event: Event): String = json"""{
     "project": {
-      "id": ${commitEvent.project.id.value},
-      "path": ${commitEvent.project.path.value}
+      "id": ${event.project.id.value},
+      "path": ${event.project.path.value}
      }
   }""".noSpaces
 

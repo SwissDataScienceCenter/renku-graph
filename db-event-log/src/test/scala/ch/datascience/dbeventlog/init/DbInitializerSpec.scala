@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CommitEventId, CommittedDate}
+import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -176,13 +176,13 @@ class DbInitializerSpec extends WordSpec with DbInitSpec with MockFactory {
   private class IOBatchDateAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])
       extends BatchDateAdder[IO](transactor, logger)
 
-  private def storeEvent(commitEventId: CommitEventId = commitEventIds.generateOne,
-                         eventStatus:   String        = eventStatuses.generateOne.value,
-                         executionDate: ExecutionDate = executionDates.generateOne,
-                         eventDate:     CommittedDate = committedDates.generateOne,
-                         eventBody:     EventBody     = eventBodies.generateOne,
-                         createdDate:   CreatedDate   = createdDates.generateOne,
-                         projectPath:   Path          = projectPaths.generateOne): Unit = execute {
+  private def storeEvent(commitEventId: CompoundEventId = compoundEventIds.generateOne,
+                         eventStatus:   String          = eventStatuses.generateOne.value,
+                         executionDate: ExecutionDate   = executionDates.generateOne,
+                         eventDate:     EventDate       = eventDates.generateOne,
+                         eventBody:     EventBody       = eventBodies.generateOne,
+                         createdDate:   CreatedDate     = createdDates.generateOne,
+                         projectPath:   Path            = projectPaths.generateOne): Unit = execute {
     sql"""|insert into 
           |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
           |values (${commitEventId.id.value}, ${commitEventId.projectId.value}, $eventStatus, ${createdDate.value}, ${executionDate.value}, ${eventDate.value}, ${eventBody.value})

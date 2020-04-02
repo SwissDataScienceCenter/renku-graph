@@ -114,10 +114,10 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
     def storeEvents(projectId: Id, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
       statuses map {
         storeEvent(
-          commitEventIds.generateOne.copy(projectId = projectId),
+          compoundEventIds.generateOne.copy(projectId = projectId),
           _,
           executionDates.generateOne,
-          committedDates.generateOne,
+          eventDates.generateOne,
           eventBodies.generateOne,
           createdDates.generateOne,
           batchDate

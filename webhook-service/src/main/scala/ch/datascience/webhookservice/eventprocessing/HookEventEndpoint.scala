@@ -37,6 +37,7 @@ import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import ch.datascience.webhookservice.model.HookToken
+import io.chrisdavenport.log4cats.Logger
 import io.circe.{Decoder, HCursor}
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -123,15 +124,25 @@ private object HookEventEndpoint {
     } yield StartCommit(commitTo, project)
 }
 
-class IOHookEventEndpoint(
-    transactor:              DbTransactor[IO, EventLogDB],
-    tokenRepositoryUrl:      TokenRepositoryUrl,
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    hookTokenCrypto:         HookTokenCrypto[IO],
-    executionTimeRecorder:   ExecutionTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
-    extends HookEventEndpoint[IO](
-      hookTokenCrypto,
-      new IOCommitToEventLog(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, executionTimeRecorder)
-    )
+object IOHookEventEndpoint {
+  def apply(
+      transactor:              DbTransactor[IO, EventLogDB],
+      tokenRepositoryUrl:      TokenRepositoryUrl,
+      gitLabUrl:               GitLabUrl,
+      gitLabThrottler:         Throttler[IO, GitLab],
+      hookTokenCrypto:         HookTokenCrypto[IO],
+      executionTimeRecorder:   ExecutionTimeRecorder[IO],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    clock:                     Clock[IO],
+    timer:                     Timer[IO]): IO[HookEventEndpoint[IO]] =
+    for {
+      commitToEventLog <- IOCommitToEventLog(transactor,
+                                             tokenRepositoryUrl,
+                                             gitLabUrl,
+                                             gitLabThrottler,
+                                             executionTimeRecorder,
+                                             logger)
+    } yield new HookEventEndpoint[IO](hookTokenCrypto, commitToEventLog)
+}

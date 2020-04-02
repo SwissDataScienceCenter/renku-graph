@@ -33,9 +33,9 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.commitevent._
 import ch.datascience.webhookservice.eventprocessing.startcommit.CommitToEventLog.SendingResult
+import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Project, StartCommit}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -245,7 +245,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
     val clock       = Clock.fixed(batchDate.value, ZoneId.systemDefault)
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
-    val commitEventSender     = mock[TryCommitEventSender]
+    val commitEventSender     = mock[CommitEventSender[Try]]
     val commitEventsSource    = mock[TryCommitEventsSourceBuilder]
     val eventsFlowBuilder     = mock[CommitEventsSourceBuilder.EventsFlowBuilder[Try]]
     val logger                = TestLogger[Try]()

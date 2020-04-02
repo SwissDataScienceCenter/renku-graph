@@ -23,6 +23,8 @@ import cats.implicits._
 import ch.datascience.dbeventlog.commands.ProcessingStatus
 import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import org.scalacheck.Gen
 
 import scala.concurrent.duration._
@@ -33,7 +35,7 @@ object DbEventLogGenerators {
 
   implicit val renkuLogTimeouts: Gen[RenkuLogTimeout] = durations(max = 5 hours) map RenkuLogTimeout.apply
 
-  implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
+  implicit val eventDates:     Gen[EventDate]     = timestampsNotInTheFuture map EventDate.apply
   implicit val createdDates:   Gen[CreatedDate]   = timestampsNotInTheFuture map CreatedDate.apply
   implicit val executionDates: Gen[ExecutionDate] = timestamps map ExecutionDate.apply
   implicit val eventStatuses: Gen[EventStatus] = Gen.oneOf(
@@ -49,4 +51,17 @@ object DbEventLogGenerators {
       total <- positiveInts(max = Integer.MAX_VALUE)
       done  <- positiveInts(max = total.value)
     } yield ProcessingStatus.from[Try](done.value, total.value).fold(throw _, identity)
+
+  implicit lazy val events: Gen[Event] = for {
+    eventId   <- eventIds
+    project   <- projects
+    date      <- eventDates
+    batchDate <- batchDates
+    body      <- eventBodies
+  } yield Event(eventId, project, date, batchDate, body)
+
+  implicit lazy val projects: Gen[EventProject] = for {
+    id   <- projectIds
+    path <- projectPaths
+  } yield EventProject(id, path)
 }

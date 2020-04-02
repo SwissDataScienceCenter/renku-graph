@@ -30,7 +30,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{BatchDate, CommitEventId}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects.Id
 import doobie.implicits._
 import eu.timepit.refined.auto._
@@ -45,16 +45,16 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
   "isEventToProcess" should {
 
     s"return true if there are events with with status $New and execution date in the past" in new TestCase {
-      storeNewEvent(commitEventIds.generateOne, ExecutionDate(now minus (5, SEC)), eventBodies.generateOne)
+      storeNewEvent(compoundEventIds.generateOne, ExecutionDate(now minus (5, SEC)), eventBodies.generateOne)
 
       eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
     }
 
     s"return true if there are events with with status $RecoverableFailure and execution date in the past" in new TestCase {
-      storeEvent(commitEventIds.generateOne,
+      storeEvent(compoundEventIds.generateOne,
                  EventStatus.RecoverableFailure,
                  ExecutionDate(now minus (5, SEC)),
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne)
 
       eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
@@ -63,10 +63,10 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     s"return true if there are events with with status $Processing " +
       "and execution date older than the given RenkuLogTimeout + 5 min" in new TestCase {
       storeEvent(
-        commitEventIds.generateOne,
+        compoundEventIds.generateOne,
         EventStatus.Processing,
         ExecutionDate(now minus (maxProcessingTime.toMinutes + 5, MIN)),
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
 
@@ -75,31 +75,31 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
     s"return false for other cases" in new TestCase {
       storeEvent(
-        commitEventIds.generateOne,
+        compoundEventIds.generateOne,
         EventStatus.Processing,
         ExecutionDate(now minus (maxProcessingTime.toMinutes - 1, MIN)),
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
-      storeEvent(commitEventIds.generateOne,
+      storeEvent(compoundEventIds.generateOne,
                  EventStatus.New,
                  ExecutionDate(now plus (5, SEC)),
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne)
-      storeEvent(commitEventIds.generateOne,
+      storeEvent(compoundEventIds.generateOne,
                  EventStatus.RecoverableFailure,
                  ExecutionDate(now plus (5, SEC)),
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne)
-      storeEvent(commitEventIds.generateOne,
+      storeEvent(compoundEventIds.generateOne,
                  EventStatus.NonRecoverableFailure,
                  ExecutionDate(now minus (5, SEC)),
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne)
-      storeEvent(commitEventIds.generateOne,
+      storeEvent(compoundEventIds.generateOne,
                  EventStatus.TriplesStore,
                  ExecutionDate(now minus (5, SEC)),
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne)
 
       eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe false
@@ -114,22 +114,22 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       val projectId = projectIds.generateOne
 
-      val event1Id        = commitEventIds.generateOne.copy(projectId = projectId)
+      val event1Id        = compoundEventIds.generateOne.copy(projectId = projectId)
       val event1Body      = eventBodies.generateOne
       val event1BatchDate = batchDates.generateOne
       storeNewEvent(event1Id, ExecutionDate(now minus (5, SEC)), event1Body, batchDate = event1BatchDate)
 
-      val event2Id   = commitEventIds.generateOne.copy(projectId = projectId)
+      val event2Id   = compoundEventIds.generateOne.copy(projectId = projectId)
       val event2Body = eventBodies.generateOne
       storeNewEvent(event2Id, ExecutionDate(now plus (5, H)), event2Body)
 
-      val event3Id        = commitEventIds.generateOne.copy(projectId = projectId)
+      val event3Id        = compoundEventIds.generateOne.copy(projectId = projectId)
       val event3Body      = eventBodies.generateOne
       val event3BatchDate = batchDates.generateOne
       storeEvent(event3Id,
                  EventStatus.RecoverableFailure,
                  ExecutionDate(now minus (5, H)),
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  event3Body,
                  batchDate = event3BatchDate)
 
@@ -150,14 +150,14 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     s"return an event with the $Processing status " +
       "and execution date older than RenkuLogTimeout + 5 min" in new TestCase {
 
-      val eventId        = commitEventIds.generateOne
+      val eventId        = compoundEventIds.generateOne
       val eventBody      = eventBodies.generateOne
       val eventBatchDate = batchDates.generateOne
       storeEvent(
         eventId,
         EventStatus.Processing,
         ExecutionDate(now minus (maxProcessingTime.toMinutes + 5, MIN)),
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBody,
         batchDate = eventBatchDate
       )
@@ -171,10 +171,10 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
       "but execution date from less than RenkuLogTimeout + 1 min" in new TestCase {
 
       storeEvent(
-        commitEventIds.generateOne,
+        compoundEventIds.generateOne,
         EventStatus.Processing,
         ExecutionDate(now minus (maxProcessingTime minusSeconds 1)),
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
 
@@ -184,7 +184,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     "return no events when there are no events matching the criteria" in new TestCase {
 
       storeNewEvent(
-        commitEventIds.generateOne,
+        compoundEventIds.generateOne,
         ExecutionDate(now plus (50, H)),
         eventBodies.generateOne
       )
@@ -198,7 +198,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
       val allProjectIds = nonEmptyList(projectIds, minElements = 2).generateOne
       val eventIdsBodiesDates = for {
         projectId     <- allProjectIds
-        eventId       <- nonEmptyList(commitIds, minElements = 5).generateOne map (CommitEventId(_, projectId))
+        eventId       <- nonEmptyList(eventIds, minElements = 5).generateOne map (CompoundEventId(_, projectId))
         eventBody     <- nonEmptyList(eventBodies, maxElements = 1).generateOne
         executionDate <- NonEmptyList.of(executionDateDifferentiated(by = projectId, allProjectIds))
       } yield (eventId, executionDate, eventBody)
@@ -228,18 +228,18 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       val projectId1 = projectIds.generateOne
       storeEvent(
-        CommitEventId(commitIds.generateOne, projectId1),
+        CompoundEventId(eventIds.generateOne, projectId1),
         EventStatus.Processing,
         ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN)),
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
       val projectId2 = projectIds.generateOne
       storeEvent(
-        CommitEventId(commitIds.generateOne, projectId2),
+        CompoundEventId(eventIds.generateOne, projectId2),
         EventStatus.New,
         ExecutionDate(now minus (1, MIN)),
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
 
@@ -274,9 +274,9 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
       ExecutionDate(now minus (1000 - (allProjects.toList.indexOf(by) * 10), SEC))
   }
 
-  private def storeNewEvent(commitEventId: CommitEventId,
+  private def storeNewEvent(commitEventId: CompoundEventId,
                             executionDate: ExecutionDate,
                             eventBody:     EventBody,
                             batchDate:     BatchDate = batchDates.generateOne): Unit =
-    storeEvent(commitEventId, New, executionDate, committedDates.generateOne, eventBody, batchDate = batchDate)
+    storeEvent(commitEventId, New, executionDate, eventDates.generateOne, eventBody, batchDate = batchDate)
 }

@@ -22,10 +22,10 @@ import java.time.Instant.now
 import java.time.temporal.ChronoUnit._
 
 import ch.datascience.dbeventlog.DbEventLogGenerators._
+import ch.datascience.dbeventlog.EventDate
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.CommittedDate
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -41,28 +41,28 @@ class EventLogLatestEventsSpec extends WordSpec with InMemoryEventLogDbSpec {
       "for all the projects in the db" in new TestCase {
       val projectId1 = projectIds.generateOne
       storeEvent(
-        commitEventIds.generateOne.copy(projectId = projectId1),
+        compoundEventIds.generateOne.copy(projectId = projectId1),
         eventStatuses.generateOne,
         executionDates.generateOne,
-        CommittedDate(now minus (20, DAYS)),
+        EventDate(now minus (20, DAYS)),
         eventBodies.generateOne
       )
 
-      val youngestCommitEventIdProject1 = commitEventIds.generateOne.copy(projectId = projectId1)
+      val youngestCommitEventIdProject1 = compoundEventIds.generateOne.copy(projectId = projectId1)
       storeEvent(
         youngestCommitEventIdProject1,
         eventStatuses.generateOne,
         executionDates.generateOne,
-        CommittedDate(now minus (3, DAYS)),
+        EventDate(now minus (3, DAYS)),
         eventBodies.generateOne
       )
 
-      val onlyCommitEventIdProject2 = commitEventIds.generateOne
+      val onlyCommitEventIdProject2 = compoundEventIds.generateOne
       storeEvent(
         onlyCommitEventIdProject2,
         eventStatuses.generateOne,
         executionDates.generateOne,
-        CommittedDate(now minus (2, DAYS)),
+        EventDate(now minus (2, DAYS)),
         eventBodies.generateOne
       )
 

@@ -18,8 +18,10 @@
 
 package ch.datascience.dbeventlog
 
+import DbEventLogGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -52,22 +54,6 @@ class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
       val Left(exception) = EventStatus.from(unknown)
 
       exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
-    }
-  }
-}
-
-class EventBodySpec extends WordSpec with ScalaCheckPropertyChecks {
-
-  "EventBody" should {
-
-    "have the NonBlank constraint" in {
-      EventBody shouldBe an[NonBlank]
-    }
-
-    "be instantiatable from any non-blank string" in {
-      forAll(nonEmptyStrings()) { body =>
-        EventBody.from(body).map(_.value) shouldBe Right(body)
-      }
     }
   }
 }
@@ -123,6 +109,18 @@ class EventMessageSpec extends WordSpec with ScalaCheckPropertyChecks {
         exceptionAsString.flush()
 
         EventMessage(exception).map(_.value) shouldBe Some(exceptionAsString.toString)
+      }
+    }
+  }
+}
+
+class EventSpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  "compoundEventId" should {
+
+    "create a CompoundEventId from the event's id and project id" in {
+      forAll { event: Event =>
+        event.compoundEventId shouldBe CompoundEventId(event.id, event.project.id)
       }
     }
   }

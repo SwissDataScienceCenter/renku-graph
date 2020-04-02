@@ -23,13 +23,14 @@ import cats.data.EitherT.{leftT, rightT}
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
+import ch.datascience.graph.model.EventsGenerators.eventBodies
 import ch.datascience.control.Throttler
-import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
+import ch.datascience.dbeventlog.{EventLogDB, EventMessage}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import EventProcessingGenerators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Id
@@ -41,7 +42,7 @@ import ch.datascience.interpreters.{TestDbTransactor, TestLogger}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.IOCommitEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
@@ -88,7 +89,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       commitsAndTriples.toList foreach successfulTriplesGenerationAndUpload
 
-      expectEventMarkedDone(commits.head.commitEventId)
+      expectEventMarkedDone(commits.head.compoundEventId)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -117,11 +118,11 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val exception2 = exceptions.generateOne
       (triplesFinder
-        .generateTriples(_: Commit)(_: Option[AccessToken]))
+        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit2, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception2)))
 
-      expectEventMarkedFailed(commit2.commitEventId, NonRecoverableFailure, exception2)
+      expectEventMarkedFailed(commit2.compoundEventId, NonRecoverableFailure, exception2)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -144,11 +145,11 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val exception = exceptions.generateOne
       (triplesFinder
-        .generateTriples(_: Commit)(_: Option[AccessToken]))
+        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception)))
 
-      expectEventMarkedFailed(commit.commitEventId, NonRecoverableFailure, exception)
+      expectEventMarkedFailed(commit.compoundEventId, NonRecoverableFailure, exception)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -171,11 +172,11 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val exception = GenerationRecoverableError(nonBlankStrings().generateOne.value)
       (triplesFinder
-        .generateTriples(_: Commit)(_: Option[AccessToken]))
+        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
         .returning(leftT[Try, JsonLDTriples](exception))
 
-      expectEventMarkedFailed(commit.commitEventId, RecoverableFailure, exception)
+      expectEventMarkedFailed(commit.compoundEventId, RecoverableFailure, exception)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -198,17 +199,17 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val rawTriples = jsonLDTriples.generateOne
       (triplesFinder
-        .generateTriples(_: Commit)(_: Option[AccessToken]))
+        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](rawTriples))
 
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (triplesCurator
-        .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
+        .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, rawTriples, maybeAccessToken)
         .returning(leftT[Try, CuratedTriples](exception))
 
-      expectEventMarkedFailed(commit.commitEventId, RecoverableFailure, exception)
+      expectEventMarkedFailed(commit.compoundEventId, RecoverableFailure, exception)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -231,17 +232,17 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val rawTriples = jsonLDTriples.generateOne
       (triplesFinder
-        .generateTriples(_: Commit)(_: Option[AccessToken]))
+        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](rawTriples))
 
       val exception = exceptions.generateOne
       (triplesCurator
-        .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
+        .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, rawTriples, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, CuratedTriples](context.raiseError(exception)))
 
-      expectEventMarkedFailed(commit.commitEventId, NonRecoverableFailure, exception)
+      expectEventMarkedFailed(commit.compoundEventId, NonRecoverableFailure, exception)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -265,13 +266,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val rawTriples = jsonLDTriples.generateOne
       (triplesFinder
-        .generateTriples(_: Commit)(_: Option[AccessToken]))
+        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit1, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](rawTriples))
 
       val curatedTriples = curatedTriplesObjects.generateOne
       (triplesCurator
-        .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
+        .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit1, rawTriples, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
@@ -283,11 +284,11 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val exception2 = exceptions.generateOne
       (triplesFinder
-        .generateTriples(_: Commit)(_: Option[AccessToken]))
+        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit2, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception2)))
 
-      expectEventMarkedFailed(commit1.commitEventId, RecoverableFailure, uploadingError)
+      expectEventMarkedFailed(commit1.compoundEventId, RecoverableFailure, uploadingError)
 
       eventProcessor(eventBody) shouldBe context.unit
 
@@ -312,13 +313,13 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
         val rawTriples = jsonLDTriples.generateOne
         (triplesFinder
-          .generateTriples(_: Commit)(_: Option[AccessToken]))
+          .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
           .expects(commit1, maybeAccessToken)
           .returning(rightT[Try, ProcessingRecoverableError](rawTriples))
 
         val curatedTriples = curatedTriplesObjects.generateOne
         (triplesCurator
-          .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
+          .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
           .expects(commit1, rawTriples, maybeAccessToken)
           .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
@@ -329,11 +330,11 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
         val exception2 = exceptions.generateOne
         (triplesFinder
-          .generateTriples(_: Commit)(_: Option[AccessToken]))
+          .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
           .expects(commit2, maybeAccessToken)
           .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception2)))
 
-        expectEventMarkedFailed(commit1.commitEventId, NonRecoverableFailure, failure)
+        expectEventMarkedFailed(commit1.compoundEventId, NonRecoverableFailure, failure)
 
         eventProcessor(eventBody) shouldBe context.unit
 
@@ -360,8 +361,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val exception = exceptions.generateOne
       (eventLogMarkDone
-        .markEventDone(_: CommitEventId))
-        .expects(commit.commitEventId)
+        .markEventDone(_: CompoundEventId))
+        .expects(commit.compoundEventId)
         .returning(context.raiseError(exception))
 
       eventProcessor(eventBody) shouldBe context.unit
@@ -396,8 +397,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .returning(context.raiseError(exception))
 
       (eventLogMarkNew
-        .markEventNew(_: CommitEventId))
-        .expects(commits.head.commitEventId)
+        .markEventNew(_: CompoundEventId))
+        .expects(commits.head.compoundEventId)
         .returning(context.unit)
 
       eventProcessor(eventBody) shouldBe context.unit
@@ -478,19 +479,19 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .findAccessToken(_: Id)(_: Id => String))
         .expects(forProjectId, projectIdToPath)
 
-    def generateTriples(forCommits: NonEmptyList[Commit]): NonEmptyList[(Commit, JsonLDTriples)] =
+    def generateTriples(forCommits: NonEmptyList[CommitEvent]): NonEmptyList[(CommitEvent, JsonLDTriples)] =
       forCommits map (_ -> jsonLDTriples.generateOne)
 
-    def successfulTriplesGenerationAndUpload(commitAndTriples: (Commit, JsonLDTriples)) = {
+    def successfulTriplesGenerationAndUpload(commitAndTriples: (CommitEvent, JsonLDTriples)) = {
       val (commit, triples) = commitAndTriples
       (triplesFinder
-        .generateTriples(_: Commit)(_: Option[AccessToken]))
+        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](triples))
 
       val curatedTriples = curatedTriplesObjects.generateOne
       (triplesCurator
-        .curate(_: Commit, _: JsonLDTriples)(_: Option[AccessToken]))
+        .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, triples, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
@@ -500,19 +501,19 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .returning(context.pure(DeliverySuccess))
     }
 
-    def expectEventMarkedDone(commitEventId: CommitEventId) =
+    def expectEventMarkedDone(commitEventId: CompoundEventId) =
       (eventLogMarkDone
-        .markEventDone(_: CommitEventId))
+        .markEventDone(_: CompoundEventId))
         .expects(commitEventId)
         .returning(context.unit)
 
-    def expectEventMarkedFailed(commitEventId: CommitEventId, status: FailureStatus, exception: Throwable) =
+    def expectEventMarkedFailed(commitEventId: CompoundEventId, status: FailureStatus, exception: Throwable) =
       (eventLogMarkFailed
-        .markEventFailed(_: CommitEventId, _: FailureStatus, _: Option[EventMessage]))
+        .markEventFailed(_: CompoundEventId, _: FailureStatus, _: Option[EventMessage]))
         .expects(commitEventId, status, EventMessage(exception))
         .returning(context.unit)
 
-    def logSummary(commits: NonEmptyList[Commit], uploaded: Int, failed: Int): Assertion =
+    def logSummary(commits: NonEmptyList[CommitEvent], uploaded: Int, failed: Int): Assertion =
       logger.logged(
         Info(
           s"${commonLogMessage(commits.head)} processed in ${executionTimeRecorder.elapsedTime}ms: " +
@@ -520,18 +521,14 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         )
       )
 
-    def logError(commit: Commit, message: String): Assertion =
+    def logError(commit: CommitEvent, message: String): Assertion =
       logger.logged(Error(s"${commonLogMessage(commit)} $message"))
 
-    def logError(commit: Commit, exception: Exception, message: String = "failed"): Assertion =
+    def logError(commit: CommitEvent, exception: Exception, message: String = "failed"): Assertion =
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
 
-    def commonLogMessage: Commit => String = {
-      case CommitWithoutParent(id, project) =>
-        s"Commit Event id: $id, project: ${project.id} ${project.path}"
-      case CommitWithParent(id, parentId, project) =>
-        s"Commit Event id: $id, project: ${project.id} ${project.path}, parentId: $parentId"
-    }
+    def commonLogMessage(event: CommitEvent): String =
+      s"Commit Event id: ${event.compoundEventId}, ${event.project.path}"
 
     def verifyMetricsCollected() =
       eventsProcessingTimes
@@ -541,15 +538,15 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .exists(_ startsWith "events_processing_times") shouldBe true
   }
 
-  private def commits(commitId: CommitId, project: Project): Gen[Commit] =
+  private def commits(commitId: CommitId, project: Project): Gen[CommitEvent] =
     for {
       maybeParentId <- Gen.option(commitIds)
     } yield maybeParentId match {
-      case None           => CommitWithoutParent(commitId, project)
-      case Some(parentId) => CommitWithParent(commitId, parentId, project)
+      case None           => CommitEventWithoutParent(EventId(commitId.value), project, commitId)
+      case Some(parentId) => CommitEventWithParent(EventId(commitId.value), project, commitId, parentId)
     }
 
-  private def commitsLists(size: Gen[Int Refined Positive] = positiveInts(max = 5)): Gen[NonEmptyList[Commit]] =
+  private def commitsLists(size: Gen[Int Refined Positive] = positiveInts(max = 5)): Gen[NonEmptyList[CommitEvent]] =
     for {
       commitId <- commitIds
       project  <- projects

@@ -23,8 +23,8 @@ import ch.datascience.dbeventlog._
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{commitEventIds, committedDates}
-import ch.datascience.graph.model.events.CommitEventId
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
+import ch.datascience.graph.model.events.CompoundEventId
 import doobie.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -40,16 +40,16 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
     s"set the given $RecoverableFailure status and message on event with the given id and project " +
       s"if the event has status $Processing" in new TestCase {
 
-      storeEvent(commitEventIds.generateOne.copy(id = eventId.id),
+      storeEvent(compoundEventIds.generateOne.copy(id = eventId.id),
                  EventStatus.Processing,
                  executionDate,
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne,
                  createdDate)
       storeEvent(eventId,
                  EventStatus.Processing,
                  executionDate,
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne,
                  createdDate)
 
@@ -70,16 +70,16 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
     s"set the given $NonRecoverableFailure status and message on event with the given id and project " +
       s"if the event has status $Processing" in new TestCase {
 
-      storeEvent(commitEventIds.generateOne.copy(id = eventId.id),
+      storeEvent(compoundEventIds.generateOne.copy(id = eventId.id),
                  EventStatus.Processing,
                  executionDate,
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne,
                  createdDate)
       storeEvent(eventId,
                  EventStatus.Processing,
                  executionDate,
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne,
                  createdDate)
 
@@ -100,7 +100,7 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
     s"do nothing when setting $RecoverableFailure and event status is different than $Processing" in new TestCase {
 
       val eventStatus = eventStatuses generateDifferentThan Processing
-      storeEvent(eventId, eventStatus, executionDate, committedDates.generateOne, eventBodies.generateOne, createdDate)
+      storeEvent(eventId, eventStatus, executionDate, eventDates.generateOne, eventBodies.generateOne, createdDate)
 
       val message          = eventMessages.generateOne
       val newExecutionDate = executionDates.generateOne
@@ -119,7 +119,7 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
     s"do nothing when setting $NonRecoverableFailure and event status is different than $Processing" in new TestCase {
 
       val eventStatus = eventStatuses generateDifferentThan Processing
-      storeEvent(eventId, eventStatus, executionDate, committedDates.generateOne, eventBodies.generateOne, createdDate)
+      storeEvent(eventId, eventStatus, executionDate, eventDates.generateOne, eventBodies.generateOne, createdDate)
 
       val message          = eventMessages.generateOne
       val newExecutionDate = executionDates.generateOne
@@ -138,14 +138,14 @@ class EventLogMarkFailedSpec extends WordSpec with InMemoryEventLogDbSpec with M
 
   private trait TestCase {
 
-    val eventId       = commitEventIds.generateOne
+    val eventId       = compoundEventIds.generateOne
     val createdDate   = createdDates.generateOne
     val executionDate = executionDates.generateOne
 
     val executionDateCalculator = mock[ExecutionDateCalculator]
     val eventLogMarkFailed      = new EventLogMarkFailed(transactor, executionDateCalculator)
 
-    def findEvent(eventId: CommitEventId): (ExecutionDate, EventStatus, Option[EventMessage]) = execute {
+    def findEvent(eventId: CompoundEventId): (ExecutionDate, EventStatus, Option[EventMessage]) = execute {
       sql"""select execution_date, status, message
            |from event_log 
            |where event_id = ${eventId.id} and project_id = ${eventId.projectId}

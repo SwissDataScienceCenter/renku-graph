@@ -21,13 +21,14 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
-import ch.datascience.dbeventlog.EventBody
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CommitId, Project}
-import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.graph.model.events.{CommitId, EventBody, EventId}
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import io.circe._
+import org.scalacheck.Gen
+import org.scalacheck.Gen.choose
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -40,9 +41,10 @@ class CommitEventsDeserialiserSpec extends WordSpec {
     "produce a single CommitEvent if the Json string can be successfully deserialized and there are no parents" in new TestCase {
       deserialiser.deserialiseToCommitEvents(commitEvent(parents = Nil)) shouldBe context.pure(
         NonEmptyList.of(
-          CommitWithoutParent(
-            commitId,
-            Project(projectId, projectPath)
+          CommitEventWithoutParent(
+            EventId(commitId.value),
+            Project(projectId, projectPath),
+            commitId
           )
         )
       )
@@ -54,10 +56,11 @@ class CommitEventsDeserialiserSpec extends WordSpec {
       deserialiser.deserialiseToCommitEvents(commitEvent(parentCommits)) shouldBe context.pure(
         NonEmptyList.fromListUnsafe(
           parentCommits map { parentCommitId =>
-            CommitWithParent(
+            CommitEventWithParent(
+              EventId(commitId.value),
+              Project(projectId, projectPath),
               commitId,
-              parentCommitId,
-              Project(projectId, projectPath)
+              parentCommitId
             )
           }
         )
@@ -99,5 +102,14 @@ class CommitEventsDeserialiserSpec extends WordSpec {
         )
         .noSpaces
     }
+  }
+
+  private implicit def parentsIdsLists(minNumber: Int = 0, maxNumber: Int = 4): Gen[List[CommitId]] = {
+    require(minNumber <= maxNumber,
+            s"minNumber = $minNumber is not <= maxNumber = $maxNumber for generating parents Ids list")
+    for {
+      parentCommitsNumber <- choose(minNumber, maxNumber)
+      parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
+    } yield parents
   }
 }

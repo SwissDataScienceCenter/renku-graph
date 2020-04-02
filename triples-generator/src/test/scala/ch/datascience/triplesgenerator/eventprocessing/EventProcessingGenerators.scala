@@ -18,18 +18,25 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
-import ch.datascience.graph.model.EventsGenerators.{commitIds, projects}
-import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import ch.datascience.graph.model.events.EventId
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import org.scalacheck.Gen
 
 private object EventProcessingGenerators {
 
-  implicit val commits: Gen[Commit] = for {
+  implicit val commits: Gen[CommitEvent] = for {
     commitId      <- commitIds
     project       <- projects
     maybeParentId <- Gen.option(commitIds)
   } yield maybeParentId match {
-    case None           => CommitWithoutParent(commitId, project)
-    case Some(parentId) => CommitWithParent(commitId, parentId, project)
+    case None           => CommitEventWithoutParent(EventId(commitId.value), project, commitId)
+    case Some(parentId) => CommitEventWithParent(EventId(commitId.value), project, commitId, parentId)
   }
+
+  implicit lazy val projects: Gen[Project] = for {
+    projectId <- projectIds
+    path      <- projectPaths
+  } yield Project(projectId, path)
 }

@@ -46,6 +46,8 @@ spec:
                   key: graph-dbEventLog-postgresPassword
             - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
               value: "{{ .Values.webhookService.dbEventLog.connectionPool }}"
+            - name: EVENT_LOG_BASE_URL
+              value: "http://{{ template "eventLog.fullname" . }}:{{ .Values.eventLog.service.port }}"
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: GITLAB_BASE_URL

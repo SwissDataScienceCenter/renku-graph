@@ -25,7 +25,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
@@ -50,7 +50,7 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
 
       val triplesWithForkInfo = curatedTriplesObjects.generateOne
       (forkInfoUpdater
-        .updateForkInfo(_: Commit, _: CuratedTriples)(_: Option[AccessToken]))
+        .updateForkInfo(_: CommitEvent, _: CuratedTriples)(_: Option[AccessToken]))
         .expects(commit, triplesWithPersonDetails, maybeAccessToken)
         .returning(triplesWithForkInfo.toRightT)
 
@@ -76,7 +76,7 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (forkInfoUpdater
-        .updateForkInfo(_: Commit, _: CuratedTriples)(_: Option[AccessToken]))
+        .updateForkInfo(_: CommitEvent, _: CuratedTriples)(_: Option[AccessToken]))
         .expects(commit, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toEitherTError)
 
@@ -92,7 +92,7 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
 
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (forkInfoUpdater
-        .updateForkInfo(_: Commit, _: CuratedTriples)(_: Option[AccessToken]))
+        .updateForkInfo(_: CommitEvent, _: CuratedTriples)(_: Option[AccessToken]))
         .expects(commit, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toLeftT)
 

@@ -31,10 +31,10 @@ class EventLogVerifyExistenceSpec extends WordSpec with InMemoryEventLogDbSpec {
 
     "return an empty list if an empty list given" in new TestCase {
       storeEvent(
-        commitEventIds.generateOne.copy(projectId = projectId),
+        compoundEventIds.generateOne.copy(projectId = projectId),
         eventStatuses.generateOne,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
 
@@ -42,20 +42,20 @@ class EventLogVerifyExistenceSpec extends WordSpec with InMemoryEventLogDbSpec {
     }
 
     "return an empty list if all ids from the list exist in the Log" in new TestCase {
-      val eventId1 = commitEventIds.generateOne.copy(projectId = projectId)
+      val eventId1 = compoundEventIds.generateOne.copy(projectId = projectId)
       storeEvent(
         eventId1,
         eventStatuses.generateOne,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
-      val eventId2 = commitEventIds.generateOne.copy(projectId = projectId)
+      val eventId2 = compoundEventIds.generateOne.copy(projectId = projectId)
       storeEvent(
         eventId2,
         eventStatuses.generateOne,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
 
@@ -65,36 +65,36 @@ class EventLogVerifyExistenceSpec extends WordSpec with InMemoryEventLogDbSpec {
     }
 
     "return a list with ids which do not exist in the Log for the specified project" in new TestCase {
-      val eventId1 = commitEventIds.generateOne.copy(projectId = projectId)
+      val eventId1 = compoundEventIds.generateOne.copy(projectId = projectId)
       storeEvent(
         eventId1,
         eventStatuses.generateOne,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
-      val eventId2 = commitEventIds.generateOne
+      val eventId2 = compoundEventIds.generateOne
       storeEvent(
         eventId2,
         eventStatuses.generateOne,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
-      val eventId3 = commitEventIds.generateOne.copy(projectId = projectId)
+      val eventId3 = compoundEventIds.generateOne.copy(projectId = projectId)
       storeEvent(
         eventId3,
         eventStatuses.generateOne,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
-      val eventId4 = commitEventIds.generateOne.copy(id = eventId1.id)
+      val eventId4 = compoundEventIds.generateOne.copy(id = eventId1.id)
       storeEvent(
         eventId4,
         eventStatuses.generateOne,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
 
@@ -104,13 +104,13 @@ class EventLogVerifyExistenceSpec extends WordSpec with InMemoryEventLogDbSpec {
     }
 
     "return all the given ids if they belong to a different project" in new TestCase {
-      val eventId1 = commitEventIds.generateOne
+      val eventId1 = compoundEventIds.generateOne
 
       storeEvent(
-        commitEventIds.generateOne.copy(id = eventId1.id),
+        compoundEventIds.generateOne.copy(id = eventId1.id),
         eventStatuses.generateOne,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne
       )
 

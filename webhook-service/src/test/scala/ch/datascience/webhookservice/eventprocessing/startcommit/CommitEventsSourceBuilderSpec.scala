@@ -30,8 +30,9 @@ import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder}
+import ch.datascience.webhookservice.eventprocessing.CommitEvent
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators.startCommits
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -155,8 +156,8 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (eventLogVerifyExistence
-        .filterNotExistingInLog(_: List[CommitId], _: Id))
-        .expects(List(commitInfo.id), startCommit.project.id)
+        .filterNotExistingInLog(_: List[EventId], _: Id))
+        .expects(List(EventId(commitInfo.id.value)), startCommit.project.id)
         .returning(context.raiseError(exception))
 
       source.transformEventsWith(send) shouldBe context.raiseError(exception)
@@ -241,9 +242,9 @@ class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
 
     def givenNonExistingInLog(in: List[CommitId], out: List[CommitId]): Unit = {
       (eventLogVerifyExistence
-        .filterNotExistingInLog(_: List[CommitId], _: Id))
-        .expects(in, startCommit.project.id)
-        .returning(context pure out)
+        .filterNotExistingInLog(_: List[EventId], _: Id))
+        .expects(in.map(id => EventId(id.value)), startCommit.project.id)
+        .returning(context pure out.map(id => EventId(id.value)))
       ()
     }
   }

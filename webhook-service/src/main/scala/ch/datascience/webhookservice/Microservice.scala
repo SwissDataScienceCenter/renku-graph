@@ -72,20 +72,24 @@ object Microservice extends IOMicroservice {
         hookTokenCrypto       <- HookTokenCrypto[IO]()
         executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
         metricsRegistry       <- MetricsRegistry()
+        hookEventEndpoint <- IOHookEventEndpoint(transactor,
+                                                 tokenRepositoryUrl,
+                                                 gitLabUrl,
+                                                 gitLabThrottler,
+                                                 hookTokenCrypto,
+                                                 executionTimeRecorder,
+                                                 ApplicationLogger)
+        hookCreatorEndpoint <- IOHookCreationEndpoint(transactor,
+                                                      tokenRepositoryUrl,
+                                                      projectHookUrl,
+                                                      gitLabUrl,
+                                                      gitLabThrottler,
+                                                      hookTokenCrypto,
+                                                      executionTimeRecorder,
+                                                      ApplicationLogger)
         routes <- new MicroserviceRoutes[IO](
-                   new IOHookEventEndpoint(transactor,
-                                           tokenRepositoryUrl,
-                                           gitLabUrl,
-                                           gitLabThrottler,
-                                           hookTokenCrypto,
-                                           executionTimeRecorder),
-                   new IOHookCreationEndpoint(transactor,
-                                              tokenRepositoryUrl,
-                                              projectHookUrl,
-                                              gitLabUrl,
-                                              gitLabThrottler,
-                                              hookTokenCrypto,
-                                              executionTimeRecorder),
+                   hookEventEndpoint,
+                   hookCreatorEndpoint,
                    new IOHookValidationEndpoint(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
                    new IOProcessingStatusEndpoint(transactor,
                                                   tokenRepositoryUrl,
@@ -97,13 +101,15 @@ object Microservice extends IOMicroservice {
                  ).routes
         httpServer = new HttpServer[IO](serverPort = 9001, routes)
 
+        eventsSynchronizationScheduler <- IOEventsSynchronizationScheduler(transactor,
+                                                                           tokenRepositoryUrl,
+                                                                           gitLabUrl,
+                                                                           gitLabThrottler,
+                                                                           executionTimeRecorder,
+                                                                           ApplicationLogger)
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,
-                     new IOEventsSynchronizationScheduler(transactor,
-                                                          tokenRepositoryUrl,
-                                                          gitLabUrl,
-                                                          gitLabThrottler,
-                                                          executionTimeRecorder),
+                     eventsSynchronizationScheduler,
                      httpServer
                    ) run args
       } yield exitCode

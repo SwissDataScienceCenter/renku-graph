@@ -18,33 +18,84 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
-import cats.effect.{ContextShift, IO}
-import cats.implicits._
-import cats.{Monad, MonadError}
+import cats.MonadError
+import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.commands.{EventLogAdd, IOEventLogAdd}
-import ch.datascience.dbeventlog.{EventBody, EventLogDB}
-import ch.datascience.graph.model.events.CommitEvent
+import ch.datascience.dbeventlog.EventLogDB
+import ch.datascience.graph.config.EventLogUrl
+import ch.datascience.graph.model.events.EventBody
+import ch.datascience.http.client.IORestClient
+import ch.datascience.webhookservice.eventprocessing.CommitEvent
+import io.chrisdavenport.log4cats.Logger
+import org.http4s.Status
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-class CommitEventSender[Interpretation[_]: Monad](
-    commitEventSerializer: CommitEventSerializer[Interpretation],
-    eventLogAdd:           EventLogAdd[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable]) {
-
-  import commitEventSerializer._
-  import eventLogAdd._
-
-  def send(commitEvent: CommitEvent): Interpretation[Unit] =
-    for {
-      serialisedEvent <- serialiseToJsonString(commitEvent)
-      eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
-      _               <- storeNewEvent(commitEvent, eventBody)
-    } yield ()
+trait CommitEventSender[Interpretation[_]] {
+  def send(commitEvent: CommitEvent): Interpretation[Unit]
 }
 
 class IOCommitEventSender(
-    transactor:          DbTransactor[IO, EventLogDB]
-)(implicit contextShift: ContextShift[IO], ME: MonadError[IO, Throwable])
-    extends CommitEventSender[IO](new CommitEventSerializer[IO], new IOEventLogAdd(transactor))
+    eventLogUrl:           EventLogUrl,
+    commitEventSerializer: CommitEventSerializer[IO],
+    logger:                Logger[IO]
+)(implicit ME:             MonadError[IO, Throwable],
+  executionContext:        ExecutionContext,
+  contextShift:            ContextShift[IO],
+  timer:                   Timer[IO])
+    extends IORestClient(Throttler.noThrottling, logger)
+    with CommitEventSender[IO] {
+
+  import cats.effect._
+  import commitEventSerializer._
+  import io.circe.Encoder
+  import io.circe.literal._
+  import io.circe.syntax._
+  import org.http4s.Method.POST
+  import org.http4s.Status.{Created, Ok}
+  import org.http4s.circe._
+  import org.http4s.{Request, Response}
+
+  def send(commitEvent: CommitEvent): IO[Unit] =
+    for {
+      serialisedEvent <- serialiseToJsonString(commitEvent)
+      eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
+      uri             <- validateUri(s"$eventLogUrl/events")
+      _               <- send(request(POST, uri).withEntity((commitEvent -> eventBody).asJson))(mapResponse)
+    } yield ()
+
+  private implicit lazy val entityEncoder: Encoder[(CommitEvent, EventBody)] =
+    Encoder.instance[(CommitEvent, EventBody)] {
+      case (event, body) => json"""{
+        "id":        ${event.id.value},
+        "project": {
+          "id":      ${event.project.id.value},
+          "path":    ${event.project.path.value}
+        },
+        "date":      ${event.committedDate.value},
+        "batchDate": ${event.batchDate.value},
+        "body":      ${body.value}
+      }"""
+    }
+
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+    case (Created, _, _) => IO.unit
+    case (Ok, _, _)      => IO.unit
+  }
+}
+
+object IOCommitEventSender {
+
+  def apply(
+      transactor:     DbTransactor[IO, EventLogDB],
+      logger:         Logger[IO]
+  )(implicit ME:      MonadError[IO, Throwable],
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]): IO[CommitEventSender[IO]] =
+    for {
+      eventLogUrl <- EventLogUrl[IO]()
+    } yield new IOCommitEventSender(eventLogUrl, new CommitEventSerializer[IO], logger)
+}

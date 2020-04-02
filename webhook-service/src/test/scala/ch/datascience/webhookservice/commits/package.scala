@@ -18,8 +18,7 @@
 
 package ch.datascience.webhookservice
 
-import ch.datascience.graph.model.events
-import ch.datascience.graph.model.events.Person
+import ch.datascience.webhookservice.eventprocessing.Person
 import io.circe.Json
 import io.circe.syntax._
 
@@ -28,7 +27,7 @@ package object commits {
   implicit class PersonOps(person: Person) {
 
     lazy val emailToJson: Json = person match {
-      case person: events.Person.WithEmail => person.email.value.asJson
+      case person: Person.WithEmail => person.email.value.asJson
       case _ => Json.Null
     }
   }

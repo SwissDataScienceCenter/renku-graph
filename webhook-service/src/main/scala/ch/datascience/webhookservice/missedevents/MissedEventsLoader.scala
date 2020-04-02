@@ -21,13 +21,13 @@ package ch.datascience.webhookservice.missedevents
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.dbeventlog.commands.EventLogLatestEvents
-import ch.datascience.graph.model.events.{CommitEventId, Project}
+import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.webhookservice.commits.{CommitInfo, LatestCommitFinder}
-import ch.datascience.webhookservice.eventprocessing.StartCommit
+import ch.datascience.webhookservice.eventprocessing.{Project, StartCommit}
 import ch.datascience.webhookservice.eventprocessing.startcommit.CommitToEventLog
 import ch.datascience.webhookservice.project.{ProjectInfo, ProjectInfoFinder}
 import io.chrisdavenport.log4cats.Logger
@@ -62,7 +62,7 @@ private class IOMissedEventsLoader(
   def loadMissedEvents: IO[Unit] =
     measureExecutionTime {
       for {
-        latestLogEvents <- findAllLatestEvents
+        latestLogEvents <- findAllLatestEvents.map(_.map(id => CompoundEventId(id.id, id.projectId)))
         updateSummary <- if (latestLogEvents.isEmpty) IO.pure(UpdateSummary())
                         else (latestLogEvents map loadEvents).sequence map toUpdateSummary
       } yield updateSummary
@@ -78,7 +78,7 @@ private class IOMissedEventsLoader(
       )
   }
 
-  private def loadEvents(latestLogEvent: CommitEventId): IO[UpdateResult] = {
+  private def loadEvents(latestLogEvent: CompoundEventId): IO[UpdateResult] = {
     for {
       maybeAccessToken  <- findAccessToken(latestLogEvent.projectId)
       maybeLatestCommit <- findLatestCommit(latestLogEvent.projectId, maybeAccessToken).value
@@ -86,12 +86,12 @@ private class IOMissedEventsLoader(
     } yield updateResult
   } recoverWith loggingWarning(latestLogEvent)
 
-  private def addEventsIfMissing(latestLogEvent:    CommitEventId,
+  private def addEventsIfMissing(latestLogEvent:    CompoundEventId,
                                  maybeLatestCommit: Option[CommitInfo],
                                  maybeAccessToken:  Option[AccessToken]) =
     maybeLatestCommit match {
-      case None                                                   => IO.pure(Skipped)
-      case Some(commitInfo) if commitInfo.id == latestLogEvent.id => IO.pure(Skipped)
+      case None                                                               => IO.pure(Skipped)
+      case Some(commitInfo) if commitInfo.id.value == latestLogEvent.id.value => IO.pure(Skipped)
       case Some(commitInfo) =>
         for {
           projectInfo <- findProjectInfo(latestLogEvent.projectId, maybeAccessToken)
@@ -107,7 +107,7 @@ private class IOMissedEventsLoader(
     )
   }
 
-  private def loggingWarning(latestLogEvent: CommitEventId): PartialFunction[Throwable, IO[UpdateResult]] = {
+  private def loggingWarning(latestLogEvent: CompoundEventId): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
       logger.warn(exception)(s"Synchronizing Commits for project ${latestLogEvent.projectId} failed")
       IO.pure(Failed)

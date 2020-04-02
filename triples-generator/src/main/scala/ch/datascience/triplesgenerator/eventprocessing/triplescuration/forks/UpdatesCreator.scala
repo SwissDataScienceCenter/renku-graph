@@ -143,7 +143,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
   private lazy val findCreatorId: Option[Email] => String = {
     case None => s"<_:${java.util.UUID.randomUUID()}>"
     case Some(email) =>
-      val username     = email.extractUsername.value
+      val username     = email.extractName.value
       val encodedEmail = email.value.replace(username, sparqlEncode(username))
       s"<mailto:$encodedEmail>"
   }

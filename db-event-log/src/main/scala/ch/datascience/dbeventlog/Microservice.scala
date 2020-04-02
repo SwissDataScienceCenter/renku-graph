@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
+import ch.datascience.dbeventlog.creation.IOEventCreationEndpoint
 import ch.datascience.dbeventlog.init.IODbInitializer
 import ch.datascience.dbeventlog.metrics.{EventLogMetrics, IOEventLogMetrics}
 import ch.datascience.http.server.HttpServer
@@ -43,10 +44,12 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
-        sentryInitializer <- SentryInitializer[IO]
-        metricsRegistry   <- MetricsRegistry()
-        eventLogMetrics   <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
+        sentryInitializer     <- SentryInitializer[IO]
+        metricsRegistry       <- MetricsRegistry()
+        eventLogMetrics       <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
+        eventCreationEndpoint <- IOEventCreationEndpoint(transactor, ApplicationLogger)
         routes <- new MicroserviceRoutes[IO](
+                   eventCreationEndpoint,
                    new RoutesMetrics[IO](metricsRegistry)
                  ).routes
         httpServer = new HttpServer[IO](serverPort = 9005, routes)
@@ -64,7 +67,7 @@ object Microservice extends IOMicroservice {
 
 private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
-    eventLogDbInitializer:    IODbInitializer,
+    dbInitializer:            IODbInitializer,
     metrics:                  EventLogMetrics,
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
@@ -73,7 +76,7 @@ private class MicroserviceRunner(
   def run(args: List[String]): IO[ExitCode] =
     for {
       _      <- sentryInitializer.run
-      _      <- eventLogDbInitializer.run
+      _      <- dbInitializer.run
       _      <- metrics.run.start.map(gatherCancelToken)
       result <- httpServer.run
     } yield result

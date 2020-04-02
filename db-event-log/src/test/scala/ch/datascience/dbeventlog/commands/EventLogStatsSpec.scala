@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.{CommitEventId, CommitId}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.projects.{Id, Path}
 import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
@@ -74,35 +74,35 @@ class EventLogStatsSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaC
 
   private val stats = new EventLogStatsImpl(transactor)
 
-  private def store: ((Path, CommitId, EventStatus)) => Unit = {
-    case (projectPath, commitId, status) =>
+  private def store: ((Path, EventId, EventStatus)) => Unit = {
+    case (projectPath, eventId, status) =>
       storeEvent(
-        CommitEventId(commitId, Id(Math.abs(projectPath.value.hashCode))),
+        CompoundEventId(eventId, Id(Math.abs(projectPath.value.hashCode))),
         status,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne,
         projectPath = projectPath
       )
   }
 
   private def store(status: EventStatus): Unit =
-    storeEvent(commitEventIds.generateOne,
+    storeEvent(compoundEventIds.generateOne,
                status,
                executionDates.generateOne,
-               committedDates.generateOne,
+               eventDates.generateOne,
                eventBodies.generateOne)
 
   private def generateEventsFor(projectPaths: List[Path]) =
     projectPaths flatMap { projectPath =>
-      nonEmptyList(commitIdsAndStatuses, maxElements = 20).generateOne.toList.map {
+      nonEmptyList(eventIdsAndStatuses, maxElements = 20).generateOne.toList.map {
         case (commitId, status) => (projectPath, commitId, status)
       }
     }
 
-  private val commitIdsAndStatuses =
+  private val eventIdsAndStatuses =
     for {
-      commitId <- commitIds
-      status   <- eventStatuses
-    } yield commitId -> status
+      eventId <- eventIds
+      status  <- eventStatuses
+    } yield eventId -> status
 }

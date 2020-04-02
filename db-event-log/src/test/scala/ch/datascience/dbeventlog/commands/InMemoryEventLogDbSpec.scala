@@ -24,7 +24,7 @@ import ch.datascience.db.DbSpec
 import ch.datascience.dbeventlog._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects.Path
 import doobie.implicits._
 import doobie.util.fragment.Fragment
@@ -55,43 +55,43 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
     sql"TRUNCATE TABLE event_log".update.run.map(_ => ())
   }
 
-  protected def storeEvent(commitEventId: CommitEventId,
-                           eventStatus:   EventStatus,
-                           executionDate: ExecutionDate,
-                           eventDate:     CommittedDate,
-                           eventBody:     EventBody,
-                           createdDate:   CreatedDate = CreatedDate(Instant.now),
-                           batchDate:     BatchDate = BatchDate(Instant.now),
-                           projectPath:   Path = projectPaths.generateOne,
-                           maybeMessage:  Option[EventMessage] = None): Unit = execute {
+  protected def storeEvent(compoundEventId: CompoundEventId,
+                           eventStatus:     EventStatus,
+                           executionDate:   ExecutionDate,
+                           eventDate:       EventDate,
+                           eventBody:       EventBody,
+                           createdDate:     CreatedDate = CreatedDate(Instant.now),
+                           batchDate:       BatchDate = BatchDate(Instant.now),
+                           projectPath:     Path = projectPaths.generateOne,
+                           maybeMessage:    Option[EventMessage] = None): Unit = execute {
     maybeMessage match {
       case None =>
         sql"""|insert into
               |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
-              |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody)
+              |values (${compoundEventId.id}, ${compoundEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody)
       """.stripMargin.update.run.map(_ => ())
       case Some(message) =>
         sql"""|insert into
               |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body, message)
-              |values (${commitEventId.id}, ${commitEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody, $message)
+              |values (${compoundEventId.id}, ${compoundEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody, $message)
       """.stripMargin.update.run.map(_ => ())
     }
   }
 
   // format: off
   protected def findEvents(status:  EventStatus,
-                           orderBy: Fragment = fr"created_date asc"): List[(CommitEventId, ExecutionDate, BatchDate)] =
+                           orderBy: Fragment = fr"created_date asc"): List[(CompoundEventId, ExecutionDate, BatchDate)] =
     execute {
       (fr"""select event_id, project_id, execution_date, batch_date
             from event_log
             where status = $status
             order by """ ++ orderBy)
-        .query[(CommitEventId, ExecutionDate, BatchDate)]
+        .query[(CompoundEventId, ExecutionDate, BatchDate)]
         .to[List]
     }
   // format: on
 
-  protected def findEventMessage(eventId: CommitEventId): Option[EventMessage] =
+  protected def findEventMessage(eventId: CompoundEventId): Option[EventMessage] =
     execute {
       sql"""select message
             from event_log 

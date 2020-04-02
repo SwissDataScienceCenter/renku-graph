@@ -19,26 +19,32 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects
 
-private sealed trait Commit extends Product with Serializable {
-  val id:      CommitId
-  val project: Project
+private sealed trait CommitEvent extends Product with Serializable {
+  val eventId:  EventId
+  val project:  Project
+  val commitId: CommitId
 }
 
-private object Commit {
+final case class Project(id: projects.Id, path: projects.Path)
 
-  final case class CommitWithParent(
-      id:       CommitId,
-      parentId: CommitId,
-      project:  Project
-  ) extends Commit
+private object CommitEvent {
 
-  final case class CommitWithoutParent(
-      id:      CommitId,
-      project: Project
-  ) extends Commit
+  final case class CommitEventWithParent(
+      eventId:  EventId,
+      project:  Project,
+      commitId: CommitId,
+      parentId: CommitId
+  ) extends CommitEvent
 
-  implicit class CommitOps(commit: Commit) {
-    lazy val commitEventId: CommitEventId = CommitEventId(commit.id, commit.project.id)
+  final case class CommitEventWithoutParent(
+      eventId:  EventId,
+      project:  Project,
+      commitId: CommitId
+  ) extends CommitEvent
+
+  implicit class CommitOps(commit: CommitEvent) {
+    lazy val compoundEventId: CompoundEventId = CompoundEventId(commit.eventId, commit.project.id)
   }
 }

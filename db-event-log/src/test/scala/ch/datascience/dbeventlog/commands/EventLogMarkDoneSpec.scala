@@ -24,7 +24,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{batchDates, commitEventIds, committedDates}
+import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -36,28 +36,28 @@ class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with Moc
     s"set status $TriplesStore on the event with the given id and project " +
       s"if the event has status $Processing" in new TestCase {
 
-      val eventId = commitEventIds.generateOne
+      val eventId = compoundEventIds.generateOne
       storeEvent(
         eventId,
         EventStatus.Processing,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne,
         batchDate = eventBatchDate
       )
       storeEvent(
-        commitEventIds.generateOne.copy(id = eventId.id),
+        compoundEventIds.generateOne.copy(id = eventId.id),
         EventStatus.Processing,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne,
         batchDate = eventBatchDate
       )
       storeEvent(
-        commitEventIds.generateOne,
+        compoundEventIds.generateOne,
         EventStatus.Processing,
         executionDates.generateOne,
-        committedDates.generateOne,
+        eventDates.generateOne,
         eventBodies.generateOne,
         batchDate = eventBatchDate
       )
@@ -69,13 +69,13 @@ class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with Moc
 
     "do nothing when updating event did not change any row" in new TestCase {
 
-      val eventId       = commitEventIds.generateOne
+      val eventId       = compoundEventIds.generateOne
       val eventStatus   = eventStatuses generateDifferentThan Processing
       val executionDate = executionDates.generateOne
       storeEvent(eventId,
                  eventStatus,
                  executionDate,
-                 committedDates.generateOne,
+                 eventDates.generateOne,
                  eventBodies.generateOne,
                  batchDate = eventBatchDate)
 

@@ -24,7 +24,7 @@ import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Renku
 import org.scalatest.Matchers._
@@ -64,7 +64,7 @@ class RenkuSpec extends WordSpec {
 
       intercept[Exception] {
         renku(timeout).log(commit, path)(triplesGenerationTakingTooLong).unsafeRunSync()
-      }.getMessage shouldBe s"'renku log' execution for commit: ${commit.id}, project: ${commit.project.id} " +
+      }.getMessage shouldBe s"'renku log' execution for commit: ${commit.commitId}, project: ${commit.project.id} " +
         s"took longer than $timeout - terminating"
     }
   }
@@ -79,16 +79,16 @@ class RenkuSpec extends WordSpec {
     private val renkuLogTimeout = RenkuLogTimeout(1500 millis)
     def renku(timeout: RenkuLogTimeout = renkuLogTimeout) = new Renku(timeout)
 
-    def triplesGeneration(returning: CommandResult): (Commit, Path) => CommandResult =
+    def triplesGeneration(returning: CommandResult): (CommitEvent, Path) => CommandResult =
       (_, _) => {
         Thread sleep (renkuLogTimeout.value - (1300 millis)).toMillis
         returning
       }
 
-    def triplesGeneration(failingWith: Exception): (Commit, Path) => CommandResult =
+    def triplesGeneration(failingWith: Exception): (CommitEvent, Path) => CommandResult =
       (_, _) => throw failingWith
 
-    val triplesGenerationTakingTooLong: (Commit, Path) => CommandResult =
+    val triplesGenerationTakingTooLong: (CommitEvent, Path) => CommandResult =
       (_, _) => {
         blocking(Thread sleep (renkuLogTimeout.value * 10).toMillis)
         CommandResult(exitCode = 0, chunks = Nil)

@@ -20,11 +20,33 @@ package ch.datascience.dbeventlog
 
 import java.time.Instant
 
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId}
+import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
+import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
+import io.circe.Decoder
 
-final class EventBody private (val value: String) extends AnyVal with StringTinyType
-object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank
+final case class Event(
+    id:        EventId,
+    project:   EventProject,
+    date:      EventDate,
+    batchDate: BatchDate,
+    body:      EventBody
+)
+
+object Event {
+  implicit class CommitEventOps(event: Event) {
+    lazy val compoundEventId: CompoundEventId = CompoundEventId(event.id, event.project.id)
+  }
+}
+
+final case class EventProject(id: projects.Id, path: projects.Path)
+
+final class EventDate private (val value: Instant) extends AnyVal with InstantTinyType
+object EventDate extends TinyTypeFactory[EventDate](new EventDate(_)) with InstantNotInTheFuture {
+  implicit val decoder: Decoder[EventDate] = instantDecoder(EventDate)
+}
 
 final class CreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
 object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture

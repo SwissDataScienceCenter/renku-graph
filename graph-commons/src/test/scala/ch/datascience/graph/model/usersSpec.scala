@@ -73,7 +73,7 @@ class EmailSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "return the username part from the email" in {
       forAll { email: Email =>
-        email.extractUsername.value shouldBe email.value.substring(0, email.value.indexOf("@"))
+        email.extractName.value shouldBe email.value.substring(0, email.value.indexOf("@"))
       }
     }
   }
@@ -107,7 +107,7 @@ class UsersResourceIdSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "encrypt the local part of the email ResourceId and wrap it in <>" in {
       forAll { email: Email =>
-        val username   = email.extractUsername.value
+        val username   = email.extractName.value
         val resourceId = ResourceId(s"mailto:$email")
 
         resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value.replace(username, sparqlEncode(username))}>"

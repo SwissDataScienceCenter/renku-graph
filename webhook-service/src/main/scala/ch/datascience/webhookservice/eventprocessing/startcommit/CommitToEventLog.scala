@@ -26,12 +26,11 @@ import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.events.CommitEvent
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.webhookservice.eventprocessing.StartCommit
 import ch.datascience.webhookservice.eventprocessing.commitevent._
+import ch.datascience.webhookservice.eventprocessing.{CommitEvent, StartCommit}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -125,17 +124,25 @@ private object CommitToEventLog {
   }
 }
 
-class IOCommitToEventLog(
-    transactor:              DbTransactor[IO, EventLogDB],
-    tokenRepositoryUrl:      TokenRepositoryUrl,
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    executionTimeRecorder:   ExecutionTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
-    extends CommitToEventLog[IO](
-      new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
+object IOCommitToEventLog {
+  def apply(
+      transactor:              DbTransactor[IO, EventLogDB],
+      tokenRepositoryUrl:      TokenRepositoryUrl,
+      gitLabUrl:               GitLabUrl,
+      gitLabThrottler:         Throttler[IO, GitLab],
+      executionTimeRecorder:   ExecutionTimeRecorder[IO],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    clock:                     Clock[IO],
+    timer:                     Timer[IO]): IO[CommitToEventLog[IO]] =
+    for {
+      eventSender <- IOCommitEventSender(transactor, logger)
+    } yield new CommitToEventLog[IO](
+      new IOAccessTokenFinder(tokenRepositoryUrl, logger),
       new IOCommitEventsSourceBuilder(transactor, gitLabUrl, gitLabThrottler),
-      new IOCommitEventSender(transactor),
-      ApplicationLogger,
+      eventSender,
+      logger,
       executionTimeRecorder
     )
+}

@@ -17,13 +17,17 @@
  */
 
 package ch.datascience.dbeventlog
+
 import java.time.Instant
 
-import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId}
 import ch.datascience.graph.model.projects
-import doobie.util._
+import doobie.util.{Get, Put, Read}
 
-package object commands {
+object TypesSerializers extends TypesSerializers
+
+trait TypesSerializers {
+
   implicit val eventIdGet: Get[EventId] = Get[String].tmap(EventId.apply)
   implicit val eventIdPut: Put[EventId] = Put[String].contramap(_.value)
 

@@ -51,11 +51,11 @@ trait GraphServices extends BeforeAndAfterAll {
 
     GraphServices.servicesRunner
       .run(
-        webhookService,
         tokenRepository,
+        eventLog,
+        webhookService,
         triplesGenerator,
-        knowledgeGraph,
-        eventLog
+        knowledgeGraph
       )
       .unsafeRunSync()
   }

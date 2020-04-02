@@ -19,7 +19,8 @@
 package ch.datascience.webhookservice.commits
 
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.users.{Email, Username}
+import ch.datascience.graph.model.users.{Email, Name}
+import ch.datascience.webhookservice.eventprocessing.{Author, Committer}
 
 case class CommitInfo(
     id:            CommitId,
@@ -39,8 +40,8 @@ object CommitInfo {
   private[commits] implicit val commitInfoDecoder: Decoder[CommitInfo] = (cursor: HCursor) => {
 
     implicit class CursorOps(cursor: ACursor) {
-      lazy val toMaybeUsername: Decoder.Result[Option[Username]] =
-        cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Username])
+      lazy val toMaybeName: Decoder.Result[Option[Name]] =
+        cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Name])
       lazy val toMaybeEmail: Decoder.Result[Option[Email]] =
         cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Email]).leftFlatMap(_ => Right(None))
     }
@@ -50,19 +51,19 @@ object CommitInfo {
       message        <- cursor.downField("message").as[CommitMessage]
       committedDate  <- cursor.downField("committed_date").as[CommittedDate]
       parents        <- cursor.downField("parent_ids").as[List[CommitId]]
-      authorName     <- cursor.downField("author_name").toMaybeUsername
+      authorName     <- cursor.downField("author_name").toMaybeName
       authorEmail    <- cursor.downField("author_email").toMaybeEmail
-      committerName  <- cursor.downField("committer_name").toMaybeUsername
+      committerName  <- cursor.downField("committer_name").toMaybeName
       committerEmail <- cursor.downField("committer_email").toMaybeEmail
       author <- (authorName, authorEmail) match {
                  case (Some(name), Some(email)) => Right(Author(name, email))
-                 case (Some(name), None)        => Right(Author.withUsername(name))
+                 case (Some(name), None)        => Right(Author.withName(name))
                  case (None, Some(email))       => Right(Author.withEmail(email))
                  case _                         => Left(DecodingFailure("Neither author name nor email", Nil))
                }
       committer <- (committerName, committerEmail) match {
                     case (Some(name), Some(email)) => Right(Committer(name, email))
-                    case (Some(name), None)        => Right(Committer.withUsername(name))
+                    case (Some(name), None)        => Right(Committer.withName(name))
                     case (None, Some(email))       => Right(Committer.withEmail(email))
                     case _                         => Left(DecodingFailure("Neither committer name nor email", Nil))
                   }

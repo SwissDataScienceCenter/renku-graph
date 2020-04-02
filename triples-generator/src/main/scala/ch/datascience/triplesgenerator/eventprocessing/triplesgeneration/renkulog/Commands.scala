@@ -28,8 +28,8 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.eventprocessing.Commit
-import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -129,20 +129,20 @@ private object Commands {
 
     import scala.util.Try
 
-    def migrate(commit: Commit, destinationDirectory: Path): IO[Unit] =
+    def migrate(commitEvent: CommitEvent, destinationDirectory: Path): IO[Unit] =
       IO(%%('renku, 'migrate, "--no-commit")(destinationDirectory))
         .flatMap(_ => IO.unit)
         .recoverWith {
           case NonFatal(exception) =>
             IO.raiseError {
               new Exception(
-                s"'renku migrate' failed for commit: ${commit.id}, project: ${commit.project.id}",
+                s"'renku migrate' failed for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id}",
                 exception
               )
             }
         }
 
-    def log[T <: Commit](
+    def log[T <: CommitEvent](
         commit:                 T,
         destinationDirectory:   Path
     )(implicit generateTriples: (T, Path) => CommandResult): IO[JsonLDTriples] =
@@ -155,9 +155,9 @@ private object Commands {
           case Right(_)      => timeoutExceededError(commit)
         }
 
-    private def timeoutExceededError(commit: Commit): IO[JsonLDTriples] = ME.raiseError {
+    private def timeoutExceededError(commitEvent: CommitEvent): IO[JsonLDTriples] = ME.raiseError {
       new Exception(
-        s"'renku log' execution for commit: ${commit.id}, project: ${commit.project.id} took longer than $timeout - terminating"
+        s"'renku log' execution for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id} took longer than $timeout - terminating"
       )
     }
 
@@ -175,19 +175,19 @@ private object Commands {
         IO.unit
       }
 
-    implicit val commitWithoutParentTriplesFinder: (CommitWithoutParent, Path) => CommandResult = {
+    implicit val commitWithoutParentTriplesFinder: (CommitEventWithoutParent, Path) => CommandResult = {
       case (_, destinationDirectory) =>
         %%('renku, 'log, "--format", "json-ld")(destinationDirectory)
     }
 
-    implicit val commitWithParentTriplesFinder: (CommitWithParent, Path) => CommandResult = {
+    implicit val commitWithParentTriplesFinder: (CommitEventWithParent, Path) => CommandResult = {
       case (commit, destinationDirectory) =>
         val changedFiles = %%(
           'git,
           'diff,
           "--name-only",
           "--diff-filter=d",
-          s"${commit.parentId}..${commit.id}"
+          s"${commit.parentId}..${commit.commitId}"
         )(destinationDirectory).out.lines
 
         %%(
@@ -196,7 +196,7 @@ private object Commands {
           "--format",
           "json-ld",
           "--revision",
-          s"${commit.parentId}..${commit.id}",
+          s"${commit.parentId}..${commit.commitId}",
           changedFiles
         )(destinationDirectory)
     }

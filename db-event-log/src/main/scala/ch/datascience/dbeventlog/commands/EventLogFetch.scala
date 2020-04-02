@@ -28,7 +28,7 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
 import ch.datascience.dbeventlog.config.RenkuLogTimeout
-import ch.datascience.graph.model.events.CommitEventId
+import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
@@ -126,7 +126,7 @@ class EventLogFetchImpl[Interpretation[_]](
     case 1 => Some(eventBody)
   }
 
-  private type EventIdAndBody = (CommitEventId, EventBody)
+  private type EventIdAndBody = (CompoundEventId, EventBody)
 }
 
 object IOEventLogFetch {
