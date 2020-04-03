@@ -31,6 +31,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -118,7 +119,9 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
 
       response.status                 shouldBe InternalServerError
       response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception).asJson
+      response.as[Json].unsafeRunSync shouldBe ErrorMessage("Event creation failed").asJson
+
+      logger.loggedOnly(Error("Event creation failed", exception))
     }
   }
 

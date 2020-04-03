@@ -21,10 +21,12 @@ package ch.datascience.dbeventlog
 import cats.effect.{Clock, IO}
 import cats.implicits._
 import ch.datascience.dbeventlog.creation.{EventCreationEndpoint, EventPersister}
+import ch.datascience.dbeventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
 import io.chrisdavenport.log4cats.Logger
+import org.http4s.Method.{GET, POST}
 import org.http4s.Status._
 import org.http4s._
 import org.scalacheck.Gen
@@ -39,8 +41,17 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
   "routes" should {
 
-    "define a POST /knowledge-graph/graphql endpoint" in new TestCase {
-      val request        = Request[IO](Method.POST, uri"events")
+    "define a GET /events/latest endpoint" in new TestCase {
+      val request = Request[IO](GET, uri"events/latest")
+      (latestEventsEndpoint.findLatestEvents _).expects().returning(Response[IO](Ok).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
+    }
+
+    "define a POST /events endpoint" in new TestCase {
+      val request        = Request[IO](POST, uri"events")
       val expectedStatus = Gen.oneOf(Created, Ok).generateOne
       (eventCreationEndpoint.addEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
 
@@ -51,7 +62,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
       val response = routes.call(
-        Request(Method.GET, uri"ping")
+        Request(GET, uri"ping")
       )
 
       response.status       shouldBe Ok
@@ -60,7 +71,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
       val response = routes.call(
-        Request(Method.GET, uri"metrics")
+        Request(GET, uri"metrics")
       )
 
       response.status       shouldBe Ok
@@ -72,14 +83,18 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
   private trait TestCase {
 
+    val latestEventsEndpoint  = mock[TestLatestEventsEndpoint]
     val eventCreationEndpoint = mock[TestEventCreationEndpoint]
     val routesMetrics         = TestRoutesMetrics()
     val routes = new MicroserviceRoutes[IO](
+      latestEventsEndpoint,
       eventCreationEndpoint,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }
 
+  class TestLatestEventsEndpoint(latestEventsFinder: LatestEventsFinder[IO], logger: Logger[IO])
+      extends LatestEventsEndpoint[IO](latestEventsFinder, logger)
   class TestEventCreationEndpoint(eventAdder: EventPersister[IO], logger: Logger[IO])
       extends EventCreationEndpoint[IO](eventAdder, logger)
 }

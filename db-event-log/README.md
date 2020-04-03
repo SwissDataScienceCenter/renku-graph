@@ -4,10 +4,11 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 ## API
 
-| Method | Path                               | Description                                        |
-|--------|------------------------------------|----------------------------------------------------|
-|  GET   | ```/ping```                        | Verifies service health                            |
-|  POST  | ```/events```                      | Creates an event with a `NEW` status               |
+| Method | Path                               | Description                                                    |
+|--------|------------------------------------|----------------------------------------------------------------|
+|  GET   | ```/ping```                        | Verifies service health                                        |
+|  POST  | ```/events```                      | Creates an event with a `NEW` status                           |
+|  GET   | ```/events/latest```               | Finds events for all the projects with the latest `event_date` |
 
 #### GET /ping
 
@@ -71,6 +72,30 @@ Event Body example:
 | OK (200)                   | When event with the given `id` for the given project already exists in the Event Log            |
 | CREATED (201)              | When a new event was created in the Event Log                                                   |
 | INTERNAL SERVER ERROR (500)| When there are problems with event creation                                                     |
+
+#### POST /events/latest
+
+Finds events for all the projects with the latest `event_date`.
+
+**Response**
+
+| Status                     | Description                                                  |
+|----------------------------|--------------------------------------------------------------|
+| OK (200)                   | If there are events found for the projects or `[]` otherwise |
+| INTERNAL SERVER ERROR (500)| When there are problems                                      |
+
+Response body example:
+
+```json
+{
+  "id":     "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id":   123,
+    "path": "namespace/project-name"
+  },
+  "body":   "JSON payload"
+}
+```
 
 ## Trying out
 

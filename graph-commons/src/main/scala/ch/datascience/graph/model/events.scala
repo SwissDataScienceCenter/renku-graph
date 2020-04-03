@@ -42,7 +42,20 @@ object events {
   implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
 
   final class EventBody private (val value: String) extends AnyVal with StringTinyType
-  implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank
+  implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank {
+
+    implicit class EventBodyOps(eventBody: EventBody) {
+      import cats.implicits._
+      import io.circe.parser.parse
+      import io.circe.{Decoder, DecodingFailure, Json}
+
+      def decodeAs[O](implicit decoder: Decoder[O]): Either[DecodingFailure, O] =
+        bodyAsJson flatMap (_.as[O])
+
+      private val bodyAsJson: Either[DecodingFailure, Json] =
+        parse(eventBody.value).leftMap(_ => DecodingFailure("Cannot parse event body", Nil))
+    }
+  }
 
   final class BatchDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) with InstantNotInTheFuture {

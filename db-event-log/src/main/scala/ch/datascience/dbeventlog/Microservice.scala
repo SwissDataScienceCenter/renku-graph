@@ -25,6 +25,7 @@ import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.creation.IOEventCreationEndpoint
 import ch.datascience.dbeventlog.init.IODbInitializer
+import ch.datascience.dbeventlog.latestevents.IOLatestEventsEndpoint
 import ch.datascience.dbeventlog.metrics.{EventLogMetrics, IOEventLogMetrics}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
@@ -47,8 +48,10 @@ object Microservice extends IOMicroservice {
         sentryInitializer     <- SentryInitializer[IO]
         metricsRegistry       <- MetricsRegistry()
         eventLogMetrics       <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
+        latestEventsEndpoint  <- IOLatestEventsEndpoint(transactor, ApplicationLogger)
         eventCreationEndpoint <- IOEventCreationEndpoint(transactor, ApplicationLogger)
         routes <- new MicroserviceRoutes[IO](
+                   latestEventsEndpoint,
                    eventCreationEndpoint,
                    new RoutesMetrics[IO](metricsRegistry)
                  ).routes

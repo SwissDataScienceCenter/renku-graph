@@ -25,13 +25,9 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.IOEventLogLatestEvents
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.tokenrepository.{IOAccessTokenFinder, TokenRepositoryUrl}
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.webhookservice.commits.IOLatestCommitFinder
-import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
-import ch.datascience.webhookservice.project.IOProjectInfoFinder
+import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
+import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -84,22 +80,11 @@ object IOEventsSynchronizationScheduler {
     contextShift:            ContextShift[IO],
     executionContext:        ExecutionContext): IO[EventsSynchronizationScheduler[IO]] =
     for {
-      commitToEventLog <- IOCommitToEventLog(transactor,
-                                             tokenRepositoryUrl,
-                                             gitLabUrl,
-                                             gitLabThrottler,
-                                             executionTimeRecorder,
-                                             logger)
-    } yield new EventsSynchronizationScheduler[IO](
-      new SchedulerConfigProvider[IO](),
-      new IOMissedEventsLoader(
-        new IOEventLogLatestEvents(transactor),
-        new IOAccessTokenFinder(tokenRepositoryUrl, logger),
-        new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, logger),
-        new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, logger),
-        commitToEventLog,
-        logger,
-        executionTimeRecorder
-      )
-    )
+      missedEventsLoader <- IOMissedEventsLoader(transactor,
+                                                 tokenRepositoryUrl,
+                                                 gitLabUrl,
+                                                 gitLabThrottler,
+                                                 executionTimeRecorder,
+                                                 logger)
+    } yield new EventsSynchronizationScheduler[IO](new SchedulerConfigProvider[IO](), missedEventsLoader)
 }

@@ -89,12 +89,11 @@ class IOCommitEventSender(
 object IOCommitEventSender {
 
   def apply(
-      transactor:     DbTransactor[IO, EventLogDB],
-      logger:         Logger[IO]
-  )(implicit ME:      MonadError[IO, Throwable],
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]): IO[CommitEventSender[IO]] =
+      transactor:              DbTransactor[IO, EventLogDB],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[CommitEventSender[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOCommitEventSender(eventLogUrl, new CommitEventSerializer[IO], logger)

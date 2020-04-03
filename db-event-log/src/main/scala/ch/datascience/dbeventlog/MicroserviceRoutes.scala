@@ -21,25 +21,29 @@ package ch.datascience.dbeventlog
 import cats.effect.{Clock, ConcurrentEffect}
 import cats.implicits._
 import ch.datascience.dbeventlog.creation.EventCreationEndpoint
+import ch.datascience.dbeventlog.latestevents.LatestEventsEndpoint
 import ch.datascience.metrics.RoutesMetrics
 import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
+    latestEventsEndpoint:  LatestEventsEndpoint[F],
     eventCreationEndpoint: EventCreationEndpoint[F],
     routesMetrics:         RoutesMetrics[F]
 )(implicit clock:          Clock[F])
     extends Http4sDsl[F] {
 
+  import eventCreationEndpoint._
+  import latestEventsEndpoint._
   import org.http4s.HttpRoutes
   import routesMetrics._
-  import eventCreationEndpoint._
 
   // format: off
   lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ POST -> Root / "events" => addEvent(request)
-    case           GET  -> Root / "ping"   => Ok("pong")
+    case           GET  -> Root / "events" / "latest" => findLatestEvents
+    case request @ POST -> Root / "events"            => addEvent(request)
+    case           GET  -> Root / "ping"              => Ok("pong")
   }.meter flatMap `add GET Root / metrics`
   // format: on
 }

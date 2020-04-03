@@ -16,32 +16,39 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.latestevents
 
 import cats.effect.{Bracket, ContextShift, IO}
 import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.dbeventlog.{EventLogDB, EventProject, TypesSerializers}
+import ch.datascience.graph.model.events.{EventBody, EventId}
 import doobie.implicits._
 
 import scala.language.higherKinds
 
-class EventLogLatestEvents[Interpretation[_]](
+class LatestEventsFinder[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+)(implicit ME:  Bracket[Interpretation, Throwable])
+    extends TypesSerializers {
 
-  def findAllLatestEvents: Interpretation[List[CompoundEventId]] =
+  import LatestEventsFinder._
+
+  def findAllLatestEvents: Interpretation[List[IdProjectBody]] =
     sql"""
-         |select log.event_id, log.project_id 
+         |select log.event_id, log.project_id, log.project_path, log.event_body 
          |from event_log log, (select project_id, max(event_date) max_event_date from event_log group by project_id) aggregate
          |where log.project_id = aggregate.project_id and log.event_date = aggregate.max_event_date
          |""".stripMargin
-      .query[CompoundEventId]
+      .query[(EventId, EventProject, EventBody)]
       .to[List]
       .transact(transactor.get)
 }
 
-class IOEventLogLatestEvents(
+object LatestEventsFinder {
+  type IdProjectBody = (EventId, EventProject, EventBody)
+}
+
+class IOLatestEventsFinder(
     transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogLatestEvents[IO](transactor)
+    extends LatestEventsFinder[IO](transactor)

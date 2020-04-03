@@ -21,7 +21,7 @@ package ch.datascience.graph.model
 import java.time.{Clock, Instant, ZoneId}
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.tinytypes.constraints.NonBlank
@@ -29,19 +29,22 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CommitEventIdSpec extends WordSpec {
+class CompoundEventIdSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   "toString" should {
 
     "be of format 'id = <eventId>, projectId = <projectId>'" in {
-      val commitEventId = compoundEventIds.generateOne
-
-      commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
+      forAll { commitEventId: CompoundEventId =>
+        commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
+      }
     }
   }
 }
 
 class EventBodySpec extends WordSpec with ScalaCheckPropertyChecks {
+
+  import io.circe.literal._
+  import io.circe.Decoder
 
   "EventBody" should {
 
@@ -55,16 +58,24 @@ class EventBodySpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
   }
-}
 
-class CompoundEventIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+  "decodeAs" should {
 
-  "toString" should {
+    "parse the string value into Json and decode using the given decoder" in {
+      val value = nonBlankStrings().generateOne.value
 
-    "be of format 'id = <eventId>, projectId = <projectId>'" in {
-      forAll { commitEventId: CompoundEventId =>
-        commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
+      case class Wrapper(value: String)
+      implicit val decoder: Decoder[Wrapper] = Decoder.instance[Wrapper] {
+        _.downField("field").as[String].map(Wrapper.apply)
       }
+
+      val eventBody = EventBody {
+        json"""{
+          "field": $value
+        }""".noSpaces
+      }
+
+      eventBody.decodeAs[Wrapper] shouldBe Right(Wrapper(value))
     }
   }
 }

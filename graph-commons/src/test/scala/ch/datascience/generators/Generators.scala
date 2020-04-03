@@ -277,7 +277,11 @@ object Generators {
 
     implicit class GenOps[T](generator: Gen[T]) {
 
-      def generateOne: T = generator.sample getOrElse generateOne
+      def generateOne: T = generateExample(generator)
+
+      def generateNonEmptyList(minElements: Int Refined Positive = 1,
+                               maxElements: Int Refined Positive = 5): NonEmptyList[T] =
+        generateExample(nonEmptyList(generator, minElements, maxElements))
 
       def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
 
@@ -293,6 +297,9 @@ object Generators {
 
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
       def toGeneratorOfOptions: Gen[Option[T]] = Gen.option(generator)
+
+      private def generateExample[O](generator: Gen[O]): O =
+        generator.sample getOrElse generateExample(generator)
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)

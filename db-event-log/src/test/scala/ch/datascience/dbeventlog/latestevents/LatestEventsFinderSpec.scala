@@ -16,20 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.latestevents
 
 import java.time.Instant.now
 import java.time.temporal.ChronoUnit._
 
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.EventDate
+import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogLatestEventsSpec extends WordSpec with InMemoryEventLogDbSpec {
+class LatestEventsFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
 
   "findAllLatestEvents" should {
 
@@ -37,43 +37,49 @@ class EventLogLatestEventsSpec extends WordSpec with InMemoryEventLogDbSpec {
       latestEventsFinder.findAllLatestEvents.unsafeRunSync() shouldBe List.empty
     }
 
-    "return (projectId, eventId) tuples with the youngest eventId (event_date wise) " +
+    "return (projectId, eventBody) tuples with the youngest eventId (event_date wise) " +
       "for all the projects in the db" in new TestCase {
-      val projectId1 = projectIds.generateOne
+      val project1 = projects.generateOne
       storeEvent(
-        compoundEventIds.generateOne.copy(projectId = projectId1),
+        compoundEventIds.generateOne.copy(projectId = project1.id),
         eventStatuses.generateOne,
         executionDates.generateOne,
         EventDate(now minus (20, DAYS)),
-        eventBodies.generateOne
+        eventBodies.generateOne,
+        projectPath = project1.path
       )
 
-      val youngestCommitEventIdProject1 = compoundEventIds.generateOne.copy(projectId = projectId1)
+      val youngestEventIdProject1   = compoundEventIds.generateOne.copy(projectId = project1.id)
+      val youngestEventBodyProject1 = eventBodies.generateOne
       storeEvent(
-        youngestCommitEventIdProject1,
+        youngestEventIdProject1,
         eventStatuses.generateOne,
         executionDates.generateOne,
         EventDate(now minus (3, DAYS)),
-        eventBodies.generateOne
+        youngestEventBodyProject1,
+        projectPath = project1.path
       )
 
-      val onlyCommitEventIdProject2 = compoundEventIds.generateOne
+      val project2          = projects.generateOne
+      val eventIdProject2   = compoundEventIds.generateOne.copy(projectId = project2.id)
+      val eventBodyProject2 = eventBodies.generateOne
       storeEvent(
-        onlyCommitEventIdProject2,
+        eventIdProject2,
         eventStatuses.generateOne,
         executionDates.generateOne,
         EventDate(now minus (2, DAYS)),
-        eventBodies.generateOne
+        eventBodyProject2,
+        projectPath = project2.path
       )
 
       latestEventsFinder.findAllLatestEvents.unsafeRunSync() shouldBe List(
-        youngestCommitEventIdProject1,
-        onlyCommitEventIdProject2
+        (youngestEventIdProject1.id, project1, youngestEventBodyProject1),
+        (eventIdProject2.id, project2, eventBodyProject2)
       )
     }
   }
 
   private trait TestCase {
-    val latestEventsFinder = new EventLogLatestEvents(transactor)
+    val latestEventsFinder = new LatestEventsFinder(transactor)
   }
 }

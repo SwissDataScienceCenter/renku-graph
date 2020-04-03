@@ -68,7 +68,10 @@ class EventCreationEndpoint[Interpretation[_]: Effect](
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case BadRequestError(exception) => BadRequest(ErrorMessage(exception))
-    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception))
+    case NonFatal(exception) =>
+      val errorMessage = ErrorMessage("Event creation failed")
+      logger.error(exception)(errorMessage.value)
+      InternalServerError(errorMessage)
   }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
@@ -99,9 +102,11 @@ object EventCreationEndpoint {
 
 object IOEventCreationEndpoint {
   import cats.effect.{ContextShift, IO}
+
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[EventCreationEndpoint[IO]] =
-    new EventCreationEndpoint[IO](new IOEventPersister(transactor), logger).pure[IO]
+  )(implicit contextShift: ContextShift[IO]): IO[EventCreationEndpoint[IO]] = IO {
+    new EventCreationEndpoint[IO](new IOEventPersister(transactor), logger)
+  }
 }

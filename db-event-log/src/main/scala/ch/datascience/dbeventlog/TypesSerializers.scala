@@ -62,6 +62,10 @@ trait TypesSerializers {
     case (eventId, projectId) => CompoundEventId(eventId, projectId)
   }
 
+  implicit val projectRead: Read[EventProject] = Read[(projects.Id, projects.Path)].map {
+    case (id, path) => EventProject(id, path)
+  }
+
   //TODO to be removed
   implicit val commitIdGet: Get[CommitId] = Get[String].tmap(CommitId.apply)
   implicit val commitIdPut: Put[CommitId] = Put[String].contramap(_.value)
