@@ -25,21 +25,21 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.{CommitId, EventBody}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.IORestClient
-import ch.datascience.webhookservice.missedevents.LatestEventsFinder.LatestProjectCommit
+import ch.datascience.webhookservice.missedevents.LatestEventsFetcher.LatestProjectCommit
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait LatestEventsFinder[Interpretation[_]] {
+private trait LatestEventsFetcher[Interpretation[_]] {
   def fetchLatestEvents: Interpretation[List[LatestProjectCommit]]
 }
 
-private object LatestEventsFinder {
+private object LatestEventsFetcher {
   final case class LatestProjectCommit(commitId: CommitId, projectId: projects.Id)
 }
 
-private class IOLatestEventsFinder(
+private class IOLatestEventsFetcher(
     eventLogUrl:    EventLogUrl,
     logger:         Logger[IO]
 )(implicit ME:      MonadError[IO, Throwable],
@@ -47,9 +47,9 @@ private class IOLatestEventsFinder(
   contextShift:     ContextShift[IO],
   timer:            Timer[IO])
     extends IORestClient(Throttler.noThrottling, logger)
-    with LatestEventsFinder[IO] {
+    with LatestEventsFetcher[IO] {
 
-  import IOLatestEventsFinder.latestCommitDecoder
+  import IOLatestEventsFetcher.latestCommitDecoder
   import cats.effect._
   import org.http4s.Method.GET
   import org.http4s._
@@ -70,15 +70,15 @@ private class IOLatestEventsFinder(
     jsonOf[IO, List[LatestProjectCommit]]
 }
 
-private object IOLatestEventsFinder {
+private object IOLatestEventsFetcher {
   def apply(
       logger:                  Logger[IO]
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[LatestEventsFinder[IO]] =
+    timer:                     Timer[IO]): IO[LatestEventsFetcher[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
-    } yield new IOLatestEventsFinder(eventLogUrl, logger)
+    } yield new IOLatestEventsFetcher(eventLogUrl, logger)
 
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe.Decoder

@@ -26,16 +26,15 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogProcessingStatus, IOEventLogProcessingStatus, ProcessingStatus}
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.logging.ExecutionTimeRecorder
+import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
 import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
 import ch.datascience.webhookservice.project.ProjectHookUrl
+import io.chrisdavenport.log4cats.Logger
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -48,15 +47,14 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class ProcessingStatusEndpoint[Interpretation[_]: Effect](
-    hookValidator:          HookValidator[Interpretation],
-    eventsProcessingStatus: EventLogProcessingStatus[Interpretation],
-    executionTimeRecorder:  ExecutionTimeRecorder[Interpretation]
-)(implicit ME:              MonadError[Interpretation, Throwable])
+    hookValidator:           HookValidator[Interpretation],
+    processingStatusFetcher: ProcessingStatusFetcher[Interpretation],
+    executionTimeRecorder:   ExecutionTimeRecorder[Interpretation]
+)(implicit ME:               MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
   import HookValidationResult._
   import ProcessingStatusEndpoint._
-  import eventsProcessingStatus._
   import executionTimeRecorder._
 
   def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]] =
@@ -74,7 +72,8 @@ class ProcessingStatusEndpoint[Interpretation[_]: Effect](
   }
 
   private def findStatus(projectId: Id): OptionT[Interpretation, Response[Interpretation]] = OptionT.liftF {
-    fetchStatus(projectId)
+    processingStatusFetcher
+      .fetchProcessingStatus(projectId)
       .semiflatMap(processingStatus => Ok(processingStatus.asJson))
       .getOrElseF(Ok(zeroProcessingStatusJson))
   }
@@ -111,16 +110,23 @@ private object ProcessingStatusEndpoint {
       }"""
 }
 
-class IOProcessingStatusEndpoint(
-    transactor:              DbTransactor[IO, EventLogDB],
-    tokenRepositoryUrl:      TokenRepositoryUrl,
-    projectHookUrl:          ProjectHookUrl,
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    executionTimeRecorder:   ExecutionTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
-    extends ProcessingStatusEndpoint[IO](
+object IOProcessingStatusEndpoint {
+  def apply(
+      tokenRepositoryUrl:      TokenRepositoryUrl,
+      projectHookUrl:          ProjectHookUrl,
+      gitLabUrl:               GitLabUrl,
+      gitLabThrottler:         Throttler[IO, GitLab],
+      executionTimeRecorder:   ExecutionTimeRecorder[IO],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    clock:                     Clock[IO],
+    timer:                     Timer[IO]): IO[ProcessingStatusEndpoint[IO]] =
+    for {
+      fetcher <- IOProcessingStatusFetcher(logger)
+    } yield new ProcessingStatusEndpoint[IO](
       new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
-      new IOEventLogProcessingStatus(transactor),
+      fetcher,
       executionTimeRecorder
     )
+}

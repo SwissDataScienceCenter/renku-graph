@@ -19,7 +19,6 @@
 package ch.datascience.dbeventlog.latestevents
 
 import LatestEventsFinder._
-import cats.MonadError
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
@@ -103,8 +102,6 @@ class LatestEventsEndpointSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
     val eventsFinder     = mock[TestLatestEventsFinder]
     val logger           = TestLogger[IO]()
     val findLatestEvents = new LatestEventsEndpoint[IO](eventsFinder, logger).findLatestEvents _
@@ -126,5 +123,6 @@ class LatestEventsEndpointSpec extends WordSpec with MockFactory {
     } yield (id, EventProject(projectId, projectPath), body)
   }
 
-  implicit def entityDecoder[E](implicit decoder: Decoder[E]): EntityDecoder[IO, E] = org.http4s.circe.jsonOf[IO, E]
+  private implicit def entityDecoder[E](implicit decoder: Decoder[E]): EntityDecoder[IO, E] =
+    org.http4s.circe.jsonOf[IO, E]
 }

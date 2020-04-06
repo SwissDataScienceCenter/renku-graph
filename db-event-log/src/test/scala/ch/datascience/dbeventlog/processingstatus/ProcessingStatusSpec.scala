@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.processingstatus
 
 import cats.implicits._
 import ch.datascience.generators.Generators._

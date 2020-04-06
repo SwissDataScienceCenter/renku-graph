@@ -87,16 +87,17 @@ object Microservice extends IOMicroservice {
                                                       hookTokenCrypto,
                                                       executionTimeRecorder,
                                                       ApplicationLogger)
+        processingStatusEndpoint <- IOProcessingStatusEndpoint(tokenRepositoryUrl,
+                                                               projectHookUrl,
+                                                               gitLabUrl,
+                                                               gitLabThrottler,
+                                                               executionTimeRecorder,
+                                                               ApplicationLogger)
         routes <- new MicroserviceRoutes[IO](
                    hookEventEndpoint,
                    hookCreatorEndpoint,
                    new IOHookValidationEndpoint(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
-                   new IOProcessingStatusEndpoint(transactor,
-                                                  tokenRepositoryUrl,
-                                                  projectHookUrl,
-                                                  gitLabUrl,
-                                                  gitLabThrottler,
-                                                  executionTimeRecorder),
+                   processingStatusEndpoint,
                    new RoutesMetrics[IO](metricsRegistry)
                  ).routes
         httpServer = new HttpServer[IO](serverPort = 9001, routes)

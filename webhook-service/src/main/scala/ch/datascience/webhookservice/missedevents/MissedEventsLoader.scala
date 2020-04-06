@@ -32,7 +32,7 @@ import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.webhookservice.commits.{CommitInfo, IOLatestCommitFinder, LatestCommitFinder}
 import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import ch.datascience.webhookservice.eventprocessing.{Project, StartCommit}
-import ch.datascience.webhookservice.missedevents.LatestEventsFinder.LatestProjectCommit
+import ch.datascience.webhookservice.missedevents.LatestEventsFetcher.LatestProjectCommit
 import ch.datascience.webhookservice.project.{IOProjectInfoFinder, ProjectInfo, ProjectInfoFinder}
 import io.chrisdavenport.log4cats.Logger
 
@@ -45,7 +45,7 @@ private abstract class MissedEventsLoader[Interpretation[_]] {
 }
 
 private class IOMissedEventsLoader(
-    latestEventsFinder:    LatestEventsFinder[IO],
+    latestEventsFinder:    LatestEventsFetcher[IO],
     accessTokenFinder:     AccessTokenFinder[IO],
     latestCommitFinder:    LatestCommitFinder[IO],
     projectInfoFinder:     ProjectInfoFinder[IO],
@@ -158,7 +158,7 @@ private object IOMissedEventsLoader {
                                              gitLabThrottler,
                                              executionTimeRecorder,
                                              logger)
-      latestEventsFinder <- IOLatestEventsFinder(logger)
+      latestEventsFinder <- IOLatestEventsFetcher(logger)
     } yield new IOMissedEventsLoader(
       latestEventsFinder,
       new IOAccessTokenFinder(tokenRepositoryUrl, logger),

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.processingstatus
 
 import java.time.temporal.ChronoUnit._
 
@@ -24,6 +24,7 @@ import cats.data.NonEmptyList
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.EventStatus
 import ch.datascience.dbeventlog.EventStatus._
+import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -35,7 +36,7 @@ import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec {
+class ProcessingStatusFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
 
   "fetchStatus" should {
 
@@ -109,7 +110,7 @@ class EventLogProcessingStatusSpec extends WordSpec with InMemoryEventLogDbSpec 
 
   private trait TestCase {
     val projectId              = projectIds.generateOne
-    val processingStatusFinder = new IOEventLogProcessingStatus(transactor)
+    val processingStatusFinder = new IOProcessingStatusFinder(transactor)
 
     def storeEvents(projectId: Id, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
       statuses map {

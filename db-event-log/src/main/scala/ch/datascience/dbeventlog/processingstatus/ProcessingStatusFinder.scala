@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.processingstatus
 
 import java.time.Instant
 
@@ -36,10 +36,12 @@ import eu.timepit.refined.numeric.NonNegative
 import scala.language.higherKinds
 import scala.math.BigDecimal.RoundingMode
 
-class EventLogProcessingStatus[Interpretation[_]](
+class ProcessingStatusFinder[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     now:        () => Instant = () => Instant.now
 )(implicit ME:  Bracket[Interpretation, Throwable]) {
+
+  import ch.datascience.dbeventlog.TypesSerializers._
 
   def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus] = OptionT {
     latestBatchStatues(projectId) flatMap toProcessingStatus
@@ -69,10 +71,10 @@ class EventLogProcessingStatus[Interpretation[_]](
     }
 }
 
-class IOEventLogProcessingStatus(
+class IOProcessingStatusFinder(
     transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogProcessingStatus[IO](transactor)
+    extends ProcessingStatusFinder[IO](transactor)
 
 import ProcessingStatus._
 

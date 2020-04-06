@@ -36,7 +36,7 @@ import ch.datascience.webhookservice.commits.{CommitInfo, LatestCommitFinder}
 import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
 import ch.datascience.webhookservice.eventprocessing.{Project, StartCommit}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
-import ch.datascience.webhookservice.missedevents.LatestEventsFinder.LatestProjectCommit
+import ch.datascience.webhookservice.missedevents.LatestEventsFetcher.LatestProjectCommit
 import ch.datascience.webhookservice.project.ProjectInfoFinder
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
@@ -267,7 +267,7 @@ class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val latestEventsFinder    = mock[LatestEventsFinder[IO]]
+    val latestEventsFinder    = mock[LatestEventsFetcher[IO]]
     val accessTokenFinder     = mock[AccessTokenFinder[IO]]
     val latestCommitFinder    = mock[LatestCommitFinder[IO]]
     val projectInfoFinder     = mock[ProjectInfoFinder[IO]]

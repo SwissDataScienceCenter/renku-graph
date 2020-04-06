@@ -6,9 +6,10 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 | Method | Path                               | Description                                                    |
 |--------|------------------------------------|----------------------------------------------------------------|
-|  GET   | ```/ping```                        | Verifies service health                                        |
 |  POST  | ```/events```                      | Creates an event with a `NEW` status                           |
 |  GET   | ```/events/latest```               | Finds events for all the projects with the latest `event_date` |
+|  GET   | ```/events/projects/:id/status```  | Finds processing status of events belonging to a project       |
+|  GET   | ```/ping```                        | Verifies service health                                        |
 
 #### GET /ping
 
@@ -73,7 +74,7 @@ Event Body example:
 | CREATED (201)              | When a new event was created in the Event Log                                                   |
 | INTERNAL SERVER ERROR (500)| When there are problems with event creation                                                     |
 
-#### POST /events/latest
+#### GET /events/latest
 
 Finds events for all the projects with the latest `event_date`.
 
@@ -94,6 +95,36 @@ Response body example:
     "path": "namespace/project-name"
   },
   "body":   "JSON payload"
+}
+```
+
+#### GET /events/projects/:id/status
+
+Finds processing status of events belonging to a project from the latest batch.
+
+**Response**
+
+| Status                     | Description                                                  |
+|----------------------------|---------------------------------------------------------|
+| OK (200)                   | If there are events for the project with the given `id` |
+| NOT_FOUND (404)            | If no events can be found for the given project         |
+| INTERNAL SERVER ERROR (500)| When some problems occurs                               |
+
+Response body examples:
+- all events from the latest batch are processed
+```json
+{
+  "done": 20,
+  "total": 20,
+  "progress": 100.00
+}
+```
+- some events from the latest batch are being processed
+```json
+{
+  "done": 10,
+  "total": 20,
+  "progress": 50.00
 }
 ```
 

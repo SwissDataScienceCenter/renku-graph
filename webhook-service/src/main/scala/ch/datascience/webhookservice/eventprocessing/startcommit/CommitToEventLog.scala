@@ -137,7 +137,7 @@ object IOCommitToEventLog {
     clock:                     Clock[IO],
     timer:                     Timer[IO]): IO[CommitToEventLog[IO]] =
     for {
-      eventSender <- IOCommitEventSender(transactor, logger)
+      eventSender <- IOCommitEventSender(logger)
     } yield new CommitToEventLog[IO](
       new IOAccessTokenFinder(tokenRepositoryUrl, logger),
       new IOCommitEventsSourceBuilder(transactor, gitLabUrl, gitLabThrottler),

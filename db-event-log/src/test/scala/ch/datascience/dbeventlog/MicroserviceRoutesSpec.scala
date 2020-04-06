@@ -22,7 +22,9 @@ import cats.effect.{Clock, IO}
 import cats.implicits._
 import ch.datascience.dbeventlog.creation.{EventCreationEndpoint, EventPersister}
 import ch.datascience.dbeventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
+import ch.datascience.dbeventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
 import io.chrisdavenport.log4cats.Logger
@@ -41,15 +43,6 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
   "routes" should {
 
-    "define a GET /events/latest endpoint" in new TestCase {
-      val request = Request[IO](GET, uri"events/latest")
-      (latestEventsEndpoint.findLatestEvents _).expects().returning(Response[IO](Ok).pure[IO])
-
-      val response = routes.call(request)
-
-      response.status shouldBe Ok
-    }
-
     "define a POST /events endpoint" in new TestCase {
       val request        = Request[IO](POST, uri"events")
       val expectedStatus = Gen.oneOf(Created, Ok).generateOne
@@ -60,13 +53,24 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       response.status shouldBe expectedStatus
     }
 
-    "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
-      val response = routes.call(
-        Request(GET, uri"ping")
-      )
+    "define a GET /events/latest endpoint" in new TestCase {
+      val request = Request[IO](GET, uri"events/latest")
+      (latestEventsEndpoint.findLatestEvents _).expects().returning(Response[IO](Ok).pure[IO])
 
-      response.status       shouldBe Ok
-      response.body[String] shouldBe "pong"
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
+    }
+
+    "define a GET /events/projects/:id/status endpoint" in new TestCase {
+      val projectId = projectIds.generateOne
+
+      val request = Request[IO](GET, uri"events" / "projects" / projectId.toString / "status")
+      (processingStatusEndpoint.findProcessingStatus _).expects(projectId).returning(Response[IO](Ok).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
     }
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
@@ -77,24 +81,37 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       response.status       shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
+
+    "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
+      val response = routes.call(
+        Request(GET, uri"ping")
+      )
+
+      response.status       shouldBe Ok
+      response.body[String] shouldBe "pong"
+    }
   }
 
   private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
   private trait TestCase {
 
-    val latestEventsEndpoint  = mock[TestLatestEventsEndpoint]
-    val eventCreationEndpoint = mock[TestEventCreationEndpoint]
-    val routesMetrics         = TestRoutesMetrics()
+    val latestEventsEndpoint     = mock[TestLatestEventsEndpoint]
+    val eventCreationEndpoint    = mock[TestEventCreationEndpoint]
+    val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
+    val routesMetrics            = TestRoutesMetrics()
     val routes = new MicroserviceRoutes[IO](
-      latestEventsEndpoint,
       eventCreationEndpoint,
+      latestEventsEndpoint,
+      processingStatusEndpoint,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }
 
-  class TestLatestEventsEndpoint(latestEventsFinder: LatestEventsFinder[IO], logger: Logger[IO])
-      extends LatestEventsEndpoint[IO](latestEventsFinder, logger)
   class TestEventCreationEndpoint(eventAdder: EventPersister[IO], logger: Logger[IO])
       extends EventCreationEndpoint[IO](eventAdder, logger)
+  class TestLatestEventsEndpoint(latestEventsFinder: LatestEventsFinder[IO], logger: Logger[IO])
+      extends LatestEventsEndpoint[IO](latestEventsFinder, logger)
+  class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
+      extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
 }

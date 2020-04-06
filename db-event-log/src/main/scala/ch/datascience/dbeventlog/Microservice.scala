@@ -27,6 +27,7 @@ import ch.datascience.dbeventlog.creation.IOEventCreationEndpoint
 import ch.datascience.dbeventlog.init.IODbInitializer
 import ch.datascience.dbeventlog.latestevents.IOLatestEventsEndpoint
 import ch.datascience.dbeventlog.metrics.{EventLogMetrics, IOEventLogMetrics}
+import ch.datascience.dbeventlog.processingstatus.IOProcessingStatusEndpoint
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -45,14 +46,16 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
-        sentryInitializer     <- SentryInitializer[IO]
-        metricsRegistry       <- MetricsRegistry()
-        eventLogMetrics       <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
-        latestEventsEndpoint  <- IOLatestEventsEndpoint(transactor, ApplicationLogger)
-        eventCreationEndpoint <- IOEventCreationEndpoint(transactor, ApplicationLogger)
+        sentryInitializer        <- SentryInitializer[IO]
+        metricsRegistry          <- MetricsRegistry()
+        eventLogMetrics          <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
+        eventCreationEndpoint    <- IOEventCreationEndpoint(transactor, ApplicationLogger)
+        latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, ApplicationLogger)
+        processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, ApplicationLogger)
         routes <- new MicroserviceRoutes[IO](
-                   latestEventsEndpoint,
                    eventCreationEndpoint,
+                   latestEventsEndpoint,
+                   processingStatusEndpoint,
                    new RoutesMetrics[IO](metricsRegistry)
                  ).routes
         httpServer = new HttpServer[IO](serverPort = 9005, routes)

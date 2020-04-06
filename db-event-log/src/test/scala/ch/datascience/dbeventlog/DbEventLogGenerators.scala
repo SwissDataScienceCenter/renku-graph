@@ -19,8 +19,6 @@
 package ch.datascience.dbeventlog
 
 import EventStatus._
-import cats.implicits._
-import ch.datascience.dbeventlog.commands.ProcessingStatus
 import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -29,7 +27,6 @@ import org.scalacheck.Gen
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.Try
 
 object DbEventLogGenerators {
 
@@ -46,11 +43,6 @@ object DbEventLogGenerators {
     NonRecoverableFailure
   )
   implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
-  implicit val processingStatuses: Gen[ProcessingStatus] =
-    for {
-      total <- positiveInts(max = Integer.MAX_VALUE)
-      done  <- positiveInts(max = total.value)
-    } yield ProcessingStatus.from[Try](done.value, total.value).fold(throw _, identity)
 
   implicit lazy val events: Gen[Event] = for {
     eventId   <- eventIds

@@ -21,8 +21,6 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
 import ch.datascience.http.client.IORestClient
@@ -89,7 +87,6 @@ class IOCommitEventSender(
 object IOCommitEventSender {
 
   def apply(
-      transactor:              DbTransactor[IO, EventLogDB],
       logger:                  Logger[IO]
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],

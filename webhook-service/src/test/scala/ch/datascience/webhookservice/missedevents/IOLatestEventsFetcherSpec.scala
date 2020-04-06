@@ -25,7 +25,7 @@ import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.missedevents.LatestEventsFinder.LatestProjectCommit
+import ch.datascience.webhookservice.missedevents.LatestEventsFetcher.LatestProjectCommit
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import io.circe.syntax._
@@ -37,7 +37,7 @@ import org.scalatest.WordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOLatestEventsFinderSpec extends WordSpec with ExternalServiceStubbing {
+class IOLatestEventsFetcherSpec extends WordSpec with ExternalServiceStubbing {
 
   "fetchLatestEvents" should {
 
@@ -50,7 +50,7 @@ class IOLatestEventsFinderSpec extends WordSpec with ExternalServiceStubbing {
           .willReturn(okJson(latestProjectCommitsList.asJson.spaces2))
       }
 
-      finder.fetchLatestEvents.unsafeRunSync() shouldBe latestProjectCommitsList
+      fetcher.fetchLatestEvents.unsafeRunSync() shouldBe latestProjectCommitsList
     }
 
     "return an empty list if nothing gets fetched from the Event Log" in new TestCase {
@@ -60,7 +60,7 @@ class IOLatestEventsFinderSpec extends WordSpec with ExternalServiceStubbing {
           .willReturn(okJson(Json.arr().spaces2))
       }
 
-      finder.fetchLatestEvents.unsafeRunSync() shouldBe Nil
+      fetcher.fetchLatestEvents.unsafeRunSync() shouldBe Nil
     }
 
     "return a RuntimeException if remote client responds with status different than OK" in new TestCase {
@@ -71,7 +71,7 @@ class IOLatestEventsFinderSpec extends WordSpec with ExternalServiceStubbing {
       }
 
       intercept[Exception] {
-        finder.fetchLatestEvents.unsafeRunSync()
+        fetcher.fetchLatestEvents.unsafeRunSync()
       }.getMessage shouldBe s"GET $eventLogUrl/events/latest returned ${Status.NotFound}; body: some error"
     }
 
@@ -83,7 +83,7 @@ class IOLatestEventsFinderSpec extends WordSpec with ExternalServiceStubbing {
       }
 
       intercept[Exception] {
-        finder.fetchLatestEvents.unsafeRunSync()
+        fetcher.fetchLatestEvents.unsafeRunSync()
       }.getMessage shouldBe s"GET $eventLogUrl/events/latest returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
   }
@@ -93,7 +93,7 @@ class IOLatestEventsFinderSpec extends WordSpec with ExternalServiceStubbing {
 
   private trait TestCase {
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val finder      = new IOLatestEventsFinder(eventLogUrl, TestLogger())
+    val fetcher     = new IOLatestEventsFetcher(eventLogUrl, TestLogger())
   }
 
   private implicit val latestProjectCommits: Gen[LatestProjectCommit] = for {
