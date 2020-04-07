@@ -26,6 +26,7 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.eventprocessing.CommitEvent
+import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Encoder
@@ -42,23 +43,38 @@ class CommitEventSenderSpec extends WordSpec with MockFactory with ExternalServi
 
   "send" should {
 
-    Created +: Ok +: Nil foreach { status =>
-      s"succeed when delivering the event to the Event Log got $status" in new TestCase {
+    s"return $EventCreated when delivering the event to the Event Log got $Created" in new TestCase {
 
-        val eventBody = serialize(commitEvent)
-        (eventSerializer
-          .serialiseToJsonString(_: CommitEvent))
-          .expects(commitEvent)
-          .returning(context.pure(eventBody))
+      val eventBody = serialize(commitEvent)
+      (eventSerializer
+        .serialiseToJsonString(_: CommitEvent))
+        .expects(commitEvent)
+        .returning(context.pure(eventBody))
 
-        stubFor {
-          post("/events")
-            .withRequestBody(equalToJson(commitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
-            .willReturn(aResponse().withStatus(status.code))
-        }
-
-        eventSender.send(commitEvent).unsafeRunSync() shouldBe ((): Unit)
+      stubFor {
+        post("/events")
+          .withRequestBody(equalToJson(commitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
+          .willReturn(aResponse().withStatus(Created.code))
       }
+
+      eventSender.send(commitEvent).unsafeRunSync() shouldBe EventCreated
+    }
+
+    s"return $EventExisted when delivering the event to the Event Log got $Ok" in new TestCase {
+
+      val eventBody = serialize(commitEvent)
+      (eventSerializer
+        .serialiseToJsonString(_: CommitEvent))
+        .expects(commitEvent)
+        .returning(context.pure(eventBody))
+
+      stubFor {
+        post("/events")
+          .withRequestBody(equalToJson(commitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
+          .willReturn(aResponse().withStatus(Ok.code))
+      }
+
+      eventSender.send(commitEvent).unsafeRunSync() shouldBe EventExisted
     }
 
     s"fail when delivering the event to the Event Log got $BadRequest" in new TestCase {

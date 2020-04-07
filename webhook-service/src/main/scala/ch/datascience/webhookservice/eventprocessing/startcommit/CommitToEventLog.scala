@@ -23,10 +23,7 @@ import cats.implicits._
 import cats.{Monad, MonadError}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.webhookservice.eventprocessing.commitevent._
@@ -46,9 +43,9 @@ class CommitToEventLog[Interpretation[_]: Monad](
     clock:                 java.time.Clock = java.time.Clock.systemDefaultZone()
 )(implicit ME:             MonadError[Interpretation, Throwable]) {
 
-  import CommitToEventLog.SendingResult
-  import CommitToEventLog.SendingResult._
+  import CommitEventSender.EventSendingResult._
   import IOAccessTokenFinder._
+  import SendingResult._
   import accessTokenFinder._
   import commitEventSender._
   import commitEventsSource._
@@ -59,24 +56,24 @@ class CommitToEventLog[Interpretation[_]: Monad](
       for {
         maybeAccessToken   <- findAccessToken(startCommit.project.id)
         commitEventsSource <- buildEventsSource(startCommit, maybeAccessToken, clock)
-        sendingResults     <- commitEventsSource transformEventsWith sendEvent(startCommit) recoverWith findingEventException
+        sendingResults     <- commitEventsSource transformEventsWith sendEvent(startCommit) recoverWith eventFindingException
       } yield sendingResults
     } flatMap logSummary(startCommit) recoverWith loggingError(startCommit)
 
   private def sendEvent(startCommit: StartCommit)(commitEvent: CommitEvent): Interpretation[SendingResult] =
     send(commitEvent)
-      .map(_ => Stored: SendingResult)
-      .recover(sendErrorLogging(startCommit, commitEvent))
+      .map {
+        case EventCreated => Created
+        case EventExisted => Existed
+      }
+      .recover {
+        case NonFatal(exception) =>
+          logger.error(exception)(logMessageFor(startCommit, "storing in the event log failed", Some(commitEvent)))
+          Failed
+      }
 
-  private def sendErrorLogging(startCommit: StartCommit,
-                               commitEvent: CommitEvent): PartialFunction[Throwable, SendingResult] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(logMessageFor(startCommit, "storing in the event log failed", Some(commitEvent)))
-      SendingResult.Failed
-  }
-
-  private lazy val findingEventException: PartialFunction[Throwable, Interpretation[List[SendingResult]]] = {
-    case NonFatal(exception) => ME.raiseError(EventFindingException(exception))
+  private lazy val eventFindingException: PartialFunction[Throwable, Interpretation[List[SendingResult]]] = {
+    case NonFatal(exception) => EventFindingException(exception).raiseError[Interpretation, List[SendingResult]]
   }
 
   private case class EventFindingException(cause: Throwable)
@@ -86,12 +83,13 @@ class CommitToEventLog[Interpretation[_]: Monad](
     case (_, Nil) => ME.unit
     case (elapsedTime, sendingResults) =>
       val groupedByType = sendingResults groupBy identity
-      val stored        = groupedByType.get(Stored).map(_.size).getOrElse(0)
+      val created       = groupedByType.get(Created).map(_.size).getOrElse(0)
+      val existed       = groupedByType.get(Existed).map(_.size).getOrElse(0)
       val failed        = groupedByType.get(Failed).map(_.size).getOrElse(0)
       logger.info(
         logMessageFor(
           startCommit,
-          s"${sendingResults.size} Commit Events generated, $stored stored in the Event Log, $failed failed in ${elapsedTime}ms"
+          s"${sendingResults.size} Commit Events generated: $created created, $existed existed, $failed failed in ${elapsedTime}ms"
         )
       )
   }
@@ -116,19 +114,8 @@ class CommitToEventLog[Interpretation[_]: Monad](
       s": $message"
 }
 
-private object CommitToEventLog {
-  sealed trait SendingResult extends Product with Serializable
-  object SendingResult {
-    final case object Stored extends SendingResult
-    final case object Failed extends SendingResult
-  }
-}
-
 object IOCommitToEventLog {
   def apply(
-      transactor:              DbTransactor[IO, EventLogDB],
-      tokenRepositoryUrl:      TokenRepositoryUrl,
-      gitLabUrl:               GitLabUrl,
       gitLabThrottler:         Throttler[IO, GitLab],
       executionTimeRecorder:   ExecutionTimeRecorder[IO],
       logger:                  Logger[IO]
@@ -137,10 +124,12 @@ object IOCommitToEventLog {
     clock:                     Clock[IO],
     timer:                     Timer[IO]): IO[CommitToEventLog[IO]] =
     for {
-      eventSender <- IOCommitEventSender(logger)
+      eventSender               <- IOCommitEventSender(logger)
+      accessTokenFinder         <- IOAccessTokenFinder(logger)
+      commitEventsSourceBuilder <- IOCommitEventsSourceBuilder(gitLabThrottler)
     } yield new CommitToEventLog[IO](
-      new IOAccessTokenFinder(tokenRepositoryUrl, logger),
-      new IOCommitEventsSourceBuilder(transactor, gitLabUrl, gitLabThrottler),
+      accessTokenFinder,
+      commitEventsSourceBuilder,
       eventSender,
       logger,
       executionTimeRecorder

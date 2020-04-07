@@ -25,12 +25,8 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
@@ -126,9 +122,6 @@ private object HookEventEndpoint {
 
 object IOHookEventEndpoint {
   def apply(
-      transactor:              DbTransactor[IO, EventLogDB],
-      tokenRepositoryUrl:      TokenRepositoryUrl,
-      gitLabUrl:               GitLabUrl,
       gitLabThrottler:         Throttler[IO, GitLab],
       hookTokenCrypto:         HookTokenCrypto[IO],
       executionTimeRecorder:   ExecutionTimeRecorder[IO],
@@ -138,11 +131,6 @@ object IOHookEventEndpoint {
     clock:                     Clock[IO],
     timer:                     Timer[IO]): IO[HookEventEndpoint[IO]] =
     for {
-      commitToEventLog <- IOCommitToEventLog(transactor,
-                                             tokenRepositoryUrl,
-                                             gitLabUrl,
-                                             gitLabThrottler,
-                                             executionTimeRecorder,
-                                             logger)
+      commitToEventLog <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
     } yield new HookEventEndpoint[IO](hookTokenCrypto, commitToEventLog)
 }

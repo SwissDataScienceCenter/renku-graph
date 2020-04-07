@@ -24,10 +24,6 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.commits._
@@ -73,9 +69,6 @@ private class EventsHistoryLoader[Interpretation[_]](
 
 private object IOEventsHistoryLoader {
   def apply(
-      transactor:              DbTransactor[IO, EventLogDB],
-      tokenRepositoryUrl:      TokenRepositoryUrl,
-      gitLabUrl:               GitLabUrl,
       gitLabThrottler:         Throttler[IO, GitLab],
       executionTimeRecorder:   ExecutionTimeRecorder[IO],
       logger:                  Logger[IO]
@@ -84,14 +77,10 @@ private object IOEventsHistoryLoader {
     clock:                     Clock[IO],
     timer:                     Timer[IO]): IO[EventsHistoryLoader[IO]] =
     for {
-      commitToEventLog <- IOCommitToEventLog(transactor,
-                                             tokenRepositoryUrl,
-                                             gitLabUrl,
-                                             gitLabThrottler,
-                                             executionTimeRecorder,
-                                             logger)
+      commitToEventLog   <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
+      latestCommitFinder <- IOLatestCommitFinder(gitLabThrottler, logger)
     } yield new EventsHistoryLoader[IO](
-      new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, logger),
+      latestCommitFinder,
       commitToEventLog,
       logger
     )

@@ -24,11 +24,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
@@ -75,10 +71,7 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 
 object IOHookCreationEndpoint {
   def apply(
-      transactor:              DbTransactor[IO, EventLogDB],
-      tokenRepositoryUrl:      TokenRepositoryUrl,
       projectHookUrl:          ProjectHookUrl,
-      gitLabUrl:               GitLabUrl,
       gitLabThrottler:         Throttler[IO, GitLab],
       hookTokenCrypto:         HookTokenCrypto[IO],
       executionTimeRecorder:   ExecutionTimeRecorder[IO],
@@ -88,13 +81,6 @@ object IOHookCreationEndpoint {
     clock:                     Clock[IO],
     timer:                     Timer[IO]): IO[HookCreationEndpoint[IO]] =
     for {
-      hookCreator <- IOHookCreator(transactor,
-                                   tokenRepositoryUrl,
-                                   projectHookUrl,
-                                   gitLabUrl,
-                                   gitLabThrottler,
-                                   hookTokenCrypto,
-                                   executionTimeRecorder,
-                                   logger)
+      hookCreator <- IOHookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
     } yield new HookCreationEndpoint[IO](hookCreator, new AccessTokenExtractor[IO])
 }

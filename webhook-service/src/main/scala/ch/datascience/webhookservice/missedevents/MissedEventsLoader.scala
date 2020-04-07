@@ -22,8 +22,6 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
 import ch.datascience.http.client.AccessToken
@@ -142,9 +140,6 @@ private class IOMissedEventsLoader(
 
 private object IOMissedEventsLoader {
   def apply(
-      transactor:            DbTransactor[IO, EventLogDB],
-      tokenRepositoryUrl:    TokenRepositoryUrl,
-      gitLabUrl:             GitLabUrl,
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],
       logger:                Logger[IO]
@@ -152,12 +147,9 @@ private object IOMissedEventsLoader {
     contextShift:            ContextShift[IO],
     executionContext:        ExecutionContext): IO[MissedEventsLoader[IO]] =
     for {
-      commitToEventLog <- IOCommitToEventLog(transactor,
-                                             tokenRepositoryUrl,
-                                             gitLabUrl,
-                                             gitLabThrottler,
-                                             executionTimeRecorder,
-                                             logger)
+      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
+      gitLabUrl          <- GitLabUrl[IO]()
+      commitToEventLog   <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
       latestEventsFinder <- IOLatestEventsFetcher(logger)
     } yield new IOMissedEventsLoader(
       latestEventsFinder,

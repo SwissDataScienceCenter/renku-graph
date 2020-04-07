@@ -23,10 +23,6 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
@@ -70,9 +66,6 @@ class EventsSynchronizationScheduler[Interpretation[_]](
 
 object IOEventsSynchronizationScheduler {
   def apply(
-      transactor:            DbTransactor[IO, EventLogDB],
-      tokenRepositoryUrl:    TokenRepositoryUrl,
-      gitLabUrl:             GitLabUrl,
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],
       logger:                Logger[IO]
@@ -80,11 +73,6 @@ object IOEventsSynchronizationScheduler {
     contextShift:            ContextShift[IO],
     executionContext:        ExecutionContext): IO[EventsSynchronizationScheduler[IO]] =
     for {
-      missedEventsLoader <- IOMissedEventsLoader(transactor,
-                                                 tokenRepositoryUrl,
-                                                 gitLabUrl,
-                                                 gitLabThrottler,
-                                                 executionTimeRecorder,
-                                                 logger)
+      missedEventsLoader <- IOMissedEventsLoader(gitLabThrottler, executionTimeRecorder, logger)
     } yield new EventsSynchronizationScheduler[IO](new SchedulerConfigProvider[IO](), missedEventsLoader)
 }

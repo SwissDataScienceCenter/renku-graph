@@ -26,9 +26,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
@@ -112,9 +110,7 @@ private object ProcessingStatusEndpoint {
 
 object IOProcessingStatusEndpoint {
   def apply(
-      tokenRepositoryUrl:      TokenRepositoryUrl,
       projectHookUrl:          ProjectHookUrl,
-      gitLabUrl:               GitLabUrl,
       gitLabThrottler:         Throttler[IO, GitLab],
       executionTimeRecorder:   ExecutionTimeRecorder[IO],
       logger:                  Logger[IO]
@@ -123,10 +119,7 @@ object IOProcessingStatusEndpoint {
     clock:                     Clock[IO],
     timer:                     Timer[IO]): IO[ProcessingStatusEndpoint[IO]] =
     for {
-      fetcher <- IOProcessingStatusFetcher(logger)
-    } yield new ProcessingStatusEndpoint[IO](
-      new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
-      fetcher,
-      executionTimeRecorder
-    )
+      fetcher       <- IOProcessingStatusFetcher(logger)
+      hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)
+    } yield new ProcessingStatusEndpoint[IO](hookValidator, fetcher, executionTimeRecorder)
 }

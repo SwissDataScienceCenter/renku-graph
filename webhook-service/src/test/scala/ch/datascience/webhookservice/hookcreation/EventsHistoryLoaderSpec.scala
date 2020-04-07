@@ -24,14 +24,13 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.webhookservice.commits.{CommitInfo, LatestCommitFinder}
-import ch.datascience.webhookservice.eventprocessing.{Project, StartCommit}
 import ch.datascience.webhookservice.eventprocessing.startcommit.TryCommitToEventLog
+import ch.datascience.webhookservice.eventprocessing.{Project, StartCommit}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.project.ProjectInfo
 import org.scalamock.scalatest.MockFactory

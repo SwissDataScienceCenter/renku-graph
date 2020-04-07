@@ -85,3 +85,15 @@ private class IOProjectHookCreator(
     case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
   }
 }
+
+private object IOProjectHookCreator {
+  def apply(
+      gitLabThrottler:         Throttler[IO, GitLab],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[ProjectHookCreator[IO]] =
+    for {
+      gitLabUrl <- GitLabUrl[IO]()
+    } yield new IOProjectHookCreator(gitLabUrl, gitLabThrottler, logger)
+}

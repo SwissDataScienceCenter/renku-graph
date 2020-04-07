@@ -18,6 +18,8 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
+import CommitEventSender.EventSendingResult
+import CommitEventSender.EventSendingResult.{EventCreated, EventExisted}
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
@@ -32,7 +34,15 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait CommitEventSender[Interpretation[_]] {
-  def send(commitEvent: CommitEvent): Interpretation[Unit]
+  def send(commitEvent: CommitEvent): Interpretation[EventSendingResult]
+}
+
+object CommitEventSender {
+  sealed trait EventSendingResult extends Product with Serializable
+  object EventSendingResult {
+    case object EventCreated extends EventSendingResult
+    case object EventExisted extends EventSendingResult
+  }
 }
 
 class IOCommitEventSender(
@@ -47,6 +57,7 @@ class IOCommitEventSender(
     with CommitEventSender[IO] {
 
   import cats.effect._
+  import cats.implicits._
   import commitEventSerializer._
   import io.circe.Encoder
   import io.circe.literal._
@@ -56,13 +67,13 @@ class IOCommitEventSender(
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  def send(commitEvent: CommitEvent): IO[Unit] =
+  def send(commitEvent: CommitEvent): IO[EventSendingResult] =
     for {
       serialisedEvent <- serialiseToJsonString(commitEvent)
       eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
       uri             <- validateUri(s"$eventLogUrl/events")
-      _               <- send(request(POST, uri).withEntity((commitEvent -> eventBody).asJson))(mapResponse)
-    } yield ()
+      sendingResult   <- send(request(POST, uri).withEntity((commitEvent -> eventBody).asJson))(mapResponse)
+    } yield sendingResult
 
   private implicit lazy val entityEncoder: Encoder[(CommitEvent, EventBody)] =
     Encoder.instance[(CommitEvent, EventBody)] {
@@ -78,9 +89,9 @@ class IOCommitEventSender(
       }"""
     }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (Created, _, _) => IO.unit
-    case (Ok, _, _)      => IO.unit
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[EventSendingResult]] = {
+    case (Created, _, _) => EventCreated.pure[IO]
+    case (Ok, _, _)      => EventExisted.pure[IO]
   }
 }
 

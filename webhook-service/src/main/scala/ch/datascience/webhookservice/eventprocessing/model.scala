@@ -19,8 +19,8 @@
 package ch.datascience.webhookservice.eventprocessing
 
 import ch.datascience.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId}
-import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.{projects, users}
 
 final case class StartCommit(
     id:      CommitId,
