@@ -46,7 +46,7 @@ class RenkuSpec extends WordSpec {
         chunks   = Seq(Left(new Bytes(commandBody.value.noSpaces.getBytes())))
       )
 
-      val triples = renku().log(commit, path)(triplesGeneration(returning = commandResult)).unsafeRunSync()
+      val triples = renku().log(event, path)(triplesGeneration(returning = commandResult)).unsafeRunSync()
 
       triples shouldBe commandBody
     }
@@ -55,7 +55,7 @@ class RenkuSpec extends WordSpec {
       val exception = exceptions.generateOne
 
       intercept[Exception] {
-        renku().log(commit, path)(triplesGeneration(failingWith = exception)).unsafeRunSync()
+        renku().log(event, path)(triplesGeneration(failingWith = exception)).unsafeRunSync()
       } shouldBe exception
     }
 
@@ -63,8 +63,8 @@ class RenkuSpec extends WordSpec {
       val timeout = RenkuLogTimeout(100 millis)
 
       intercept[Exception] {
-        renku(timeout).log(commit, path)(triplesGenerationTakingTooLong).unsafeRunSync()
-      }.getMessage shouldBe s"'renku log' execution for commit: ${commit.commitId}, project: ${commit.project.id} " +
+        renku(timeout).log(event, path)(triplesGenerationTakingTooLong).unsafeRunSync()
+      }.getMessage shouldBe s"'renku log' execution for commit: ${event.commitId}, project: ${event.project.id} " +
         s"took longer than $timeout - terminating"
     }
   }
@@ -73,8 +73,8 @@ class RenkuSpec extends WordSpec {
   private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
-    val commit = commits.generateOne
-    val path   = paths.generateOne
+    val event = commitEvents.generateOne
+    val path  = paths.generateOne
 
     private val renkuLogTimeout = RenkuLogTimeout(1500 millis)
     def renku(timeout: RenkuLogTimeout = renkuLogTimeout) = new Renku(timeout)

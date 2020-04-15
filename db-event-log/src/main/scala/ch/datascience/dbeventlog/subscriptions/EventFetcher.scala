@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.subscriptions
 
 import java.time.{Duration, Instant}
 
@@ -37,25 +37,25 @@ import doobie.util.fragments._
 import scala.language.higherKinds
 import scala.util.Random
 
-trait EventLogFetch[Interpretation[_]] {
-  def isEventToProcess:  Interpretation[Boolean]
-  def popEventToProcess: Interpretation[Option[EventBody]]
+private trait EventFetcher[Interpretation[_]] {
+  def popEvent: Interpretation[Option[(CompoundEventId, EventBody)]]
 }
 
-class EventLogFetchImpl[Interpretation[_]](
+private class EventFetcherImpl[Interpretation[_]](
     transactor:       DbTransactor[Interpretation, EventLogDB],
     renkuLogTimeout:  RenkuLogTimeout,
     now:              () => Instant = () => Instant.now,
     pickRandomlyFrom: List[projects.Id] => Option[projects.Id] = ids => ids.get(Random nextInt ids.size)
 )(implicit ME:        Bracket[Interpretation, Throwable])
-    extends EventLogFetch[Interpretation] {
+    extends EventFetcher[Interpretation] {
+
+  import TypesSerializers._
 
   private lazy val MaxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
 
-  override def isEventToProcess: Interpretation[Boolean] =
-    findOldestEvent.transact(transactor.get).map(_.isDefined)
+  private type EventIdAndBody = (CompoundEventId, EventBody)
 
-  override def popEventToProcess: Interpretation[Option[EventBody]] =
+  override def popEvent: Interpretation[Option[EventIdAndBody]] =
     findEventAndUpdateForProcessing().transact(transactor.get)
 
   private def findEventAndUpdateForProcessing() =
@@ -66,17 +66,6 @@ class EventLogFetchImpl[Interpretation[_]](
                                    .getOrElse(Free.pure[ConnectionOp, Option[EventIdAndBody]](None))
       maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
     } yield maybeBody
-
-  // format: off
-  private def findOldestEvent = {
-    fr"""select event_id, project_id, event_body
-         from event_log
-         where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-           or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
-         order by execution_date asc
-         limit 1"""
-  }.query[EventIdAndBody].option
-  // format: on
 
   // format: off
   private def findProjectsWithEventsInQueue = {
@@ -110,29 +99,27 @@ class EventLogFetchImpl[Interpretation[_]](
     case many          => pickRandomlyFrom(many)
   }
 
-  private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventBody]] = {
-    case None => Free.pure[ConnectionOp, Option[EventBody]](None)
-    case Some((commitEventId, eventBody)) =>
+  private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventIdAndBody]] = {
+    case None => Free.pure[ConnectionOp, Option[EventIdAndBody]](None)
+    case Some(idAndBody @ (commitEventId, eventBody)) =>
       sql"""update event_log 
            |set status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
            |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
            |  or (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
            |""".stripMargin.update.run
-        .map(toNoneIfEventAlreadyTaken(eventBody))
+        .map(toNoneIfEventAlreadyTaken(idAndBody))
   }
 
-  private def toNoneIfEventAlreadyTaken(eventBody: EventBody): Int => Option[EventBody] = {
+  private def toNoneIfEventAlreadyTaken(idAndBody: EventIdAndBody): Int => Option[EventIdAndBody] = {
     case 0 => None
-    case 1 => Some(eventBody)
+    case 1 => Some(idAndBody)
   }
-
-  private type EventIdAndBody = (CompoundEventId, EventBody)
 }
 
-object IOEventLogFetch {
+private object IOEventLogFetch {
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB]
-  )(implicit contextShift: ContextShift[IO]): IO[EventLogFetchImpl[IO]] =
-    RenkuLogTimeout[IO]() map (new EventLogFetchImpl(transactor, _))
+  )(implicit contextShift: ContextShift[IO]): IO[EventFetcherImpl[IO]] =
+    RenkuLogTimeout[IO]() map (new EventFetcherImpl(transactor, _))
 }

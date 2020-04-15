@@ -24,6 +24,7 @@ import cats.MonadError
 import cats.effect._
 import ch.datascience.dbeventlog.init.IODbInitializer
 import ch.datascience.dbeventlog.metrics.{EventLogMetrics, StatsFinder}
+import ch.datascience.dbeventlog.subscriptions.EventsDispatcher
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
@@ -42,7 +43,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   "run" should {
 
     "return Success Exit Code " +
-      "if Sentry, DB and metrics initialisation are fine " +
+      "if Sentry, DB, Events Dispatcher and metrics initialisation are fine " +
       "and http server starts up" in new TestCase {
 
       (sentryInitializer.run _)
@@ -54,6 +55,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .returning(context.unit)
 
       (metrics.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventsDispatcher.run _)
         .expects()
         .returning(IO.unit)
 
@@ -106,6 +111,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
+      (eventsDispatcher.run _)
+        .expects()
+        .returning(IO.unit)
+
       val exception = exceptions.generateOne
       (httpServer.run _)
         .expects()
@@ -116,6 +125,31 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
+    "return Success ExitCode even if Events Dispatcher initialisation fails" in new TestCase {
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (dbInitializer.run _)
+        .expects()
+        .returning(context.unit)
+
+      val exception = exceptions.generateOne
+      (eventsDispatcher.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      (metrics.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (httpServer.run _)
+        .expects()
+        .returning(context.pure(ExitCode.Success))
+
+      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+    }
+
     "return Success ExitCode even if Event Log Metrics initialisation fails" in new TestCase {
       (sentryInitializer.run _)
         .expects()
@@ -124,6 +158,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       (dbInitializer.run _)
         .expects()
         .returning(context.unit)
+
+      (eventsDispatcher.run _)
+        .expects()
+        .returning(IO.unit)
 
       val exception = exceptions.generateOne
       (metrics.run _)
@@ -146,11 +184,13 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
 
     val sentryInitializer = mock[IOSentryInitializer]
     val dbInitializer     = mock[IODbInitializer]
+    val eventsDispatcher  = mock[EventsDispatcher]
     val metrics           = mock[TestEventLogMetrics]
     val httpServer        = mock[IOHttpServer]
     val runner = new MicroserviceRunner(sentryInitializer,
                                         dbInitializer,
                                         metrics,
+                                        eventsDispatcher,
                                         httpServer,
                                         new ConcurrentHashMap[CancelToken[IO], Unit]())
 

@@ -16,23 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing
+package ch.datascience.triplesgenerator
 
-import ch.datascience.graph.model.events.EventBody
+import ch.datascience.generators.Generators.httpUrls
+import org.scalacheck.Gen
 
-import scala.language.higherKinds
-
-class EventsSource[Interpretation[_]](
-    newRunner: EventProcessor[Interpretation] => Interpretation[EventProcessorRunner[Interpretation]]
-) {
-
-  def withEventsProcessor(
-      eventProcessor: EventProcessor[Interpretation]
-  ): Interpretation[EventProcessorRunner[Interpretation]] = newRunner(eventProcessor)
-}
-
-abstract class EventProcessor[Interpretation[_]] extends (EventBody => Interpretation[Unit])
-
-abstract class EventProcessorRunner[Interpretation[_]](eventProcessor: EventProcessor[Interpretation]) {
-  def run: Interpretation[Unit]
+package object subscriptions {
+  implicit val subscriptionUrls: Gen[SubscriptionUrl] = httpUrls() map SubscriptionUrl.apply
 }

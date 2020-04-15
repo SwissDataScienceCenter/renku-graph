@@ -4,23 +4,13 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 ## API
 
-| Method | Path                               | Description                                                    |
-|--------|------------------------------------|----------------------------------------------------------------|
-|  POST  | ```/events```                      | Creates an event with a `NEW` status                           |
-|  GET   | ```/events/latest```               | Finds events for all the projects with the latest `event_date` |
-|  GET   | ```/events/projects/:id/status```  | Finds processing status of events belonging to a project       |
-|  GET   | ```/ping```                        | Verifies service health                                        |
-
-#### GET /ping
-
-Verifies service health.
-
-**Response**
-
-| Status                     | Description           |
-|----------------------------|-----------------------|
-| OK (200)                   | If service is healthy |
-| INTERNAL SERVER ERROR (500)| Otherwise             |
+| Method | Path                                     | Description                                                    |
+|--------|------------------------------------------|----------------------------------------------------------------|
+|  POST  | ```/events```                            | Creates an event with a `NEW` status                           |
+|  GET   | ```/events/latest```                     | Finds events for all the projects with the latest `event_date` |
+|  GET   | ```/events/projects/:id/status```        | Finds processing status of events belonging to a project       |
+|  POST  | ```/events/subscriptions?status=READY``` | Adds a subscription for the events                             |
+|  GET   | ```/ping```                              | Verifies service health                                        |
 
 #### POST /events
 
@@ -72,6 +62,7 @@ Event Body example:
 |----------------------------|-------------------------------------------------------------------------------------------------|
 | OK (200)                   | When event with the given `id` for the given project already exists in the Event Log            |
 | CREATED (201)              | When a new event was created in the Event Log                                                   |
+| BAD_REQUEST (400)          | When request body is not a valid JSON Event                                                     |
 | INTERNAL SERVER ERROR (500)| When there are problems with event creation                                                     |
 
 #### GET /events/latest
@@ -127,6 +118,41 @@ Response body examples:
   "progress": 50.00
 }
 ```
+
+#### POST /events/subscriptions?status=READY
+
+Adds a subscription to the events with certain statuses. Once a service gets successfully subscribed by receiving an OK,
+event-log service will start distributing events with the given `status` to the URL presented in the request body. 
+
+**NOTICE:** 
+As a good practice, the subscription should be renewed periodically in case of restart or URL change.
+
+**Request**
+
+```json
+{
+  "url": "http://host/path"
+}
+```
+
+**Response**
+
+| Status                     | Description                                                         |
+|----------------------------|---------------------------------------------------------------------|
+| ACCEPTED (202)             | When subscription was successfully added/renewed                    |
+| BAD_REQUEST (400)          | When there's no `status=READY` parameter or request body is invalid |
+| INTERNAL SERVER ERROR (500)| When there were problems with processing the request                |
+
+#### GET /ping
+
+Verifies service health.
+
+**Response**
+
+| Status                     | Description           |
+|----------------------------|-----------------------|
+| OK (200)                   | If service is healthy |
+| INTERNAL SERVER ERROR (500)| Otherwise             |
 
 ## Trying out
 

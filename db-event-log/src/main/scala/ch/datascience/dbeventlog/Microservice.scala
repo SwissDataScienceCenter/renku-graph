@@ -19,6 +19,7 @@
 package ch.datascience.dbeventlog
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
@@ -28,14 +29,26 @@ import ch.datascience.dbeventlog.init.IODbInitializer
 import ch.datascience.dbeventlog.latestevents.IOLatestEventsEndpoint
 import ch.datascience.dbeventlog.metrics.{EventLogMetrics, IOEventLogMetrics}
 import ch.datascience.dbeventlog.processingstatus.IOProcessingStatusEndpoint
+import ch.datascience.dbeventlog.subscriptions.{EventsDispatcher, IOSubscriptions, IOSubscriptionsEndpoint}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
+import pureconfig.loadConfigOrThrow
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 object Microservice extends IOMicroservice {
+
+  private implicit val executionContext: ExecutionContext =
+    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
+
+  protected implicit override def contextShift: ContextShift[IO] =
+    IO.contextShift(executionContext)
+
+  protected implicit override def timer: Timer[IO] =
+    IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
@@ -52,10 +65,14 @@ object Microservice extends IOMicroservice {
         eventCreationEndpoint    <- IOEventCreationEndpoint(transactor, ApplicationLogger)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, ApplicationLogger)
+        subscriptions            <- IOSubscriptions(ApplicationLogger)
+        eventsDispatcher         <- EventsDispatcher(transactor, subscriptions, ApplicationLogger)
+        subscriptionsEndpoint    <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
         routes <- new MicroserviceRoutes[IO](
                    eventCreationEndpoint,
                    latestEventsEndpoint,
                    processingStatusEndpoint,
+                   subscriptionsEndpoint,
                    new RoutesMetrics[IO](metricsRegistry)
                  ).routes
         httpServer = new HttpServer[IO](serverPort = 9005, routes)
@@ -64,6 +81,7 @@ object Microservice extends IOMicroservice {
                      sentryInitializer,
                      new IODbInitializer(transactor, ApplicationLogger),
                      eventLogMetrics,
+                     eventsDispatcher,
                      httpServer,
                      subProcessesCancelTokens
                    ) run args
@@ -75,6 +93,7 @@ private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
     dbInitializer:            IODbInitializer,
     metrics:                  EventLogMetrics,
+    eventsDispatcher:         EventsDispatcher,
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
@@ -84,6 +103,7 @@ private class MicroserviceRunner(
       _      <- sentryInitializer.run
       _      <- dbInitializer.run
       _      <- metrics.run.start.map(gatherCancelToken)
+      _      <- eventsDispatcher.run.start.map(gatherCancelToken)
       result <- httpServer.run
     } yield result
 

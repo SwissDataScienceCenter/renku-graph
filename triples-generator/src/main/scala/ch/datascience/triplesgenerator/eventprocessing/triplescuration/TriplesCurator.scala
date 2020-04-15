@@ -32,7 +32,7 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-class TriplesCurator[Interpretation[_]](
+private[eventprocessing] class TriplesCurator[Interpretation[_]](
     personDetailsUpdater: PersonDetailsUpdater[Interpretation],
     forkInfoUpdater:      ForkInfoUpdater[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable]) {
@@ -56,7 +56,7 @@ class TriplesCurator[Interpretation[_]](
   }
 }
 
-object IOTriplesCurator {
+private[eventprocessing] object IOTriplesCurator {
 
   import cats.effect.{ContextShift, IO, Timer}
   import ch.datascience.config.GitLab

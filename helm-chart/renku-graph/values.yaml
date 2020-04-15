@@ -38,7 +38,6 @@ triplesGenerator:
   reProvisioningInitialDelay: 1 minute
   gitlab:
     rateLimit: 30/sec
-  generationProcessInitialDelay: 2 minutes
   ## a demanded number of concurrent triples generation processes
   generationProcessesNumber: 3
   threadsNumber: 6
@@ -63,8 +62,6 @@ webhookService:
   gitlab:
     rateLimit: 100/sec
   threadsNumber: 3
-  dbEventLog:
-    connectionPool: 4
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`

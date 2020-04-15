@@ -37,7 +37,7 @@ import scala.concurrent.ExecutionContext
 
 // This TriplesGenerator supposed to be used by the acceptance-tests only
 
-object RemoteTriplesGenerator extends ConfigLoader[IO] {
+private[eventprocessing] object RemoteTriplesGenerator extends ConfigLoader[IO] {
 
   def apply(
       configuration:           Config
@@ -51,7 +51,7 @@ object RemoteTriplesGenerator extends ConfigLoader[IO] {
     } yield new RemoteTriplesGenerator(serviceUrl, ApplicationLogger)
 }
 
-class RemoteTriplesGenerator(
+private[eventprocessing] class RemoteTriplesGenerator(
     serviceUrl:              TriplesGenerationServiceUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])

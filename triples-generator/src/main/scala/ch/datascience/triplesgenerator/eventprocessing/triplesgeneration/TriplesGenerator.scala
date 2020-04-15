@@ -32,13 +32,13 @@ import com.typesafe.config.{Config, ConfigFactory}
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-trait TriplesGenerator[Interpretation[_]] {
+private[eventprocessing] trait TriplesGenerator[Interpretation[_]] {
   def generateTriples(
       commit:                  CommitEvent
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, JsonLDTriples]
 }
 
-object TriplesGenerator {
+private[eventprocessing] object TriplesGenerator {
 
   final case class GenerationRecoverableError(message: String)
       extends Exception(message)

@@ -30,10 +30,17 @@ import doobie.implicits._
 
 import scala.language.higherKinds
 
-class EventLogMarkFailed[Interpretation[_]](
+trait EventLogMarkFailed[Interpretation[_]] {
+  def markEventFailed(commitEventId: events.CompoundEventId,
+                      status:        FailureStatus,
+                      maybeMessage:  Option[EventMessage]): Interpretation[Unit]
+}
+
+class EventLogMarkFailedImpl[Interpretation[_]](
     transactor:              DbTransactor[Interpretation, EventLogDB],
     executionDateCalculator: ExecutionDateCalculator = new ExecutionDateCalculator()
-)(implicit ME:               Bracket[Interpretation, Throwable]) {
+)(implicit ME:               Bracket[Interpretation, Throwable])
+    extends EventLogMarkFailed[Interpretation] {
 
   import executionDateCalculator._
 
@@ -104,4 +111,4 @@ object ExecutionDateCalculator {
 class IOEventLogMarkFailed(
     transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogMarkFailed[IO](transactor)
+    extends EventLogMarkFailedImpl[IO](transactor)

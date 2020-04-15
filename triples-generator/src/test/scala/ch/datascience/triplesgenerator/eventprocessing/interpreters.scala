@@ -19,18 +19,14 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.{Bracket, IO}
-import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkFailed, EventLogMarkNew}
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
+import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkNew}
+import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
-private class TryCommitEventsDeserialiser   extends CommitEventsDeserialiser[Try]
-private abstract class TryAccessTokenFinder extends AccessTokenFinder[Try]
-private abstract class TryTriplesGenerator  extends TriplesGenerator[Try]
+private class IOEventBodyDeserialiser extends EventBodyDeserialiser[IO]
 private abstract class TryEventLogMarkDone(
     transactor: DbTransactor[Try, EventLogDB]
 )(implicit ME:  Bracket[Try, Throwable])
@@ -39,11 +35,8 @@ private abstract class TryEventLogMarkNew(
     transactor: DbTransactor[Try, EventLogDB]
 )(implicit ME:  Bracket[Try, Throwable])
     extends EventLogMarkNew[Try](transactor)
-private abstract class TryEventLogMarkFailed(
-    transactor: DbTransactor[Try, EventLogDB]
-)(implicit ME:  Bracket[Try, Throwable])
-    extends EventLogMarkFailed[Try](transactor)
 
-abstract class IOEventProcessorRunner(
-    eventProcessor: EventProcessor[IO]
-) extends EventProcessorRunner[IO](eventProcessor)
+abstract class IOEventProcessingEndpoint(eventBodyDeserializer:  EventBodyDeserialiser[IO],
+                                         eventsProcessingRunner: EventsProcessingRunner[IO],
+                                         logger:                 Logger[IO])
+    extends EventProcessingEndpoint[IO](eventBodyDeserializer, eventsProcessingRunner, logger)

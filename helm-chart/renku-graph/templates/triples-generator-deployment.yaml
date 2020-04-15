@@ -83,8 +83,6 @@ spec:
             - name: SENTRY_ENVIRONMENT_NAME
               value: {{ .Values.sentry.environmentName }}
               {{- end }}
-            - name: GENERATION_PROCESSES_INITIAL_DELAY
-              value: "{{ .Values.triplesGenerator.generationProcessInitialDelay }}"
             - name: GENERATION_PROCESSES_NUMBER
               value: "{{ .Values.triplesGenerator.generationProcessesNumber }}"
             - name: THREADS_NUMBER

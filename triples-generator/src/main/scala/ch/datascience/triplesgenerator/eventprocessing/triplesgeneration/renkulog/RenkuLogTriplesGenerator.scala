@@ -40,7 +40,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
-class RenkuLogTriplesGenerator private[renkulog] (
+private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
     gitRepoUrlFinder:    GitLabRepoUrlFinder[IO],
     renku:               Commands.Renku,
     file:                Commands.File,
@@ -118,7 +118,7 @@ class RenkuLogTriplesGenerator private[renkulog] (
   }
 }
 
-object RenkuLogTriplesGenerator {
+private[eventprocessing] object RenkuLogTriplesGenerator {
 
   def apply()(implicit contextShift: ContextShift[IO],
               executionContext:      ExecutionContext,

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.subscriptions
 
 import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN, SECONDS => SEC}
 import java.time.{Duration, Instant}
@@ -26,6 +26,7 @@ import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
 import cats.data.NonEmptyList
+import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -40,73 +41,9 @@ import org.scalatest.WordSpec
 
 import scala.language.postfixOps
 
-class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
-  "isEventToProcess" should {
-
-    s"return true if there are events with with status $New and execution date in the past" in new TestCase {
-      storeNewEvent(compoundEventIds.generateOne, ExecutionDate(now minus (5, SEC)), eventBodies.generateOne)
-
-      eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
-    }
-
-    s"return true if there are events with with status $RecoverableFailure and execution date in the past" in new TestCase {
-      storeEvent(compoundEventIds.generateOne,
-                 EventStatus.RecoverableFailure,
-                 ExecutionDate(now minus (5, SEC)),
-                 eventDates.generateOne,
-                 eventBodies.generateOne)
-
-      eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
-    }
-
-    s"return true if there are events with with status $Processing " +
-      "and execution date older than the given RenkuLogTimeout + 5 min" in new TestCase {
-      storeEvent(
-        compoundEventIds.generateOne,
-        EventStatus.Processing,
-        ExecutionDate(now minus (maxProcessingTime.toMinutes + 5, MIN)),
-        eventDates.generateOne,
-        eventBodies.generateOne
-      )
-
-      eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe true
-    }
-
-    s"return false for other cases" in new TestCase {
-      storeEvent(
-        compoundEventIds.generateOne,
-        EventStatus.Processing,
-        ExecutionDate(now minus (maxProcessingTime.toMinutes - 1, MIN)),
-        eventDates.generateOne,
-        eventBodies.generateOne
-      )
-      storeEvent(compoundEventIds.generateOne,
-                 EventStatus.New,
-                 ExecutionDate(now plus (5, SEC)),
-                 eventDates.generateOne,
-                 eventBodies.generateOne)
-      storeEvent(compoundEventIds.generateOne,
-                 EventStatus.RecoverableFailure,
-                 ExecutionDate(now plus (5, SEC)),
-                 eventDates.generateOne,
-                 eventBodies.generateOne)
-      storeEvent(compoundEventIds.generateOne,
-                 EventStatus.NonRecoverableFailure,
-                 ExecutionDate(now minus (5, SEC)),
-                 eventDates.generateOne,
-                 eventBodies.generateOne)
-      storeEvent(compoundEventIds.generateOne,
-                 EventStatus.TriplesStore,
-                 ExecutionDate(now minus (5, SEC)),
-                 eventDates.generateOne,
-                 eventBodies.generateOne)
-
-      eventLogFetch.isEventToProcess.unsafeRunSync() shouldBe false
-    }
-  }
-
-  "popEventToProcess" should {
+  "popEvent" should {
 
     "return an event with execution date farthest in the past " +
       s"and status $New or $RecoverableFailure " +
@@ -135,16 +72,16 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(event3Body)
+      eventLogFetch.popEvent.unsafeRunSync() shouldBe Some(event3Id -> event3Body)
 
       findEvents(EventStatus.Processing) shouldBe List((event3Id, executionDate, event3BatchDate))
 
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(event1Body)
+      eventLogFetch.popEvent.unsafeRunSync() shouldBe Some(event1Id -> event1Body)
 
       findEvents(EventStatus.Processing) shouldBe List((event1Id, executionDate, event1BatchDate),
                                                        (event3Id, executionDate, event3BatchDate))
 
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
+      eventLogFetch.popEvent.unsafeRunSync() shouldBe None
     }
 
     s"return an event with the $Processing status " +
@@ -162,7 +99,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
         batchDate = eventBatchDate
       )
 
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe Some(eventBody)
+      eventLogFetch.popEvent.unsafeRunSync() shouldBe Some(eventId -> eventBody)
 
       findEvents(EventStatus.Processing) shouldBe List((eventId, executionDate, eventBatchDate))
     }
@@ -178,7 +115,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
         eventBodies.generateOne
       )
 
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
+      eventLogFetch.popEvent.unsafeRunSync() shouldBe None
     }
 
     "return no events when there are no events matching the criteria" in new TestCase {
@@ -189,7 +126,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
         eventBodies.generateOne
       )
 
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe None
+      eventLogFetch.popEvent.unsafeRunSync() shouldBe None
     }
 
     "return events from various projects " +
@@ -209,9 +146,9 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      override val eventLogFetch = new EventLogFetchImpl(transactor, renkuLogTimeout)
+      override val eventLogFetch = new EventFetcherImpl(transactor, renkuLogTimeout)
       eventIdsBodiesDates.toList foreach { _ =>
-        eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe a[Some[_]]
+        eventLogFetch.popEvent.unsafeRunSync() shouldBe a[Some[_]]
       }
 
       val commitEventsByExecutionOrder = findEvents(
@@ -245,12 +182,12 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
       findEvents(EventStatus.Processing).map(_._1.projectId) shouldBe List(projectId1)
 
-      override val eventLogFetch = new EventLogFetchImpl(
+      override val eventLogFetch = new EventFetcherImpl(
         transactor,
         renkuLogTimeout,
         pickRandomlyFrom = _ => projectId2.some
       )
-      eventLogFetch.popEventToProcess.unsafeRunSync() shouldBe a[Some[_]]
+      eventLogFetch.popEvent.unsafeRunSync() shouldBe a[Some[_]]
 
       findEvents(
         status  = Processing,
@@ -264,7 +201,7 @@ class EventLogFetchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
     val currentTime       = mockFunction[Instant]
     val renkuLogTimeout   = renkuLogTimeouts.generateOne
     val maxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
-    val eventLogFetch     = new EventLogFetchImpl(transactor, renkuLogTimeout, currentTime)
+    val eventLogFetch     = new EventFetcherImpl(transactor, renkuLogTimeout, currentTime)
 
     val now           = Instant.now()
     val executionDate = ExecutionDate(now)

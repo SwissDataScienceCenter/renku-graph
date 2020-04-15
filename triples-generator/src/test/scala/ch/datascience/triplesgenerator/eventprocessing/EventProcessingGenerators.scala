@@ -26,7 +26,7 @@ import org.scalacheck.Gen
 
 private object EventProcessingGenerators {
 
-  implicit val commits: Gen[CommitEvent] = for {
+  implicit val commitEvents: Gen[CommitEvent] = for {
     commitId      <- commitIds
     project       <- projects
     maybeParentId <- Gen.option(commitIds)

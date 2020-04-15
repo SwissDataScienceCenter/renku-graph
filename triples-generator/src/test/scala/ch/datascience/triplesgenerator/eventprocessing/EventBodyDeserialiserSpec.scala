@@ -34,12 +34,12 @@ import org.scalatest.WordSpec
 
 import scala.util.{Failure, Try}
 
-class CommitEventsDeserialiserSpec extends WordSpec {
+class EventBodyDeserialiserSpec extends WordSpec {
 
-  "deserialiseToCommitEvents" should {
+  "toCommitEvents" should {
 
     "produce a single CommitEvent if the Json string can be successfully deserialized and there are no parents" in new TestCase {
-      deserialiser.deserialiseToCommitEvents(commitEvent(parents = Nil)) shouldBe context.pure(
+      deserialiser.toCommitEvents(commitEvent(parents = Nil)) shouldBe context.pure(
         NonEmptyList.of(
           CommitEventWithoutParent(
             EventId(commitId.value),
@@ -53,7 +53,7 @@ class CommitEventsDeserialiserSpec extends WordSpec {
     "produce CommitEvents for all the parents if they are present" in new TestCase {
       val parentCommits = parentsIdsLists(minNumber = 1).generateOne
 
-      deserialiser.deserialiseToCommitEvents(commitEvent(parentCommits)) shouldBe context.pure(
+      deserialiser.toCommitEvents(commitEvent(parentCommits)) shouldBe context.pure(
         NonEmptyList.fromListUnsafe(
           parentCommits map { parentCommitId =>
             CommitEventWithParent(
@@ -68,14 +68,14 @@ class CommitEventsDeserialiserSpec extends WordSpec {
     }
 
     "fail if parsing fails" in new TestCase {
-      val Failure(ParsingFailure(message, underlying)) = deserialiser.deserialiseToCommitEvents(EventBody("{"))
+      val Failure(ParsingFailure(message, underlying)) = deserialiser.toCommitEvents(EventBody("{"))
 
       message    shouldBe "CommitEvent cannot be deserialised: '{'"
       underlying shouldBe a[ParsingFailure]
     }
 
     "fail if decoding fails" in new TestCase {
-      val Failure(DecodingFailure(message, _)) = deserialiser.deserialiseToCommitEvents(EventBody("{}"))
+      val Failure(DecodingFailure(message, _)) = deserialiser.toCommitEvents(EventBody("{}"))
 
       message shouldBe "CommitEvent cannot be deserialised: '{}'"
     }
@@ -88,7 +88,7 @@ class CommitEventsDeserialiserSpec extends WordSpec {
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val deserialiser = new CommitEventsDeserialiser[Try]
+    val deserialiser = new EventBodyDeserialiser[Try]
 
     def commitEvent(parents: List[CommitId]): EventBody = EventBody {
       Json

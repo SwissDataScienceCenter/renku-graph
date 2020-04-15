@@ -21,21 +21,25 @@ package ch.datascience.triplesgenerator
 import cats.effect.{Clock, ConcurrentEffect}
 import cats.implicits._
 import ch.datascience.metrics.RoutesMetrics
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingEndpoint
 import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    routesMetrics: RoutesMetrics[F]
-)(implicit clock:  Clock[F])
+    eventProcessingEndpoint: EventProcessingEndpoint[F],
+    routesMetrics:           RoutesMetrics[F]
+)(implicit clock:            Clock[F])
     extends Http4sDsl[F] {
 
   import org.http4s.HttpRoutes
   import routesMetrics._
+  import eventProcessingEndpoint._
 
-  lazy val routes: F[HttpRoutes[F]] = HttpRoutes
-    .of[F] {
-      case GET -> Root / "ping" => Ok("pong")
-    }
-    .meter flatMap `add GET Root / metrics`
+  // format: off
+  lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
+    case request @ POST -> Root / "events" => processEvent(request)
+    case GET            -> Root / "ping"   => Ok("pong")
+  }.meter flatMap `add GET Root / metrics`
+  // format: on
 }

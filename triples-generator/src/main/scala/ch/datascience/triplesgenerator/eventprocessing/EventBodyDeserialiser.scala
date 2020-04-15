@@ -30,11 +30,11 @@ import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}
 
 import scala.language.higherKinds
 
-private class CommitEventsDeserialiser[Interpretation[_]](
+private class EventBodyDeserialiser[Interpretation[_]](
     implicit ME: MonadError[Interpretation, Throwable]
 ) {
 
-  def deserialiseToCommitEvents(eventBody: EventBody): Interpretation[NonEmptyList[CommitEvent]] = ME.fromEither {
+  def toCommitEvents(eventBody: EventBody): Interpretation[NonEmptyList[CommitEvent]] = ME.fromEither {
     parse(eventBody.value)
       .flatMap(_.as[NonEmptyList[CommitEvent]])
       .leftMap(toMeaningfulError(eventBody))

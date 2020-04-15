@@ -25,9 +25,9 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
-import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessorRunner
 import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
 import ch.datascience.triplesgenerator.reprovisioning.IOReProvisioning
+import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -39,8 +39,8 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   "run" should {
 
     "return Success ExitCode if " +
-      "Sentry and RDF dataset initialisation are fine and " +
-      "the re-provisioning, the Event Processor and the http server start up" in new TestCase {
+      "Sentry and RDF dataset initialisation are fine " +
+      "and subscription, re-provisioning and the http server start up" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -49,11 +49,11 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (reProvisioning.run _)
+      (subscriber.run _)
         .expects()
         .returning(IO.unit)
 
-      (eventProcessorRunner.run _)
+      (reProvisioning.run _)
         .expects()
         .returning(IO.unit)
 
@@ -99,7 +99,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (eventProcessorRunner.run _)
+      (subscriber.run _)
         .expects()
         .returning(IO.unit)
 
@@ -117,7 +117,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "return Success ExitCode even if Event Processor fails" in new TestCase {
+    "return Success ExitCode even if running Subscriber fails" in new TestCase {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
@@ -127,7 +127,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
 
       val exception = exceptions.generateOne
-      (eventProcessorRunner.run _)
+      (subscriber.run _)
         .expects()
         .returning(IO.raiseError(exception))
 
@@ -151,7 +151,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (eventProcessorRunner.run _)
+      (subscriber.run _)
         .expects()
         .returning(IO.unit)
 
@@ -169,16 +169,16 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val sentryInitializer    = mock[IOSentryInitializer]
-    val datasetInitializer   = mock[IOFusekiDatasetInitializer]
-    val reProvisioning       = mock[IOReProvisioning]
-    val eventProcessorRunner = mock[IOEventProcessorRunner]
-    val httpServer           = mock[IOHttpServer]
+    val sentryInitializer  = mock[IOSentryInitializer]
+    val datasetInitializer = mock[IOFusekiDatasetInitializer]
+    val subscriber         = mock[Subscriber]
+    val reProvisioning     = mock[IOReProvisioning]
+    val httpServer         = mock[IOHttpServer]
     val microserviceRunner = new MicroserviceRunner(
       sentryInitializer,
       datasetInitializer,
+      subscriber,
       reProvisioning,
-      eventProcessorRunner,
       httpServer,
       new ConcurrentHashMap[CancelToken[IO], Unit]()
     )

@@ -51,10 +51,10 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
       val triplesWithForkInfo = curatedTriplesObjects.generateOne
       (forkInfoUpdater
         .updateForkInfo(_: CommitEvent, _: CuratedTriples)(_: Option[AccessToken]))
-        .expects(commit, triplesWithPersonDetails, maybeAccessToken)
+        .expects(event, triplesWithPersonDetails, maybeAccessToken)
         .returning(triplesWithForkInfo.toRightT)
 
-      curator.curate(commit, triples).value shouldBe Right(triplesWithForkInfo).pure[Try]
+      curator.curate(event, triples).value shouldBe Right(triplesWithForkInfo).pure[Try]
     }
 
     "fail with the failure from the person details update" in new TestCase {
@@ -64,7 +64,7 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
         .expects(CuratedTriples(triples, updates = Nil))
         .returning(exception.raiseError[Try, CuratedTriples])
 
-      curator.curate(commit, triples).value shouldBe exception.raiseError[Try, CuratedTriples]
+      curator.curate(event, triples).value shouldBe exception.raiseError[Try, CuratedTriples]
     }
 
     "fail with the failure from the fork info update" in new TestCase {
@@ -77,10 +77,10 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
       val exception = exceptions.generateOne
       (forkInfoUpdater
         .updateForkInfo(_: CommitEvent, _: CuratedTriples)(_: Option[AccessToken]))
-        .expects(commit, triplesWithPersonDetails, maybeAccessToken)
+        .expects(event, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toEitherTError)
 
-      curator.curate(commit, triples).value shouldBe exception.raiseError[Try, CuratedTriples]
+      curator.curate(event, triples).value shouldBe exception.raiseError[Try, CuratedTriples]
     }
 
     s"return $CurationRecoverableError if forkInfoUpdater returns one" in new TestCase {
@@ -93,10 +93,10 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (forkInfoUpdater
         .updateForkInfo(_: CommitEvent, _: CuratedTriples)(_: Option[AccessToken]))
-        .expects(commit, triplesWithPersonDetails, maybeAccessToken)
+        .expects(event, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toLeftT)
 
-      curator.curate(commit, triples).value shouldBe Left(exception).pure[Try]
+      curator.curate(event, triples).value shouldBe Left(exception).pure[Try]
     }
   }
 
@@ -104,7 +104,7 @@ class TriplesCuratorSpec extends WordSpec with MockFactory {
 
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val triples = jsonLDTriples.generateOne
-    val commit  = commits.generateOne
+    val event   = commitEvents.generateOne
 
     class TryPersonDetailsUpdater(updatesCreator: UpdatesCreator) extends PersonDetailsUpdater[Try](updatesCreator)
     val personDetailsUpdater = mock[TryPersonDetailsUpdater]
