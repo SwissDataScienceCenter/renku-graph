@@ -16,27 +16,28 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.statuschange.commands
 
 import java.time.Instant
 
-import ch.datascience.dbeventlog.DbEventLogGenerators._
+import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, eventStatuses, executionDates}
+import ch.datascience.dbeventlog.EventStatus.{New, Processing}
+import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
+import ch.datascience.dbeventlog.statuschange.UpdateCommandsRunner
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
-import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogMarkNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
-  "markEventNew" should {
+  "command" should {
 
-    s"set status $New on the event with the given id and project " +
-      s"if the event has status $Processing" in new TestCase {
+    s"set status $New on the event with the given id and $Processing status " +
+      s"and return ${UpdateResult.Updated}" in new TestCase {
 
-      val eventId = compoundEventIds.generateOne
       storeEvent(
         eventId,
         EventStatus.Processing,
@@ -62,36 +63,48 @@ class EventLogMarkNewSpec extends WordSpec with InMemoryEventLogDbSpec with Mock
         batchDate = eventBatchDate
       )
 
-      eventLogMarkNew.markEventNew(eventId).unsafeRunSync() shouldBe ((): Unit)
+      findEvents(status = New) shouldBe List.empty
+
+      val command = ToNew(eventId, currentTime)
+
+      (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
       findEvents(status = New) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
     }
 
-    s"fail when updating event with status different than $Processing" in new TestCase {
+    EventStatus.all.filterNot(_ == Processing) foreach { eventStatus =>
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.Conflict}" in new TestCase {
 
-      val eventId       = compoundEventIds.generateOne
-      val eventStatus   = eventStatuses generateDifferentThan Processing
-      val executionDate = executionDates.generateOne
-      storeEvent(eventId,
-                 eventStatus,
-                 executionDate,
-                 eventDates.generateOne,
-                 eventBodies.generateOne,
-                 batchDate = eventBatchDate)
+        val eventStatus   = eventStatuses generateDifferentThan Processing
+        val executionDate = executionDates.generateOne
+        storeEvent(eventId,
+                   eventStatus,
+                   executionDate,
+                   eventDates.generateOne,
+                   eventBodies.generateOne,
+                   batchDate = eventBatchDate)
 
-      intercept[RuntimeException] {
-        eventLogMarkNew.markEventNew(eventId).unsafeRunSync()
-      }.getMessage shouldBe s"Event with $eventId couldn't be marked as $New; either no event or not with status $Processing"
+        findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-      findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
+        val command = ToNew(eventId, currentTime)
+
+        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+
+        val expectedEvents =
+          if (eventStatus != New) List.empty
+          else List((eventId, executionDate, eventBatchDate))
+        findEvents(status = New) shouldBe expectedEvents
+      }
     }
   }
 
   private trait TestCase {
+    val currentTime    = mockFunction[Instant]
+    val eventId        = compoundEventIds.generateOne
+    val eventBatchDate = batchDates.generateOne
 
-    val eventBatchDate  = batchDates.generateOne
-    val currentTime     = mockFunction[Instant]
-    val eventLogMarkNew = new EventLogMarkNew(transactor, currentTime)
+    val commandRunner = new UpdateCommandsRunner(transactor)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

@@ -18,25 +18,31 @@
 
 package ch.datascience.dbeventlog.statuschange.commands
 
-import ch.datascience.dbeventlog.{EventStatus, TypesSerializers}
+import java.time.Instant
+
+import ch.datascience.dbeventlog.EventStatus
+import ch.datascience.dbeventlog.EventStatus.{New, Processing}
 import ch.datascience.graph.model.events.CompoundEventId
-import doobie.util.fragment.Fragment
+import doobie.implicits._
+import doobie.util.fragment
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.collection.NonEmpty
 
-import scala.language.higherKinds
+private[statuschange] final case class ToNew(
+    eventId: CompoundEventId,
+    now:     () => Instant = () => Instant.now
+) extends ChangeStatusCommand {
 
-private[statuschange] trait ChangeStatusCommand extends Product with Serializable with TypesSerializers {
-  def eventId:   CompoundEventId
-  def status:    EventStatus
-  def query:     Fragment
-  def mapResult: Int => UpdateResult
-}
+  override val status: EventStatus = New
 
-sealed trait UpdateResult extends Product with Serializable
+  override def query: fragment.Fragment =
+    sql"""|update event_log 
+          |set status = $status, execution_date = ${now()}
+          |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}
+          |""".stripMargin
 
-object UpdateResult {
-  case object Conflict extends UpdateResult
-  case object Updated  extends UpdateResult
-  case class Failure(message: String Refined NonEmpty) extends UpdateResult
+  override def mapResult: Int => UpdateResult = {
+    case 0 => UpdateResult.Conflict
+    case 1 => UpdateResult.Updated
+    case _ => UpdateResult.Failure(Refined.unsafeApply(s"An attempt to set status $status on $eventId"))
+  }
 }

@@ -25,13 +25,15 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.client.IORestClient
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait EventStatusUpdater[Interpretation[_]] {
-  def markDone(eventId: CompoundEventId): Interpretation[Unit]
+  def markEventNew(eventId:  CompoundEventId): Interpretation[Unit]
+  def markEventDone(eventId: CompoundEventId): Interpretation[Unit]
 }
 
 private class IOEventStatusUpdater(
@@ -51,13 +53,29 @@ private class IOEventStatusUpdater(
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  override def markDone(eventId: CompoundEventId): IO[Unit] =
+  override def markEventNew(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
+    eventId,
+    payload         = json"""{"status": "NEW"}""",
+    responseMapping = okConflictAsSuccess
+  )
+
+  override def markEventDone(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
+    eventId,
+    payload         = json"""{"status": "TRIPLES_STORE"}""",
+    responseMapping = okConflictAsSuccess
+  )
+
+  private def sendStatusChange(
+      eventId:         CompoundEventId,
+      payload:         Json,
+      responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]]
+  ): IO[Unit] =
     for {
       uri           <- validateUri(s"$eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status")
-      sendingResult <- send(request(PATCH, uri).withEntity(json"""{"status": "TRIPLES_STORE"}"""))(mapResponse)
+      sendingResult <- send(request(PATCH, uri).withEntity(payload))(responseMapping)
     } yield sendingResult
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+  private lazy val okConflictAsSuccess: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
     case (Ok, _, _)       => IO.unit
     case (Conflict, _, _) => IO.unit
   }

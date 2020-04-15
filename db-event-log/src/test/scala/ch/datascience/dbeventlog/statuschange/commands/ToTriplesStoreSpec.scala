@@ -20,7 +20,7 @@ package ch.datascience.dbeventlog.statuschange.commands
 
 import java.time.Instant
 
-import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, eventStatuses, executionDates}
+import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, executionDates}
 import ch.datascience.dbeventlog.EventStatus.{Processing, TriplesStore}
 import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.dbeventlog.statuschange.UpdateCommandsRunner
@@ -35,8 +35,8 @@ class ToTriplesStoreSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
 
   "command" should {
 
-    s"set status $TriplesStore on the event with the given id and project " +
-      s"if the event has status $Processing" in new TestCase {
+    s"set status $TriplesStore on the event with the given id and $Processing status " +
+      s"and return ${UpdateResult.Updated}" in new TestCase {
 
       storeEvent(
         eventId,
@@ -63,6 +63,8 @@ class ToTriplesStoreSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
         batchDate = eventBatchDate
       )
 
+      findEvents(status = TriplesStore) shouldBe List.empty
+
       val command = ToTriplesStore(eventId, currentTime)
 
       (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
@@ -70,22 +72,29 @@ class ToTriplesStoreSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
       findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
     }
 
-    "do nothing when updating event did not change any row" in new TestCase {
+    EventStatus.all.filterNot(_ == Processing) foreach { eventStatus =>
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.Conflict}" in new TestCase {
 
-      val eventStatus   = eventStatuses generateDifferentThan Processing
-      val executionDate = executionDates.generateOne
-      storeEvent(eventId,
-                 eventStatus,
-                 executionDate,
-                 eventDates.generateOne,
-                 eventBodies.generateOne,
-                 batchDate = eventBatchDate)
+        val executionDate = executionDates.generateOne
+        storeEvent(eventId,
+                   eventStatus,
+                   executionDate,
+                   eventDates.generateOne,
+                   eventBodies.generateOne,
+                   batchDate = eventBatchDate)
 
-      val command = ToTriplesStore(eventId, currentTime)
+        findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-      (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+        val command = ToTriplesStore(eventId, currentTime)
 
-      findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
+        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+
+        val expectedEvents =
+          if (eventStatus != TriplesStore) List.empty
+          else List((eventId, executionDate, eventBatchDate))
+        findEvents(status = TriplesStore) shouldBe expectedEvents
+      }
     }
   }
 

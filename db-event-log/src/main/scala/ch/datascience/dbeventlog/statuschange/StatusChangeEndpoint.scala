@@ -59,9 +59,11 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
   private implicit class ResultOps(result: UpdateResult) {
     lazy val asHttpResponse: Interpretation[Response[Interpretation]] = result match {
-      case UpdateResult.Updated          => Ok(InfoMessage("Event status updated"))
-      case UpdateResult.Conflict         => Conflict(InfoMessage("Event status cannot be updated"))
-      case UpdateResult.Failure(message) => InternalServerError(ErrorMessage(message.value))
+      case UpdateResult.Updated  => Ok(InfoMessage("Event status updated"))
+      case UpdateResult.Conflict => Conflict(InfoMessage("Event status cannot be updated"))
+      case UpdateResult.Failure(message) =>
+        logger.error(message.value)
+        InternalServerError(ErrorMessage(message.value))
     }
   }
 
@@ -77,7 +79,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
   private def findDecoder(eventId: CompoundEventId): EntityDecoder[Interpretation, ChangeStatusCommand] = {
     import ch.datascience.dbeventlog.EventStatus
-    import ch.datascience.dbeventlog.EventStatus.TriplesStore
+    import ch.datascience.dbeventlog.EventStatus._
     import commands._
     import io.circe.{Decoder, HCursor}
 
@@ -86,6 +88,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
         status <- cursor.downField("status").as[EventStatus]
       } yield status match {
         case TriplesStore => ToTriplesStore(eventId)
+        case New          => ToNew(eventId)
         case _            => throw new Exception("boooom!")
       }
 

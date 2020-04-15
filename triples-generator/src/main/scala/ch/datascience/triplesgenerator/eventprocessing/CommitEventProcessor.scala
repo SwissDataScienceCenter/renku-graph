@@ -55,7 +55,6 @@ private class CommitEventProcessor[Interpretation[_]](
     triplesCurator:        TriplesCurator[Interpretation],
     uploader:              Uploader[Interpretation],
     eventStatusUpdater:    EventStatusUpdater[Interpretation],
-    eventLogMarkNew:       EventLogMarkNew[Interpretation],
     eventLogMarkFailed:    EventLogMarkFailed[Interpretation],
     logger:                Logger[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
@@ -67,7 +66,6 @@ private class CommitEventProcessor[Interpretation[_]](
   import UploadingResult._
   import accessTokenFinder._
   import eventLogMarkFailed._
-  import eventLogMarkNew._
   import eventStatusUpdater._
   import executionTimeRecorder._
   import triplesCurator._
@@ -134,7 +132,7 @@ private class CommitEventProcessor[Interpretation[_]](
   private def updateEventLog(uploadingResults: NonEmptyList[UploadingResult]) = {
     for {
       _ <- if (uploadingResults.allUploaded)
-            markDone(uploadingResults.head.commit.compoundEventId)
+            markEventDone(uploadingResults.head.commit.compoundEventId)
           else if (uploadingResults.haveRecoverableFailure)
             markEventAsRecoverable(uploadingResults.recoverableError)
           else markEventAsNonRecoverable(uploadingResults.nonRecoverableError)
@@ -250,7 +248,6 @@ private object IOCommitEventProcessor {
       triplesCurator,
       uploader,
       eventStatusUpdater,
-      new IOEventLogMarkNew(transactor),
       new IOEventLogMarkFailed(transactor),
       logger,
       executionTimeRecorder

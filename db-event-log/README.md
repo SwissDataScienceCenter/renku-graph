@@ -105,7 +105,14 @@ Updates status of the event with given `id` and `project_id`.
 
 **Request**
 
-There are different payloads required for different status types:
+There are different payloads required for different status types transitions:
+- `NEW`
+```json
+{
+  "status": "NEW"
+}
+```
+**Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
 - `TRIPLES_STORE`
 ```json
 {

@@ -317,7 +317,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val exception = exceptions.generateOne
       (eventStatusUpdater
-        .markDone(_: CompoundEventId))
+        .markEventDone(_: CompoundEventId))
         .expects(commit.compoundEventId)
         .returning(context.raiseError(exception))
 
@@ -335,7 +335,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
         .returning(context.raiseError(exception))
 
-      (eventLogMarkNew
+      (eventStatusUpdater
         .markEventNew(_: CompoundEventId))
         .expects(commitEvents.head.compoundEventId)
         .returning(context.unit)
@@ -397,7 +397,6 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
     val triplesCurator        = mock[TryTriplesCurator]
     val uploader              = mock[TryUploader]
     val eventStatusUpdater    = mock[EventStatusUpdater[Try]]
-    val eventLogMarkNew       = mock[TryEventLogMarkNew]
     val eventLogMarkFailed    = mock[EventLogMarkFailed[Try]]
     val logger                = TestLogger[Try]()
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger, Option(eventsProcessingTimes))
@@ -407,7 +406,6 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       triplesCurator,
       uploader,
       eventStatusUpdater,
-      eventLogMarkNew,
       eventLogMarkFailed,
       logger,
       executionTimeRecorder
@@ -442,7 +440,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
     def expectEventMarkedDone(commitEventId: CompoundEventId) =
       (eventStatusUpdater
-        .markDone(_: CompoundEventId))
+        .markEventDone(_: CompoundEventId))
         .expects(commitEventId)
         .returning(context.unit)
 

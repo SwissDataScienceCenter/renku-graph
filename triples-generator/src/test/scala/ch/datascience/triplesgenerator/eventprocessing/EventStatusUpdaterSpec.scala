@@ -34,6 +34,35 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
 
+  "markNew" should {
+
+    Set(Ok, Conflict) foreach { status =>
+      s"succeed if remote responds with $status" in new TestCase {
+        stubFor {
+          patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+            .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        updater.markEventNew(eventId).unsafeRunSync() shouldBe ((): Unit)
+      }
+    }
+
+    s"fail if remote responds with status different than $Ok" in new TestCase {
+      val status = BadRequest
+
+      stubFor {
+        patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+          .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+          .willReturn(aResponse().withStatus(status.code))
+      }
+
+      intercept[Exception] {
+        updater.markEventNew(eventId).unsafeRunSync() shouldBe ((): Unit)
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status returned $status; body: "
+    }
+  }
+
   "markDone" should {
 
     Set(Ok, Conflict) foreach { status =>
@@ -44,7 +73,7 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        updater.markDone(eventId).unsafeRunSync() shouldBe ((): Unit)
+        updater.markEventDone(eventId).unsafeRunSync() shouldBe ((): Unit)
       }
     }
 
@@ -58,7 +87,7 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
       }
 
       intercept[Exception] {
-        updater.markDone(eventId).unsafeRunSync() shouldBe ((): Unit)
+        updater.markEventDone(eventId).unsafeRunSync() shouldBe ((): Unit)
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status returned $status; body: "
     }
   }

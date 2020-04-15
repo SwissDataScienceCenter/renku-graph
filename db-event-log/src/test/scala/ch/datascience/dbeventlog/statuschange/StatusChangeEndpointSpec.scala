@@ -24,8 +24,8 @@ import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.EventStatus.TriplesStore
-import ch.datascience.dbeventlog.statuschange.commands.{ChangeStatusCommand, ToTriplesStore, UpdateResult}
+import ch.datascience.dbeventlog.EventStatus._
+import ch.datascience.dbeventlog.statuschange.commands.{ChangeStatusCommand, ToNew, ToTriplesStore, UpdateResult}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
@@ -42,82 +42,95 @@ import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
+import org.scalatest.prop.TableDrivenPropertyChecks
 
-class StatusChangeEndpointSpec extends WordSpec with MockFactory {
+class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrivenPropertyChecks {
 
   "changeStatus" should {
 
-    "decode payload from the request, " +
-      "perform request event status update " +
-      s"and return $Ok if all went fine - $TriplesStore status case" in new TestCase {
+    val scenarios = Table(
+      "status"     -> "command",
+      New          -> ToTriplesStore(compoundEventIds.generateOne),
+      TriplesStore -> ToNew(compoundEventIds.generateOne)
+    )
+    forAll(scenarios) { (status, command) =>
+      "decode payload from the body, " +
+        "perform status update " +
+        s"and return $Ok if all went fine - $status status case" in new TestCase {
 
-      val command: ChangeStatusCommand = ToTriplesStore(eventId)
-      (commandsRunner.run _)
-        .expects(command)
-        .returning(UpdateResult.Updated.pure[IO])
+        val eventId = command.eventId
 
-      val request = Request(
-        Method.PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(command.asJson)
+        (commandsRunner.run _)
+          .expects(command)
+          .returning(UpdateResult.Updated.pure[IO])
 
-      val response = changeStatus(eventId, request).unsafeRunSync()
+        val request = Request(
+          Method.PATCH,
+          uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+        ).withEntity(command.asJson)
 
-      response.status                        shouldBe Ok
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status updated")
+        val response = changeStatus(eventId, request).unsafeRunSync()
 
-      logger.expectNoLogs()
-    }
+        response.status                        shouldBe Ok
+        response.contentType                   shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status updated")
 
-    "decode payload from the request, " +
-      "perform request event status update " +
-      s"and return $Conflict if no event gets updated - $TriplesStore status case" in new TestCase {
+        logger.expectNoLogs()
+      }
 
-      val command: ChangeStatusCommand = ToTriplesStore(eventId)
-      (commandsRunner.run _)
-        .expects(command)
-        .returning(UpdateResult.Conflict.pure[IO])
+      "decode payload from the body, " +
+        "perform status update " +
+        s"and return $Conflict if no event gets updated - $status status case" in new TestCase {
 
-      val request = Request(
-        Method.PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(command.asJson)
+        val eventId = command.eventId
 
-      val response = changeStatus(eventId, request).unsafeRunSync()
+        (commandsRunner.run _)
+          .expects(command)
+          .returning(UpdateResult.Conflict.pure[IO])
 
-      response.status                        shouldBe Conflict
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status cannot be updated")
+        val request = Request(
+          Method.PATCH,
+          uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+        ).withEntity(command.asJson)
 
-      logger.expectNoLogs()
-    }
+        val response = changeStatus(eventId, request).unsafeRunSync()
 
-    "decode payload from the request, " +
-      "perform request event status update " +
-      s"and return $InternalServerError if there was an error during update - $TriplesStore status case" in new TestCase {
+        response.status                        shouldBe Conflict
+        response.contentType                   shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status cannot be updated")
 
-      val errorMessage = nonBlankStrings().generateOne
-      val command: ChangeStatusCommand = ToTriplesStore(eventId)
-      (commandsRunner.run _)
-        .expects(command)
-        .returning(UpdateResult.Failure(errorMessage).pure[IO])
+        logger.expectNoLogs()
+      }
 
-      val request = Request(
-        Method.PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(command.asJson)
+      "decode payload from the body, " +
+        "perform status update " +
+        s"and return $InternalServerError if there was an error during update - $status status case" in new TestCase {
 
-      val response = changeStatus(eventId, request).unsafeRunSync()
+        val eventId = command.eventId
 
-      response.status                        shouldBe InternalServerError
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage(errorMessage.value)
+        val errorMessage = nonBlankStrings().generateOne
+        (commandsRunner.run _)
+          .expects(command)
+          .returning(UpdateResult.Failure(errorMessage).pure[IO])
 
-      logger.expectNoLogs()
+        val request = Request(
+          Method.PATCH,
+          uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+        ).withEntity(command.asJson)
+
+        val response = changeStatus(eventId, request).unsafeRunSync()
+
+        response.status                        shouldBe InternalServerError
+        response.contentType                   shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage(errorMessage.value)
+
+        logger.loggedOnly(Error(errorMessage.value))
+      }
     }
 
     s"return $BadRequest if decoding payload fails" in new TestCase {
+
+      val eventId = compoundEventIds.generateOne
 
       val payload = json"""{}"""
       val request = Request(
@@ -137,6 +150,8 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory {
     }
 
     s"return $InternalServerError when updating event status fails" in new TestCase {
+
+      val eventId = compoundEventIds.generateOne
 
       val command: ChangeStatusCommand = ToTriplesStore(eventId)
       val exception = exceptions.generateOne
@@ -160,17 +175,18 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val eventId = compoundEventIds.generateOne
-
     val commandsRunner = mock[TestUpdateCommandsRunner]
     val logger         = TestLogger[IO]()
     val changeStatus   = new StatusChangeEndpoint[IO](commandsRunner, logger).changeStatus _
   }
 
   implicit val commandEncoder: Encoder[ChangeStatusCommand] = Encoder.instance[ChangeStatusCommand] {
+    case command @ ToNew(_, _)          => json"""{
+      "status": ${command.status.value}
+    }"""
     case command @ ToTriplesStore(_, _) => json"""{
-        "status": ${command.status.value}
-      }"""
+      "status": ${command.status.value}
+    }"""
   }
 
   private class TestUpdateCommandsRunner(transactor: DbTransactor[IO, EventLogDB])
