@@ -23,13 +23,15 @@ import cats.implicits._
 import ch.datascience.dbeventlog.creation.{EventCreationEndpoint, EventPersister}
 import ch.datascience.dbeventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import ch.datascience.dbeventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
+import ch.datascience.dbeventlog.statuschange.TestStatusChangeEndpoint
 import ch.datascience.dbeventlog.subscriptions.{Subscriptions, SubscriptionsEndpoint}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
 import io.chrisdavenport.log4cats.Logger
-import org.http4s.Method.{GET, POST}
+import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
 import org.http4s._
 import org.scalacheck.Gen
@@ -68,6 +70,21 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
       val request = Request[IO](GET, uri"events" / "projects" / projectId.toString / "status")
       (processingStatusEndpoint.findProcessingStatus _).expects(projectId).returning(Response[IO](Ok).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
+    }
+
+    "define a PATCH /events/:id/projects/:id/status endpoint" in new TestCase {
+      val eventId = compoundEventIds.generateOne
+
+      val request = Request[IO](
+        method = PATCH,
+        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+      )
+
+      (statusChangeEndpoint.changeStatus _).expects(eventId, request).returning(Response[IO](Ok).pure[IO])
 
       val response = routes.call(request)
 
@@ -128,11 +145,13 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
     val eventCreationEndpoint    = mock[TestEventCreationEndpoint]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
     val routesMetrics            = TestRoutesMetrics()
+    val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
     val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
     val routes = new MicroserviceRoutes[IO](
       eventCreationEndpoint,
       latestEventsEndpoint,
       processingStatusEndpoint,
+      statusChangeEndpoint,
       subscriptionsEndpoint,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))

@@ -30,8 +30,8 @@ import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
@@ -54,7 +54,7 @@ private class CommitEventProcessor[Interpretation[_]](
     triplesGenerator:      TriplesGenerator[Interpretation],
     triplesCurator:        TriplesCurator[Interpretation],
     uploader:              Uploader[Interpretation],
-    eventLogMarkDone:      EventLogMarkDone[Interpretation],
+    eventStatusUpdater:    EventStatusUpdater[Interpretation],
     eventLogMarkNew:       EventLogMarkNew[Interpretation],
     eventLogMarkFailed:    EventLogMarkFailed[Interpretation],
     logger:                Logger[Interpretation],
@@ -66,9 +66,9 @@ private class CommitEventProcessor[Interpretation[_]](
   import IOAccessTokenFinder._
   import UploadingResult._
   import accessTokenFinder._
-  import eventLogMarkDone._
   import eventLogMarkFailed._
   import eventLogMarkNew._
+  import eventStatusUpdater._
   import executionTimeRecorder._
   import triplesCurator._
   import triplesGenerator._
@@ -134,7 +134,7 @@ private class CommitEventProcessor[Interpretation[_]](
   private def updateEventLog(uploadingResults: NonEmptyList[UploadingResult]) = {
     for {
       _ <- if (uploadingResults.allUploaded)
-            markEventDone(uploadingResults.head.commit.compoundEventId)
+            markDone(uploadingResults.head.commit.compoundEventId)
           else if (uploadingResults.haveRecoverableFailure)
             markEventAsRecoverable(uploadingResults.recoverableError)
           else markEventAsNonRecoverable(uploadingResults.nonRecoverableError)
@@ -232,26 +232,27 @@ private object IOCommitEventProcessor {
       metricsRegistry:     MetricsRegistry[IO],
       gitLabThrottler:     Throttler[IO, GitLab],
       timeRecorder:        SparqlQueryTimeRecorder[IO],
+      logger:              Logger[IO],
       config:              Config = ConfigFactory.load()
   )(implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      uploader              <- IOUploader(ApplicationLogger, timeRecorder)
-      accessTokenFinder     <- IOAccessTokenFinder(ApplicationLogger)
-      triplesCurator        <- IOTriplesCurator(gitLabThrottler, ApplicationLogger, timeRecorder)
+      uploader              <- IOUploader(logger, timeRecorder)
+      accessTokenFinder     <- IOAccessTokenFinder(logger)
+      triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
+      eventStatusUpdater    <- IOEventStatusUpdater(logger)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
-                                                         maybeHistogram = Some(eventsProcessingTimes))
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
     } yield new CommitEventProcessor(
       accessTokenFinder,
       triplesGenerator,
       triplesCurator,
       uploader,
-      new IOEventLogMarkDone(transactor),
+      eventStatusUpdater,
       new IOEventLogMarkNew(transactor),
       new IOEventLogMarkFailed(transactor),
-      ApplicationLogger,
+      logger,
       executionTimeRecorder
     )
 }

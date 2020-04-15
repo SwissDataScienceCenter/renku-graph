@@ -8,6 +8,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |--------|------------------------------------------|----------------------------------------------------------------|
 |  POST  | ```/events```                            | Creates an event with a `NEW` status                           |
 |  GET   | ```/events/latest```                     | Finds events for all the projects with the latest `event_date` |
+|  PATCH | ```/events/:id/projects/:id/status```    | Updates event status                                           |
 |  GET   | ```/events/projects/:id/status```        | Finds processing status of events belonging to a project       |
 |  POST  | ```/events/subscriptions?status=READY``` | Adds a subscription for the events                             |
 |  GET   | ```/ping```                              | Verifies service health                                        |
@@ -88,6 +89,30 @@ Response body example:
   "body":   "JSON payload"
 }
 ```
+
+#### PATCH /events/:id/projects/:id/status
+
+Updates status of the event with given `id` and `project_id`.
+
+**Response**
+
+| Status                     | Description                                                                 |
+|----------------------------|-----------------------------------------------------------------------------|
+| OK (200)                   | If status update is successful                                              |
+| NOT_FOUND (404)            | When there's no event with the given `id` and `project_id`                  |
+| CONFLICT (409)             | When current status of the event does not allow to become the requested one |
+| INTERNAL SERVER ERROR (500)| When some problems occurs                                                   |
+
+**Request**
+
+There are different payloads required for different status types:
+- `TRIPLES_STORE`
+```json
+{
+  "status": "TRIPLES_STORE"
+}
+```
+**Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
 
 #### GET /events/projects/:id/status
 

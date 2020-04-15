@@ -20,13 +20,12 @@ package ch.datascience.dbeventlog
 package creation
 
 import DbEventLogGenerators._
-import cats.MonadError
+import EventPersister.Result
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
-import EventPersister.Result
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.EndpointTester._
@@ -53,7 +52,7 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
       "if there's no such an event in the Log yet" in new TestCase {
 
       val event = events.generateOne
-      (eventAdder.storeNewEvent _)
+      (persister.storeNewEvent _)
         .expects(event)
         .returning(Result.Created.pure[IO])
 
@@ -74,7 +73,7 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
       "if such an event was already in the Log" in new TestCase {
 
       val event = events.generateOne
-      (eventAdder.storeNewEvent _)
+      (persister.storeNewEvent _)
         .expects(event)
         .returning(Result.Existed.pure[IO])
 
@@ -109,9 +108,9 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
 
       val event     = events.generateOne
       val exception = exceptions.generateOne
-      (eventAdder.storeNewEvent _)
+      (persister.storeNewEvent _)
         .expects(event)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, EventPersister.Result])
 
       val request = Request(Method.POST, uri"events").withEntity(event.asJson)
 
@@ -126,11 +125,9 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
-    val eventAdder = mock[TestEventLogAdd]
-    val logger     = TestLogger[IO]()
-    val addEvent   = new EventCreationEndpoint[IO](eventAdder, logger).addEvent _
+    val persister = mock[TestEventPersister]
+    val logger    = TestLogger[IO]()
+    val addEvent  = new EventCreationEndpoint[IO](persister, logger).addEvent _
   }
 
   private implicit lazy val eventEncoder: Encoder[Event] = Encoder.instance[Event] { event =>
@@ -150,5 +147,5 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
     }"""
   }
 
-  class TestEventLogAdd(transactor: DbTransactor[IO, EventLogDB]) extends EventPersister(transactor)
+  class TestEventPersister(transactor: DbTransactor[IO, EventLogDB]) extends EventPersister(transactor)
 }

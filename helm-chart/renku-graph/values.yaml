@@ -41,8 +41,6 @@ triplesGenerator:
   ## a demanded number of concurrent triples generation processes
   generationProcessesNumber: 3
   threadsNumber: 6
-  dbEventLog:
-    connectionPool: 6
 
 webhookService:
   image:

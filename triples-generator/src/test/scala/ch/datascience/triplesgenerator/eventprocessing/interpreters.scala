@@ -21,16 +21,12 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.effect.{Bracket, IO}
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.{EventLogMarkDone, EventLogMarkNew}
+import ch.datascience.dbeventlog.commands.EventLogMarkNew
 import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
 private class IOEventBodyDeserialiser extends EventBodyDeserialiser[IO]
-private abstract class TryEventLogMarkDone(
-    transactor: DbTransactor[Try, EventLogDB]
-)(implicit ME:  Bracket[Try, Throwable])
-    extends EventLogMarkDone[Try](transactor)
 private abstract class TryEventLogMarkNew(
     transactor: DbTransactor[Try, EventLogDB]
 )(implicit ME:  Bracket[Try, Throwable])

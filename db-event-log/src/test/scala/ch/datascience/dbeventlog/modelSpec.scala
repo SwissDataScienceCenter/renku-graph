@@ -23,6 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
+import io.circe.Json
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -46,12 +47,24 @@ class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
       s"be instantiatable from '$stringValue'" in {
         EventStatus.from(stringValue) shouldBe Right(expectedStatus)
       }
+
+      s"be deserializable from $stringValue" in {
+        Json.fromString(stringValue).as[EventStatus] shouldBe Right(expectedStatus)
+      }
     }
 
-    "fail for unknown value" in {
+    "fail instantiation for unknown value" in {
       val unknown = nonEmptyStrings().generateOne
 
       val Left(exception) = EventStatus.from(unknown)
+
+      exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
+    }
+
+    "fail deserialization for unknown value" in {
+      val unknown = nonEmptyStrings().generateOne
+
+      val Left(exception) = Json.fromString(unknown).as[EventStatus]
 
       exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
     }

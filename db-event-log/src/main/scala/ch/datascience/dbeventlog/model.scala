@@ -20,12 +20,14 @@ package ch.datascience.dbeventlog
 
 import java.time.Instant
 
+import cats.implicits._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
+import io.circe.Decoder.decodeString
 
 final case class Event(
     id:        EventId,
@@ -97,6 +99,13 @@ object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator)
     override val value: String = "NON_RECOVERABLE_FAILURE"
   }
   type NonRecoverableFailure = NonRecoverableFailure.type
+
+  implicit val eventStatusDecoder: Decoder[EventStatus] = decodeString.emap { value =>
+    Either.fromOption(
+      EventStatus.all.find(_.value == value),
+      ifNone = s"'$value' unknown EventStatus"
+    )
+  }
 }
 
 private object EventStatusInstantiator extends (String => EventStatus) {

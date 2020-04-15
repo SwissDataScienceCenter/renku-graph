@@ -16,28 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.http.server
+package ch.datascience.dbeventlog.statuschange.commands
 
-import ch.datascience.graph.model.{events, projects}
+import ch.datascience.dbeventlog.{EventStatus, TypesSerializers}
+import doobie.util.fragment.Fragment
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 
-import scala.util.Try
+import scala.language.higherKinds
 
-object binders {
+private[statuschange] trait ChangeStatusCommand extends Product with Serializable with TypesSerializers {
+  def status:    EventStatus
+  def query:     Fragment
+  def mapResult: Int => UpdateResult
+}
 
-  object ProjectId {
-    def unapply(value: String): Option[projects.Id] =
-      Try {
-        projects.Id(value.toInt)
-      }.toOption
-  }
+sealed trait UpdateResult extends Product with Serializable
 
-  object ProjectPath {
-    def unapply(value: String): Option[projects.Path] =
-      projects.Path.from(value).toOption
-  }
-
-  object EventId {
-    def unapply(value: String): Option[events.EventId] =
-      events.EventId.from(value).toOption
-  }
+object UpdateResult {
+  case object Conflict extends UpdateResult
+  case object Updated  extends UpdateResult
+  case class Failure(message: String Refined NonEmpty) extends UpdateResult
 }

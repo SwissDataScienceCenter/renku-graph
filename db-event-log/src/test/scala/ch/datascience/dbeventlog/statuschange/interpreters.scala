@@ -16,28 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.http.server
+package ch.datascience.dbeventlog.statuschange
 
-import ch.datascience.graph.model.{events, projects}
+import cats.effect.IO
+import io.chrisdavenport.log4cats.Logger
 
-import scala.util.Try
-
-object binders {
-
-  object ProjectId {
-    def unapply(value: String): Option[projects.Id] =
-      Try {
-        projects.Id(value.toInt)
-      }.toOption
-  }
-
-  object ProjectPath {
-    def unapply(value: String): Option[projects.Path] =
-      projects.Path.from(value).toOption
-  }
-
-  object EventId {
-    def unapply(value: String): Option[events.EventId] =
-      events.EventId.from(value).toOption
-  }
-}
+class TestStatusChangeEndpoint(updateCommandsRunner: UpdateCommandsRunner[IO], logger: Logger[IO])
+    extends StatusChangeEndpoint[IO](updateCommandsRunner, logger)

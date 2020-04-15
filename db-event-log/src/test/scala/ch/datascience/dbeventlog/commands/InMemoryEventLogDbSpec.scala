@@ -30,7 +30,7 @@ import doobie.implicits._
 import doobie.util.fragment.Fragment
 import org.scalatest.TestSuite
 
-trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
+trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb with TypesSerializers {
   self: TestSuite =>
 
   protected def initDb(): Unit = execute {

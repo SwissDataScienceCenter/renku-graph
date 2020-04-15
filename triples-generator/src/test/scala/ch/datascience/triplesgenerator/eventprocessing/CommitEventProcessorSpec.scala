@@ -316,8 +316,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       successfulTriplesGenerationAndUpload(commit -> jsonLDTriples.generateOne)
 
       val exception = exceptions.generateOne
-      (eventLogMarkDone
-        .markEventDone(_: CompoundEventId))
+      (eventStatusUpdater
+        .markDone(_: CompoundEventId))
         .expects(commit.compoundEventId)
         .returning(context.raiseError(exception))
 
@@ -370,12 +370,14 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(eventsProcessingTimesBuilder, *)
         .returning(IO.pure(eventsProcessingTimes))
 
+      val logger = TestLogger[IO]()
       IOCommitEventProcessor(
         mock[TestDbTransactor[EventLogDB]],
         mock[TriplesGenerator[IO]],
         metricsRegistry,
         Throttler.noThrottling,
-        new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(TestLogger()))
+        new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)),
+        logger
       ).unsafeRunSync()
     }
   }
@@ -394,7 +396,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
     val triplesFinder         = mock[TriplesGenerator[Try]]
     val triplesCurator        = mock[TryTriplesCurator]
     val uploader              = mock[TryUploader]
-    val eventLogMarkDone      = mock[TryEventLogMarkDone]
+    val eventStatusUpdater    = mock[EventStatusUpdater[Try]]
     val eventLogMarkNew       = mock[TryEventLogMarkNew]
     val eventLogMarkFailed    = mock[EventLogMarkFailed[Try]]
     val logger                = TestLogger[Try]()
@@ -404,7 +406,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       triplesFinder,
       triplesCurator,
       uploader,
-      eventLogMarkDone,
+      eventStatusUpdater,
       eventLogMarkNew,
       eventLogMarkFailed,
       logger,
@@ -439,8 +441,8 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
     }
 
     def expectEventMarkedDone(commitEventId: CompoundEventId) =
-      (eventLogMarkDone
-        .markEventDone(_: CompoundEventId))
+      (eventStatusUpdater
+        .markDone(_: CompoundEventId))
         .expects(commitEventId)
         .returning(context.unit)
 

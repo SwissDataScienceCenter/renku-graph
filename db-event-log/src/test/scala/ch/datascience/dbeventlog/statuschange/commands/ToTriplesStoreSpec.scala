@@ -16,27 +16,28 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.statuschange.commands
 
 import java.time.Instant
 
-import ch.datascience.dbeventlog.DbEventLogGenerators._
+import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, eventStatuses, executionDates}
+import ch.datascience.dbeventlog.EventStatus.{Processing, TriplesStore}
+import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
+import ch.datascience.dbeventlog.statuschange.UpdateCommandsRunner
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
-import EventStatus._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class ToTriplesStoreSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
-  "markEventDone" should {
+  "command" should {
 
     s"set status $TriplesStore on the event with the given id and project " +
       s"if the event has status $Processing" in new TestCase {
 
-      val eventId = compoundEventIds.generateOne
       storeEvent(
         eventId,
         EventStatus.Processing,
@@ -62,14 +63,15 @@ class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with Moc
         batchDate = eventBatchDate
       )
 
-      eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ((): Unit)
+      val command = ToTriplesStore(eventId, currentTime)
+
+      (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
       findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
     }
 
     "do nothing when updating event did not change any row" in new TestCase {
 
-      val eventId       = compoundEventIds.generateOne
       val eventStatus   = eventStatuses generateDifferentThan Processing
       val executionDate = executionDates.generateOne
       storeEvent(eventId,
@@ -79,17 +81,20 @@ class EventLogMarkDoneSpec extends WordSpec with InMemoryEventLogDbSpec with Moc
                  eventBodies.generateOne,
                  batchDate = eventBatchDate)
 
-      eventLogMarkDone.markEventDone(eventId).unsafeRunSync() shouldBe ((): Unit)
+      val command = ToTriplesStore(eventId, currentTime)
+
+      (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
       findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
     }
   }
 
   private trait TestCase {
+    val currentTime    = mockFunction[Instant]
+    val eventId        = compoundEventIds.generateOne
+    val eventBatchDate = batchDates.generateOne
 
-    val eventBatchDate   = batchDates.generateOne
-    val currentTime      = mockFunction[Instant]
-    val eventLogMarkDone = new EventLogMarkDone(transactor, currentTime)
+    val commandRunner = new UpdateCommandsRunner(transactor)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

@@ -18,26 +18,26 @@
 
 package ch.datascience.graph.http.server
 
-import ch.datascience.graph.model.{events, projects}
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators.eventIds
+import ch.datascience.graph.model.events
+import org.scalatest.Matchers._
+import org.scalatest.WordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.util.Try
+class EventIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+  import binders._
 
-object binders {
+  "unapply" should {
 
-  object ProjectId {
-    def unapply(value: String): Option[projects.Id] =
-      Try {
-        projects.Id(value.toInt)
-      }.toOption
-  }
+    "convert valid eventId as string to EventId" in {
+      forAll { id: events.EventId =>
+        EventId.unapply(id.toString) shouldBe Some(id)
+      }
+    }
 
-  object ProjectPath {
-    def unapply(value: String): Option[projects.Path] =
-      projects.Path.from(value).toOption
-  }
-
-  object EventId {
-    def unapply(value: String): Option[events.EventId] =
-      events.EventId.from(value).toOption
+    "return None if string value is blank" in {
+      EventId.unapply(" ") shouldBe None
+    }
   }
 }

@@ -45,8 +45,8 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  import EventsProcessingRunner.EventSchedulingResult
   import EventProcessingEndpoint._
+  import EventsProcessingRunner.EventSchedulingResult
   import cats.implicits._
   import ch.datascience.controllers.InfoMessage._
   import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -133,7 +133,8 @@ object IOEventProcessingEndpoint {
                                                      triplesGenerator,
                                                      metricsRegistry,
                                                      gitLabThrottler,
-                                                     timeRecorder)
+                                                     timeRecorder,
+                                                     logger)
       eventsProcessingRunner <- IOEventsProcessingRunner(commitEventProcessor, logger)
       bodyDeserialiser = new EventBodyDeserialiser[IO]()
     } yield new EventProcessingEndpoint[IO](bodyDeserialiser, eventsProcessingRunner, logger)
