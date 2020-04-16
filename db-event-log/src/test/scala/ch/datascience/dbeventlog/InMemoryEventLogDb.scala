@@ -27,7 +27,7 @@ import doobie.util.transactor.Transactor
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-trait InMemoryEventLogDb {
+trait InMemoryEventLogDb extends TypesSerializers {
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 

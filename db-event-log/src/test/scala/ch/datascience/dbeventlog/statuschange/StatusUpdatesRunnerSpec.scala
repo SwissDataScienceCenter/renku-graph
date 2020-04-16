@@ -19,9 +19,8 @@
 package ch.datascience.dbeventlog.statuschange
 
 import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, executionDates}
-import ch.datascience.dbeventlog.EventStatus
+import ch.datascience.dbeventlog.{EventStatus, InMemoryEventLogDbSpec}
 import ch.datascience.dbeventlog.EventStatus.{New, Processing}
-import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.dbeventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}

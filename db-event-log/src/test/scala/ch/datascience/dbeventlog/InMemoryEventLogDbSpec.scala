@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog
 
 import java.time.Instant
 
 import ch.datascience.db.DbSpec
-import ch.datascience.dbeventlog._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody}
@@ -30,7 +29,7 @@ import doobie.implicits._
 import doobie.util.fragment.Fragment
 import org.scalatest.TestSuite
 
-trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb with TypesSerializers {
+trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
   self: TestSuite =>
 
   protected def initDb(): Unit = execute {

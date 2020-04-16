@@ -80,9 +80,7 @@ lazy val triplesGenerator = Project(
   commonSettings
 ).dependsOn(
   graphCommons % "compile->compile",
-  graphCommons % "test->test",
-  dbEventLog % "compile->compile",
-  dbEventLog % "test->test"
+  graphCommons % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin

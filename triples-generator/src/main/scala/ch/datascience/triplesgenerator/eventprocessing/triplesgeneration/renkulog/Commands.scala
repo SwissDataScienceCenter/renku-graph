@@ -21,8 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
-import ch.datascience.dbeventlog.config.RenkuLogTimeout
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken

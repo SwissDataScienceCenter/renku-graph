@@ -25,8 +25,6 @@ import DbEventLogGenerators._
 import EventPersister.Result
 import Result._
 import ch.datascience.dbeventlog.EventStatus.New
-import ch.datascience.dbeventlog.TypesSerializers
-import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}

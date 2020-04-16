@@ -23,7 +23,6 @@ import java.time.Instant
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.commands._
 import ch.datascience.dbeventlog.{CreatedDate, Event}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.BatchDate

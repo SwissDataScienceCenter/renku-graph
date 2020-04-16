@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.implicits._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.Event
-import ch.datascience.dbeventlog.commands._
+import ch.datascience.dbeventlog.rescheduling._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger

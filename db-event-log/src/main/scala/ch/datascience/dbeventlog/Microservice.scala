@@ -29,6 +29,7 @@ import ch.datascience.dbeventlog.init.IODbInitializer
 import ch.datascience.dbeventlog.latestevents.IOLatestEventsEndpoint
 import ch.datascience.dbeventlog.metrics.{EventLogMetrics, IOEventLogMetrics}
 import ch.datascience.dbeventlog.processingstatus.IOProcessingStatusEndpoint
+import ch.datascience.dbeventlog.rescheduling.IOReSchedulingEndpoint
 import ch.datascience.dbeventlog.statuschange.IOStatusChangeEndpoint
 import ch.datascience.dbeventlog.subscriptions.{EventsDispatcher, IOSubscriptions, IOSubscriptionsEndpoint}
 import ch.datascience.http.server.HttpServer
@@ -66,6 +67,7 @@ object Microservice extends IOMicroservice {
         eventCreationEndpoint    <- IOEventCreationEndpoint(transactor, ApplicationLogger)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, ApplicationLogger)
+        reSchedulingEndpoint     <- IOReSchedulingEndpoint(transactor, ApplicationLogger)
         statusChangeEndpoint     <- IOStatusChangeEndpoint(transactor, ApplicationLogger)
         subscriptions            <- IOSubscriptions(ApplicationLogger)
         eventsDispatcher         <- EventsDispatcher(transactor, subscriptions, ApplicationLogger)
@@ -74,6 +76,7 @@ object Microservice extends IOMicroservice {
                    eventCreationEndpoint,
                    latestEventsEndpoint,
                    processingStatusEndpoint,
+                   reSchedulingEndpoint,
                    statusChangeEndpoint,
                    subscriptionsEndpoint,
                    new RoutesMetrics[IO](metricsRegistry)

@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.config
+package ch.datascience.graph.config
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.dbeventlog.DbEventLogGenerators._
+import ch.datascience.generators.CommonGraphGenerators.renkuLogTimeouts
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.durations
 import com.typesafe.config.ConfigFactory

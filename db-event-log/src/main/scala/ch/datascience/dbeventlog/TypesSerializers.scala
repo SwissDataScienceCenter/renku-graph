@@ -20,7 +20,7 @@ package ch.datascience.dbeventlog
 
 import java.time.Instant
 
-import ch.datascience.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId}
 import ch.datascience.graph.model.projects
 import doobie.util.{Get, Put, Read}
 
@@ -65,8 +65,4 @@ trait TypesSerializers {
   implicit val projectRead: Read[EventProject] = Read[(projects.Id, projects.Path)].map {
     case (id, path) => EventProject(id, path)
   }
-
-  //TODO to be removed
-  implicit val commitIdGet: Get[CommitId] = Get[String].tmap(CommitId.apply)
-  implicit val commitIdPut: Put[CommitId] = Put[String].contramap(_.value)
 }

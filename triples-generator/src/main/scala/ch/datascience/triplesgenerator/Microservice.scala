@@ -25,8 +25,6 @@ import cats.effect._
 import ch.datascience.config.GitLab
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
-import ch.datascience.db.DbTransactorResource
-import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -51,47 +49,36 @@ object Microservice extends IOMicroservice {
   private implicit val executionContext: ExecutionContext =
     ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
 
-  protected implicit override def contextShift: ContextShift[IO] =
-    IO.contextShift(executionContext)
+  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
 
-  protected implicit override def timer: Timer[IO] =
-    IO.timer(executionContext)
+  protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      transactorResource <- new EventLogDbConfigProvider[IO] map DbTransactorResource[IO, EventLogDB]
-      exitCode           <- runMicroservice(transactorResource, args)
+      sentryInitializer        <- SentryInitializer[IO]
+      fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
+      subscriber               <- Subscriber(ApplicationLogger)
+      triplesGeneration        <- TriplesGeneration[IO]()
+      metricsRegistry          <- MetricsRegistry()
+      gitLabRateLimit          <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+      gitLabThrottler          <- Throttler[IO, GitLab](gitLabRateLimit)
+      sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
+      reProvisioning           <- IOReProvisioning(triplesGeneration, sparqlTimeRecorder, ApplicationLogger)
+      eventProcessingEndpoint <- IOEventProcessingEndpoint(triplesGeneration,
+                                                           metricsRegistry,
+                                                           gitLabThrottler,
+                                                           sparqlTimeRecorder,
+                                                           ApplicationLogger)
+      routes <- new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
+      exitCode <- new MicroserviceRunner(
+                   sentryInitializer,
+                   fusekiDatasetInitializer,
+                   subscriber,
+                   reProvisioning,
+                   new HttpServer[IO](serverPort = ServicePort.value, routes),
+                   subProcessesCancelTokens
+                 ) run args
     } yield exitCode
-
-  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
-    transactorResource.use { transactor =>
-      for {
-        sentryInitializer        <- SentryInitializer[IO]
-        fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
-        subscriber               <- Subscriber(ApplicationLogger)
-        triplesGeneration        <- TriplesGeneration[IO]()
-        metricsRegistry          <- MetricsRegistry()
-        gitLabRateLimit          <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-        gitLabThrottler          <- Throttler[IO, GitLab](gitLabRateLimit)
-        sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
-        reProvisioning           <- IOReProvisioning(triplesGeneration, transactor, sparqlTimeRecorder)
-        eventProcessingEndpoint <- IOEventProcessingEndpoint(transactor,
-                                                             triplesGeneration,
-                                                             metricsRegistry,
-                                                             gitLabThrottler,
-                                                             sparqlTimeRecorder,
-                                                             ApplicationLogger)
-        routes <- new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
-        exitCode <- new MicroserviceRunner(
-                     sentryInitializer,
-                     fusekiDatasetInitializer,
-                     subscriber,
-                     reProvisioning,
-                     new HttpServer[IO](serverPort = ServicePort.value, routes),
-                     subProcessesCancelTokens
-                   ) run args
-      } yield exitCode
-    }
 }
 
 private class MicroserviceRunner(

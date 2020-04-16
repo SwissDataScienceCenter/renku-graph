@@ -21,8 +21,7 @@ package ch.datascience.graph.acceptancetests.db
 import cats.effect.IO
 import ch.datascience.db.DBConfigProvider
 import ch.datascience.dbeventlog._
-import ch.datascience.dbeventlog.commands._
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.projects.Id
 import doobie.implicits._
 
@@ -31,12 +30,13 @@ import scala.language.postfixOps
 object EventLog extends InMemoryEventLogDb {
 
   def findEvents(projectId: Id, status: EventStatus): List[CommitId] = execute {
-    sql"""select event_id
-         |from event_log
-         |where project_id = $projectId and status = $status
-         """.stripMargin
-      .query[CommitId]
+    sql"""|select event_id
+          |from event_log
+          |where project_id = $projectId and status = $status
+          |""".stripMargin
+      .query[EventId]
       .to[List]
+      .map(_.map(eventId => CommitId(eventId.value)))
   }
 
   protected override val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =

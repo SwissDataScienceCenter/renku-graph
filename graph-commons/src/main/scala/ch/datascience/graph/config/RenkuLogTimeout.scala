@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.config
+package ch.datascience.graph.config
 
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 

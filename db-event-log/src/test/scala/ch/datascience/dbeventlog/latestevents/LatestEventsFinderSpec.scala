@@ -22,8 +22,7 @@ import java.time.Instant.now
 import java.time.temporal.ChronoUnit._
 
 import ch.datascience.dbeventlog.DbEventLogGenerators._
-import ch.datascience.dbeventlog.EventDate
-import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
+import ch.datascience.dbeventlog.{EventDate, InMemoryEventLogDbSpec}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import org.scalatest.Matchers._

@@ -22,9 +22,8 @@ import java.time.Instant
 
 import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, executionDates}
 import ch.datascience.dbeventlog.EventStatus.{New, Processing}
-import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.dbeventlog.statuschange.StatusUpdatesRunnerImpl
-import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
+import ch.datascience.dbeventlog.{EventStatus, ExecutionDate, InMemoryEventLogDbSpec}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import org.scalamock.scalatest.MockFactory

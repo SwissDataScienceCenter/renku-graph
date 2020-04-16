@@ -28,7 +28,9 @@ trait DbInitSpec extends InMemoryEventLogDb {
   self: Suite =>
 
   protected def tableExists(): Boolean =
-    sql"""select exists (select * from event_log);""".query.option
+    sql"""select exists (select * from event_log);"""
+      .query[Boolean]
+      .option
       .transact(transactor.get)
       .recover { case _ => None }
       .unsafeRunSync()

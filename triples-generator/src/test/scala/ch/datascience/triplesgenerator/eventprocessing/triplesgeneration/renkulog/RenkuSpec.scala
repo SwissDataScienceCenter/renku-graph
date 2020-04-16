@@ -20,10 +20,10 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 
 import ammonite.ops.{Bytes, CommandResult, Path}
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.dbeventlog.config.RenkuLogTimeout
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuLogTimeout
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Renku

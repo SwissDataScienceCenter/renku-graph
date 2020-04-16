@@ -10,6 +10,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |  GET   | ```/events/latest```                     | Finds events for all the projects with the latest `event_date` |
 |  PATCH | ```/events/:id/projects/:id/status```    | Updates event status                                           |
 |  GET   | ```/events/projects/:id/status```        | Finds processing status of events belonging to a project       |
+|  POST  | ```/events/status/NEW```                 | Changes status of all the events to `NEW`                      |
 |  POST  | ```/events/subscriptions?status=READY``` | Adds a subscription for the events                             |
 |  GET   | ```/ping```                              | Verifies service health                                        |
 
@@ -166,6 +167,20 @@ Response body examples:
   "progress": 50.00
 }
 ```
+
+#### POST /events/status/NEW
+
+Triggers changing status of all the events in the Log to `NEW`.
+
+**NOTICE:** 
+By calling this endpoint all the events will get re-processed.
+
+**Response**
+
+| Status                     | Description                                          |
+|----------------------------|------------------------------------------------------|
+| ACCEPTED (202)             | When setting the status got accepted                 |
+| INTERNAL SERVER ERROR (500)| When there were problems with processing the request |
 
 #### POST /events/subscriptions?status=READY
 

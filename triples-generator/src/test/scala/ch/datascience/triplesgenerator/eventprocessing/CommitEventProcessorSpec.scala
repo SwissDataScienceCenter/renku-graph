@@ -25,7 +25,6 @@ import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.control.Throttler
-import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -370,7 +369,6 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       val logger = TestLogger[IO]()
       IOCommitEventProcessor(
-        mock[TestDbTransactor[EventLogDB]],
         mock[TriplesGenerator[IO]],
         metricsRegistry,
         Throttler.noThrottling,

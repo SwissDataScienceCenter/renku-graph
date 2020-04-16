@@ -19,29 +19,22 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect._
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.EventLogReScheduler
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
-import scala.util.Try
 
 class IOReProvisioning(triplesFinder:         TriplesVersionFinder[IO],
                        triplesRemover:        TriplesRemover[IO],
-                       eventLogReScheduler:   EventLogReScheduler[IO],
+                       eventsReScheduler:     EventsReScheduler[IO],
                        reProvisioningDelay:   ReProvisioningDelay,
                        executionTimeRecorder: ExecutionTimeRecorder[IO],
                        logger:                Logger[IO],
                        sleepWhenBusy:         FiniteDuration)(implicit timer: Timer[IO])
     extends ReProvisioning[IO](triplesFinder,
                                triplesRemover,
-                               eventLogReScheduler,
+                               eventsReScheduler,
                                reProvisioningDelay,
                                executionTimeRecorder,
                                logger,
                                sleepWhenBusy)
-
-class TryEventLogReScheduler(transactor: DbTransactor[Try, EventLogDB])(implicit ME: Bracket[Try, Throwable])
-    extends EventLogReScheduler[Try](transactor)

@@ -22,8 +22,6 @@ import cats.MonadError
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
@@ -220,7 +218,6 @@ private object IOCommitEventProcessor {
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
       triplesGenerator:    TriplesGenerator[IO],
       metricsRegistry:     MetricsRegistry[IO],
       gitLabThrottler:     Throttler[IO, GitLab],

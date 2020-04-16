@@ -23,6 +23,7 @@ import cats.implicits._
 import ch.datascience.dbeventlog.creation.{EventCreationEndpoint, EventPersister}
 import ch.datascience.dbeventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import ch.datascience.dbeventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
+import ch.datascience.dbeventlog.rescheduling.ReSchedulingEndpoint
 import ch.datascience.dbeventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import ch.datascience.dbeventlog.subscriptions.{Subscriptions, SubscriptionsEndpoint}
 import ch.datascience.generators.Generators.Implicits._
@@ -91,6 +92,17 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       response.status shouldBe Ok
     }
 
+    "define a POST /events/status/NEW endpoint" in new TestCase {
+
+      (reSchedulingEndpoint.triggerReScheduling _).expects().returning(Response[IO](Accepted).pure[IO])
+
+      val request = Request[IO](POST, uri"events" / "status" / "NEW")
+
+      val response = routes.call(request)
+
+      response.status shouldBe Accepted
+    }
+
     "define a POST /events/subscriptions?status=READY endpoint" in new TestCase {
       val request = Request[IO](POST, uri"events" / "subscriptions" withQueryParam ("status", "READY"))
       (subscriptionsEndpoint.addSubscription _).expects(request).returning(Response[IO](Accepted).pure[IO])
@@ -144,6 +156,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
     val latestEventsEndpoint     = mock[TestLatestEventsEndpoint]
     val eventCreationEndpoint    = mock[TestEventCreationEndpoint]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
+    val reSchedulingEndpoint     = mock[ReSchedulingEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
     val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
     val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
@@ -151,6 +164,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       eventCreationEndpoint,
       latestEventsEndpoint,
       processingStatusEndpoint,
+      reSchedulingEndpoint,
       statusChangeEndpoint,
       subscriptionsEndpoint,
       routesMetrics

@@ -27,7 +27,7 @@ import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus._
 import ch.datascience.dbeventlog._
-import ch.datascience.dbeventlog.config.RenkuLogTimeout
+import ch.datascience.graph.config.RenkuLogTimeout
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import doobie.free.connection.ConnectionOp

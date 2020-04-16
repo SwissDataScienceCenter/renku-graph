@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.rescheduling
 
 import java.time.Instant
 
@@ -33,7 +33,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class EventLogReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "scheduleEventsForProcessing" should {
 
@@ -60,9 +60,7 @@ class EventLogReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with 
       val event6Date = eventDates.generateOne
       addEvent(event6Id, RecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply), event6Date)
 
-      eventLog
-        .scheduleEventsForProcessing()
-        .unsafeRunSync() shouldBe ((): Unit)
+      eventLog.scheduleEventsForProcessing.unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = New).toSet shouldBe Set(
         (event1Id, ExecutionDate(event1Date.value), BatchDate(currentTime)),
@@ -81,7 +79,7 @@ class EventLogReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with 
     val currentTime                 = Instant.now()
     private val currentTimeProvider = mockFunction[Instant]
     currentTimeProvider.expects().returning(currentTime)
-    val eventLog = new EventLogReScheduler(transactor, currentTimeProvider)
+    val eventLog = new ReScheduler(transactor, currentTimeProvider)
 
     def addEvent(commitEventId: CompoundEventId,
                  status:        EventStatus,

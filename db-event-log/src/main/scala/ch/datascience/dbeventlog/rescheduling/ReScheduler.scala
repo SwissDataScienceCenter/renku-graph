@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.dbeventlog.commands
+package ch.datascience.dbeventlog.rescheduling
 
 import java.time.Instant
 
@@ -28,13 +28,15 @@ import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import doobie.implicits._
 
 import scala.language.higherKinds
+import ch.datascience.dbeventlog.TypesSerializers
 
-class EventLogReScheduler[Interpretation[_]](
+private class ReScheduler[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     now:        () => Instant = () => Instant.now
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+)(implicit ME:  Bracket[Interpretation, Throwable])
+    extends TypesSerializers {
 
-  def scheduleEventsForProcessing(): Interpretation[Unit] =
+  def scheduleEventsForProcessing: Interpretation[Unit] =
     runUpdate()
       .transact(transactor.get)
       .map(_ => ())
@@ -45,7 +47,7 @@ class EventLogReScheduler[Interpretation[_]](
           |""".stripMargin.update.run
 }
 
-class IOEventLogReScheduler(
+private class IOReScheduler(
     transactor:          DbTransactor[IO, EventLogDB]
 )(implicit contextShift: ContextShift[IO])
-    extends EventLogReScheduler[IO](transactor)
+    extends ReScheduler[IO](transactor)

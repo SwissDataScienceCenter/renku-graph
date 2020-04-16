@@ -22,9 +22,8 @@ import java.time.Instant
 
 import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
 import ch.datascience.dbeventlog.EventStatus.{NonRecoverableFailure, Processing}
-import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.dbeventlog.statuschange.StatusUpdatesRunnerImpl
-import ch.datascience.dbeventlog.{EventMessage, EventStatus, ExecutionDate}
+import ch.datascience.dbeventlog.{EventMessage, EventStatus, ExecutionDate, InMemoryEventLogDbSpec}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.events.CompoundEventId

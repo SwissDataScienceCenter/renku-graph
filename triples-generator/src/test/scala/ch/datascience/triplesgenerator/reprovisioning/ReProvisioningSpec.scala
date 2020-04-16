@@ -21,7 +21,6 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.MonadError
 import cats.effect.{IO, Timer}
 import cats.implicits._
-import ch.datascience.dbeventlog.commands.IOEventLogReScheduler
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
@@ -49,7 +48,7 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
           .expects()
           .returning(context.unit)
 
-        (eventLogReScheduler.scheduleEventsForProcessing _)
+        (eventsReScheduler.triggerEventsReScheduling _)
           .expects()
           .returning(context.unit)
       }
@@ -110,7 +109,7 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
           .expects()
           .returning(context.unit)
 
-        (eventLogReScheduler.scheduleEventsForProcessing _)
+        (eventsReScheduler.triggerEventsReScheduling _)
           .expects()
           .returning(context.unit)
       }
@@ -135,7 +134,7 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
           .expects()
           .returning(context.unit)
 
-        (eventLogReScheduler.scheduleEventsForProcessing _)
+        (eventsReScheduler.triggerEventsReScheduling _)
           .expects()
           .returning(context.raiseError(exception))
 
@@ -147,7 +146,7 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
           .expects()
           .returning(context.unit)
 
-        (eventLogReScheduler.scheduleEventsForProcessing _)
+        (eventsReScheduler.triggerEventsReScheduling _)
           .expects()
           .returning(context.unit)
       }
@@ -172,7 +171,7 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
       new ReProvisioning[IO](
         triplesVersionFinder,
         triplesRemover,
-        eventLogReScheduler,
+        eventsReScheduler,
         someInitialDelay,
         executionTimeRecorder,
         logger,
@@ -192,14 +191,14 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
 
     val triplesVersionFinder  = mock[TriplesVersionFinder[IO]]
     val triplesRemover        = mock[TriplesRemover[IO]]
-    val eventLogReScheduler   = mock[IOEventLogReScheduler]
+    val eventsReScheduler     = mock[EventsReScheduler[IO]]
     val initialDelay          = ReProvisioningDelay(durations(100 millis).generateOne)
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder(logger)
     val reProvisioning = new ReProvisioning[IO](
       triplesVersionFinder,
       triplesRemover,
-      eventLogReScheduler,
+      eventsReScheduler,
       initialDelay,
       executionTimeRecorder,
       logger,

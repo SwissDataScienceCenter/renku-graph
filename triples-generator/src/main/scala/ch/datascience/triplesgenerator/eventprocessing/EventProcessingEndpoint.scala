@@ -23,8 +23,6 @@ import cats.data.NonEmptyList
 import cats.effect.{Effect, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.MetricsRegistry
@@ -118,7 +116,6 @@ object IOEventProcessingEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
       triplesGeneration:   TriplesGeneration,
       metricsRegistry:     MetricsRegistry[IO],
       gitLabThrottler:     Throttler[IO, GitLab],
@@ -129,8 +126,7 @@ object IOEventProcessingEndpoint {
     timer:                 Timer[IO]): IO[EventProcessingEndpoint[IO]] =
     for {
       triplesGenerator <- TriplesGenerator(triplesGeneration)
-      commitEventProcessor <- IOCommitEventProcessor(transactor,
-                                                     triplesGenerator,
+      commitEventProcessor <- IOCommitEventProcessor(triplesGenerator,
                                                      metricsRegistry,
                                                      gitLabThrottler,
                                                      timeRecorder,
