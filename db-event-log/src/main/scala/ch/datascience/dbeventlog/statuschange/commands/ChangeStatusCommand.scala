@@ -26,11 +26,16 @@ import eu.timepit.refined.collection.NonEmpty
 
 import scala.language.higherKinds
 
-private[statuschange] trait ChangeStatusCommand extends Product with Serializable with TypesSerializers {
-  def eventId:   CompoundEventId
-  def status:    EventStatus
-  def query:     Fragment
-  def mapResult: Int => UpdateResult
+trait ChangeStatusCommand extends Product with Serializable with TypesSerializers {
+  def eventId: CompoundEventId
+  def status:  EventStatus
+  def query:   Fragment
+
+  def mapResult: Int => UpdateResult = {
+    case 0 => UpdateResult.Conflict
+    case 1 => UpdateResult.Updated
+    case _ => UpdateResult.Failure(Refined.unsafeApply(s"An attempt to set status $status on $eventId failed"))
+  }
 }
 
 sealed trait UpdateResult extends Product with Serializable

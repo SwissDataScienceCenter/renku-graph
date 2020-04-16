@@ -30,7 +30,7 @@ import eu.timepit.refined.auto._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class UpdateCommandsRunnerSpec extends WordSpec with InMemoryEventLogDbSpec {
+class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec {
 
   "run" should {
 
@@ -48,7 +48,7 @@ class UpdateCommandsRunnerSpec extends WordSpec with InMemoryEventLogDbSpec {
   private trait TestCase {
     val eventId = compoundEventIds.generateOne
 
-    val runner = new UpdateCommandsRunner(transactor)
+    val runner = new StatusUpdatesRunnerImpl(transactor)
   }
 
   private case class TestCommand(eventId: CompoundEventId) extends ChangeStatusCommand {

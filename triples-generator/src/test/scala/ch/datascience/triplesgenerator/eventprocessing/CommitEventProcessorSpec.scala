@@ -25,9 +25,7 @@ import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.control.Throttler
-import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.commands.EventLogMarkFailed
-import ch.datascience.dbeventlog.{EventLogDB, EventMessage}
+import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -113,7 +111,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(commit2, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception2)))
 
-      expectEventMarkedFailed(commit2.compoundEventId, NonRecoverableFailure, exception2)
+      expectEventMarkedAsNonRecoverableFailure(commit2.compoundEventId, exception2)
 
       eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
@@ -121,7 +119,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       logSummary(commitEvents, uploaded = successfulCommitsAndTriples.size, failed = 1)
     }
 
-    s"succeed and mark event with $NonRecoverableFailure if finding triples fails" in new TestCase {
+    "succeed and mark event with NonRecoverableFailure if finding triples fails" in new TestCase {
 
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
@@ -135,7 +133,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(commit, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception)))
 
-      expectEventMarkedFailed(commit.compoundEventId, NonRecoverableFailure, exception)
+      expectEventMarkedAsNonRecoverableFailure(commit.compoundEventId, exception)
 
       eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
@@ -143,7 +141,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       logSummary(commitEvents, uploaded = 0, failed = 1)
     }
 
-    s"succeed and mark event with $RecoverableFailure if finding triples fails with $GenerationRecoverableError" in new TestCase {
+    s"succeed and mark event with RecoverableFailure if finding triples fails with $GenerationRecoverableError" in new TestCase {
 
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
@@ -157,7 +155,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(commit, maybeAccessToken)
         .returning(leftT[Try, JsonLDTriples](exception))
 
-      expectEventMarkedFailed(commit.compoundEventId, RecoverableFailure, exception)
+      expectEventMarkedAsRecoverableFailure(commit.compoundEventId, exception)
 
       eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
@@ -165,7 +163,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       logSummary(commitEvents, uploaded = 0, failed = 1)
     }
 
-    s"succeed and mark event with $RecoverableFailure if curating triples fails with $CurationRecoverableError" in new TestCase {
+    s"succeed and mark event with RecoverableFailure if curating triples fails with $CurationRecoverableError" in new TestCase {
 
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
@@ -185,7 +183,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(commit, rawTriples, maybeAccessToken)
         .returning(leftT[Try, CuratedTriples](exception))
 
-      expectEventMarkedFailed(commit.compoundEventId, RecoverableFailure, exception)
+      expectEventMarkedAsRecoverableFailure(commit.compoundEventId, exception)
 
       eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
@@ -193,7 +191,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       logSummary(commitEvents, uploaded = 0, failed = 1)
     }
 
-    s"succeed and mark event with $NonRecoverableFailure if curating triples fails" in new TestCase {
+    "succeed and mark event with NonRecoverableFailure if curating triples fails" in new TestCase {
 
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
@@ -213,7 +211,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(commit, rawTriples, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, CuratedTriples](context.raiseError(exception)))
 
-      expectEventMarkedFailed(commit.compoundEventId, NonRecoverableFailure, exception)
+      expectEventMarkedAsNonRecoverableFailure(commit.compoundEventId, exception)
 
       eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
@@ -221,7 +219,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       logSummary(commitEvents, uploaded = 0, failed = 1)
     }
 
-    s"succeed and mark event with $RecoverableFailure " +
+    "succeed and mark event with RecoverableFailure " +
       s"if uploading triples to the dataset fails with $DeliveryFailure for at least one event" in new TestCase {
 
       val commitEvents              = commitsLists(size = Gen.const(2)).generateOne
@@ -254,7 +252,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(commit2, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception2)))
 
-      expectEventMarkedFailed(commit1.compoundEventId, RecoverableFailure, uploadingError)
+      expectEventMarkedAsRecoverableFailure(commit1.compoundEventId, uploadingError)
 
       eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
@@ -262,7 +260,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       logSummary(commitEvents, uploaded = 0, failed = 2)
     }
 
-    s"succeed and mark event with $NonRecoverableFailure " +
+    "succeed and mark event with NonRecoverableFailure " +
       s"if uploading triples to the store fails with either $InvalidTriplesFailure or $InvalidUpdatesFailure for at least one event" in new TestCase {
 
       (InvalidTriplesFailure("error") +: InvalidUpdatesFailure("error") +: Nil) foreach { failure =>
@@ -295,7 +293,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
           .expects(commit2, maybeAccessToken)
           .returning(EitherT.liftF[Try, ProcessingRecoverableError, JsonLDTriples](context.raiseError(exception2)))
 
-        expectEventMarkedFailed(commit1.compoundEventId, NonRecoverableFailure, failure)
+        expectEventMarkedAsNonRecoverableFailure(commit1.compoundEventId, failure)
 
         eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
@@ -305,7 +303,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       }
     }
 
-    s"succeed and log an error if marking event as $TriplesStore fails" in new TestCase {
+    "succeed and log an error if marking event as TriplesStore fails" in new TestCase {
 
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
@@ -323,11 +321,11 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
-      logError(commitEvents.head, exception, s"failed to mark as $TriplesStore in the Event Log")
+      logError(commitEvents.head, exception, "failed to mark as TriplesStore in the Event Log")
       logSummary(commitEvents, uploaded = 1, failed = 0)
     }
 
-    s"mark event as $New and log an error if finding an access token fails" in new TestCase {
+    "mark event as New and log an error if finding an access token fails" in new TestCase {
 
       val commitEvents = commitsLists(size = Gen.const(1)).generateOne
 
@@ -397,7 +395,6 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
     val triplesCurator        = mock[TryTriplesCurator]
     val uploader              = mock[TryUploader]
     val eventStatusUpdater    = mock[EventStatusUpdater[Try]]
-    val eventLogMarkFailed    = mock[EventLogMarkFailed[Try]]
     val logger                = TestLogger[Try]()
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger, Option(eventsProcessingTimes))
     val eventProcessor = new CommitEventProcessor(
@@ -406,7 +403,6 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
       triplesCurator,
       uploader,
       eventStatusUpdater,
-      eventLogMarkFailed,
       logger,
       executionTimeRecorder
     )
@@ -444,10 +440,16 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
         .expects(commitEventId)
         .returning(context.unit)
 
-    def expectEventMarkedFailed(commitEventId: CompoundEventId, status: FailureStatus, exception: Throwable) =
-      (eventLogMarkFailed
-        .markEventFailed(_: CompoundEventId, _: FailureStatus, _: Option[EventMessage]))
-        .expects(commitEventId, status, EventMessage(exception))
+    def expectEventMarkedAsRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
+      (eventStatusUpdater
+        .markEventFailedRecoverably(_: CompoundEventId, _: Throwable))
+        .expects(commitEventId, exception)
+        .returning(context.unit)
+
+    def expectEventMarkedAsNonRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
+      (eventStatusUpdater
+        .markEventFailedNonRecoverably(_: CompoundEventId, _: Throwable))
+        .expects(commitEventId, exception)
         .returning(context.unit)
 
     def logSummary(commits: NonEmptyList[CommitEvent], uploaded: Int, failed: Int): Assertion =

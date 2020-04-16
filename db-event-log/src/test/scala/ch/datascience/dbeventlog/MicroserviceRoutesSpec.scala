@@ -23,7 +23,7 @@ import cats.implicits._
 import ch.datascience.dbeventlog.creation.{EventCreationEndpoint, EventPersister}
 import ch.datascience.dbeventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import ch.datascience.dbeventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import ch.datascience.dbeventlog.statuschange.TestStatusChangeEndpoint
+import ch.datascience.dbeventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import ch.datascience.dbeventlog.subscriptions.{Subscriptions, SubscriptionsEndpoint}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
@@ -165,4 +165,6 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
   class TestSubscriptionEndpoint(subscriptions: Subscriptions[IO], logger: Logger[IO])
       extends SubscriptionsEndpoint[IO](subscriptions, logger)
+  class TestStatusChangeEndpoint(updateCommandsRunner: StatusUpdatesRunner[IO], logger: Logger[IO])
+      extends StatusChangeEndpoint[IO](updateCommandsRunner, logger)
 }

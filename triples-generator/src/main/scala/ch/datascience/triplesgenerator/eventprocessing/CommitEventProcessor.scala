@@ -23,9 +23,7 @@ import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.commands._
-import ch.datascience.dbeventlog.{EventLogDB, EventMessage}
+import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
@@ -55,7 +53,6 @@ private class CommitEventProcessor[Interpretation[_]](
     triplesCurator:        TriplesCurator[Interpretation],
     uploader:              Uploader[Interpretation],
     eventStatusUpdater:    EventStatusUpdater[Interpretation],
-    eventLogMarkFailed:    EventLogMarkFailed[Interpretation],
     logger:                Logger[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable])
@@ -65,7 +62,6 @@ private class CommitEventProcessor[Interpretation[_]](
   import IOAccessTokenFinder._
   import UploadingResult._
   import accessTokenFinder._
-  import eventLogMarkFailed._
   import eventStatusUpdater._
   import executionTimeRecorder._
   import triplesCurator._
@@ -150,15 +146,14 @@ private class CommitEventProcessor[Interpretation[_]](
 
   private def markEventAsRecoverable(maybeUploadingError: Option[UploadingResult]) =
     maybeUploadingError match {
-      case Some(RecoverableError(commit, exception)) =>
-        markEventFailed(commit.compoundEventId, RecoverableFailure, EventMessage(exception))
-      case _ => ME.unit
+      case Some(RecoverableError(commit, exception)) => markEventFailedRecoverably(commit.compoundEventId, exception)
+      case _                                         => ME.unit
     }
 
   private def markEventAsNonRecoverable(maybeUploadingError: Option[UploadingResult]) =
     maybeUploadingError match {
       case Some(NonRecoverableError(commit, exception)) =>
-        markEventFailed(commit.compoundEventId, NonRecoverableFailure, EventMessage(exception))
+        markEventFailedNonRecoverably(commit.compoundEventId, exception)
       case _ => ME.unit
     }
 
@@ -167,7 +162,7 @@ private class CommitEventProcessor[Interpretation[_]](
   ): PartialFunction[Throwable, Interpretation[NonEmptyList[UploadingResult]]] = {
     case NonFatal(exception) =>
       logger.error(exception)(
-        s"${logMessageCommon(uploadingResults.head.commit)} failed to mark as $TriplesStore in the Event Log"
+        s"${logMessageCommon(uploadingResults.head.commit)} failed to mark as TriplesStore in the Event Log"
       )
       uploadingResults.pure[Interpretation]
   }
@@ -248,7 +243,6 @@ private object IOCommitEventProcessor {
       triplesCurator,
       uploader,
       eventStatusUpdater,
-      new IOEventLogMarkFailed(transactor),
       logger,
       executionTimeRecorder
     )

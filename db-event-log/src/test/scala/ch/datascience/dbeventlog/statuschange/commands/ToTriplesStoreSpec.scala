@@ -23,7 +23,7 @@ import java.time.Instant
 import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, executionDates}
 import ch.datascience.dbeventlog.EventStatus.{Processing, TriplesStore}
 import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
-import ch.datascience.dbeventlog.statuschange.UpdateCommandsRunner
+import ch.datascience.dbeventlog.statuschange.StatusUpdatesRunnerImpl
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
@@ -103,7 +103,7 @@ class ToTriplesStoreSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
     val eventId        = compoundEventIds.generateOne
     val eventBatchDate = batchDates.generateOne
 
-    val commandRunner = new UpdateCommandsRunner(transactor)
+    val commandRunner = new StatusUpdatesRunnerImpl(transactor)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

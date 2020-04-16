@@ -22,10 +22,9 @@ import cats.effect.IO
 import cats.implicits._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
+import ch.datascience.dbeventlog.DbEventLogGenerators.eventMessages
 import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.statuschange.commands.{ChangeStatusCommand, ToNew, ToTriplesStore, UpdateResult}
+import ch.datascience.dbeventlog.statuschange.commands._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
@@ -49,9 +48,11 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
   "changeStatus" should {
 
     val scenarios = Table(
-      "status"     -> "command",
-      New          -> ToTriplesStore(compoundEventIds.generateOne),
-      TriplesStore -> ToNew(compoundEventIds.generateOne)
+      "status"              -> "command",
+      New                   -> ToTriplesStore(compoundEventIds.generateOne),
+      TriplesStore          -> ToNew(compoundEventIds.generateOne),
+      RecoverableFailure    -> ToRecoverableFailure(compoundEventIds.generateOne, eventMessages.generateOption),
+      NonRecoverableFailure -> ToNonRecoverableFailure(compoundEventIds.generateOne, eventMessages.generateOption)
     )
     forAll(scenarios) { (status, command) =>
       "decode payload from the body, " +
@@ -149,6 +150,25 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
       logger.expectNoLogs()
     }
 
+    s"return $BadRequest for unsupported status" in new TestCase {
+
+      val eventId = compoundEventIds.generateOne
+
+      val payload = json"""{"status": "PROCESSING"}"""
+      val request = Request(
+        Method.PATCH,
+        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+      ).withEntity(payload)
+
+      val response = changeStatus(eventId, request).unsafeRunSync()
+
+      response.status                        shouldBe BadRequest
+      response.contentType                   shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage("Transition to 'PROCESSING' status unsupported")
+
+      logger.expectNoLogs()
+    }
+
     s"return $InternalServerError when updating event status fails" in new TestCase {
 
       val eventId = compoundEventIds.generateOne
@@ -175,20 +195,23 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
   }
 
   private trait TestCase {
-    val commandsRunner = mock[TestUpdateCommandsRunner]
+    val commandsRunner = mock[StatusUpdatesRunner[IO]]
     val logger         = TestLogger[IO]()
     val changeStatus   = new StatusChangeEndpoint[IO](commandsRunner, logger).changeStatus _
   }
 
   implicit val commandEncoder: Encoder[ChangeStatusCommand] = Encoder.instance[ChangeStatusCommand] {
-    case command @ ToNew(_, _)          => json"""{
+    case command @ ToNew(_, _)                                 => json"""{
       "status": ${command.status.value}
     }"""
-    case command @ ToTriplesStore(_, _) => json"""{
+    case command @ ToTriplesStore(_, _)                        => json"""{
       "status": ${command.status.value}
     }"""
+    case command @ ToRecoverableFailure(_, maybeMessage, _)    => json"""{
+      "status": ${command.status.value}
+    }""" deepMerge maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
+    case command @ ToNonRecoverableFailure(_, maybeMessage, _) => json"""{
+      "status": ${command.status.value}
+    }""" deepMerge maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
   }
-
-  private class TestUpdateCommandsRunner(transactor: DbTransactor[IO, EventLogDB])
-      extends UpdateCommandsRunner[IO](transactor)
 }

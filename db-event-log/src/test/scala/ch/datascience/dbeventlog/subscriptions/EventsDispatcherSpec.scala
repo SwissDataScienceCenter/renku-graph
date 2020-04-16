@@ -18,11 +18,12 @@
 
 package ch.datascience.dbeventlog.subscriptions
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{IO, Timer}
 import cats.implicits._
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog.EventStatus.NonRecoverableFailure
-import ch.datascience.dbeventlog.commands.EventLogMarkFailed
+import ch.datascience.dbeventlog.statuschange.StatusUpdatesRunner
+import ch.datascience.dbeventlog.statuschange.commands.{ToNonRecoverableFailure, UpdateResult}
 import ch.datascience.dbeventlog.subscriptions.EventsSender.SendingResult
 import ch.datascience.dbeventlog.subscriptions.EventsSender.SendingResult._
 import ch.datascience.dbeventlog.{Event, EventMessage}
@@ -40,7 +41,6 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Millis, Seconds, Span}
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -140,9 +140,10 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
         .expects(capture(usedUrls), event.compoundEventId, event.body)
         .returning(exception.raiseError[IO, SendingResult])
 
-      (eventsStatusUpdater.markEventFailed _)
-        .expects(event.compoundEventId, NonRecoverableFailure, EventMessage(exception))
-        .returning(IO.unit)
+      val statusUpdateCommand = ToNonRecoverableFailure(event.compoundEventId, EventMessage(exception))
+      (statusUpdatesRunner.run _)
+        .expects(statusUpdateCommand)
+        .returning(UpdateResult.Updated.pure[IO])
 
       val nextEvent = givenEvent(got = Delivered)
 
@@ -289,14 +290,15 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
         .expects(capture(usedUrls), event.compoundEventId, event.body)
         .returning(exception.raiseError[IO, SendingResult])
 
-      val markEventException = exceptions.generateOne
-      (eventsStatusUpdater.markEventFailed _)
-        .expects(event.compoundEventId, NonRecoverableFailure, EventMessage(exception))
-        .returning(markEventException.raiseError[IO, Unit])
+      val statusUpdateCommand        = ToNonRecoverableFailure(event.compoundEventId, EventMessage(exception))
+      val eventStatusChangeException = exceptions.generateOne
+      (statusUpdatesRunner.run _)
+        .expects(statusUpdateCommand)
+        .returning(eventStatusChangeException.raiseError[IO, UpdateResult])
         .twice()
-      (eventsStatusUpdater.markEventFailed _)
-        .expects(event.compoundEventId, NonRecoverableFailure, EventMessage(exception))
-        .returning(IO.unit)
+      (statusUpdatesRunner.run _)
+        .expects(statusUpdateCommand)
+        .returning(UpdateResult.Updated.pure[IO])
 
       givenNoMoreEvents()
 
@@ -308,8 +310,8 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
 
       eventually {
         logger.loggedOnly(
-          Error(s"Marking event as $NonRecoverableFailure failed", markEventException),
-          Error(s"Marking event as $NonRecoverableFailure failed", markEventException),
+          Error(s"Marking event as $NonRecoverableFailure failed", eventStatusChangeException),
+          Error(s"Marking event as $NonRecoverableFailure failed", eventStatusChangeException),
           Error(s"Event ${event.compoundEventId}, url = ${usedUrls.value} -> $NonRecoverableFailure", exception)
         )
       }
@@ -326,13 +328,13 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
 
     val subscriptions       = mock[TestIOSubscriptions]
     val eventsFinder        = mock[EventFetcher[IO]]
-    val eventsStatusUpdater = mock[EventLogMarkFailed[IO]]
+    val statusUpdatesRunner = mock[StatusUpdatesRunner[IO]]
     val eventsSender        = mock[EventsSender[IO]]
     val logger              = TestLogger[IO]()
     val dispatcher = new EventsDispatcher(
       subscriptions,
       eventsFinder,
-      eventsStatusUpdater,
+      statusUpdatesRunner,
       eventsSender,
       logger,
       noSubscriptionSleep = 500 millis,

@@ -20,22 +20,23 @@ package ch.datascience.dbeventlog.statuschange.commands
 
 import java.time.Instant
 
-import ch.datascience.dbeventlog.EventStatus
-import ch.datascience.dbeventlog.EventStatus.{Processing, TriplesStore}
+import ch.datascience.dbeventlog.EventStatus.{NonRecoverableFailure, Processing}
+import ch.datascience.dbeventlog.{EventMessage, EventStatus}
 import ch.datascience.graph.model.events.CompoundEventId
 import doobie.implicits._
-import doobie.util.fragment
+import doobie.util.fragment.Fragment
 
-final case class ToTriplesStore(
-    eventId: CompoundEventId,
-    now:     () => Instant = () => Instant.now
+final case class ToNonRecoverableFailure(
+    eventId:      CompoundEventId,
+    maybeMessage: Option[EventMessage],
+    now:          () => Instant = () => Instant.now
 ) extends ChangeStatusCommand {
 
-  override val status: EventStatus = TriplesStore
+  override val status: EventStatus = NonRecoverableFailure
 
-  override def query: fragment.Fragment =
+  override def query: Fragment =
     sql"""|update event_log 
-          |set status = $status, execution_date = ${now()}
+          |set status = $status, execution_date = ${now()}, message = $maybeMessage
           |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}
           |""".stripMargin
 }

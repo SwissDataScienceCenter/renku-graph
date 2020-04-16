@@ -120,6 +120,22 @@ There are different payloads required for different status types transitions:
 }
 ```
 **Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
+- `RECOVERABLE_FAILURE`
+```json
+{
+  "status": "RECOVERABLE_FAILURE",
+  "message": "error message"
+}
+```
+**Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
+- `NON_RECOVERABLE_FAILURE`
+```json
+{
+  "status": "NON_RECOVERABLE_FAILURE",
+  "message": "error message"
+}
+```
+**Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
 
 #### GET /events/projects/:id/status
 

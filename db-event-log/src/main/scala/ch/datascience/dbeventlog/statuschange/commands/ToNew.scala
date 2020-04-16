@@ -25,9 +25,8 @@ import ch.datascience.dbeventlog.EventStatus.{New, Processing}
 import ch.datascience.graph.model.events.CompoundEventId
 import doobie.implicits._
 import doobie.util.fragment
-import eu.timepit.refined.api.Refined
 
-private[statuschange] final case class ToNew(
+final case class ToNew(
     eventId: CompoundEventId,
     now:     () => Instant = () => Instant.now
 ) extends ChangeStatusCommand {
@@ -39,10 +38,4 @@ private[statuschange] final case class ToNew(
           |set status = $status, execution_date = ${now()}
           |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}
           |""".stripMargin
-
-  override def mapResult: Int => UpdateResult = {
-    case 0 => UpdateResult.Conflict
-    case 1 => UpdateResult.Updated
-    case _ => UpdateResult.Failure(Refined.unsafeApply(s"An attempt to set status $status on $eventId"))
-  }
 }

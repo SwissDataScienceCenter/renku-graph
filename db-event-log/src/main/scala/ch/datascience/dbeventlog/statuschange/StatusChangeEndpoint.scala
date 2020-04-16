@@ -22,8 +22,8 @@ import cats.MonadError
 import cats.effect.{ContextShift, Effect}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
 import ch.datascience.dbeventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
+import ch.datascience.dbeventlog.{EventLogDB, EventMessage}
 import ch.datascience.graph.model.events.CompoundEventId
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
@@ -32,16 +32,16 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](
-    updateCommandsRunner: UpdateCommandsRunner[Interpretation],
-    logger:               Logger[Interpretation]
-)(implicit ME:            MonadError[Interpretation, Throwable])
+    statusUpdatesRunner: StatusUpdatesRunner[Interpretation],
+    logger:              Logger[Interpretation]
+)(implicit ME:           MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
   import ch.datascience.controllers.InfoMessage._
   import ch.datascience.controllers.{ErrorMessage, InfoMessage}
   import org.http4s.circe._
   import org.http4s.{EntityDecoder, Request, Response}
-  import updateCommandsRunner.run
+  import statusUpdatesRunner.run
 
   def changeStatus(eventId: CompoundEventId,
                    request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
@@ -85,11 +85,14 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
     implicit val commandDecoder: Decoder[ChangeStatusCommand] = (cursor: HCursor) =>
       for {
-        status <- cursor.downField("status").as[EventStatus]
+        status       <- cursor.downField("status").as[EventStatus]
+        maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
       } yield status match {
-        case TriplesStore => ToTriplesStore(eventId)
-        case New          => ToNew(eventId)
-        case _            => throw new Exception("boooom!")
+        case TriplesStore          => ToTriplesStore(eventId)
+        case New                   => ToNew(eventId)
+        case RecoverableFailure    => ToRecoverableFailure(eventId, maybeMessage)
+        case NonRecoverableFailure => ToNonRecoverableFailure(eventId, maybeMessage)
+        case other                 => throw new Exception(s"Transition to '$other' status unsupported")
       }
 
     jsonOf[Interpretation, ChangeStatusCommand]
@@ -104,6 +107,6 @@ object IOStatusChangeEndpoint {
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
-      updateCommandsRunner <- IOUpdateCommandsRunner(transactor)
-    } yield new StatusChangeEndpoint(updateCommandsRunner, logger)
+      statusUpdatesRunner <- IOUpdateCommandsRunner(transactor)
+    } yield new StatusChangeEndpoint(statusUpdatesRunner, logger)
 }

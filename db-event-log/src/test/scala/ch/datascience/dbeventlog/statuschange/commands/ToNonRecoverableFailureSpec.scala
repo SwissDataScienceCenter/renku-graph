@@ -20,32 +20,27 @@ package ch.datascience.dbeventlog.statuschange.commands
 
 import java.time.Instant
 
-import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, executionDates}
-import ch.datascience.dbeventlog.EventStatus.{New, Processing}
+import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
+import ch.datascience.dbeventlog.EventStatus.{NonRecoverableFailure, Processing}
 import ch.datascience.dbeventlog.commands.InMemoryEventLogDbSpec
 import ch.datascience.dbeventlog.statuschange.StatusUpdatesRunnerImpl
-import ch.datascience.dbeventlog.{EventStatus, ExecutionDate}
+import ch.datascience.dbeventlog.{EventMessage, EventStatus, ExecutionDate}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
+import ch.datascience.graph.model.events.CompoundEventId
+import doobie.implicits._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "command" should {
 
-    s"set status $New on the event with the given id and $Processing status " +
+    s"set status $NonRecoverableFailure on the event with the given id and $Processing status " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
-      storeEvent(
-        eventId,
-        EventStatus.Processing,
-        executionDates.generateOne,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        batchDate = eventBatchDate
-      )
       storeEvent(
         compoundEventIds.generateOne.copy(id = eventId.id),
         EventStatus.Processing,
@@ -54,22 +49,24 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
         eventBodies.generateOne,
         batchDate = eventBatchDate
       )
+      val executionDate = executionDates.generateOne
       storeEvent(
-        compoundEventIds.generateOne,
+        eventId,
         EventStatus.Processing,
-        executionDates.generateOne,
+        executionDate,
         eventDates.generateOne,
         eventBodies.generateOne,
         batchDate = eventBatchDate
       )
 
-      findEvents(status = New) shouldBe List.empty
+      findEvent(eventId) shouldBe Some((executionDate, Processing, None))
 
-      val command = ToNew(eventId, currentTime)
+      val maybeMessage = Gen.option(eventMessages).generateOne
+      val command      = ToNonRecoverableFailure(eventId, maybeMessage, currentTime)
 
       (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-      findEvents(status = New) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+      findEvent(eventId) shouldBe Some((ExecutionDate(now), NonRecoverableFailure, maybeMessage))
     }
 
     EventStatus.all.filterNot(_ == Processing) foreach { eventStatus =>
@@ -84,16 +81,14 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
                    eventBodies.generateOne,
                    batchDate = eventBatchDate)
 
-        findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
+        findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-        val command = ToNew(eventId, currentTime)
+        val maybeMessage = Gen.option(eventMessages).generateOne
+        val command      = ToNonRecoverableFailure(eventId, maybeMessage, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
-        val expectedEvents =
-          if (eventStatus != New) List.empty
-          else List((eventId, executionDate, eventBatchDate))
-        findEvents(status = New) shouldBe expectedEvents
+        findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
       }
     }
   }
@@ -108,4 +103,14 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
+
+  private def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
+    execute {
+      sql"""select execution_date, status, message
+           |from event_log 
+           |where event_id = ${eventId.id} and project_id = ${eventId.projectId}
+         """.stripMargin
+        .query[(ExecutionDate, EventStatus, Option[EventMessage])]
+        .option
+    }
 }

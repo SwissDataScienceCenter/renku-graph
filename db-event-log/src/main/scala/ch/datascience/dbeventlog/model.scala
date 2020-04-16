@@ -59,6 +59,8 @@ object ExecutionDate extends TinyTypeFactory[ExecutionDate](new ExecutionDate(_)
 final class EventMessage private (val value: String) extends AnyVal with StringTinyType
 object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) with NonBlank {
 
+  implicit val decoder: Decoder[EventMessage] = stringDecoder(EventMessage)
+
   import java.io.{PrintWriter, StringWriter}
 
   def apply(exception: Throwable): Option[EventMessage] = {

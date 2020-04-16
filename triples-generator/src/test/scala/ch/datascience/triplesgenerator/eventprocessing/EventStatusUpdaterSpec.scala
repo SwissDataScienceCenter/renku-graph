@@ -18,7 +18,10 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
+import java.io.{PrintWriter, StringWriter}
+
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.generators.Generators.exceptions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
@@ -92,6 +95,68 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
     }
   }
 
+  "markEventFailedRecoverably" should {
+
+    Set(Ok, Conflict) foreach { status =>
+      s"succeed if remote responds with $status" in new TestCase {
+        val exception = exceptions.generateOne
+        stubFor {
+          patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+            .withRequestBody(
+              equalToJson(json"""{"status": "RECOVERABLE_FAILURE", "message": ${asString(exception)}}""".spaces2)
+            )
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        updater.markEventFailedRecoverably(eventId, exception).unsafeRunSync() shouldBe ((): Unit)
+      }
+    }
+
+    s"fail if remote responds with status different than $Ok" in new TestCase {
+      val status = BadRequest
+
+      stubFor {
+        patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+          .willReturn(aResponse().withStatus(status.code))
+      }
+
+      intercept[Exception] {
+        updater.markEventFailedRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status returned $status; body: "
+    }
+  }
+
+  "markEventFailedNonRecoverably" should {
+
+    Set(Ok, Conflict) foreach { status =>
+      s"succeed if remote responds with $status" in new TestCase {
+        val exception = exceptions.generateOne
+        stubFor {
+          patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+            .withRequestBody(
+              equalToJson(json"""{"status": "NON_RECOVERABLE_FAILURE", "message": ${asString(exception)}}""".spaces2)
+            )
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        updater.markEventFailedNonRecoverably(eventId, exception).unsafeRunSync() shouldBe ((): Unit)
+      }
+    }
+
+    s"fail if remote responds with status different than $Ok" in new TestCase {
+      val status = BadRequest
+
+      stubFor {
+        patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+          .willReturn(aResponse().withStatus(status.code))
+      }
+
+      intercept[Exception] {
+        updater.markEventFailedNonRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status returned $status; body: "
+    }
+  }
+
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
@@ -100,5 +165,12 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
 
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
     val updater     = new IOEventStatusUpdater(eventLogUrl, TestLogger())
+  }
+
+  private def asString(exception: Exception): String = {
+    val exceptionAsString = new StringWriter
+    exception.printStackTrace(new PrintWriter(exceptionAsString))
+    exceptionAsString.flush()
+    exceptionAsString.toString.trim
   }
 }

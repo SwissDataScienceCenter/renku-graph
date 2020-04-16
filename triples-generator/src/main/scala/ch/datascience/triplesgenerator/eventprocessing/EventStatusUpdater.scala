@@ -18,6 +18,8 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
+import java.io.{PrintWriter, StringWriter}
+
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
@@ -25,15 +27,16 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.client.IORestClient
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Json
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait EventStatusUpdater[Interpretation[_]] {
-  def markEventNew(eventId:  CompoundEventId): Interpretation[Unit]
-  def markEventDone(eventId: CompoundEventId): Interpretation[Unit]
+  def markEventNew(eventId:                  CompoundEventId): Interpretation[Unit]
+  def markEventDone(eventId:                 CompoundEventId): Interpretation[Unit]
+  def markEventFailedRecoverably(eventId:    CompoundEventId, exception: Throwable): Interpretation[Unit]
+  def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): Interpretation[Unit]
 }
 
 private class IOEventStatusUpdater(
@@ -47,7 +50,9 @@ private class IOEventStatusUpdater(
     with EventStatusUpdater[IO] {
 
   import cats.effect._
+  import io.circe._
   import io.circe.literal._
+  import io.circe.syntax._
   import org.http4s.Method.PATCH
   import org.http4s.Status.{Conflict, Ok}
   import org.http4s.circe._
@@ -65,6 +70,20 @@ private class IOEventStatusUpdater(
     responseMapping = okConflictAsSuccess
   )
 
+  override def markEventFailedRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
+    sendStatusChange(
+      eventId,
+      payload         = json"""{"status": "RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      responseMapping = okConflictAsSuccess
+    )
+
+  override def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
+    sendStatusChange(
+      eventId,
+      payload         = json"""{"status": "NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      responseMapping = okConflictAsSuccess
+    )
+
   private def sendStatusChange(
       eventId:         CompoundEventId,
       payload:         Json,
@@ -78,6 +97,17 @@ private class IOEventStatusUpdater(
   private lazy val okConflictAsSuccess: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
     case (Ok, _, _)       => IO.unit
     case (Conflict, _, _) => IO.unit
+  }
+
+  private implicit val exceptionEncoder: Encoder[Throwable] = Encoder.instance[Throwable] { exception =>
+    val exceptionAsString = new StringWriter
+    exception.printStackTrace(new PrintWriter(exceptionAsString))
+    exceptionAsString.flush()
+
+    exceptionAsString.toString.trim match {
+      case ""      => Json.obj()
+      case message => json"""{"message": $message}"""
+    }
   }
 }
 

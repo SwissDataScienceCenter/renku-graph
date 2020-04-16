@@ -21,10 +21,10 @@ package ch.datascience.dbeventlog.subscriptions
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.{EventLogDB, EventMessage}
-import ch.datascience.dbeventlog.EventStatus.{FailureStatus, NonRecoverableFailure}
-import ch.datascience.dbeventlog.commands.{EventLogMarkFailed, IOEventLogMarkFailed}
+import ch.datascience.dbeventlog.statuschange.commands.{ChangeStatusCommand, ToNonRecoverableFailure, UpdateResult}
+import ch.datascience.dbeventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
 import ch.datascience.dbeventlog.subscriptions.EventsSender.SendingResult
+import ch.datascience.dbeventlog.{EventLogDB, EventMessage}
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import io.chrisdavenport.log4cats.Logger
 
@@ -37,7 +37,7 @@ import scala.util.control.NonFatal
 class EventsDispatcher(
     subscriptions:       Subscriptions[IO],
     eventsFinder:        EventFetcher[IO],
-    eventsStatusUpdater: EventLogMarkFailed[IO],
+    statusUpdatesRunner: StatusUpdatesRunner[IO],
     eventsSender:        EventsSender[IO],
     logger:              Logger[IO],
     noSubscriptionSleep: FiniteDuration,
@@ -48,7 +48,6 @@ class EventsDispatcher(
   import SendingResult._
   import eventsFinder._
   import eventsSender._
-  import eventsStatusUpdater._
 
   def run: IO[Unit] =
     subscriptions.getAll flatMap {
@@ -89,11 +88,11 @@ class EventsDispatcher(
 
   private def nonRecoverableError(url: SubscriptionUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
+      val markEventFailed = ToNonRecoverableFailure(id, EventMessage(exception))
       for {
-        result <- markEventFailed(id, NonRecoverableFailure, EventMessage(exception))
-                   .recoverWith(retry(id, NonRecoverableFailure, EventMessage(exception)))
-        _ <- logger.error(exception)(s"Event $id, url = $url -> $NonRecoverableFailure")
-      } yield result
+        _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
+        _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
+      } yield ()
   }
 
   private def loggingError(message: String): PartialFunction[Throwable, IO[Unit]] = {
@@ -110,16 +109,14 @@ class EventsDispatcher(
       dispatch(urls, id, body)
   }
 
-  private def retry(id:           CompoundEventId,
-                    status:       FailureStatus,
-                    maybeMessage: Option[EventMessage]): PartialFunction[Throwable, IO[Unit]] = {
+  private def retry(command: ChangeStatusCommand): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) => {
       for {
-        _ <- logger.error(exception)(s"Marking event as $NonRecoverableFailure failed")
-        _ <- timer sleep onErrorSleep
-        _ <- markEventFailed(id, status, maybeMessage)
-      } yield ()
-    } recoverWith retry(id, status, maybeMessage)
+        _      <- logger.error(exception)(s"Marking event as ${command.status} failed")
+        _      <- timer sleep onErrorSleep
+        result <- statusUpdatesRunner run command
+      } yield result
+    } recoverWith retry(command)
   }
 }
 
@@ -136,11 +133,12 @@ object EventsDispatcher {
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[EventsDispatcher] =
     for {
-      eventsFinder <- IOEventLogFetch(transactor)
-      eventsSender <- IOEventsSender(logger)
+      eventsFinder        <- IOEventLogFetch(transactor)
+      eventsSender        <- IOEventsSender(logger)
+      updateCommandRunner <- IOUpdateCommandsRunner(transactor)
     } yield new EventsDispatcher(subscriptions,
                                  eventsFinder,
-                                 new IOEventLogMarkFailed(transactor),
+                                 updateCommandRunner,
                                  eventsSender,
                                  logger,
                                  noSubscriptionSleep = NoSubscriptionSleep,
