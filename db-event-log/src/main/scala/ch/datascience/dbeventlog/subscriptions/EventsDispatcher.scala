@@ -26,6 +26,8 @@ import ch.datascience.dbeventlog.statuschange.{IOUpdateCommandsRunner, StatusUpd
 import ch.datascience.dbeventlog.subscriptions.EventsSender.SendingResult
 import ch.datascience.dbeventlog.{EventLogDB, EventMessage}
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -39,6 +41,7 @@ class EventsDispatcher(
     eventsFinder:        EventFetcher[IO],
     statusUpdatesRunner: StatusUpdatesRunner[IO],
     eventsSender:        EventsSender[IO],
+    waitingEventsGauge:  LabeledGauge[IO, projects.Path],
     logger:              Logger[IO],
     noSubscriptionSleep: FiniteDuration,
     noEventSleep:        FiniteDuration,
@@ -88,7 +91,7 @@ class EventsDispatcher(
 
   private def nonRecoverableError(url: SubscriptionUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
-      val markEventFailed = ToNonRecoverableFailure(id, EventMessage(exception))
+      val markEventFailed = ToNonRecoverableFailure[IO](id, EventMessage(exception), waitingEventsGauge)
       for {
         _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
         _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
@@ -109,7 +112,7 @@ class EventsDispatcher(
       dispatch(urls, id, body)
   }
 
-  private def retry(command: ChangeStatusCommand): PartialFunction[Throwable, IO[UpdateResult]] = {
+  private def retry(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) => {
       for {
         _      <- logger.error(exception)(s"Marking event as ${command.status} failed")
@@ -128,18 +131,20 @@ object EventsDispatcher {
   def apply(
       transactor:              DbTransactor[IO, EventLogDB],
       subscriptions:           Subscriptions[IO],
+      waitingEventsGauge:      LabeledGauge[IO, projects.Path],
       logger:                  Logger[IO]
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[EventsDispatcher] =
     for {
-      eventsFinder        <- IOEventLogFetch(transactor)
+      eventsFinder        <- IOEventLogFetch(transactor, waitingEventsGauge)
       eventsSender        <- IOEventsSender(logger)
       updateCommandRunner <- IOUpdateCommandsRunner(transactor)
     } yield new EventsDispatcher(subscriptions,
                                  eventsFinder,
                                  updateCommandRunner,
                                  eventsSender,
+                                 waitingEventsGauge,
                                  logger,
                                  noSubscriptionSleep = NoSubscriptionSleep,
                                  noEventSleep        = NoEventSleep,

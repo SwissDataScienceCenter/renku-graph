@@ -53,9 +53,9 @@ class StatsFinderSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaChe
     }
   }
 
-  "waitingEvents" should {
+  "countEvents" should {
 
-    "return info about number of events waiting in the queue split by projects" in {
+    "return info about number of events with the given status in the queue grouped by projects" in {
       forAll(nonEmptyList(projectPaths, minElements = 2, maxElements = 8)) { projectPaths =>
         prepareDbForTest()
 
@@ -63,10 +63,16 @@ class StatsFinderSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaChe
 
         events foreach store
 
-        stats.waitingEvents.unsafeRunSync() shouldBe events
+        stats.countEvents(Set(New, RecoverableFailure)).unsafeRunSync() shouldBe events
           .groupBy(_._1)
           .map {
-            case (projectPath, sameProjectGroup) => projectPath -> sameProjectGroup.count(_._3 == New)
+            case (projectPath, sameProjectGroup) =>
+              projectPath -> sameProjectGroup.count {
+                case (_, _, status) => Set(New, RecoverableFailure) contains status
+              }
+          }
+          .filter {
+            case (_, count) => count > 0
           }
       }
     }

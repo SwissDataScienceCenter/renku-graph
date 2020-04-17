@@ -28,9 +28,11 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.metrics.LabeledGauge
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -147,5 +149,7 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
     }"""
   }
 
-  class TestEventPersister(transactor: DbTransactor[IO, EventLogDB]) extends EventPersister(transactor)
+  class TestEventPersister(transactor:         DbTransactor[IO, EventLogDB],
+                           waitingEventsGauge: LabeledGauge[IO, projects.Path])
+      extends EventPersister(transactor, waitingEventsGauge)
 }

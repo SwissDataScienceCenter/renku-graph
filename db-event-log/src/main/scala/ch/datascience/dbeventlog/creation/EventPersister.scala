@@ -23,11 +23,14 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
+import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus.{New, Processing, RecoverableFailure}
 import ch.datascience.dbeventlog.TypesSerializers._
 import ch.datascience.dbeventlog.{Event, EventLogDB, EventStatus}
 import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
 import doobie.util.fragments.in
@@ -35,15 +38,19 @@ import doobie.util.fragments.in
 import scala.language.higherKinds
 
 class EventPersister[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    now:        () => Instant = () => Instant.now
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+    transactor:         DbTransactor[Interpretation, EventLogDB],
+    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                () => Instant = () => Instant.now
+)(implicit ME:          Bracket[Interpretation, Throwable]) {
 
   import EventPersister.Result
   import Result._
 
   def storeNewEvent(event: Event): Interpretation[Result] =
-    insertIfNotDuplicate(event).transact(transactor.get)
+    for {
+      result <- insertIfNotDuplicate(event).transact(transactor.get)
+      _      <- if (result == Created) waitingEventsGauge.increment(event.project.path) else ME.unit
+    } yield result
 
   private def insertIfNotDuplicate(event: Event) =
     checkIfInLog(event) flatMap {
@@ -103,6 +110,7 @@ object EventPersister {
 }
 
 class IOEventPersister(
-    transactor:          DbTransactor[IO, EventLogDB]
+    transactor:          DbTransactor[IO, EventLogDB],
+    waitingEventsGauge:  LabeledGauge[IO, projects.Path]
 )(implicit contextShift: ContextShift[IO])
-    extends EventPersister[IO](transactor)
+    extends EventPersister[IO](transactor, waitingEventsGauge)

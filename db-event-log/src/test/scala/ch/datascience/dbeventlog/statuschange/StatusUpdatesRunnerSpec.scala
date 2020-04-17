@@ -18,39 +18,55 @@
 
 package ch.datascience.dbeventlog.statuschange
 
+import cats.effect.IO
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, executionDates}
-import ch.datascience.dbeventlog.{EventStatus, InMemoryEventLogDbSpec}
 import ch.datascience.dbeventlog.EventStatus.{New, Processing}
 import ch.datascience.dbeventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
+import ch.datascience.dbeventlog.{EventLogDB, EventStatus, InMemoryEventLogDbSpec}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import eu.timepit.refined.auto._
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec {
+import scala.language.higherKinds
+
+class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "run" should {
 
-    "execute query from the given command " +
-      "and map the result using command's result mapping rules" in new TestCase {
+    "execute query from the given command, " +
+      "map the result using command's result mapping rules " +
+      "and update metrics gauges" in new TestCase {
 
-      store(eventId, New)
+      store(eventId, projectPath, New)
 
-      runner.run(TestCommand(eventId)).unsafeRunSync() shouldBe UpdateResult.Updated
+      (gauge.increment _).expects(projectPath).returning(IO.unit)
+
+      runner.run(TestCommand(eventId, projectPath, gauge)).unsafeRunSync() shouldBe UpdateResult.Updated
 
       findEvents(status = Processing).map(_._1) shouldBe List(eventId)
     }
   }
 
   private trait TestCase {
-    val eventId = compoundEventIds.generateOne
+    val eventId     = compoundEventIds.generateOne
+    val projectPath = projectPaths.generateOne
 
-    val runner = new StatusUpdatesRunnerImpl(transactor)
+    val gauge  = mock[LabeledGauge[IO, projects.Path]]
+    val runner = new StatusUpdatesRunnerImpl[IO](transactor)
   }
 
-  private case class TestCommand(eventId: CompoundEventId) extends ChangeStatusCommand {
+  private case class TestCommand(eventId:     CompoundEventId,
+                                 projectPath: projects.Path,
+                                 gauge:       LabeledGauge[IO, projects.Path])
+      extends ChangeStatusCommand[IO] {
     import doobie.implicits._
 
     override val status: EventStatus = Processing
@@ -66,8 +82,17 @@ class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec {
       case 1 => UpdateResult.Updated
       case _ => UpdateResult.Failure("error message")
     }
+
+    override def updateGauges(
+        updateResult:      UpdateResult
+    )(implicit transactor: DbTransactor[IO, EventLogDB]) = gauge increment projectPath
   }
 
-  private def store(eventId: CompoundEventId, status: EventStatus): Unit =
-    storeEvent(eventId, status, executionDates.generateOne, eventDates.generateOne, eventBodies.generateOne)
+  private def store(eventId: CompoundEventId, projectPath: projects.Path, status: EventStatus): Unit =
+    storeEvent(eventId,
+               status,
+               executionDates.generateOne,
+               eventDates.generateOne,
+               eventBodies.generateOne,
+               projectPath = projectPath)
 }

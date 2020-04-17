@@ -18,27 +18,27 @@
 
 package ch.datascience.dbeventlog.metrics
 
+import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.dbeventlog._
 import ch.datascience.graph.model.projects.Path
 import doobie.implicits._
+import doobie.util.fragments.in
 
 import scala.language.higherKinds
 
 trait StatsFinder[Interpretation[_]] {
-  def statuses:      Interpretation[Map[EventStatus, Long]]
-  def waitingEvents: Interpretation[Map[Path, Long]]
+  def statuses: Interpretation[Map[EventStatus, Long]]
+  def countEvents(statuses: Set[EventStatus]): Interpretation[Map[Path, Long]]
 }
 
-private class StatsFinderImpl[Interpretation[_]](
+class StatsFinderImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends StatsFinder[Interpretation] {
-
-  import TypesSerializers._
+    extends StatsFinder[Interpretation]
+    with TypesSerializers {
 
   override def statuses: Interpretation[Map[EventStatus, Long]] =
     sql"""select status, count(event_id) from event_log group by status;""".stripMargin
@@ -51,26 +51,30 @@ private class StatsFinderImpl[Interpretation[_]](
   private def addMissingStatues(stats: Map[EventStatus, Long]): Map[EventStatus, Long] =
     EventStatus.all.map(status => status -> stats.getOrElse(status, 0L)).toMap
 
-  override def waitingEvents: Interpretation[Map[Path, Long]] =
-    sql"""|select project_path, sum(events)
-          |from (
-          |  select project_path, count(event_id) as events 
-          |  from event_log 
-          |  where status = ${New: EventStatus} 
-          |  group by project_path
-          |  union
-          |  select distinct project_path, 0 as events
-          |  from event_log
-          |) counts
-          |group by project_path; 
-          |""".stripMargin
-      .query[(Path, Long)]
-      .to[List]
-      .transact(transactor.get)
-      .map(_.toMap)
+  // format: off
+  override def countEvents(statuses: Set[EventStatus]): Interpretation[Map[Path, Long]] =
+    NonEmptyList.fromList(statuses.toList) match {
+      case None =>               Map.empty[Path, Long].pure[Interpretation]
+      case Some(statusesList) => (fr"""
+    |select project_path, count(event_id)
+    |from event_log
+    |where """ ++ `status IN`(statusesList) ++ fr"""
+    |group by project_path
+    |""").stripMargin
+          .query[(Path, Long)]
+          .to[List]
+          .transact(transactor.get)
+          .map(_.toMap)
+          }
+  // format: on
+
+  private def `status IN`(statuses: NonEmptyList[EventStatus]) = in(fr"status", statuses)
 }
 
-private class IOStatsFinder(
-    transactor:          DbTransactor[IO, EventLogDB]
-)(implicit contextShift: ContextShift[IO])
-    extends StatsFinderImpl[IO](transactor)
+object IOStatsFinder {
+  def apply(
+      transactor:          DbTransactor[IO, EventLogDB]
+  )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
+    new StatsFinderImpl[IO](transactor)
+  }
+}

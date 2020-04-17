@@ -18,7 +18,8 @@
 
 package ch.datascience.dbeventlog.statuschange.commands
 
-import ch.datascience.dbeventlog.{EventStatus, TypesSerializers}
+import ch.datascience.db.DbTransactor
+import ch.datascience.dbeventlog.{EventLogDB, EventStatus, TypesSerializers}
 import ch.datascience.graph.model.events.CompoundEventId
 import doobie.util.fragment.Fragment
 import eu.timepit.refined.api.Refined
@@ -26,10 +27,13 @@ import eu.timepit.refined.collection.NonEmpty
 
 import scala.language.higherKinds
 
-trait ChangeStatusCommand extends Product with Serializable with TypesSerializers {
+trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable with TypesSerializers {
   def eventId: CompoundEventId
   def status:  EventStatus
   def query:   Fragment
+  def updateGauges(updateResult: UpdateResult)(
+      implicit transactor:       DbTransactor[Interpretation, EventLogDB]
+  ): Interpretation[Unit]
 
   def mapResult: Int => UpdateResult = {
     case 0 => UpdateResult.Conflict

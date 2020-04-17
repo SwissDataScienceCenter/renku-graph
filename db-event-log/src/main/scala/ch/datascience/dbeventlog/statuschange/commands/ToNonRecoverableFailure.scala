@@ -20,17 +20,27 @@ package ch.datascience.dbeventlog.statuschange.commands
 
 import java.time.Instant
 
+import cats.effect.Bracket
+import cats.implicits._
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus.{NonRecoverableFailure, Processing}
-import ch.datascience.dbeventlog.{EventMessage, EventStatus}
+import ch.datascience.dbeventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import ch.datascience.dbeventlog.{EventLogDB, EventMessage, EventStatus}
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 
-final case class ToNonRecoverableFailure(
-    eventId:      CompoundEventId,
-    maybeMessage: Option[EventMessage],
-    now:          () => Instant = () => Instant.now
-) extends ChangeStatusCommand {
+import scala.language.higherKinds
+
+final case class ToNonRecoverableFailure[Interpretation[_]](
+    eventId:            CompoundEventId,
+    maybeMessage:       Option[EventMessage],
+    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                () => Instant = () => Instant.now
+)(implicit ME:          Bracket[Interpretation, Throwable])
+    extends ChangeStatusCommand[Interpretation] {
 
   override val status: EventStatus = NonRecoverableFailure
 
@@ -39,4 +49,11 @@ final case class ToNonRecoverableFailure(
           |set status = $status, execution_date = ${now()}, message = $maybeMessage
           |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}
           |""".stripMargin
+
+  override def updateGauges(
+      updateResult:      UpdateResult
+  )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
+    case UpdateResult.Updated => findProjectPath(eventId) flatMap waitingEventsGauge.decrement
+    case _                    => ME.unit
+  }
 }

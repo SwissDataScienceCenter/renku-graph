@@ -20,12 +20,16 @@ package ch.datascience.dbeventlog.statuschange.commands
 
 import java.time.Instant
 
+import cats.effect.IO
 import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, executionDates}
 import ch.datascience.dbeventlog.EventStatus.{New, Processing}
 import ch.datascience.dbeventlog.statuschange.StatusUpdatesRunnerImpl
 import ch.datascience.dbeventlog.{EventStatus, ExecutionDate, InMemoryEventLogDbSpec}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -34,16 +38,19 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
   "command" should {
 
-    s"set status $New on the event with the given id and $Processing status " +
+    s"set status $New on the event with the given id and $Processing status, " +
+      "increment waiting events gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
+      val projectPath = projectPaths.generateOne
       storeEvent(
         eventId,
         EventStatus.Processing,
         executionDates.generateOne,
         eventDates.generateOne,
         eventBodies.generateOne,
-        batchDate = eventBatchDate
+        batchDate   = eventBatchDate,
+        projectPath = projectPath
       )
       storeEvent(
         compoundEventIds.generateOne.copy(id = eventId.id),
@@ -64,7 +71,9 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
       findEvents(status = New) shouldBe List.empty
 
-      val command = ToNew(eventId, currentTime)
+      (waitingEventsGauge.increment _).expects(projectPath).returning(IO.unit)
+
+      val command = ToNew[IO](eventId, waitingEventsGauge, currentTime)
 
       (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -85,7 +94,7 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
         findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-        val command = ToNew(eventId, currentTime)
+        val command = ToNew[IO](eventId, waitingEventsGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -98,9 +107,10 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
   }
 
   private trait TestCase {
-    val currentTime    = mockFunction[Instant]
-    val eventId        = compoundEventIds.generateOne
-    val eventBatchDate = batchDates.generateOne
+    val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
+    val currentTime        = mockFunction[Instant]
+    val eventId            = compoundEventIds.generateOne
+    val eventBatchDate     = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor)
 

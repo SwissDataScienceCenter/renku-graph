@@ -24,10 +24,13 @@ import ch.datascience.dbeventlog._
 import DbEventLogGenerators._
 import EventPersister.Result
 import Result._
+import cats.effect.IO
 import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -41,7 +44,9 @@ class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
       "and there's no batch waiting or under processing" in new TestCase {
 
       // storeNewEvent 1
-      eventLogAdd.storeNewEvent(event).unsafeRunSync shouldBe Created
+      (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
+
+      persister.storeNewEvent(event).unsafeRunSync shouldBe Created
 
       storedEvent(event.compoundEventId) shouldBe (
         event.compoundEventId,
@@ -54,10 +59,13 @@ class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
       )
 
       // storeNewEvent 2 - different event id and different project
-      val event2       = events.generateOne
+      val event2 = events.generateOne
+      (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+
       val nowForEvent2 = Instant.now()
       currentTime.expects().returning(nowForEvent2)
-      eventLogAdd.storeNewEvent(event2).unsafeRunSync shouldBe Created
+
+      persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
 
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
       save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
@@ -68,17 +76,22 @@ class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
       "and there's a batch for that project waiting and under processing" in new TestCase {
 
       // storeNewEvent 1
-      eventLogAdd.storeNewEvent(event).unsafeRunSync shouldBe Created
+      (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
+
+      persister.storeNewEvent(event).unsafeRunSync shouldBe Created
 
       findEvents(status = New).head shouldBe (
         event.compoundEventId, ExecutionDate(now), event.batchDate
       )
 
       // storeNewEvent 2 - different event id and batch date but same project
-      val event2       = event.copy(id = eventIds.generateOne, batchDate = batchDates.generateOne)
+      val event2 = event.copy(id = eventIds.generateOne, batchDate = batchDates.generateOne)
+      (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+
       val nowForEvent2 = Instant.now()
       currentTime.expects().returning(nowForEvent2)
-      eventLogAdd.storeNewEvent(event2).unsafeRunSync shouldBe Created
+
+      persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
 
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
       save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
@@ -88,17 +101,21 @@ class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
     "add a new event if there is another event with the same id but for a different project" in new TestCase {
 
       // Save 1
-      eventLogAdd.storeNewEvent(event).unsafeRunSync shouldBe Created
+      (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
+
+      persister.storeNewEvent(event).unsafeRunSync shouldBe Created
 
       val save1Event1 +: Nil = findEvents(status = New)
       save1Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
 
       // Save 2 - the same event id but different project
-      val event2       = events.generateOne.copy(id = event.id)
-      val event2Body   = eventBodies.generateOne
+      val event2 = events.generateOne.copy(id = event.id)
+      (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+
       val nowForEvent2 = Instant.now()
       currentTime.expects().returning(nowForEvent2)
-      eventLogAdd.storeNewEvent(event2).unsafeRunSync shouldBe Created
+
+      persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
 
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
       save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
@@ -107,11 +124,13 @@ class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
 
     "do nothing if there is an event with the same id and project in the db already" in new TestCase {
 
-      eventLogAdd.storeNewEvent(event).unsafeRunSync shouldBe Created
+      (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
+
+      persister.storeNewEvent(event).unsafeRunSync shouldBe Created
 
       storedEvent(event.compoundEventId)._1 shouldBe event.compoundEventId
 
-      eventLogAdd.storeNewEvent(event.copy(body = eventBodies.generateOne)).unsafeRunSync shouldBe Existed
+      persister.storeNewEvent(event.copy(body = eventBodies.generateOne)).unsafeRunSync shouldBe Existed
 
       storedEvent(event.compoundEventId) shouldBe (
         event.compoundEventId,
@@ -129,8 +148,9 @@ class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
 
     val event = events.generateOne
 
-    val currentTime = mockFunction[Instant]
-    val eventLogAdd = new EventPersister(transactor, currentTime)
+    val currentTime        = mockFunction[Instant]
+    val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
+    val persister          = new EventPersister(transactor, waitingEventsGauge, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now)

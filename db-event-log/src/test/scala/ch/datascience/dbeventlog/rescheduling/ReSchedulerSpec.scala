@@ -23,11 +23,14 @@ import java.time.Instant
 import ch.datascience.dbeventlog.DbEventLogGenerators._
 import ch.datascience.dbeventlog._
 import EventStatus._
+import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId}
+import ch.datascience.graph.model.projects.Path
+import ch.datascience.metrics.LabeledGauge
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -60,6 +63,8 @@ class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
       val event6Date = eventDates.generateOne
       addEvent(event6Id, RecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply), event6Date)
 
+      (waitingEventsGauge.reset _).expects().returning(IO.unit)
+
       eventLog.scheduleEventsForProcessing.unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = New).toSet shouldBe Set(
@@ -76,10 +81,11 @@ class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
 
   private trait TestCase {
 
+    val waitingEventsGauge          = mock[LabeledGauge[IO, Path]]
     val currentTime                 = Instant.now()
     private val currentTimeProvider = mockFunction[Instant]
     currentTimeProvider.expects().returning(currentTime)
-    val eventLog = new ReScheduler(transactor, currentTimeProvider)
+    val eventLog = new ReScheduler(transactor, waitingEventsGauge, currentTimeProvider)
 
     def addEvent(commitEventId: CompoundEventId,
                  status:        EventStatus,

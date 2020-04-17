@@ -25,6 +25,8 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 import ch.datascience.dbeventlog.{EventLogDB, EventMessage}
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 
@@ -33,6 +35,7 @@ import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](
     statusUpdatesRunner: StatusUpdatesRunner[Interpretation],
+    waitingEventsGauge:  LabeledGauge[Interpretation, projects.Path],
     logger:              Logger[Interpretation]
 )(implicit ME:           MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
@@ -46,13 +49,13 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
   def changeStatus(eventId: CompoundEventId,
                    request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
-      command      <- request.as[ChangeStatusCommand](ME, findDecoder(eventId)) recoverWith badRequest
+      command      <- request.as[ChangeStatusCommand[Interpretation]](ME, findDecoder(eventId)) recoverWith badRequest
       updateResult <- run(command)
       response     <- updateResult.asHttpResponse
     } yield response
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[ChangeStatusCommand]] = {
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[ChangeStatusCommand[Interpretation]]] = {
     case NonFatal(exception) =>
       ME.raiseError(BadRequestError(exception))
   }
@@ -77,25 +80,27 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
-  private def findDecoder(eventId: CompoundEventId): EntityDecoder[Interpretation, ChangeStatusCommand] = {
+  private def findDecoder(
+      eventId: CompoundEventId
+  ): EntityDecoder[Interpretation, ChangeStatusCommand[Interpretation]] = {
     import ch.datascience.dbeventlog.EventStatus
     import ch.datascience.dbeventlog.EventStatus._
     import commands._
     import io.circe.{Decoder, HCursor}
 
-    implicit val commandDecoder: Decoder[ChangeStatusCommand] = (cursor: HCursor) =>
+    implicit val commandDecoder: Decoder[ChangeStatusCommand[Interpretation]] = (cursor: HCursor) =>
       for {
         status       <- cursor.downField("status").as[EventStatus]
         maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
       } yield status match {
-        case TriplesStore          => ToTriplesStore(eventId)
-        case New                   => ToNew(eventId)
-        case RecoverableFailure    => ToRecoverableFailure(eventId, maybeMessage)
-        case NonRecoverableFailure => ToNonRecoverableFailure(eventId, maybeMessage)
+        case TriplesStore          => ToTriplesStore[Interpretation](eventId, waitingEventsGauge)
+        case New                   => ToNew[Interpretation](eventId, waitingEventsGauge)
+        case RecoverableFailure    => ToRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge)
+        case NonRecoverableFailure => ToNonRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge)
         case other                 => throw new Exception(s"Transition to '$other' status unsupported")
       }
 
-    jsonOf[Interpretation, ChangeStatusCommand]
+    jsonOf[Interpretation, ChangeStatusCommand[Interpretation]]
   }
 }
 
@@ -104,9 +109,10 @@ object IOStatusChangeEndpoint {
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:  LabeledGauge[IO, projects.Path],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
       statusUpdatesRunner <- IOUpdateCommandsRunner(transactor)
-    } yield new StatusChangeEndpoint(statusUpdatesRunner, logger)
+    } yield new StatusChangeEndpoint(statusUpdatesRunner, waitingEventsGauge, logger)
 }

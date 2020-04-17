@@ -24,22 +24,25 @@ import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus.New
-import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
+import ch.datascience.dbeventlog.{EventLogDB, EventStatus, TypesSerializers}
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 
 import scala.language.higherKinds
-import ch.datascience.dbeventlog.TypesSerializers
 
 private class ReScheduler[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    now:        () => Instant = () => Instant.now
-)(implicit ME:  Bracket[Interpretation, Throwable])
+    transactor:         DbTransactor[Interpretation, EventLogDB],
+    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                () => Instant = () => Instant.now
+)(implicit ME:          Bracket[Interpretation, Throwable])
     extends TypesSerializers {
 
   def scheduleEventsForProcessing: Interpretation[Unit] =
-    runUpdate()
-      .transact(transactor.get)
-      .map(_ => ())
+    for {
+      _ <- runUpdate() transact transactor.get
+      _ <- waitingEventsGauge.reset
+    } yield ()
 
   private def runUpdate() =
     sql"""|update event_log 
@@ -48,6 +51,7 @@ private class ReScheduler[Interpretation[_]](
 }
 
 private class IOReScheduler(
-    transactor:          DbTransactor[IO, EventLogDB]
+    transactor:          DbTransactor[IO, EventLogDB],
+    waitingEventsGauge:  LabeledGauge[IO, projects.Path]
 )(implicit contextShift: ContextShift[IO])
-    extends ReScheduler[IO](transactor)
+    extends ReScheduler[IO](transactor, waitingEventsGauge)

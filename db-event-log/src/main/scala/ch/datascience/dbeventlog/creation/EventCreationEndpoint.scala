@@ -29,6 +29,7 @@ import ch.datascience.dbeventlog._
 import ch.datascience.graph.model.events.{BatchDate, EventBody, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
+import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
@@ -105,8 +106,9 @@ object IOEventCreationEndpoint {
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:  LabeledGauge[IO, projects.Path],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[EventCreationEndpoint[IO]] = IO {
-    new EventCreationEndpoint[IO](new IOEventPersister(transactor), logger)
+    new EventCreationEndpoint[IO](new IOEventPersister(transactor, waitingEventsGauge), logger)
   }
 }

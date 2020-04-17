@@ -20,16 +20,26 @@ package ch.datascience.dbeventlog.statuschange.commands
 
 import java.time.Instant
 
-import ch.datascience.dbeventlog.EventStatus
+import cats.effect.Bracket
+import cats.implicits._
+import ch.datascience.db.DbTransactor
 import ch.datascience.dbeventlog.EventStatus.{Processing, TriplesStore}
+import ch.datascience.dbeventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import doobie.util.fragment
 
-final case class ToTriplesStore(
-    eventId: CompoundEventId,
-    now:     () => Instant = () => Instant.now
-) extends ChangeStatusCommand {
+import scala.language.higherKinds
+
+final case class ToTriplesStore[Interpretation[_]](
+    eventId:            CompoundEventId,
+    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                () => Instant = () => Instant.now
+)(implicit ME:          Bracket[Interpretation, Throwable])
+    extends ChangeStatusCommand[Interpretation] {
 
   override val status: EventStatus = TriplesStore
 
@@ -38,4 +48,11 @@ final case class ToTriplesStore(
           |set status = $status, execution_date = ${now()}
           |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}
           |""".stripMargin
+
+  override def updateGauges(
+      updateResult:      UpdateResult
+  )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
+    case UpdateResult.Updated => findProjectPath(eventId) flatMap waitingEventsGauge.decrement
+    case _                    => ME.unit
+  }
 }

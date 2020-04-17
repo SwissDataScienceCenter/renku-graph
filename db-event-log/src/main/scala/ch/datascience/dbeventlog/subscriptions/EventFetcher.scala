@@ -30,6 +30,7 @@ import ch.datascience.dbeventlog._
 import ch.datascience.graph.config.RenkuLogTimeout
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
 import doobie.util.fragments._
@@ -42,45 +43,52 @@ private trait EventFetcher[Interpretation[_]] {
 }
 
 private class EventFetcherImpl[Interpretation[_]](
-    transactor:       DbTransactor[Interpretation, EventLogDB],
-    renkuLogTimeout:  RenkuLogTimeout,
-    now:              () => Instant = () => Instant.now,
-    pickRandomlyFrom: List[projects.Id] => Option[projects.Id] = ids => ids.get(Random nextInt ids.size)
-)(implicit ME:        Bracket[Interpretation, Throwable])
+    transactor:         DbTransactor[Interpretation, EventLogDB],
+    renkuLogTimeout:    RenkuLogTimeout,
+    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                () => Instant = () => Instant.now,
+    pickRandomlyFrom: List[(projects.Id, projects.Path)] => Option[(projects.Id, projects.Path)] = ids =>
+      ids.get(Random nextInt ids.size)
+)(implicit ME: Bracket[Interpretation, Throwable])
     extends EventFetcher[Interpretation] {
 
   import TypesSerializers._
 
   private lazy val MaxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
 
-  private type EventIdAndBody = (CompoundEventId, EventBody)
+  private type EventIdAndBody   = (CompoundEventId, EventBody)
+  private type ProjectIdAndPath = (projects.Id, projects.Path)
 
   override def popEvent: Interpretation[Option[EventIdAndBody]] =
-    findEventAndUpdateForProcessing().transact(transactor.get)
+    for {
+      maybeProjectEventIdAndBody <- findEventAndUpdateForProcessing().transact(transactor.get)
+      (maybeProject, maybeEventIdAndBody) = maybeProjectEventIdAndBody
+      _ <- maybeDecrementWaitingEvents(maybeProject, maybeEventIdAndBody)
+    } yield maybeEventIdAndBody
 
   private def findEventAndUpdateForProcessing() =
     for {
-      maybeProjectId <- findProjectsWithEventsInQueue map selectRandom
-      maybeIdAndProjectAndBody <- maybeProjectId
+      maybeProject <- findProjectsWithEventsInQueue map selectRandom
+      maybeIdAndProjectAndBody <- maybeProject
                                    .map(findOldestEvent)
                                    .getOrElse(Free.pure[ConnectionOp, Option[EventIdAndBody]](None))
       maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
-    } yield maybeBody
+    } yield maybeProject -> maybeBody
 
   // format: off
   private def findProjectsWithEventsInQueue = {
-    fr"""select distinct project_id
+    fr"""select distinct project_id, project_path
          from event_log
          where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
                or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})"""
-  }.query[projects.Id].to[List]
+  }.query[ProjectIdAndPath].to[List]
   // format: on
 
   // format: off
-  private def findOldestEvent(id: projects.Id) = {
+  private def findOldestEvent(idAndPath: ProjectIdAndPath) = {
     fr"""select event_log.event_id, event_log.project_id, event_log.event_body
          from event_log
-         where project_id = $id
+         where project_id = ${idAndPath._1}
            and (
              (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
              or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
@@ -93,7 +101,7 @@ private class EventFetcherImpl[Interpretation[_]](
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
 
-  private lazy val selectRandom: List[projects.Id] => Option[projects.Id] = {
+  private lazy val selectRandom: List[ProjectIdAndPath] => Option[ProjectIdAndPath] = {
     case Nil           => None
     case single +: Nil => Some(single)
     case many          => pickRandomlyFrom(many)
@@ -101,7 +109,7 @@ private class EventFetcherImpl[Interpretation[_]](
 
   private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventIdAndBody]] = {
     case None => Free.pure[ConnectionOp, Option[EventIdAndBody]](None)
-    case Some(idAndBody @ (commitEventId, eventBody)) =>
+    case Some(idAndBody @ (commitEventId, _)) =>
       sql"""update event_log 
            |set status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
            |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
@@ -114,12 +122,18 @@ private class EventFetcherImpl[Interpretation[_]](
     case 0 => None
     case 1 => Some(idAndBody)
   }
+
+  private def maybeDecrementWaitingEvents(maybeProject: Option[ProjectIdAndPath], maybeBody: Option[EventIdAndBody]) =
+    (maybeBody, maybeProject) mapN {
+      case (_, (_, projectPath)) => waitingEventsGauge decrement projectPath
+    } getOrElse ME.unit
 }
 
 private object IOEventLogFetch {
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB]
+      transactor:          DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:  LabeledGauge[IO, projects.Path]
   )(implicit contextShift: ContextShift[IO]): IO[EventFetcherImpl[IO]] =
-    RenkuLogTimeout[IO]() map (new EventFetcherImpl(transactor, _))
+    RenkuLogTimeout[IO]() map (new EventFetcherImpl(transactor, _, waitingEventsGauge))
 }

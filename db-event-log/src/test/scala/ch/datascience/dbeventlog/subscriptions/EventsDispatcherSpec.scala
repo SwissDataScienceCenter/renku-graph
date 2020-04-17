@@ -30,8 +30,10 @@ import ch.datascience.dbeventlog.{Event, EventMessage}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.metrics.LabeledGauge
 import eu.timepit.refined.auto._
 import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
@@ -140,7 +142,8 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
         .expects(capture(usedUrls), event.compoundEventId, event.body)
         .returning(exception.raiseError[IO, SendingResult])
 
-      val statusUpdateCommand = ToNonRecoverableFailure(event.compoundEventId, EventMessage(exception))
+      val statusUpdateCommand =
+        ToNonRecoverableFailure[IO](event.compoundEventId, EventMessage(exception), waitingEventsGauge)
       (statusUpdatesRunner.run _)
         .expects(statusUpdateCommand)
         .returning(UpdateResult.Updated.pure[IO])
@@ -290,7 +293,8 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
         .expects(capture(usedUrls), event.compoundEventId, event.body)
         .returning(exception.raiseError[IO, SendingResult])
 
-      val statusUpdateCommand        = ToNonRecoverableFailure(event.compoundEventId, EventMessage(exception))
+      val statusUpdateCommand =
+        ToNonRecoverableFailure[IO](event.compoundEventId, EventMessage(exception), waitingEventsGauge)
       val eventStatusChangeException = exceptions.generateOne
       (statusUpdatesRunner.run _)
         .expects(statusUpdateCommand)
@@ -326,6 +330,7 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
     val urls @ url1 +: url2 +: Nil =
       subscriptionUrls.generateNonEmptyList(minElements = 2, maxElements = 2).toList
 
+    val waitingEventsGauge  = mock[LabeledGauge[IO, projects.Path]]
     val subscriptions       = mock[TestIOSubscriptions]
     val eventsFinder        = mock[EventFetcher[IO]]
     val statusUpdatesRunner = mock[StatusUpdatesRunner[IO]]
@@ -336,6 +341,7 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
       eventsFinder,
       statusUpdatesRunner,
       eventsSender,
+      waitingEventsGauge,
       logger,
       noSubscriptionSleep = 500 millis,
       noEventSleep        = 250 millis,

@@ -29,8 +29,10 @@ import ch.datascience.dbeventlog.subscriptions.{Subscriptions, SubscriptionsEndp
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
+import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
@@ -179,6 +181,8 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
   class TestSubscriptionEndpoint(subscriptions: Subscriptions[IO], logger: Logger[IO])
       extends SubscriptionsEndpoint[IO](subscriptions, logger)
-  class TestStatusChangeEndpoint(updateCommandsRunner: StatusUpdatesRunner[IO], logger: Logger[IO])
-      extends StatusChangeEndpoint[IO](updateCommandsRunner, logger)
+  class TestStatusChangeEndpoint(updateCommandsRunner: StatusUpdatesRunner[IO],
+                                 waitingEventsGauge:   LabeledGauge[IO, projects.Path],
+                                 logger:               Logger[IO])
+      extends StatusChangeEndpoint[IO](updateCommandsRunner, waitingEventsGauge, logger)
 }

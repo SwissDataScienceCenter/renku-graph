@@ -21,77 +21,41 @@ package ch.datascience.dbeventlog.metrics
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.{EventLogDB, EventStatus}
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.metrics.MetricsRegistry
+import ch.datascience.dbeventlog.EventStatus
+import ch.datascience.metrics._
 import io.chrisdavenport.log4cats.Logger
-import io.prometheus.client.Gauge
 
 import scala.concurrent.duration.FiniteDuration
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
 class EventLogMetrics(
-    statsFinder:           StatsFinder[IO],
-    logger:                Logger[IO],
-    waitingEventsGauge:    Gauge,
-    statusesGauge:         Gauge,
-    totalGauge:            Gauge,
-    interval:              FiniteDuration = EventLogMetrics.interval,
-    statusesInterval:      FiniteDuration = EventLogMetrics.statusesInterval,
-    waitingEventsInterval: FiniteDuration = EventLogMetrics.waitingEventsInterval
-)(implicit ME:             MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO]) {
+    statsFinder:      StatsFinder[IO],
+    logger:           Logger[IO],
+    statusesGauge:    LabeledGauge[IO, EventStatus],
+    totalGauge:       SingleValueGauge[IO],
+    interval:         FiniteDuration = EventLogMetrics.interval,
+    statusesInterval: FiniteDuration = EventLogMetrics.statusesInterval
+)(implicit ME:        MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO]) {
 
   def run: IO[Unit] =
     for {
       _ <- timer sleep interval
-      _ <- updateCollectors()
+      _ <- updateStatuses()
     } yield ()
-
-  private def updateCollectors() = {
-    for {
-      _ <- updateStatuses().start
-      _ <- updateWaitingEvents().start
-    } yield ()
-  } recoverWith logAndRetry(continueWith = run)
 
   private def updateStatuses(): IO[Unit] = {
     for {
       statuses <- statsFinder.statuses
-      _ = statuses foreach toStatusesGauge
-      _ = totalGauge set statuses.values.sum
-      _ <- timer sleep statusesInterval
-      _ <- updateStatuses()
+      _        <- (statuses map toStatusesGauge).toList.sequence
+      _        <- totalGauge set statuses.values.sum
+      _        <- timer sleep statusesInterval
+      _        <- updateStatuses()
     } yield ()
   } recoverWith logAndRetry(continueWith = updateStatuses())
 
-  private lazy val toStatusesGauge: ((EventStatus, Long)) => Unit = {
-    case (status, count) => statusesGauge.labels(status.toString).set(count)
-  }
-
-  private def updateWaitingEvents(previousState: Map[Path, Long] = Map.empty): IO[Unit] = {
-    for {
-      waitingEvents <- statsFinder.waitingEvents
-      newState = removeZeroCountProjects(waitingEvents, previousState)
-      _        = newState foreach toWaitingEventsGauge
-      _ <- timer sleep waitingEventsInterval
-      _ <- updateWaitingEvents(newState)
-    } yield ()
-  } recoverWith logAndRetry(continueWith = updateWaitingEvents())
-
-  private def removeZeroCountProjects(currentEvents: Map[Path, Long], previousState: Map[Path, Long]): Map[Path, Long] =
-    if (previousState.isEmpty) currentEvents
-    else {
-      val currentZeros  = currentEvents.filter(_._2 == 0).keySet
-      val previousZeros = previousState.filter(_._2 == 0).keySet
-      val zerosToDelete = currentZeros intersect previousZeros
-      zerosToDelete foreach (project => waitingEventsGauge remove project.toString)
-      currentEvents.filterNot { case (project, _) => zerosToDelete contains project }
-    }
-
-  private lazy val toWaitingEventsGauge: ((Path, Long)) => Unit = {
-    case (path, count) => waitingEventsGauge.labels(path.toString).set(count)
+  private lazy val toStatusesGauge: ((EventStatus, Long)) => IO[Unit] = {
+    case (status, count) => statusesGauge set status -> count
   }
 
   private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {
@@ -108,44 +72,27 @@ object EventLogMetrics {
 
   import scala.concurrent.duration._
 
-  private val interval:              FiniteDuration = 10 seconds
-  private val statusesInterval:      FiniteDuration = 5 seconds
-  private val waitingEventsInterval: FiniteDuration = 5 seconds
-
-  private[metrics] val waitingEventsGaugeBuilder: Gauge.Builder =
-    Gauge
-      .build()
-      .name("events_waiting_count")
-      .help("Number of waiting Events by project path.")
-      .labelNames("project")
-
-  private[metrics] val statusesGaugeBuilder: Gauge.Builder =
-    Gauge
-      .build()
-      .name("events_statuses_count")
-      .help("Total Commit Events by status.")
-      .labelNames("status")
-
-  private[metrics] val totalGaugeBuilder: Gauge.Builder =
-    Gauge
-      .build()
-      .name("events_count")
-      .help("Total Commit Events.")
+  private val interval:         FiniteDuration = 10 seconds
+  private val statusesInterval: FiniteDuration = 5 seconds
 }
 
 object IOEventLogMetrics {
 
-  import EventLogMetrics._
   import cats.effect.IO._
+  import eu.timepit.refined.auto._
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
+      statsFinder:         StatsFinder[IO],
       logger:              Logger[IO],
       metricsRegistry:     MetricsRegistry[IO]
   )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[EventLogMetrics] =
     for {
-      waitingEventsGauge <- metricsRegistry.register[Gauge, Gauge.Builder](waitingEventsGaugeBuilder)
-      statusesGauge      <- metricsRegistry.register[Gauge, Gauge.Builder](statusesGaugeBuilder)
-      totalGauge         <- metricsRegistry.register[Gauge, Gauge.Builder](totalGaugeBuilder)
-    } yield new EventLogMetrics(new IOStatsFinder(transactor), logger, waitingEventsGauge, statusesGauge, totalGauge)
+      statusesGauge <- Gauge[IO, EventStatus](name = "events_statuses_count",
+                                              help      = "Total Commit Events by status.",
+                                              labelName = "status")(metricsRegistry)
+      totalGauge <- Gauge(
+                     name = "events_count",
+                     help = "Total Commit Events."
+                   )(metricsRegistry)
+    } yield new EventLogMetrics(statsFinder, logger, statusesGauge, totalGauge)
 }

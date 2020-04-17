@@ -22,15 +22,14 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.MonadError
 import cats.effect._
-import ch.datascience.dbeventlog.init.IODbInitializer
 import ch.datascience.dbeventlog.metrics.{EventLogMetrics, StatsFinder}
 import ch.datascience.dbeventlog.subscriptions.EventsDispatcher
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
+import ch.datascience.metrics.{LabeledGauge, SingleValueGauge}
 import io.chrisdavenport.log4cats.Logger
-import io.prometheus.client.Gauge
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -43,16 +42,12 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   "run" should {
 
     "return Success Exit Code " +
-      "if Sentry, DB, Events Dispatcher and metrics initialisation are fine " +
+      "if Sentry, Events Dispatcher and metrics initialisation are fine " +
       "and http server starts up" in new TestCase {
 
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
-
-      (dbInitializer.run _)
-        .expects()
-        .returning(context.unit)
 
       (metrics.run _)
         .expects()
@@ -81,31 +76,11 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if DB initialisation fails" in new TestCase {
-
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      val exception = exceptions.generateOne
-      (dbInitializer.run _)
-        .expects()
-        .returning(context.raiseError(exception))
-
-      intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
-      } shouldBe exception
-    }
-
     "fail if starting the http server fails" in new TestCase {
 
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
-
-      (dbInitializer.run _)
-        .expects()
-        .returning(context.unit)
 
       (metrics.run _)
         .expects()
@@ -130,10 +105,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (dbInitializer.run _)
-        .expects()
-        .returning(context.unit)
-
       val exception = exceptions.generateOne
       (eventsDispatcher.run _)
         .expects()
@@ -154,10 +125,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       (sentryInitializer.run _)
         .expects()
         .returning(IO.unit)
-
-      (dbInitializer.run _)
-        .expects()
-        .returning(context.unit)
 
       (eventsDispatcher.run _)
         .expects()
@@ -183,36 +150,30 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
     val context = MonadError[IO, Throwable]
 
     val sentryInitializer = mock[IOSentryInitializer]
-    val dbInitializer     = mock[IODbInitializer]
     val eventsDispatcher  = mock[EventsDispatcher]
     val metrics           = mock[TestEventLogMetrics]
     val httpServer        = mock[IOHttpServer]
     val runner = new MicroserviceRunner(sentryInitializer,
-                                        dbInitializer,
                                         metrics,
                                         eventsDispatcher,
                                         httpServer,
                                         new ConcurrentHashMap[CancelToken[IO], Unit]())
 
     class TestEventLogMetrics(
-        statsFinder:           StatsFinder[IO],
-        logger:                Logger[IO],
-        waitingEventsGauge:    Gauge,
-        statusesGauge:         Gauge,
-        totalGauge:            Gauge,
-        interval:              FiniteDuration,
-        statusesInterval:      FiniteDuration,
-        waitingEventsInterval: FiniteDuration
-    )(implicit ME:             MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
+        statsFinder:      StatsFinder[IO],
+        logger:           Logger[IO],
+        statusesGauge:    LabeledGauge[IO, EventStatus],
+        totalGauge:       SingleValueGauge[IO],
+        interval:         FiniteDuration,
+        statusesInterval: FiniteDuration
+    )(implicit ME:        MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
         extends EventLogMetrics(
           statsFinder,
           logger,
-          waitingEventsGauge,
           statusesGauge,
           totalGauge,
           interval,
-          statusesInterval,
-          waitingEventsInterval
+          statusesInterval
         )
   }
 }

@@ -21,13 +21,17 @@ package ch.datascience.dbeventlog.statuschange.commands
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
 
+import cats.effect.IO
 import ch.datascience.dbeventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
 import ch.datascience.dbeventlog.EventStatus.{Processing, RecoverableFailure}
 import ch.datascience.dbeventlog.statuschange.StatusUpdatesRunnerImpl
 import ch.datascience.dbeventlog.{EventMessage, EventStatus, ExecutionDate, InMemoryEventLogDbSpec}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -38,7 +42,8 @@ class ToRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec with
 
   "command" should {
 
-    s"set status $RecoverableFailure on the event with the given id and $Processing status " +
+    s"set status $RecoverableFailure on the event with the given id and $Processing status, " +
+      "increment waiting events gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
       storeEvent(
@@ -50,19 +55,23 @@ class ToRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec with
         batchDate = eventBatchDate
       )
       val executionDate = executionDates.generateOne
+      val projectPath   = projectPaths.generateOne
       storeEvent(
         eventId,
         EventStatus.Processing,
         executionDate,
         eventDates.generateOne,
         eventBodies.generateOne,
-        batchDate = eventBatchDate
+        batchDate   = eventBatchDate,
+        projectPath = projectPath
       )
 
       findEvent(eventId) shouldBe Some((executionDate, Processing, None))
 
+      (waitingEventsGauge.increment _).expects(projectPath).returning(IO.unit)
+
       val maybeMessage = Gen.option(eventMessages).generateOne
-      val command      = ToRecoverableFailure(eventId, maybeMessage, currentTime)
+      val command      = ToRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, currentTime)
 
       (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -84,7 +93,7 @@ class ToRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec with
         findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
         val maybeMessage = Gen.option(eventMessages).generateOne
-        val command      = ToRecoverableFailure(eventId, maybeMessage, currentTime)
+        val command      = ToRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -94,9 +103,10 @@ class ToRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec with
   }
 
   private trait TestCase {
-    val currentTime    = mockFunction[Instant]
-    val eventId        = compoundEventIds.generateOne
-    val eventBatchDate = batchDates.generateOne
+    val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
+    val currentTime        = mockFunction[Instant]
+    val eventId            = compoundEventIds.generateOne
+    val eventBatchDate     = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor)
 

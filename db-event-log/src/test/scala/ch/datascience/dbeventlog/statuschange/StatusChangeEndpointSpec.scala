@@ -28,12 +28,15 @@ import ch.datascience.dbeventlog.statuschange.commands._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
+import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.metrics.LabeledGauge
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.prometheus.client.Gauge
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -48,11 +51,15 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
   "changeStatus" should {
 
     val scenarios = Table(
-      "status"              -> "command",
-      New                   -> ToTriplesStore(compoundEventIds.generateOne),
-      TriplesStore          -> ToNew(compoundEventIds.generateOne),
-      RecoverableFailure    -> ToRecoverableFailure(compoundEventIds.generateOne, eventMessages.generateOption),
-      NonRecoverableFailure -> ToNonRecoverableFailure(compoundEventIds.generateOne, eventMessages.generateOption)
+      "status"     -> "command builder",
+      New          -> ToTriplesStore[IO](compoundEventIds.generateOne, waitingEventsGauge),
+      TriplesStore -> ToNew[IO](compoundEventIds.generateOne, waitingEventsGauge),
+      RecoverableFailure -> ToRecoverableFailure[IO](compoundEventIds.generateOne,
+                                                     eventMessages.generateOption,
+                                                     waitingEventsGauge),
+      NonRecoverableFailure -> ToNonRecoverableFailure[IO](compoundEventIds.generateOne,
+                                                           eventMessages.generateOption,
+                                                           waitingEventsGauge)
     )
     forAll(scenarios) { (status, command) =>
       "decode payload from the body, " +
@@ -173,7 +180,7 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
 
       val eventId = compoundEventIds.generateOne
 
-      val command: ChangeStatusCommand = ToTriplesStore(eventId)
+      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, waitingEventsGauge)
       val exception = exceptions.generateOne
       (commandsRunner.run _)
         .expects(command)
@@ -197,21 +204,29 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
   private trait TestCase {
     val commandsRunner = mock[StatusUpdatesRunner[IO]]
     val logger         = TestLogger[IO]()
-    val changeStatus   = new StatusChangeEndpoint[IO](commandsRunner, logger).changeStatus _
+    val changeStatus   = new StatusChangeEndpoint[IO](commandsRunner, waitingEventsGauge, logger).changeStatus _
   }
 
-  implicit val commandEncoder: Encoder[ChangeStatusCommand] = Encoder.instance[ChangeStatusCommand] {
-    case command @ ToNew(_, _)                                 => json"""{
-      "status": ${command.status.value}
-    }"""
-    case command @ ToTriplesStore(_, _)                        => json"""{
-      "status": ${command.status.value}
-    }"""
-    case command @ ToRecoverableFailure(_, maybeMessage, _)    => json"""{
-      "status": ${command.status.value}
-    }""" deepMerge maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
-    case command @ ToNonRecoverableFailure(_, maybeMessage, _) => json"""{
-      "status": ${command.status.value}
-    }""" deepMerge maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
+  implicit val commandEncoder: Encoder[ChangeStatusCommand[IO]] = Encoder.instance[ChangeStatusCommand[IO]] {
+    case command: ToNew[IO]                   => json"""{
+        "status": ${command.status.value}
+      }"""
+    case command: ToTriplesStore[IO]          => json"""{
+        "status": ${command.status.value}
+      }"""
+    case command: ToRecoverableFailure[IO]    => json"""{
+        "status": ${command.status.value}
+      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
+    case command: ToNonRecoverableFailure[IO] => json"""{
+        "status": ${command.status.value}
+      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
+  }
+
+  private lazy val waitingEventsGauge: LabeledGauge[IO, projects.Path] = new LabeledGauge[IO, projects.Path] {
+    override def set(labelValue:       (projects.Path, Double)) = IO.unit
+    override def increment(labelValue: projects.Path)           = IO.unit
+    override def decrement(labelValue: projects.Path)           = IO.unit
+    override def reset           = IO.unit
+    protected override def gauge = Gauge.build("name", "help").create()
   }
 }

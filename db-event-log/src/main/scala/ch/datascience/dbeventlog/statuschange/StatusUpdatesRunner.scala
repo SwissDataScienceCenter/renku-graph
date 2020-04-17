@@ -26,7 +26,7 @@ import ch.datascience.dbeventlog.statuschange.commands.{ChangeStatusCommand, Upd
 import scala.language.higherKinds
 
 trait StatusUpdatesRunner[Interpretation[_]] {
-  def run(command: ChangeStatusCommand): Interpretation[UpdateResult]
+  def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult]
 }
 
 class StatusUpdatesRunnerImpl[Interpretation[_]](
@@ -34,13 +34,16 @@ class StatusUpdatesRunnerImpl[Interpretation[_]](
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends StatusUpdatesRunner[Interpretation] {
 
+  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+
   import cats.implicits._
   import doobie.implicits._
 
-  override def run(command: ChangeStatusCommand): Interpretation[UpdateResult] =
+  override def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult] =
     for {
       queryResult  <- command.query.update.run transact transactor.get
       updateResult <- ME.catchNonFatal(command mapResult queryResult)
+      _            <- command updateGauges updateResult
     } yield updateResult
 }
 

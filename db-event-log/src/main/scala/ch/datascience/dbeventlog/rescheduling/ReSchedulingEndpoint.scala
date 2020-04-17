@@ -18,7 +18,9 @@
 
 package ch.datascience.dbeventlog.rescheduling
 
-import cats.effect.{ContextShift, Effect, IO}
+import cats.effect.{ContextShift, IO}
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
@@ -54,8 +56,9 @@ object IOReSchedulingEndpoint {
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:  LabeledGauge[IO, projects.Path],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[ReSchedulingEndpoint[IO]] = IO {
-    new ReSchedulingEndpointImpl(new IOReScheduler(transactor), logger)
+    new ReSchedulingEndpointImpl(new IOReScheduler(transactor, waitingEventsGauge), logger)
   }
 }

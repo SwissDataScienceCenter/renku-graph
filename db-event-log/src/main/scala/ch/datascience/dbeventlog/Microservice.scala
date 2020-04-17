@@ -27,7 +27,7 @@ import ch.datascience.db.DbTransactorResource
 import ch.datascience.dbeventlog.creation.IOEventCreationEndpoint
 import ch.datascience.dbeventlog.init.IODbInitializer
 import ch.datascience.dbeventlog.latestevents.IOLatestEventsEndpoint
-import ch.datascience.dbeventlog.metrics.{EventLogMetrics, IOEventLogMetrics}
+import ch.datascience.dbeventlog.metrics._
 import ch.datascience.dbeventlog.processingstatus.IOProcessingStatusEndpoint
 import ch.datascience.dbeventlog.rescheduling.IOReSchedulingEndpoint
 import ch.datascience.dbeventlog.statuschange.IOStatusChangeEndpoint
@@ -46,11 +46,9 @@ object Microservice extends IOMicroservice {
   private implicit val executionContext: ExecutionContext =
     ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
 
-  protected implicit override def contextShift: ContextShift[IO] =
-    IO.contextShift(executionContext)
+  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
 
-  protected implicit override def timer: Timer[IO] =
-    IO.timer(executionContext)
+  protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
@@ -61,16 +59,19 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
+        _                        <- new IODbInitializer(transactor, ApplicationLogger).run
         sentryInitializer        <- SentryInitializer[IO]
+        statsFinder              <- IOStatsFinder(transactor)
         metricsRegistry          <- MetricsRegistry()
-        eventLogMetrics          <- IOEventLogMetrics(transactor, ApplicationLogger, metricsRegistry)
-        eventCreationEndpoint    <- IOEventCreationEndpoint(transactor, ApplicationLogger)
+        eventLogMetrics          <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
+        waitingEventsGauge       <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        eventCreationEndpoint    <- IOEventCreationEndpoint(transactor, waitingEventsGauge, ApplicationLogger)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, ApplicationLogger)
-        reSchedulingEndpoint     <- IOReSchedulingEndpoint(transactor, ApplicationLogger)
-        statusChangeEndpoint     <- IOStatusChangeEndpoint(transactor, ApplicationLogger)
+        reSchedulingEndpoint     <- IOReSchedulingEndpoint(transactor, waitingEventsGauge, ApplicationLogger)
+        statusChangeEndpoint     <- IOStatusChangeEndpoint(transactor, waitingEventsGauge, ApplicationLogger)
         subscriptions            <- IOSubscriptions(ApplicationLogger)
-        eventsDispatcher         <- EventsDispatcher(transactor, subscriptions, ApplicationLogger)
+        eventsDispatcher         <- EventsDispatcher(transactor, subscriptions, waitingEventsGauge, ApplicationLogger)
         subscriptionsEndpoint    <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
         routes <- new MicroserviceRoutes[IO](
                    eventCreationEndpoint,
@@ -85,7 +86,6 @@ object Microservice extends IOMicroservice {
 
         exitCode <- new MicroserviceRunner(
                      sentryInitializer,
-                     new IODbInitializer(transactor, ApplicationLogger),
                      eventLogMetrics,
                      eventsDispatcher,
                      httpServer,
@@ -97,7 +97,6 @@ object Microservice extends IOMicroservice {
 
 private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
-    dbInitializer:            IODbInitializer,
     metrics:                  EventLogMetrics,
     eventsDispatcher:         EventsDispatcher,
     httpServer:               HttpServer[IO],
@@ -107,9 +106,8 @@ private class MicroserviceRunner(
   def run(args: List[String]): IO[ExitCode] =
     for {
       _      <- sentryInitializer.run
-      _      <- dbInitializer.run
-      _      <- metrics.run.start.map(gatherCancelToken)
-      _      <- eventsDispatcher.run.start.map(gatherCancelToken)
+      _      <- metrics.run.start map gatherCancelToken
+      _      <- eventsDispatcher.run.start map gatherCancelToken
       result <- httpServer.run
     } yield result
 
