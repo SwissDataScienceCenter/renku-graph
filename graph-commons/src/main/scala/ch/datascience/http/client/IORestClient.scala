@@ -150,15 +150,19 @@ abstract class IORestClient[ThrottlingTarget](
                                  request:     HttpRequest,
                                  mapResponse: ResponseMapping[T],
                                  attempt:     Int): PartialFunction[Throwable, IO[T]] = {
-    case error: RestClientError =>
-      throttler.release *> IO.raiseError(error)
+    case error: RestClientError => throttler.release flatMap (_ => error.raiseError[IO, T])
     case NonFatal(cause) =>
       cause match {
         case exception: ConnectException if attempt <= maxRetries.value =>
-          logger.warn(LogMessage(request.request, s"timed out -> retrying attempt $attempt", exception))
-          timer.sleep(retryInterval) *> callRemote(httpClient, request, mapResponse, attempt + 1)
+          for {
+            _      <- logger.warn(LogMessage(request.request, s"timed out -> retrying attempt $attempt", exception))
+            _      <- timer sleep retryInterval
+            result <- callRemote(httpClient, request, mapResponse, attempt + 1)
+          } yield result
         case other =>
-          throttler.release *> IO.raiseError(ConnectivityException(LogMessage(request.request, other), other))
+          throttler.release flatMap (
+              _ => ConnectivityException(LogMessage(request.request, other), other).raiseError[IO, T]
+          )
       }
   }
 

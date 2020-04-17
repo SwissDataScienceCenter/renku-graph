@@ -49,7 +49,10 @@ class ReProvisioning[Interpretation[_]](
   import triplesVersionFinder._
 
   def run: Interpretation[Unit] =
-    timer.sleep(reProvisioningDelay.value) *> startReProvisioning
+    for {
+      _ <- timer sleep reProvisioningDelay.value
+      _ <- startReProvisioning
+    } yield ()
 
   private def startReProvisioning: Interpretation[Unit] =
     triplesUpToDate.flatMap {

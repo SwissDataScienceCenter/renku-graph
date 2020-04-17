@@ -82,7 +82,7 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
   }
 
   private def createRepositoryDirectory(projectPath: projects.Path): IO[Path] =
-    contextShift.shift *> mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
+    mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
 
   private def tempDirectoryName(repositoryName: String) =
     workDirectory / s"$repositoryName-${randomLong()}"

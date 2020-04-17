@@ -43,7 +43,11 @@ class EventLogMetrics(
     waitingEventsInterval: FiniteDuration = EventLogMetrics.waitingEventsInterval
 )(implicit ME:             MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO]) {
 
-  def run: IO[Unit] = (timer sleep interval) *> updateCollectors
+  def run: IO[Unit] =
+    for {
+      _ <- timer sleep interval
+      _ <- updateCollectors()
+    } yield ()
 
   private def updateCollectors() = {
     for {
@@ -57,7 +61,8 @@ class EventLogMetrics(
       statuses <- statsFinder.statuses
       _ = statuses foreach toStatusesGauge
       _ = totalGauge set statuses.values.sum
-      _ <- (timer sleep statusesInterval) *> updateStatuses()
+      _ <- timer sleep statusesInterval
+      _ <- updateStatuses()
     } yield ()
   } recoverWith logAndRetry(continueWith = updateStatuses())
 
@@ -70,7 +75,8 @@ class EventLogMetrics(
       waitingEvents <- statsFinder.waitingEvents
       newState = removeZeroCountProjects(waitingEvents, previousState)
       _        = newState foreach toWaitingEventsGauge
-      _ <- (timer sleep waitingEventsInterval) *> updateWaitingEvents(newState)
+      _ <- timer sleep waitingEventsInterval
+      _ <- updateWaitingEvents(newState)
     } yield ()
   } recoverWith logAndRetry(continueWith = updateWaitingEvents())
 
@@ -90,8 +96,11 @@ class EventLogMetrics(
 
   private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
-      logger.error(exception)("Problem with gathering metrics")
-      (timer sleep interval) *> continueWith
+      for {
+        _ <- logger.error(exception)("Problem with gathering metrics")
+        _ <- timer sleep interval
+        _ <- continueWith
+      } yield ()
   }
 }
 
