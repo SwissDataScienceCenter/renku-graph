@@ -16,29 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.db
+package io.renku.eventlog
 
-import cats.effect.IO
-import ch.datascience.db.DBConfigProvider
-import ch.datascience.graph.model.events.{CommitId, EventId}
-import ch.datascience.graph.model.projects.Id
+import cats.effect.Bracket
+import cats.implicits._
+import ch.datascience.db.DbTransactor
 import doobie.implicits._
-import io.renku.eventlog._
+import doobie.util.fragment.Fragment
 
-import scala.language.postfixOps
+import scala.language.higherKinds
 
-object EventLog extends InMemoryEventLogDb {
+package object init {
 
-  def findEvents(projectId: Id, status: EventStatus): List[CommitId] = execute {
-    sql"""|select event_id
-          |from event_log
-          |where project_id = $projectId and status = $status
-          |""".stripMargin
-      .query[EventId]
-      .to[List]
-      .map(_.map(eventId => CommitId(eventId.value)))
-  }
-
-  protected override val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
-    new EventLogDbConfigProvider[IO].get().unsafeRunSync()
+  def execute[Interpretation[_]](
+      sql:               Fragment
+  )(implicit transactor: DbTransactor[Interpretation, EventLogDB],
+    ME:                  Bracket[Interpretation, Throwable]): Interpretation[Unit] =
+    sql.update.run.transact(transactor.get).map(_ => ())
 }

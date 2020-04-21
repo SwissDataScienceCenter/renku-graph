@@ -16,29 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests.db
+package io.renku.eventlog
 
-import cats.effect.IO
+import cats.MonadError
 import ch.datascience.db.DBConfigProvider
-import ch.datascience.graph.model.events.{CommitId, EventId}
-import ch.datascience.graph.model.projects.Id
-import doobie.implicits._
-import io.renku.eventlog._
+import eu.timepit.refined.auto._
 
-import scala.language.postfixOps
+import scala.language.higherKinds
 
-object EventLog extends InMemoryEventLogDb {
+sealed trait EventLogDB
 
-  def findEvents(projectId: Id, status: EventStatus): List[CommitId] = execute {
-    sql"""|select event_id
-          |from event_log
-          |where project_id = $projectId and status = $status
-          |""".stripMargin
-      .query[EventId]
-      .to[List]
-      .map(_.map(eventId => CommitId(eventId.value)))
-  }
-
-  protected override val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
-    new EventLogDbConfigProvider[IO].get().unsafeRunSync()
-}
+class EventLogDbConfigProvider[Interpretation[_]](
+    implicit ME: MonadError[Interpretation, Throwable]
+) extends DBConfigProvider[Interpretation, EventLogDB](
+      namespace = "event-log",
+      dbName    = "event_log"
+    )

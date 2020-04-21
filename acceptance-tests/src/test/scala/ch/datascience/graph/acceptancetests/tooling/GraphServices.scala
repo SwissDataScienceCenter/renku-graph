@@ -23,6 +23,7 @@ import cats.effect.concurrent.Semaphore
 import ch.datascience.graph.acceptancetests.stubs.GitLab
 import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
+import io.renku.eventlog
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.ExecutionContext
