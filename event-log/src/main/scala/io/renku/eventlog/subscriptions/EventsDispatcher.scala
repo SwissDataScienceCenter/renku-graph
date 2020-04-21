@@ -71,8 +71,12 @@ class EventsDispatcher(
         result <- sendEvent(url, id, body)
         _      <- logStatement(result, url, id)
         _ <- result match {
-              case Delivered   => IO.unit
-              case ServiceBusy => dispatch(otherUrls :+ url, id, body)
+              case Delivered => IO.unit
+              case ServiceBusy =>
+                otherUrls match {
+                  case Nil => (timer sleep noSubscriptionSleep) flatMap (_ => run)
+                  case _   => dispatch(otherUrls :+ url, id, body)
+                }
               case Misdelivered =>
                 subscriptions
                   .remove(url)
