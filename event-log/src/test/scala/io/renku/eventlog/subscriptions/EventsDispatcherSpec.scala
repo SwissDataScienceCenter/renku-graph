@@ -143,8 +143,10 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
         .expects(capture(usedUrls), event.compoundEventId, event.body)
         .returning(exception.raiseError[IO, SendingResult])
 
-      val statusUpdateCommand =
-        ToNonRecoverableFailure[IO](event.compoundEventId, EventMessage(exception), waitingEventsGauge)
+      val statusUpdateCommand = ToNonRecoverableFailure[IO](event.compoundEventId,
+                                                            EventMessage(exception),
+                                                            waitingEventsGauge,
+                                                            underProcessingGauge)
       (statusUpdatesRunner.run _)
         .expects(statusUpdateCommand)
         .returning(Updated.pure[IO])
@@ -294,8 +296,10 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
         .expects(capture(usedUrls), event.compoundEventId, event.body)
         .returning(exception.raiseError[IO, SendingResult])
 
-      val statusUpdateCommand =
-        ToNonRecoverableFailure[IO](event.compoundEventId, EventMessage(exception), waitingEventsGauge)
+      val statusUpdateCommand = ToNonRecoverableFailure[IO](event.compoundEventId,
+                                                            EventMessage(exception),
+                                                            waitingEventsGauge,
+                                                            underProcessingGauge)
       val eventStatusChangeException = exceptions.generateOne
       (statusUpdatesRunner.run _)
         .expects(statusUpdateCommand)
@@ -331,18 +335,20 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
     val urls @ url1 +: url2 +: Nil =
       subscriptionUrls.generateNonEmptyList(minElements = 2, maxElements = 2).toList
 
-    val waitingEventsGauge  = mock[LabeledGauge[IO, projects.Path]]
-    val subscriptions       = mock[TestIOSubscriptions]
-    val eventsFinder        = mock[EventFetcher[IO]]
-    val statusUpdatesRunner = mock[StatusUpdatesRunner[IO]]
-    val eventsSender        = mock[EventsSender[IO]]
-    val logger              = TestLogger[IO]()
+    val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
+    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
+    val subscriptions        = mock[TestIOSubscriptions]
+    val eventsFinder         = mock[EventFetcher[IO]]
+    val statusUpdatesRunner  = mock[StatusUpdatesRunner[IO]]
+    val eventsSender         = mock[EventsSender[IO]]
+    val logger               = TestLogger[IO]()
     val dispatcher = new EventsDispatcher(
       subscriptions,
       eventsFinder,
       statusUpdatesRunner,
       eventsSender,
       waitingEventsGauge,
+      underProcessingGauge,
       logger,
       noSubscriptionSleep = 500 millis,
       noEventSleep        = 250 millis,

@@ -34,10 +34,11 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](
-    statusUpdatesRunner: StatusUpdatesRunner[Interpretation],
-    waitingEventsGauge:  LabeledGauge[Interpretation, projects.Path],
-    logger:              Logger[Interpretation]
-)(implicit ME:           MonadError[Interpretation, Throwable])
+    statusUpdatesRunner:  StatusUpdatesRunner[Interpretation],
+    waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
+    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
+    logger:               Logger[Interpretation]
+)(implicit ME:            MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
   import ch.datascience.controllers.InfoMessage._
@@ -93,11 +94,13 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
         status       <- cursor.downField("status").as[EventStatus]
         maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
       } yield status match {
-        case TriplesStore          => ToTriplesStore[Interpretation](eventId, waitingEventsGauge)
-        case New                   => ToNew[Interpretation](eventId, waitingEventsGauge)
-        case RecoverableFailure    => ToRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge)
-        case NonRecoverableFailure => ToNonRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge)
-        case other                 => throw new Exception(s"Transition to '$other' status unsupported")
+        case TriplesStore => ToTriplesStore[Interpretation](eventId, waitingEventsGauge, underProcessingGauge)
+        case New          => ToNew[Interpretation](eventId, waitingEventsGauge, underProcessingGauge)
+        case RecoverableFailure =>
+          ToRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge)
+        case NonRecoverableFailure =>
+          ToNonRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge)
+        case other => throw new Exception(s"Transition to '$other' status unsupported")
       }
 
     jsonOf[Interpretation, ChangeStatusCommand[Interpretation]]
@@ -108,11 +111,12 @@ object IOStatusChangeEndpoint {
   import cats.effect.IO
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:  LabeledGauge[IO, projects.Path],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
+      transactor:           DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:   LabeledGauge[IO, projects.Path],
+      underProcessingGauge: LabeledGauge[IO, projects.Path],
+      logger:               Logger[IO]
+  )(implicit contextShift:  ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
       statusUpdatesRunner <- IOUpdateCommandsRunner(transactor)
-    } yield new StatusChangeEndpoint(statusUpdatesRunner, waitingEventsGauge, logger)
+    } yield new StatusChangeEndpoint(statusUpdatesRunner, waitingEventsGauge, underProcessingGauge, logger)
 }

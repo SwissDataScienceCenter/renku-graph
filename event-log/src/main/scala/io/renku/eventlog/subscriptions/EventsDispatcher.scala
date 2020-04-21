@@ -37,16 +37,17 @@ import scala.util.Random.shuffle
 import scala.util.control.NonFatal
 
 class EventsDispatcher(
-    subscriptions:       Subscriptions[IO],
-    eventsFinder:        EventFetcher[IO],
-    statusUpdatesRunner: StatusUpdatesRunner[IO],
-    eventsSender:        EventsSender[IO],
-    waitingEventsGauge:  LabeledGauge[IO, projects.Path],
-    logger:              Logger[IO],
-    noSubscriptionSleep: FiniteDuration,
-    noEventSleep:        FiniteDuration,
-    onErrorSleep:        FiniteDuration
-)(implicit timer:        Timer[IO]) {
+    subscriptions:        Subscriptions[IO],
+    eventsFinder:         EventFetcher[IO],
+    statusUpdatesRunner:  StatusUpdatesRunner[IO],
+    eventsSender:         EventsSender[IO],
+    waitingEventsGauge:   LabeledGauge[IO, projects.Path],
+    underProcessingGauge: LabeledGauge[IO, projects.Path],
+    logger:               Logger[IO],
+    noSubscriptionSleep:  FiniteDuration,
+    noEventSleep:         FiniteDuration,
+    onErrorSleep:         FiniteDuration
+)(implicit timer:         Timer[IO]) {
 
   import eventsFinder._
   import eventsSender._
@@ -91,7 +92,8 @@ class EventsDispatcher(
 
   private def nonRecoverableError(url: SubscriptionUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
-      val markEventFailed = ToNonRecoverableFailure[IO](id, EventMessage(exception), waitingEventsGauge)
+      val markEventFailed =
+        ToNonRecoverableFailure[IO](id, EventMessage(exception), waitingEventsGauge, underProcessingGauge)
       for {
         _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
         _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
@@ -132,12 +134,13 @@ object EventsDispatcher {
       transactor:              DbTransactor[IO, EventLogDB],
       subscriptions:           Subscriptions[IO],
       waitingEventsGauge:      LabeledGauge[IO, projects.Path],
+      underProcessingGauge:    LabeledGauge[IO, projects.Path],
       logger:                  Logger[IO]
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[EventsDispatcher] =
     for {
-      eventsFinder        <- IOEventLogFetch(transactor, waitingEventsGauge)
+      eventsFinder        <- IOEventLogFetch(transactor, waitingEventsGauge, underProcessingGauge)
       eventsSender        <- IOEventsSender(logger)
       updateCommandRunner <- IOUpdateCommandsRunner(transactor)
     } yield new EventsDispatcher(subscriptions,
@@ -145,6 +148,7 @@ object EventsDispatcher {
                                  updateCommandRunner,
                                  eventsSender,
                                  waitingEventsGauge,
+                                 underProcessingGauge,
                                  logger,
                                  noSubscriptionSleep = NoSubscriptionSleep,
                                  noEventSleep        = NoEventSleep,

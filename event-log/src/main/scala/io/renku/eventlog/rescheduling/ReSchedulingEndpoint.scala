@@ -55,10 +55,11 @@ object IOReSchedulingEndpoint {
   import io.renku.eventlog.EventLogDB
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:  LabeledGauge[IO, projects.Path],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[ReSchedulingEndpoint[IO]] = IO {
-    new ReSchedulingEndpointImpl(new IOReScheduler(transactor, waitingEventsGauge), logger)
+      transactor:           DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:   LabeledGauge[IO, projects.Path],
+      underProcessingGauge: LabeledGauge[IO, projects.Path],
+      logger:               Logger[IO]
+  )(implicit contextShift:  ContextShift[IO]): IO[ReSchedulingEndpoint[IO]] = IO {
+    new ReSchedulingEndpointImpl(new IOReScheduler(transactor, waitingEventsGauge, underProcessingGauge), logger)
   }
 }

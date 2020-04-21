@@ -39,7 +39,7 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
   "command" should {
 
     s"set status $New on the event with the given id and $Processing status, " +
-      "increment waiting events gauge for the project " +
+      "increment waiting events gauge and decrement under processing gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
       val projectPath = projectPaths.generateOne
@@ -72,8 +72,9 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
       findEvents(status = New) shouldBe List.empty
 
       (waitingEventsGauge.increment _).expects(projectPath).returning(IO.unit)
+      (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-      val command = ToNew[IO](eventId, waitingEventsGauge, currentTime)
+      val command = ToNew[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
 
       (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -94,7 +95,7 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
         findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-        val command = ToNew[IO](eventId, waitingEventsGauge, currentTime)
+        val command = ToNew[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -107,10 +108,11 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
   }
 
   private trait TestCase {
-    val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
-    val currentTime        = mockFunction[Instant]
-    val eventId            = compoundEventIds.generateOne
-    val eventBatchDate     = batchDates.generateOne
+    val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
+    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
+    val currentTime          = mockFunction[Instant]
+    val eventId              = compoundEventIds.generateOne
+    val eventBatchDate       = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor)
 

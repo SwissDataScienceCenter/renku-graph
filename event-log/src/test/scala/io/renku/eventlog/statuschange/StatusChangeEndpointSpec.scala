@@ -53,14 +53,16 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
 
     val scenarios = Table(
       "status"     -> "command builder",
-      New          -> ToTriplesStore[IO](compoundEventIds.generateOne, waitingEventsGauge),
-      TriplesStore -> ToNew[IO](compoundEventIds.generateOne, waitingEventsGauge),
+      New          -> ToTriplesStore[IO](compoundEventIds.generateOne, waitingEventsGauge, underProcessingGauge),
+      TriplesStore -> ToNew[IO](compoundEventIds.generateOne, waitingEventsGauge, underProcessingGauge),
       RecoverableFailure -> ToRecoverableFailure[IO](compoundEventIds.generateOne,
                                                      eventMessages.generateOption,
-                                                     waitingEventsGauge),
+                                                     waitingEventsGauge,
+                                                     underProcessingGauge),
       NonRecoverableFailure -> ToNonRecoverableFailure[IO](compoundEventIds.generateOne,
                                                            eventMessages.generateOption,
-                                                           waitingEventsGauge)
+                                                           waitingEventsGauge,
+                                                           underProcessingGauge)
     )
     forAll(scenarios) { (status, command) =>
       "decode payload from the body, " +
@@ -181,7 +183,7 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
 
       val eventId = compoundEventIds.generateOne
 
-      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, waitingEventsGauge)
+      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, waitingEventsGauge, underProcessingGauge)
       val exception = exceptions.generateOne
       (commandsRunner.run _)
         .expects(command)
@@ -205,7 +207,12 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
   private trait TestCase {
     val commandsRunner = mock[StatusUpdatesRunner[IO]]
     val logger         = TestLogger[IO]()
-    val changeStatus   = new StatusChangeEndpoint[IO](commandsRunner, waitingEventsGauge, logger).changeStatus _
+    val changeStatus = new StatusChangeEndpoint[IO](
+      commandsRunner,
+      waitingEventsGauge,
+      underProcessingGauge,
+      logger
+    ).changeStatus _
   }
 
   implicit val commandEncoder: Encoder[ChangeStatusCommand[IO]] = Encoder.instance[ChangeStatusCommand[IO]] {
@@ -223,7 +230,9 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
       }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
   }
 
-  private lazy val waitingEventsGauge: LabeledGauge[IO, projects.Path] = new LabeledGauge[IO, projects.Path] {
+  private lazy val waitingEventsGauge:   LabeledGauge[IO, projects.Path] = new GaugeStub
+  private lazy val underProcessingGauge: LabeledGauge[IO, projects.Path] = new GaugeStub
+  private class GaugeStub extends LabeledGauge[IO, projects.Path] {
     override def set(labelValue:       (projects.Path, Double)) = IO.unit
     override def increment(labelValue: projects.Path)           = IO.unit
     override def decrement(labelValue: projects.Path)           = IO.unit

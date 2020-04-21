@@ -183,6 +183,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       extends SubscriptionsEndpoint[IO](subscriptions, logger)
   class TestStatusChangeEndpoint(updateCommandsRunner: StatusUpdatesRunner[IO],
                                  waitingEventsGauge:   LabeledGauge[IO, projects.Path],
+                                 underProcessingGauge: LabeledGauge[IO, projects.Path],
                                  logger:               Logger[IO])
-      extends StatusChangeEndpoint[IO](updateCommandsRunner, waitingEventsGauge, logger)
+      extends StatusChangeEndpoint[IO](updateCommandsRunner, waitingEventsGauge, underProcessingGauge, logger)
 }

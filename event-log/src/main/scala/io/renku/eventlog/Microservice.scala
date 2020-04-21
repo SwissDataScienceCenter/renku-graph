@@ -65,14 +65,25 @@ object Microservice extends IOMicroservice {
         metricsRegistry          <- MetricsRegistry()
         eventLogMetrics          <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
         waitingEventsGauge       <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        underProcessingGauge     <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger)
         eventCreationEndpoint    <- IOEventCreationEndpoint(transactor, waitingEventsGauge, ApplicationLogger)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, ApplicationLogger)
-        reSchedulingEndpoint     <- IOReSchedulingEndpoint(transactor, waitingEventsGauge, ApplicationLogger)
-        statusChangeEndpoint     <- IOStatusChangeEndpoint(transactor, waitingEventsGauge, ApplicationLogger)
-        subscriptions            <- IOSubscriptions(ApplicationLogger)
-        eventsDispatcher         <- EventsDispatcher(transactor, subscriptions, waitingEventsGauge, ApplicationLogger)
-        subscriptionsEndpoint    <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
+        reSchedulingEndpoint <- IOReSchedulingEndpoint(transactor,
+                                                       waitingEventsGauge,
+                                                       underProcessingGauge,
+                                                       ApplicationLogger)
+        statusChangeEndpoint <- IOStatusChangeEndpoint(transactor,
+                                                       waitingEventsGauge,
+                                                       underProcessingGauge,
+                                                       ApplicationLogger)
+        subscriptions <- IOSubscriptions(ApplicationLogger)
+        eventsDispatcher <- EventsDispatcher(transactor,
+                                             subscriptions,
+                                             waitingEventsGauge,
+                                             underProcessingGauge,
+                                             ApplicationLogger)
+        subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
         routes <- new MicroserviceRoutes[IO](
                    eventCreationEndpoint,
                    latestEventsEndpoint,

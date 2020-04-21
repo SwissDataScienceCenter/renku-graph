@@ -43,10 +43,11 @@ private trait EventFetcher[Interpretation[_]] {
 }
 
 private class EventFetcherImpl[Interpretation[_]](
-    transactor:         DbTransactor[Interpretation, EventLogDB],
-    renkuLogTimeout:    RenkuLogTimeout,
-    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                () => Instant = () => Instant.now,
+    transactor:           DbTransactor[Interpretation, EventLogDB],
+    renkuLogTimeout:      RenkuLogTimeout,
+    waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
+    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                  () => Instant = () => Instant.now,
     pickRandomlyFrom: List[(projects.Id, projects.Path)] => Option[(projects.Id, projects.Path)] = ids =>
       ids.get(Random nextInt ids.size)
 )(implicit ME: Bracket[Interpretation, Throwable])
@@ -63,7 +64,7 @@ private class EventFetcherImpl[Interpretation[_]](
     for {
       maybeProjectEventIdAndBody <- findEventAndUpdateForProcessing().transact(transactor.get)
       (maybeProject, maybeEventIdAndBody) = maybeProjectEventIdAndBody
-      _ <- maybeDecrementWaitingEvents(maybeProject, maybeEventIdAndBody)
+      _ <- maybeUpdateMetrics(maybeProject, maybeEventIdAndBody)
     } yield maybeEventIdAndBody
 
   private def findEventAndUpdateForProcessing() =
@@ -123,17 +124,22 @@ private class EventFetcherImpl[Interpretation[_]](
     case 1 => Some(idAndBody)
   }
 
-  private def maybeDecrementWaitingEvents(maybeProject: Option[ProjectIdAndPath], maybeBody: Option[EventIdAndBody]) =
+  private def maybeUpdateMetrics(maybeProject: Option[ProjectIdAndPath], maybeBody: Option[EventIdAndBody]) =
     (maybeBody, maybeProject) mapN {
-      case (_, (_, projectPath)) => waitingEventsGauge decrement projectPath
+      case (_, (_, projectPath)) =>
+        for {
+          _ <- waitingEventsGauge decrement projectPath
+          _ <- underProcessingGauge increment projectPath
+        } yield ()
     } getOrElse ME.unit
 }
 
 private object IOEventLogFetch {
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:  LabeledGauge[IO, projects.Path]
-  )(implicit contextShift: ContextShift[IO]): IO[EventFetcherImpl[IO]] =
-    RenkuLogTimeout[IO]() map (new EventFetcherImpl(transactor, _, waitingEventsGauge))
+      transactor:           DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:   LabeledGauge[IO, projects.Path],
+      underProcessingGauge: LabeledGauge[IO, projects.Path]
+  )(implicit contextShift:  ContextShift[IO]): IO[EventFetcherImpl[IO]] =
+    RenkuLogTimeout[IO]() map (new EventFetcherImpl(transactor, _, waitingEventsGauge, underProcessingGauge))
 }

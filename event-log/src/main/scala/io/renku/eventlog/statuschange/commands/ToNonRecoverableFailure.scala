@@ -35,11 +35,12 @@ import io.renku.eventlog.{EventLogDB, EventMessage, EventStatus}
 import scala.language.higherKinds
 
 final case class ToNonRecoverableFailure[Interpretation[_]](
-    eventId:            CompoundEventId,
-    maybeMessage:       Option[EventMessage],
-    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                () => Instant = () => Instant.now
-)(implicit ME:          Bracket[Interpretation, Throwable])
+    eventId:              CompoundEventId,
+    maybeMessage:         Option[EventMessage],
+    waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
+    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                  () => Instant = () => Instant.now
+)(implicit ME:            Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override val status: EventStatus = NonRecoverableFailure
@@ -53,7 +54,12 @@ final case class ToNonRecoverableFailure[Interpretation[_]](
   override def updateGauges(
       updateResult:      UpdateResult
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap waitingEventsGauge.decrement
-    case _                    => ME.unit
+    case UpdateResult.Updated =>
+      for {
+        path <- findProjectPath(eventId)
+        _    <- waitingEventsGauge decrement path
+        _    <- underProcessingGauge decrement path
+      } yield ()
+    case _ => ME.unit
   }
 }

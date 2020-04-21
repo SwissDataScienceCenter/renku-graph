@@ -64,6 +64,7 @@ class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
       addEvent(event6Id, RecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply), event6Date)
 
       (waitingEventsGauge.reset _).expects().returning(IO.unit)
+      (underProcessingGauge.reset _).expects().returning(IO.unit)
 
       eventLog.scheduleEventsForProcessing.unsafeRunSync() shouldBe ((): Unit)
 
@@ -82,10 +83,11 @@ class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
   private trait TestCase {
 
     val waitingEventsGauge          = mock[LabeledGauge[IO, Path]]
+    val underProcessingGauge        = mock[LabeledGauge[IO, Path]]
     val currentTime                 = Instant.now()
     private val currentTimeProvider = mockFunction[Instant]
     currentTimeProvider.expects().returning(currentTime)
-    val eventLog = new ReScheduler(transactor, waitingEventsGauge, currentTimeProvider)
+    val eventLog = new ReScheduler(transactor, waitingEventsGauge, underProcessingGauge, currentTimeProvider)
 
     def addEvent(commitEventId: CompoundEventId,
                  status:        EventStatus,

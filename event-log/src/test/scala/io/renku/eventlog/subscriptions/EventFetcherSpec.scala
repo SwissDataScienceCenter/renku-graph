@@ -79,12 +79,14 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
       findEvents(EventStatus.Processing) shouldBe List.empty
 
       expectWaitingEventsGaugeDecrement(projectPath)
+      expectUnderProcessingGaugeIncrement(projectPath)
 
       eventLogFetch.popEvent.unsafeRunSync() shouldBe Some(event3Id -> event3Body)
 
       findEvents(EventStatus.Processing) shouldBe List((event3Id, executionDate, event3BatchDate))
 
       expectWaitingEventsGaugeDecrement(projectPath)
+      expectUnderProcessingGaugeIncrement(projectPath)
 
       eventLogFetch.popEvent.unsafeRunSync() shouldBe Some(event1Id -> event1Body)
 
@@ -112,6 +114,7 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
       )
 
       expectWaitingEventsGaugeDecrement(projectPath)
+      expectUnderProcessingGaugeIncrement(projectPath)
 
       eventLogFetch.popEvent.unsafeRunSync() shouldBe Some(eventId -> eventBody)
 
@@ -161,8 +164,14 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
       findEvents(EventStatus.Processing) shouldBe List.empty
 
       (waitingEventsGauge.decrement _).expects(*).returning(IO.unit).repeat(eventIdsBodiesDates.size)
+      (underProcessingGauge.increment _).expects(*).returning(IO.unit).repeat(eventIdsBodiesDates.size)
 
-      override val eventLogFetch = new EventFetcherImpl(transactor, renkuLogTimeout, waitingEventsGauge)
+      override val eventLogFetch = new EventFetcherImpl(
+        transactor,
+        renkuLogTimeout,
+        waitingEventsGauge,
+        underProcessingGauge
+      )
       eventIdsBodiesDates.toList foreach { _ =>
         eventLogFetch.popEvent.unsafeRunSync() shouldBe a[Some[_]]
       }
@@ -203,9 +212,11 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
         transactor,
         renkuLogTimeout,
         waitingEventsGauge,
+        underProcessingGauge,
         pickRandomlyFrom = _ => (project2Id -> project2Path).some
       )
       expectWaitingEventsGaugeDecrement(project2Path)
+      expectUnderProcessingGaugeIncrement(project2Path)
       eventLogFetch.popEvent.unsafeRunSync() shouldBe a[Some[_]]
 
       findEvents(
@@ -217,11 +228,18 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
 
   private trait TestCase {
 
-    val currentTime        = mockFunction[Instant]
-    val renkuLogTimeout    = renkuLogTimeouts.generateOne
-    val waitingEventsGauge = mock[LabeledGauge[IO, Path]]
-    val maxProcessingTime  = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
-    val eventLogFetch      = new EventFetcherImpl(transactor, renkuLogTimeout, waitingEventsGauge, currentTime)
+    val currentTime          = mockFunction[Instant]
+    val renkuLogTimeout      = renkuLogTimeouts.generateOne
+    val waitingEventsGauge   = mock[LabeledGauge[IO, Path]]
+    val underProcessingGauge = mock[LabeledGauge[IO, Path]]
+    val maxProcessingTime    = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
+    val eventLogFetch = new EventFetcherImpl(
+      transactor,
+      renkuLogTimeout,
+      waitingEventsGauge,
+      underProcessingGauge,
+      currentTime
+    )
 
     val now           = Instant.now()
     val executionDate = ExecutionDate(now)
@@ -232,6 +250,11 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
 
     def expectWaitingEventsGaugeDecrement(projectPath: Path) =
       (waitingEventsGauge.decrement _)
+        .expects(projectPath)
+        .returning(IO.unit)
+
+    def expectUnderProcessingGaugeIncrement(projectPath: Path) =
+      (underProcessingGauge.increment _)
         .expects(projectPath)
         .returning(IO.unit)
   }

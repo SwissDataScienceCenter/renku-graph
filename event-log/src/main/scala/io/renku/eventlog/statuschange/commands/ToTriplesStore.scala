@@ -35,10 +35,11 @@ import io.renku.eventlog.{EventLogDB, EventStatus}
 import scala.language.higherKinds
 
 final case class ToTriplesStore[Interpretation[_]](
-    eventId:            CompoundEventId,
-    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                () => Instant = () => Instant.now
-)(implicit ME:          Bracket[Interpretation, Throwable])
+    eventId:              CompoundEventId,
+    waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
+    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                  () => Instant = () => Instant.now
+)(implicit ME:            Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override val status: EventStatus = TriplesStore
@@ -52,7 +53,12 @@ final case class ToTriplesStore[Interpretation[_]](
   override def updateGauges(
       updateResult:      UpdateResult
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap waitingEventsGauge.decrement
-    case _                    => ME.unit
+    case UpdateResult.Updated =>
+      for {
+        path <- findProjectPath(eventId)
+        _    <- waitingEventsGauge decrement path
+        _    <- underProcessingGauge decrement path
+      } yield ()
+    case _ => ME.unit
   }
 }

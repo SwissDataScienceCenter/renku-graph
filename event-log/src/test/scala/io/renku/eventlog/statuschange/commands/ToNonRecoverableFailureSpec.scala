@@ -42,7 +42,7 @@ class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec w
   "command" should {
 
     s"set status $NonRecoverableFailure on the event with the given id and $Processing status, " +
-      "decrement waiting events gauge for the project " +
+      "decrement waiting events and under processing gauges for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
       storeEvent(
@@ -68,9 +68,11 @@ class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec w
       findEvent(eventId) shouldBe Some((executionDate, Processing, None))
 
       (waitingEventsGauge.decrement _).expects(projectPath).returning(IO.unit)
+      (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
 
       val maybeMessage = Gen.option(eventMessages).generateOne
-      val command      = ToNonRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, currentTime)
+      val command =
+        ToNonRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge, currentTime)
 
       (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -92,7 +94,8 @@ class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec w
         findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
         val maybeMessage = Gen.option(eventMessages).generateOne
-        val command      = ToNonRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, currentTime)
+        val command =
+          ToNonRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -102,10 +105,11 @@ class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec w
   }
 
   private trait TestCase {
-    val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
-    val currentTime        = mockFunction[Instant]
-    val eventId            = compoundEventIds.generateOne
-    val eventBatchDate     = batchDates.generateOne
+    val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
+    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
+    val currentTime          = mockFunction[Instant]
+    val eventId              = compoundEventIds.generateOne
+    val eventBatchDate       = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor)
 
