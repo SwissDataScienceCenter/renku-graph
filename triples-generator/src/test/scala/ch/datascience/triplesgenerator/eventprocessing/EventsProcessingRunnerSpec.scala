@@ -53,7 +53,7 @@ class EventsProcessingRunnerSpec extends WordSpec with Eventually with Integrati
 
       // draining processing capacity by scheduling max number of jobs
       (1 to processesNumber).toList map { _ =>
-        processingRunner.scheduleForProcessing(eventId, events).unsafeRunAsyncAndForget()
+        processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync()
       }
 
       // any new job to get the Busy status
@@ -67,8 +67,8 @@ class EventsProcessingRunnerSpec extends WordSpec with Eventually with Integrati
     "release the processing resource on processing failure" in new TestCase {
 
       // draining processing capacity by scheduling max number of jobs
-      processingRunner.scheduleForProcessing(eventIdCausingFailure, events).unsafeRunAsyncAndForget()
-      processingRunner.scheduleForProcessing(eventIdCausingFailure, events).unsafeRunAsyncAndForget()
+      processingRunner.scheduleForProcessing(eventIdCausingFailure, events).unsafeRunSync()
+      processingRunner.scheduleForProcessing(eventIdCausingFailure, events).unsafeRunSync()
 
       // any new job to get the Busy status
       processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Busy
@@ -76,12 +76,6 @@ class EventsProcessingRunnerSpec extends WordSpec with Eventually with Integrati
       // once at least one process is done, new events should be accepted again
       sleep(eventProcessingTime + eventProcessingTime / 2)
       processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
-    }
-
-    "fail if processing an event fails" in new TestCase {
-      intercept[Exception] {
-        processingRunner.scheduleForProcessing(eventIdCausingFailure, events).unsafeRunSync()
-      } shouldBe exception
     }
   }
 

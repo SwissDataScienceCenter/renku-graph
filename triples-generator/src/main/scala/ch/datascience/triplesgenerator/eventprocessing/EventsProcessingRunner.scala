@@ -54,9 +54,8 @@ private class IOEventsProcessingRunner private (
     eventProcessor: EventProcessor[IO],
     semaphore:      Semaphore[IO],
     logger:         Logger[IO]
-) extends EventsProcessingRunner[IO] {
-
-  import eventProcessor._
+)(implicit cs:      ContextShift[IO])
+    extends EventsProcessingRunner[IO] {
 
   override def scheduleForProcessing(eventId: CompoundEventId,
                                      events:  NonEmptyList[CommitEvent]): IO[EventSchedulingResult] =
@@ -65,16 +64,22 @@ private class IOEventsProcessingRunner private (
       case _ => {
         for {
           _ <- semaphore.acquire
-          _ <- process(eventId, events)
-          _ <- semaphore.release
+          _ <- process(eventId, events).start
         } yield Accepted: EventSchedulingResult
       } recoverWith releasingSemaphore
     }
 
-  private lazy val releasingSemaphore: PartialFunction[Throwable, IO[EventSchedulingResult]] = {
+  private def process(eventId: CompoundEventId, events: NonEmptyList[CommitEvent]) = {
+    for {
+      _ <- eventProcessor.process(eventId, events)
+      _ <- semaphore.release
+    } yield ()
+  } recoverWith releasingSemaphore
+
+  private def releasingSemaphore[O]: PartialFunction[Throwable, IO[O]] = {
     case NonFatal(exception) =>
       semaphore.release flatMap { _ =>
-        exception.raiseError[IO, EventSchedulingResult]
+        exception.raiseError[IO, O]
       }
   }
 }
