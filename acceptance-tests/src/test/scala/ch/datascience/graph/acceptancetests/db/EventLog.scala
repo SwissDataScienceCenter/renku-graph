@@ -20,7 +20,7 @@ package ch.datascience.graph.acceptancetests.db
 
 import cats.effect.IO
 import ch.datascience.db.DBConfigProvider
-import ch.datascience.dbeventlog._
+import ch.datascience.eventlog._
 import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.projects.Id
 import doobie.implicits._

@@ -18,8 +18,8 @@
 
 package ch.datascience.graph.acceptancetests
 
-import ch.datascience.dbeventlog.EventStatus
-import ch.datascience.dbeventlog.EventStatus.New
+import ch.datascience.eventlog.EventStatus
+import ch.datascience.eventlog.EventStatus.New
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog

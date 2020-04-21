@@ -19,7 +19,7 @@ lazy val root = Project(
 ).aggregate(
   jsonLd,
   graphCommons,
-  dbEventLog,
+  eventLog,
   tokenRepository,
   webhookService,
   triplesGenerator,
@@ -47,9 +47,9 @@ lazy val graphCommons = Project(
   AutomateHeaderPlugin
 )
 
-lazy val dbEventLog = Project(
-  id = "db-event-log",
-  base = file("db-event-log")
+lazy val eventLog = Project(
+  id = "event-log",
+  base = file("event-log")
 ).settings(
   commonSettings
 ).dependsOn(
@@ -123,7 +123,7 @@ lazy val acceptanceTests = Project(
   tokenRepository,
   knowledgeGraph % "test->test",
   graphCommons % "test->test",
-  dbEventLog % "test->test"
+  eventLog % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )

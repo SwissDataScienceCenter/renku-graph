@@ -25,5 +25,5 @@ charts:
         valuesPath: knowledgeGraph.image
       event-log:
         contextPath: ..
-        dockerfilePath: ../db-event-log/Dockerfile
+        dockerfilePath: ../event-log/Dockerfile
         valuesPath: eventLog.image

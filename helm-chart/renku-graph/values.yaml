@@ -59,7 +59,7 @@ webhookService:
     interval: 30 minutes
   gitlab:
     rateLimit: 100/sec
-  threadsNumber: 3
+  threadsNumber: 4
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
@@ -79,7 +79,7 @@ knowledgeGraph:
   gitlab:
     rateLimit: 100/sec
   jvmXmx: 200m
-  threadsNumber: 3
+  threadsNumber: 4
   services:
     renku:
       ## Renku knowledge-graph resources path e.g. `knowledge-graph` would assume
@@ -88,7 +88,7 @@ knowledgeGraph:
 
 eventLog:
   image:
-    repository: renku/db-event-log
+    repository: renku/event-log
     tag: 'latest'
     pullPolicy: IfNotPresent
   service:
@@ -143,7 +143,7 @@ resources: {}
   # limits:
   #  cpu: 100m
   #  memory: 128Mi
-  # requests:
+# requests:
 #  cpu: 100m
 #  memory: 128Mi
 

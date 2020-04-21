@@ -79,7 +79,7 @@ object GraphServices {
   val webhookService  = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
   val tokenRepository = ServiceRun("token-repository", tokenrepository.Microservice, tokenRepositoryClient)
   val knowledgeGraph  = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
-  val eventLog        = ServiceRun("event-log", dbeventlog.Microservice, eventLogClient)
+  val eventLog        = ServiceRun("event-log", eventlog.Microservice, eventLogClient)
   val triplesGenerator = ServiceRun(
     "triples-generator",
     service          = triplesgenerator.Microservice,

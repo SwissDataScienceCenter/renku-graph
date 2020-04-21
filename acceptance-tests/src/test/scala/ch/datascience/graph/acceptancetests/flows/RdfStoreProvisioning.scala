@@ -19,8 +19,8 @@
 package ch.datascience.graph.acceptancetests.flows
 
 import AccessTokenPresence._
-import ch.datascience.dbeventlog.EventStatus
-import ch.datascience.dbeventlog.EventStatus.New
+import ch.datascience.eventlog.EventStatus
+import ch.datascience.eventlog.EventStatus.New
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.db.EventLog
