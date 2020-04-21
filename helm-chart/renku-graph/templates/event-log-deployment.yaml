@@ -38,7 +38,7 @@ spec:
 {{- else }}
                   name: {{ template "eventLog.fullname" . }}
 {{- end }}
-                  key: graph-eventLog-postgresPassword
+                  key: graph-dbEventLog-postgresPassword
             - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
               value: "{{ .Values.eventLog.connectionPool }}"
             - name: RENKU_LOG_TIMEOUT
