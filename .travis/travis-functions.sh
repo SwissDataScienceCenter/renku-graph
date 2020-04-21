@@ -75,7 +75,6 @@ function updateVersionInRenku() {
   # pushing to the remote
   git checkout -b auto-update/renku-graph-$TRAVIS_TAG
   git add charts/renku/requirements.yaml
-  git add charts/renku/requirements.lock
   git commit -m "chore: updating renku-graph version to $TRAVIS_TAG"
   git push --set-upstream origin auto-update/renku-graph-$TRAVIS_TAG
 }
