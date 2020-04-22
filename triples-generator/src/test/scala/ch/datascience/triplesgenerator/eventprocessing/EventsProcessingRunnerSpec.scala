@@ -29,6 +29,7 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult.{Accepted, Busy}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
@@ -76,6 +77,10 @@ class EventsProcessingRunnerSpec extends WordSpec with Eventually with Integrati
       // once at least one process is done, new events should be accepted again
       sleep(eventProcessingTime + eventProcessingTime / 2)
       processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
+
+      eventually {
+        logger.logged(Error(s"Processing event $eventIdCausingFailure failed", exception))
+      }
     }
   }
 

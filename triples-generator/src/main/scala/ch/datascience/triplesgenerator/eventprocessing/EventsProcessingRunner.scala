@@ -74,7 +74,13 @@ private class IOEventsProcessingRunner private (
       _ <- eventProcessor.process(eventId, events)
       _ <- semaphore.release
     } yield ()
-  } recoverWith releasingSemaphore
+  } recoverWith {
+    case NonFatal(exception) =>
+      for {
+        _ <- semaphore.release
+        _ <- logger.error(exception)(s"Processing event $eventId failed")
+      } yield ()
+  }
 
   private def releasingSemaphore[O]: PartialFunction[Throwable, IO[O]] = {
     case NonFatal(exception) =>
