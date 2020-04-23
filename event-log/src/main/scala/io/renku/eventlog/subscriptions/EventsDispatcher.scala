@@ -25,15 +25,14 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
-import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, ToNonRecoverableFailure, UpdateResult}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import io.renku.eventlog.{EventLogDB, EventMessage}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
-import scala.util.Random.shuffle
 import scala.util.control.NonFatal
 
 class EventsDispatcher(
@@ -49,73 +48,107 @@ class EventsDispatcher(
     onErrorSleep:         FiniteDuration
 )(implicit timer:         Timer[IO]) {
 
-  import eventsFinder._
   import eventsSender._
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
 
-  def run: IO[Unit] =
-    subscriptions.getAll flatMap {
-      case Nil =>
-        logger.info("Waiting for subscribers")
-        (timer sleep noSubscriptionSleep) flatMap (_ => run)
-      case urls =>
-        popEvent flatMap {
-          case None             => (timer sleep noEventSleep) flatMap (_ => run)
-          case Some((id, body)) => dispatch(shuffle(urls), id, body) flatMap (_ => run)
-        } recoverWith loggingError("Finding events to process failed")
-    } recoverWith loggingError("Finding subscribers failed")
+  def run: IO[Unit] = waitForSubscriptions(andThen = popEvent)
 
-  private def dispatch(urls: List[SubscriptionUrl], id: CompoundEventId, body: EventBody): IO[Unit] = urls match {
-    case url +: otherUrls => {
-      for {
-        result <- sendEvent(url, id, body)
-        _      <- logStatement(result, url, id)
-        _ <- result match {
-              case Delivered => IO.unit
-              case ServiceBusy =>
-                otherUrls match {
-                  case Nil => (timer sleep noSubscriptionSleep) flatMap (_ => run)
-                  case _   => dispatch(otherUrls :+ url, id, body)
-                }
-              case Misdelivered =>
-                subscriptions
-                  .remove(url)
-                  .flatMap(_ => dispatch(otherUrls, id, body))
-                  .recoverWith(redispatch(otherUrls, id, body))
-            }
-      } yield ()
-    } recoverWith nonRecoverableError(url, id)
-    case Nil => run
-  }
+  private def waitForSubscriptions(andThen: => IO[Unit]): IO[Unit] = {
+    subscriptions.isNext flatMap {
+      case true => andThen
+      case false =>
+        for {
+          _ <- logger.info("Waiting for subscribers")
+          _ <- timer sleep noSubscriptionSleep
+          _ <- waitForSubscriptions(andThen)
+        } yield ()
+    }
+  } recoverWith loggingError("Finding subscribers failed", retry = waitForSubscriptions(andThen))
+
+  private def popEvent: IO[Unit] =
+    eventsFinder.popEvent
+      .recoverWith(loggingError("Finding events to process failed", retry = eventsFinder.popEvent))
+      .flatMap {
+        case None             => (timer sleep noEventSleep) flatMap (_ => popEvent)
+        case Some((id, body)) => dispatch(id, body) flatMap (_ => popEvent)
+      }
+
+  private def dispatch(id: CompoundEventId, body: EventBody): IO[Unit] =
+    subscriptions.next flatMap {
+      case Some(url) => {
+        for {
+          result <- sendEvent(url, id, body)
+          _      <- logStatement(result, url, id)
+          _ <- result match {
+                case Delivered    => IO.unit
+                case ServiceBusy  => reDispatch(id, body, url)
+                case Misdelivered => removeUrlAndRollback(id, body, url)
+              }
+        } yield ()
+      } recoverWith markEventAsRecoverable(url, id)
+      case None => waitForSubscriptions(andThen = dispatch(id, body))
+    }
+
+  private def toNew(id: CompoundEventId) = ToNew[IO](id, waitingEventsGauge, underProcessingGauge)
 
   private def logStatement(result: SendingResult, url: SubscriptionUrl, id: CompoundEventId): IO[Unit] = result match {
     case result @ Delivered    => logger.info(s"Event $id, url = $url -> $result")
-    case result @ ServiceBusy  => logger.info(s"Event $id, url = $url -> $result")
+    case result @ ServiceBusy  => IO.unit
     case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
   }
 
-  private def nonRecoverableError(url: SubscriptionUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
+  private def reDispatch(id: CompoundEventId, body: EventBody, url: SubscriptionUrl) =
+    (subscriptions hasOtherThan url) flatMap {
+      case true  => dispatch(id, body)
+      case false => (timer sleep noSubscriptionSleep) flatMap (_ => dispatch(id, body))
+    }
+
+  private def removeUrlAndRollback(id: CompoundEventId, body: EventBody, url: SubscriptionUrl) = {
+    for {
+      _ <- subscriptions remove url
+      _ <- subscriptions.isNext flatMap {
+            case true => dispatch(id, body)
+            case false =>
+              statusUpdatesRunner run toNew(id) map (_ => ()) recoverWith retryDispatching(
+                id,
+                body,
+                s"Event $id problems to rollback event"
+              )
+          }
+    } yield ()
+  } recoverWith retryDispatching(id, body, "Removing subscription failed")
+
+  private def retryDispatching(id:      CompoundEventId,
+                               body:    EventBody,
+                               message: String): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
-      val markEventFailed =
-        ToNonRecoverableFailure[IO](id, EventMessage(exception), waitingEventsGauge, underProcessingGauge)
+      for {
+        _ <- logger.error(exception)(message)
+        _ <- dispatch(id, body)
+      } yield ()
+  }
+
+  private def markEventAsRecoverable(url: SubscriptionUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
+    case NonFatal(exception) =>
+      val markEventFailed = ToNonRecoverableFailure[IO](
+        id,
+        EventMessage(exception),
+        waitingEventsGauge,
+        underProcessingGauge
+      )
       for {
         _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
         _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
       } yield ()
   }
 
-  private def loggingError(message: String): PartialFunction[Throwable, IO[Unit]] = {
+  private def loggingError[O](message: String, retry: => IO[O]): PartialFunction[Throwable, IO[O]] = {
     case NonFatal(exception) =>
-      logger.error(exception)(message)
-      (timer sleep onErrorSleep) flatMap (_ => run)
-  }
-
-  private def redispatch(urls: List[SubscriptionUrl],
-                         id:   CompoundEventId,
-                         body: EventBody): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("Removing subscription failed")
-      dispatch(urls, id, body)
+      for {
+        _      <- logger.error(exception)(message)
+        _      <- timer sleep onErrorSleep
+        result <- retry
+      } yield result
   }
 
   private def retry(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
@@ -146,7 +179,7 @@ object EventsDispatcher {
     for {
       eventsFinder        <- IOEventLogFetch(transactor, waitingEventsGauge, underProcessingGauge)
       eventsSender        <- IOEventsSender(logger)
-      updateCommandRunner <- IOUpdateCommandsRunner(transactor)
+      updateCommandRunner <- IOUpdateCommandsRunner(transactor, logger)
     } yield new EventsDispatcher(subscriptions,
                                  eventsFinder,
                                  updateCommandRunner,
