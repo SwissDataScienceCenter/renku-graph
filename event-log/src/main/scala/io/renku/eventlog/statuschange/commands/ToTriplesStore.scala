@@ -36,7 +36,6 @@ import scala.language.higherKinds
 
 final case class ToTriplesStore[Interpretation[_]](
     eventId:              CompoundEventId,
-    waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
     now:                  () => Instant = () => Instant.now
 )(implicit ME:            Bracket[Interpretation, Throwable])
@@ -53,12 +52,7 @@ final case class ToTriplesStore[Interpretation[_]](
   override def updateGauges(
       updateResult:      UpdateResult
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated =>
-      for {
-        path <- findProjectPath(eventId)
-        _    <- waitingEventsGauge decrement path
-        _    <- underProcessingGauge decrement path
-      } yield ()
-    case _ => ME.unit
+    case UpdateResult.Updated => findProjectPath(eventId) flatMap underProcessingGauge.decrement
+    case _                    => ME.unit
   }
 }

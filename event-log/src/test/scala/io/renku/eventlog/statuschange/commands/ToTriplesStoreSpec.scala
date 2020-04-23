@@ -72,10 +72,9 @@ class ToTriplesStoreSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
 
       findEvents(status = TriplesStore) shouldBe List.empty
 
-      (waitingEventsGauge.decrement _).expects(projectPath).returning(IO.unit)
       (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-      val command = ToTriplesStore[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
+      val command = ToTriplesStore[IO](eventId, underProcessingGauge, currentTime)
 
       (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -96,7 +95,7 @@ class ToTriplesStoreSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
 
         findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-        val command = ToTriplesStore[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
+        val command = ToTriplesStore[IO](eventId, underProcessingGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -109,7 +108,6 @@ class ToTriplesStoreSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
   }
 
   private trait TestCase {
-    val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
     val currentTime          = mockFunction[Instant]
     val eventId              = compoundEventIds.generateOne

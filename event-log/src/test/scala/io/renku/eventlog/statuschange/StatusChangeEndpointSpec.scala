@@ -53,21 +53,22 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
 
     val scenarios = Table(
       "status"     -> "command builder",
-      New          -> ToTriplesStore[IO](compoundEventIds.generateOne, waitingEventsGauge, underProcessingGauge),
-      TriplesStore -> ToNew[IO](compoundEventIds.generateOne, waitingEventsGauge, underProcessingGauge),
+      TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne, underProcessingGauge),
+      New          -> ToNew[IO](compoundEventIds.generateOne, waitingEventsGauge, underProcessingGauge),
       RecoverableFailure -> ToRecoverableFailure[IO](compoundEventIds.generateOne,
                                                      eventMessages.generateOption,
                                                      waitingEventsGauge,
                                                      underProcessingGauge),
       NonRecoverableFailure -> ToNonRecoverableFailure[IO](compoundEventIds.generateOne,
                                                            eventMessages.generateOption,
-                                                           waitingEventsGauge,
                                                            underProcessingGauge)
     )
     forAll(scenarios) { (status, command) =>
       "decode payload from the body, " +
         "perform status update " +
         s"and return $Ok if all went fine - $status status case" in new TestCase {
+
+        command.status shouldBe status
 
         val eventId = command.eventId
 
@@ -183,7 +184,7 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
 
       val eventId = compoundEventIds.generateOne
 
-      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, waitingEventsGauge, underProcessingGauge)
+      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, underProcessingGauge)
       val exception = exceptions.generateOne
       (commandsRunner.run _)
         .expects(command)

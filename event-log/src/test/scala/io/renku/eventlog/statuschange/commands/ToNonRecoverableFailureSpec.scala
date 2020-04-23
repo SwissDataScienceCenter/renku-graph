@@ -68,12 +68,11 @@ class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec w
 
       findEvent(eventId) shouldBe Some((executionDate, Processing, None))
 
-      (waitingEventsGauge.decrement _).expects(projectPath).returning(IO.unit)
       (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
 
       val maybeMessage = Gen.option(eventMessages).generateOne
       val command =
-        ToNonRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge, currentTime)
+        ToNonRecoverableFailure[IO](eventId, maybeMessage, underProcessingGauge, currentTime)
 
       (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -96,7 +95,7 @@ class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec w
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToNonRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge, currentTime)
+          ToNonRecoverableFailure[IO](eventId, maybeMessage, underProcessingGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -106,7 +105,6 @@ class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec w
   }
 
   private trait TestCase {
-    val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
     val currentTime          = mockFunction[Instant]
     val eventId              = compoundEventIds.generateOne

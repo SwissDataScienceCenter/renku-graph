@@ -130,12 +130,7 @@ class EventsDispatcher(
 
   private def markEventAsRecoverable(url: SubscriptionUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
-      val markEventFailed = ToNonRecoverableFailure[IO](
-        id,
-        EventMessage(exception),
-        waitingEventsGauge,
-        underProcessingGauge
-      )
+      val markEventFailed = ToNonRecoverableFailure[IO](id, EventMessage(exception), underProcessingGauge)
       for {
         _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
         _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")

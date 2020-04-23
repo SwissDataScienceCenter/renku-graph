@@ -289,10 +289,7 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
           .returning(exception.raiseError[IO, SendingResult])
 
         sending(
-          ToNonRecoverableFailure[IO](failingEvent.compoundEventId,
-                                      EventMessage(exception),
-                                      waitingEventsGauge,
-                                      underProcessingGauge),
+          ToNonRecoverableFailure[IO](failingEvent.compoundEventId, EventMessage(exception), underProcessingGauge),
           returning = Updated.pure[IO]
         )
 
@@ -419,19 +416,13 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
           .returning(exception.raiseError[IO, SendingResult])
 
         sending(
-          ToNonRecoverableFailure[IO](failingEvent.compoundEventId,
-                                      EventMessage(exception),
-                                      waitingEventsGauge,
-                                      underProcessingGauge),
+          ToNonRecoverableFailure[IO](failingEvent.compoundEventId, EventMessage(exception), underProcessingGauge),
           returning = exception.raiseError[IO, UpdateResult]
         )
 
         // retrying
         sending(
-          ToNonRecoverableFailure[IO](failingEvent.compoundEventId,
-                                      EventMessage(exception),
-                                      waitingEventsGauge,
-                                      underProcessingGauge),
+          ToNonRecoverableFailure[IO](failingEvent.compoundEventId, EventMessage(exception), underProcessingGauge),
           returning = Updated.pure[IO]
         )
 

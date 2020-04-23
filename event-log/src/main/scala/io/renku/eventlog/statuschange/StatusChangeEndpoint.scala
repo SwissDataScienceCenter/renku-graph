@@ -94,12 +94,12 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
         status       <- cursor.downField("status").as[EventStatus]
         maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
       } yield status match {
-        case TriplesStore => ToTriplesStore[Interpretation](eventId, waitingEventsGauge, underProcessingGauge)
+        case TriplesStore => ToTriplesStore[Interpretation](eventId, underProcessingGauge)
         case New          => ToNew[Interpretation](eventId, waitingEventsGauge, underProcessingGauge)
         case RecoverableFailure =>
           ToRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge)
         case NonRecoverableFailure =>
-          ToNonRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge)
+          ToNonRecoverableFailure[Interpretation](eventId, maybeMessage, underProcessingGauge)
         case other => throw new Exception(s"Transition to '$other' status unsupported")
       }
 
