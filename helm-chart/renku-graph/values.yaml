@@ -39,7 +39,7 @@ triplesGenerator:
   gitlab:
     rateLimit: 30/sec
   ## a demanded number of concurrent triples generation processes
-  generationProcessesNumber: 3
+  generationProcessesNumber: 4
   threadsNumber: 6
 
 webhookService:
