@@ -25,6 +25,8 @@ import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodie
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.metrics.LabeledGauge
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
@@ -50,9 +52,13 @@ class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec with 
 
       (gauge.increment _).expects(projectPath).returning(IO.unit)
 
-      runner.run(TestCommand(eventId, projectPath, gauge)).unsafeRunSync() shouldBe Updated
+      val command = TestCommand(eventId, projectPath, gauge)
+
+      runner.run(command).unsafeRunSync() shouldBe Updated
 
       findEvents(status = Processing).map(_._1) shouldBe List(eventId)
+
+      logger.loggedOnly(Info(s"Event $eventId got ${command.status}"))
     }
   }
 
@@ -61,7 +67,8 @@ class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec with 
     val projectPath = projectPaths.generateOne
 
     val gauge  = mock[LabeledGauge[IO, projects.Path]]
-    val runner = new StatusUpdatesRunnerImpl[IO](transactor)
+    val logger = TestLogger[IO]()
+    val runner = new StatusUpdatesRunnerImpl[IO](transactor, logger)
   }
 
   private case class TestCommand(eventId:     CompoundEventId,

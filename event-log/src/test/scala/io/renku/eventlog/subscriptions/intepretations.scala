@@ -19,6 +19,8 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.IO
+import cats.effect.concurrent.Ref
 import io.chrisdavenport.log4cats.Logger
 
-class TestIOSubscriptions(logger: Logger[IO]) extends Subscriptions[IO](logger)
+class TestIOSubscriptions(currentUrl: Ref[IO, Option[SubscriptionUrl]], logger: Logger[IO])
+    extends Subscriptions[IO](currentUrl, logger)

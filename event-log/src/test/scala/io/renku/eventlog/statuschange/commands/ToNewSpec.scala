@@ -25,6 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.LabeledGauge
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
 import io.renku.eventlog.EventStatus.{New, Processing}
@@ -114,7 +115,7 @@ class ToNewSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
     val eventId              = compoundEventIds.generateOne
     val eventBatchDate       = batchDates.generateOne
 
-    val commandRunner = new StatusUpdatesRunnerImpl(transactor)
+    val commandRunner = new StatusUpdatesRunnerImpl(transactor, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

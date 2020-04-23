@@ -35,7 +35,7 @@ import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.rescheduling.IOReSchedulingEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
-import io.renku.eventlog.subscriptions.{EventsDispatcher, IOSubscriptions, IOSubscriptionsEndpoint}
+import io.renku.eventlog.subscriptions.{EventsDispatcher, IOSubscriptionsEndpoint, Subscriptions}
 import pureconfig.loadConfigOrThrow
 
 import scala.concurrent.ExecutionContext
@@ -77,7 +77,7 @@ object Microservice extends IOMicroservice {
                                                        waitingEventsGauge,
                                                        underProcessingGauge,
                                                        ApplicationLogger)
-        subscriptions <- IOSubscriptions(ApplicationLogger)
+        subscriptions <- Subscriptions(ApplicationLogger)
         eventsDispatcher <- EventsDispatcher(transactor,
                                              subscriptions,
                                              waitingEventsGauge,

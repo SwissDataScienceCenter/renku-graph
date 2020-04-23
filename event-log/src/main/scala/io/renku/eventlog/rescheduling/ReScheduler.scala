@@ -26,8 +26,8 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
+import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventStatus.New
-import io.renku.eventlog.metrics.UnderProcessingGauge
 import io.renku.eventlog.{EventLogDB, EventStatus, TypesSerializers}
 
 import scala.language.higherKinds
@@ -36,6 +36,7 @@ private class ReScheduler[Interpretation[_]](
     transactor:           DbTransactor[Interpretation, EventLogDB],
     waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
+    logger:               Logger[Interpretation],
     now:                  () => Instant = () => Instant.now
 )(implicit ME:            Bracket[Interpretation, Throwable])
     extends TypesSerializers {
@@ -43,6 +44,7 @@ private class ReScheduler[Interpretation[_]](
   def scheduleEventsForProcessing: Interpretation[Unit] =
     for {
       _ <- runUpdate() transact transactor.get
+      _ <- logger.info("All events re-scheduled")
       _ <- waitingEventsGauge.reset
       _ <- underProcessingGauge.reset
     } yield ()
@@ -56,6 +58,7 @@ private class ReScheduler[Interpretation[_]](
 private class IOReScheduler(
     transactor:           DbTransactor[IO, EventLogDB],
     waitingEventsGauge:   LabeledGauge[IO, projects.Path],
-    underProcessingGauge: LabeledGauge[IO, projects.Path]
+    underProcessingGauge: LabeledGauge[IO, projects.Path],
+    logger:               Logger[IO]
 )(implicit contextShift:  ContextShift[IO])
-    extends ReScheduler[IO](transactor, waitingEventsGauge, underProcessingGauge)
+    extends ReScheduler[IO](transactor, waitingEventsGauge, underProcessingGauge, logger)

@@ -26,6 +26,7 @@ import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
@@ -111,7 +112,7 @@ class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec w
     val eventId              = compoundEventIds.generateOne
     val eventBatchDate       = batchDates.generateOne
 
-    val commandRunner = new StatusUpdatesRunnerImpl(transactor)
+    val commandRunner = new StatusUpdatesRunnerImpl(transactor, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

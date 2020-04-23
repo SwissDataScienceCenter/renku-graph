@@ -25,7 +25,6 @@ import ch.datascience.controllers.InfoMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -51,8 +50,6 @@ class ReSchedulingEndpointSpec extends WordSpec with MockFactory {
       response.status                        shouldBe Accepted
       response.contentType                   shouldBe Some(`Content-Type`(application.json))
       response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Events re-scheduling triggered")
-
-      logger.expectNoLogs()
     }
 
     s"return $Accepted regardless of the outcome of the call to events re-scheduling" in new TestCase {
@@ -69,14 +66,11 @@ class ReSchedulingEndpointSpec extends WordSpec with MockFactory {
       response.status                        shouldBe Accepted
       response.contentType                   shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Events re-scheduling triggered")
-
-      logger.expectNoLogs()
     }
   }
 
   private trait TestCase {
     val reScheduler         = mock[IOReScheduler]
-    val logger              = TestLogger[IO]()
-    val triggerReScheduling = new ReSchedulingEndpointImpl(reScheduler, logger).triggerReScheduling _
+    val triggerReScheduling = new ReSchedulingEndpointImpl(reScheduler).triggerReScheduling _
   }
 }

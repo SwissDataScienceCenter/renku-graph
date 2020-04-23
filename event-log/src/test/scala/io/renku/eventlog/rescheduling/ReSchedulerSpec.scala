@@ -27,6 +27,8 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId}
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.metrics.LabeledGauge
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
@@ -77,6 +79,8 @@ class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
         (event6Id, ExecutionDate(event6Date.value), BatchDate(currentTime))
       )
       findEventMessage(event4Id) shouldBe None
+
+      logger.loggedOnly(Info("All events re-scheduled"))
     }
   }
 
@@ -87,7 +91,8 @@ class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
     val currentTime                 = Instant.now()
     private val currentTimeProvider = mockFunction[Instant]
     currentTimeProvider.expects().returning(currentTime)
-    val eventLog = new ReScheduler(transactor, waitingEventsGauge, underProcessingGauge, currentTimeProvider)
+    val logger   = TestLogger[IO]()
+    val eventLog = new ReScheduler(transactor, waitingEventsGauge, underProcessingGauge, logger, currentTimeProvider)
 
     def addEvent(commitEventId: CompoundEventId,
                  status:        EventStatus,

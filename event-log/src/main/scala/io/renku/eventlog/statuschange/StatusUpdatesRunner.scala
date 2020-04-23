@@ -20,7 +20,9 @@ package io.renku.eventlog.statuschange
 
 import cats.effect.Bracket
 import ch.datascience.db.DbTransactor
+import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 
 import scala.language.higherKinds
@@ -30,7 +32,8 @@ trait StatusUpdatesRunner[Interpretation[_]] {
 }
 
 class StatusUpdatesRunnerImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB]
+    transactor: DbTransactor[Interpretation, EventLogDB],
+    logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends StatusUpdatesRunner[Interpretation] {
 
@@ -43,15 +46,21 @@ class StatusUpdatesRunnerImpl[Interpretation[_]](
     for {
       queryResult  <- command.query.update.run transact transactor.get
       updateResult <- ME.catchNonFatal(command mapResult queryResult)
+      _            <- logInfo(command, updateResult)
       _            <- command updateGauges updateResult
     } yield updateResult
+
+  private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
+    case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
+    case _       => ME.unit
+  }
 }
 
 object IOUpdateCommandsRunner {
 
   import cats.effect.IO
 
-  def apply(transactor: DbTransactor[IO, EventLogDB]): IO[StatusUpdatesRunner[IO]] = IO {
-    new StatusUpdatesRunnerImpl[IO](transactor)
+  def apply(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO]): IO[StatusUpdatesRunner[IO]] = IO {
+    new StatusUpdatesRunnerImpl[IO](transactor, logger)
   }
 }

@@ -117,6 +117,6 @@ object IOStatusChangeEndpoint {
       logger:               Logger[IO]
   )(implicit contextShift:  ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
-      statusUpdatesRunner <- IOUpdateCommandsRunner(transactor)
+      statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, logger)
     } yield new StatusChangeEndpoint(statusUpdatesRunner, waitingEventsGauge, underProcessingGauge, logger)
 }

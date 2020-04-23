@@ -32,8 +32,7 @@ trait ReSchedulingEndpoint[Interpretation[_]] {
 }
 
 class ReSchedulingEndpointImpl(
-    reScheduler:         ReScheduler[IO],
-    logger:              Logger[IO]
+    reScheduler:         ReScheduler[IO]
 )(implicit contextShift: ContextShift[IO])
     extends Http4sDsl[IO]
     with ReSchedulingEndpoint[IO] {
@@ -60,6 +59,8 @@ object IOReSchedulingEndpoint {
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       logger:               Logger[IO]
   )(implicit contextShift:  ContextShift[IO]): IO[ReSchedulingEndpoint[IO]] = IO {
-    new ReSchedulingEndpointImpl(new IOReScheduler(transactor, waitingEventsGauge, underProcessingGauge), logger)
+    new ReSchedulingEndpointImpl(
+      new IOReScheduler(transactor, waitingEventsGauge, underProcessingGauge, logger)
+    )
   }
 }

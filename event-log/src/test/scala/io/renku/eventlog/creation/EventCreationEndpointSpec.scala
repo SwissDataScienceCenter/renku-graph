@@ -29,7 +29,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.metrics.LabeledGauge
 import io.circe.literal._
 import io.circe.syntax._
@@ -66,7 +66,7 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
       response.contentType                   shouldBe Some(`Content-Type`(application.json))
       response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event created")
 
-      logger.expectNoLogs()
+      logger.loggedOnly(Info(s"Event ${event.compoundEventId}, projectPath = ${event.project.path} added"))
     }
 
     "decode an Event from the request, " +

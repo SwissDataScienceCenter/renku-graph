@@ -51,6 +51,7 @@ class EventCreationEndpoint[Interpretation[_]: Effect](
     for {
       event         <- request.as[Event] recoverWith badRequest
       storingResult <- storeNewEvent(event)
+      _             <- logInfo(event, storingResult)
       response      <- storingResult.asHttpResponse
     } yield response
   } recoverWith httpResponse
@@ -65,6 +66,11 @@ class EventCreationEndpoint[Interpretation[_]: Effect](
       case Result.Created => Created(InfoMessage("Event created"))
       case Result.Existed => Ok(InfoMessage("Event existed"))
     }
+  }
+
+  private def logInfo(event: Event, result: Result): Interpretation[Unit] = result match {
+    case Result.Created => logger.info(s"Event ${event.compoundEventId}, projectPath = ${event.project.path} added")
+    case _              => ME.unit
   }
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
