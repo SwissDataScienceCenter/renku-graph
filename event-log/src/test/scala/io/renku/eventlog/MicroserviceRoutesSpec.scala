@@ -31,7 +31,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.creation.{EventCreationEndpoint, EventPersister}
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import io.renku.eventlog.rescheduling.ReSchedulingEndpoint
+import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.{Subscriptions, SubscriptionsEndpoint}
 import org.http4s.Method.{GET, PATCH, POST}
@@ -57,6 +57,17 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       val response = routes.call(request)
 
       response.status shouldBe expectedStatus
+    }
+
+    "define a PATCH /events endpoint" in new TestCase {
+
+      val request = Request[IO](PATCH, uri"events")
+
+      (eventsPatchingEndpoint.triggerEventsPatching _).expects(request).returning(Response[IO](Accepted).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe Accepted
     }
 
     "define a GET /events/latest endpoint" in new TestCase {
@@ -92,17 +103,6 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       val response = routes.call(request)
 
       response.status shouldBe Ok
-    }
-
-    "define a POST /events/status/NEW endpoint" in new TestCase {
-
-      (reSchedulingEndpoint.triggerReScheduling _).expects().returning(Response[IO](Accepted).pure[IO])
-
-      val request = Request[IO](POST, uri"events" / "status" / "NEW")
-
-      val response = routes.call(request)
-
-      response.status shouldBe Accepted
     }
 
     "define a POST /events/subscriptions?status=READY endpoint" in new TestCase {
@@ -158,7 +158,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
     val latestEventsEndpoint     = mock[TestLatestEventsEndpoint]
     val eventCreationEndpoint    = mock[TestEventCreationEndpoint]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
-    val reSchedulingEndpoint     = mock[ReSchedulingEndpoint[IO]]
+    val eventsPatchingEndpoint   = mock[EventsPatchingEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
     val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
     val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
@@ -166,7 +166,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       eventCreationEndpoint,
       latestEventsEndpoint,
       processingStatusEndpoint,
-      reSchedulingEndpoint,
+      eventsPatchingEndpoint,
       statusChangeEndpoint,
       subscriptionsEndpoint,
       routesMetrics

@@ -21,6 +21,7 @@ package io.renku.eventlog.creation
 import EventPersister.Result
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor
@@ -50,7 +51,7 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
 
     "decode an Event from the request, " +
       "create it in the Event Log " +
-      "and return CREATED " +
+      s"and return $Created " +
       "if there's no such an event in the Log yet" in new TestCase {
 
       val event = events.generateOne
@@ -71,7 +72,7 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
 
     "decode an Event from the request, " +
       "create it in the Event Log " +
-      "and return OK " +
+      s"and return $Ok " +
       "if such an event was already in the Log" in new TestCase {
 
       val event = events.generateOne
@@ -90,7 +91,7 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
       logger.expectNoLogs()
     }
 
-    "return BAD_REQUEST if decoding Event from the request fails" in new TestCase {
+    s"return $BadRequest if decoding Event from the request fails" in new TestCase {
 
       val payload = jsons.generateOne
       val request = Request(Method.POST, uri"events").withEntity(payload)
@@ -99,14 +100,14 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage(
+      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(
         s"Invalid message body: Could not decode JSON: $payload"
       )
 
       logger.expectNoLogs()
     }
 
-    "return INTERNAL_SERVER_ERROR when storing Event in the Log fails" in new TestCase {
+    s"return $InternalServerError when storing Event in the Log fails" in new TestCase {
 
       val event     = events.generateOne
       val exception = exceptions.generateOne

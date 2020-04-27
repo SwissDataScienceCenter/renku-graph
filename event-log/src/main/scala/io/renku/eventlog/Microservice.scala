@@ -33,7 +33,7 @@ import io.renku.eventlog.init.IODbInitializer
 import io.renku.eventlog.latestevents.IOLatestEventsEndpoint
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
-import io.renku.eventlog.rescheduling.IOReSchedulingEndpoint
+import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions.{EventsDispatcher, IOSubscriptionsEndpoint, Subscriptions}
 import pureconfig.loadConfigOrThrow
@@ -69,10 +69,10 @@ object Microservice extends IOMicroservice {
         eventCreationEndpoint    <- IOEventCreationEndpoint(transactor, waitingEventsGauge, ApplicationLogger)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, ApplicationLogger)
-        reSchedulingEndpoint <- IOReSchedulingEndpoint(transactor,
-                                                       waitingEventsGauge,
-                                                       underProcessingGauge,
-                                                       ApplicationLogger)
+        eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
+                                                           waitingEventsGauge,
+                                                           underProcessingGauge,
+                                                           ApplicationLogger)
         statusChangeEndpoint <- IOStatusChangeEndpoint(transactor,
                                                        waitingEventsGauge,
                                                        underProcessingGauge,
@@ -88,7 +88,7 @@ object Microservice extends IOMicroservice {
                    eventCreationEndpoint,
                    latestEventsEndpoint,
                    processingStatusEndpoint,
-                   reSchedulingEndpoint,
+                   eventsPatchingEndpoint,
                    statusChangeEndpoint,
                    subscriptionsEndpoint,
                    new RoutesMetrics[IO](metricsRegistry)

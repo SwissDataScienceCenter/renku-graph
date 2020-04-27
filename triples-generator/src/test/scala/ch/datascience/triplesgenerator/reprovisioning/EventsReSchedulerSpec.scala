@@ -23,6 +23,7 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.literal._
 import org.http4s.Status.{Accepted, BadRequest}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -36,7 +37,8 @@ class EventsReSchedulerSpec extends WordSpec with ExternalServiceStubbing {
     s"succeed if posting to Event Log's events/status/NEW results with $Accepted" in new TestCase {
 
       stubFor {
-        post("/events/status/NEW")
+        patch(urlEqualTo("/events"))
+          .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
@@ -47,13 +49,13 @@ class EventsReSchedulerSpec extends WordSpec with ExternalServiceStubbing {
 
       val message = "message"
       stubFor {
-        post("/events/status/NEW")
+        patch(urlEqualTo("/events"))
           .willReturn(badRequest().withBody(message))
       }
 
       intercept[Exception] {
         sender.triggerEventsReScheduling.unsafeRunSync()
-      }.getMessage shouldBe s"POST $eventLogUrl/events/status/NEW returned $BadRequest; body: $message"
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events returned $BadRequest; body: $message"
     }
   }
 

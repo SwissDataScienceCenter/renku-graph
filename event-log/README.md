@@ -7,10 +7,10 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | Method | Path                                     | Description                                                    |
 |--------|------------------------------------------|----------------------------------------------------------------|
 |  POST  | ```/events```                            | Creates an event with a `NEW` status                           |
+|  PATCH | ```/events```                            | Changes events' data by applying the given patch               |
 |  GET   | ```/events/latest```                     | Finds events for all the projects with the latest `event_date` |
 |  PATCH | ```/events/:id/projects/:id/status```    | Updates event status                                           |
 |  GET   | ```/events/projects/:id/status```        | Finds processing status of events belonging to a project       |
-|  POST  | ```/events/status/NEW```                 | Changes status of all the events to `NEW`                      |
 |  POST  | ```/events/subscriptions?status=READY``` | Adds a subscription for the events                             |
 |  GET   | ```/ping```                              | Verifies service health                                        |
 
@@ -60,12 +60,35 @@ Event Body example:
 
 **Response**
 
-| Status                     | Description                                                                                     |
-|----------------------------|-------------------------------------------------------------------------------------------------|
-| OK (200)                   | When event with the given `id` for the given project already exists in the Event Log            |
-| CREATED (201)              | When a new event was created in the Event Log                                                   |
-| BAD_REQUEST (400)          | When request body is not a valid JSON Event                                                     |
-| INTERNAL SERVER ERROR (500)| When there are problems with event creation                                                     |
+| Status                     | Description                                                                          |
+|----------------------------|--------------------------------------------------------------------------------------|
+| OK (200)                   | When event with the given `id` for the given project already exists in the Event Log |
+| CREATED (201)              | When a new event was created in the Event Log                                        |
+| BAD_REQUEST (400)          | When request body is not a valid JSON Event                                          |
+| INTERNAL SERVER ERROR (500)| When there are problems with event creation                                          |
+
+#### PATCH /events
+
+Changes events' data by applying the given patch.
+
+**NOTICE:** 
+Be aware that the given patch affects all the events in the Event Log.
+
+**Request**
+
+```json
+{
+  "status": "NEW"
+}
+```
+
+**Response**
+
+| Status                     | Description                                          |
+|----------------------------|------------------------------------------------------|
+| ACCEPTED (202)             | When the given data patch got accepted               |
+| BAD_REQUEST (400)          | When request body is not valid                       |
+| INTERNAL SERVER ERROR (500)| When there were problems with processing the request |
 
 #### GET /events/latest
 
@@ -167,20 +190,6 @@ Response body examples:
   "progress": 50.00
 }
 ```
-
-#### POST /events/status/NEW
-
-Triggers changing status of all the events in the Log to `NEW`.
-
-**NOTICE:** 
-By calling this endpoint all the events will get re-processed.
-
-**Response**
-
-| Status                     | Description                                          |
-|----------------------------|------------------------------------------------------|
-| ACCEPTED (202)             | When setting the status got accepted                 |
-| INTERNAL SERVER ERROR (500)| When there were problems with processing the request |
 
 #### POST /events/subscriptions?status=READY
 

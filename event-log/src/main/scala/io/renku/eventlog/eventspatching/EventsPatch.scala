@@ -16,49 +16,47 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.rescheduling
+package io.renku.eventlog.eventspatching
 
 import java.time.Instant
 
-import cats.effect.{Bracket, ContextShift, IO}
-import cats.implicits._
-import ch.datascience.db.DbTransactor
+import cats.MonadError
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
-import io.chrisdavenport.log4cats.Logger
+import cats.implicits._
+import doobie.util.fragment.Fragment
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.EventStatus.New
-import io.renku.eventlog.{EventLogDB, EventStatus, TypesSerializers}
+import io.renku.eventlog.{EventStatus, TypesSerializers}
 
 import scala.language.higherKinds
 
-private class ReScheduler[Interpretation[_]](
-    transactor:           DbTransactor[Interpretation, EventLogDB],
+private trait EventsPatch[Interpretation[_]] extends Product with Serializable with TypesSerializers {
+  def name:           String Refined NonEmpty
+  def query:          Fragment
+  def updateGauges(): Interpretation[Unit]
+}
+
+private case class StatusNewPatch[Interpretation[_]](
     waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
-    logger:               Logger[Interpretation],
     now:                  () => Instant = () => Instant.now
-)(implicit ME:            Bracket[Interpretation, Throwable])
-    extends TypesSerializers {
+)(implicit ME:            MonadError[Interpretation, Throwable])
+    extends EventsPatch[Interpretation] {
 
-  def scheduleEventsForProcessing: Interpretation[Unit] =
+  val status: EventStatus             = New
+  val name:   String Refined NonEmpty = Refined.unsafeApply(s"Status $status patch")
+
+  override def query: Fragment =
+    sql"""|update event_log
+          |set status = $status, execution_date = event_date, batch_date = ${now()}, message = NULL
+          |""".stripMargin
+
+  override def updateGauges(): Interpretation[Unit] =
     for {
-      _ <- runUpdate() transact transactor.get
-      _ <- logger.info("All events re-scheduled")
       _ <- waitingEventsGauge.reset
       _ <- underProcessingGauge.reset
     } yield ()
-
-  private def runUpdate() =
-    sql"""|update event_log 
-          |set status = ${New: EventStatus}, execution_date = event_date, batch_date = ${now()}, message = NULL
-          |""".stripMargin.update.run
 }
-
-private class IOReScheduler(
-    transactor:           DbTransactor[IO, EventLogDB],
-    waitingEventsGauge:   LabeledGauge[IO, projects.Path],
-    underProcessingGauge: LabeledGauge[IO, projects.Path],
-    logger:               Logger[IO]
-)(implicit contextShift:  ContextShift[IO])
-    extends ReScheduler[IO](transactor, waitingEventsGauge, underProcessingGauge, logger)

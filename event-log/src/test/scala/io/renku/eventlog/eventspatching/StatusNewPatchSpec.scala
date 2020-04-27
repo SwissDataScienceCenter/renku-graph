@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.rescheduling
+package io.renku.eventlog.eventspatching
 
 import java.time.Instant
 
@@ -28,7 +28,6 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.metrics.LabeledGauge
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
@@ -38,9 +37,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class StatusNewPatchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
 
-  "scheduleEventsForProcessing" should {
+  "StatusNewPatch" should {
 
     s"set status to $New, batch_date to the current time, execution_date to event_date and clean-up the message on all events" in new TestCase {
 
@@ -68,7 +67,7 @@ class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
       (waitingEventsGauge.reset _).expects().returning(IO.unit)
       (underProcessingGauge.reset _).expects().returning(IO.unit)
 
-      eventLog.scheduleEventsForProcessing.unsafeRunSync() shouldBe ((): Unit)
+      patcher.applyToAllEvents(patch).unsafeRunSync() shouldBe ((): Unit)
 
       findEvents(status = New).toSet shouldBe Set(
         (event1Id, ExecutionDate(event1Date.value), BatchDate(currentTime)),
@@ -79,8 +78,6 @@ class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
         (event6Id, ExecutionDate(event6Date.value), BatchDate(currentTime))
       )
       findEventMessage(event4Id) shouldBe None
-
-      logger.loggedOnly(Info("All events re-scheduled"))
     }
   }
 
@@ -91,8 +88,9 @@ class ReSchedulerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFact
     val currentTime                 = Instant.now()
     private val currentTimeProvider = mockFunction[Instant]
     currentTimeProvider.expects().returning(currentTime)
-    val logger   = TestLogger[IO]()
-    val eventLog = new ReScheduler(transactor, waitingEventsGauge, underProcessingGauge, logger, currentTimeProvider)
+    val patch = StatusNewPatch(waitingEventsGauge, underProcessingGauge, currentTimeProvider)
+
+    val patcher = new EventsPatcher(transactor, TestLogger[IO]())
 
     def addEvent(commitEventId: CompoundEventId,
                  status:        EventStatus,

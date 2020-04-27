@@ -39,14 +39,16 @@ private class IOEventsReScheduler(
     with EventsReScheduler[IO] {
 
   import cats.effect._
-  import org.http4s.Method.POST
+  import io.circe.literal._
+  import org.http4s.Method.PATCH
   import org.http4s.Status.Accepted
+  import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
   override def triggerEventsReScheduling: IO[Unit] =
     for {
-      uri           <- validateUri(s"$eventLogUrl/events/status/NEW")
-      sendingResult <- send(request(POST, uri).withEmptyBody)(mapResponse)
+      uri           <- validateUri(s"$eventLogUrl/events")
+      sendingResult <- send(request(PATCH, uri).withEntity(json"""{"status": "NEW"}"""))(mapResponse)
     } yield sendingResult
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {

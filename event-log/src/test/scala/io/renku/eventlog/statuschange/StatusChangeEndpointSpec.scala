@@ -20,6 +20,7 @@ package io.renku.eventlog.statuschange
 
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
@@ -173,9 +174,9 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
-      response.status                        shouldBe BadRequest
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage("Transition to 'PROCESSING' status unsupported")
+      response.status                         shouldBe BadRequest
+      response.contentType                    shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage("Transition to 'PROCESSING' status unsupported")
 
       logger.expectNoLogs()
     }

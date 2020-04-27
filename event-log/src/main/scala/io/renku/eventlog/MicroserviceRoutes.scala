@@ -28,7 +28,7 @@ import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.creation.EventCreationEndpoint
 import io.renku.eventlog.latestevents.LatestEventsEndpoint
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
-import io.renku.eventlog.rescheduling.ReSchedulingEndpoint
+import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.statuschange.StatusChangeEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
 import org.http4s._
@@ -40,7 +40,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     eventCreationEndpoint:    EventCreationEndpoint[F],
     latestEventsEndpoint:     LatestEventsEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
-    reSchedulingEndpoint:     ReSchedulingEndpoint[F],
+    eventsPatchingEndpoint:   EventsPatchingEndpoint[F],
     statusChangeEndpoint:     StatusChangeEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     routesMetrics:            RoutesMetrics[F]
@@ -52,7 +52,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import latestEventsEndpoint._
   import org.http4s.HttpRoutes
   import processingStatusEndpoint._
-  import reSchedulingEndpoint._
+  import eventsPatchingEndpoint._
   import routesMetrics._
   import statusChangeEndpoint._
   import subscriptionsEndpoint._
@@ -60,10 +60,10 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   // format: off
   lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ POST  -> Root / "events"                                                                  => addEvent(request)
+    case request @ PATCH -> Root / "events"                                                                  => triggerEventsPatching(request)
     case           GET   -> Root / "events" / "latest"                                                       => findLatestEvents
     case           GET   -> Root / "events" / "projects" / ProjectId(id) / "status"                          => findProcessingStatus(id)
     case request @ PATCH -> Root / "events" / EventId(eventId) / "projects"/ ProjectId(projectId) / "status" => changeStatus(CompoundEventId(eventId, projectId), request)
-    case           POST  -> Root / "events" / "status" / "NEW"                                               => triggerReScheduling
     case request @ POST  -> Root / "events" / "subscriptions" :? status(maybeStatus)                         => maybeAddSubscription(maybeStatus, request)
     case           GET   -> Root / "ping"                                                                    => Ok("pong")
   }.meter flatMap `add GET Root / metrics`
