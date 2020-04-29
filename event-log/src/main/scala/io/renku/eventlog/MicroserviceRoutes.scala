@@ -62,13 +62,13 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   // format: off
   lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ POST  -> Root / "events"                                                                  => addEvent(request)
-    case request @ PATCH -> Root / "events"                                                                  => triggerEventsPatching(request)
-    case           GET   -> Root / "events" / "latest"                                                       => findLatestEvents
-    case request @ PATCH -> Root / "events" / EventId(eventId) / "projects"/ ProjectId(projectId) / "status" => changeStatus(CompoundEventId(eventId, projectId), request)
-    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId)                       => maybeFindProcessingStatus(maybeProjectId)
-    case           GET   -> Root / "ping"                                                                    => Ok("pong")
-    case request @ POST  -> Root / "subscriptions"                                                           => addSubscription(request)
+    case request @ POST  -> Root / "events"                                            => addEvent(request)
+    case request @ PATCH -> Root / "events"                                            => triggerEventsPatching(request)
+    case           GET   -> Root / "events" / "latest"                                 => findLatestEvents
+    case request @ PATCH -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => changeStatus(CompoundEventId(eventId, projectId), request)
+    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
+    case           GET   -> Root / "ping"                                              => Ok("pong")
+    case request @ POST  -> Root / "subscriptions"                                     => addSubscription(request)
   }.meter flatMap `add GET Root / metrics`
   // format: on
 

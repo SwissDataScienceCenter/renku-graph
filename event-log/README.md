@@ -9,7 +9,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |  POST  | ```/events```                           | Creates an event with a `NEW` status                           |
 |  PATCH | ```/events```                           | Changes events' data by applying the given patch               |
 |  GET   | ```/events/latest```                    | Finds events for all the projects with the latest `event_date` |
-|  PATCH | ```/events/:id/projects/:id/status```   | Updates event status                                           |
+|  PATCH | ```/events/:event-id/:project-id```     | Updates chosen event's data                                    |
 |  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
 |  GET   | ```/ping```                             | Verifies service health                                        |
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
@@ -126,37 +126,28 @@ To fetch various Prometheus metrics of the service.
 | OK (200)                   | Containing the metrics |
 | INTERNAL SERVER ERROR (500)| Otherwise              |
 
-#### PATCH /events/:id/projects/:id/status
+#### PATCH /events/:event-id/:project-id
 
-Updates status of the event with given `id` and `project_id`.
-
-**Response**
-
-| Status                     | Description                                                                 |
-|----------------------------|-----------------------------------------------------------------------------|
-| OK (200)                   | If status update is successful                                              |
-| NOT_FOUND (404)            | When there's no event with the given `id` and `project_id`                  |
-| CONFLICT (409)             | When current status of the event does not allow to become the requested one |
-| INTERNAL SERVER ERROR (500)| When some problems occurs                                                   |
+Updates event's data with the given payload.
 
 **Request**
 
-There are different payloads required for different status types transitions:
-- `NEW`
+Currently, only status changing payloads are allowed:
+- for transitioning event from status `PROCESSING` to `NEW`
 ```json
 {
   "status": "NEW"
 }
 ```
 **Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
-- `TRIPLES_STORE`
+- for transitioning event from status `PROCESSING` to `TRIPLES_STORE`
 ```json
 {
   "status": "TRIPLES_STORE"
 }
 ```
 **Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
-- `RECOVERABLE_FAILURE`
+- for transitioning event from status `PROCESSING` to `RECOVERABLE_FAILURE`
 ```json
 {
   "status": "RECOVERABLE_FAILURE",
@@ -164,7 +155,7 @@ There are different payloads required for different status types transitions:
 }
 ```
 **Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
-- `NON_RECOVERABLE_FAILURE`
+- for transitioning event from status `PROCESSING` to `NON_RECOVERABLE_FAILURE`
 ```json
 {
   "status": "NON_RECOVERABLE_FAILURE",
@@ -172,6 +163,15 @@ There are different payloads required for different status types transitions:
 }
 ```
 **Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
+
+**Response**
+
+| Status                     | Description                                                                 |
+|----------------------------|-----------------------------------------------------------------------------|
+| OK (200)                   | If status update is successful                                              |
+| BAD_REQUEST (400)          | When invalid payload is given                                               |
+| CONFLICT (409)             | When current status of the event does not allow to become the requested one |
+| INTERNAL SERVER ERROR (500)| When some problems occurs                                                   |
 
 #### GET /ping
 

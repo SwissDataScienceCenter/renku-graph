@@ -42,7 +42,7 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
     Set(Ok, Conflict) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
             .willReturn(aResponse().withStatus(status.code))
         }
@@ -55,14 +55,14 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
       val status = BadRequest
 
       stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
         updater.markEventNew(eventId).unsafeRunSync() shouldBe ((): Unit)
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status returned $status; body: "
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }
 
@@ -71,7 +71,7 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
     Set(Ok, Conflict) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(equalToJson(json"""{"status": "TRIPLES_STORE"}""".spaces2))
             .willReturn(aResponse().withStatus(status.code))
         }
@@ -84,14 +84,14 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
       val status = BadRequest
 
       stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .withRequestBody(equalToJson(json"""{"status": "TRIPLES_STORE"}""".spaces2))
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
         updater.markEventDone(eventId).unsafeRunSync() shouldBe ((): Unit)
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status returned $status; body: "
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }
 
@@ -101,7 +101,7 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
       s"succeed if remote responds with $status" in new TestCase {
         val exception = exceptions.generateOne
         stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(
               equalToJson(json"""{"status": "RECOVERABLE_FAILURE", "message": ${asString(exception)}}""".spaces2)
             )
@@ -116,13 +116,13 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
       val status = BadRequest
 
       stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
         updater.markEventFailedRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status returned $status; body: "
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }
 
@@ -132,7 +132,7 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
       s"succeed if remote responds with $status" in new TestCase {
         val exception = exceptions.generateOne
         stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(
               equalToJson(json"""{"status": "NON_RECOVERABLE_FAILURE", "message": ${asString(exception)}}""".spaces2)
             )
@@ -147,13 +147,13 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
       val status = BadRequest
 
       stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/projects/${eventId.projectId}/status"))
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
         updater.markEventFailedNonRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status returned $status; body: "
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }
 

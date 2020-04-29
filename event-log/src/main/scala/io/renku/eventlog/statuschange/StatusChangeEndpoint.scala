@@ -57,8 +57,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
   } recoverWith httpResponse
 
   private lazy val badRequest: PartialFunction[Throwable, Interpretation[ChangeStatusCommand[Interpretation]]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(BadRequestError(exception))
+    case NonFatal(exception) => ME.raiseError(BadRequestError(exception))
   }
 
   private implicit class ResultOps(result: UpdateResult) {

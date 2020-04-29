@@ -90,7 +90,7 @@ private class IOEventStatusUpdater(
       responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]]
   ): IO[Unit] =
     for {
-      uri           <- validateUri(s"$eventLogUrl/events/${eventId.id}/projects/${eventId.projectId}/status")
+      uri           <- validateUri(s"$eventLogUrl/events/${eventId.id}/${eventId.projectId}")
       sendingResult <- send(request(PATCH, uri).withEntity(payload))(responseMapping)
     } yield sendingResult
 

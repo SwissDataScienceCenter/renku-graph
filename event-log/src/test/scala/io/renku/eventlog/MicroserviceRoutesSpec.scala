@@ -83,12 +83,12 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       response.status shouldBe Ok
     }
 
-    "define a PATCH /events/:id/projects/:id/status endpoint" in new TestCase {
+    "define a PATCH /events/:event-id/:project-:id endpoint" in new TestCase {
       val eventId = compoundEventIds.generateOne
 
       val request = Request[IO](
         method = PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+        uri"events" / eventId.id.toString / eventId.projectId.toString
       )
 
       (statusChangeEndpoint.changeStatus _).expects(eventId, request).returning(Response[IO](Ok).pure[IO])
