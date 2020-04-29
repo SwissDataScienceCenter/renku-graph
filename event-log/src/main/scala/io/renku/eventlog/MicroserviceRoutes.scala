@@ -18,10 +18,14 @@
 
 package io.renku.eventlog
 
+import cats.data.ValidatedNel
 import cats.effect.{Clock, ConcurrentEffect}
 import cats.implicits._
+import ch.datascience.controllers.ErrorMessage
+import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.http.server.binders._
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.projects
 import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.creation.EventCreationEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
@@ -30,8 +34,10 @@ import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.StatusChangeEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
 
 import scala.language.higherKinds
+import scala.util.Try
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     eventCreationEndpoint:    EventCreationEndpoint[F],
@@ -44,6 +50,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 )(implicit clock:             Clock[F])
     extends Http4sDsl[F] {
 
+  import ProjectIdParameter._
   import eventCreationEndpoint._
   import eventsPatchingEndpoint._
   import latestEventsEndpoint._
@@ -58,10 +65,39 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case request @ POST  -> Root / "events"                                                                  => addEvent(request)
     case request @ PATCH -> Root / "events"                                                                  => triggerEventsPatching(request)
     case           GET   -> Root / "events" / "latest"                                                       => findLatestEvents
-    case           GET   -> Root / "events" / "projects" / ProjectId(id) / "status"                          => findProcessingStatus(id)
     case request @ PATCH -> Root / "events" / EventId(eventId) / "projects"/ ProjectId(projectId) / "status" => changeStatus(CompoundEventId(eventId, projectId), request)
+    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId)                       => maybeFindProcessingStatus(maybeProjectId)
     case           GET   -> Root / "ping"                                                                    => Ok("pong")
     case request @ POST  -> Root / "subscriptions"                                                           => addSubscription(request)
   }.meter flatMap `add GET Root / metrics`
   // format: on
+
+  private object ProjectIdParameter {
+
+    private implicit val queryParameterDecoder: QueryParamDecoder[projects.Id] =
+      (value: QueryParameterValue) => {
+        for {
+          int <- Try(value.value.toInt).toEither
+          id  <- projects.Id.from(int)
+        } yield id
+      }.leftMap(_ => ParseFailure(s"'${`project-id`}' parameter with invalid value", "")).toValidatedNel
+
+    object `project-id` extends OptionalValidatingQueryParamDecoderMatcher[projects.Id]("project-id") {
+      val parameterName: String = "project-id"
+
+      override val toString: String = parameterName
+    }
+  }
+
+  private def maybeFindProcessingStatus(
+      maybeProjectId: Option[ValidatedNel[ParseFailure, projects.Id]]
+  ): F[Response[F]] = maybeProjectId match {
+    case None =>
+      BadRequest(ErrorMessage("No 'project-id' parameter"))
+    case Some(validatedProjectId) =>
+      validatedProjectId.fold(
+        errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
+        findProcessingStatus
+      )
+  }
 }

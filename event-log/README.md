@@ -4,15 +4,16 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 ## API
 
-| Method | Path                                  | Description                                                    |
-|--------|---------------------------------------|----------------------------------------------------------------|
-|  POST  | ```/events```                         | Creates an event with a `NEW` status                           |
-|  PATCH | ```/events```                         | Changes events' data by applying the given patch               |
-|  GET   | ```/events/latest```                  | Finds events for all the projects with the latest `event_date` |
-|  PATCH | ```/events/:id/projects/:id/status``` | Updates event status                                           |
-|  GET   | ```/events/projects/:id/status```     | Finds processing status of events belonging to a project       |
-|  POST  | ```/subscriptions```                  | Adds a subscription for events                                 |
-|  GET   | ```/ping```                           | Verifies service health                                        |
+| Method | Path                                    | Description                                                    |
+|--------|-----------------------------------------|----------------------------------------------------------------|
+|  POST  | ```/events```                           | Creates an event with a `NEW` status                           |
+|  PATCH | ```/events```                           | Changes events' data by applying the given patch               |
+|  GET   | ```/events/latest```                    | Finds events for all the projects with the latest `event_date` |
+|  PATCH | ```/events/:id/projects/:id/status```   | Updates event status                                           |
+|  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
+|  GET   | ```/ping```                             | Verifies service health                                        |
+|  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
+|  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
 
 #### POST /events
 
@@ -114,6 +115,17 @@ Response body example:
 }
 ```
 
+#### GET /metrics
+
+To fetch various Prometheus metrics of the service.
+
+**Response**
+
+| Status                     | Description            |
+|----------------------------|------------------------|
+| OK (200)                   | Containing the metrics |
+| INTERNAL SERVER ERROR (500)| Otherwise              |
+
 #### PATCH /events/:id/projects/:id/status
 
 Updates status of the event with given `id` and `project_id`.
@@ -161,15 +173,27 @@ There are different payloads required for different status types transitions:
 ```
 **Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
 
-#### GET /events/projects/:id/status
+#### GET /ping
 
-Finds processing status of events belonging to a project from the latest batch.
+Verifies service health.
+
+**Response**
+
+| Status                     | Description           |
+|----------------------------|-----------------------|
+| OK (200)                   | If service is healthy |
+| INTERNAL SERVER ERROR (500)| Otherwise             |
+
+#### GET /processing-status?project-id=:id
+
+Finds processing status of events belonging to the project with the given `id` from the latest batch.
 
 **Response**
 
 | Status                     | Description                                                  |
 |----------------------------|---------------------------------------------------------|
 | OK (200)                   | If there are events for the project with the given `id` |
+| BAD_REQUEST (400)          | If the `project-id` parameter is not given or invalid   |
 | NOT_FOUND (404)            | If no events can be found for the given project         |
 | INTERNAL SERVER ERROR (500)| When some problems occurs                               |
 
@@ -190,17 +214,6 @@ Response body examples:
   "progress": 50.00
 }
 ```
-
-#### GET /ping
-
-Verifies service health.
-
-**Response**
-
-| Status                     | Description           |
-|----------------------------|-----------------------|
-| OK (200)                   | If service is healthy |
-| INTERNAL SERVER ERROR (500)| Otherwise             |
 
 #### POST /subscriptions
 

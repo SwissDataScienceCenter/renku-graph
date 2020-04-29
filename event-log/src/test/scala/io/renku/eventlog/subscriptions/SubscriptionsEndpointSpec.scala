@@ -28,7 +28,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import io.circe.{Encoder, Json}
+import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.eventlog.EventStatus

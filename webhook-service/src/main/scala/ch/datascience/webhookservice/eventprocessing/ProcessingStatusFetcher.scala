@@ -96,7 +96,7 @@ private class IOProcessingStatusFetcher(
 
   override def fetchProcessingStatus(projectId: projects.Id): OptionT[IO, ProcessingStatus] = OptionT {
     for {
-      uri          <- validateUri(s"$eventLogUrl/events/projects/$projectId/status")
+      uri          <- validateUri(s"$eventLogUrl/processing-status") map (_.withQueryParam("project-id", projectId.toString))
       latestEvents <- send(request(GET, uri))(mapResponse)
     } yield latestEvents
   }

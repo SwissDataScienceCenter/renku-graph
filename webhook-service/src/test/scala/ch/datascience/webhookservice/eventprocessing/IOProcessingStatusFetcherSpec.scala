@@ -50,7 +50,7 @@ class IOProcessingStatusFetcherSpec extends WordSpec with ExternalServiceStubbin
       val processingStatus = processingStatuses.generateOne
 
       stubFor {
-        get(s"/events/projects/$projectId/status")
+        get(s"/processing-status?project-id=$projectId")
           .willReturn(okJson(processingStatus.asJson.spaces2))
       }
 
@@ -60,7 +60,7 @@ class IOProcessingStatusFetcherSpec extends WordSpec with ExternalServiceStubbin
     "return None if NOT_FOUND returned the Event Log" in new TestCase {
 
       stubFor {
-        get(s"/events/projects/$projectId/status")
+        get(s"/processing-status?project-id=$projectId")
           .willReturn(notFound())
       }
 
@@ -70,37 +70,37 @@ class IOProcessingStatusFetcherSpec extends WordSpec with ExternalServiceStubbin
     "return a RuntimeException if remote client responds with status different than OK and NOT_FOUND" in new TestCase {
 
       stubFor {
-        get(s"/events/projects/$projectId/status")
-          .willReturn(unauthorized().withBody("some error"))
+        get(s"/processing-status?project-id=$projectId")
+          .willReturn(badRequest().withBody("some error"))
       }
 
       intercept[Exception] {
         fetcher.fetchProcessingStatus(projectId).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $eventLogUrl/events/projects/$projectId/status returned ${Status.Unauthorized}; body: some error"
+      }.getMessage shouldBe s"GET $eventLogUrl/processing-status?project-id=$projectId returned ${Status.BadRequest}; body: some error"
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
 
       stubFor {
-        get(s"/events/projects/$projectId/status")
+        get(s"/processing-status?project-id=$projectId")
           .willReturn(okJson(json"""{}""".spaces2))
       }
 
       intercept[Exception] {
         fetcher.fetchProcessingStatus(projectId).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $eventLogUrl/events/projects/$projectId/status returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage shouldBe s"GET $eventLogUrl/processing-status?project-id=$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
 
     "return a RuntimeException if remote client responds with invalid body" in new TestCase {
 
       stubFor {
-        get(s"/events/projects/$projectId/status")
+        get(s"/processing-status?project-id=$projectId")
           .willReturn(okJson(json"""{"done": "1", "total": 2, "progress": 3}""".spaces2))
       }
 
       intercept[Exception] {
         fetcher.fetchProcessingStatus(projectId).value.unsafeRunSync()
-      }.getMessage shouldBe s"""GET $eventLogUrl/events/projects/$projectId/status returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {"done" : "1","total" : 2,"progress" : 3}"""
+      }.getMessage shouldBe s"""GET $eventLogUrl/processing-status?project-id=$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {"done" : "1","total" : 2,"progress" : 3}"""
     }
   }
 
