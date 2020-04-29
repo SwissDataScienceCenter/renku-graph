@@ -46,7 +46,7 @@ class IOLatestEventsFetcherSpec extends WordSpec with ExternalServiceStubbing {
       val latestProjectCommitsList = latestProjectCommits.generateNonEmptyList().toList
 
       stubFor {
-        get("/events/latest")
+        get("/events?latest-per-project=true")
           .willReturn(okJson(latestProjectCommitsList.asJson.spaces2))
       }
 
@@ -56,7 +56,7 @@ class IOLatestEventsFetcherSpec extends WordSpec with ExternalServiceStubbing {
     "return an empty list if nothing gets fetched from the Event Log" in new TestCase {
 
       stubFor {
-        get("/events/latest")
+        get("/events?latest-per-project=true")
           .willReturn(okJson(Json.arr().spaces2))
       }
 
@@ -66,25 +66,25 @@ class IOLatestEventsFetcherSpec extends WordSpec with ExternalServiceStubbing {
     "return a RuntimeException if remote client responds with status different than OK" in new TestCase {
 
       stubFor {
-        get("/events/latest")
+        get("/events?latest-per-project=true")
           .willReturn(notFound().withBody("some error"))
       }
 
       intercept[Exception] {
         fetcher.fetchLatestEvents.unsafeRunSync()
-      }.getMessage shouldBe s"GET $eventLogUrl/events/latest returned ${Status.NotFound}; body: some error"
+      }.getMessage shouldBe s"GET $eventLogUrl/events?latest-per-project=true returned ${Status.NotFound}; body: some error"
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
 
       stubFor {
-        get("/events/latest")
+        get("/events?latest-per-project=true")
           .willReturn(okJson(json"""{}""".spaces2))
       }
 
       intercept[Exception] {
         fetcher.fetchLatestEvents.unsafeRunSync()
-      }.getMessage shouldBe s"GET $eventLogUrl/events/latest returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage shouldBe s"GET $eventLogUrl/events?latest-per-project=true returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
   }
 

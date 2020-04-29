@@ -50,6 +50,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 )(implicit clock:             Clock[F])
     extends Http4sDsl[F] {
 
+  import LatestPerProjectParameter._
   import ProjectIdParameter._
   import eventCreationEndpoint._
   import eventsPatchingEndpoint._
@@ -64,13 +65,41 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ POST  -> Root / "events"                                            => addEvent(request)
     case request @ PATCH -> Root / "events"                                            => triggerEventsPatching(request)
-    case           GET   -> Root / "events" / "latest"                                 => findLatestEvents
+    case           GET   -> Root / "events" :? `latest-per-project`(maybeValue)        => maybeFindLatestEvents(maybeValue)
     case request @ PATCH -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => changeStatus(CompoundEventId(eventId, projectId), request)
     case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
     case           GET   -> Root / "ping"                                              => Ok("pong")
     case request @ POST  -> Root / "subscriptions"                                     => addSubscription(request)
   }.meter flatMap `add GET Root / metrics`
   // format: on
+
+  private object LatestPerProjectParameter {
+
+    private implicit val queryParameterDecoder: QueryParamDecoder[Boolean] =
+      (value: QueryParameterValue) =>
+        Try(value.value.toBoolean).toEither
+          .leftMap(_ => ParseFailure(s"'${`latest-per-project`}' parameter with invalid value", ""))
+          .toValidatedNel
+
+    object `latest-per-project` extends OptionalValidatingQueryParamDecoderMatcher[Boolean]("latest-per-project") {
+      val parameterName:     String = "latest-per-project"
+      override val toString: String = parameterName
+    }
+  }
+
+  private def maybeFindLatestEvents(
+      maybeValue: Option[ValidatedNel[ParseFailure, Boolean]]
+  ): F[Response[F]] = maybeValue match {
+    case None =>
+      NotFound(ErrorMessage(s"No '${`latest-per-project`}' parameter"))
+    case Some(maybeTrue) =>
+      maybeTrue.fold(
+        errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
+        value =>
+          if (value) findLatestEvents
+          else BadRequest(ErrorMessage(s"'${`latest-per-project`}' parameter with invalid value"))
+      )
+  }
 
   private object ProjectIdParameter {
 
@@ -83,8 +112,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       }.leftMap(_ => ParseFailure(s"'${`project-id`}' parameter with invalid value", "")).toValidatedNel
 
     object `project-id` extends OptionalValidatingQueryParamDecoderMatcher[projects.Id]("project-id") {
-      val parameterName: String = "project-id"
-
+      val parameterName:     String = "project-id"
       override val toString: String = parameterName
     }
   }
@@ -93,7 +121,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       maybeProjectId: Option[ValidatedNel[ParseFailure, projects.Id]]
   ): F[Response[F]] = maybeProjectId match {
     case None =>
-      BadRequest(ErrorMessage("No 'project-id' parameter"))
+      NotFound(ErrorMessage(s"No '${`project-id`}' parameter"))
     case Some(validatedProjectId) =>
       validatedProjectId.fold(
         errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),

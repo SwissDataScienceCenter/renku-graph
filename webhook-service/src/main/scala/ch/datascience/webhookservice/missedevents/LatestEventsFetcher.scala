@@ -58,7 +58,7 @@ private class IOLatestEventsFetcher(
 
   override def fetchLatestEvents: IO[List[LatestProjectCommit]] =
     for {
-      uri          <- validateUri(s"$eventLogUrl/events/latest")
+      uri          <- validateUri(s"$eventLogUrl/events") map (_.withQueryParam("latest-per-project", "true"))
       latestEvents <- send(request(GET, uri))(mapResponse)
     } yield latestEvents
 

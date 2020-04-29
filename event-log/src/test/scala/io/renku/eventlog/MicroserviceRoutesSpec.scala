@@ -20,8 +20,9 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.implicits._
-import ch.datascience.controllers.ErrorMessage
+import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
+import ch.datascience.controllers.InfoMessage.InfoMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
@@ -53,14 +54,35 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
   "routes" should {
 
-    "define a POST /events endpoint" in new TestCase {
-      val request        = Request[IO](POST, uri"events")
-      val expectedStatus = Gen.oneOf(Created, Ok).generateOne
-      (eventCreationEndpoint.addEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
+    "define a GET /events?latest-per-project=true" in new TestCase {
+
+      val request = Request[IO](GET, uri"events" withQueryParam ("latest-per-project", "true"))
+
+      (latestEventsEndpoint.findLatestEvents _).expects().returning(Response[IO](Ok).pure[IO])
 
       val response = routes.call(request)
 
-      response.status shouldBe expectedStatus
+      response.status shouldBe Ok
+    }
+
+    "define a GET /events?latest-per-project=true " +
+      s"returning $NotFound if no latest-per-project parameter given" in new TestCase {
+
+      val response = routes call Request[IO](GET, uri"events")
+
+      response.status            shouldBe NotFound
+      response.contentType       shouldBe Some(`Content-Type`(application.json))
+      response.body[InfoMessage] shouldBe InfoMessage("No 'latest-per-project' parameter")
+    }
+
+    "define a GET /events?latest-per-project=true " +
+      s"returning $BadRequest if latest-per-project parameter has invalid value" in new TestCase {
+
+      val response = routes call Request[IO](GET, uri"events" withQueryParam ("latest-per-project", "xxx"))
+
+      response.status             shouldBe BadRequest
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe ErrorMessage("'latest-per-project' parameter with invalid value")
     }
 
     "define a PATCH /events endpoint" in new TestCase {
@@ -74,13 +96,14 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       response.status shouldBe Accepted
     }
 
-    "define a GET /events/latest endpoint" in new TestCase {
-      val request = Request[IO](GET, uri"events/latest")
-      (latestEventsEndpoint.findLatestEvents _).expects().returning(Response[IO](Ok).pure[IO])
+    "define a POST /events endpoint" in new TestCase {
+      val request        = Request[IO](POST, uri"events")
+      val expectedStatus = Gen.oneOf(Created, Ok).generateOne
+      (eventCreationEndpoint.addEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
 
       val response = routes.call(request)
 
-      response.status shouldBe Ok
+      response.status shouldBe expectedStatus
     }
 
     "define a PATCH /events/:event-id/:project-:id endpoint" in new TestCase {
@@ -126,16 +149,16 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
     }
 
     "define a GET /processing-status?project-id=:id endpoint " +
-      s"returning $BadRequest if no project-id parameter is given" in new TestCase {
+      s"returning $NotFound if no project-id parameter is given" in new TestCase {
       val projectId = projectIds.generateOne
 
       val request = Request[IO](GET, uri"processing-status")
 
       val response = routes.call(request)
 
-      response.status             shouldBe BadRequest
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe ErrorMessage("No 'project-id' parameter")
+      response.status            shouldBe NotFound
+      response.contentType       shouldBe Some(`Content-Type`(application.json))
+      response.body[InfoMessage] shouldBe InfoMessage("No 'project-id' parameter")
     }
 
     "define a GET /processing-status?project-id=:id endpoint " +

@@ -6,14 +6,64 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 | Method | Path                                    | Description                                                    |
 |--------|-----------------------------------------|----------------------------------------------------------------|
-|  POST  | ```/events```                           | Creates an event with a `NEW` status                           |
+|  GET   | ```/events?latest_per_project=true```   | Finds events for all the projects with the latest `event_date` |
 |  PATCH | ```/events```                           | Changes events' data by applying the given patch               |
-|  GET   | ```/events/latest```                    | Finds events for all the projects with the latest `event_date` |
+|  POST  | ```/events```                           | Creates an event with a `NEW` status                           |
 |  PATCH | ```/events/:event-id/:project-id```     | Updates chosen event's data                                    |
 |  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
 |  GET   | ```/ping```                             | Verifies service health                                        |
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 |  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
+
+
+#### GET /events?latest_per_project=true
+
+Finds events for all the projects with the latest `event_date`.
+
+**Response**
+
+| Status                     | Description                                                   |
+|----------------------------|---------------------------------------------------------------|
+| OK (200)                   | If there are events found for the projects or `[]` otherwise  |
+| BAD_REQUEST (400)          | If value different that `true` given for `latest_per_project` |
+| NOT_FOUND (404)            | If no `latest_per_project` given                              |
+| INTERNAL SERVER ERROR (500)| When there are problems                                       |
+
+Response body example:
+
+```json
+{
+  "id":     "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id":   123,
+    "path": "namespace/project-name"
+  },
+  "body":   "JSON payload"
+}
+```
+
+#### PATCH /events
+
+Changes events' data by applying the given patch.
+
+**NOTICE:** 
+Be aware that the given patch affects all the events in the Event Log.
+
+**Request**
+
+```json
+{
+  "status": "NEW"
+}
+```
+
+**Response**
+
+| Status                     | Description                                          |
+|----------------------------|------------------------------------------------------|
+| ACCEPTED (202)             | When the given data patch got accepted               |
+| BAD_REQUEST (400)          | When request body is not valid                       |
+| INTERNAL SERVER ERROR (500)| When there were problems with processing the request |
 
 #### POST /events
 
@@ -67,53 +117,6 @@ Event Body example:
 | CREATED (201)              | When a new event was created in the Event Log                                        |
 | BAD_REQUEST (400)          | When request body is not a valid JSON Event                                          |
 | INTERNAL SERVER ERROR (500)| When there are problems with event creation                                          |
-
-#### PATCH /events
-
-Changes events' data by applying the given patch.
-
-**NOTICE:** 
-Be aware that the given patch affects all the events in the Event Log.
-
-**Request**
-
-```json
-{
-  "status": "NEW"
-}
-```
-
-**Response**
-
-| Status                     | Description                                          |
-|----------------------------|------------------------------------------------------|
-| ACCEPTED (202)             | When the given data patch got accepted               |
-| BAD_REQUEST (400)          | When request body is not valid                       |
-| INTERNAL SERVER ERROR (500)| When there were problems with processing the request |
-
-#### GET /events/latest
-
-Finds events for all the projects with the latest `event_date`.
-
-**Response**
-
-| Status                     | Description                                                  |
-|----------------------------|--------------------------------------------------------------|
-| OK (200)                   | If there are events found for the projects or `[]` otherwise |
-| INTERNAL SERVER ERROR (500)| When there are problems                                      |
-
-Response body example:
-
-```json
-{
-  "id":     "df654c3b1bd105a29d658f78f6380a842feac879",
-  "project": {
-    "id":   123,
-    "path": "namespace/project-name"
-  },
-  "body":   "JSON payload"
-}
-```
 
 #### GET /metrics
 
@@ -190,12 +193,12 @@ Finds processing status of events belonging to the project with the given `id` f
 
 **Response**
 
-| Status                     | Description                                                  |
-|----------------------------|---------------------------------------------------------|
-| OK (200)                   | If there are events for the project with the given `id` |
-| BAD_REQUEST (400)          | If the `project-id` parameter is not given or invalid   |
-| NOT_FOUND (404)            | If no events can be found for the given project         |
-| INTERNAL SERVER ERROR (500)| When some problems occurs                               |
+| Status                     | Description                                                                        |
+|----------------------------|------------------------------------------------------------------------------------|
+| OK (200)                   | If there are events for the project with the given `id`                            |
+| BAD_REQUEST (400)          | If the `project-id` parameter is not given or invalid                              |
+| NOT_FOUND (404)            | If no events can be found for the given project or no `project-id` parameter given |
+| INTERNAL SERVER ERROR (500)| When some problems occurs                                                          |
 
 Response body examples:
 - all events from the latest batch are processed
