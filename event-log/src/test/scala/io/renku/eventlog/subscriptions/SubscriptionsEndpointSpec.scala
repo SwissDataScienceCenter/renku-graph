@@ -28,9 +28,11 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.eventlog.EventStatus
+import io.renku.eventlog.EventStatus.{New, RecoverableFailure}
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
@@ -43,14 +45,15 @@ class SubscriptionsEndpointSpec extends WordSpec with MockFactory {
 
   "addSubscription" should {
 
-    s"return $Accepted when subscription URL was added to the pool" in new TestCase {
+    s"return $Accepted when there are NEW and RECOVERABLE_FAILURE statuses in the payload " +
+      "and subscriber URL was added to the pool" in new TestCase {
 
       (subscriptions.add _)
-        .expects(subscriptionUrl)
+        .expects(subscriberUrl)
         .returning(IO.unit)
 
-      val request = Request(Method.POST, uri"events" / "subscriptions" withQueryParam ("status", "READY"))
-        .withEntity(subscriptionUrl.asJson)
+      val request = Request(Method.POST, uri"subscriptions")
+        .withEntity((subscriberUrl -> Set(New, RecoverableFailure)).asJson)
 
       val response = addSubscription(request).unsafeRunSync()
 
@@ -61,10 +64,10 @@ class SubscriptionsEndpointSpec extends WordSpec with MockFactory {
       logger.expectNoLogs()
     }
 
-    s"return $BadRequest when subscription URL cannot be decoded from the request" in new TestCase {
+    s"return $BadRequest when subscriber URL cannot be decoded from the request" in new TestCase {
 
       val payload = json"""{}"""
-      val request = Request(Method.POST, uri"events" / "subscriptions" withQueryParam ("status", "READY"))
+      val request = Request(Method.POST, uri"subscriptions")
         .withEntity(payload)
 
       val response = addSubscription(request).unsafeRunSync()
@@ -78,19 +81,35 @@ class SubscriptionsEndpointSpec extends WordSpec with MockFactory {
       logger.expectNoLogs()
     }
 
-    s"return $InternalServerError when adding subscription URL to the pool fails" in new TestCase {
+    s"return $BadRequest when statuses in the request are other than NEW and RECOVERABLE_FAILURE" in new TestCase {
 
-      val exception = exceptions.generateOne
-      (subscriptions.add _)
-        .expects(subscriptionUrl)
-        .returning(exception.raiseError[IO, Unit])
-
-      val request = Request(Method.POST, uri"events" / "subscriptions" withQueryParam ("status", "READY"))
-        .withEntity(subscriptionUrl.asJson)
+      val request = Request(Method.POST, uri"subscriptions")
+        .withEntity((subscriberUrl -> Set(New: EventStatus)).asJson)
 
       val response = addSubscription(request).unsafeRunSync()
 
-      val expectedMessage = "Adding subscription URL failed"
+      response.status      shouldBe BadRequest
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(
+        s"Subscriptions to $New and $RecoverableFailure status supported only"
+      )
+
+      logger.expectNoLogs()
+    }
+
+    s"return $InternalServerError when adding subscriber URL to the pool fails" in new TestCase {
+
+      val exception = exceptions.generateOne
+      (subscriptions.add _)
+        .expects(subscriberUrl)
+        .returning(exception.raiseError[IO, Unit])
+
+      val request = Request(Method.POST, uri"subscriptions")
+        .withEntity((subscriberUrl -> Set(New, RecoverableFailure)).asJson)
+
+      val response = addSubscription(request).unsafeRunSync()
+
+      val expectedMessage = "Adding subscriber URL failed"
       response.status                         shouldBe InternalServerError
       response.contentType                    shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(expectedMessage)
@@ -100,17 +119,18 @@ class SubscriptionsEndpointSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val subscriptionUrl = subscriptionUrls.generateOne
+    val subscriberUrl = subscriberUrls.generateOne
 
     val subscriptions   = mock[TestIOSubscriptions]
     val logger          = TestLogger[IO]()
     val addSubscription = new SubscriptionsEndpoint[IO](subscriptions, logger).addSubscription _
   }
 
-  private implicit lazy val subscriptionUrlEncoder: Encoder[SubscriptionUrl] =
-    Encoder.instance[SubscriptionUrl] { url =>
-      json"""{
-        "url": ${url.value}
+  private implicit lazy val payloadEncoder: Encoder[(SubscriberUrl, Set[EventStatus])] =
+    Encoder.instance[(SubscriberUrl, Set[EventStatus])] {
+      case (url, statuses) => json"""{
+        "subscriberUrl": ${url.value},
+        "statuses": ${statuses.map(_.toString).toList}
       }"""
     }
 }

@@ -22,5 +22,5 @@ import cats.effect.IO
 import cats.effect.concurrent.Ref
 import io.chrisdavenport.log4cats.Logger
 
-class TestIOSubscriptions(currentUrl: Ref[IO, Option[SubscriptionUrl]], logger: Logger[IO])
+class TestIOSubscriptions(currentUrl: Ref[IO, Option[SubscriberUrl]], logger: Logger[IO])
     extends Subscriptions[IO](currentUrl, logger)

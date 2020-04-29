@@ -490,7 +490,7 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
   private trait TestCase {
 
     val urls @ url1 +: url2 +: Nil =
-      subscriptionUrls.generateNonEmptyList(minElements = 2, maxElements = 2).toList
+      subscriberUrls.generateNonEmptyList(minElements = 2, maxElements = 2).toList
 
     val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
@@ -521,7 +521,7 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
     def givenEvent(
         event:  Event = events.generateOne,
         got:    SendingResult,
-        forUrl: SubscriptionUrl
+        forUrl: SubscriberUrl
     ): Event = {
 
       findingEvent(returning = Some(event))
@@ -542,17 +542,17 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
       event
     }
 
-    def hasOtherUrls(than: SubscriptionUrl, returning: Boolean) =
+    def hasOtherUrls(than: SubscriberUrl, returning: Boolean) =
       (subscriptions.hasOtherThan _)
         .expects(than)
         .returning(returning.pure[IO])
 
-    def nextUrl(returning: Option[SubscriptionUrl]) =
+    def nextUrl(returning: Option[SubscriberUrl]) =
       (subscriptions.next _)
         .expects()
         .returning(returning.pure[IO])
 
-    def expectRemoval(of: SubscriptionUrl) =
+    def expectRemoval(of: SubscriberUrl) =
       (subscriptions.remove _)
         .expects(of)
         .returning(IO.unit)
@@ -565,7 +565,7 @@ class EventsDispatcherSpec extends WordSpec with MockFactory with Eventually {
     def sending(
         event:  Event,
         got:    SendingResult,
-        forUrl: SubscriptionUrl
+        forUrl: SubscriberUrl
     ) =
       (eventsSender.sendEvent _)
         .expects(forUrl, event.compoundEventId, event.body)

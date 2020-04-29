@@ -28,12 +28,12 @@ import org.scalatest.WordSpec
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-class SubscriptionUrlFinderSpec extends WordSpec {
+class SubscriberUrlFinderSpec extends WordSpec {
 
-  "findSubscriptionUrl" should {
+  "findSubscriberUrl" should {
 
     "return host IP" in new TestCase {
-      finder.findSubscriptionUrl shouldBe SubscriptionUrl(
+      finder.findSubscriberUrl shouldBe SubscriberUrl(
         s"http:/$findAddress:${Microservice.ServicePort}/events"
       ).pure[Try]
     }

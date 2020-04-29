@@ -21,5 +21,5 @@ package io.renku.eventlog.subscriptions
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-final class SubscriptionUrl private (val value: String) extends AnyVal with StringTinyType
-object SubscriptionUrl extends TinyTypeFactory[SubscriptionUrl](new SubscriptionUrl(_)) with Url
+final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
+object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url

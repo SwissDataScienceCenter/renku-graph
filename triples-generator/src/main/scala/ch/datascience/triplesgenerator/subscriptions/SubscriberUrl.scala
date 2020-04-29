@@ -25,11 +25,11 @@ import ch.datascience.triplesgenerator.Microservice
 
 import scala.language.higherKinds
 
-final class SubscriptionUrl private (val value: String) extends AnyVal with StringTinyType
-object SubscriptionUrl extends TinyTypeFactory[SubscriptionUrl](new SubscriptionUrl(_)) with Url
+final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
+object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url
 
 private trait SubscriptionUrlFinder[Interpretation[_]] {
-  def findSubscriptionUrl: Interpretation[SubscriptionUrl]
+  def findSubscriberUrl: Interpretation[SubscriberUrl]
 }
 
 private class SubscriptionUrlFinderImpl[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable])
@@ -41,12 +41,12 @@ private class SubscriptionUrlFinderImpl[Interpretation[_]]()(implicit ME: MonadE
 
   import scala.collection.JavaConverters._
 
-  override def findSubscriptionUrl: Interpretation[SubscriptionUrl] =
+  override def findSubscriberUrl: Interpretation[SubscriberUrl] =
     findAddress flatMap {
       case None =>
-        new Exception("Cannot find service IP").raiseError[Interpretation, SubscriptionUrl]
+        new Exception("Cannot find service IP").raiseError[Interpretation, SubscriberUrl]
       case Some(address) =>
-        SubscriptionUrl(s"http://${address.getHostAddress}:${Microservice.ServicePort}/events").pure[Interpretation]
+        SubscriberUrl(s"http://${address.getHostAddress}:${Microservice.ServicePort}/events").pure[Interpretation]
     }
 
   private def findAddress = ME.catchNonFatal {

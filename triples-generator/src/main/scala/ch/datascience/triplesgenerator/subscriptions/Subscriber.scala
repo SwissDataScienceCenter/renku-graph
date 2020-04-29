@@ -46,13 +46,13 @@ class Subscriber(
 
   private def subscribeForEvents(initOrError: Boolean): IO[Unit] = {
     for {
-      subscriptionUrl <- findSubscriptionUrl
-      _               <- send(subscriptionUrl) recoverWith errorLoggedAndRetry("Sending subscription URL failed")
-      _               <- if (initOrError) logger.info(s"Subscribed for events with $subscriptionUrl") else IO.unit
-      _               <- timer sleep renewDelay
-      _               <- subscribeForEvents(initOrError = false)
+      subscriberUrl <- findSubscriberUrl
+      _             <- send(subscriberUrl) recoverWith errorLoggedAndRetry("Subscribing for events failed")
+      _             <- if (initOrError) logger.info(s"Subscribed for events with $subscriberUrl") else IO.unit
+      _             <- timer sleep renewDelay
+      _             <- subscribeForEvents(initOrError = false)
     } yield ()
-  } recoverWith errorLoggedAndRetry("Finding subscription URL failed")
+  } recoverWith errorLoggedAndRetry("Finding subscriber URL failed")
 
   private def errorLoggedAndRetry(message: String): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>

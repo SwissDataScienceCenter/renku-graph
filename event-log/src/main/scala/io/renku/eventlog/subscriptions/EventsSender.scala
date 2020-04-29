@@ -31,7 +31,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait EventsSender[Interpretation[_]] {
-  def sendEvent(subscriptionUrl: SubscriptionUrl, id: CompoundEventId, body: EventBody): Interpretation[SendingResult]
+  def sendEvent(subscriptionUrl: SubscriberUrl, id: CompoundEventId, body: EventBody): Interpretation[SendingResult]
 }
 
 private object EventsSender {
@@ -63,9 +63,9 @@ private class IOEventsSender(
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  def sendEvent(subscriptionUrl: SubscriptionUrl, id: CompoundEventId, body: EventBody): IO[SendingResult] = {
+  def sendEvent(subscriberUrl: SubscriberUrl, id: CompoundEventId, body: EventBody): IO[SendingResult] = {
     for {
-      uri           <- validateUri(subscriptionUrl.value)
+      uri           <- validateUri(subscriberUrl.value)
       sendingResult <- send(request(POST, uri).withEntity((id -> body).asJson))(mapResponse)
     } yield sendingResult
   } recoverWith connectivityException(to = Misdelivered)

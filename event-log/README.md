@@ -4,15 +4,15 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 ## API
 
-| Method | Path                                     | Description                                                    |
-|--------|------------------------------------------|----------------------------------------------------------------|
-|  POST  | ```/events```                            | Creates an event with a `NEW` status                           |
-|  PATCH | ```/events```                            | Changes events' data by applying the given patch               |
-|  GET   | ```/events/latest```                     | Finds events for all the projects with the latest `event_date` |
-|  PATCH | ```/events/:id/projects/:id/status```    | Updates event status                                           |
-|  GET   | ```/events/projects/:id/status```        | Finds processing status of events belonging to a project       |
-|  POST  | ```/events/subscriptions?status=READY``` | Adds a subscription for the events                             |
-|  GET   | ```/ping```                              | Verifies service health                                        |
+| Method | Path                                  | Description                                                    |
+|--------|---------------------------------------|----------------------------------------------------------------|
+|  POST  | ```/events```                         | Creates an event with a `NEW` status                           |
+|  PATCH | ```/events```                         | Changes events' data by applying the given patch               |
+|  GET   | ```/events/latest```                  | Finds events for all the projects with the latest `event_date` |
+|  PATCH | ```/events/:id/projects/:id/status``` | Updates event status                                           |
+|  GET   | ```/events/projects/:id/status```     | Finds processing status of events belonging to a project       |
+|  POST  | ```/subscriptions```                  | Adds a subscription for events                                 |
+|  GET   | ```/ping```                           | Verifies service health                                        |
 
 #### POST /events
 
@@ -191,30 +191,6 @@ Response body examples:
 }
 ```
 
-#### POST /events/subscriptions?status=READY
-
-Adds a subscription to the events with certain statuses. Once a service gets successfully subscribed by receiving an OK,
-event-log service will start distributing events with the given `status` to the URL presented in the request body. 
-
-**NOTICE:** 
-As a good practice, the subscription should be renewed periodically in case of restart or URL change.
-
-**Request**
-
-```json
-{
-  "url": "http://host/path"
-}
-```
-
-**Response**
-
-| Status                     | Description                                                         |
-|----------------------------|---------------------------------------------------------------------|
-| ACCEPTED (202)             | When subscription was successfully added/renewed                    |
-| BAD_REQUEST (400)          | When there's no `status=READY` parameter or request body is invalid |
-| INTERNAL SERVER ERROR (500)| When there were problems with processing the request                |
-
 #### GET /ping
 
 Verifies service health.
@@ -225,6 +201,32 @@ Verifies service health.
 |----------------------------|-----------------------|
 | OK (200)                   | If service is healthy |
 | INTERNAL SERVER ERROR (500)| Otherwise             |
+
+#### POST /subscriptions
+
+Adds a subscription to the events with certain statuses. Once a service gets successfully subscribed by receiving an ACCEPTED,
+event-log service will start distributing events with the given `statuses` to the URL presented in the request body. Currently, 
+event-log allows subscriptions to `NEW` and `RECOVERABLE_FAILURE` statuses only. 
+
+**NOTICE:** 
+As a good practice, the subscription should be renewed periodically in case of restart or URL change.
+
+**Request**
+
+```json
+{
+  "subscriberUrl": "http://host/path",
+  "statuses": ["NEW","RECOVERABLE_FAILURE"]
+}
+```
+
+**Response**
+
+| Status                     | Description                                                                                         |
+|----------------------------|-----------------------------------------------------------------------------------------------------|
+| ACCEPTED (202)             | When subscription was successfully added/renewed                                                    |
+| BAD_REQUEST (400)          | When there payload is invalid e.g. no `statuses` are different than `NEW` and `RECOVERABLE_FAILURE` |
+| INTERNAL SERVER ERROR (500)| When there were problems with processing the request                                                |
 
 ## Trying out
 

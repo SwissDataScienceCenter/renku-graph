@@ -30,48 +30,48 @@ class SubscriptionsSpec extends WordSpec {
 
   "add and getAll" should {
 
-    "add the given Subscription URL to the pool " +
+    "add the given Subscriber URL to the pool " +
       "if it's not present there yet" in new TestCase {
-      subscriptions.add(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
-      subscriptions.getAll.unsafeRunSync()               shouldBe List(subscriptionUrl)
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.getAll.unsafeRunSync()             shouldBe List(subscriberUrl)
 
-      val otherSubscriptionUrl = subscriptionUrls.generateOne
-      subscriptions.add(otherSubscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
-      subscriptions.getAll.unsafeRunSync()                    should contain theSameElementsAs List(subscriptionUrl, otherSubscriptionUrl)
+      val otherSubscriberUrl = subscriberUrls.generateOne
+      subscriptions.add(otherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.getAll.unsafeRunSync()                  should contain theSameElementsAs List(subscriberUrl, otherSubscriberUrl)
 
       logger.loggedOnly(
-        Info(s"$subscriptionUrl added"),
-        Info(s"$otherSubscriptionUrl added")
+        Info(s"$subscriberUrl added"),
+        Info(s"$otherSubscriberUrl added")
       )
     }
 
-    "do nothing if the given Subscription URL is already present in the pool" in new TestCase {
-      subscriptions.add(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
-      subscriptions.getAll.unsafeRunSync()               shouldBe List(subscriptionUrl)
+    "do nothing if the given Subscriber URL is already present in the pool" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.getAll.unsafeRunSync()             shouldBe List(subscriberUrl)
 
-      subscriptions.add(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
-      subscriptions.getAll.unsafeRunSync()               shouldBe List(subscriptionUrl)
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.getAll.unsafeRunSync()             shouldBe List(subscriberUrl)
 
-      logger.loggedOnly(Info(s"$subscriptionUrl added"))
+      logger.loggedOnly(Info(s"$subscriberUrl added"))
     }
   }
 
   "remove" should {
 
-    "remove the given Subscription URL if present in the pool" in new TestCase {
-      subscriptions.add(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
-      subscriptions.getAll.unsafeRunSync()               shouldBe List(subscriptionUrl)
+    "remove the given Subscriber URL if present in the pool" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.getAll.unsafeRunSync()             shouldBe List(subscriberUrl)
 
-      subscriptions.remove(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.remove(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info(s"$subscriptionUrl added"),
-        Info(s"$subscriptionUrl removed")
+        Info(s"$subscriberUrl added"),
+        Info(s"$subscriberUrl removed")
       )
     }
 
-    "do nothing when given Subscription URL does not exist in the pool" in new TestCase {
-      subscriptions.remove(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
+    "do nothing when given Subscriber URL does not exist in the pool" in new TestCase {
+      subscriptions.remove(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
     }
   }
 
@@ -82,15 +82,15 @@ class SubscriptionsSpec extends WordSpec {
     }
 
     "return the only URL even if there just one" in new TestCase {
-      subscriptions.add(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      subscriptions.next.unsafeRunSync() shouldBe subscriptionUrl.some
-      subscriptions.next.unsafeRunSync() shouldBe subscriptionUrl.some
+      subscriptions.next.unsafeRunSync() shouldBe subscriberUrl.some
+      subscriptions.next.unsafeRunSync() shouldBe subscriberUrl.some
     }
 
     "iterate over all the added urls" in new TestCase {
-      subscriptions.add(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
-      val otherUrl = subscriptionUrls.generateOne
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      val otherUrl = subscriberUrls.generateOne
       subscriptions.add(otherUrl).unsafeRunSync() shouldBe ((): Unit)
 
       val receivedUrls = List(
@@ -105,13 +105,13 @@ class SubscriptionsSpec extends WordSpec {
     }
 
     "skip over removed item even if it suppose to be the next one" in new TestCase {
-      subscriptions.add(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
-      val otherUrl = subscriptionUrls.generateOne
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      val otherUrl = subscriberUrls.generateOne
       subscriptions.add(otherUrl).unsafeRunSync() shouldBe ((): Unit)
 
       val Some(first) = subscriptions.next.unsafeRunSync()
 
-      val expectedNext = if (first == subscriptionUrl) otherUrl else subscriptionUrl
+      val expectedNext = if (first == subscriberUrl) otherUrl else subscriberUrl
       (subscriptions remove expectedNext).unsafeRunSync()
 
       subscriptions.next.unsafeRunSync() shouldBe Some(first)
@@ -125,12 +125,12 @@ class SubscriptionsSpec extends WordSpec {
     }
 
     "return true if there's at least a single URL" in new TestCase {
-      subscriptions.add(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
       subscriptions.isNext.unsafeRunSync() shouldBe true
       subscriptions.isNext.unsafeRunSync() shouldBe true
 
-      subscriptions.add(subscriptionUrls.generateOne).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.add(subscriberUrls.generateOne).unsafeRunSync() shouldBe ((): Unit)
 
       subscriptions.isNext.unsafeRunSync() shouldBe true
     }
@@ -139,25 +139,25 @@ class SubscriptionsSpec extends WordSpec {
   "hasOtherThan" should {
 
     "return false if there are no URLs" in new TestCase {
-      subscriptions.hasOtherThan(subscriptionUrl).unsafeRunSync() shouldBe false
+      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe false
     }
 
     "return false if there is only one URL the same as given" in new TestCase {
-      subscriptions.add(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      subscriptions.hasOtherThan(subscriptionUrl).unsafeRunSync() shouldBe false
+      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe false
     }
 
     "return true if there are other URLs then the given one" in new TestCase {
-      subscriptions.add(subscriptionUrl).unsafeRunSync()              shouldBe ((): Unit)
-      subscriptions.add(subscriptionUrls.generateOne).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.add(subscriberUrl).unsafeRunSync()              shouldBe ((): Unit)
+      subscriptions.add(subscriberUrls.generateOne).unsafeRunSync() shouldBe ((): Unit)
 
-      subscriptions.hasOtherThan(subscriptionUrl).unsafeRunSync() shouldBe true
+      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe true
     }
   }
 
   private trait TestCase {
-    val subscriptionUrl = subscriptionUrls.generateOne
+    val subscriberUrl = subscriberUrls.generateOne
 
     val logger        = TestLogger[IO]()
     val subscriptions = Subscriptions(logger).unsafeRunSync()

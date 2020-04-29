@@ -18,20 +18,17 @@
 
 package io.renku.eventlog
 
-import cats.data.{Validated, ValidatedNel}
 import cats.effect.{Clock, ConcurrentEffect}
 import cats.implicits._
 import ch.datascience.graph.http.server.binders._
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.http.server.QueryParameterTools._
 import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.creation.EventCreationEndpoint
+import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.LatestEventsEndpoint
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
-import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.statuschange.StatusChangeEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
-import org.http4s._
 import org.http4s.dsl.Http4sDsl
 
 import scala.language.higherKinds
@@ -47,12 +44,11 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 )(implicit clock:             Clock[F])
     extends Http4sDsl[F] {
 
-  import AddSubscription._
   import eventCreationEndpoint._
+  import eventsPatchingEndpoint._
   import latestEventsEndpoint._
   import org.http4s.HttpRoutes
   import processingStatusEndpoint._
-  import eventsPatchingEndpoint._
   import routesMetrics._
   import statusChangeEndpoint._
   import subscriptionsEndpoint._
@@ -64,34 +60,8 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case           GET   -> Root / "events" / "latest"                                                       => findLatestEvents
     case           GET   -> Root / "events" / "projects" / ProjectId(id) / "status"                          => findProcessingStatus(id)
     case request @ PATCH -> Root / "events" / EventId(eventId) / "projects"/ ProjectId(projectId) / "status" => changeStatus(CompoundEventId(eventId, projectId), request)
-    case request @ POST  -> Root / "events" / "subscriptions" :? status(maybeStatus)                         => maybeAddSubscription(maybeStatus, request)
     case           GET   -> Root / "ping"                                                                    => Ok("pong")
+    case request @ POST  -> Root / "subscriptions"                                                           => addSubscription(request)
   }.meter flatMap `add GET Root / metrics`
   // format: on
-
-  private object AddSubscription {
-
-    private val statusQueryParamError = ParseFailure("No valid 'status' query parameter", "")
-
-    private implicit val statusDecoder: QueryParamDecoder[String] =
-      (value: QueryParameterValue) => {
-        Validated
-          .cond(
-            value.value.trim == "READY",
-            value.value.trim,
-            statusQueryParamError
-          )
-          .toValidatedNel
-      }
-
-    object status extends OptionalValidatingQueryParamDecoderMatcher[String]("status") {
-      val parameterName: String = "status"
-    }
-
-    def maybeAddSubscription(maybeStatus: Option[ValidatedNel[ParseFailure, String]],
-                             request:     Request[F]): F[Response[F]] =
-      maybeStatus
-        .fold(statusQueryParamError.invalidNel[String])(identity)
-        .fold(toBadRequest(), _ => addSubscription(request))
-  }
 }

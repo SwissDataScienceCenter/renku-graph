@@ -46,7 +46,7 @@ class EventsSenderSpec extends WordSpec with ExternalServiceStubbing {
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
-      sender.sendEvent(subscriptionUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe Delivered
+      sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe Delivered
     }
 
     s"return ServiceBusy if remote responds with $TooManyRequests" in new TestCase {
@@ -56,7 +56,7 @@ class EventsSenderSpec extends WordSpec with ExternalServiceStubbing {
           .willReturn(aResponse().withStatus(TooManyRequests.code))
       }
 
-      sender.sendEvent(subscriptionUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe ServiceBusy
+      sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe ServiceBusy
     }
 
     NotFound +: BadGateway +: ServiceUnavailable +: Nil foreach { status =>
@@ -67,7 +67,7 @@ class EventsSenderSpec extends WordSpec with ExternalServiceStubbing {
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        sender.sendEvent(subscriptionUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe Misdelivered
+        sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe Misdelivered
       }
     }
 
@@ -75,7 +75,7 @@ class EventsSenderSpec extends WordSpec with ExternalServiceStubbing {
       override val sender = new IOEventsSender(TestLogger())
 
       sender
-        .sendEvent(SubscriptionUrl("http://unexisting"), event.compoundEventId, event.body)
+        .sendEvent(SubscriberUrl("http://unexisting"), event.compoundEventId, event.body)
         .unsafeRunSync() shouldBe Misdelivered
     }
 
@@ -87,8 +87,8 @@ class EventsSenderSpec extends WordSpec with ExternalServiceStubbing {
       }
 
       intercept[Exception] {
-        sender.sendEvent(subscriptionUrl, event.compoundEventId, event.body).unsafeRunSync()
-      }.getMessage shouldBe s"POST $subscriptionUrl returned $BadRequest; body: message"
+        sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync()
+      }.getMessage shouldBe s"POST $subscriberUrl returned $BadRequest; body: message"
     }
   }
 
@@ -96,8 +96,8 @@ class EventsSenderSpec extends WordSpec with ExternalServiceStubbing {
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val event           = events.generateOne
-    val subscriptionUrl = SubscriptionUrl(externalServiceBaseUrl)
+    val event         = events.generateOne
+    val subscriberUrl = SubscriberUrl(externalServiceBaseUrl)
 
     val sender = new IOEventsSender(TestLogger())
   }

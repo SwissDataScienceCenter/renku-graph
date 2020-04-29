@@ -29,9 +29,9 @@ import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.creation.{EventCreationEndpoint, EventPersister}
+import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.{Subscriptions, SubscriptionsEndpoint}
 import org.http4s.Method.{GET, PATCH, POST}
@@ -105,33 +105,6 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       response.status shouldBe Ok
     }
 
-    "define a POST /events/subscriptions?status=READY endpoint" in new TestCase {
-      val request = Request[IO](POST, uri"events" / "subscriptions" withQueryParam ("status", "READY"))
-      (subscriptionsEndpoint.addSubscription _).expects(request).returning(Response[IO](Accepted).pure[IO])
-
-      val response = routes.call(request)
-
-      response.status shouldBe Accepted
-    }
-
-    "define a POST /events/subscriptions?status=READY endpoint " +
-      s"returning $BadRequest when there's no status query parameter" in new TestCase {
-      val request = Request[IO](POST, uri"events" / "subscriptions")
-
-      val response = routes.call(request)
-
-      response.status shouldBe BadRequest
-    }
-
-    "define a POST /events/subscriptions?status=READY endpoint " +
-      s"returning $BadRequest when there's value different than 'READY' for the status query parameter" in new TestCase {
-      val request = Request[IO](POST, uri"events" / "subscriptions" withQueryParam ("status", "unknown"))
-
-      val response = routes.call(request)
-
-      response.status shouldBe BadRequest
-    }
-
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
       val response = routes.call(
         Request(GET, uri"metrics")
@@ -142,12 +115,20 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
     }
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
-      val response = routes.call(
-        Request(GET, uri"ping")
-      )
+      val response = routes.call(Request(GET, uri"ping"))
 
       response.status       shouldBe Ok
       response.body[String] shouldBe "pong"
+    }
+
+    "define a POST /subscriptions endpoint" in new TestCase {
+      val request = Request[IO](POST, uri"subscriptions")
+
+      (subscriptionsEndpoint.addSubscription _).expects(request).returning(Response[IO](Accepted).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe Accepted
     }
   }
 

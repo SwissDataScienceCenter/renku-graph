@@ -91,19 +91,19 @@ class EventsDispatcher(
 
   private def toNew(id: CompoundEventId) = ToNew[IO](id, waitingEventsGauge, underProcessingGauge)
 
-  private def logStatement(result: SendingResult, url: SubscriptionUrl, id: CompoundEventId): IO[Unit] = result match {
+  private def logStatement(result: SendingResult, url: SubscriberUrl, id: CompoundEventId): IO[Unit] = result match {
     case result @ Delivered    => logger.info(s"Event $id, url = $url -> $result")
     case result @ ServiceBusy  => IO.unit
     case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
   }
 
-  private def reDispatch(id: CompoundEventId, body: EventBody, url: SubscriptionUrl) =
+  private def reDispatch(id: CompoundEventId, body: EventBody, url: SubscriberUrl) =
     (subscriptions hasOtherThan url) flatMap {
       case true  => dispatch(id, body)
       case false => (timer sleep noSubscriptionSleep) flatMap (_ => dispatch(id, body))
     }
 
-  private def removeUrlAndRollback(id: CompoundEventId, body: EventBody, url: SubscriptionUrl) = {
+  private def removeUrlAndRollback(id: CompoundEventId, body: EventBody, url: SubscriberUrl) = {
     for {
       _ <- subscriptions remove url
       _ <- subscriptions.isNext flatMap {
@@ -128,7 +128,7 @@ class EventsDispatcher(
       } yield ()
   }
 
-  private def markEventAsRecoverable(url: SubscriptionUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
+  private def markEventAsRecoverable(url: SubscriberUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
       val markEventFailed = ToNonRecoverableFailure[IO](id, EventMessage(exception), underProcessingGauge)
       for {

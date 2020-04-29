@@ -45,14 +45,14 @@ class SubscriberSpec extends WordSpec with MockFactory with Eventually {
 
     "send/resend subscription for events" in new TestCase {
 
-      val subscriptionUrl = subscriptionUrls.generateOne
-      (urlFinder.findSubscriptionUrl _)
+      val subscriberUrl = subscriberUrls.generateOne
+      (urlFinder.findSubscriberUrl _)
         .expects()
-        .returning(subscriptionUrl.pure[IO])
+        .returning(subscriberUrl.pure[IO])
         .atLeastOnce()
 
       (subscriptionSender.send _)
-        .expects(subscriptionUrl)
+        .expects(subscriberUrl)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -60,26 +60,26 @@ class SubscriberSpec extends WordSpec with MockFactory with Eventually {
 
       eventually {
         logger.loggedOnly(
-          Info(s"Subscribed for events with $subscriptionUrl")
+          Info(s"Subscribed for events with $subscriberUrl")
         )
       }
     }
 
-    "log an error and retry if finding Subscription URL fails" in new TestCase {
+    "log an error and retry if finding Subscriber URL fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (urlFinder.findSubscriptionUrl _)
+      (urlFinder.findSubscriberUrl _)
         .expects()
-        .returning(exception.raiseError[IO, SubscriptionUrl])
+        .returning(exception.raiseError[IO, SubscriberUrl])
 
-      val subscriptionUrl = subscriptionUrls.generateOne
-      (urlFinder.findSubscriptionUrl _)
+      val subscriberUrl = subscriberUrls.generateOne
+      (urlFinder.findSubscriberUrl _)
         .expects()
-        .returning(subscriptionUrl.pure[IO])
+        .returning(subscriberUrl.pure[IO])
         .atLeastOnce()
 
       (subscriptionSender.send _)
-        .expects(subscriptionUrl)
+        .expects(subscriberUrl)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -87,26 +87,26 @@ class SubscriberSpec extends WordSpec with MockFactory with Eventually {
 
       eventually {
         logger.loggedOnly(
-          Error("Finding subscription URL failed", exception),
-          Info(s"Subscribed for events with $subscriptionUrl")
+          Error("Finding subscriber URL failed", exception),
+          Info(s"Subscribed for events with $subscriberUrl")
         )
       }
     }
 
     "log an error and retry if sending Subscription URL fails" in new TestCase {
 
-      val subscriptionUrl = subscriptionUrls.generateOne
-      (urlFinder.findSubscriptionUrl _)
+      val subscriberUrl = subscriberUrls.generateOne
+      (urlFinder.findSubscriberUrl _)
         .expects()
-        .returning(subscriptionUrl.pure[IO])
+        .returning(subscriberUrl.pure[IO])
         .atLeastTwice()
 
       val exception = exceptions.generateOne
       (subscriptionSender.send _)
-        .expects(subscriptionUrl)
+        .expects(subscriberUrl)
         .returning(exception.raiseError[IO, Unit])
       (subscriptionSender.send _)
-        .expects(subscriptionUrl)
+        .expects(subscriberUrl)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -114,8 +114,8 @@ class SubscriberSpec extends WordSpec with MockFactory with Eventually {
 
       eventually {
         logger.loggedOnly(
-          Error("Sending subscription URL failed", exception),
-          Info(s"Subscribed for events with $subscriptionUrl")
+          Error("Subscribing for events failed", exception),
+          Info(s"Subscribed for events with $subscriberUrl")
         )
       }
     }

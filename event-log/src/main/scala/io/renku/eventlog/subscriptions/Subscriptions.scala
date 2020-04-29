@@ -28,26 +28,26 @@ import io.chrisdavenport.log4cats.Logger
 import scala.language.higherKinds
 
 class Subscriptions[Interpretation[_]] private[subscriptions] (
-    currentUrl: Ref[Interpretation, Option[SubscriptionUrl]],
+    currentUrl: Ref[Interpretation, Option[SubscriberUrl]],
     logger:     Logger[Interpretation]
 )(implicit ME:  MonadError[Interpretation, Throwable]) {
   import scala.collection.JavaConverters._
 
-  private val subscriptionsPool = new ConcurrentHashMap[SubscriptionUrl, Unit]()
+  private val subscriptionsPool = new ConcurrentHashMap[SubscriberUrl, Unit]()
 
-  def add(subscriptionUrl: SubscriptionUrl): Interpretation[Unit] = ME.catchNonFatal {
-    val present = subscriptionsPool.containsKey(subscriptionUrl)
-    subscriptionsPool.putIfAbsent(subscriptionUrl, ())
-    if (!present) logger.info(s"$subscriptionUrl added")
+  def add(subscriberUrl: SubscriberUrl): Interpretation[Unit] = ME.catchNonFatal {
+    val present = subscriptionsPool.containsKey(subscriberUrl)
+    subscriptionsPool.putIfAbsent(subscriberUrl, ())
+    if (!present) logger.info(s"$subscriberUrl added")
     ()
   }
 
-  def next: Interpretation[Option[SubscriptionUrl]] = {
+  def next: Interpretation[Option[SubscriberUrl]] = {
 
-    def replaceCurrentUrl(maybeUrl: Option[SubscriptionUrl]) = currentUrl.set(maybeUrl) map (_ => maybeUrl)
+    def replaceCurrentUrl(maybeUrl: Option[SubscriberUrl]) = currentUrl.set(maybeUrl) map (_ => maybeUrl)
 
     getAll.flatMap {
-      case Nil => currentUrl.getAndSet(Option.empty[SubscriptionUrl])
+      case Nil => currentUrl.getAndSet(Option.empty[SubscriberUrl])
       case urls =>
         currentUrl.get flatMap {
           case None => currentUrl.set(urls.headOption) map (_ => urls.headOption)
@@ -63,16 +63,16 @@ class Subscriptions[Interpretation[_]] private[subscriptions] (
 
   def isNext: Interpretation[Boolean] = (!subscriptionsPool.isEmpty).pure[Interpretation]
 
-  def hasOtherThan(url: SubscriptionUrl): Interpretation[Boolean] = getAll map (_.exists(_ != url))
+  def hasOtherThan(url: SubscriberUrl): Interpretation[Boolean] = getAll map (_.exists(_ != url))
 
-  def getAll: Interpretation[List[SubscriptionUrl]] = ME.catchNonFatal {
+  def getAll: Interpretation[List[SubscriberUrl]] = ME.catchNonFatal {
     subscriptionsPool.keys().asScala.toList
   }
 
-  def remove(subscriptionUrl: SubscriptionUrl): Interpretation[Unit] = ME.catchNonFatal {
-    val present = subscriptionsPool.containsKey(subscriptionUrl)
-    subscriptionsPool remove subscriptionUrl
-    if (present) logger.info(s"$subscriptionUrl removed")
+  def remove(subscriberUrl: SubscriberUrl): Interpretation[Unit] = ME.catchNonFatal {
+    val present = subscriptionsPool.containsKey(subscriberUrl)
+    subscriptionsPool remove subscriberUrl
+    if (present) logger.info(s"$subscriberUrl removed")
     ()
   }
 }
@@ -82,6 +82,6 @@ object Subscriptions {
 
   def apply(logger: Logger[IO]): IO[Subscriptions[IO]] =
     for {
-      currentUrl <- Ref.of[IO, Option[SubscriptionUrl]](None)
+      currentUrl <- Ref.of[IO, Option[SubscriberUrl]](None)
     } yield new Subscriptions[IO](currentUrl, logger)
 }

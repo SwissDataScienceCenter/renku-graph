@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait SubscriptionSender[Interpretation[_]] {
-  def send(subscriptionUrl: SubscriptionUrl): Interpretation[Unit]
+  def send(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 }
 
 private class IOSubscriptionSender(
@@ -47,17 +47,21 @@ private class IOSubscriptionSender(
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  override def send(subscriptionUrl: SubscriptionUrl): IO[Unit] =
+  private val statuses = Set("NEW", "RECOVERABLE_FAILURE")
+
+  override def send(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
-      uri           <- validateUri(s"$eventLogUrl/events/subscriptions?status=READY")
-      sendingResult <- send(request(POST, uri).withEntity(subscriptionUrl.asJson))(mapResponse)
+      uri           <- validateUri(s"$eventLogUrl/subscriptions")
+      sendingResult <- send(request(POST, uri).withEntity((subscriberUrl -> statuses).asJson))(mapResponse)
     } yield sendingResult
 
-  private implicit lazy val entityEncoder: Encoder[SubscriptionUrl] = Encoder.instance[SubscriptionUrl] { url =>
-    json"""{
-      "url": ${url.value}
-    }"""
-  }
+  private implicit lazy val entityEncoder: Encoder[(SubscriberUrl, Set[String])] =
+    Encoder.instance[(SubscriberUrl, Set[String])] {
+      case (url, statuses) => json"""{
+        "subscriberUrl": ${url.value},
+        "statuses": ${statuses.toList}
+      }"""
+    }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
     case (Accepted, _, _) => IO.unit

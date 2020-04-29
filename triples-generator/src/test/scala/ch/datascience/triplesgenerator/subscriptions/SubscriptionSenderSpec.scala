@@ -38,29 +38,29 @@ class SubscriptionSenderSpec extends WordSpec with MockFactory with ExternalServ
 
   "send" should {
 
-    s"succeed if posting Subscription URL results with $Accepted" in new TestCase {
+    s"succeed if posting Subscriber URL and statuses NEW and RECOVERABLE_FAILURE results with $Accepted" in new TestCase {
 
       stubFor {
-        post("/events/subscriptions?status=READY")
-          .withRequestBody(equalToJson(subscriptionUrl.asJson.spaces2))
+        post("/subscriptions")
+          .withRequestBody(equalToJson((subscriberUrl -> Set("NEW", "RECOVERABLE_FAILURE")).asJson.spaces2))
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
-      sender.send(subscriptionUrl).unsafeRunSync() shouldBe ((): Unit)
+      sender.send(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
     }
 
-    "fail when posting Subscription URL results in any other status" in new TestCase {
+    "fail when posting the payload results in any other status" in new TestCase {
 
       val message = "message"
       stubFor {
-        post("/events/subscriptions?status=READY")
-          .withRequestBody(equalToJson(subscriptionUrl.asJson.spaces2))
+        post("/subscriptions")
+          .withRequestBody(equalToJson((subscriberUrl -> Set("NEW", "RECOVERABLE_FAILURE")).asJson.spaces2))
           .willReturn(badRequest().withBody(message))
       }
 
       intercept[Exception] {
-        sender.send(subscriptionUrl).unsafeRunSync()
-      }.getMessage shouldBe s"POST $eventLogUrl/events/subscriptions?status=READY returned $BadRequest; body: $message"
+        sender.send(subscriberUrl).unsafeRunSync()
+      }.getMessage shouldBe s"POST $eventLogUrl/subscriptions returned $BadRequest; body: $message"
     }
   }
 
@@ -68,15 +68,17 @@ class SubscriptionSenderSpec extends WordSpec with MockFactory with ExternalServ
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val subscriptionUrl = subscriptionUrls.generateOne
+    val subscriberUrl = subscriberUrls.generateOne
 
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
     val sender      = new IOSubscriptionSender(eventLogUrl, TestLogger())
   }
 
-  private implicit lazy val urlEncoder: Encoder[SubscriptionUrl] = Encoder.instance[SubscriptionUrl] { url =>
-    json"""{
-      "url": ${url.value}
-    }"""
-  }
+  private implicit lazy val payloadEncoder: Encoder[(SubscriberUrl, Set[String])] =
+    Encoder.instance[(SubscriberUrl, Set[String])] {
+      case (url, statuses) => json"""{
+        "subscriberUrl": ${url.value},
+        "statuses": ${statuses.toList}
+      }"""
+    }
 }
