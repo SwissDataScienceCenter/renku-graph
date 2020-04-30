@@ -120,7 +120,7 @@ class EventsPatchingEndpointSpec extends WordSpec with MockFactory {
   private trait TestCase {
     def payload(status: EventStatus) = json"""{"status": ${status.value}}"""
 
-    val eventsPatcher        = mock[IOEventsPatcher]
+    val eventsPatcher        = mock[EventsPatcher[IO]]
     val waitingEventsGauge   = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, Path]]
 

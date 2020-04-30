@@ -21,8 +21,11 @@ package io.renku.eventlog.latestevents
 import java.time.Instant.now
 import java.time.temporal.ChronoUnit._
 
+import ch.datascience.db.Query
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.metrics.TestLabeledHistogram
+import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
 import org.scalatest.Matchers._
@@ -75,10 +78,13 @@ class LatestEventsFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
         (youngestEventIdProject1.id, project1, youngestEventBodyProject1),
         (eventIdProject2.id, project2, eventBodyProject2)
       )
+
+      queriesExecTimes.verifyExecutionTimeMeasured("latest projects events")
     }
   }
 
   private trait TestCase {
-    val latestEventsFinder = new LatestEventsFinder(transactor)
+    val queriesExecTimes   = TestLabeledHistogram[Query.Name]("query_id")
+    val latestEventsFinder = new LatestEventsFinderImpl(transactor, queriesExecTimes)
   }
 }

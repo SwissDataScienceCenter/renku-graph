@@ -18,12 +18,14 @@
 
 package io.renku.eventlog.metrics
 
+import ch.datascience.db.Query
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.projects.{Id, Path}
+import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
@@ -49,6 +51,8 @@ class StatsFinderSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaChe
           RecoverableFailure    -> statuses.count(_ == RecoverableFailure),
           NonRecoverableFailure -> statuses.count(_ == NonRecoverableFailure)
         )
+
+        queriesExecTimes.verifyExecutionTimeMeasured("statuses count")
       }
     }
   }
@@ -74,11 +78,14 @@ class StatsFinderSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaChe
           .filter {
             case (_, count) => count > 0
           }
+
+        queriesExecTimes.verifyExecutionTimeMeasured("projects events count")
       }
     }
   }
 
-  private val stats = new StatsFinderImpl(transactor)
+  private val queriesExecTimes = TestLabeledHistogram[Query.Name]("query_id")
+  private val stats            = new StatsFinderImpl(transactor, queriesExecTimes)
 
   private def store: ((Path, EventId, EventStatus)) => Unit = {
     case (projectPath, eventId, status) =>

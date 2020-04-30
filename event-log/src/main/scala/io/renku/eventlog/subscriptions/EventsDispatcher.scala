@@ -20,10 +20,10 @@ package io.renku.eventlog.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, Query}
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
@@ -167,14 +167,15 @@ object EventsDispatcher {
       subscriptions:           Subscriptions[IO],
       waitingEventsGauge:      LabeledGauge[IO, projects.Path],
       underProcessingGauge:    LabeledGauge[IO, projects.Path],
+      queriesExecTimes:        LabeledHistogram[IO, Query.Name],
       logger:                  Logger[IO]
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[EventsDispatcher] =
     for {
-      eventsFinder        <- IOEventLogFetch(transactor, waitingEventsGauge, underProcessingGauge)
+      eventsFinder        <- IOEventLogFetch(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
       eventsSender        <- IOEventsSender(logger)
-      updateCommandRunner <- IOUpdateCommandsRunner(transactor, logger)
+      updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
     } yield new EventsDispatcher(subscriptions,
                                  eventsFinder,
                                  updateCommandRunner,

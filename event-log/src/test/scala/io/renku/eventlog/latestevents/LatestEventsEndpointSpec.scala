@@ -23,7 +23,6 @@ import cats.effect.IO
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
-import ch.datascience.db.DbTransactor
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.{EventBody, EventId}
@@ -34,7 +33,7 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.syntax._
 import io.circe.{Decoder, Json}
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.{Event, EventLogDB, EventProject}
+import io.renku.eventlog.{Event, EventProject}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -102,12 +101,10 @@ class LatestEventsEndpointSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val eventsFinder     = mock[TestLatestEventsFinder]
+    val eventsFinder     = mock[LatestEventsFinder[IO]]
     val logger           = TestLogger[IO]()
     val findLatestEvents = new LatestEventsEndpoint[IO](eventsFinder, logger).findLatestEvents _
   }
-
-  class TestLatestEventsFinder(transactor: DbTransactor[IO, EventLogDB]) extends LatestEventsFinder(transactor)
 
   private val toIdProjectBody: Event => IdProjectBody =
     event => (event.id, event.project, event.body)

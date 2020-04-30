@@ -24,8 +24,9 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbClient, DbTransactor, Query}
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
 import eu.timepit.refined.api.RefType.applyRef
 import eu.timepit.refined.api.Refined
@@ -36,29 +37,39 @@ import io.renku.eventlog.{EventLogDB, EventStatus}
 import scala.language.higherKinds
 import scala.math.BigDecimal.RoundingMode
 
-class ProcessingStatusFinder[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    now:        () => Instant = () => Instant.now
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+trait ProcessingStatusFinder[Interpretation[_]] {
+  def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus]
+}
 
+class ProcessingStatusFinderImpl(
+    transactor:       DbTransactor[IO, EventLogDB],
+    queriesExecTimes: LabeledHistogram[IO, Query.Name],
+    now:              () => Instant = () => Instant.now
+)(implicit ME:        Bracket[IO, Throwable])
+    extends DbClient(Some(queriesExecTimes))
+    with ProcessingStatusFinder[IO] {
+
+  import eu.timepit.refined.auto._
   import io.renku.eventlog.TypesSerializers._
 
-  def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus] = OptionT {
-    latestBatchStatues(projectId) flatMap toProcessingStatus
+  override def fetchStatus(projectId: Id): OptionT[IO, ProcessingStatus] = OptionT {
+    measureExecutionTime(latestBatchStatues(projectId)) transact transactor.get flatMap toProcessingStatus
   }
 
-  private def latestBatchStatues(projectId: Id) = sql"""
-    select log.status
-    from event_log log
-    inner join (
-        select batch_date
-        from event_log
-        where project_id = $projectId
-        order by batch_date desc
-        limit 1
-      ) max_batch_date on log.batch_date = max_batch_date.batch_date
-    where log.project_id = $projectId
-  """.query[EventStatus].to[List].transact(transactor.get)
+  private def latestBatchStatues(projectId: Id) = Query(
+    query = sql"""|select log.status
+                  |from event_log log
+                  |inner join (
+                  |    select batch_date
+                  |    from event_log
+                  |    where project_id = $projectId
+                  |    order by batch_date desc
+                  |    limit 1
+                  |  ) max_batch_date on log.batch_date = max_batch_date.batch_date
+                  |where log.project_id = $projectId
+                  |""".stripMargin.query[EventStatus].to[List],
+    name  = "processing status"
+  )
 
   private def toProcessingStatus(statuses: List[EventStatus]) =
     statuses.foldLeft(0 -> 0) {
@@ -66,15 +77,19 @@ class ProcessingStatusFinder[Interpretation[_]](
         (done + 1) -> (total + 1)
       case ((done, total), _) => done -> (total + 1)
     } match {
-      case (0, 0)        => Option.empty[ProcessingStatus].pure[Interpretation]
+      case (0, 0)        => Option.empty[ProcessingStatus].pure[IO]
       case (done, total) => ProcessingStatus.from(done, total)(ME) map Option.apply
     }
 }
 
-class IOProcessingStatusFinder(
-    transactor:          DbTransactor[IO, EventLogDB]
-)(implicit contextShift: ContextShift[IO])
-    extends ProcessingStatusFinder[IO](transactor)
+object IOProcessingStatusFinder {
+  def apply(
+      transactor:          DbTransactor[IO, EventLogDB],
+      queriesExecTimes:    LabeledHistogram[IO, Query.Name]
+  )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusFinder[IO]] = IO {
+    new ProcessingStatusFinderImpl(transactor, queriesExecTimes)
+  }
+}
 
 import ProcessingStatus._
 

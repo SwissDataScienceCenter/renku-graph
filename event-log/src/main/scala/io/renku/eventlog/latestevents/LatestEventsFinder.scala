@@ -18,37 +18,54 @@
 
 package io.renku.eventlog.latestevents
 
-import cats.effect.{Bracket, ContextShift, IO}
-import ch.datascience.db.DbTransactor
+import cats.effect.{Bracket, IO}
+import ch.datascience.db.{DbClient, DbTransactor, Query}
 import ch.datascience.graph.model.events.{EventBody, EventId}
+import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
+import io.renku.eventlog.latestevents.LatestEventsFinder.IdProjectBody
 import io.renku.eventlog.{EventLogDB, EventProject, TypesSerializers}
 
 import scala.language.higherKinds
 
-class LatestEventsFinder[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends TypesSerializers {
+trait LatestEventsFinder[Interpretation[_]] {
+  def findAllLatestEvents: Interpretation[List[IdProjectBody]]
+}
+
+class LatestEventsFinderImpl(
+    transactor:       DbTransactor[IO, EventLogDB],
+    queriesExecTimes: LabeledHistogram[IO, Query.Name]
+)(implicit ME:        Bracket[IO, Throwable])
+    extends DbClient(Some(queriesExecTimes))
+    with LatestEventsFinder[IO]
+    with TypesSerializers {
 
   import LatestEventsFinder._
+  import eu.timepit.refined.auto._
 
-  def findAllLatestEvents: Interpretation[List[IdProjectBody]] =
-    sql"""
-         |select log.event_id, log.project_id, log.project_path, log.event_body 
-         |from event_log log, (select project_id, max(event_date) max_event_date from event_log group by project_id) aggregate
-         |where log.project_id = aggregate.project_id and log.event_date = aggregate.max_event_date
-         |""".stripMargin
+  override def findAllLatestEvents: IO[List[IdProjectBody]] =
+    measureExecutionTime(findEvents) transact transactor.get
+
+  private def findEvents = Query(
+    sql"""|select log.event_id, log.project_id, log.project_path, log.event_body
+          |from event_log log, (select project_id, max(event_date) max_event_date from event_log group by project_id) aggregate
+          |where log.project_id = aggregate.project_id and log.event_date = aggregate.max_event_date
+          |""".stripMargin
       .query[(EventId, EventProject, EventBody)]
-      .to[List]
-      .transact(transactor.get)
+      .to[List],
+    name = "latest projects events"
+  )
 }
 
 object LatestEventsFinder {
   type IdProjectBody = (EventId, EventProject, EventBody)
 }
 
-class IOLatestEventsFinder(
-    transactor:          DbTransactor[IO, EventLogDB]
-)(implicit contextShift: ContextShift[IO])
-    extends LatestEventsFinder[IO](transactor)
+object IOLatestEventsFinder {
+  def apply(
+      transactor:       DbTransactor[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, Query.Name]
+  ): IO[LatestEventsFinder[IO]] = IO {
+    new LatestEventsFinderImpl(transactor, queriesExecTimes)
+  }
+}

@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.statuschange
 
-import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import cats.effect.{Bracket, IO}
+import ch.datascience.db.{DbClient, DbTransactor, Query}
+import ch.datascience.metrics.LabeledHistogram
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
@@ -31,26 +32,27 @@ trait StatusUpdatesRunner[Interpretation[_]] {
   def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult]
 }
 
-class StatusUpdatesRunnerImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends StatusUpdatesRunner[Interpretation] {
+class StatusUpdatesRunnerImpl(
+    transactor:       DbTransactor[IO, EventLogDB],
+    queriesExecTimes: LabeledHistogram[IO, Query.Name],
+    logger:           Logger[IO]
+)(implicit ME:        Bracket[IO, Throwable])
+    extends DbClient(Some(queriesExecTimes))
+    with StatusUpdatesRunner[IO] {
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: DbTransactor[IO, EventLogDB] = transactor
 
-  import cats.implicits._
   import doobie.implicits._
 
-  override def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult] =
+  override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
     for {
-      queryResult  <- command.query.update.run transact transactor.get
+      queryResult  <- measureExecutionTime(command.query) transact transactor.get
       updateResult <- ME.catchNonFatal(command mapResult queryResult)
       _            <- logInfo(command, updateResult)
       _            <- command updateGauges updateResult
     } yield updateResult
 
-  private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
+  private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
     case _       => ME.unit
   }
@@ -60,7 +62,9 @@ object IOUpdateCommandsRunner {
 
   import cats.effect.IO
 
-  def apply(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO]): IO[StatusUpdatesRunner[IO]] = IO {
-    new StatusUpdatesRunnerImpl[IO](transactor, logger)
+  def apply(transactor:       DbTransactor[IO, EventLogDB],
+            queriesExecTimes: LabeledHistogram[IO, Query.Name],
+            logger:           Logger[IO]): IO[StatusUpdatesRunner[IO]] = IO {
+    new StatusUpdatesRunnerImpl(transactor, queriesExecTimes, logger)
   }
 }

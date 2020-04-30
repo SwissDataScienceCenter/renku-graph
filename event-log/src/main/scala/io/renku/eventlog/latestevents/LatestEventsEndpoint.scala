@@ -21,6 +21,8 @@ package io.renku.eventlog.latestevents
 import cats.MonadError
 import cats.effect.Effect
 import cats.implicits._
+import ch.datascience.db.Query
+import ch.datascience.metrics.LabeledHistogram
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
@@ -77,8 +79,10 @@ object IOLatestEventsEndpoint {
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
+      queriesExecTimes:    LabeledHistogram[IO, Query.Name],
       logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[LatestEventsEndpoint[IO]] = IO {
-    new LatestEventsEndpoint[IO](new IOLatestEventsFinder(transactor), logger)
-  }
+  )(implicit contextShift: ContextShift[IO]): IO[LatestEventsEndpoint[IO]] =
+    for {
+      eventsFinder <- IOLatestEventsFinder(transactor, queriesExecTimes)
+    } yield new LatestEventsEndpoint[IO](eventsFinder, logger)
 }

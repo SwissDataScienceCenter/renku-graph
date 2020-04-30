@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, Query}
 import ch.datascience.graph.model.events.CompoundEventId
 import doobie.util.fragment.Fragment
 import eu.timepit.refined.api.Refined
@@ -30,7 +30,7 @@ import scala.language.higherKinds
 trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable with TypesSerializers {
   def eventId: CompoundEventId
   def status:  EventStatus
-  def query:   Fragment
+  def query:   Query[Int]
   def updateGauges(updateResult: UpdateResult)(
       implicit transactor:       DbTransactor[Interpretation, EventLogDB]
   ): Interpretation[Unit]

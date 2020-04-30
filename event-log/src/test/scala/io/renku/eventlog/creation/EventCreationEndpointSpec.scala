@@ -24,19 +24,16 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DbTransactor
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.metrics.LabeledGauge
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.{Event, EventLogDB, EventProject}
+import io.renku.eventlog.{Event, EventProject}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -128,7 +125,7 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
   }
 
   private trait TestCase {
-    val persister = mock[TestEventPersister]
+    val persister = mock[EventPersister[IO]]
     val logger    = TestLogger[IO]()
     val addEvent  = new EventCreationEndpoint[IO](persister, logger).addEvent _
   }
@@ -149,8 +146,4 @@ class EventCreationEndpointSpec extends WordSpec with MockFactory {
       "path": ${project.path.value}
     }"""
   }
-
-  class TestEventPersister(transactor:         DbTransactor[IO, EventLogDB],
-                           waitingEventsGauge: LabeledGauge[IO, projects.Path])
-      extends EventPersister(transactor, waitingEventsGauge)
 }

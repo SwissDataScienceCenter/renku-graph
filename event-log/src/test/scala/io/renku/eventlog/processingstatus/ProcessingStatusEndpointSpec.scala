@@ -24,7 +24,6 @@ import cats.implicits._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage.InfoMessage
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DbTransactor
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
@@ -33,7 +32,6 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import eu.timepit.refined.api.Refined
 import io.circe.Decoder
-import io.renku.eventlog.EventLogDB
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
@@ -109,12 +107,10 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
   private trait TestCase {
     val projectId = projectIds.generateOne
 
-    val statusFinder         = mock[TestProcessingStatusFinder]
+    val statusFinder         = mock[ProcessingStatusFinder[IO]]
     val logger               = TestLogger[IO]()
     val findProcessingStatus = new ProcessingStatusEndpoint[IO](statusFinder, logger).findProcessingStatus _
   }
-
-  class TestProcessingStatusFinder(transactor: DbTransactor[IO, EventLogDB]) extends ProcessingStatusFinder(transactor)
 
   private implicit val processingStatusDecoder: Decoder[ProcessingStatus] = cursor =>
     for {

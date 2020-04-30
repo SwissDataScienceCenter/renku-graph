@@ -20,8 +20,9 @@ package io.renku.eventlog.eventspatching
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.controllers.ErrorMessage
+import ch.datascience.db.Query
 import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventStatus
 import io.renku.eventlog.EventStatus.New
@@ -96,13 +97,15 @@ object IOEventsPatchingEndpoint {
       transactor:           DbTransactor[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:     LabeledHistogram[IO, Query.Name],
       logger:               Logger[IO]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventsPatchingEndpoint[IO]] = IO {
-    new EventsPatchingEndpointImpl(
-      new IOEventsPatcher(transactor, logger),
+  )(implicit contextShift:  ContextShift[IO]): IO[EventsPatchingEndpoint[IO]] =
+    for {
+      eventsPatcher <- IOEventsPatcher(transactor, queriesExecTimes, logger)
+    } yield new EventsPatchingEndpointImpl(
+      eventsPatcher,
       waitingEventsGauge,
       underProcessingGauge,
       logger
     )
-  }
 }

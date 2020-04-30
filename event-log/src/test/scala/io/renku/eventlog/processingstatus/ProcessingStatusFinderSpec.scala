@@ -21,12 +21,14 @@ package io.renku.eventlog.processingstatus
 import java.time.temporal.ChronoUnit._
 
 import cats.data.NonEmptyList
+import ch.datascience.db.Query
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.BatchDate
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
@@ -64,6 +66,8 @@ class ProcessingStatusFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
       processingStatus.done.value           shouldBe doneEvents.size
       processingStatus.total.value          shouldBe expectedTotal
       processingStatus.progress.value.floor shouldBe ((doneEvents.size.toDouble / expectedTotal) * 100).floor
+
+      queriesExecTimes.verifyExecutionTimeMeasured("processing status")
     }
 
     "return ProcessingStatus for the latest batch only" in new TestCase {
@@ -109,7 +113,8 @@ class ProcessingStatusFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
 
   private trait TestCase {
     val projectId              = projectIds.generateOne
-    val processingStatusFinder = new IOProcessingStatusFinder(transactor)
+    val queriesExecTimes       = TestLabeledHistogram[Query.Name]("query_id")
+    val processingStatusFinder = new ProcessingStatusFinderImpl(transactor, queriesExecTimes)
 
     def storeEvents(projectId: Id, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
       statuses map {

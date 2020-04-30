@@ -21,11 +21,12 @@ package io.renku.eventlog.eventspatching
 import java.time.Instant
 
 import cats.MonadError
+import cats.implicits._
+import ch.datascience.db.Query
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
+import doobie.free.connection.ConnectionIO
 import doobie.implicits._
-import cats.implicits._
-import doobie.util.fragment.Fragment
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.EventStatus.New
@@ -34,9 +35,10 @@ import io.renku.eventlog.{EventStatus, TypesSerializers}
 import scala.language.higherKinds
 
 private trait EventsPatch[Interpretation[_]] extends Product with Serializable with TypesSerializers {
-  def name:           String Refined NonEmpty
-  def query:          Fragment
-  def updateGauges(): Interpretation[Unit]
+  def name:               String Refined NonEmpty
+  def updateGauges():     Interpretation[Unit]
+  protected def sqlQuery: ConnectionIO[Int]
+  lazy val query: Query[Int] = Query(sqlQuery, name)
 }
 
 private case class StatusNewPatch[Interpretation[_]](
@@ -47,12 +49,12 @@ private case class StatusNewPatch[Interpretation[_]](
     extends EventsPatch[Interpretation] {
 
   val status: EventStatus             = New
-  val name:   String Refined NonEmpty = Refined.unsafeApply(s"Status $status patch")
+  val name:   String Refined NonEmpty = Refined.unsafeApply(s"status $status patch")
 
-  override def query: Fragment =
+  protected override def sqlQuery: ConnectionIO[Int] =
     sql"""|update event_log
           |set status = $status, execution_date = event_date, batch_date = ${now()}, message = NULL
-          |""".stripMargin
+          |""".stripMargin.update.run
 
   override def updateGauges(): Interpretation[Unit] =
     for {

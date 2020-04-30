@@ -18,9 +18,10 @@
 
 package io.renku.eventlog.eventspatching
 
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.effect.{Bracket, IO}
 import cats.implicits._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbClient, DbTransactor, Query}
+import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -28,20 +29,27 @@ import io.renku.eventlog.EventLogDB
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-private class EventsPatcher[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+private trait EventsPatcher[Interpretation[_]] {
+  def applyToAllEvents(eventsPatch: EventsPatch[Interpretation]): Interpretation[Unit]
+}
 
-  def applyToAllEvents(eventsPatch: EventsPatch[Interpretation]): Interpretation[Unit] = {
+private class EventsPatcherImpl(
+    transactor:       DbTransactor[IO, EventLogDB],
+    queriesExecTimes: LabeledHistogram[IO, Query.Name],
+    logger:           Logger[IO]
+)(implicit ME:        Bracket[IO, Throwable])
+    extends DbClient(Some(queriesExecTimes))
+    with EventsPatcher[IO] {
+
+  def applyToAllEvents(eventsPatch: EventsPatch[IO]): IO[Unit] = {
     for {
-      _ <- eventsPatch.query.update.run transact transactor.get
+      _ <- measureExecutionTime(eventsPatch.query) transact transactor.get
       _ <- eventsPatch.updateGauges()
       _ <- logger.info(s"All events patched with ${eventsPatch.name}")
     } yield ()
   } recoverWith loggedError(eventsPatch)
 
-  private def loggedError(patch: EventsPatch[Interpretation]): PartialFunction[Throwable, Interpretation[Unit]] = {
+  private def loggedError(patch: EventsPatch[IO]): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
       val message = s"Patching all events with ${patch.name} failed"
       logger.error(exception)(message)
@@ -51,8 +59,12 @@ private class EventsPatcher[Interpretation[_]](
   }
 }
 
-private class IOEventsPatcher(
-    transactor:          DbTransactor[IO, EventLogDB],
-    logger:              Logger[IO]
-)(implicit contextShift: ContextShift[IO])
-    extends EventsPatcher[IO](transactor, logger)
+private object IOEventsPatcher {
+  def apply(
+      transactor:       DbTransactor[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, Query.Name],
+      logger:           Logger[IO]
+  ): IO[EventsPatcher[IO]] = IO {
+    new EventsPatcherImpl(transactor, queriesExecTimes, logger)
+  }
+}

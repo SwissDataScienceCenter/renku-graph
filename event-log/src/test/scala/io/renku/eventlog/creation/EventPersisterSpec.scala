@@ -23,12 +23,14 @@ import java.time.Instant
 import EventPersister.Result
 import Result._
 import cats.effect.IO
+import ch.datascience.db.Query
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import doobie.implicits._
+import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus.New
 import io.renku.eventlog._
@@ -70,6 +72,8 @@ class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
       save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
       save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
+
+      queriesExecTimes.verifyExecutionTimeMeasured("new - check existence", "new - find batch", "new - create")
     }
 
     "add a new event if there is no event with the given id for the given project " +
@@ -150,7 +154,8 @@ class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
 
     val currentTime        = mockFunction[Instant]
     val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
-    val persister          = new EventPersister(transactor, waitingEventsGauge, currentTime)
+    val queriesExecTimes   = TestLabeledHistogram[Query.Name]("query_id")
+    val persister          = new EventPersisterImpl(transactor, waitingEventsGauge, queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now)

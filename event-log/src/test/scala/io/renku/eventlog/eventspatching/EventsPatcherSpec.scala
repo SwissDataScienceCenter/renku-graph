@@ -20,11 +20,15 @@ package io.renku.eventlog.eventspatching
 
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.db.Query
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.metrics.{SingleValueGauge, TestLabeledHistogram}
+import doobie.free.connection.ConnectionIO
 import doobie.implicits._
+import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 import org.scalamock.scalatest.MockFactory
@@ -37,76 +41,70 @@ class EventsPatcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
     "execute given patch's query and update it's gauges" in new TestCase {
 
-      (patch.name _)
-        .expects()
-        .returning(patchName)
+      val patch = TestEventsPatch(gauge)
 
-      (patch.query _)
-        .expects()
-        .returning(sql"update event_log set status = ${New: EventStatus}")
-
-      (patch.updateGauges _)
-        .expects()
-        .returning(IO.unit)
+      (gauge.set _).expects(*).returning(IO.unit)
 
       patcher.applyToAllEvents(patch).unsafeRunSync() shouldBe ((): Unit)
 
-      logger.loggedOnly(Info(s"All events patched with $patchName"))
+      queriesExecTimes.verifyExecutionTimeMeasured(patch.query.name)
+
+      logger.loggedOnly(Info(s"All events patched with ${patch.name}"))
     }
 
     "log a failure when running the update fails" in new TestCase {
 
-      (patch.name _)
-        .expects()
-        .returning(patchName)
-
-      (patch.query _)
-        .expects()
-        .returning(sql"update nonexisting set status = ${New: EventStatus}")
+      val patch = TestEventsPatch(gauge, sql"update event_log".update.run)
 
       val exception = intercept[Exception] {
         patcher.applyToAllEvents(patch).unsafeRunSync()
       }
 
-      val errorMessage = s"Patching all events with $patchName failed"
+      val errorMessage = s"Patching all events with ${patch.name} failed"
       exception.getMessage shouldBe errorMessage
       logger.loggedOnly(Error(errorMessage, exception.getCause))
+
+      queriesExecTimes.verifyExecutionTimeMeasured(patch.query.name)
     }
 
     "log a failure when updating gauges fails" in new TestCase {
 
-      (patch.name _)
-        .expects()
-        .returning(patchName)
-
-      (patch.query _)
-        .expects()
-        .returning(sql"update event_log set status = ${New: EventStatus}")
+      val patch = TestEventsPatch(gauge)
 
       val exception = exceptions.generateOne
-      (patch.updateGauges _)
-        .expects()
-        .returning(exception.raiseError[IO, Unit])
+      (gauge.set _).expects(*).returning(exception.raiseError[IO, Unit])
 
       val actualException = intercept[Exception] {
         patcher.applyToAllEvents(patch).unsafeRunSync()
       }
 
-      val errorMessage = s"Patching all events with $patchName failed"
+      val errorMessage = s"Patching all events with ${patch.name} failed"
       actualException.getMessage shouldBe errorMessage
 
       actualException.getCause shouldBe exception
 
       logger.loggedOnly(Error(errorMessage, exception))
+
+      queriesExecTimes.verifyExecutionTimeMeasured(patch.query.name)
     }
   }
 
   private trait TestCase {
 
-    val patchName = nonBlankStrings().generateOne
-    val patch     = mock[EventsPatch[IO]]
+    val gauge = mock[SingleValueGauge[IO]]
 
-    val logger  = TestLogger[IO]()
-    val patcher = new EventsPatcher(transactor, logger)
+    val queriesExecTimes = TestLabeledHistogram[Query.Name]("query_id")
+    val logger           = TestLogger[IO]()
+    val patcher          = new EventsPatcherImpl(transactor, queriesExecTimes, logger)
+  }
+
+  private case class TestEventsPatch(
+      gauge:                  SingleValueGauge[IO],
+      protected val sqlQuery: ConnectionIO[Int] = sql"""|update event_log
+                                                        |set status = ${New: EventStatus}
+                                                        |""".stripMargin.update.run
+  ) extends EventsPatch[IO] {
+    override val name           = "test events patch"
+    override def updateGauges() = gauge.set(20d)
   }
 }

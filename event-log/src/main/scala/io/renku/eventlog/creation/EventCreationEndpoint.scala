@@ -24,11 +24,11 @@ import cats.effect.Effect
 import cats.implicits._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, Query}
 import ch.datascience.graph.model.events.{BatchDate, EventBody, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog._
 import org.http4s.dsl.Http4sDsl
@@ -113,8 +113,10 @@ object IOEventCreationEndpoint {
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       waitingEventsGauge:  LabeledGauge[IO, projects.Path],
+      queriesExecTimes:    LabeledHistogram[IO, Query.Name],
       logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[EventCreationEndpoint[IO]] = IO {
-    new EventCreationEndpoint[IO](new IOEventPersister(transactor, waitingEventsGauge), logger)
-  }
+  )(implicit contextShift: ContextShift[IO]): IO[EventCreationEndpoint[IO]] =
+    for {
+      eventPersister <- IOEventPersister(transactor, waitingEventsGauge, queriesExecTimes)
+    } yield new EventCreationEndpoint[IO](eventPersister, logger)
 }

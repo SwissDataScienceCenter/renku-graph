@@ -21,6 +21,7 @@ package io.renku.eventlog.eventspatching
 import java.time.Instant
 
 import cats.effect.IO
+import ch.datascience.db.Query
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -28,7 +29,9 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
@@ -78,6 +81,8 @@ class StatusNewPatchSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
         (event6Id, ExecutionDate(event6Date.value), BatchDate(currentTime))
       )
       findEventMessage(event4Id) shouldBe None
+
+      queriesExecTimes.verifyExecutionTimeMeasured(Refined.unsafeApply(s"status $New patch"))
     }
   }
 
@@ -85,12 +90,13 @@ class StatusNewPatchSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
 
     val waitingEventsGauge          = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge        = mock[LabeledGauge[IO, Path]]
+    val queriesExecTimes            = TestLabeledHistogram[Query.Name]("query_id")
     val currentTime                 = Instant.now()
     private val currentTimeProvider = mockFunction[Instant]
     currentTimeProvider.expects().returning(currentTime)
     val patch = StatusNewPatch(waitingEventsGauge, underProcessingGauge, currentTimeProvider)
 
-    val patcher = new EventsPatcher(transactor, TestLogger[IO]())
+    val patcher = new EventsPatcherImpl(transactor, queriesExecTimes, TestLogger[IO]())
 
     def addEvent(commitEventId: CompoundEventId,
                  status:        EventStatus,

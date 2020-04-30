@@ -24,6 +24,7 @@ import java.time.{Duration, Instant}
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.db.Query
 import ch.datascience.generators.CommonGraphGenerators.renkuLogTimeouts
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -31,7 +32,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
@@ -94,6 +95,10 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
                                                        (event3Id, executionDate, event3BatchDate))
 
       eventLogFetch.popEvent.unsafeRunSync() shouldBe None
+
+      queriesExecTimes.verifyExecutionTimeMeasured("pop event - projects",
+                                                   "pop event - oldest",
+                                                   "pop event - status update")
     }
 
     s"return an event with the $Processing status " +
@@ -170,7 +175,8 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
         transactor,
         renkuLogTimeout,
         waitingEventsGauge,
-        underProcessingGauge
+        underProcessingGauge,
+        TestLabeledHistogram[Query.Name]("query_id")
       )
       eventIdsBodiesDates.toList foreach { _ =>
         eventLogFetch.popEvent.unsafeRunSync() shouldBe a[Some[_]]
@@ -213,6 +219,7 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
         renkuLogTimeout,
         waitingEventsGauge,
         underProcessingGauge,
+        TestLabeledHistogram[Query.Name]("query_id"),
         pickRandomlyFrom = _ => (project2Id -> project2Path).some
       )
       expectWaitingEventsGaugeDecrement(project2Path)
@@ -232,12 +239,14 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
     val renkuLogTimeout      = renkuLogTimeouts.generateOne
     val waitingEventsGauge   = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, Path]]
+    val queriesExecTimes     = TestLabeledHistogram[Query.Name]("query_id")
     val maxProcessingTime    = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
     val eventLogFetch = new EventFetcherImpl(
       transactor,
       renkuLogTimeout,
       waitingEventsGauge,
       underProcessingGauge,
+      queriesExecTimes,
       currentTime
     )
 

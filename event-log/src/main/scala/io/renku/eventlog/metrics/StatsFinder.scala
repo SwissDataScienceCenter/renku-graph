@@ -21,10 +21,12 @@ package io.renku.eventlog.metrics
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbClient, DbTransactor, Query}
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
 import doobie.util.fragments.in
+import eu.timepit.refined.auto._
 import io.renku.eventlog._
 
 import scala.language.higherKinds
@@ -34,38 +36,50 @@ trait StatsFinder[Interpretation[_]] {
   def countEvents(statuses: Set[EventStatus]): Interpretation[Map[Path, Long]]
 }
 
-class StatsFinderImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends StatsFinder[Interpretation]
+class StatsFinderImpl(
+    transactor:       DbTransactor[IO, EventLogDB],
+    queriesExecTimes: LabeledHistogram[IO, Query.Name]
+)(implicit ME:        Bracket[IO, Throwable])
+    extends DbClient(Some(queriesExecTimes))
+    with StatsFinder[IO]
     with TypesSerializers {
 
-  override def statuses: Interpretation[Map[EventStatus, Long]] =
-    sql"""select status, count(event_id) from event_log group by status;""".stripMargin
-      .query[(EventStatus, Long)]
-      .to[List]
+  override def statuses: IO[Map[EventStatus, Long]] =
+    measureExecutionTime(findStatuses)
       .transact(transactor.get)
       .map(_.toMap)
       .map(addMissingStatues)
 
+  private lazy val findStatuses = Query(
+    sql"""select status, count(event_id) from event_log group by status;""".stripMargin
+      .query[(EventStatus, Long)]
+      .to[List],
+    name = "statuses count"
+  )
+
   private def addMissingStatues(stats: Map[EventStatus, Long]): Map[EventStatus, Long] =
     EventStatus.all.map(status => status -> stats.getOrElse(status, 0L)).toMap
 
-  // format: off
-  override def countEvents(statuses: Set[EventStatus]): Interpretation[Map[Path, Long]] =
+  override def countEvents(statuses: Set[EventStatus]): IO[Map[Path, Long]] =
     NonEmptyList.fromList(statuses.toList) match {
-      case None =>               Map.empty[Path, Long].pure[Interpretation]
-      case Some(statusesList) => (fr"""
-    |select project_path, count(event_id)
-    |from event_log
-    |where """ ++ `status IN`(statusesList) ++ fr"""
-    |group by project_path
-    |""").stripMargin
-          .query[(Path, Long)]
-          .to[List]
+      case None => Map.empty[Path, Long].pure[IO]
+      case Some(statusesList) =>
+        measureExecutionTime(countProjectsEvents(statusesList))
           .transact(transactor.get)
           .map(_.toMap)
-          }
+    }
+
+  // format: off
+  private def countProjectsEvents(statuses: NonEmptyList[EventStatus]) = Query({
+    fr"""
+    |select project_path, count(event_id)
+    |from event_log
+    |where """ ++ `status IN`(statuses) ++ fr"""
+    |group by project_path
+    |"""
+    }.stripMargin.query[(Path, Long)].to[List],
+    name = "projects events count"
+  )
   // format: on
 
   private def `status IN`(statuses: NonEmptyList[EventStatus]) = in(fr"status", statuses)
@@ -73,8 +87,9 @@ class StatsFinderImpl[Interpretation[_]](
 
 object IOStatsFinder {
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB]
+      transactor:          DbTransactor[IO, EventLogDB],
+      queriesExecTimes:    LabeledHistogram[IO, Query.Name]
   )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
-    new StatsFinderImpl[IO](transactor)
+    new StatsFinderImpl(transactor, queriesExecTimes)
   }
 }

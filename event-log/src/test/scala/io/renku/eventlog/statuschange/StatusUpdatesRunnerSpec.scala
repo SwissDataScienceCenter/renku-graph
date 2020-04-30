@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.IO
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, Query}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -27,7 +27,7 @@ import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
 import io.renku.eventlog.EventStatus.{New, Processing}
@@ -59,6 +59,8 @@ class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec with 
       findEvents(status = Processing).map(_._1) shouldBe List(eventId)
 
       logger.loggedOnly(Info(s"Event $eventId got ${command.status}"))
+
+      histogram.verifyExecutionTimeMeasured(command.query.name)
     }
   }
 
@@ -66,9 +68,10 @@ class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec with 
     val eventId     = compoundEventIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val gauge  = mock[LabeledGauge[IO, projects.Path]]
-    val logger = TestLogger[IO]()
-    val runner = new StatusUpdatesRunnerImpl[IO](transactor, logger)
+    val gauge     = mock[LabeledGauge[IO, projects.Path]]
+    val histogram = TestLabeledHistogram[Query.Name]("query_id")
+    val logger    = TestLogger[IO]()
+    val runner    = new StatusUpdatesRunnerImpl(transactor, histogram, logger)
   }
 
   private case class TestCommand(eventId:     CompoundEventId,
@@ -79,11 +82,13 @@ class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec with 
 
     override val status: EventStatus = Processing
 
-    override def query =
+    override def query = Query(
       sql"""|update event_log 
             |set status = $status
             |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${New: EventStatus}
-            |""".stripMargin
+            |""".stripMargin.update.run,
+      name = "test_status_update"
+    )
 
     override def mapResult: Int => UpdateResult = {
       case 0 => UpdateResult.Conflict

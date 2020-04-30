@@ -20,40 +20,46 @@ package io.renku.eventlog.creation
 
 import java.time.Instant
 
+import EventPersister.Result
+import Result._
 import cats.data.NonEmptyList
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.effect.{Bracket, IO}
 import cats.free.Free
-import cats.implicits._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbClient, DbTransactor, Query}
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
 import doobie.util.fragments.in
+import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus.{New, Processing, RecoverableFailure}
 import io.renku.eventlog.TypesSerializers._
 import io.renku.eventlog.{Event, EventLogDB, EventStatus}
 
 import scala.language.higherKinds
 
-class EventPersister[Interpretation[_]](
-    transactor:         DbTransactor[Interpretation, EventLogDB],
-    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
+trait EventPersister[Interpretation[_]] {
+  def storeNewEvent(event: Event): Interpretation[Result]
+}
+
+class EventPersisterImpl(
+    transactor:         DbTransactor[IO, EventLogDB],
+    waitingEventsGauge: LabeledGauge[IO, projects.Path],
+    queriesExecTimes:   LabeledHistogram[IO, Query.Name],
     now:                () => Instant = () => Instant.now
-)(implicit ME:          Bracket[Interpretation, Throwable]) {
+)(implicit ME:          Bracket[IO, Throwable])
+    extends DbClient(Some(queriesExecTimes))
+    with EventPersister[IO] {
 
-  import EventPersister.Result
-  import Result._
-
-  def storeNewEvent(event: Event): Interpretation[Result] =
+  override def storeNewEvent(event: Event): IO[Result] =
     for {
-      result <- insertIfNotDuplicate(event).transact(transactor.get)
+      result <- insertIfNotDuplicate(event) transact transactor.get
       _      <- if (result == Created) waitingEventsGauge.increment(event.project.path) else ME.unit
     } yield result
 
   private def insertIfNotDuplicate(event: Event) =
-    checkIfInLog(event) flatMap {
+    measureExecutionTime(checkIfInLog(event)) flatMap {
       case Some(_) => Free.pure[ConnectionOp, Result](Existed)
       case None    => addToLog(event)
     }
@@ -61,38 +67,45 @@ class EventPersister[Interpretation[_]](
   private def addToLog(event: Event): Free[ConnectionOp, Result] =
     for {
       updatedCommitEvent <- eventuallyAddToExistingBatch(event)
-      _                  <- insert(updatedCommitEvent)
+      _                  <- measureExecutionTime(insert(updatedCommitEvent))
     } yield Created
 
-  private def eventuallyAddToExistingBatch(event: Event) = findBatchInQueue(event) map {
+  private def eventuallyAddToExistingBatch(event: Event) = measureExecutionTime(findBatchInQueue(event)) map {
     case Some(batchDateUnderProcessing) => event.copy(batchDate = batchDateUnderProcessing)
     case _                              => event
   }
 
-  private def checkIfInLog(event: Event) =
+  private def checkIfInLog(event: Event) = Query(
     sql"""|select event_id
           |from event_log
           |where event_id = ${event.id} and project_id = ${event.project.id}""".stripMargin
       .query[String]
-      .option
+      .option,
+    name = "new - check existence"
+  )
 
   // format: off
-  private def findBatchInQueue(event: Event) = { fr"""
-    select batch_date
-    from event_log
-    where project_id = ${event.project.id} and """ ++ `status IN`(New, RecoverableFailure, Processing) ++ fr"""
-    order by batch_date desc
-    limit 1"""
-    }.query[BatchDate].option
+  private def findBatchInQueue(event: Event) = Query({ fr"""
+      select batch_date
+      from event_log
+      where project_id = ${event.project.id} and """ ++ `status IN`(New, RecoverableFailure, Processing) ++ fr"""
+      order by batch_date desc
+      limit 1"""
+    }.query[BatchDate].option,
+    name = "new - find batch"
+  )
   // format: on
 
   private def insert(event: Event) = {
     import event._
     val currentTime = now()
-    sql"""insert into
+    Query(
+      sql"""insert into
           event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
           values ($id, ${project.id}, ${project.path}, ${EventStatus.New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
-      """.update.run.map(_ => ())
+      """.update.run.map(_ => ()),
+      name = "new - create"
+    )
   }
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
@@ -109,8 +122,12 @@ object EventPersister {
   }
 }
 
-class IOEventPersister(
-    transactor:          DbTransactor[IO, EventLogDB],
-    waitingEventsGauge:  LabeledGauge[IO, projects.Path]
-)(implicit contextShift: ContextShift[IO])
-    extends EventPersister[IO](transactor, waitingEventsGauge)
+object IOEventPersister {
+  def apply(
+      transactor:         DbTransactor[IO, EventLogDB],
+      waitingEventsGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:   LabeledHistogram[IO, Query.Name]
+  ) = IO {
+    new EventPersisterImpl(transactor, waitingEventsGauge, queriesExecTimes)
+  }
+}

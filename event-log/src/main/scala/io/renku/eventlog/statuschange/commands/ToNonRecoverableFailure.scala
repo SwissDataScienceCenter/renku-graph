@@ -22,12 +22,12 @@ import java.time.Instant
 
 import cats.effect.Bracket
 import cats.implicits._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, Query}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
-import doobie.util.fragment.Fragment
+import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus.{NonRecoverableFailure, Processing}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage, EventStatus}
@@ -44,11 +44,13 @@ final case class ToNonRecoverableFailure[Interpretation[_]](
 
   override val status: EventStatus = NonRecoverableFailure
 
-  override def query: Fragment =
+  override def query: Query[Int] = Query(
     sql"""|update event_log 
           |set status = $status, execution_date = ${now()}, message = $maybeMessage
           |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}
-          |""".stripMargin
+          |""".stripMargin.update.run,
+    name = "processing->non_recoverable_fail"
+  )
 
   override def updateGauges(
       updateResult:      UpdateResult

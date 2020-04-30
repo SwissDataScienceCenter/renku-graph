@@ -21,10 +21,10 @@ package io.renku.eventlog.statuschange
 import cats.MonadError
 import cats.effect.{ContextShift, Effect}
 import cats.implicits._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, Query}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 import io.renku.eventlog.{EventLogDB, EventMessage}
@@ -113,9 +113,10 @@ object IOStatusChangeEndpoint {
       transactor:           DbTransactor[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:     LabeledHistogram[IO, Query.Name],
       logger:               Logger[IO]
   )(implicit contextShift:  ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
-      statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, logger)
+      statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
     } yield new StatusChangeEndpoint(statusUpdatesRunner, waitingEventsGauge, underProcessingGauge, logger)
 }
