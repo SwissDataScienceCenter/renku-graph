@@ -6,7 +6,7 @@
 
 - `helm-chart` helm chart, published using chartpress
 - `acceptance-tests` acceptance tests for the services
-- `db-event-log` Postgres based Event Log module
+- `event-log` a microservice providing CRUD operations on the Event Log
 - `graph-commons` common classes for all the services
 - `token-repository` a microservice managing Access Tokens for projects
 - `triples-generator` a microservice translating Event Log events to RDF triples in an RDF store

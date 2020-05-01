@@ -27,7 +27,7 @@ import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
@@ -38,7 +38,7 @@ import scala.language.higherKinds
 
 private[triplescuration] trait ForkInfoUpdater[Interpretation[_]] {
   def updateForkInfo(
-      commit:                  Commit,
+      commit:                  CommitEvent,
       givenCuratedTriples:     CuratedTriples
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, CuratedTriples]
 }
@@ -54,7 +54,7 @@ private[triplescuration] class IOForkInfoUpdater(
   import updatesCreator._
 
   def updateForkInfo(
-      commit:                  Commit,
+      commit:                  CommitEvent,
       givenCuratedTriples:     CuratedTriples
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, CuratedTriples] = EitherT {
     (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path))

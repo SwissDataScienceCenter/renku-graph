@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
-import ch.datascience.dbeventlog.EventStatus.{New, TriplesStore}
+import io.renku.eventlog.EventStatus.{New, TriplesStore}
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog

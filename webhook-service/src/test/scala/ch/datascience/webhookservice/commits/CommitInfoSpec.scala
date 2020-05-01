@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.commits
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{Author, Committer}
+import ch.datascience.webhookservice.eventprocessing.{Author, Committer}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators.commitInfos
 import io.circe.literal._
 import org.scalatest.Matchers._
@@ -36,9 +36,9 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
       forAll { commitInfo: CommitInfo =>
         json"""{
           "id":              ${commitInfo.id.value},
-          "author_name":     ${commitInfo.author.username.value},
+          "author_name":     ${commitInfo.author.name.value},
           "author_email":    ${commitInfo.author.emailToJson},
-          "committer_name":  ${commitInfo.committer.username.value},
+          "committer_name":  ${commitInfo.committer.name.value},
           "committer_email": ${commitInfo.committer.emailToJson},
           "message":         ${commitInfo.message.value},
           "committed_date":  ${commitInfo.committedDate.value},
@@ -49,8 +49,8 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "decode valid JSON with blank emails to a CommitInfo object" in {
       val commitInfo        = commitInfos.generateOne
-      val authorUsername    = usernames.generateOne
-      val committerUsername = usernames.generateOne
+      val authorUsername    = userNames.generateOne
+      val committerUsername = userNames.generateOne
       json"""{
         "id":              ${commitInfo.id.value},
         "author_name":     ${authorUsername.value},
@@ -62,8 +62,8 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
         "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
       }""".as[CommitInfo] shouldBe Right(
         commitInfo.copy(
-          author    = Author.withUsername(authorUsername),
-          committer = Committer.withUsername(committerUsername)
+          author    = Author.withName(authorUsername),
+          committer = Committer.withName(committerUsername)
         )
       )
     }
@@ -91,8 +91,8 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "decode invalid emails to Nones" in {
       val commitInfo        = commitInfos.generateOne
-      val authorUsername    = usernames.generateOne
-      val committerUsername = usernames.generateOne
+      val authorUsername    = userNames.generateOne
+      val committerUsername = userNames.generateOne
       json"""{
         "id":              ${commitInfo.id.value},
         "author_name":     ${authorUsername.value},
@@ -104,8 +104,8 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
         "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
       }""".as[CommitInfo] shouldBe Right(
         commitInfo.copy(
-          author    = Author.withUsername(authorUsername),
-          committer = Committer.withUsername(committerUsername)
+          author    = Author.withName(authorUsername),
+          committer = Committer.withName(committerUsername)
         )
       )
     }
@@ -117,7 +117,7 @@ class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
         "id":              ${commitInfo.id.value},
         "author_name":     ${blankStrings().generateOne},
         "author_email":    ${blankStrings().generateOne},
-        "committer_name":  ${usernames.generateOne.value},
+        "committer_name":  ${userNames.generateOne.value},
         "committer_email": ${userEmails.generateOne.value},
         "message":         ${commitInfo.message.value},
         "committed_date":  ${commitInfo.committedDate.value},

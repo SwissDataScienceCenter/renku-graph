@@ -24,11 +24,6 @@ import cats.effect._
 import ch.datascience.config.GitLab
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
-import ch.datascience.db.DbTransactorResource
-import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
-import ch.datascience.dbeventlog.{EventLogDB, EventLogDbConfigProvider}
-import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -57,63 +52,48 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      transactorResource <- new EventLogDbConfigProvider[IO] map DbTransactorResource[IO, EventLogDB]
-      exitCode           <- runMicroservice(transactorResource, args)
+      sentryInitializer     <- SentryInitializer[IO]
+      projectHookUrl        <- ProjectHookUrl.fromConfig[IO]()
+      gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+      gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+      hookTokenCrypto       <- HookTokenCrypto[IO]()
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+      metricsRegistry       <- MetricsRegistry()
+      hookEventEndpoint <- IOHookEventEndpoint(gitLabThrottler,
+                                               hookTokenCrypto,
+                                               executionTimeRecorder,
+                                               ApplicationLogger)
+      hookCreatorEndpoint <- IOHookCreationEndpoint(projectHookUrl,
+                                                    gitLabThrottler,
+                                                    hookTokenCrypto,
+                                                    executionTimeRecorder,
+                                                    ApplicationLogger)
+      processingStatusEndpoint <- IOProcessingStatusEndpoint(projectHookUrl,
+                                                             gitLabThrottler,
+                                                             executionTimeRecorder,
+                                                             ApplicationLogger)
+      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler)
+      routes <- new MicroserviceRoutes[IO](
+                 hookEventEndpoint,
+                 hookCreatorEndpoint,
+                 hookValidationEndpoint,
+                 processingStatusEndpoint,
+                 new RoutesMetrics[IO](metricsRegistry)
+               ).routes
+      httpServer = new HttpServer[IO](serverPort = 9001, routes)
+
+      eventsSynchronizationScheduler <- IOEventsSynchronizationScheduler(gitLabThrottler,
+                                                                         executionTimeRecorder,
+                                                                         ApplicationLogger)
+      exitCode <- new MicroserviceRunner(
+                   sentryInitializer,
+                   eventsSynchronizationScheduler,
+                   httpServer
+                 ) run args
     } yield exitCode
-
-  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
-    transactorResource.use { transactor =>
-      for {
-        sentryInitializer     <- SentryInitializer[IO]
-        tokenRepositoryUrl    <- TokenRepositoryUrl[IO]()
-        projectHookUrl        <- ProjectHookUrl.fromConfig[IO]()
-        gitLabUrl             <- GitLabUrl[IO]()
-        gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-        gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-        hookTokenCrypto       <- HookTokenCrypto[IO]()
-        executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-        metricsRegistry       <- MetricsRegistry()
-        routes <- new MicroserviceRoutes[IO](
-                   new IOHookEventEndpoint(transactor,
-                                           tokenRepositoryUrl,
-                                           gitLabUrl,
-                                           gitLabThrottler,
-                                           hookTokenCrypto,
-                                           executionTimeRecorder),
-                   new IOHookCreationEndpoint(transactor,
-                                              tokenRepositoryUrl,
-                                              projectHookUrl,
-                                              gitLabUrl,
-                                              gitLabThrottler,
-                                              hookTokenCrypto,
-                                              executionTimeRecorder),
-                   new IOHookValidationEndpoint(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
-                   new IOProcessingStatusEndpoint(transactor,
-                                                  tokenRepositoryUrl,
-                                                  projectHookUrl,
-                                                  gitLabUrl,
-                                                  gitLabThrottler,
-                                                  executionTimeRecorder),
-                   new RoutesMetrics[IO](metricsRegistry)
-                 ).routes
-        httpServer = new HttpServer[IO](serverPort = 9001, routes)
-
-        exitCode <- new MicroserviceRunner(
-                     sentryInitializer,
-                     new IOEventLogDbInitializer(transactor),
-                     new IOEventsSynchronizationScheduler(transactor,
-                                                          tokenRepositoryUrl,
-                                                          gitLabUrl,
-                                                          gitLabThrottler,
-                                                          executionTimeRecorder),
-                     httpServer
-                   ) run args
-      } yield exitCode
-    }
 }
 
 class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],
-                         eventLogDbInitializer:          IOEventLogDbInitializer,
                          eventsSynchronizationScheduler: EventsSynchronizationScheduler[IO],
                          httpServer:                     HttpServer[IO])(implicit contextShift: ContextShift[IO]) {
   import cats.implicits._
@@ -121,7 +101,6 @@ class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],
   def run(args: List[String]): IO[ExitCode] =
     for {
       _ <- sentryInitializer.run
-      _ <- eventLogDbInitializer.run
       _ <- List(httpServer.run.start, eventsSynchronizationScheduler.run).sequence
     } yield ExitCode.Success
 }

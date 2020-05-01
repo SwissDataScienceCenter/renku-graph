@@ -34,8 +34,7 @@ object ProjectHookUrl {
   def fromConfig[Interpretation[_]](
       config:    Config = ConfigFactory.load
   )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[ProjectHookUrl] =
-    SelfUrl[Interpretation](config)
-      .map(from)
+    SelfUrl[Interpretation](config).map(from)
 
   def from(selfUrl: SelfUrl): ProjectHookUrl = new ProjectHookUrl((selfUrl / "webhooks" / "events").value)
 }

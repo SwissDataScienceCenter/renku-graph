@@ -22,61 +22,18 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events._
 import org.scalacheck.Gen
-import org.scalacheck.Gen._
 
 object EventsGenerators {
 
   implicit val commitIds:      Gen[CommitId]      = shas map CommitId.apply
   implicit val commitMessages: Gen[CommitMessage] = nonEmptyStrings() map CommitMessage.apply
   implicit val committedDates: Gen[CommittedDate] = timestampsNotInTheFuture map CommittedDate.apply
+  implicit val eventIds:       Gen[EventId]       = shas map EventId.apply
   implicit val batchDates:     Gen[BatchDate]     = timestampsNotInTheFuture map BatchDate.apply
+  implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
 
-  implicit val authors: Gen[Author] = Gen.oneOf(
-    usernames map Author.withUsername,
-    userEmails map Author.withEmail,
-    for {
-      username <- usernames
-      email    <- userEmails
-    } yield Author(username, email)
-  )
-
-  implicit val committers: Gen[Committer] = Gen.oneOf(
-    usernames map Committer.withUsername,
-    userEmails map Committer.withEmail,
-    for {
-      username <- usernames
-      email    <- userEmails
-    } yield Committer(username, email)
-  )
-
-  implicit val projects: Gen[Project] = for {
+  implicit val compoundEventIds: Gen[CompoundEventId] = for {
+    eventId   <- eventIds
     projectId <- projectIds
-    path      <- projectPaths
-  } yield Project(projectId, path)
-
-  implicit def parentsIdsLists(minNumber: Int = 0, maxNumber: Int = 4): Gen[List[CommitId]] = {
-    require(minNumber <= maxNumber,
-            s"minNumber = $minNumber is not <= maxNumber = $maxNumber for generating parents Ids list")
-
-    for {
-      parentCommitsNumber <- choose(minNumber, maxNumber)
-      parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
-    } yield parents
-  }
-
-  implicit val commitEventIds: Gen[CommitEventId] = for {
-    eventId   <- commitIds
-    projectId <- projectIds
-  } yield CommitEventId(eventId, projectId)
-
-  implicit val commitEvents: Gen[CommitEvent] = for {
-    commitId      <- commitIds
-    project       <- projects
-    message       <- commitMessages
-    committedDate <- committedDates
-    author        <- authors
-    committer     <- committers
-    parentsIds    <- parentsIdsLists()
-    batchDate     <- batchDates
-  } yield CommitEvent(commitId, project, message, committedDate, author, committer, parentsIds, batchDate)
+  } yield CompoundEventId(eventId, projectId)
 }

@@ -19,8 +19,11 @@
 package ch.datascience.triplesgenerator
 
 import cats.effect.{Clock, IO}
+import cats.implicits._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
+import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessingEndpoint
+import org.http4s.Method.POST
 import org.http4s.Status._
 import org.http4s._
 import org.scalamock.scalatest.MockFactory
@@ -33,6 +36,16 @@ import scala.language.reflectiveCalls
 class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
   "routes" should {
+
+    "define a POST /events endpoint" in new TestCase {
+      val request        = Request[IO](POST, uri"events")
+      val expectedStatus = Accepted
+      (eventProcessingEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe expectedStatus
+    }
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
 
@@ -56,7 +69,11 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
   private trait TestCase {
 
-    val routesMetrics = TestRoutesMetrics()
-    val routes        = new MicroserviceRoutes[IO](routesMetrics).routes.map(_.or(notAvailableResponse))
+    val eventProcessingEndpoint = mock[IOEventProcessingEndpoint]
+    val routesMetrics           = TestRoutesMetrics()
+    val routes = new MicroserviceRoutes[IO](
+      eventProcessingEndpoint,
+      routesMetrics
+    ).routes.map(_.or(notAvailableResponse))
   }
 }

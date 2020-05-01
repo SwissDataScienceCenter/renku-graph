@@ -30,23 +30,10 @@ spec:
               value: {{ .Values.global.renku.domain }}
             - name: RENKU_BASE_URL
               value: https://{{ .Values.global.renku.domain }}
+            - name: EVENT_LOG_BASE_URL
+              value: "http://{{ template "eventLog.fullname" . }}:{{ .Values.eventLog.service.port }}"
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
-            - name: EVENT_LOG_POSTGRES_HOST
-              value: "{{ template "postgresql.fullname" . }}:5432"
-            - name: EVENT_LOG_POSTGRES_USER
-              value: {{ .Values.global.graph.dbEventLog.postgresUser }}
-            - name: EVENT_LOG_POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-{{- if .Values.global.graph.dbEventLog.existingSecret }}
-                  name: {{ tpl .Values.global.graph.dbEventLog.existingSecret . }}
-{{- else }}
-                  name: {{ template "triplesGenerator.fullname" . }}
-{{- end }}
-                  key: graph-dbEventLog-postgresPassword
-            - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
-              value: "{{ .Values.triplesGenerator.dbEventLog.connectionPool }}"
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
             - name: GITLAB_RATE_LIMIT
@@ -83,8 +70,6 @@ spec:
             - name: SENTRY_ENVIRONMENT_NAME
               value: {{ .Values.sentry.environmentName }}
               {{- end }}
-            - name: GENERATION_PROCESSES_INITIAL_DELAY
-              value: "{{ .Values.triplesGenerator.generationProcessInitialDelay }}"
             - name: GENERATION_PROCESSES_NUMBER
               value: "{{ .Values.triplesGenerator.generationProcessesNumber }}"
             - name: THREADS_NUMBER

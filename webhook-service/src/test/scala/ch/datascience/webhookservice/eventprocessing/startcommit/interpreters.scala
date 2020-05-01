@@ -18,11 +18,8 @@
 
 package ch.datascience.webhookservice.eventprocessing.startcommit
 
-import cats.effect.Bracket
+import cats.effect.IO
 import cats.implicits._
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.dbeventlog.commands.EventLogVerifyExistence
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.commits.CommitInfoFinder
@@ -42,13 +39,18 @@ class TryCommitToEventLog(
                                   commitEventSender,
                                   logger,
                                   executionTimeRecorder)
+class IOCommitToEventLog(
+    accessTokenFinder:     AccessTokenFinder[IO],
+    commitEventsSource:    CommitEventsSourceBuilder[IO],
+    commitEventSender:     CommitEventSender[IO],
+    logger:                Logger[IO],
+    executionTimeRecorder: ExecutionTimeRecorder[IO]
+) extends CommitToEventLog[IO](accessTokenFinder,
+                                 commitEventsSource,
+                                 commitEventSender,
+                                 logger,
+                                 executionTimeRecorder)
 
 private class TryCommitEventsSourceBuilder(
-    commitInfoFinder:        CommitInfoFinder[Try],
-    eventLogVerifyExistence: EventLogVerifyExistence[Try]
-) extends CommitEventsSourceBuilder[Try](commitInfoFinder, eventLogVerifyExistence)
-
-private class TryEventLogVerifyExistence(
-    transactor: DbTransactor[Try, EventLogDB]
-)(implicit ME:  Bracket[Try, Throwable])
-    extends EventLogVerifyExistence[Try](transactor)
+    commitInfoFinder: CommitInfoFinder[Try]
+) extends CommitEventsSourceBuilder[Try](commitInfoFinder)

@@ -18,13 +18,12 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
+import ProcessingStatusGenerator._
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.IO
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.dbeventlog.DbEventLogGenerators.processingStatuses
-import ch.datascience.dbeventlog.commands.{IOEventLogProcessingStatus, ProcessingStatus}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
@@ -34,6 +33,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
 import ch.datascience.webhookservice.hookvalidation.IOHookValidator
@@ -59,8 +59,8 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(HookExists))
 
       val processingStatus = processingStatuses.generateOne
-      (eventsProcessingStatus
-        .fetchStatus(_: Id))
+      (processingStatusFetcher
+        .fetchProcessingStatus(_: Id))
         .expects(projectId)
         .returning(OptionT.some(processingStatus))
 
@@ -87,8 +87,8 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
         .expects(projectId, None)
         .returning(context.pure(HookExists))
 
-      (eventsProcessingStatus
-        .fetchStatus(_: Id))
+      (processingStatusFetcher
+        .fetchProcessingStatus(_: Id))
         .expects(projectId)
         .returning(OptionT.none[IO, ProcessingStatus])
 
@@ -153,8 +153,8 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
         .returning(context.pure(HookExists))
 
       val exception = exceptions.generateOne
-      (eventsProcessingStatus
-        .fetchStatus(_: Id))
+      (processingStatusFetcher
+        .fetchProcessingStatus(_: Id))
         .expects(projectId)
         .returning(OptionT.liftF(context.raiseError(exception)))
 
@@ -171,13 +171,13 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
 
     val projectId = projectIds.generateOne
 
-    val hookValidator          = mock[IOHookValidator]
-    val eventsProcessingStatus = mock[IOEventLogProcessingStatus]
-    val logger                 = TestLogger[IO]()
-    val executionTimeRecorder  = TestExecutionTimeRecorder[IO](logger)
+    val hookValidator           = mock[IOHookValidator]
+    val processingStatusFetcher = mock[ProcessingStatusFetcher[IO]]
+    val logger                  = TestLogger[IO]()
+    val executionTimeRecorder   = TestExecutionTimeRecorder[IO](logger)
     val fetchProcessingStatus = new ProcessingStatusEndpoint[IO](
       hookValidator,
-      eventsProcessingStatus,
+      processingStatusFetcher,
       executionTimeRecorder
     ).fetchProcessingStatus _
   }

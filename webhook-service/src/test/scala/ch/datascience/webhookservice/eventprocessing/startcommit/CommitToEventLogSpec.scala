@@ -33,16 +33,16 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.webhookservice.eventprocessing.StartCommit
+import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult.{EventCreated, EventExisted}
 import ch.datascience.webhookservice.eventprocessing.commitevent._
-import ch.datascience.webhookservice.eventprocessing.startcommit.CommitToEventLog.SendingResult
+import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Project, StartCommit}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-import scala.util.{Failure, Success, Try}
+import scala.util._
 
 class CommitToEventLogSpec extends WordSpec with MockFactory {
 
@@ -50,7 +50,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
   "storeCommitsInEventLog" should {
 
-    "convert the start Commit into commit events and store them in the event log" in new TestCase {
+    "convert the Start Commit into commit events and store them in the Event Log" in new TestCase {
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
@@ -63,26 +63,32 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
         .expects(startCommit, maybeAccessToken, clock)
         .returning(context pure eventsFlowBuilder)
 
-      val commitEvents = commitEventsFrom(startCommit).generateOne
+      val commitEvents @ startCommitEvent +: ancestorEvents = commitEventsFrom(startCommit).generateOne
       (eventsFlowBuilder
-        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .transformEventsWith(_: CommitEvent => Try[SendingResult]))
         .expects(*)
         .onCall { transform: Function1[CommitEvent, Try[SendingResult]] =>
           commitEvents.map(transform).sequence
         }
 
-      commitEvents foreach { commitEvent =>
+      val sendingResults = commitEvents map { commitEvent =>
+        val sendingResult = if (Random.nextBoolean()) EventCreated else EventExisted
         (commitEventSender
           .send(_: CommitEvent))
           .expects(commitEvent)
-          .returning(context.pure(()))
+          .returning(sendingResult.pure[Try])
+        sendingResult
       }
 
       commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Success(())
 
       logger.loggedOnly(
         Info(
-          successfulStoring(startCommit, commitEvents = commitEvents.size, stored = commitEvents.size, failed = 0)
+          successfulStoring(startCommit,
+                            commitEvents = commitEvents.size,
+                            created      = sendingResults.count(_ == EventCreated),
+                            existed      = sendingResults.count(_ == EventExisted),
+                            failed       = 0)
         )
       )
     }
@@ -102,7 +108,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val commitEvents = List.empty[CommitEvent]
       (eventsFlowBuilder
-        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .transformEventsWith(_: CommitEvent => Try[SendingResult]))
         .expects(*)
         .onCall { transform: Function1[CommitEvent, Try[SendingResult]] =>
           commitEvents.map(transform).sequence
@@ -126,7 +132,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(generalFailure(startCommit), exception))
     }
 
-    "fail if finding commit events source fails" in new TestCase {
+    "fail if building commit events source fails" in new TestCase {
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
@@ -160,7 +166,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (eventsFlowBuilder
-        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .transformEventsWith(_: CommitEvent => Try[SendingResult]))
         .expects(*)
         .returning(context raiseError exception)
 
@@ -184,7 +190,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val exception = exceptions.generateOne
       (eventsFlowBuilder
-        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .transformEventsWith(_: CommitEvent => Try[SendingResult]))
         .expects(*)
         .onCall { _: Function1[CommitEvent, Try[SendingResult]] =>
           context raiseError exception
@@ -195,7 +201,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
       logger.loggedOnly(Error(failedFinding(startCommit), exception))
     }
 
-    "store all non failing events and log errors for these for which storing fails" in new TestCase {
+    "store all non failing events and log errors for these which failed" in new TestCase {
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
         .findAccessToken(_: Id)(_: Id => String))
@@ -209,7 +215,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
 
       val commitEvents @ failingEvent +: passingEvents = commitEventsFrom(startCommit).generateOne
       (eventsFlowBuilder
-        .transformEventsWith[SendingResult](_: CommitEvent => Try[SendingResult]))
+        .transformEventsWith(_: CommitEvent => Try[SendingResult]))
         .expects(*)
         .onCall { transform: Function1[CommitEvent, Try[SendingResult]] =>
           commitEvents.map(transform).sequence
@@ -224,14 +230,14 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
         (commitEventSender
           .send(_: CommitEvent))
           .expects(event)
-          .returning(context pure ((): Unit))
+          .returning(context pure EventCreated)
       }
 
       commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Success(())
 
       logger.loggedOnly(
         Error(failedStoring(startCommit, failingEvent), exception),
-        Info(successfulStoring(startCommit, commitEvents.size, stored = passingEvents.size, failed = 1))
+        Info(successfulStoring(startCommit, commitEvents.size, created = passingEvents.size, existed = 0, failed = 1))
       )
     }
   }
@@ -245,7 +251,7 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
     val clock       = Clock.fixed(batchDate.value, ZoneId.systemDefault)
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
-    val commitEventSender     = mock[TryCommitEventSender]
+    val commitEventSender     = mock[CommitEventSender[Try]]
     val commitEventsSource    = mock[TryCommitEventsSourceBuilder]
     val eventsFlowBuilder     = mock[CommitEventsSourceBuilder.EventsFlowBuilder[Try]]
     val logger                = TestLogger[Try]()
@@ -259,9 +265,13 @@ class CommitToEventLogSpec extends WordSpec with MockFactory {
       clock
     )
 
-    def successfulStoring(startCommit: StartCommit, commitEvents: Int, stored: Int, failed: Int): String =
+    def successfulStoring(startCommit:  StartCommit,
+                          commitEvents: Int,
+                          created:      Int,
+                          existed:      Int,
+                          failed:       Int): String =
       s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}: " +
-        s"$commitEvents Commit Events generated, $stored stored in the Event Log, $failed failed in ${executionTimeRecorder.elapsedTime}ms"
+        s"$commitEvents Commit Events generated: $created created, $existed existed, $failed failed in ${executionTimeRecorder.elapsedTime}ms"
 
     def failedFinding(startCommit: StartCommit): String =
       s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}: " +

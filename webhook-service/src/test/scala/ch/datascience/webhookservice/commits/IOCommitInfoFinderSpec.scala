@@ -31,6 +31,7 @@ import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import org.http4s.Status
@@ -156,9 +157,9 @@ class IOCommitInfoFinderSpec extends WordSpec with MockFactory with ExternalServ
 
     lazy val responseJson = json"""{
       "id":              ${commitId.value},
-      "author_name":     ${author.username.value},
+      "author_name":     ${author.name.value},
       "author_email":    ${author.emailToJson},
-      "committer_name":  ${committer.username.value},
+      "committer_name":  ${committer.name.value},
       "committer_email": ${committer.emailToJson},
       "message":         ${commitMessage.value},
       "committed_date":  "2012-09-20T09:06:12+03:00",

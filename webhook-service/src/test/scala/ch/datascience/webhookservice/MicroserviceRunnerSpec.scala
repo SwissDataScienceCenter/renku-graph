@@ -20,7 +20,6 @@ package ch.datascience.webhookservice
 
 import cats.MonadError
 import cats.effect._
-import ch.datascience.dbeventlog.init.IOEventLogDbInitializer
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.http.server.IOHttpServer
@@ -37,14 +36,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
   "run" should {
 
     "return Success Exit Code if " +
-      "Sentry and the Event Log db initialize and " +
+      "Sentry initialisation is fine and " +
       "Events Synchronization Scheduler and Http Server start up" in new TestCase {
 
       (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventLogDbInitializer.run _)
         .expects()
         .returning(IO.unit)
 
@@ -71,29 +66,9 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
       } shouldBe exception
     }
 
-    "fail if Event Log db verification fails" in new TestCase {
-
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      val exception = Generators.exceptions.generateOne
-      (eventLogDbInitializer.run _)
-        .expects()
-        .returning(context.raiseError(exception))
-
-      intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
-      } shouldBe exception
-    }
-
     "fail if starting the Events Synchronization Scheduler fails" in new TestCase {
 
       (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventLogDbInitializer.run _)
         .expects()
         .returning(IO.unit)
 
@@ -117,10 +92,6 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
         .expects()
         .returning(IO.unit)
 
-      (eventLogDbInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
       val exception = Generators.exceptions.generateOne
       (httpServer.run _)
         .expects()
@@ -140,12 +111,10 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
     val context = MonadError[IO, Throwable]
 
     val sentryInitializer              = mock[IOSentryInitializer]
-    val eventLogDbInitializer          = mock[IOEventLogDbInitializer]
     val eventsSynchronizationScheduler = mock[TestIOEventsSynchronizationScheduler]
     val httpServer                     = mock[IOHttpServer]
     val runner = new MicroserviceRunner(
       sentryInitializer,
-      eventLogDbInitializer,
       eventsSynchronizationScheduler,
       httpServer
     )

@@ -70,7 +70,6 @@ class ServicesRunner(
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }
-
   }
 
   private def verifyServiceReady(serviceRun: ServiceRun)(implicit timer: Timer[IO]): IO[Unit] =
@@ -78,12 +77,12 @@ class ServicesRunner(
       case ServiceUp =>
         serviceRun.postServiceStart.sequence flatMap (_ => logger.info(s"Service ${serviceRun.name} started"))
       case _ =>
-        timer.sleep(500 millis) *> verifyServiceReady(serviceRun)
+        (timer sleep (500 millis)) flatMap (_ => verifyServiceReady(serviceRun))
     }
 
   private def verifyServiceDown(serviceRun: ServiceRun)(implicit timer: Timer[IO]): IO[Unit] =
     serviceRun.serviceClient.ping flatMap {
-      case ServiceUp => timer.sleep(500 millis) *> verifyServiceDown(serviceRun)
+      case ServiceUp => (timer sleep (500 millis)) flatMap (_ => verifyServiceDown(serviceRun))
       case _         => logger.info(s"Service ${serviceRun.name} stopped")
     }
 

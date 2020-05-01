@@ -19,8 +19,6 @@
 package ch.datascience.graph.acceptancetests.flows
 
 import AccessTokenPresence._
-import ch.datascience.dbeventlog.EventStatus
-import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.db.EventLog
@@ -36,6 +34,8 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.webhookservice.model.HookToken
+import io.renku.eventlog.EventStatus
+import io.renku.eventlog.EventStatus.New
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Assertion

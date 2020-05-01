@@ -75,7 +75,7 @@ class RdfStoreServer(port: Int Refined Positive, datasetName: DatasetName)(impli
         case exception: FusekiException =>
           exception.getCause match {
             case _: BindException =>
-              timer.sleep(1 second) *> start
+              (timer sleep (1 second)) flatMap (_ => start)
             case other =>
               IO.raiseError(new IllegalStateException(s"Cannot start fuseki on http://localhost:$port", other))
           }

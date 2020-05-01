@@ -24,9 +24,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
@@ -68,13 +66,17 @@ class HookValidationEndpoint[Interpretation[_]: Effect](
   }
 }
 
-class IOHookValidationEndpoint(
-    tokenRepositoryUrl:      TokenRepositoryUrl,
-    projectHookUrl:          ProjectHookUrl,
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends HookValidationEndpoint[IO](
-      new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
+object IOHookValidationEndpoint {
+  def apply(
+      projectHookUrl:          ProjectHookUrl,
+      gitLabThrottler:         Throttler[IO, GitLab]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[HookValidationEndpoint[IO]] =
+    for {
+      hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)
+    } yield new HookValidationEndpoint[IO](
+      hookValidator,
       new AccessTokenExtractor[IO]
     )
+}
