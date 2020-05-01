@@ -19,7 +19,7 @@
 package ch.datascience.db
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.db.Query.Name
+import ch.datascience.db.SqlQuery.Name
 import ch.datascience.db.TestDbConfig.newDbConfig
 import ch.datascience.metrics.{LabeledHistogram, TestLabeledHistogram}
 import doobie.implicits._
@@ -41,7 +41,7 @@ class DbClientSpec extends WordSpec {
 
     "execute the query and measure execution time with the given histogram" in {
 
-      val histogram = TestLabeledHistogram[Query.Name]("query_id")
+      val histogram = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
       val dbClient = new TestDbClient(maybeHistogram = Some(histogram))
 
@@ -70,9 +70,9 @@ private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) e
     )
   )
 
-  val queryName: Query.Name = "some_id"
+  val queryName: SqlQuery.Name = "some_id"
 
-  private def query(expected: Int) = Query(
+  private def query(expected: Int) = SqlQuery(
     sql"""select $expected;""".query[Int].unique,
     queryName
   )

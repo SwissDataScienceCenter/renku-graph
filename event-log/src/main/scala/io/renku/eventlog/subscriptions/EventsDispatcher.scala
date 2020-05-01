@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.db.{DbTransactor, Query}
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -167,7 +167,7 @@ object EventsDispatcher {
       subscriptions:           Subscriptions[IO],
       waitingEventsGauge:      LabeledGauge[IO, projects.Path],
       underProcessingGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:        LabeledHistogram[IO, Query.Name],
+      queriesExecTimes:        LabeledHistogram[IO, SqlQuery.Name],
       logger:                  Logger[IO]
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],

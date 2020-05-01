@@ -25,7 +25,7 @@ import Result._
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, IO}
 import cats.free.Free
-import ch.datascience.db.{DbClient, DbTransactor, Query}
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -46,7 +46,7 @@ trait EventPersister[Interpretation[_]] {
 class EventPersisterImpl(
     transactor:         DbTransactor[IO, EventLogDB],
     waitingEventsGauge: LabeledGauge[IO, projects.Path],
-    queriesExecTimes:   LabeledHistogram[IO, Query.Name],
+    queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
     now:                () => Instant = () => Instant.now
 )(implicit ME:          Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
@@ -75,7 +75,7 @@ class EventPersisterImpl(
     case _                              => event
   }
 
-  private def checkIfInLog(event: Event) = Query(
+  private def checkIfInLog(event: Event) = SqlQuery(
     sql"""|select event_id
           |from event_log
           |where event_id = ${event.id} and project_id = ${event.project.id}""".stripMargin
@@ -85,7 +85,7 @@ class EventPersisterImpl(
   )
 
   // format: off
-  private def findBatchInQueue(event: Event) = Query({ fr"""
+  private def findBatchInQueue(event: Event) = SqlQuery({ fr"""
       select batch_date
       from event_log
       where project_id = ${event.project.id} and """ ++ `status IN`(New, RecoverableFailure, Processing) ++ fr"""
@@ -99,7 +99,7 @@ class EventPersisterImpl(
   private def insert(event: Event) = {
     import event._
     val currentTime = now()
-    Query(
+    SqlQuery(
       sql"""insert into
           event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
           values ($id, ${project.id}, ${project.path}, ${EventStatus.New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
@@ -126,7 +126,7 @@ object IOEventPersister {
   def apply(
       transactor:         DbTransactor[IO, EventLogDB],
       waitingEventsGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:   LabeledHistogram[IO, Query.Name]
+      queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name]
   ) = IO {
     new EventPersisterImpl(transactor, waitingEventsGauge, queriesExecTimes)
   }

@@ -20,7 +20,7 @@ package io.renku.eventlog.eventspatching
 
 import cats.effect.{Bracket, IO}
 import cats.implicits._
-import ch.datascience.db.{DbClient, DbTransactor, Query}
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
@@ -35,7 +35,7 @@ private trait EventsPatcher[Interpretation[_]] {
 
 private class EventsPatcherImpl(
     transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, Query.Name],
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
     logger:           Logger[IO]
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
@@ -62,7 +62,7 @@ private class EventsPatcherImpl(
 private object IOEventsPatcher {
   def apply(
       transactor:       DbTransactor[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, Query.Name],
+      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   ): IO[EventsPatcher[IO]] = IO {
     new EventsPatcherImpl(transactor, queriesExecTimes, logger)

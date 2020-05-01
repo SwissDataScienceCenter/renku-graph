@@ -20,7 +20,7 @@ package io.renku.eventlog.eventspatching
 
 import cats.effect.{ContextShift, IO}
 import ch.datascience.controllers.ErrorMessage
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
@@ -97,7 +97,7 @@ object IOEventsPatchingEndpoint {
       transactor:           DbTransactor[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:     LabeledHistogram[IO, Query.Name],
+      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
       logger:               Logger[IO]
   )(implicit contextShift:  ContextShift[IO]): IO[EventsPatchingEndpoint[IO]] =
     for {

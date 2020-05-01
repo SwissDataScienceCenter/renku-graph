@@ -23,7 +23,7 @@ import java.time.Instant
 import EventPersister.Result
 import Result._
 import cats.effect.IO
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
@@ -154,7 +154,7 @@ class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
 
     val currentTime        = mockFunction[Instant]
     val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
-    val queriesExecTimes   = TestLabeledHistogram[Query.Name]("query_id")
+    val queriesExecTimes   = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val persister          = new EventPersisterImpl(transactor, waitingEventsGauge, queriesExecTimes, currentTime)
 
     val now = Instant.now()

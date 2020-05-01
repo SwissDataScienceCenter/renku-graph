@@ -19,14 +19,14 @@
 package ch.datascience.db
 
 import cats.effect.{Async, IO}
-import ch.datascience.db.Query.Name
+import ch.datascience.db.SqlQuery.Name
 import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 
 abstract class DbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) {
 
-  protected def measureExecutionTime[ResultType](query: Query[ResultType]): ConnectionIO[ResultType] =
+  protected def measureExecutionTime[ResultType](query: SqlQuery[ResultType]): ConnectionIO[ResultType] =
     maybeHistogram match {
       case None => query.query
       case Some(histogram) =>

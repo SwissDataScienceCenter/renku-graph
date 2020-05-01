@@ -21,7 +21,7 @@ package io.renku.eventlog.metrics
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.db.{DbClient, DbTransactor, Query}
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
@@ -38,7 +38,7 @@ trait StatsFinder[Interpretation[_]] {
 
 class StatsFinderImpl(
     transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, Query.Name]
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
     with StatsFinder[IO]
@@ -50,7 +50,7 @@ class StatsFinderImpl(
       .map(_.toMap)
       .map(addMissingStatues)
 
-  private lazy val findStatuses = Query(
+  private lazy val findStatuses = SqlQuery(
     sql"""select status, count(event_id) from event_log group by status;""".stripMargin
       .query[(EventStatus, Long)]
       .to[List],
@@ -70,7 +70,7 @@ class StatsFinderImpl(
     }
 
   // format: off
-  private def countProjectsEvents(statuses: NonEmptyList[EventStatus]) = Query({
+  private def countProjectsEvents(statuses: NonEmptyList[EventStatus]) = SqlQuery({
     fr"""
     |select project_path, count(event_id)
     |from event_log
@@ -88,7 +88,7 @@ class StatsFinderImpl(
 object IOStatsFinder {
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, Query.Name]
+      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
     new StatsFinderImpl(transactor, queriesExecTimes)
   }

@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.{Bracket, IO}
-import ch.datascience.db.{DbClient, DbTransactor, Query}
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -34,7 +34,7 @@ trait StatusUpdatesRunner[Interpretation[_]] {
 
 class StatusUpdatesRunnerImpl(
     transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, Query.Name],
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
     logger:           Logger[IO]
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
@@ -63,7 +63,7 @@ object IOUpdateCommandsRunner {
   import cats.effect.IO
 
   def apply(transactor:       DbTransactor[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, Query.Name],
+            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
             logger:           Logger[IO]): IO[StatusUpdatesRunner[IO]] = IO {
     new StatusUpdatesRunnerImpl(transactor, queriesExecTimes, logger)
   }

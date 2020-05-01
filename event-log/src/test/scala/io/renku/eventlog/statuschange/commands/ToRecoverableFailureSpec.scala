@@ -22,7 +22,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
 
 import cats.effect.IO
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -115,7 +115,7 @@ class ToRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec with
   private trait TestCase {
     val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram            = TestLabeledHistogram[Query.Name]("query_id")
+    val histogram            = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val currentTime          = mockFunction[Instant]
     val eventId              = compoundEventIds.generateOne
     val eventBatchDate       = batchDates.generateOne

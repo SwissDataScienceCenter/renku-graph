@@ -24,7 +24,7 @@ import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
 import cats.implicits._
-import ch.datascience.db.{DbClient, DbTransactor, Query}
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.config.RenkuLogTimeout
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
@@ -48,7 +48,7 @@ private class EventFetcherImpl(
     renkuLogTimeout:      RenkuLogTimeout,
     waitingEventsGauge:   LabeledGauge[IO, projects.Path],
     underProcessingGauge: LabeledGauge[IO, projects.Path],
-    queriesExecTimes:     LabeledHistogram[IO, Query.Name],
+    queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
     now:                  () => Instant = () => Instant.now,
     pickRandomlyFrom: List[(projects.Id, projects.Path)] => Option[(projects.Id, projects.Path)] = ids =>
       ids.get(Random nextInt ids.size)
@@ -80,7 +80,7 @@ private class EventFetcherImpl(
     } yield maybeProject -> maybeBody
 
   // format: off
-  private def findProjectsWithEventsInQueue = Query({
+  private def findProjectsWithEventsInQueue = SqlQuery({
       fr"""select distinct project_id, project_path
            from event_log
            where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
@@ -91,7 +91,7 @@ private class EventFetcherImpl(
   // format: on
 
   // format: off
-  private def findOldestEvent(idAndPath: ProjectIdAndPath) = Query({
+  private def findOldestEvent(idAndPath: ProjectIdAndPath) = SqlQuery({
       fr"""select event_log.event_id, event_log.project_id, event_log.event_body
            from event_log
            where project_id = ${idAndPath._1}
@@ -122,7 +122,7 @@ private class EventFetcherImpl(
       measureExecutionTime(updateStatus(commitEventId)) map toNoneIfEventAlreadyTaken(idAndBody)
   }
 
-  private def updateStatus(commitEventId: CompoundEventId) = Query(
+  private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
     sql"""|update event_log 
           |set status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
           |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
@@ -152,7 +152,7 @@ private object IOEventLogFetch {
       transactor:           DbTransactor[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:     LabeledHistogram[IO, Query.Name]
+      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift:  ContextShift[IO]): IO[EventFetcher[IO]] =
     RenkuLogTimeout[IO]() map (new EventFetcherImpl(transactor,
                                                     _,

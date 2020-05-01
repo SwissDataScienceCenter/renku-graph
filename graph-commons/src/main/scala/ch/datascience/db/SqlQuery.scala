@@ -18,12 +18,12 @@
 
 package ch.datascience.db
 
-import ch.datascience.db.Query.Name
+import ch.datascience.db.SqlQuery.Name
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
-final case class Query[ResultType](query: doobie.ConnectionIO[ResultType], name: Name)
+final case class SqlQuery[ResultType](query: doobie.ConnectionIO[ResultType], name: Name)
 
-object Query {
+object SqlQuery {
   type Name = String Refined NonEmpty
 }

@@ -21,7 +21,7 @@ package io.renku.eventlog.processingstatus
 import java.time.temporal.ChronoUnit._
 
 import cats.data.NonEmptyList
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -113,7 +113,7 @@ class ProcessingStatusFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
 
   private trait TestCase {
     val projectId              = projectIds.generateOne
-    val queriesExecTimes       = TestLabeledHistogram[Query.Name]("query_id")
+    val queriesExecTimes       = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val processingStatusFinder = new ProcessingStatusFinderImpl(transactor, queriesExecTimes)
 
     def storeEvents(projectId: Id, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =

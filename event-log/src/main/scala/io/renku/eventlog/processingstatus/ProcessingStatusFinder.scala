@@ -24,7 +24,7 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.implicits._
-import ch.datascience.db.{DbClient, DbTransactor, Query}
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
@@ -43,7 +43,7 @@ trait ProcessingStatusFinder[Interpretation[_]] {
 
 class ProcessingStatusFinderImpl(
     transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, Query.Name],
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
     now:              () => Instant = () => Instant.now
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
@@ -56,7 +56,7 @@ class ProcessingStatusFinderImpl(
     measureExecutionTime(latestBatchStatues(projectId)) transact transactor.get flatMap toProcessingStatus
   }
 
-  private def latestBatchStatues(projectId: Id) = Query(
+  private def latestBatchStatues(projectId: Id) = SqlQuery(
     query = sql"""|select log.status
                   |from event_log log
                   |inner join (
@@ -85,7 +85,7 @@ class ProcessingStatusFinderImpl(
 object IOProcessingStatusFinder {
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, Query.Name]
+      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusFinder[IO]] = IO {
     new ProcessingStatusFinderImpl(transactor, queriesExecTimes)
   }

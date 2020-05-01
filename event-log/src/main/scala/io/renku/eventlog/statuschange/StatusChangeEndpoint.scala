@@ -21,7 +21,7 @@ package io.renku.eventlog.statuschange
 import cats.MonadError
 import cats.effect.{ContextShift, Effect}
 import cats.implicits._
-import ch.datascience.db.{DbTransactor, Query}
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -113,7 +113,7 @@ object IOStatusChangeEndpoint {
       transactor:           DbTransactor[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:     LabeledHistogram[IO, Query.Name],
+      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
       logger:               Logger[IO]
   )(implicit contextShift:  ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {

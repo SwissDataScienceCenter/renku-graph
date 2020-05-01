@@ -22,7 +22,7 @@ import java.time.Instant
 
 import cats.MonadError
 import cats.implicits._
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
@@ -38,7 +38,7 @@ private trait EventsPatch[Interpretation[_]] extends Product with Serializable w
   def name:               String Refined NonEmpty
   def updateGauges():     Interpretation[Unit]
   protected def sqlQuery: ConnectionIO[Int]
-  lazy val query: Query[Int] = Query(sqlQuery, name)
+  lazy val query: SqlQuery[Int] = SqlQuery(sqlQuery, name)
 }
 
 private case class StatusNewPatch[Interpretation[_]](

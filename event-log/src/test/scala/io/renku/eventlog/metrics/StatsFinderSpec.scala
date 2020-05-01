@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.metrics
 
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -84,7 +84,7 @@ class StatsFinderSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaChe
     }
   }
 
-  private val queriesExecTimes = TestLabeledHistogram[Query.Name]("query_id")
+  private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
   private val stats            = new StatsFinderImpl(transactor, queriesExecTimes)
 
   private def store: ((Path, EventId, EventStatus)) => Unit = {

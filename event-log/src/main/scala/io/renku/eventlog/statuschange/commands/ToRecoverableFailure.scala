@@ -23,7 +23,7 @@ import java.time.temporal.ChronoUnit.MINUTES
 
 import cats.effect.Bracket
 import cats.implicits._
-import ch.datascience.db.{DbTransactor, Query}
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
@@ -46,7 +46,7 @@ final case class ToRecoverableFailure[Interpretation[_]](
 
   override val status: EventStatus = RecoverableFailure
 
-  override def query: Query[Int] = Query(
+  override def query: SqlQuery[Int] = SqlQuery(
     sql"""|update event_log
           |set status = $status, execution_date = ${now() plus (10, MINUTES)}, message = $maybeMessage
           |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}

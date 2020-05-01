@@ -22,7 +22,7 @@ import java.time.Instant
 
 import cats.effect.Bracket
 import cats.implicits._
-import ch.datascience.db.{DbTransactor, Query}
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
@@ -44,7 +44,7 @@ final case class ToNew[Interpretation[_]](
 
   override val status: EventStatus = New
 
-  override def query: Query[Int] = Query(
+  override def query: SqlQuery[Int] = SqlQuery(
     sql"""|update event_log 
           |set status = $status, execution_date = ${now()}
           |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}

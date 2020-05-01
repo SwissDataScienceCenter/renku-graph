@@ -20,7 +20,7 @@ package io.renku.eventlog.eventspatching
 
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
@@ -93,7 +93,7 @@ class EventsPatcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFa
 
     val gauge = mock[SingleValueGauge[IO]]
 
-    val queriesExecTimes = TestLabeledHistogram[Query.Name]("query_id")
+    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val logger           = TestLogger[IO]()
     val patcher          = new EventsPatcherImpl(transactor, queriesExecTimes, logger)
   }

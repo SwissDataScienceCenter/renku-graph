@@ -24,7 +24,7 @@ import java.time.{Duration, Instant}
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.CommonGraphGenerators.renkuLogTimeouts
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -176,7 +176,7 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
         renkuLogTimeout,
         waitingEventsGauge,
         underProcessingGauge,
-        TestLabeledHistogram[Query.Name]("query_id")
+        TestLabeledHistogram[SqlQuery.Name]("query_id")
       )
       eventIdsBodiesDates.toList foreach { _ =>
         eventLogFetch.popEvent.unsafeRunSync() shouldBe a[Some[_]]
@@ -219,7 +219,7 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
         renkuLogTimeout,
         waitingEventsGauge,
         underProcessingGauge,
-        TestLabeledHistogram[Query.Name]("query_id"),
+        TestLabeledHistogram[SqlQuery.Name]("query_id"),
         pickRandomlyFrom = _ => (project2Id -> project2Path).some
       )
       expectWaitingEventsGaugeDecrement(project2Path)
@@ -239,7 +239,7 @@ class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFac
     val renkuLogTimeout      = renkuLogTimeouts.generateOne
     val waitingEventsGauge   = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, Path]]
-    val queriesExecTimes     = TestLabeledHistogram[Query.Name]("query_id")
+    val queriesExecTimes     = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val maxProcessingTime    = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
     val eventLogFetch = new EventFetcherImpl(
       transactor,

@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.IO
-import ch.datascience.db.{DbTransactor, Query}
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -69,7 +69,7 @@ class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec with 
     val projectPath = projectPaths.generateOne
 
     val gauge     = mock[LabeledGauge[IO, projects.Path]]
-    val histogram = TestLabeledHistogram[Query.Name]("query_id")
+    val histogram = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val logger    = TestLogger[IO]()
     val runner    = new StatusUpdatesRunnerImpl(transactor, histogram, logger)
   }
@@ -82,7 +82,7 @@ class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec with 
 
     override val status: EventStatus = Processing
 
-    override def query = Query(
+    override def query = SqlQuery(
       sql"""|update event_log 
             |set status = $status
             |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${New: EventStatus}

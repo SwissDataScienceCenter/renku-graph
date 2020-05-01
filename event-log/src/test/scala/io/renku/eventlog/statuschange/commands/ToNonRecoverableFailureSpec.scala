@@ -21,7 +21,7 @@ package io.renku.eventlog.statuschange.commands
 import java.time.Instant
 
 import cats.effect.IO
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -112,7 +112,7 @@ class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec w
 
   private trait TestCase {
     val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram            = TestLabeledHistogram[Query.Name]("query_id")
+    val histogram            = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val currentTime          = mockFunction[Instant]
     val eventId              = compoundEventIds.generateOne
     val eventBatchDate       = batchDates.generateOne

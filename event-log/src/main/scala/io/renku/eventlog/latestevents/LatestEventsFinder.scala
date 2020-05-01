@@ -19,7 +19,7 @@
 package io.renku.eventlog.latestevents
 
 import cats.effect.{Bracket, IO}
-import ch.datascience.db.{DbClient, DbTransactor, Query}
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{EventBody, EventId}
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
@@ -34,7 +34,7 @@ trait LatestEventsFinder[Interpretation[_]] {
 
 class LatestEventsFinderImpl(
     transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, Query.Name]
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
     with LatestEventsFinder[IO]
@@ -46,7 +46,7 @@ class LatestEventsFinderImpl(
   override def findAllLatestEvents: IO[List[IdProjectBody]] =
     measureExecutionTime(findEvents) transact transactor.get
 
-  private def findEvents = Query(
+  private def findEvents = SqlQuery(
     sql"""|select log.event_id, log.project_id, log.project_path, log.event_body
           |from event_log log, (select project_id, max(event_date) max_event_date from event_log group by project_id) aggregate
           |where log.project_id = aggregate.project_id and log.event_date = aggregate.max_event_date
@@ -64,7 +64,7 @@ object LatestEventsFinder {
 object IOLatestEventsFinder {
   def apply(
       transactor:       DbTransactor[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, Query.Name]
+      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   ): IO[LatestEventsFinder[IO]] = IO {
     new LatestEventsFinderImpl(transactor, queriesExecTimes)
   }

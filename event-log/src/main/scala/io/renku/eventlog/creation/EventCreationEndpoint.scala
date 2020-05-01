@@ -24,7 +24,7 @@ import cats.effect.Effect
 import cats.implicits._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.{DbTransactor, Query}
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{BatchDate, EventBody, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
@@ -113,7 +113,7 @@ object IOEventCreationEndpoint {
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       waitingEventsGauge:  LabeledGauge[IO, projects.Path],
-      queriesExecTimes:    LabeledHistogram[IO, Query.Name],
+      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[EventCreationEndpoint[IO]] =
     for {

@@ -21,7 +21,7 @@ package io.renku.eventlog.eventspatching
 import java.time.Instant
 
 import cats.effect.IO
-import ch.datascience.db.Query
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -90,7 +90,7 @@ class StatusNewPatchSpec extends WordSpec with InMemoryEventLogDbSpec with MockF
 
     val waitingEventsGauge          = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge        = mock[LabeledGauge[IO, Path]]
-    val queriesExecTimes            = TestLabeledHistogram[Query.Name]("query_id")
+    val queriesExecTimes            = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val currentTime                 = Instant.now()
     private val currentTimeProvider = mockFunction[Instant]
     currentTimeProvider.expects().returning(currentTime)
