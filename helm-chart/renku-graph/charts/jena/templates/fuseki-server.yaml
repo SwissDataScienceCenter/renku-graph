@@ -26,5 +26,4 @@ data:
     $JAVA -Xmx2G -cp $JAR jena.textindexer --desc=$DATASET_CONFIG
 
     echo Starting Fuseki...
-    JVM_ARGS=${JVM_ARGS:--Xmx2G}
-    $JAVA $JVM_ARGS -jar $JAR "$@"
+    $JAVA $JVM_ARGS $JAVA_OPTS -jar $JAR "$@"

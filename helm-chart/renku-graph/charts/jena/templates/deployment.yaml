@@ -25,6 +25,9 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: JAVA_OPTS
+              value: -Xmx{{ .Values.jvmXmx }} -XX:+UseG1GC
           ports:
             - name: http
               containerPort: 3030
