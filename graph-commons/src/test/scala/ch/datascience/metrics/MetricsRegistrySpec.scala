@@ -20,7 +20,7 @@ package ch.datascience.metrics
 
 import ch.datascience.metrics.MetricsRegistry.{DisabledMetricsRegistry, EnabledMetricsRegistry}
 import com.typesafe.config.ConfigFactory
-import io.prometheus.client.Gauge
+import io.prometheus.client.{Gauge => LibGauge}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -57,8 +57,8 @@ class MetricsRegistrySpec extends WordSpec {
       val gaugeName = "gauge_name"
 
       val gauge = EnabledMetricsRegistry
-        .register[Gauge, Gauge.Builder](
-          Gauge
+        .register[LibGauge, LibGauge.Builder](
+          LibGauge
             .build()
             .name(gaugeName)
             .help("some gauge info")
@@ -82,8 +82,8 @@ class MetricsRegistrySpec extends WordSpec {
       val gaugeName = "gauge_name"
 
       val gauge = DisabledMetricsRegistry
-        .register[Gauge, Gauge.Builder](
-          Gauge
+        .register[LibGauge, LibGauge.Builder](
+          LibGauge
             .build()
             .name(gaugeName)
             .help("some gauge info")

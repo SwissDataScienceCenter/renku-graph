@@ -58,3 +58,14 @@ class IOAccessTokenAssociator(
     case (NoContent, _, _) => IO.unit
   }
 }
+
+object IOAccessTokenAssociator {
+  def apply(
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[AccessTokenAssociator[IO]] =
+    for {
+      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
+    } yield new IOAccessTokenAssociator(tokenRepositoryUrl, logger)
+}

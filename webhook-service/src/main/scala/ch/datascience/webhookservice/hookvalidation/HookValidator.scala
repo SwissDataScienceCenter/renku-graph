@@ -151,13 +151,17 @@ object HookValidator {
   final case class NoAccessTokenException(message: String) extends RuntimeException(message)
 }
 
-class IOHookValidator(
-    tokenRepositoryUrl:      TokenRepositoryUrl,
-    projectHookUrl:          ProjectHookUrl,
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends HookValidator[IO](
+object IOHookValidator {
+  def apply(
+      projectHookUrl:          ProjectHookUrl,
+      gitLabThrottler:         Throttler[IO, GitLab]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[HookValidator[IO]] =
+    for {
+      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
+      gitLabUrl          <- GitLabUrl[IO]()
+    } yield new HookValidator[IO](
       projectHookUrl,
       new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
       new IOProjectHookVerifier(gitLabUrl, gitLabThrottler, ApplicationLogger),
@@ -166,3 +170,4 @@ class IOHookValidator(
       new IOAccessTokenRemover(tokenRepositoryUrl, ApplicationLogger),
       ApplicationLogger
     )
+}

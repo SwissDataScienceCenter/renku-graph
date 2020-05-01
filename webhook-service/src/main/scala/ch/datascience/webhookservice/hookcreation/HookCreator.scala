@@ -24,13 +24,9 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventLogDB
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
@@ -112,22 +108,31 @@ private object HookCreator {
   )
 }
 
-private class IOHookCreator(
-    transactor:              DbTransactor[IO, EventLogDB],
-    tokenRepositoryUrl:      TokenRepositoryUrl,
-    projectHookUrl:          ProjectHookUrl,
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    hookTokenCrypto:         HookTokenCrypto[IO],
-    executionTimeRecorder:   ExecutionTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], clock: Clock[IO], timer: Timer[IO])
-    extends HookCreator[IO](
+private object IOHookCreator {
+  def apply(
+      projectHookUrl:          ProjectHookUrl,
+      gitLabThrottler:         Throttler[IO, GitLab],
+      hookTokenCrypto:         HookTokenCrypto[IO],
+      executionTimeRecorder:   ExecutionTimeRecorder[IO],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    clock:                     Clock[IO],
+    timer:                     Timer[IO]): IO[HookCreator[IO]] =
+    for {
+      eventsHistoryLoader <- IOEventsHistoryLoader(gitLabThrottler, executionTimeRecorder, logger)
+      hookValidator       <- IOHookValidator(projectHookUrl, gitLabThrottler)
+      projectInfoFinder   <- IOProjectInfoFinder(gitLabThrottler, logger)
+      hookCreator         <- IOProjectHookCreator(gitLabThrottler, logger)
+      tokenAssociator     <- IOAccessTokenAssociator(logger)
+    } yield new HookCreator[IO](
       projectHookUrl,
-      new IOHookValidator(tokenRepositoryUrl, projectHookUrl, gitLabUrl, gitLabThrottler),
-      new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger),
+      hookValidator,
+      projectInfoFinder,
       hookTokenCrypto,
-      new IOProjectHookCreator(gitLabUrl, gitLabThrottler, ApplicationLogger),
-      new IOAccessTokenAssociator(tokenRepositoryUrl, ApplicationLogger),
-      new IOEventsHistoryLoader(transactor, tokenRepositoryUrl, gitLabUrl, gitLabThrottler, executionTimeRecorder),
-      ApplicationLogger
+      hookCreator,
+      tokenAssociator,
+      eventsHistoryLoader,
+      logger
     )
+}

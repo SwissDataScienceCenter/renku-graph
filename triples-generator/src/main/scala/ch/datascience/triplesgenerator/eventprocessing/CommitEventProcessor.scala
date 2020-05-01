@@ -22,18 +22,14 @@ import cats.MonadError
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.db.DbTransactor
-import ch.datascience.dbeventlog.EventStatus._
-import ch.datascience.dbeventlog.commands._
-import ch.datascience.dbeventlog.{EventBody, EventLogDB, EventMessage}
+import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.eventprocessing.Commit.{CommitWithParent, CommitWithoutParent}
-import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
@@ -45,43 +41,48 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class CommitEventProcessor[Interpretation[_]](
-    commitEventsDeserialiser: CommitEventsDeserialiser[Interpretation],
-    accessTokenFinder:        AccessTokenFinder[Interpretation],
-    triplesGenerator:         TriplesGenerator[Interpretation],
-    triplesCurator:           TriplesCurator[Interpretation],
-    uploader:                 Uploader[Interpretation],
-    eventLogMarkDone:         EventLogMarkDone[Interpretation],
-    eventLogMarkNew:          EventLogMarkNew[Interpretation],
-    eventLogMarkFailed:       EventLogMarkFailed[Interpretation],
-    logger:                   Logger[Interpretation],
-    executionTimeRecorder:    ExecutionTimeRecorder[Interpretation]
-)(implicit ME:                MonadError[Interpretation, Throwable])
+private trait EventProcessor[Interpretation[_]] {
+  def process(eventId: CompoundEventId, events: NonEmptyList[CommitEvent]): Interpretation[Unit]
+}
+
+private class CommitEventProcessor[Interpretation[_]](
+    accessTokenFinder:     AccessTokenFinder[Interpretation],
+    triplesGenerator:      TriplesGenerator[Interpretation],
+    triplesCurator:        TriplesCurator[Interpretation],
+    uploader:              Uploader[Interpretation],
+    eventStatusUpdater:    EventStatusUpdater[Interpretation],
+    logger:                Logger[Interpretation],
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
+)(implicit ME:             MonadError[Interpretation, Throwable])
     extends EventProcessor[Interpretation] {
 
+  import CommitEventProcessor._
   import IOAccessTokenFinder._
   import UploadingResult._
   import accessTokenFinder._
-  import commitEventsDeserialiser._
-  import eventLogMarkDone._
-  import eventLogMarkFailed._
-  import eventLogMarkNew._
+  import eventStatusUpdater._
   import executionTimeRecorder._
   import triplesCurator._
   import triplesGenerator._
   import uploader._
 
-  def apply(eventBody: EventBody): Interpretation[Unit] =
+  def process(eventId: CompoundEventId, events: NonEmptyList[CommitEvent]): Interpretation[Unit] =
     measureExecutionTime {
       for {
-        commits          <- deserialiseToCommitEvents(eventBody)
-        maybeAccessToken <- findAccessToken(commits.head.project.id) recoverWith rollback(commits.head)
-        uploadingResults <- allToTriplesAndUpload(commits)(maybeAccessToken)
+        maybeAccessToken <- findAccessToken(events.head.project.id) recoverWith rollback(events.head)
+        uploadingResults <- allToTriplesAndUpload(events)(maybeAccessToken)
       } yield uploadingResults
-    } flatMap logSummary recoverWith logEventProcessingError(eventBody)
+    } flatMap logSummary recoverWith logError(eventId, events.head.project.path)
+
+  private def logError(eventId:     CompoundEventId,
+                       projectPath: projects.Path): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"Commit Event processing failure: $eventId, projectPath: $projectPath")
+      ME.unit
+  }
 
   private def allToTriplesAndUpload(
-      commits:                 NonEmptyList[Commit]
+      commits:                 NonEmptyList[CommitEvent]
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[NonEmptyList[UploadingResult]] =
     commits
       .map(toTriplesAndUpload)
@@ -89,7 +90,7 @@ class CommitEventProcessor[Interpretation[_]](
       .flatMap(updateEventLog)
 
   private def toTriplesAndUpload(
-      commit:                  Commit
+      commit:                  CommitEvent
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
       rawTriples     <- generateTriples(commit)
@@ -98,7 +99,7 @@ class CommitEventProcessor[Interpretation[_]](
     } yield result
   }.value map (_.fold(toRecoverableError(commit), identity)) recoverWith nonRecoverableFailure(commit)
 
-  private def toUploadingResult(commit: Commit): TriplesUploadResult => UploadingResult = {
+  private def toUploadingResult(commit: CommitEvent): TriplesUploadResult => UploadingResult = {
     case DeliverySuccess => Uploaded(commit)
     case error @ DeliveryFailure(message) =>
       logger.error(s"${logMessageCommon(commit)} $message")
@@ -111,21 +112,21 @@ class CommitEventProcessor[Interpretation[_]](
       NonRecoverableError(commit, error: Throwable)
   }
 
-  private def toRecoverableError(commit: Commit): ProcessingRecoverableError => UploadingResult = { error =>
+  private def toRecoverableError(commit: CommitEvent): ProcessingRecoverableError => UploadingResult = { error =>
     logger.error(s"${logMessageCommon(commit)} ${error.message}")
     RecoverableError(commit, error)
   }
 
-  private def nonRecoverableFailure(commit: Commit): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
+  private def nonRecoverableFailure(commit: CommitEvent): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
     case NonFatal(exception) =>
       logger.error(exception)(s"${logMessageCommon(commit)} failed")
-      ME.pure(NonRecoverableError(commit, exception): UploadingResult)
+      (NonRecoverableError(commit, exception): UploadingResult).pure[Interpretation]
   }
 
   private def updateEventLog(uploadingResults: NonEmptyList[UploadingResult]) = {
     for {
       _ <- if (uploadingResults.allUploaded)
-            markEventDone(uploadingResults.head.commit.commitEventId)
+            markEventDone(uploadingResults.head.commit.compoundEventId)
           else if (uploadingResults.haveRecoverableFailure)
             markEventAsRecoverable(uploadingResults.recoverableError)
           else markEventAsNonRecoverable(uploadingResults.nonRecoverableError)
@@ -143,15 +144,14 @@ class CommitEventProcessor[Interpretation[_]](
 
   private def markEventAsRecoverable(maybeUploadingError: Option[UploadingResult]) =
     maybeUploadingError match {
-      case Some(RecoverableError(commit, exception)) =>
-        markEventFailed(commit.commitEventId, RecoverableFailure, EventMessage(exception))
-      case _ => ME.unit
+      case Some(RecoverableError(commit, exception)) => markEventFailedRecoverably(commit.compoundEventId, exception)
+      case _                                         => ME.unit
     }
 
   private def markEventAsNonRecoverable(maybeUploadingError: Option[UploadingResult]) =
     maybeUploadingError match {
       case Some(NonRecoverableError(commit, exception)) =>
-        markEventFailed(commit.commitEventId, NonRecoverableFailure, EventMessage(exception))
+        markEventFailedNonRecoverably(commit.compoundEventId, exception)
       case _ => ME.unit
     }
 
@@ -160,9 +160,9 @@ class CommitEventProcessor[Interpretation[_]](
   ): PartialFunction[Throwable, Interpretation[NonEmptyList[UploadingResult]]] = {
     case NonFatal(exception) =>
       logger.error(exception)(
-        s"${logMessageCommon(uploadingResults.head.commit)} failed to mark as $TriplesStore in the Event Log"
+        s"${logMessageCommon(uploadingResults.head.commit)} failed to mark as TriplesStore in the Event Log"
       )
-      ME.pure(uploadingResults)
+      uploadingResults.pure[Interpretation]
   }
 
   private def logSummary: ((ElapsedTime, NonEmptyList[UploadingResult])) => Interpretation[Unit] = {
@@ -179,45 +179,38 @@ class CommitEventProcessor[Interpretation[_]](
       )
   }
 
-  private lazy val logMessageCommon: Commit => String = {
-    case CommitWithoutParent(id, project) =>
-      s"Commit Event id: $id, project: ${project.id} ${project.path}"
-    case CommitWithParent(id, parentId, project) =>
-      s"Commit Event id: $id, project: ${project.id} ${project.path}, parentId: $parentId"
-  }
+  private def logMessageCommon(event: CommitEvent): String =
+    s"Commit Event id: ${event.compoundEventId}, ${event.project.path}"
 
-  private def logEventProcessingError(eventBody: EventBody): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) => logger.error(exception)(s"Commit Event processing failure: $eventBody")
-  }
-
-  private def rollback(commit: Commit): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
+  private def rollback(commit: CommitEvent): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
     case NonFatal(exception) =>
-      markEventNew(commit.commitEventId)
+      markEventNew(commit.compoundEventId)
         .flatMap(_ => ME.raiseError(new Exception("processing failure -> Event rolled back", exception)))
   }
 
   private sealed trait UploadingResult extends Product with Serializable {
-    val commit: Commit
+    val commit: CommitEvent
   }
   private sealed trait UploadingError extends UploadingResult {
     val cause: Throwable
   }
   private object UploadingResult {
-    case class Uploaded(commit:            Commit) extends UploadingResult
-    case class RecoverableError(commit:    Commit, cause: Throwable) extends UploadingError
-    case class NonRecoverableError(commit: Commit, cause: Throwable) extends UploadingError
+    case class Uploaded(commit:            CommitEvent) extends UploadingResult
+    case class RecoverableError(commit:    CommitEvent, cause: Throwable) extends UploadingError
+    case class NonRecoverableError(commit: CommitEvent, cause: Throwable) extends UploadingError
   }
 }
 
-object CommitEventProcessor {
+private object CommitEventProcessor {
   trait ProcessingRecoverableError extends Exception { val message: String }
 }
 
-object IOCommitEventProcessor {
+private object IOCommitEventProcessor {
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler
+  import com.typesafe.config.{Config, ConfigFactory}
 
-  private[triplesgenerator] lazy val eventsProcessingTimesBuilder =
+  private[eventprocessing] lazy val eventsProcessingTimesBuilder =
     Histogram
       .build()
       .name("events_processing_times")
@@ -225,31 +218,29 @@ object IOCommitEventProcessor {
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
       triplesGenerator:    TriplesGenerator[IO],
       metricsRegistry:     MetricsRegistry[IO],
       gitLabThrottler:     Throttler[IO, GitLab],
-      timeRecorder:        SparqlQueryTimeRecorder[IO]
+      timeRecorder:        SparqlQueryTimeRecorder[IO],
+      logger:              Logger[IO],
+      config:              Config = ConfigFactory.load()
   )(implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
     for {
-      uploader              <- IOUploader(ApplicationLogger, timeRecorder)
-      accessTokenFinder     <- IOAccessTokenFinder(ApplicationLogger)
-      triplesCurator        <- IOTriplesCurator(gitLabThrottler, ApplicationLogger, timeRecorder)
+      uploader              <- IOUploader(logger, timeRecorder)
+      accessTokenFinder     <- IOAccessTokenFinder(logger)
+      triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
+      eventStatusUpdater    <- IOEventStatusUpdater(logger)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger,
-                                                         maybeHistogram = Some(eventsProcessingTimes))
-    } yield new CommitEventProcessor[IO](
-      new CommitEventsDeserialiser[IO](),
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
+    } yield new CommitEventProcessor(
       accessTokenFinder,
       triplesGenerator,
       triplesCurator,
       uploader,
-      new IOEventLogMarkDone(transactor),
-      new IOEventLogMarkNew(transactor),
-      new IOEventLogMarkFailed(transactor),
-      ApplicationLogger,
+      eventStatusUpdater,
+      logger,
       executionTimeRecorder
     )
 }

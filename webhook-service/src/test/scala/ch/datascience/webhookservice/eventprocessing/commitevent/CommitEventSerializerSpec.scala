@@ -21,9 +21,8 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events
-import ch.datascience.graph.model.events.CommitEvent
+import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Person}
+import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import io.circe.Json
 import io.circe.parser._
 import org.scalatest.Matchers._
@@ -64,14 +63,14 @@ class CommitEventSerializerSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
-  private implicit class PersonOps(person: events.Person) {
+  private implicit class PersonOps(person: Person) {
     lazy val toJson: Json = person match {
-      case person: events.Person.WithEmail =>
+      case person: Person.WithEmail =>
         Json.obj(
-          "username" -> Json.fromString(person.username.value),
+          "username" -> Json.fromString(person.name.value),
           "email"    -> Json.fromString(person.email.value)
         )
-      case person: events.Person => Json.obj("username" -> Json.fromString(person.username.value))
+      case person: Person => Json.obj("username" -> Json.fromString(person.name.value))
       case _ => Json.Null
     }
   }

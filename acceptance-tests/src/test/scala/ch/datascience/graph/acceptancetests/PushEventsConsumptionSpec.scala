@@ -18,8 +18,6 @@
 
 package ch.datascience.graph.acceptancetests
 
-import ch.datascience.dbeventlog.EventStatus
-import ch.datascience.dbeventlog.EventStatus.New
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
@@ -33,6 +31,8 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.literal._
+import io.renku.eventlog.EventStatus
+import io.renku.eventlog.EventStatus.New
 import org.http4s.Status._
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually

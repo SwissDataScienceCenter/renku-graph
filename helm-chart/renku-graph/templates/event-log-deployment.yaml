@@ -1,0 +1,91 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ include "eventLog.fullname" . }}
+  labels:
+    app: {{ template "eventLog.name" . }}
+    chart: {{ template "graph.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ include "eventLog.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "eventLog.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: event-log
+          image: "{{ .Values.eventLog.image.repository }}:{{ .Values.eventLog.image.tag }}"
+          imagePullPolicy: {{ .Values.eventLog.image.pullPolicy }}
+          env:
+            - name: EVENT_LOG_POSTGRES_HOST
+              value: "{{ template "postgresql.fullname" . }}:5432"
+            - name: EVENT_LOG_POSTGRES_USER
+              value: {{ .Values.global.graph.dbEventLog.postgresUser }}
+            - name: EVENT_LOG_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+{{- if .Values.global.graph.dbEventLog.existingSecret }}
+                  name: {{ tpl .Values.global.graph.dbEventLog.existingSecret . }}
+{{- else }}
+                  name: {{ template "eventLog.fullname" . }}
+{{- end }}
+                  key: graph-dbEventLog-postgresPassword
+            - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
+              value: "{{ .Values.eventLog.connectionPool }}"
+            - name: RENKU_LOG_TIMEOUT
+              value: "{{ .Values.triplesGenerator.renkuLogTimeout }}"
+            - name: SENTRY_DSN
+              value: {{ .Values.sentry.sentryDsnRenkuPython }}
+            - name: SENTRY_ENABLED
+              value: "{{ .Values.sentry.enabled }}"
+              {{- if .Values.sentry.enabled }}
+            - name: SENTRY_BASE_URL
+              value: {{ .Values.sentry.url }}
+            - name: SENTRY_ENVIRONMENT_NAME
+              value: {{ .Values.sentry.environmentName }}
+              {{- end }}
+            - name: THREADS_NUMBER
+              value: "{{ .Values.eventLog.threadsNumber }}"
+            - name: JAVA_OPTS
+              value: -Xmx{{ .Values.eventLog.jvmXmx }} -XX:+UseG1GC
+          ports:
+            - name: http-event-log
+              containerPort: 9005
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http-event-log
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http-event-log
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+  {{ toYaml .Values.eventLog.resources | indent 12 }}
+  {{- with .Values.nodeSelector }}
+nodeSelector:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+affinity:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+tolerations:
+  {{ toYaml . | indent 8 }}
+  {{- end }}

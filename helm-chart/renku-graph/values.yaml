@@ -35,15 +35,12 @@ triplesGenerator:
       memory: 2000Mi
   jvmXmx: 1G
   renkuLogTimeout: 60 minutes
-  reProvisioningInitialDelay: 1 second
+  reProvisioningInitialDelay: 1 minute
   gitlab:
     rateLimit: 30/sec
-  generationProcessInitialDelay: 2 minutes
   ## a demanded number of concurrent triples generation processes
-  generationProcessesNumber: 3
+  generationProcessesNumber: 4
   threadsNumber: 6
-  dbEventLog:
-    connectionPool: 6
 
 webhookService:
   image:
@@ -62,9 +59,7 @@ webhookService:
     interval: 30 minutes
   gitlab:
     rateLimit: 100/sec
-  threadsNumber: 3
-  dbEventLog:
-    connectionPool: 4
+  threadsNumber: 4
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
@@ -84,12 +79,27 @@ knowledgeGraph:
   gitlab:
     rateLimit: 100/sec
   jvmXmx: 200m
-  threadsNumber: 3
+  threadsNumber: 4
   services:
     renku:
       ## Renku knowledge-graph resources path e.g. `knowledge-graph` would assume
       ## Renku resource are available at: https://{global.renku.domain}/knowledge-graph
       resourcesPath: "/knowledge-graph"
+
+eventLog:
+  image:
+    repository: renku/event-log
+    tag: 'latest'
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 9005
+  resources:
+    limits:
+      memory: 250Mi
+  jvmXmx: 250m
+  threadsNumber: 6
+  connectionPool: 10
 
 sentry:
   enabled: false
@@ -133,7 +143,7 @@ resources: {}
   # limits:
   #  cpu: 100m
   #  memory: 128Mi
-  # requests:
+# requests:
 #  cpu: 100m
 #  memory: 128Mi
 

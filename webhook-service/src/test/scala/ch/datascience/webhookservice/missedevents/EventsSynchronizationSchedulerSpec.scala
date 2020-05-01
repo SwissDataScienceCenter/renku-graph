@@ -31,7 +31,6 @@ import org.scalatest.WordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.{postfixOps, reflectiveCalls}
 import scala.util.Try
@@ -42,7 +41,7 @@ class EventsSynchronizationSchedulerSpec extends WordSpec with MockFactory with 
 
     "kick off the events synchronization process " +
       "with initial delay read from config and " +
-      "continues endlessly with interval sleeping periods" in new TestCase {
+      "continues endlessly with interval periods" in new TestCase {
 
       (timer
         .sleep(_: FiniteDuration))
@@ -55,7 +54,7 @@ class EventsSynchronizationSchedulerSpec extends WordSpec with MockFactory with 
         .returning(context.unit)
         .atLeastOnce()
 
-      IO.shift(global) *> IO.suspend(IO.pure(scheduler.run)).start.unsafeRunCancelable(_ => ())
+      IO.suspend(scheduler.run.pure[IO]).start.unsafeRunAsyncAndForget()
 
       eventually {
         eventsLoader.callCounter.get() should be > 5

@@ -41,9 +41,9 @@ private class IOTriplesRemover(
 
   override def removeAllTriples(): IO[Unit] = updateWitNoResult {
     SparqlQuery(
-      name = "all triples remove",
-      Set.empty,
-      "DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }"
+      name     = "all triples remove",
+      prefixes = Set.empty,
+      body     = "CLEAR DEFAULT"
     )
   }
 }

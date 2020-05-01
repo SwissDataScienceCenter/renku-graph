@@ -50,7 +50,7 @@ object users {
     )
 
     implicit class EmailOps(email: Email) {
-      lazy val extractUsername: Username = Username(email.value.split('@').head)
+      lazy val extractName: users.Name = users.Name(email.value.split('@').head)
     }
   }
 

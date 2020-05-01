@@ -23,6 +23,7 @@ import cats.effect.concurrent.Semaphore
 import ch.datascience.graph.acceptancetests.stubs.GitLab
 import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
+import io.renku.eventlog
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.ExecutionContext
@@ -39,18 +40,21 @@ trait GraphServices extends BeforeAndAfterAll {
   protected val tokenRepositoryClient:  ServiceClient        = GraphServices.tokenRepositoryClient
   protected val triplesGeneratorClient: ServiceClient        = GraphServices.triplesGeneratorClient
   protected val knowledgeGraphClient:   KnowledgeGraphClient = GraphServices.knowledgeGraphClient
+  protected val eventLogClient:         ServiceClient        = GraphServices.eventLogClient
   protected val webhookService:         ServiceRun           = GraphServices.webhookService
   protected val tokenRepository:        ServiceRun           = GraphServices.tokenRepository
   protected val triplesGenerator:       ServiceRun           = GraphServices.triplesGenerator
   protected val knowledgeGraph:         ServiceRun           = GraphServices.knowledgeGraph
+  protected val eventLog:               ServiceRun           = GraphServices.eventLog
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
     GraphServices.servicesRunner
       .run(
-        webhookService,
         tokenRepository,
+        eventLog,
+        webhookService,
         triplesGenerator,
         knowledgeGraph
       )
@@ -71,10 +75,12 @@ object GraphServices {
   val triplesGeneratorClient = TriplesGeneratorClient()
   val tokenRepositoryClient  = TokenRepositoryClient()
   val knowledgeGraphClient   = KnowledgeGraphClient()
+  val eventLogClient         = EventLogClient()
 
   val webhookService  = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
   val tokenRepository = ServiceRun("token-repository", tokenrepository.Microservice, tokenRepositoryClient)
   val knowledgeGraph  = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
+  val eventLog        = ServiceRun("event-log", eventlog.Microservice, eventLogClient)
   val triplesGenerator = ServiceRun(
     "triples-generator",
     service          = triplesgenerator.Microservice,

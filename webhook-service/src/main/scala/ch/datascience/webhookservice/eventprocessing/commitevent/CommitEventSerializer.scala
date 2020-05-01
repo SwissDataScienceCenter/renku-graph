@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
-import ch.datascience.graph.model.events._
+import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Person}
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 
@@ -47,11 +47,11 @@ private class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[I
 
   private implicit def personEncoder[E <: Person]: Encoder[E] = Encoder.instance[E] {
     case person: Person.WithEmail => json"""{
-      "username": ${person.username.value},
+      "username": ${person.name.value},
       "email"   : ${person.email.value}
     }"""
     case person: Person           => json"""{
-      "username": ${person.username.value}
+      "username": ${person.name.value}
     }"""
   }
 }

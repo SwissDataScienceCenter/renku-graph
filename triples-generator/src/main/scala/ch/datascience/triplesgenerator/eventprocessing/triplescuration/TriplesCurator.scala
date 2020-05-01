@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.EitherT
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.{ForkInfoUpdater, IOForkInfoUpdater}
@@ -32,7 +32,7 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-class TriplesCurator[Interpretation[_]](
+private[eventprocessing] class TriplesCurator[Interpretation[_]](
     personDetailsUpdater: PersonDetailsUpdater[Interpretation],
     forkInfoUpdater:      ForkInfoUpdater[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable]) {
@@ -40,7 +40,7 @@ class TriplesCurator[Interpretation[_]](
   import forkInfoUpdater._
 
   def curate(
-      commit:  Commit,
+      commit:  CommitEvent,
       triples: JsonLDTriples
   )(
       implicit maybeAccessToken: Option[AccessToken]
@@ -56,7 +56,7 @@ class TriplesCurator[Interpretation[_]](
   }
 }
 
-object IOTriplesCurator {
+private[eventprocessing] object IOTriplesCurator {
 
   import cats.effect.{ContextShift, IO, Timer}
   import ch.datascience.config.GitLab

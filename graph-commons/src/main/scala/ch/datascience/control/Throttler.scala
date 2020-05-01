@@ -54,10 +54,16 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[contr
     } yield ()
 
   private def verifyThroughput(startTimes: List[Long], now: Long) =
-    if (notTooEarly(startTimes, now))
-      workersStartTimes.modify(old => (startTimes :+ now) -> old) *> semaphore.release
+    if (notTooEarly(startTimes, now)) for {
+      _ <- workersStartTimes.modify(old => (startTimes :+ now) -> old)
+      _ <- semaphore.release
+    } yield ()
     else
-      semaphore.release *> timer.sleep(NextAttemptSleep) *> acquire
+      for {
+        _ <- semaphore.release
+        _ <- timer sleep NextAttemptSleep
+        _ <- acquire
+      } yield ()
 
   private def notTooEarly(startTimes: List[Long], now: Long): Boolean = {
     val (_, durations) = (startTimes.tail :+ now).foldLeft(startTimes.head -> List.empty[Long]) {

@@ -21,13 +21,15 @@ package ch.datascience.webhookservice.generators
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.webhookservice.commits.CommitInfo
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import ch.datascience.webhookservice.eventprocessing.StartCommit
+import ch.datascience.webhookservice.eventprocessing._
 import ch.datascience.webhookservice.model._
 import ch.datascience.webhookservice.project._
-import eu.timepit.refined.api.RefType
+import eu.timepit.refined.api.Refined
 import org.scalacheck.Gen
+import org.scalacheck.Gen.choose
 
 object WebhookServiceGenerators {
 
@@ -36,11 +38,7 @@ object WebhookServiceGenerators {
     project <- projects
   } yield StartCommit(id, project)
 
-  implicit val serializedHookTokens: Gen[SerializedHookToken] = nonEmptyStrings().map { value =>
-    RefType
-      .applyRef[SerializedHookToken](value)
-      .getOrElse(throw new IllegalArgumentException("Generated HookAuthToken cannot be blank"))
-  }
+  implicit val serializedHookTokens: Gen[SerializedHookToken] = nonEmptyStrings() map Refined.unsafeApply
 
   implicit val hookTokens: Gen[HookToken] = for {
     projectId <- projectIds
@@ -63,4 +61,48 @@ object WebhookServiceGenerators {
     committer     <- committers
     parents       <- listOf(commitIds)
   } yield CommitInfo(id, message, committedDate, author, committer, parents)
+
+  implicit lazy val commitEvents: Gen[CommitEvent] = for {
+    commitId      <- commitIds
+    project       <- projects
+    message       <- commitMessages
+    committedDate <- committedDates
+    author        <- authors
+    committer     <- committers
+    parentsIds    <- parentsIdsLists()
+    batchDate     <- batchDates
+  } yield CommitEvent(commitId, project, message, committedDate, author, committer, parentsIds, batchDate)
+
+  implicit lazy val authors: Gen[Author] = Gen.oneOf(
+    userNames map Author.withName,
+    userEmails map Author.withEmail,
+    for {
+      username <- userNames
+      email    <- userEmails
+    } yield Author(username, email)
+  )
+
+  implicit lazy val committers: Gen[Committer] = Gen.oneOf(
+    userNames map Committer.withName,
+    userEmails map Committer.withEmail,
+    for {
+      username <- userNames
+      email    <- userEmails
+    } yield Committer(username, email)
+  )
+
+  implicit lazy val projects: Gen[Project] = for {
+    projectId <- projectIds
+    path      <- projectPaths
+  } yield Project(projectId, path)
+
+  implicit def parentsIdsLists(minNumber: Int = 0, maxNumber: Int = 4): Gen[List[CommitId]] = {
+    require(minNumber <= maxNumber,
+            s"minNumber = $minNumber is not <= maxNumber = $maxNumber for generating parents Ids list")
+
+    for {
+      parentCommitsNumber <- choose(minNumber, maxNumber)
+      parents             <- Gen.listOfN(parentCommitsNumber, commitIds)
+    } yield parents
+  }
 }

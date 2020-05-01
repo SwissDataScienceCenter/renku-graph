@@ -26,7 +26,7 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.triplesgenerator.eventprocessing.Commit
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import com.typesafe.config.Config
 import io.chrisdavenport.log4cats.Logger
@@ -37,7 +37,7 @@ import scala.concurrent.ExecutionContext
 
 // This TriplesGenerator supposed to be used by the acceptance-tests only
 
-object RemoteTriplesGenerator extends ConfigLoader[IO] {
+private[eventprocessing] object RemoteTriplesGenerator extends ConfigLoader[IO] {
 
   def apply(
       configuration:           Config
@@ -51,7 +51,7 @@ object RemoteTriplesGenerator extends ConfigLoader[IO] {
     } yield new RemoteTriplesGenerator(serviceUrl, ApplicationLogger)
 }
 
-class RemoteTriplesGenerator(
+private[eventprocessing] class RemoteTriplesGenerator(
     serviceUrl:              TriplesGenerationServiceUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
@@ -68,11 +68,11 @@ class RemoteTriplesGenerator(
   import org.http4s.dsl.io._
 
   override def generateTriples(
-      commit:                  Commit
+      commitEvent:             CommitEvent
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
     EitherT.right {
       for {
-        uri           <- validateUri(s"$serviceUrl/projects/${commit.project.id}/commits/${commit.id}")
+        uri           <- validateUri(s"$serviceUrl/projects/${commitEvent.project.id}/commits/${commitEvent.commitId}")
         triplesInJson <- send(request(GET, uri))(mapResponse)
         triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
       } yield triples

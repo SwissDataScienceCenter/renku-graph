@@ -29,7 +29,7 @@ import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
+import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl, RenkuLogTimeout}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
@@ -43,6 +43,8 @@ import eu.timepit.refined.auto._
 import io.circe.literal._
 import org.scalacheck.Gen
 
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.Try
 
 object CommonGraphGenerators {
@@ -92,6 +94,8 @@ object CommonGraphGenerators {
     .listOfN(3, positiveInts(max = 50))
     .map(_.mkString("."))
     .map(SchemaVersion.apply)
+
+  implicit val renkuLogTimeouts: Gen[RenkuLogTimeout] = durations(max = 5 hours) map RenkuLogTimeout.apply
 
   implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls() map RenkuBaseUrl.apply
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
