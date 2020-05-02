@@ -43,7 +43,7 @@ private class IOTriplesRemover(
     SparqlQuery(
       name     = "all triples remove",
       prefixes = Set.empty,
-      body     = "CLEAR DEFAULT"
+      body     = "DROP DEFAULT"
     )
   }
 }
