@@ -55,14 +55,13 @@ tolerations: []
 affinity: {}
 
 # Jena configuration
-jena:
-  jvmXmx: 2G
-  users:
-    admin:
-      ## Admin user password
-      ## Generate one using: `openssl rand -hex 16`
-      password:
-    renku:
-      ## Dataset user password
-      ## Generate one using: `openssl rand -hex 16`
-      password:
+jvmXmx: 2G
+users:
+  admin:
+    ## Admin user password
+    ## Generate one using: `openssl rand -hex 16`
+    password:
+  renku:
+    ## Dataset user password
+    ## Generate one using: `openssl rand -hex 16`
+    password:
