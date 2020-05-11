@@ -138,7 +138,7 @@ lazy val commonSettings = Seq(
   publishArtifact in(Compile, packageDoc) := false,
   publishArtifact in(Compile, packageSrc) := false,
 
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3"),
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
 
   scalacOptions += "-Ypartial-unification",
   scalacOptions += "-feature",
