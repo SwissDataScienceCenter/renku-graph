@@ -46,11 +46,16 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       "- a case when unrelated projects are using the same imported dataset" in new TestCase {
       forAll(nonModifiedDatasets(), datasetProjects, addedToProject, datasetProjects, addedToProject) {
         (dataset, project1, addedToProject1, project2, addedToProject2) =>
-          val project1DatasetCreationDate = CommittedDate(addedToProject1.date.value)
+          val modifiedOnProject1 = addedToProject.generateOne.copy(
+            date = datasetInProjectCreationDates generateGreaterThan addedToProject1.date
+          )
+          val modifiedDataset = modifiedDatasets(dataset, project1.copy(created = modifiedOnProject1)).generateOne.copy(
+            maybeDescription = datasetDescriptions.generateSome
+          )
 
           loadToStore(
-            dataSetCommit(
-              committedDate = project1DatasetCreationDate,
+            nonModifiedDataSetCommit(
+              committedDate = CommittedDate(addedToProject1.date.value),
               committer     = Person(addedToProject1.agent.name, addedToProject1.agent.maybeEmail)
             )(
               project1.path,
@@ -66,23 +71,24 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               datasetCreators           = dataset.published.creators map toPerson,
               datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit( // to simulate adding a file to the data-set in another commit
-              committedDate = CommittedDate(project1DatasetCreationDate.value plusSeconds 10)
+            modifiedDataSetCommit( // to simulate data-set modification in another commit
+              committedDate = CommittedDate(modifiedOnProject1.date.value),
+              committer     = Person(modifiedOnProject1.agent.name, modifiedOnProject1.agent.maybeEmail)
             )(
               project1.path,
               project1.name
             )(
-              datasetIdentifier         = dataset.id,
-              datasetName               = dataset.name,
-              datasetUrl                = dataset.url,
-              maybeDatasetSameAs        = dataset.sameAs.some,
-              maybeDatasetDescription   = dataset.maybeDescription,
-              maybeDatasetPublishedDate = dataset.published.maybeDate,
-              datasetCreatedDate        = DateCreated(addedToProject1.date.value),
-              datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetIdentifier         = modifiedDataset.id,
+              datasetName               = modifiedDataset.name,
+              datasetUrl                = modifiedDataset.url,
+              datasetDerivedFrom        = modifiedDataset.derivedFrom,
+              maybeDatasetDescription   = modifiedDataset.maybeDescription,
+              maybeDatasetPublishedDate = modifiedDataset.published.maybeDate,
+              datasetCreatedDate        = DateCreated(modifiedOnProject1.date.value),
+              datasetCreators           = modifiedDataset.published.creators map toPerson,
+              datasetParts              = modifiedDataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit( // to simulate adding the same data-set to another project
+            nonModifiedDataSetCommit( // to simulate adding the same data-set to another project
               committedDate = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value)),
               committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
             )(
@@ -108,6 +114,13 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
                               DatasetProject(project2.path, project2.name, addedToProject2)).sorted
             )
           )
+
+          datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync() shouldBe Some(
+            modifiedDataset.copy(
+              parts    = modifiedDataset.parts.sorted,
+              projects = List(DatasetProject(project1.path, project1.name, modifiedOnProject1)).sorted
+            )
+          )
       }
     }
 
@@ -116,7 +129,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       forAll(nonModifiedDatasets(), datasetProjects, addedToProject, datasetProjects, addedToProject) {
         (dataset, project1, addedToProject1, project2, addedToProject2) =>
           loadToStore(
-            dataSetCommit(
+            nonModifiedDataSetCommit(
               committedDate = CommittedDate(addedToProject1.date.value),
               committer     = Person(addedToProject1.agent.name, addedToProject1.agent.maybeEmail)
             )(
@@ -133,7 +146,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               datasetCreators           = dataset.published.creators map toPerson,
               datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit( // simulating dataset modification
+            nonModifiedDataSetCommit( // simulating dataset modification
               committedDate = CommittedDate(addedToProject1.date.value).shiftToFuture
             )(
               project1.path,
@@ -149,7 +162,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               datasetCreators           = dataset.published.creators map toPerson,
               datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit( // to simulate adding first project's data-set to another project
+            nonModifiedDataSetCommit( // to simulate adding first project's data-set to another project
               committedDate = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value)),
               committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
             )(
@@ -183,7 +196,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       "- a case when an imported dataset is used in one project" in new TestCase {
       forAll(nonModifiedDatasets(), datasetProjects, addedToProject) { (dataset, project, addedToProject) =>
         loadToStore(
-          dataSetCommit(
+          nonModifiedDataSetCommit(
             committedDate = CommittedDate(addedToProject.date.value),
             committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
           )(
@@ -200,7 +213,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             datasetCreators           = dataset.published.creators map toPerson,
             datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
           ),
-          dataSetCommit( // simulating dataset modification
+          nonModifiedDataSetCommit( // simulating dataset modification
             committedDate = CommittedDate(addedToProject.date.value).shiftToFuture
           )(
             project.path,
@@ -232,7 +245,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       "- a case of a single used in-project created dataset" in new TestCase {
       forAll(nonModifiedDatasets(), datasetProjects, addedToProject) { (dataset, project, addedToProject) =>
         loadToStore(
-          dataSetCommit(
+          nonModifiedDataSetCommit(
             committedDate = CommittedDate(addedToProject.date.value),
             committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
           )(
@@ -249,7 +262,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             datasetCreators           = dataset.published.creators map toPerson,
             datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
           ),
-          dataSetCommit( // simulating dataset modification
+          nonModifiedDataSetCommit( // simulating dataset modification
             committedDate = CommittedDate(addedToProject.date.value).shiftToFuture
           )(
             project.path,
@@ -291,7 +304,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           val project2DatasetId           = datasetIdentifiers.generateOne
 
           loadToStore(
-            dataSetCommit(
+            nonModifiedDataSetCommit(
               committedDate = project1DatasetCreationDate,
               committer     = Person(addedToProject1.agent.name, addedToProject1.agent.maybeEmail)
             )(
@@ -307,7 +320,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               datasetCreators           = dataset.published.creators map toPerson,
               datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit( // to simulate adding the same data-set to another project
+            nonModifiedDataSetCommit( // to simulate adding the same data-set to another project
               commitId      = project2DatasetCommit,
               committedDate = project2DatasetCommitDate,
               committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
@@ -324,7 +337,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               datasetCreators           = dataset.published.creators map toPerson,
               datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit( // to simulate forking project2
+            nonModifiedDataSetCommit( // to simulate forking project2
               commitId      = project2DatasetCommit,
               committedDate = project2DatasetCommitDate,
               committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
@@ -371,7 +384,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           val project2DatasetId           = datasetIdentifiers.generateOne
 
           loadToStore(
-            dataSetCommit(
+            nonModifiedDataSetCommit(
               committedDate = project1DatasetCreationDate,
               committer     = Person(addedToProject1.agent.name, addedToProject1.agent.maybeEmail)
             )(
@@ -387,7 +400,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               datasetCreators           = dataset.published.creators map toPerson,
               datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit( // to simulate adding first project's data-set to another project
+            nonModifiedDataSetCommit( // to simulate adding first project's data-set to another project
               commitId      = project2DatasetCommit,
               committedDate = project2DatasetCommitDate,
               committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
@@ -404,7 +417,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               datasetCreators           = dataset.published.creators map toPerson,
               datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit( // to simulate forking project2
+            nonModifiedDataSetCommit( // to simulate forking project2
               commitId      = project2DatasetCommit,
               committedDate = project2DatasetCommitDate,
               committer     = Person(addedToProject2.agent.name, addedToProject2.agent.maybeEmail)
@@ -443,7 +456,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
         (sourceProject, forkProject, dataset, addedToProject, commitId) =>
           val datasetCreationDate = addedToProject.date.toUnsafe(date => CommittedDate.from(date.value))
           loadToStore(
-            dataSetCommit(
+            nonModifiedDataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
               committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
@@ -460,7 +473,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               datasetCreators           = dataset.published.creators map toPerson,
               datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit(
+            nonModifiedDataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
               committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
@@ -498,7 +511,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
         (sourceProject, forkProject, dataset, addedToProject, commitId) =>
           val datasetCreationDate = addedToProject.date.toUnsafe(date => CommittedDate.from(date.value))
           loadToStore(
-            dataSetCommit(
+            nonModifiedDataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
               committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
@@ -515,7 +528,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
               datasetCreators           = dataset.published.creators map toPerson,
               datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
             ),
-            dataSetCommit(
+            nonModifiedDataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
               committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
@@ -551,7 +564,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       forAll(datasetProjects, datasetProjects, datasetProjects, nonModifiedDatasets(), addedToProject, commitIds) {
         (grandparentProject, parentProject, childProject, dataset, addedToProject, commitId) =>
           val datasetCreationDate = addedToProject.date.toUnsafe(date => CommittedDate.from(date.value))
-          val grandparentProjectDataSet = dataSetCommit(
+          val grandparentProjectDataSet = nonModifiedDataSetCommit(
             commitId      = commitId,
             committedDate = datasetCreationDate,
             committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
@@ -568,7 +581,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             datasetCreators           = dataset.published.creators map toPerson,
             datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
           )
-          val parentProjectDataSet = dataSetCommit(
+          val parentProjectDataSet = nonModifiedDataSetCommit(
             commitId      = commitId,
             committedDate = datasetCreationDate,
             committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
@@ -588,7 +601,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           loadToStore(
             grandparentProjectDataSet,
             parentProjectDataSet,
-            dataSetCommit(
+            nonModifiedDataSetCommit(
               commitId      = commitId,
               committedDate = datasetCreationDate,
               committer     = Person(addedToProject.agent.name, addedToProject.agent.maybeEmail)
@@ -847,7 +860,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
   private def toDataSetCommit(dataSet: NonModifiedDataset, noSameAs: Boolean = false): JsonLD =
     dataSet.projects match {
       case project +: Nil =>
-        dataSetCommit(
+        nonModifiedDataSetCommit(
           committedDate = CommittedDate(project.created.date.value),
           committer     = Person(project.created.agent.name, project.created.agent.maybeEmail)
         )(
@@ -875,4 +888,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
   private implicit lazy val projectsAlphabeticalOrdering: Ordering[DatasetProject] =
     (project1: DatasetProject, project2: DatasetProject) => project1.name.value compareTo project2.name.value
+
+  private implicit val dateCreatedInProjectOrdering: Ordering[DateCreatedInProject] =
+    (x: DateCreatedInProject, y: DateCreatedInProject) => x.value compareTo y.value
 }

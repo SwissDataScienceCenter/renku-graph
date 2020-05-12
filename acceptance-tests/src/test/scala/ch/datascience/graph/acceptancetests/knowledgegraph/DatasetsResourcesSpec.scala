@@ -92,7 +92,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
-        dataSetCommit(
+        nonModifiedDataSetCommit(
           commitId      = dataset1CommitId,
           committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail),
@@ -111,7 +111,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           datasetCreators           = dataset1.published.creators.map(toPerson),
           datasetParts              = dataset1.parts.map(part => (part.name, part.atLocation))
         ),
-        dataSetCommit(
+        nonModifiedDataSetCommit(
           commitId      = dataset2CommitId,
           committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
@@ -311,7 +311,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
                         committedDate:        CommittedDate,
                         dataset:              NonModifiedDataset,
                         overriddenIdentifier: Option[Identifier] = None) =
-      dataSetCommit(
+      nonModifiedDataSetCommit(
         commitId      = commitId,
         committedDate = committedDate,
         schemaVersion = currentSchemaVersion

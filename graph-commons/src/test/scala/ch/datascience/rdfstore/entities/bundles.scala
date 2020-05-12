@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.{listOf, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Url}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, FilePath, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
@@ -67,9 +67,9 @@ object bundles extends Schemas {
     ).asJsonLD
 
   def randomDataSetCommit(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
-    dataSetCommit()()()
+    Gen.oneOf(nonModifiedDataSetCommit()()(), modifiedDataSetCommit()()()).generateOne
 
-  def dataSetCommit(
+  def nonModifiedDataSetCommit(
       commitId:      CommitId      = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
       committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
@@ -98,6 +98,53 @@ object bundles extends Schemas {
         datasetName,
         datasetUrl,
         maybeDatasetSameAs,
+        maybeDatasetDescription,
+        maybeDatasetPublishedDate,
+        datasetCreatedDate,
+        datasetCreators,
+        datasetParts map { case (name, location) => DataSetPart(name, location, commitId, project, committer) },
+        Generation(FilePath(".renku") / "datasets" / datasetIdentifier,
+                   Activity(
+                     commitId,
+                     committedDate,
+                     committer,
+                     project,
+                     Agent(schemaVersion)
+                   )),
+        project
+      )
+      .asJsonLD
+  }
+
+  def modifiedDataSetCommit(
+      commitId:      CommitId      = commitIds.generateOne,
+      committedDate: CommittedDate = committedDates.generateOne,
+      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
+      schemaVersion: SchemaVersion = schemaVersions.generateOne
+  )(
+      projectPath:         Path                 = projectPaths.generateOne,
+      projectName:         projects.Name        = projectNames.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
+      maybeParent:         Option[Project]      = None
+  )(
+      datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
+      datasetName:               Name = datasetNames.generateOne,
+      datasetUrl:                Url = datasetUrls.generateOne,
+      datasetDerivedFrom:        DerivedFrom = datasetDerivedFroms.generateOne,
+      maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:        datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      datasetCreators:           Set[Person] = setOf(persons).generateOne,
+      datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
+  )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
+    val project: Project = Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent)
+    DataSet
+      .modified(
+        datasetIdentifier,
+        datasetName,
+        datasetUrl,
+        datasetDerivedFrom,
         maybeDatasetDescription,
         maybeDatasetPublishedDate,
         datasetCreatedDate,

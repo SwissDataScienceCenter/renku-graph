@@ -18,11 +18,11 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
+import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
-import ch.datascience.knowledgegraph.datasets.model.Dataset
+import ch.datascience.knowledgegraph.datasets.model.{Dataset, ModifiedDataset, NonModifiedDataset}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
@@ -36,22 +36,44 @@ private class BaseDetailsFinder(
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext,
-  contextShift:              ContextShift[IO],
-  timer:                     Timer[IO],
-  ME:                        MonadError[IO, Throwable])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
 
   def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
-    queryExpecting[List[Dataset]](using = query(identifier)) flatMap toSingleDataset
+    queryExpecting[List[IdAndDerived]](using = queryFindingDerivedFrom(identifier)) flatMap toSingleTuple flatMap {
+      case `no dataset found`() =>
+        Option.empty[Dataset].pure[IO]
+      case `not modified dataset`() =>
+        queryExpecting[List[NonModifiedDataset]](using = queryForNonModified(identifier)) flatMap toSingleDataset
+      case `modified dataset`() =>
+        queryExpecting[List[ModifiedDataset]](using = queryForModified(identifier)) flatMap toSingleDataset
+      case _ =>
+        new Exception(s"Cannot find dataset with $identifier id").raiseError[IO, Option[Dataset]]
+    }
 
-  private def query(identifier: Identifier) = SparqlQuery(
-    name = "ds by id - base details",
+  private def queryFindingDerivedFrom(identifier: Identifier) = SparqlQuery(
+    name = "ds by id - is modified",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+      "PREFIX schema: <http://schema.org/>",
+      "PREFIX prov: <http://www.w3.org/ns/prov#>"
+    ),
+    s"""|SELECT ?id ?maybeDerivedFrom
+        |WHERE {
+        |  ?dsId rdf:type <http://schema.org/Dataset>;
+        |        schema:identifier "$identifier";
+        |        schema:identifier ?id.
+        |  OPTIONAL { ?dsId prov:wasDerivedFrom ?maybeDerivedFrom }.
+        |}
+        |""".stripMargin
+  )
+
+  private def queryForNonModified(identifier: Identifier) = SparqlQuery(
+    name = "ds by id - non modified",
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX schema: <http://schema.org/>"
     ),
     s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?url (?topmostSameAs AS ?sameAs) ?description ?publishedDate
@@ -90,46 +112,102 @@ private class BaseDetailsFinder(
         |    GROUP BY ?topmostSameAs
         |    HAVING (COUNT(*) > 0)
         |  } {
-        |    ?datasetId schema:identifier "$identifier" ;
-        |               schema:identifier ?identifier ;
-        |               rdf:type <http://schema.org/Dataset> ;
-        |               schema:name ?name .
-        |    OPTIONAL { ?datasetId schema:url ?url } .
-        |    OPTIONAL { ?datasetId schema:description ?description } .
-        |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate } .
+        |    ?datasetId schema:identifier "$identifier";
+        |               schema:identifier ?identifier;
+        |               rdf:type <http://schema.org/Dataset>;
+        |               schema:url ?url;
+        |               schema:name ?name.
+        |    OPTIONAL { ?datasetId schema:description ?description }.
+        |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate }.
         |  }
         |}
         |""".stripMargin
   )
 
+  private def queryForModified(identifier: Identifier) = SparqlQuery(
+    name = "ds by id - modified",
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX schema: <http://schema.org/>",
+      "PREFIX prov: <http://www.w3.org/ns/prov#>"
+    ),
+    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?url ?derivedFrom ?description ?publishedDate
+        |WHERE {
+        |  ?datasetId schema:identifier "$identifier";
+        |             schema:identifier ?identifier;
+        |             rdf:type <http://schema.org/Dataset>;
+        |             schema:url ?url;
+        |             prov:wasDerivedFrom ?derivedFrom;
+        |             schema:name ?name.
+        |  OPTIONAL { ?datasetId schema:description ?description } .
+        |  OPTIONAL { ?datasetId schema:datePublished ?publishedDate } .
+        |}
+        |""".stripMargin
+  )
+
   private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
-    case Nil            => ME.pure(None)
-    case dataset +: Nil => ME.pure(Some(dataset))
-    case datasets       => ME.raiseError(new RuntimeException(s"More than one dataset with ${datasets.head.id} id"))
+    case Nil            => Option.empty[Dataset].pure[IO]
+    case dataset +: Nil => Option(dataset).pure[IO]
+    case dataset +: _   => new Exception(s"More than one dataset with ${dataset.id} id").raiseError[IO, Option[Dataset]]
+  }
+
+  private lazy val toSingleTuple: List[IdAndDerived] => IO[Option[IdAndDerived]] = {
+    case Nil          => Option.empty[IdAndDerived].pure[IO]
+    case tuple +: Nil => Option(tuple).pure[IO]
+    case (id, _) +: _ => new Exception(s"More than one dataset with $id id").raiseError[IO, Option[IdAndDerived]]
+  }
+
+  private object `no dataset found` {
+    def unapply(tuple: Option[IdAndDerived]): Boolean = tuple match {
+      case None => true
+      case _    => false
+    }
+  }
+
+  private object `not modified dataset` {
+    def unapply(tuple: Option[IdAndDerived]): Boolean = tuple match {
+      case Some((_, None)) => true
+      case _               => false
+    }
+  }
+
+  private object `modified dataset` {
+    def unapply(tuple: Option[IdAndDerived]): Boolean = tuple match {
+      case Some((_, Some(_))) => true
+      case _                  => false
+    }
   }
 }
 
 private object BaseDetailsFinder {
   import io.circe.Decoder
+  import Decoder._
+  import ch.datascience.graph.model.datasets._
+  import ch.datascience.knowledgegraph.datasets.model._
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-  private[rest] implicit val maybeRecordDecoder: Decoder[List[Dataset]] = {
-    import Decoder._
-    import ch.datascience.graph.model.datasets._
-    import ch.datascience.knowledgegraph.datasets.model._
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
-
-    def extract[T](property: String, from: HCursor)(implicit decoder: Decoder[T]): Result[T] =
-      from.downField(property).downField("value").as[T]
-
-    val dataset: Decoder[Dataset] = { cursor =>
+  private[rest] type IdAndDerived = (Identifier, Option[DerivedFrom])
+  private[rest] implicit val idsAndDerivedDecoder: Decoder[List[IdAndDerived]] = {
+    val idAndDerived: Decoder[IdAndDerived] = { implicit cursor =>
       for {
-        id                 <- extract[String]("datasetId", from = cursor)
-        identifier         <- extract[Identifier]("identifier", from = cursor)
-        name               <- extract[Name]("name", from = cursor)
-        url                <- extract[Url]("url", from = cursor)
-        maybeSameAs        <- extract[Option[String]]("sameAs", from = cursor).map(blankToNone).flatMap(toOption[SameAs])
-        maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate", from = cursor)
-        maybeDescription <- extract[Option[String]]("description", from = cursor)
+        id               <- extract[Identifier]("id")
+        maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
+      } yield id -> maybeDerivedFrom
+    }
+    _.downField("results").downField("bindings").as(decodeList(idAndDerived))
+  }
+
+  private[rest] implicit val nonModifiedDecoder: Decoder[List[NonModifiedDataset]] = {
+
+    val dataset: Decoder[NonModifiedDataset] = { implicit cursor =>
+      for {
+        id                 <- extract[String]("datasetId")
+        identifier         <- extract[Identifier]("identifier")
+        name               <- extract[Name]("name")
+        url                <- extract[Url]("url")
+        maybeSameAs        <- extract[Option[String]]("sameAs").map(blankToNone).flatMap(toOption[SameAs])
+        maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate")
+        maybeDescription <- extract[Option[String]]("description")
                              .map(blankToNone)
                              .flatMap(toOption[Description])
       } yield NonModifiedDataset(
@@ -146,4 +224,34 @@ private object BaseDetailsFinder {
 
     _.downField("results").downField("bindings").as(decodeList(dataset))
   }
+
+  private[rest] implicit val modifiedDecoder: Decoder[List[ModifiedDataset]] = {
+
+    val dataset: Decoder[ModifiedDataset] = { implicit cursor =>
+      for {
+        identifier         <- extract[Identifier]("identifier")
+        name               <- extract[Name]("name")
+        url                <- extract[Url]("url")
+        derivedFrom        <- extract[DerivedFrom]("derivedFrom")
+        maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate")
+        maybeDescription <- extract[Option[String]]("description")
+                             .map(blankToNone)
+                             .flatMap(toOption[Description])
+      } yield ModifiedDataset(
+        identifier,
+        name,
+        url,
+        derivedFrom,
+        maybeDescription,
+        DatasetPublishing(maybePublishedDate, Set.empty),
+        parts    = List.empty,
+        projects = List.empty
+      )
+    }
+
+    _.downField("results").downField("bindings").as(decodeList(dataset))
+  }
+
+  private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
+    cursor.downField(property).downField("value").as[T]
 }

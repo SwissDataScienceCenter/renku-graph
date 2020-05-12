@@ -21,7 +21,7 @@ package ch.datascience.tinytypes.json
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
 
-import DecodingTestTypes._
+import ch.datascience.tinytypes.TestTinyTypes._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import eu.timepit.refined.api.Refined

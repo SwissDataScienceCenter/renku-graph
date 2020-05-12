@@ -865,7 +865,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     def toJsonLD(firstDatasetDateCreated: DateCreated, noSameAs: Boolean): List[JsonLD] =
       dataset.projects match {
         case firstProject +: otherProjects =>
-          val firstJsonLd = dataSetCommit(
+          val firstJsonLd = nonModifiedDataSetCommit(
             committedDate = CommittedDate(firstDatasetDateCreated.value)
           )(
             projectPath = firstProject.path
@@ -884,7 +884,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
             else dataset.sameAs.some
           val otherJsonLds = otherProjects.map { project =>
             val projectDateCreated = firstDatasetDateCreated.shiftToFuture
-            dataSetCommit(
+            nonModifiedDataSetCommit(
               committedDate = CommittedDate(projectDateCreated.value)
             )(
               projectPath = project.path

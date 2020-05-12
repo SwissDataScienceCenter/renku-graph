@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
-import ch.datascience.knowledgegraph.datasets.model.{Dataset, NonModifiedDataset}
+import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetPart, DatasetProject, DatasetPublishing, ModifiedDataset, NonModifiedDataset}
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
@@ -57,14 +57,20 @@ private class IODatasetFinder(
       parts             <- partsFiber.join
       projects          <- projectsFiber.join
     } yield maybeDetails map { details =>
-      details
-        .asInstanceOf[NonModifiedDataset]
-        .copy(
-          published = details.published.copy(creators = creators),
-          parts     = parts,
-          projects  = projects
-        )
+      details.copy(
+        published = details.published.copy(creators = creators),
+        parts     = parts,
+        projects  = projects
+      )
     }
+
+  private implicit class DatasetOps(dataset: Dataset) {
+    def copy(published: DatasetPublishing, parts: List[DatasetPart], projects: List[DatasetProject]): Dataset =
+      dataset match {
+        case ds: NonModifiedDataset => ds.copy(published = published, parts = parts, projects = projects)
+        case ds: ModifiedDataset    => ds.copy(published = published, parts = parts, projects = projects)
+      }
+  }
 }
 
 private object IODatasetFinder {

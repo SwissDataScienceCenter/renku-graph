@@ -53,6 +53,20 @@ object DatasetsGenerators {
       projects         <- projects
     } yield NonModifiedDataset(id, name, url, sameAs, maybeDescription, published, part, projects.toList)
 
+  def modifiedDatasets(dataset: Dataset, project: DatasetProject): Gen[ModifiedDataset] =
+    for {
+      id          <- datasetIdentifiers
+      url         <- datasetUrls
+      derivedFrom <- datasetDerivedFroms
+    } yield ModifiedDataset(id,
+                            dataset.name,
+                            url,
+                            DerivedFrom(s"$derivedFrom/${dataset.id}"),
+                            dataset.maybeDescription,
+                            dataset.published,
+                            dataset.parts,
+                            List(project))
+
   def modifiedDatasets(
       derivedFrom: Gen[DerivedFrom]                  = datasetDerivedFroms,
       projects:    Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)

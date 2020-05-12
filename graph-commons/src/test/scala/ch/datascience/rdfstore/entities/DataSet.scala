@@ -33,7 +33,14 @@ final case class DataSet private (id:                  Identifier,
                                   parts:               List[DataSetPart],
                                   generation:          Generation,
                                   project:             Project,
-                                  keywords:            List[Keyword])
+                                  keywords:            List[Keyword]) {
+  import cats.implicits._
+
+  require(!isSameAsAndDerived, s"Dataset with $id has both sameAs and wasDerivedFrom set")
+
+  private lazy val isSameAsAndDerived: Boolean =
+    (maybeSameAs -> maybeWasDerivedFrom).mapN((_, _) => true).getOrElse(false)
+}
 
 object DataSet {
 
@@ -112,6 +119,7 @@ object DataSet {
         schema / "name"              -> entity.name.asJsonLD,
         schema / "url"               -> entity.url.asJsonLD,
         schema / "sameAs"            -> entity.maybeSameAs.asJsonLD,
+        prov / "wasDerivedFrom"      -> entity.maybeWasDerivedFrom.asJsonLD,
         schema / "description"       -> entity.maybeDescription.asJsonLD,
         schema / "datePublished"     -> entity.maybePublishedDate.asJsonLD,
         schema / "dateCreated"       -> entity.createdDate.asJsonLD,

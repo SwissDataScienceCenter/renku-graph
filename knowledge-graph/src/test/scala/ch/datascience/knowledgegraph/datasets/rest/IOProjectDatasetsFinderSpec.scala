@@ -47,12 +47,12 @@ class IOProjectDatasetsFinderSpec
       forAll(projectPaths, nonModifiedDatasets(), nonModifiedDatasets()) { (projectPath, dataset1, dataset2) =>
         loadToStore(
           randomDataSetCommit,
-          dataSetCommit()(projectPath)(
+          nonModifiedDataSetCommit()(projectPath)(
             datasetIdentifier  = dataset1.id,
             datasetName        = dataset1.name,
             maybeDatasetSameAs = dataset1.sameAs.some
           ),
-          dataSetCommit()(projectPath)(
+          nonModifiedDataSetCommit()(projectPath)(
             datasetIdentifier  = dataset2.id,
             datasetName        = dataset2.name,
             maybeDatasetSameAs = dataset2.sameAs.some
@@ -71,12 +71,12 @@ class IOProjectDatasetsFinderSpec
       forAll(projectPaths, nonModifiedDatasets(), projectPaths, nonModifiedDatasets()) {
         (project1, dataset1, project2, dataset2) =>
           loadToStore(
-            dataSetCommit()(project1)(
+            nonModifiedDataSetCommit()(project1)(
               datasetIdentifier  = dataset1.id,
               datasetName        = dataset1.name,
               maybeDatasetSameAs = dataset1.sameAs.some
             ),
-            dataSetCommit()(project2)(
+            nonModifiedDataSetCommit()(project2)(
               datasetIdentifier  = dataset2.id,
               datasetName        = dataset2.name,
               maybeDatasetSameAs = DataSet.entityId(dataset1.id).asSameAs.some
@@ -98,12 +98,12 @@ class IOProjectDatasetsFinderSpec
         val dataSet1BasedSameAs = DataSet.entityId(dataset1.id).asSameAs
 
         loadToStore(
-          dataSetCommit()(project1)(
+          nonModifiedDataSetCommit()(project1)(
             datasetIdentifier  = dataset1.id,
             datasetName        = dataset1.name,
             maybeDatasetSameAs = None
           ),
-          dataSetCommit()(project2)(
+          nonModifiedDataSetCommit()(project2)(
             datasetIdentifier  = dataset2.id,
             datasetName        = dataset2.name,
             maybeDatasetSameAs = dataSet1BasedSameAs.some

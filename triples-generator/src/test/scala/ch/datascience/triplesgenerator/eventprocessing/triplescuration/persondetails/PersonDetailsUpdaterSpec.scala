@@ -60,7 +60,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
         .toList
         .toSet
       val jsonTriples = JsonLDTriples {
-        dataSetCommit(
+        nonModifiedDataSetCommit(
           committer = entities.Person(committerName, committerEmail)
         )(
           projectPath         = projectPaths.generateOne,

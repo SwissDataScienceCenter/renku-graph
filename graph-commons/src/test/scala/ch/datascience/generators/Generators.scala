@@ -297,6 +297,11 @@ object Generators {
         else generated
       }
 
+      def generateGreaterThan(value: T)(implicit ordering: Ordering[T]): T = {
+        val candidate = generator.generateOne
+        if (ordering.compare(candidate, value) > 0) candidate else generateGreaterThan(value)
+      }
+
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
       def toGeneratorOfOptions: Gen[Option[T]] = Gen.option(generator)
 

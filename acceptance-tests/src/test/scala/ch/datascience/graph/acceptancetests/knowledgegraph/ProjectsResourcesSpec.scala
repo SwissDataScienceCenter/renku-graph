@@ -86,7 +86,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
-        dataSetCommit(
+        nonModifiedDataSetCommit(
           commitId      = dataset1CommitId,
           schemaVersion = currentSchemaVersion
         )(
