@@ -25,14 +25,35 @@ import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 
 object model {
 
-  final case class Dataset(id:               Identifier,
-                           name:             Name,
-                           sameAs:           SameAs,
-                           maybeUrl:         Option[Url],
-                           maybeDescription: Option[Description],
-                           published:        DatasetPublishing,
-                           parts:            List[DatasetPart],
-                           projects:         List[DatasetProject])
+  sealed trait Dataset extends Product with Serializable {
+    val id:               Identifier
+    val name:             Name
+    val url:              Url
+    val maybeDescription: Option[Description]
+    val published:        DatasetPublishing
+    val parts:            List[DatasetPart]
+    val projects:         List[DatasetProject]
+  }
+
+  final case class NonModifiedDataset(id:               Identifier,
+                                      name:             Name,
+                                      url:              Url,
+                                      sameAs:           SameAs,
+                                      maybeDescription: Option[Description],
+                                      published:        DatasetPublishing,
+                                      parts:            List[DatasetPart],
+                                      projects:         List[DatasetProject])
+      extends Dataset
+
+  final case class ModifiedDataset(id:               Identifier,
+                                   name:             Name,
+                                   url:              Url,
+                                   derivedFrom:      DerivedFrom,
+                                   maybeDescription: Option[Description],
+                                   published:        DatasetPublishing,
+                                   parts:            List[DatasetPart],
+                                   projects:         List[DatasetProject])
+      extends Dataset
 
   final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])
   final case class DatasetCreator(maybeEmail:   Option[Email], name:             UserName, maybeAffiliation: Option[Affiliation])

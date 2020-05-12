@@ -44,7 +44,7 @@ class IOProjectDatasetsFinderSpec
   "findProjectDatasets" should {
 
     "return all datasets of the given project" in new TestCase {
-      forAll(projectPaths, datasets, datasets) { (projectPath, dataset1, dataset2) =>
+      forAll(projectPaths, nonModifiedDatasets(), nonModifiedDatasets()) { (projectPath, dataset1, dataset2) =>
         loadToStore(
           randomDataSetCommit,
           dataSetCommit()(projectPath)(
@@ -68,26 +68,27 @@ class IOProjectDatasetsFinderSpec
 
     "return datasets of the given project with sameAs from the very top ancestor " +
       "- case with an external dataset" in new TestCase {
-      forAll(projectPaths, datasets, projectPaths, datasets) { (project1, dataset1, project2, dataset2) =>
-        loadToStore(
-          dataSetCommit()(project1)(
-            datasetIdentifier  = dataset1.id,
-            datasetName        = dataset1.name,
-            maybeDatasetSameAs = dataset1.sameAs.some
-          ),
-          dataSetCommit()(project2)(
-            datasetIdentifier  = dataset2.id,
-            datasetName        = dataset2.name,
-            maybeDatasetSameAs = DataSet.entityId(dataset1.id).asSameAs.some
+      forAll(projectPaths, nonModifiedDatasets(), projectPaths, nonModifiedDatasets()) {
+        (project1, dataset1, project2, dataset2) =>
+          loadToStore(
+            dataSetCommit()(project1)(
+              datasetIdentifier  = dataset1.id,
+              datasetName        = dataset1.name,
+              maybeDatasetSameAs = dataset1.sameAs.some
+            ),
+            dataSetCommit()(project2)(
+              datasetIdentifier  = dataset2.id,
+              datasetName        = dataset2.name,
+              maybeDatasetSameAs = DataSet.entityId(dataset1.id).asSameAs.some
+            )
           )
-        )
 
-        datasetsFinder.findProjectDatasets(project1).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.name, dataset1.sameAs)
-        )
-        datasetsFinder.findProjectDatasets(project2).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset2.id, dataset2.name, dataset1.sameAs)
-        )
+          datasetsFinder.findProjectDatasets(project1).unsafeRunSync() should contain theSameElementsAs List(
+            (dataset1.id, dataset1.name, dataset1.sameAs)
+          )
+          datasetsFinder.findProjectDatasets(project2).unsafeRunSync() should contain theSameElementsAs List(
+            (dataset2.id, dataset2.name, dataset1.sameAs)
+          )
       }
     }
 

@@ -21,20 +21,75 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.graph.model.datasets._
 import ch.datascience.rdfstore.FusekiBaseUrl
 
-final case class DataSet(id:                 Identifier,
-                         name:               Name,
-                         maybeUrl:           Option[Url] = None,
-                         maybeSameAs:        Option[SameAs] = None,
-                         maybeDescription:   Option[Description] = None,
-                         maybePublishedDate: Option[PublishedDate] = None,
-                         createdDate:        DateCreated,
-                         creators:           Set[Person],
-                         parts:              List[DataSetPart],
-                         generation:         Generation,
-                         project:            Project,
-                         keywords:           List[Keyword] = Nil)
+final case class DataSet private (id:                  Identifier,
+                                  name:                Name,
+                                  url:                 Url,
+                                  maybeSameAs:         Option[SameAs],
+                                  maybeWasDerivedFrom: Option[DerivedFrom],
+                                  maybeDescription:    Option[Description],
+                                  maybePublishedDate:  Option[PublishedDate],
+                                  createdDate:         DateCreated,
+                                  creators:            Set[Person],
+                                  parts:               List[DataSetPart],
+                                  generation:          Generation,
+                                  project:             Project,
+                                  keywords:            List[Keyword])
 
 object DataSet {
+
+  def nonModified(id:                 Identifier,
+                  name:               Name,
+                  url:                Url,
+                  maybeSameAs:        Option[SameAs],
+                  maybeDescription:   Option[Description] = None,
+                  maybePublishedDate: Option[PublishedDate] = None,
+                  createdDate:        DateCreated,
+                  creators:           Set[Person],
+                  parts:              List[DataSetPart],
+                  generation:         Generation,
+                  project:            Project,
+                  keywords:           List[Keyword] = Nil): DataSet = DataSet(
+    id,
+    name,
+    url,
+    maybeSameAs,
+    maybeWasDerivedFrom = None,
+    maybeDescription,
+    maybePublishedDate,
+    createdDate,
+    creators,
+    parts,
+    generation,
+    project,
+    keywords
+  )
+
+  def modified(id:                 Identifier,
+               name:               Name,
+               url:                Url,
+               wasDerivedFrom:     DerivedFrom,
+               maybeDescription:   Option[Description] = None,
+               maybePublishedDate: Option[PublishedDate] = None,
+               createdDate:        DateCreated,
+               creators:           Set[Person],
+               parts:              List[DataSetPart],
+               generation:         Generation,
+               project:            Project,
+               keywords:           List[Keyword] = Nil): DataSet = DataSet(
+    id,
+    name,
+    url,
+    maybeSameAs         = None,
+    maybeWasDerivedFrom = Some(wasDerivedFrom),
+    maybeDescription,
+    maybePublishedDate,
+    createdDate,
+    creators,
+    parts,
+    generation,
+    project,
+    keywords
+  )
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
@@ -55,7 +110,7 @@ object DataSet {
         rdfs / "label"               -> entity.id.asJsonLD,
         schema / "identifier"        -> entity.id.asJsonLD,
         schema / "name"              -> entity.name.asJsonLD,
-        schema / "url"               -> entity.maybeUrl.asJsonLD,
+        schema / "url"               -> entity.url.asJsonLD,
         schema / "sameAs"            -> entity.maybeSameAs.asJsonLD,
         schema / "description"       -> entity.maybeDescription.asJsonLD,
         schema / "datePublished"     -> entity.maybePublishedDate.asJsonLD,

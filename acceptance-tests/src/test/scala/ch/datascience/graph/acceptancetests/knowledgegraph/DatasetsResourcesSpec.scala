@@ -75,14 +75,14 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       agent = DatasetAgent(project.created.maybeCreator.flatMap(_.maybeEmail),
                            project.created.maybeCreator.map(_.name).getOrElse(userNames.generateOne))
     )
-    val dataset1 = datasets.generateOne.copy(
+    val dataset1 = nonModifiedDatasets().generateOne.copy(
       maybeDescription = Some(datasetDescriptions.generateOne),
       published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
       projects         = List(DatasetProject(project.path, project.name, dataset1Creation))
     )
     val dataset2Creation = addedToProject.generateOne
     val dataset2CommitId = commitIds.generateOne
-    val dataset2 = datasets.generateOne.copy(
+    val dataset2 = nonModifiedDatasets().generateOne.copy(
       maybeDescription = None,
       published        = datasetPublishingInfos.generateOne.copy(maybeDate = None),
       projects         = List(DatasetProject(project.path, project.name, dataset2Creation))
@@ -192,18 +192,18 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
 
       val text             = nonBlankStrings(minLength = 10).generateOne
       val dataset1Projects = nonEmptyList(projects).generateOne.toList
-      val dataset1 = datasets.generateOne.copy(
+      val dataset1 = nonModifiedDatasets().generateOne.copy(
         name     = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
         projects = dataset1Projects map toDatasetProject
       )
       val dataset2Projects = nonEmptyList(projects).generateOne.toList
-      val dataset2 = datasets.generateOne.copy(
+      val dataset2 = nonModifiedDatasets().generateOne.copy(
         maybeDescription = Some(sentenceContaining(text).map(_.value).map(Description.apply).generateOne),
         projects         = dataset2Projects map toDatasetProject
       )
       val dataset3Projects = nonEmptyList(projects).generateOne.toList
       val dataset3 = {
-        val dataset = datasets.generateOne
+        val dataset = nonModifiedDatasets().generateOne
         dataset.copy(
           published = dataset.published.copy(
             creators = Set(
@@ -215,7 +215,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         )
       }
       val dataset4Projects = List(projects.generateOne)
-      val dataset4 = datasets.generateOne.copy(
+      val dataset4 = nonModifiedDatasets().generateOne.copy(
         projects = dataset4Projects map toDatasetProject
       )
 
@@ -282,7 +282,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         .flatMap(sortCreators)
     }
 
-    def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit = {
+    def pushToStore(dataset: NonModifiedDataset, projects: List[Project])(implicit accessToken: AccessToken): Unit = {
       val firstProject +: otherProjects = projects
 
       val commitId      = commitIds.generateOne
@@ -309,7 +309,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     def toDataSetCommit(project:              Project,
                         commitId:             CommitId,
                         committedDate:        CommittedDate,
-                        dataset:              Dataset,
+                        dataset:              NonModifiedDataset,
                         overriddenIdentifier: Option[Identifier] = None) =
       dataSetCommit(
         commitId      = commitId,
@@ -337,7 +337,7 @@ object DatasetsResources {
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
-  def briefJson(dataset: Dataset): Json = json"""{
+  def briefJson(dataset: NonModifiedDataset): Json = json"""{
     "identifier": ${dataset.id.value}, 
     "name": ${dataset.name.value},
     "sameAs": ${dataset.sameAs.value}

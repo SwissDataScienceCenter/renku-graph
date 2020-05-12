@@ -85,8 +85,8 @@ class DatasetEndpoint[Interpretation[_]: Effect](
       List(
         Some("identifier" -> dataset.id.asJson),
         Some("name" -> dataset.name.asJson),
-        Some("sameAs" -> dataset.sameAs.asJson),
-        dataset.maybeUrl.map(url => "url" -> url.asJson),
+        Some("url" -> dataset.url.asJson),
+        Some("sameAs" -> dataset.asInstanceOf[NonModifiedDataset].sameAs.asJson),
         dataset.maybeDescription.map(description => "description" -> description.asJson),
         Some("published" -> Json.obj(List(
           dataset.published.maybeDate.map(date => "datePublished" -> date.asJson),

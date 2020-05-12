@@ -126,17 +126,17 @@ private object BaseDetailsFinder {
         id                 <- extract[String]("datasetId", from = cursor)
         identifier         <- extract[Identifier]("identifier", from = cursor)
         name               <- extract[Name]("name", from = cursor)
-        maybeUrl           <- extract[Option[String]]("url", from = cursor).map(blankToNone).flatMap(toOption[Url])
+        url                <- extract[Url]("url", from = cursor)
         maybeSameAs        <- extract[Option[String]]("sameAs", from = cursor).map(blankToNone).flatMap(toOption[SameAs])
         maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate", from = cursor)
         maybeDescription <- extract[Option[String]]("description", from = cursor)
                              .map(blankToNone)
                              .flatMap(toOption[Description])
-      } yield Dataset(
+      } yield NonModifiedDataset(
         identifier,
         name,
+        url,
         maybeSameAs getOrElse SameAs(id),
-        maybeUrl,
         maybeDescription,
         DatasetPublishing(maybePublishedDate, Set.empty),
         parts    = List.empty,

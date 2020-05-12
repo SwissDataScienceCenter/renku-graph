@@ -74,7 +74,7 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     )
   }
   private val dataset1CommitId = commitIds.generateOne
-  private val dataset = datasets.generateOne.copy(
+  private val dataset = nonModifiedDatasets().generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
     projects         = List(DatasetProject(project.path, project.name, addedToProject.generateOne))

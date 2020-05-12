@@ -58,7 +58,7 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
   "getDataset" should {
 
     "respond with OK and the found dataset" in new TestCase {
-      forAll { dataset: Dataset =>
+      forAll(nonModifiedDatasets()) { dataset =>
         (datasetsFinder
           .findDataset(_: Identifier))
           .expects(dataset.id)
@@ -150,13 +150,13 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
     for {
       id               <- cursor.downField("identifier").as[Identifier]
       name             <- cursor.downField("name").as[Name]
+      url              <- cursor.downField("url").as[Url]
       sameAs           <- cursor.downField("sameAs").as[SameAs]
-      maybeUrl         <- cursor.downField("url").as[Option[Url]]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       published        <- cursor.downField("published").as[DatasetPublishing]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
-    } yield Dataset(id, name, sameAs, maybeUrl, maybeDescription, published, parts, projects)
+    } yield NonModifiedDataset(id, name, url, sameAs, maybeDescription, published, parts, projects)
 
   private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>
     for {

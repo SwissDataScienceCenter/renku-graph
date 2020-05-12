@@ -20,11 +20,10 @@ package ch.datascience.knowledgegraph.datasets
 
 import cats.Order
 import cats.data.NonEmptyList
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.SameAs
+import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.knowledgegraph.datasets.model._
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
@@ -33,18 +32,41 @@ object DatasetsGenerators {
 
   implicit val datasets: Gen[Dataset] = datasets()
 
-  def datasets(sameAs:   Gen[SameAs]                       = datasetSameAs,
-               projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] =
+  def datasets(projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] =
+    for {
+      modified <- Gen.oneOf(true, false)
+      dataset  <- if (modified) modifiedDatasets(projects = projects) else nonModifiedDatasets(projects = projects)
+    } yield dataset
+
+  def nonModifiedDatasets(
+      sameAs:   Gen[SameAs]                       = datasetSameAs,
+      projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
+  ): Gen[NonModifiedDataset] =
     for {
       id               <- datasetIdentifiers
       name             <- datasetNames
-      maybeUrl         <- Gen.option(datasetUrls)
-      sameas           <- sameAs
+      url              <- datasetUrls
+      sameAs           <- sameAs
       maybeDescription <- Gen.option(datasetDescriptions)
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
       projects         <- projects
-    } yield Dataset(id, name, sameas, maybeUrl, maybeDescription, published, part, projects.toList)
+    } yield NonModifiedDataset(id, name, url, sameAs, maybeDescription, published, part, projects.toList)
+
+  def modifiedDatasets(
+      derivedFrom: Gen[DerivedFrom]                  = datasetDerivedFroms,
+      projects:    Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
+  ): Gen[ModifiedDataset] =
+    for {
+      id               <- datasetIdentifiers
+      name             <- datasetNames
+      url              <- datasetUrls
+      derivedFrom      <- derivedFrom
+      maybeDescription <- Gen.option(datasetDescriptions)
+      published        <- datasetPublishingInfos
+      part             <- listOf(datasetParts)
+      projects         <- projects
+    } yield ModifiedDataset(id, name, url, derivedFrom, maybeDescription, published, part, projects.toList)
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
     maybeEmail       <- Gen.option(userEmails)

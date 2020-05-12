@@ -44,7 +44,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id " +
       "- a case when unrelated projects are using the same imported dataset" in new TestCase {
-      forAll(datasets, datasetProjects, addedToProject, datasetProjects, addedToProject) {
+      forAll(nonModifiedDatasets(), datasetProjects, addedToProject, datasetProjects, addedToProject) {
         (dataset, project1, addedToProject1, project2, addedToProject2) =>
           val project1DatasetCreationDate = CommittedDate(addedToProject1.date.value)
 
@@ -58,7 +58,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -74,7 +74,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -91,7 +91,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = datasetIdentifiers.generateOne,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -113,7 +113,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id " +
       "- a case when unrelated projects are using the same dataset created in renku project" in new TestCase {
-      forAll(datasets, datasetProjects, addedToProject, datasetProjects, addedToProject) {
+      forAll(nonModifiedDatasets(), datasetProjects, addedToProject, datasetProjects, addedToProject) {
         (dataset, project1, addedToProject1, project2, addedToProject2) =>
           loadToStore(
             dataSetCommit(
@@ -125,7 +125,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -141,7 +141,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -158,7 +158,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = datasetIdentifiers.generateOne,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.entityId.asSameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -181,7 +181,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id " +
       "- a case when an imported dataset is used in one project" in new TestCase {
-      forAll(datasets, datasetProjects, addedToProject) { (dataset, project, addedToProject) =>
+      forAll(nonModifiedDatasets(), datasetProjects, addedToProject) { (dataset, project, addedToProject) =>
         loadToStore(
           dataSetCommit(
             committedDate = CommittedDate(addedToProject.date.value),
@@ -192,7 +192,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
-            maybeDatasetUrl           = dataset.maybeUrl,
+            datasetUrl                = dataset.url,
             maybeDatasetSameAs        = dataset.sameAs.some,
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -208,7 +208,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
-            maybeDatasetUrl           = dataset.maybeUrl,
+            datasetUrl                = dataset.url,
             maybeDatasetSameAs        = dataset.sameAs.some,
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -230,7 +230,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id " +
       "- a case of a single used in-project created dataset" in new TestCase {
-      forAll(datasets, datasetProjects, addedToProject) { (dataset, project, addedToProject) =>
+      forAll(nonModifiedDatasets(), datasetProjects, addedToProject) { (dataset, project, addedToProject) =>
         loadToStore(
           dataSetCommit(
             committedDate = CommittedDate(addedToProject.date.value),
@@ -241,7 +241,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
-            maybeDatasetUrl           = dataset.maybeUrl,
+            datasetUrl                = dataset.url,
             maybeDatasetSameAs        = None,
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -257,7 +257,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
-            maybeDatasetUrl           = dataset.maybeUrl,
+            datasetUrl                = dataset.url,
             maybeDatasetSameAs        = None,
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -283,7 +283,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id " +
       "- a case when unrelated projects are using the same imported dataset and one of them is forked" in new TestCase {
-      forAll(datasets, datasetProjects, addedToProject, datasetProjects, addedToProject, datasetProjects) {
+      forAll(nonModifiedDatasets(), datasetProjects, addedToProject, datasetProjects, addedToProject, datasetProjects) {
         (dataset, project1, addedToProject1, project2, addedToProject2, project2Fork) =>
           val project1DatasetCreationDate = CommittedDate(addedToProject1.date.value)
           val project2DatasetCommit       = commitIds.generateOne
@@ -300,7 +300,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -317,7 +317,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = project2DatasetId,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -334,7 +334,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = project2DatasetId,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -363,7 +363,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id " +
       "- a case when unrelated projects are using the same dataset created in renku project and one of them is forked" in new TestCase {
-      forAll(datasets, datasetProjects, addedToProject, datasetProjects, addedToProject, datasetProjects) {
+      forAll(nonModifiedDatasets(), datasetProjects, addedToProject, datasetProjects, addedToProject, datasetProjects) {
         (dataset, project1, addedToProject1, project2, addedToProject2, project2Fork) =>
           val project1DatasetCreationDate = CommittedDate(addedToProject1.date.value)
           val project2DatasetCommit       = commitIds.generateOne
@@ -380,7 +380,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -397,7 +397,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = project2DatasetId,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.entityId.asSameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -414,7 +414,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = project2DatasetId,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.entityId.asSameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -439,7 +439,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id " +
       "- a case when a created dataset is defined on a project which has a fork" in new TestCase {
-      forAll(datasetProjects, datasetProjects, datasets, addedToProject, commitIds) {
+      forAll(datasetProjects, datasetProjects, nonModifiedDatasets(), addedToProject, commitIds) {
         (sourceProject, forkProject, dataset, addedToProject, commitId) =>
           val datasetCreationDate = addedToProject.date.toUnsafe(date => CommittedDate.from(date.value))
           loadToStore(
@@ -453,7 +453,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -470,7 +470,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -494,7 +494,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id " +
       "- a case when an imported dataset is defined on a project which has a fork" in new TestCase {
-      forAll(datasetProjects, datasetProjects, datasets, addedToProject, commitIds) {
+      forAll(datasetProjects, datasetProjects, nonModifiedDatasets(), addedToProject, commitIds) {
         (sourceProject, forkProject, dataset, addedToProject, commitId) =>
           val datasetCreationDate = addedToProject.date.toUnsafe(date => CommittedDate.from(date.value))
           loadToStore(
@@ -508,7 +508,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -525,7 +525,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -548,7 +548,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id " +
       "- a case when a created dataset is defined on a grandparent project which has two levels of forks" in new TestCase {
-      forAll(datasetProjects, datasetProjects, datasetProjects, datasets, addedToProject, commitIds) {
+      forAll(datasetProjects, datasetProjects, datasetProjects, nonModifiedDatasets(), addedToProject, commitIds) {
         (grandparentProject, parentProject, childProject, dataset, addedToProject, commitId) =>
           val datasetCreationDate = addedToProject.date.toUnsafe(date => CommittedDate.from(date.value))
           val grandparentProjectDataSet = dataSetCommit(
@@ -561,7 +561,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
-            maybeDatasetUrl           = dataset.maybeUrl,
+            datasetUrl                = dataset.url,
             maybeDatasetSameAs        = None,
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -578,7 +578,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
-            maybeDatasetUrl           = dataset.maybeUrl,
+            datasetUrl                = dataset.url,
             maybeDatasetSameAs        = None,
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -598,7 +598,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
-              maybeDatasetUrl           = dataset.maybeUrl,
+              datasetUrl                = dataset.url,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -626,7 +626,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id - case when the first dataset is externally imported" in new TestCase {
       val dataset1Project = datasetProjects.generateOne
-      val dataset1 = datasets.generateOne
+      val dataset1 = nonModifiedDatasets().generateOne
         .copy(projects = List(dataset1Project))
       val dataset1Json = toDataSetCommit(dataset1)
 
@@ -661,7 +661,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
     "return the details of the dataset with the given id - case when the first dataset is in-project created" in new TestCase {
       val dataset1Project = datasetProjects.generateOne
-      val dataset1 = datasets.generateOne
+      val dataset1 = nonModifiedDatasets().generateOne
         .copy(projects = List(dataset1Project))
       val dataset1Json = toDataSetCommit(dataset1, noSameAs = true)
 
@@ -698,7 +698,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
     "return the details of the dataset with the given id - " +
       "case when the requested id is in the middle of the hierarchy" in new TestCase {
       val dataset1Project = datasetProjects.generateOne
-      val dataset1 = datasets.generateOne
+      val dataset1 = nonModifiedDatasets().generateOne
         .copy(projects = List(dataset1Project))
       val dataset1Json = toDataSetCommit(dataset1, noSameAs = true)
 
@@ -735,7 +735,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
     "return the details of the dataset with the given id - " +
       "case when the requested id is at the end of the hierarchy" in new TestCase {
       val dataset1Project = datasetProjects.generateOne
-      val dataset1 = datasets.generateOne
+      val dataset1 = nonModifiedDatasets().generateOne
         .copy(projects = List(dataset1Project))
       val dataset1Json = toDataSetCommit(dataset1, noSameAs = true)
 
@@ -773,12 +773,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       "case when there're two first level projects sharing a dataset " +
       "and some other project imports from on of these two" in new TestCase {
       val dataset1Project = datasetProjects.generateOne
-      val dataset1 = datasets.generateOne
+      val dataset1 = nonModifiedDatasets().generateOne
         .copy(projects = List(dataset1Project))
       val dataset1Json = toDataSetCommit(dataset1)
 
       val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
-      val dataset2 = datasets.generateOne.copy(
+      val dataset2 = nonModifiedDatasets().generateOne.copy(
         sameAs   = dataset1.sameAs,
         projects = List(dataset2Project)
       )
@@ -844,7 +844,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       .getOrElse(throw new Exception(s"Cannot convert $maybeEntityId EntityId to SameAs"))
   }
 
-  private def toDataSetCommit(dataSet: Dataset, noSameAs: Boolean = false): JsonLD =
+  private def toDataSetCommit(dataSet: NonModifiedDataset, noSameAs: Boolean = false): JsonLD =
     dataSet.projects match {
       case project +: Nil =>
         dataSetCommit(
@@ -856,7 +856,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
         )(
           datasetIdentifier         = dataSet.id,
           datasetName               = dataSet.name,
-          maybeDatasetUrl           = dataSet.maybeUrl,
+          datasetUrl                = dataSet.url,
           maybeDatasetSameAs        = if (noSameAs) None else dataSet.sameAs.some,
           maybeDatasetDescription   = dataSet.maybeDescription,
           maybeDatasetPublishedDate = dataSet.published.maybeDate,

@@ -40,6 +40,9 @@ object datasets {
   final class Url private (val value: String) extends AnyVal with StringTinyType
   implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
 
+  final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
+  implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url
+
   sealed trait SameAs extends Any with UrlTinyType {
 
     override def equals(obj: Any): Boolean =

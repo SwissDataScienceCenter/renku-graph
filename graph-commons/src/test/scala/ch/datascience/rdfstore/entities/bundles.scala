@@ -83,7 +83,7 @@ object bundles extends Schemas {
   )(
       datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
       datasetName:               Name = datasetNames.generateOne,
-      maybeDatasetUrl:           Option[Url] = Gen.option(datasetUrls).generateOne,
+      datasetUrl:                Url = datasetUrls.generateOne,
       maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
       maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
       maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
@@ -92,26 +92,28 @@ object bundles extends Schemas {
       datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
   )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
     val project: Project = Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent)
-    DataSet(
-      datasetIdentifier,
-      datasetName,
-      maybeDatasetUrl,
-      maybeDatasetSameAs,
-      maybeDatasetDescription,
-      maybeDatasetPublishedDate,
-      datasetCreatedDate,
-      datasetCreators,
-      datasetParts map { case (name, location) => DataSetPart(name, location, commitId, project, committer) },
-      Generation(FilePath(".renku") / "datasets" / datasetIdentifier,
-                 Activity(
-                   commitId,
-                   committedDate,
-                   committer,
-                   project,
-                   Agent(schemaVersion)
-                 )),
-      project
-    ).asJsonLD
+    DataSet
+      .nonModified(
+        datasetIdentifier,
+        datasetName,
+        datasetUrl,
+        maybeDatasetSameAs,
+        maybeDatasetDescription,
+        maybeDatasetPublishedDate,
+        datasetCreatedDate,
+        datasetCreators,
+        datasetParts map { case (name, location) => DataSetPart(name, location, commitId, project, committer) },
+        Generation(FilePath(".renku") / "datasets" / datasetIdentifier,
+                   Activity(
+                     commitId,
+                     committedDate,
+                     committer,
+                     project,
+                     Agent(schemaVersion)
+                   )),
+        project
+      )
+      .asJsonLD
   }
 
   object exemplarLineageFlow {
@@ -437,34 +439,38 @@ object bundles extends Schemas {
         ArtifactEntity(outFile1, Generation(FilePath("outputs/output_0"), commit9ProcessRunActivity)).asJsonLD,
         commit9PlotDataEntity.asJsonLD,
         ArtifactEntity(Generation(FilePath("data/zhbikes/2018velo.csv"), commit10Activity)).asJsonLD,
-        DataSet(
-          id          = dataSetId,
-          name        = datasets.Name("zhbikes"),
-          createdDate = datasetCreatedDates.generateOne,
-          creators    = Set(persons.generateOne),
-          parts = List(
-            DataSetPart(
-              datasets.PartName("2019velo.csv"),
-              datasets.PartLocation("data/zhbikes/2019velo.csv"),
-              commit3Id,
-              project,
-              persons.generateOne,
-              datasetCreatedDates.generateOne,
-              datasetUrls.generateOption
+        DataSet
+          .nonModified(
+            id          = dataSetId,
+            name        = datasets.Name("zhbikes"),
+            url         = datasetUrls.generateOne,
+            maybeSameAs = None,
+            createdDate = datasetCreatedDates.generateOne,
+            creators    = Set(persons.generateOne),
+            parts = List(
+              DataSetPart(
+                datasets.PartName("2019velo.csv"),
+                datasets.PartLocation("data/zhbikes/2019velo.csv"),
+                commit3Id,
+                project,
+                persons.generateOne,
+                datasetCreatedDates.generateOne,
+                datasetUrls.generateOption
+              ),
+              DataSetPart(
+                datasets.PartName("2018velo.csv"),
+                datasets.PartLocation("data/zhbikes/2018velo.csv"),
+                commit10Id,
+                project,
+                persons.generateOne,
+                datasetCreatedDates.generateOne,
+                datasetUrls.generateOption
+              )
             ),
-            DataSetPart(
-              datasets.PartName("2018velo.csv"),
-              datasets.PartLocation("data/zhbikes/2018velo.csv"),
-              commit10Id,
-              project,
-              persons.generateOne,
-              datasetCreatedDates.generateOne,
-              datasetUrls.generateOption
-            )
-          ),
-          generation = Generation(FilePath(s".renku/datasets/$dataSetId"), commit11Activity),
-          project    = project
-        ).asJsonLD,
+            generation = Generation(FilePath(s".renku/datasets/$dataSetId"), commit11Activity),
+            project    = project
+          )
+          .asJsonLD,
         commit12ParquetEntity.asJsonLD,
         ArtifactEntity(outFile1, Generation(FilePath("steps/step_1/outputs/output_0"), commit12Step1ProcessRunActivity)).asJsonLD,
         commit12PlotDataEntity.asJsonLD,
