@@ -32,11 +32,10 @@ object DatasetsGenerators {
 
   implicit val datasets: Gen[Dataset] = datasets()
 
-  def datasets(projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] =
-    for {
-      modified <- Gen.oneOf(true, false)
-      dataset  <- if (modified) modifiedDatasets(projects = projects) else nonModifiedDatasets(projects = projects)
-    } yield dataset
+  def datasets(projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] = Gen.oneOf(
+    modifiedDatasets(projects    = projects),
+    nonModifiedDatasets(projects = projects)
+  )
 
   def nonModifiedDatasets(
       sameAs:   Gen[SameAs]                       = datasetSameAs,

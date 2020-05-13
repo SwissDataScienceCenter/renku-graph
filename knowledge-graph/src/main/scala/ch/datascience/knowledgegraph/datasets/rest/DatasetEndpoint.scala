@@ -86,7 +86,12 @@ class DatasetEndpoint[Interpretation[_]: Effect](
         Some("identifier" -> dataset.id.asJson),
         Some("name" -> dataset.name.asJson),
         Some("url" -> dataset.url.asJson),
-        Some("sameAs" -> dataset.asInstanceOf[NonModifiedDataset].sameAs.asJson),
+        Some {
+          dataset match {
+            case ds: NonModifiedDataset => "sameAs" -> ds.sameAs.asJson
+            case ds: ModifiedDataset    => "derivedFrom" -> ds.derivedFrom.asJson
+          }
+        },
         dataset.maybeDescription.map(description => "description" -> description.asJson),
         Some("published" -> Json.obj(List(
           dataset.published.maybeDate.map(date => "datePublished" -> date.asJson),
