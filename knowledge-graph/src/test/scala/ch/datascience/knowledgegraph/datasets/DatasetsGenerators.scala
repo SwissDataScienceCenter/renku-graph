@@ -23,7 +23,7 @@ import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, Url}
 import ch.datascience.knowledgegraph.datasets.model._
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
@@ -60,7 +60,7 @@ object DatasetsGenerators {
       derivedFrom <- datasetDerivedFroms
     } yield ModifiedDataset(id,
                             dataset.name,
-                            url,
+                            Url(s"$url/$id"),
                             DerivedFrom(s"$derivedFrom/${dataset.id}"),
                             dataset.maybeDescription,
                             dataset.published,
@@ -104,10 +104,10 @@ object DatasetsGenerators {
   implicit lazy val datasetProjects: Gen[DatasetProject] = for {
     path    <- projectPaths
     name    <- projectNames
-    created <- addedToProject
+    created <- addedToProjectObjects
   } yield DatasetProject(path, name, created)
 
-  implicit lazy val addedToProject: Gen[AddedToProject] = for {
+  implicit lazy val addedToProjectObjects: Gen[AddedToProject] = for {
     createdDate <- datasetInProjectCreationDates
     agent       <- datasetAgents
   } yield AddedToProject(createdDate, agent)

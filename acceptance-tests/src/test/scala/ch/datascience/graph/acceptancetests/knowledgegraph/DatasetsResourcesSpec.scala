@@ -71,7 +71,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       )
     }
     val dataset1CommitId = commitIds.generateOne
-    val dataset1Creation = addedToProject.generateOne.copy(
+    val dataset1Creation = addedToProjectObjects.generateOne.copy(
       agent = DatasetAgent(project.created.maybeCreator.flatMap(_.maybeEmail),
                            project.created.maybeCreator.map(_.name).getOrElse(userNames.generateOne))
     )
@@ -80,7 +80,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
       projects         = List(DatasetProject(project.path, project.name, dataset1Creation))
     )
-    val dataset2Creation = addedToProject.generateOne
+    val dataset2Creation = addedToProjectObjects.generateOne
     val dataset2CommitId = commitIds.generateOne
     val dataset2 = nonModifiedDatasets().generateOne.copy(
       maybeDescription = None,
@@ -328,7 +328,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       )
 
     def toDatasetProject(project: Project) =
-      DatasetProject(project.path, project.name, addedToProject.generateOne)
+      DatasetProject(project.path, project.name, addedToProjectObjects.generateOne)
   }
 }
 
