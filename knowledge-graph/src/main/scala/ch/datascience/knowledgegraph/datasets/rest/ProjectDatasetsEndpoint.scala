@@ -22,7 +22,7 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
-import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, Name, SameAs}
 import ch.datascience.http.rest.Links
 import Links._
 import ch.datascience.config.renku
@@ -48,6 +48,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
+  import ProjectDatasetsFinder.SameAsOrDerived
   import executionTimeRecorder._
   import org.http4s.circe._
 
@@ -72,16 +73,24 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
   }
 
-  private implicit val datasetEncoder: Encoder[(Identifier, Name, SameAs)] =
-    Encoder.instance[(Identifier, Name, SameAs)] {
-      case (id, name, sameAs) =>
+  private implicit val sameAsOrDerivedEncoder: Encoder[SameAsOrDerived] = Encoder.instance[SameAsOrDerived] {
+    case Left(sameAs:       SameAs)      => json"""{"sameAs": ${sameAs.toString}}"""
+    case Right(derivedFrom: DerivedFrom) => json"""{"derivedFrom": ${derivedFrom.toString}}"""
+  }
+
+  private implicit val datasetEncoder: Encoder[(Identifier, Name, SameAsOrDerived)] =
+    Encoder.instance[(Identifier, Name, SameAsOrDerived)] {
+      case (id, name, sameAsOrDerived) =>
         json"""{
           "identifier": ${id.toString},
-          "name": ${name.toString},
-          "sameAs": ${sameAs.toString}
-        }""" deepMerge _links(
-          Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
-        )
+          "name": ${name.toString}
+        }"""
+          .deepMerge(sameAsOrDerived.asJson)
+          .deepMerge(
+            _links(
+              Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
+            )
+          )
     }
 }
 

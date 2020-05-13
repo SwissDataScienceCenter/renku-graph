@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.SameAs
+import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.logging.TestExecutionTimeRecorder
@@ -44,7 +44,7 @@ class IOProjectDatasetsFinderSpec
   "findProjectDatasets" should {
 
     "return all datasets of the given project" in new TestCase {
-      forAll(projectPaths, nonModifiedDatasets(), nonModifiedDatasets()) { (projectPath, dataset1, dataset2) =>
+      forAll(projectPaths, nonModifiedDatasets(), modifiedDatasets()) { (projectPath, dataset1, dataset2) =>
         loadToStore(
           randomDataSetCommit,
           nonModifiedDataSetCommit()(projectPath)(
@@ -52,22 +52,22 @@ class IOProjectDatasetsFinderSpec
             datasetName        = dataset1.name,
             maybeDatasetSameAs = dataset1.sameAs.some
           ),
-          nonModifiedDataSetCommit()(projectPath)(
+          modifiedDataSetCommit()(projectPath)(
             datasetIdentifier  = dataset2.id,
             datasetName        = dataset2.name,
-            maybeDatasetSameAs = dataset2.sameAs.some
+            datasetDerivedFrom = dataset2.derivedFrom
           )
         )
 
         datasetsFinder.findProjectDatasets(projectPath).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.name, dataset1.sameAs),
-          (dataset2.id, dataset2.name, dataset2.sameAs)
+          (dataset1.id, dataset1.name, Left(dataset1.sameAs)),
+          (dataset2.id, dataset2.name, Right(dataset2.derivedFrom))
         )
       }
     }
 
     "return datasets of the given project with sameAs from the very top ancestor " +
-      "- case with an external dataset" in new TestCase {
+      "- case with a dataset imported from third party service" in new TestCase {
       forAll(projectPaths, nonModifiedDatasets(), projectPaths, nonModifiedDatasets()) {
         (project1, dataset1, project2, dataset2) =>
           loadToStore(
@@ -84,10 +84,10 @@ class IOProjectDatasetsFinderSpec
           )
 
           datasetsFinder.findProjectDatasets(project1).unsafeRunSync() should contain theSameElementsAs List(
-            (dataset1.id, dataset1.name, dataset1.sameAs)
+            (dataset1.id, dataset1.name, Left(dataset1.sameAs))
           )
           datasetsFinder.findProjectDatasets(project2).unsafeRunSync() should contain theSameElementsAs List(
-            (dataset2.id, dataset2.name, dataset1.sameAs)
+            (dataset2.id, dataset2.name, Left(dataset1.sameAs))
           )
       }
     }
@@ -111,10 +111,46 @@ class IOProjectDatasetsFinderSpec
         )
 
         datasetsFinder.findProjectDatasets(project1).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.name, dataSet1BasedSameAs)
+          (dataset1.id, dataset1.name, Left(dataSet1BasedSameAs))
         )
         datasetsFinder.findProjectDatasets(project2).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset2.id, dataset2.name, dataSet1BasedSameAs)
+          (dataset2.id, dataset2.name, Left(dataSet1BasedSameAs))
+        )
+      }
+    }
+
+    "return the very last modified dataset of the given project" in new TestCase {
+      forAll(datasetProjects, nonModifiedDatasets()) { (project, dataset) =>
+        val datasetModification1 = modifiedDatasets(dataset, project).generateOne.copy(
+          maybeDescription = datasetDescriptions.generateSome,
+          derivedFrom      = DerivedFrom(DataSet.entityId(dataset.id).value)
+        )
+        val datasetModification2 = modifiedDatasets(datasetModification1, project).generateOne.copy(
+          maybeDescription = datasetDescriptions.generateSome,
+          derivedFrom      = DerivedFrom(DataSet.entityId(datasetModification1.id).value)
+        )
+
+        loadToStore(
+          randomDataSetCommit,
+          nonModifiedDataSetCommit()(project.path)(
+            datasetIdentifier  = dataset.id,
+            datasetName        = dataset.name,
+            maybeDatasetSameAs = dataset.sameAs.some
+          ),
+          modifiedDataSetCommit()(project.path)(
+            datasetIdentifier  = datasetModification1.id,
+            datasetName        = datasetModification1.name,
+            datasetDerivedFrom = datasetModification1.derivedFrom
+          ),
+          modifiedDataSetCommit()(project.path)(
+            datasetIdentifier  = datasetModification2.id,
+            datasetName        = datasetModification2.name,
+            datasetDerivedFrom = datasetModification2.derivedFrom
+          )
+        )
+
+        datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
+          (datasetModification2.id, datasetModification2.name, Right(datasetModification2.derivedFrom))
         )
       }
     }

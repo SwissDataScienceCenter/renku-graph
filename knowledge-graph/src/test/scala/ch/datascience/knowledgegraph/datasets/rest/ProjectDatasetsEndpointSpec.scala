@@ -26,11 +26,12 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs}
+import ch.datascience.graph.model.datasets.{Identifier, Name}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
+import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder.SameAsOrDerived
 import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.Json
 import io.circe.literal._
@@ -123,8 +124,8 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
       logger
     ).getProjectDatasets _
 
-    lazy val toJson: ((Identifier, Name, SameAs)) => Json = {
-      case (id, name, sameAs) =>
+    lazy val toJson: ((Identifier, Name, SameAsOrDerived)) => Json = {
+      case (id, name, Left(sameAs)) =>
         json"""{
           "identifier": ${id.value},
           "name": ${name.value},
@@ -134,12 +135,22 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
           }]
         }"""
+      case (id, name, Right(derivedFrom)) =>
+        json"""{
+          "identifier": ${id.value},
+          "name": ${name.value},
+          "derivedFrom": ${derivedFrom.value},
+          "_links": [{
+            "rel": "details",
+            "href": ${(renkuResourcesUrl / "datasets" / id).value}
+          }]
+        }"""
     }
   }
 
-  private implicit val datasetBasicDetails: Gen[(Identifier, Name, SameAs)] = for {
-    id     <- datasetIdentifiers
-    name   <- datasetNames
-    sameAs <- datasetSameAs
-  } yield (id, name, sameAs)
+  private implicit lazy val datasetBasicDetails: Gen[(Identifier, Name, SameAsOrDerived)] = for {
+    id                      <- datasetIdentifiers
+    name                    <- datasetNames
+    sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
+  } yield (id, name, sameAsEitherDerivedFrom)
 }

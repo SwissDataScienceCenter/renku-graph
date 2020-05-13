@@ -365,7 +365,8 @@ Response body example:
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
       "name": "rmDaYfpehl",
-      "sameAs": "http://host/url1",
+      "sameAs" : "http://host/url1",                  // optional property when no "derivedFrom" exists
+      "derivedFrom" : "http://host/url1",             // optional property when no "sameAs" exists
       "_links": [  
          {  
             "rel": "details",
@@ -376,7 +377,8 @@ Response body example:
    {  
       "identifier": "a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
       "name": "a",
-      "sameAs": "http://host/url2",
+      "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
+      "derivedFrom" : "http://host/url2",             // optional property when no "sameAs" exists
       "_links": [  
          {  
             "rel": "details",

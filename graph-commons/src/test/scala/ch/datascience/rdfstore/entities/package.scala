@@ -22,7 +22,7 @@ import java.time.{Instant, LocalDate}
 import java.util.UUID
 
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{IdSameAs, SameAs, UrlSameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, UrlSameAs}
 import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.RelativePath
@@ -38,6 +38,8 @@ package object entities extends Schemas {
 
   implicit val fusekiBaseUrlToEntityId: FusekiBaseUrl => EntityId = url => EntityId of url.value
   implicit val renkuBaseUrlToEntityId:  RenkuBaseUrl => EntityId  = url => EntityId of url.value
+
+  implicit val derivedFromEncoder: JsonLDEncoder[DerivedFrom] = derivedFrom => EntityId.of(derivedFrom.value).asJsonLD
 
   implicit val sameAsEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
     case v: IdSameAs  => idSameAsEncoder(v)
