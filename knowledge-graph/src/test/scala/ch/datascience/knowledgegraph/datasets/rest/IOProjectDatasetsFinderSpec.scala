@@ -121,14 +121,15 @@ class IOProjectDatasetsFinderSpec
 
     "return the very last modified dataset of the given project" in new TestCase {
       forAll(datasetProjects, nonModifiedDatasets()) { (project, dataset) =>
-        val datasetModification1 = modifiedDatasets(dataset, project).generateOne.copy(
-          maybeDescription = datasetDescriptions.generateSome,
-          derivedFrom      = DerivedFrom(DataSet.entityId(dataset.id).value)
-        )
-        val datasetModification2 = modifiedDatasets(datasetModification1, project).generateOne.copy(
-          maybeDescription = datasetDescriptions.generateSome,
-          derivedFrom      = DerivedFrom(DataSet.entityId(datasetModification1.id).value)
-        )
+        val datasetModification1 =
+          modifiedDatasets(dataset, project, DerivedFrom(DataSet.entityId(dataset.id).value)).generateOne.copy(
+            maybeDescription = datasetDescriptions.generateSome
+          )
+        val datasetModification2 =
+          modifiedDatasets(datasetModification1, project, DerivedFrom(DataSet.entityId(datasetModification1.id).value)).generateOne
+            .copy(
+              maybeDescription = datasetDescriptions.generateSome
+            )
 
         loadToStore(
           randomDataSetCommit,

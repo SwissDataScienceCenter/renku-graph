@@ -22,6 +22,7 @@ import java.time.{Instant, LocalDate}
 
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
+import io.renku.jsonld.EntityId
 
 object datasets {
 
@@ -41,7 +42,9 @@ object datasets {
   implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
 
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
-  implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url
+  implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url {
+    def apply(datasetEntityId: EntityId): DerivedFrom = DerivedFrom(datasetEntityId.toString)
+  }
 
   sealed trait SameAs extends Any with UrlTinyType {
 

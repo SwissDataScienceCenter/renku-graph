@@ -53,7 +53,7 @@ libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersi
 // Test dependencies
 libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.24.1" % Test
 
-val jenaVersion = "3.12.0"
+val jenaVersion = "3.15.0"
 libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test

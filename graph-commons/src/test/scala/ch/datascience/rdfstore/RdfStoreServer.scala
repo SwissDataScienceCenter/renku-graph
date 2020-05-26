@@ -20,7 +20,7 @@ package ch.datascience.rdfstore
 
 import java.net.BindException
 
-import cats.effect.{ExitCode, IO, IOApp, Timer}
+import cats.effect._
 import cats.implicits._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -42,10 +42,12 @@ object RdfStoreServer extends IOApp {
 class RdfStoreServer(port: Int Refined Positive, datasetName: DatasetName)(implicit timer: Timer[IO]) {
 
   private lazy val dataset = {
+    import java.nio.file.Files
+
     import org.apache.jena.graph.NodeFactory
     import org.apache.jena.query.DatasetFactory
     import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
-    import org.apache.lucene.store.RAMDirectory
+    import org.apache.lucene.store.MMapDirectory
 
     val entityDefinition: EntityDefinition = {
       val definition = new EntityDefinition("uri", "name")
@@ -55,8 +57,8 @@ class RdfStoreServer(port: Int Refined Positive, datasetName: DatasetName)(impli
     }
 
     TextDatasetFactory.createLucene(
-      DatasetFactory.create(),
-      new RAMDirectory,
+      DatasetFactory.createTxnMem(),
+      new MMapDirectory(Files.createTempDirectory("lucene-store-jena")),
       new TextIndexConfig(entityDefinition)
     )
   }

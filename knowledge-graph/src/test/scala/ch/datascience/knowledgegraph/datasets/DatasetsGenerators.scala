@@ -22,9 +22,11 @@ import cats.Order
 import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, Url}
 import ch.datascience.knowledgegraph.datasets.model._
+import ch.datascience.rdfstore.entities.DataSet
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
@@ -52,29 +54,39 @@ object DatasetsGenerators {
       projects         <- projects
     } yield NonModifiedDataset(id, name, url, sameAs, maybeDescription, published, part, projects.toList)
 
-  def modifiedDatasets(dataset: Dataset, project: DatasetProject): Gen[ModifiedDataset] =
+  def modifiedDatasets(dataset: Dataset, project: DatasetProject, derivedFromOverride: DerivedFrom)(
+      implicit renkuBaseUrl:    RenkuBaseUrl
+  ): Gen[ModifiedDataset] = modifiedDatasets(dataset, project, Some(derivedFromOverride))
+
+  def modifiedDatasets(dataset: Dataset,
+                       project: DatasetProject)(implicit renkuBaseUrl: RenkuBaseUrl): Gen[ModifiedDataset] =
+    modifiedDatasets(dataset, project, derivedFromOverride = None)
+
+  def modifiedDatasets(dataset: Dataset, project: DatasetProject, derivedFromOverride: Option[DerivedFrom])(
+      implicit renkuBaseUrl:    RenkuBaseUrl
+  ): Gen[ModifiedDataset] =
     for {
-      id          <- datasetIdentifiers
-      url         <- datasetUrls
-      derivedFrom <- datasetDerivedFroms
-    } yield ModifiedDataset(id,
-                            dataset.name,
-                            Url(s"$url/$id"),
-                            DerivedFrom(s"$derivedFrom/${dataset.id}"),
-                            dataset.maybeDescription,
-                            dataset.published,
-                            dataset.parts,
-                            List(project))
+      id        <- datasetIdentifiers
+      published <- datasetPublishingInfos
+    } yield ModifiedDataset(
+      id,
+      dataset.name,
+      Url(DataSet.entityId(id).value),
+      derivedFromOverride getOrElse DerivedFrom(DataSet.entityId(dataset.id)),
+      dataset.maybeDescription,
+      published,
+      dataset.parts,
+      List(project)
+    )
 
   def modifiedDatasets(
-      derivedFrom: Gen[DerivedFrom]                  = datasetDerivedFroms,
-      projects:    Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
+      projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
   ): Gen[ModifiedDataset] =
     for {
       id               <- datasetIdentifiers
       name             <- datasetNames
       url              <- datasetUrls
-      derivedFrom      <- derivedFrom
+      derivedFrom      <- datasetDerivedFroms
       maybeDescription <- Gen.option(datasetDescriptions)
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
