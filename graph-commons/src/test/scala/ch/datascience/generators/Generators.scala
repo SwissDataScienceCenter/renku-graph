@@ -281,6 +281,9 @@ object Generators {
 
       def generateOne: T = generateExample(generator)
 
+      def generateList(ofSize: Int Refined Positive): List[T] =
+        generateNonEmptyList(minElements = ofSize, maxElements = ofSize).toList
+
       def generateNonEmptyList(minElements: Int Refined Positive = 1,
                                maxElements: Int Refined Positive = 5): NonEmptyList[T] =
         generateExample(nonEmptyList(generator, minElements, maxElements))

@@ -35,11 +35,28 @@ object RdfStoreServer extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      _ <- new RdfStoreServer(3030, DatasetName("renku")).start
+      _ <- new RdfStoreServer(3030, DatasetName("renku"), muteLogging = false).start
     } yield ExitCode.Success
 }
 
-class RdfStoreServer(port: Int Refined Positive, datasetName: DatasetName)(implicit timer: Timer[IO]) {
+class RdfStoreServer(
+    port:         Int Refined Positive,
+    datasetName:  DatasetName,
+    muteLogging:  Boolean = true
+)(implicit timer: Timer[IO]) {
+
+  if (!muteLogging) {
+    import org.apache.jena.atlas.logging.LogCtl
+    import org.apache.jena.fuseki.Fuseki._
+    import org.slf4j.event.Level._
+
+    LogCtl.setJavaLogging()
+    LogCtl.setLevel(requestLogName, INFO.toString)
+    LogCtl.setLevel(actionLogName, INFO.toString)
+    LogCtl.setLevel(serverLogName, ERROR.toString)
+    LogCtl.setLevel(adminLogName, ERROR.toString)
+    LogCtl.setLevel("org.eclipse.jetty", ERROR.toString)
+  }
 
   private lazy val dataset = {
     import java.nio.file.Files

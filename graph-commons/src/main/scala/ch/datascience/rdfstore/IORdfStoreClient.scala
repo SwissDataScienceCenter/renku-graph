@@ -48,6 +48,7 @@ abstract class IORdfStoreClient(
     extends IORestClient(Throttler.noThrottling, logger, Some(timeRecorder.instance), retryInterval, maxRetries) {
 
   import IORdfStoreClient._
+  import ch.datascience.http.client.UrlEncoder.urlEncode
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
   import org.http4s.Status._
@@ -99,8 +100,8 @@ abstract class IORdfStoreClient(
     _.as[ResultType](implicitly[MonadError[IO, Throwable]], jsonOf[IO, ResultType])
 
   private def toEntity(queryType: RdfQueryType, query: SparqlQuery): String = queryType match {
-    case _: RdfQuery => s"query=$query"
-    case _ => s"update=$query"
+    case _: RdfQuery => s"query=${urlEncode(query.toString)}"
+    case _ => s"update=${urlEncode(query.toString)}"
   }
 
   private def path(queryType: RdfQueryType): String = queryType match {

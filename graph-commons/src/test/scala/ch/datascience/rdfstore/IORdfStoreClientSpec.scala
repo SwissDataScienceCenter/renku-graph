@@ -23,6 +23,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging._
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
@@ -64,7 +65,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
-          .withRequestBody(equalTo(s"query=${client.query}"))
+          .withRequestBody(equalTo(s"query=${urlEncode(client.query.toString)}"))
           .willReturn(okJson(responseBody.noSpaces))
       }
 
@@ -123,7 +124,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
-          .withRequestBody(equalTo(s"query=${client.query.include[Try](pagingRequest).get}"))
+          .withRequestBody(equalTo(s"query=${urlEncode(client.query.include[Try](pagingRequest).get.toString)}"))
           .willReturn(okJson(responseBody.noSpaces))
       }
 
@@ -150,7 +151,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
-          .withRequestBody(equalTo(s"query=${client.query.include[Try](pagingRequest).get}"))
+          .withRequestBody(equalTo(s"query=${urlEncode(client.query.include[Try](pagingRequest).get.toString)}"))
           .willReturn(okJson(responseBody.noSpaces))
       }
 
@@ -170,7 +171,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
-          .withRequestBody(equalTo(s"query=${client.query.toCountQuery}"))
+          .withRequestBody(equalTo(s"query=${urlEncode(client.query.toCountQuery.toString)}"))
           .willReturn(okJson(totalResponseBody.noSpaces))
       }
 
@@ -197,7 +198,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
-          .withRequestBody(equalTo(s"query=${client.query.include[Try](pagingRequest).get}"))
+          .withRequestBody(equalTo(s"query=${urlEncode(client.query.include[Try](pagingRequest).get.toString)}"))
           .willReturn(okJson(responseBody.noSpaces))
       }
 
@@ -220,7 +221,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
-          .withRequestBody(equalTo(s"query=${countQuery.toCountQuery}"))
+          .withRequestBody(equalTo(s"query=${urlEncode(countQuery.toCountQuery.toString)}"))
           .willReturn(okJson(totalResponseBody.noSpaces))
       }
 
@@ -270,7 +271,7 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
         post(s"/${rdfStoreConfig.datasetName}/update")
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
-          .withRequestBody(equalTo(s"update=${client.query}"))
+          .withRequestBody(equalTo(s"update=${urlEncode(client.query.toString)}"))
           .willReturn(ok())
       }
 
@@ -329,14 +330,14 @@ class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with Mo
     val client = new TestRdfQueryClient(
       query = SparqlQuery(name = "find all triples",
                           prefixes = Set.empty,
-                          body     = """SELECT ?s ?p ?o WHERE { ?s ?p ?o} ORDER BY ASC(?s)"""),
+                          body     = """SELECT ?s ?p ?o WHERE { ?s ?p ?o } ORDER BY ASC(?s)"""),
       rdfStoreConfig
     )
   }
 
   private trait UpdateClientTestCase extends TestCase {
     val client = new TestRdfClient(
-      query = SparqlQuery(name = "insert", Set.empty, """INSERT { "o" "p" "s"} {}"""),
+      query = SparqlQuery(name = "insert", Set.empty, """INSERT { 'o' 'p' 's' } {}"""),
       rdfStoreConfig
     )
   }

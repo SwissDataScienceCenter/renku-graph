@@ -53,6 +53,8 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
+  protected override val givenServerRunning: Boolean = true
+
   "findDatasets - no phrase" should {
 
     Option(Phrase("*")) +: Option.empty[Phrase] +: Nil foreach { maybePhrase =>
@@ -200,7 +202,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       ).sortBy(_.name.value)
     }
 
-    "merge all datasets having the same sameAs not pointing to project's dataset" in new TestCase {
+    "merge all datasets having the same sameAs pointing to external source" in new TestCase {
       val dataset1     = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
       val dataset2     = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne
       val datasetsList = List(dataset1, dataset2)
@@ -304,19 +306,19 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(3)
     }
 
-    "merge all datasets having the same sameAs together with forks to different projects" in new TestCase {
+    "merge all datasets having the same sameAs together with their forks to different projects" in new TestCase {
       val dataset1CreatedDate = datasetCreatedDates.generateOne
       val dataset1 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
       ).generateOne
-      val dataset1Fork = dataset1.copy(projects = List(datasetProjects.generateOne))
+      val dataset1Fork = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       val dataset2CreatedDate = dataset1CreatedDate.shiftToFuture
       val dataset2 = dataset1.copy(
         id       = datasetIdentifiers.generateOne,
-        projects = List(datasetProjects.generateOne)
+        projects = datasetProjects.generateList(ofSize = 1)
       )
-      val dataset2Fork = dataset2.copy(projects = List(datasetProjects.generateOne))
+      val dataset2Fork = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       loadToStore(
         List(
@@ -328,7 +330,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage(1)))
         .unsafeRunSync()
 
       result.results shouldBe List(
@@ -344,15 +346,15 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val initialDataset = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, minElements = 3, maxElements = 3)
       ).generateOne
-      val initialDatasetFork = initialDataset.copy(projects = List(datasetProjects.generateOne))
+      val initialDatasetFork = initialDataset.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       val importedDatasetCreatedDate = initialDatasetCreatedDate.shiftToFuture
       val importedDataset = initialDataset.copy(
         id       = datasetIdentifiers.generateOne,
-        projects = List(datasetProjects.generateOne),
+        projects = datasetProjects.generateList(ofSize = 1),
         sameAs   = initialDataset.entityId.asSameAs
       )
-      val importedDatasetFork = importedDataset.copy(projects = List(datasetProjects.generateOne))
+      val importedDatasetFork = importedDataset.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       loadToStore(
         List(
@@ -364,7 +366,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage(1)))
         .unsafeRunSync()
 
       result.results shouldBe List(
@@ -379,12 +381,12 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val dataset1 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, maxElements = 1)
       ).generateOne
-      val dataset1Fork = dataset1.copy(projects = List(datasetProjects.generateOne))
+      val dataset1Fork = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       val dataset2 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, maxElements = 1)
       ).generateOne
-      val dataset2Fork = dataset2.copy(projects = List(datasetProjects.generateOne))
+      val dataset2Fork = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       loadToStore(
         List(
@@ -396,7 +398,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
+        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage(2)))
         .unsafeRunSync()
 
       result.results shouldBe List(
@@ -411,7 +413,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
   "findDatasets - some phrase given" should {
 
-    "merge all datasets having the same sameAs not pointing to project's dataset" in new TestCase {
+    "merge all datasets having the same sameAs pointing to some external storage" in new TestCase {
 
       val phrase = phrases.generateOne
       val dataset1 = nonModifiedDatasets(
@@ -441,10 +443,6 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
       result.pagingInfo.pagingRequest shouldBe pagingRequest
       result.pagingInfo.total         shouldBe Total(3)
-    }
-
-    "return no results if the match was only in an older version of a dataset which is not used anymore" in new TestCase {
-      fail("boom!")
     }
 
     "merge datasets when they are imported from other renku project" in new TestCase {
@@ -513,6 +511,56 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.pagingRequest shouldBe pagingRequest
       result.pagingInfo.total         shouldBe Total(3)
     }
+
+    "return no results if there is no matching dataset" in new TestCase {
+
+      val dataset = nonModifiedDatasets().generateOne
+
+      loadToStore(dataset.toJsonLDsAndProjects(noSameAs = true).jsonLDs: _*)
+
+      val result = datasetsFinder
+        .findDatasets(Some(phrases.generateOne), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+
+      result.results          shouldBe empty
+      result.pagingInfo.total shouldBe Total(0)
+    }
+
+    "not return datasets if the match was only in an older version which is not used anymore" in new TestCase {
+
+      val project  = datasetProjects.generateOne
+      val phrase   = phrases.generateOne
+      val original = nonModifiedDatasets().generateOne.copy(projects = List(project)).makeNameContaining(phrase)
+      val fork     = modifiedDatasets(original, project).generateOne.copy(name = datasetNames.generateOne)
+
+      loadToStore(
+        List(
+          original.toJsonLDsAndProjects(noSameAs = true).jsonLDs,
+          fork.toJsonLDs()
+        ).flatten: _*
+      )
+
+      datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+        .results shouldBe empty
+    }
+
+    "not return datasets neither sharing the sameAs not in the derivation hierarchy " +
+      "if they do not match the criteria" in new TestCase {
+
+      val dataset1 = nonModifiedDatasets().generateOne.copy()
+      val phrase   = phrases.generateOne
+      val project  = datasetProjects.generateOne
+      val dataset2 = nonModifiedDatasets().generateOne.copy(projects = List(project)).makeNameContaining(phrase)
+
+      loadToStore(List(dataset1, dataset2).flatMap(_.toJsonLDsAndProjects(noSameAs = true)).jsonLDs: _*)
+
+      datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+        .results shouldBe List(dataset1.toDatasetSearchResult)
+    }
   }
 
   "findDatasets in case of forks - some phrase given" should {
@@ -524,23 +572,23 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val dataset1 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, minElements = 2)
       ).generateOne.makeNameContaining(phrase)
-      val dataset1Fork            = dataset1.copy(projects = List(datasetProjects.generateOne))
+      val dataset1Fork            = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
       val dataset1PrimCreatedDate = dataset1CreatedDate.shiftToFuture
       val dataset1Prim = dataset1.copy(
         id       = datasetIdentifiers.generateOne,
-        projects = List(datasetProjects.generateOne)
+        projects = datasetProjects.generateList(ofSize = 1)
       )
-      val dataset1PrimFork    = dataset1Prim.copy(projects = List(datasetProjects.generateOne))
+      val dataset1PrimFork    = dataset1Prim.copy(projects = datasetProjects.generateList(ofSize = 1))
       val dataset2CreatedDate = datasetCreatedDates.generateOne
       val dataset2 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, maxElements = 1)
       ).generateOne.makeDescContaining(phrase)
-      val dataset2Fork        = dataset2.copy(projects = List(datasetProjects.generateOne))
+      val dataset2Fork        = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
       val dataset3CreatedDate = datasetCreatedDates.generateOne
       val dataset3 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, maxElements = 1)
       ).generateOne.makeCreatorNameContaining(phrase)
-      val dataset3Fork = dataset3.copy(projects = List(datasetProjects.generateOne))
+      val dataset3Fork = dataset3.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       loadToStore(
         List(
@@ -578,24 +626,24 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val dataset1 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, minElements = 2)
       ).generateOne.makeNameContaining(phrase)
-      val dataset1Fork            = dataset1.copy(projects = List(datasetProjects.generateOne))
+      val dataset1Fork            = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
       val dataset1PrimCreatedDate = dataset1CreatedDate.shiftToFuture
       val dataset1Prim = dataset1.copy(
         id       = datasetIdentifiers.generateOne,
-        projects = List(datasetProjects.generateOne),
+        projects = datasetProjects.generateList(ofSize = 1),
         sameAs   = dataset1.entityId.asSameAs
       )
-      val dataset1PrimFork    = dataset1Prim.copy(projects = List(datasetProjects.generateOne))
+      val dataset1PrimFork    = dataset1Prim.copy(projects = datasetProjects.generateList(ofSize = 1))
       val dataset2CreatedDate = datasetCreatedDates.generateOne
       val dataset2 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, minElements = 2)
       ).generateOne.makeDescContaining(phrase)
-      val dataset2Fork        = dataset2.copy(projects = List(datasetProjects.generateOne))
+      val dataset2Fork        = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
       val dataset3CreatedDate = datasetCreatedDates.generateOne
       val dataset3 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, minElements = 2)
       ).generateOne.makeCreatorNameContaining(phrase)
-      val dataset3Fork = dataset3.copy(projects = List(datasetProjects.generateOne))
+      val dataset3Fork = dataset3.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       loadToStore(
         List(
@@ -633,19 +681,19 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val dataset1 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, maxElements = 1)
       ).generateOne.makeNameContaining(phrase)
-      val dataset1Fork = dataset1.copy(projects = List(datasetProjects.generateOne))
+      val dataset1Fork = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       val dataset2CreatedDate = datasetCreatedDates.generateOne
       val dataset2 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, maxElements = 1)
       ).generateOne.makeDescContaining(phrase)
-      val dataset2Fork = dataset2.copy(projects = List(datasetProjects.generateOne))
+      val dataset2Fork = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       val dataset3CreatedDate = datasetCreatedDates.generateOne
       val dataset3 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, maxElements = 1)
       ).generateOne.makeCreatorNameContaining(phrase)
-      val dataset3Fork = dataset3.copy(projects = List(datasetProjects.generateOne))
+      val dataset3Fork = dataset3.copy(projects = datasetProjects.generateList(ofSize = 1))
 
       loadToStore(
         List(
@@ -825,7 +873,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         val dataset2 = dataset1.copy(
           id       = datasetIdentifiers.generateOne,
           sameAs   = dataset1Jsons.entityId.asSameAs,
-          projects = List(datasetProjects.generateOne)
+          projects = datasetProjects.generateList(ofSize = 1)
         )
         val dataset2CreatedDate = dataset1CreatedDate.shiftToFuture
         val dataset2Jsons       = dataset2.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs = false).jsonLDs
@@ -833,7 +881,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         val dataset3 = dataset2.copy(
           id       = datasetIdentifiers.generateOne,
           sameAs   = dataset2Jsons.entityId.asSameAs,
-          projects = List(datasetProjects.generateOne)
+          projects = datasetProjects.generateList(ofSize = 1)
         )
         val dataset3Jsons = dataset3.toJsonLDsAndProjects(dataset2CreatedDate.shiftToFuture, noSameAs = false).jsonLDs
 
@@ -861,7 +909,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         val dataset2 = dataset1.copy(
           id       = datasetIdentifiers.generateOne,
           sameAs   = dataset1Jsons.entityId.asSameAs,
-          projects = List(datasetProjects.generateOne)
+          projects = datasetProjects.generateList(ofSize = 1)
         )
         val dataset2CreatedDate = dataset1CreatedDate.shiftToFuture
         val dataset2Jsons       = dataset2.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs = false).jsonLDs
@@ -869,7 +917,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         val dataset3 = dataset2.copy(
           id       = datasetIdentifiers.generateOne,
           sameAs   = dataset2Jsons.entityId.asSameAs,
-          projects = List(datasetProjects.generateOne)
+          projects = datasetProjects.generateList(ofSize = 1)
         )
         val dataset3Jsons = dataset3.toJsonLDsAndProjects(dataset2CreatedDate.shiftToFuture, noSameAs = false).jsonLDs
 
@@ -905,7 +953,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         val dataset3 = dataset2.copy(
           id       = datasetIdentifiers.generateOne,
           sameAs   = dataset2Jsons.entityId.asSameAs,
-          projects = List(datasetProjects.generateOne)
+          projects = datasetProjects.generateList(ofSize = 1)
         )
         val dataset3Jsons = dataset3.toJsonLDsAndProjects(dataset2CreatedDate.shiftToFuture, noSameAs = false).jsonLDs
 
@@ -1173,7 +1221,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val newDataset = dataset.copy(
         id       = datasetIdentifiers.generateOne,
         sameAs   = datasetJsons.entityId.asSameAs,
-        projects = List(datasetProjects.generateOne)
+        projects = datasetProjects.generateList(ofSize = 1)
       )
       val newDatasetCreatedDate = createdDate.shiftToFuture
       val newDatasetJsons       = newDataset.toJsonLDsAndProjects(newDatasetCreatedDate, noSameAs = false).jsonLDs
