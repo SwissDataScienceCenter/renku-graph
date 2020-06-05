@@ -19,6 +19,8 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
 import cats.MonadError
+import cats.data.NonEmptyList
+import cats.implicits._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
@@ -38,53 +40,70 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
   import PersonDetailsUpdater._
   import updatesCreator._
 
-  def curate(curatedTriples: CuratedTriples): Interpretation[CuratedTriples] = ME.catchNonFatal(
-    removePersonsAttributes
-      .andThen {
-        case (newTriples, persons) => newTriples -> prepareUpdates(persons)
-      }
-      .andThen {
-        case (newTriples, newUpdates) => CuratedTriples(newTriples, curatedTriples.updates ++ newUpdates)
-      }
-      .apply(curatedTriples.triples)
-  )
-}
+  def curate(curatedTriples: CuratedTriples): Interpretation[CuratedTriples] =
+    for {
+      triplesAndPersons <- removePersonsAttributes(curatedTriples.triples)
+      (newTriples, persons) = triplesAndPersons
+      newUpdates <- ME.catchNonFatal(prepareUpdates(persons))
+    } yield CuratedTriples(newTriples, curatedTriples.updates ++ newUpdates)
 
-private[triplescuration] object PersonDetailsUpdater {
-
-  def apply[Interpretation[_]]()(
-      implicit ME: MonadError[Interpretation, Throwable]
-  ): PersonDetailsUpdater[Interpretation] = new PersonDetailsUpdater[Interpretation](new UpdatesCreator)
-
-  final case class Person(id: ResourceId, names: Set[Name], emails: Set[Email])
-
-  private object removePersonsAttributes extends (JsonLDTriples => (JsonLDTriples, Set[Person])) {
+  private object removePersonsAttributes extends (JsonLDTriples => Interpretation[(JsonLDTriples, Set[Person])]) {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
     import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
     import scala.collection.mutable
 
-    override def apply(triples: JsonLDTriples): (JsonLDTriples, Set[Person]) = {
-      val persons     = mutable.HashSet[Person]()
-      val updatedJson = Plated.transform(toJsonWithoutPersonDetails(persons))(triples.value)
-      JsonLDTriples(updatedJson) -> persons.toSet
+    override def apply(triples: JsonLDTriples): Interpretation[(JsonLDTriples, Set[Person])] = {
+      val persons = mutable.HashSet[Person]()
+      for {
+        updatedJson <- Plated.transformM(toJsonWithoutPersonDetails(persons))(triples.value)
+      } yield JsonLDTriples(updatedJson) -> persons.toSet
     }
 
-    private def toJsonWithoutPersonDetails(persons: mutable.Set[Person])(json: Json): Json =
+    private def toJsonWithoutPersonDetails(persons: mutable.Set[Person])(json: Json): Interpretation[Json] =
       root.`@type`.each.string.getAll(json) match {
-        case types if types.contains("http://schema.org/Person") => {
-          for {
-            entityId <- json.get[ResourceId]("@id") flatMap skipBlankNodes
-            personNames  = json.getValues[Name]("http://schema.org/name")
-            noNamesJson  = json remove "http://schema.org/name"
-            personEmails = noNamesJson.getValues[Email]("http://schema.org/email")
-            noEmailsJson = noNamesJson remove "http://schema.org/email"
-            noLabelsJson = noEmailsJson remove "http://www.w3.org/2000/01/rdf-schema#label"
-            _            = persons add Person(entityId, personNames.toSet, personEmails.toSet)
-          } yield noLabelsJson
-        } getOrElse json
-        case _ => json
+        case types if types.contains("http://schema.org/Person") =>
+          findPersonData(json) match {
+            case None => json.pure[Interpretation]
+            case Some(personData) =>
+              for {
+                foundPerson <- personData.toPerson
+                _ = persons add foundPerson
+              } yield removeNameAndEmail(foundPerson.id, json)
+          }
+        case _ => json.pure[Interpretation]
       }
+
+    private def findPersonData(json: Json) =
+      for {
+        entityId <- json.get[ResourceId]("@id") flatMap skipBlankNodes
+        personNames  = json.getValues[Name]("http://schema.org/name")
+        personEmails = json.getValues[Email]("http://schema.org/email")
+      } yield (entityId, personNames, personEmails)
+
+    private implicit class PersonDataOps(personData: (ResourceId, List[Name], List[Email])) {
+
+      private val (entityId, personNames, personEmails) = personData
+
+      lazy val toPerson: Interpretation[Person] = for {
+        nonEmptyNames <- toNonEmptyList(personNames)
+      } yield Person(entityId, nonEmptyNames, personEmails.toSet)
+
+      private lazy val toNonEmptyList: List[Name] => Interpretation[NonEmptyList[Name]] = {
+        case Nil =>
+          ME.raiseError {
+            new Exception(s"No names for person with '$entityId' id found in generated JSON-LD")
+          }
+        case first +: other =>
+          NonEmptyList.of(first, other: _*).pure[Interpretation]
+      }
+    }
+
+    private def removeNameAndEmail(resourceId: ResourceId, json: Json) =
+      json
+        .remove("http://schema.org/name")
+        .remove("http://schema.org/email")
+        .remove("http://www.w3.org/2000/01/rdf-schema#label")
 
     private lazy val skipBlankNodes: ResourceId => Option[ResourceId] = id =>
       if (id.value startsWith "_") None
@@ -117,4 +136,13 @@ private[triplescuration] object PersonDetailsUpdater {
       def remove(property: String): Json = root.obj.modify(_.remove(property))(json)
     }
   }
+}
+
+private[triplescuration] object PersonDetailsUpdater {
+
+  def apply[Interpretation[_]]()(
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): PersonDetailsUpdater[Interpretation] = new PersonDetailsUpdater[Interpretation](new UpdatesCreator)
+
+  final case class Person(id: ResourceId, names: NonEmptyList[Name], emails: Set[Email])
 }

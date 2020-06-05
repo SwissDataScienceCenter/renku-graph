@@ -42,13 +42,14 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
 import scala.collection.mutable
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 class PersonDetailsUpdaterSpec extends WordSpec {
 
   "curate" should {
 
-    "remove properties from all the Person entities found in the given Json except those which id starts with '_'" +
+    "remove name and email properties from all the Person entities found in the given Json " +
+      "except those which id starts with '_' (blank nodes) " +
       "and create SPARQL updates for them" in new TestCase {
       val projectCreatorName  = userNames.generateOne
       val projectCreatorEmail = userEmails.generateOne
@@ -90,6 +91,18 @@ class PersonDetailsUpdaterSpec extends WordSpec {
     }
   }
 
+  "fail if there's a Person entity without a name" in new TestCase {
+
+    val jsonTriples = JsonLDTriples(randomDataSetCommit.toJson)
+
+    val noNamesJson = JsonLDTriples(jsonTriples.removePersonsNames)
+
+    val result = curator curate CuratedTriples(noNamesJson, updates = Nil)
+
+    result                       shouldBe a[Failure[_]]
+    result.failed.get.getMessage should include regex "No names for person with '(.*)' id found in generated JSON-LD".r
+  }
+
   private trait TestCase {
     implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
     implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
@@ -99,6 +112,14 @@ class PersonDetailsUpdaterSpec extends WordSpec {
   }
 
   private implicit class TriplesOps(triples: JsonLDTriples) {
+
+    lazy val removePersonsNames: Json = Plated.transform[Json] { json =>
+      root.`@type`.each.string.getAll(json) match {
+        case types if types.contains("http://schema.org/Person") =>
+          root.obj.modify(_.remove("http://schema.org/name"))(json)
+        case _ => json
+      }
+    }(triples.value)
 
     lazy val collectAllPersons: Set[Person] = {
       val collected = mutable.HashSet.empty[Person]
@@ -130,7 +151,7 @@ class PersonDetailsUpdaterSpec extends WordSpec {
   private lazy val maybeUpdatePerson: entities.Person => Option[UpdatePerson] = { person =>
     person.maybeEmail map { email =>
       val entityId = person.asJsonLD.entityId getOrElse (throw new Exception(s"Cannot find entity id for $person"))
-      UpdatePerson(ResourceId(entityId.toString), Set(person.name), Set(email))
+      UpdatePerson(ResourceId(entityId.toString), NonEmptyList.of(person.name), Set(email))
     }
   }
 
