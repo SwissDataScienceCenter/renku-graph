@@ -19,13 +19,15 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
 import PersonDetailsUpdater.{Person => UpdaterPerson}
+import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.Person
-import io.circe.Json
+import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -35,7 +37,48 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
   "prepareUpdates" should {
 
-    "generate query changing person's name and removing label - case when email present" in new TestCase {
+    "generate query creating person with a name and email" in new TestCase {
+      forAll { (name: Name, email: Email) =>
+        findPersons shouldBe empty
+
+        val personId = Person(name, email).asJsonLD.entityId.get
+
+        val updates = updatesCreator.prepareUpdates(
+          Set(
+            UpdaterPerson(ResourceId(personId.value), NonEmptyList.of(name), Set(email))
+          )
+        )
+
+        (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+
+        findPersons should contain theSameElementsAs Set(
+          (personId.value, Some(name.value), Some(email.value), None)
+        )
+
+        clearDataset()
+      }
+    }
+
+    "generate query creating a Person with a name only" in new TestCase {
+
+      val name     = userNames.generateOne
+      val personId = Person(name).asJsonLD.entityId.get
+
+      val updates = updatesCreator.prepareUpdates(
+        Set(
+          UpdaterPerson(ResourceId(personId.value), NonEmptyList.of(name), emails = Set.empty)
+        )
+      )
+
+      (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+
+      val actual = findPersons
+      actual should have size 1
+      val (_, Some(actualName), None, None) = actual.head
+      actualName shouldBe name.value
+    }
+
+    "generate query updating person's name and removing label - case when person id is known" in new TestCase {
       forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
         val person1Json = Person(name1, email1).asJsonLD
         val person1Id   = person1Json.entityId.get
@@ -53,7 +96,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(person1Id.value), Set(name1Updated), Set(email1))
+            UpdaterPerson(ResourceId(person1Id.value), NonEmptyList.of(name1Updated), Set(email1))
           )
         )
 
@@ -68,7 +111,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
       }
     }
 
-    "generate query changing person's name and email and removing label - case when email removed" in new TestCase {
+    "generate query updating person's name and removing email and label - case when person id is known" in new TestCase {
       forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
         val person1Json = Person(name1, email1).asJsonLD
         val person1Id   = person1Json.entityId.get
@@ -86,7 +129,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(person1Id.value), Set(name1Updated), Set.empty)
+            UpdaterPerson(ResourceId(person1Id.value), NonEmptyList.of(name1Updated), emails = Set.empty)
           )
         )
 
@@ -94,6 +137,43 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         findPersons should contain theSameElementsAs Set(
           (person1Id.value, Some(name1Updated.value), None, None),
+          (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
+        )
+
+        clearDataset()
+      }
+    }
+
+    "generate query updating person's details with multiple names and emails " +
+      "- case when person id is known" in new TestCase {
+      forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
+        val person1Json = Person(name1, email1).asJsonLD
+        val person1Id   = person1Json.entityId.get
+        val person2Json = Person(name2, email2).asJsonLD
+        val person2Id   = person2Json.entityId.get
+
+        loadToStore(person1Json, person2Json)
+
+        findPersons should contain theSameElementsAs Set(
+          (person1Id.value, Some(name1.value), Some(email1.value), Some(name1.value)),
+          (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
+        )
+
+        val name1Updates  = nonEmptyList(userNames, minElements = 2).generateOne
+        val email1Updates = nonEmptySet(userEmails, minElements = 2).generateOne
+
+        val updates = updatesCreator.prepareUpdates(
+          Set(
+            UpdaterPerson(ResourceId(person1Id.value), name1Updates, email1Updates)
+          )
+        )
+
+        (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+
+        val results = findPersons
+        results.filter(_._1 == person1Id.value).map(_._2) shouldBe name1Updates.map(v => Some(v.value)).toList.toSet
+        results.filter(_._1 == person1Id.value).map(_._3) shouldBe email1Updates.map(v => Some(v.value))
+        results.filter(_._1 == person2Id.value) shouldBe Set(
           (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
         )
 
@@ -117,11 +197,5 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
   private trait TestCase {
     val updatesCreator = new UpdatesCreator
-  }
-
-  private implicit class JsonOps(json: Json) {
-    import io.circe.optics.JsonPath._
-
-    def remove(property: String): Json = root.obj.modify(_.remove(property))(json)
   }
 }
