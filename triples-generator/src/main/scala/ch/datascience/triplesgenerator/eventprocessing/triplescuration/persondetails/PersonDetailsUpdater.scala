@@ -69,7 +69,7 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
               for {
                 foundPerson <- personData.toPerson
                 _ = persons add foundPerson
-              } yield removeNameAndEmail(foundPerson.id, json)
+              } yield removeNameAndEmail(json)
           }
         case _ => json.pure[Interpretation]
       }
@@ -99,7 +99,7 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
       }
     }
 
-    private def removeNameAndEmail(resourceId: ResourceId, json: Json) =
+    private def removeNameAndEmail(json: Json) =
       json
         .remove("http://schema.org/name")
         .remove("http://schema.org/email")
