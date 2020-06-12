@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
-import cats.data.NonEmptyList
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
 
@@ -26,12 +25,4 @@ package object triplescuration {
 
   def `INSERT DATA`[TT <: TinyType { type V = String }](resource: String, property: String, value: TT): String =
     s"INSERT DATA { $resource $property '${sparqlEncode(value.value)}'}"
-
-  def `INSERT DATA`[TT <: TinyType { type V = String }](resource: String,
-                                                        property: String,
-                                                        values:   NonEmptyList[TT]): String =
-    values
-      .map(tt => s"$property '${sparqlEncode(tt.value)}'")
-      .toList
-      .mkString(s"INSERT DATA { $resource ", " ; ", " }")
 }
