@@ -107,9 +107,21 @@ class IOProcessingStatusFetcherSpec extends WordSpec with ExternalServiceStubbin
   "ProcessingStatus.from" should {
 
     import ProcessingStatus._
+    import eu.timepit.refined.auto._
+
+    "succeed if done is 0" in {
+      val done:     Done     = 0
+      val total:    Total    = positiveInts().generateOne
+      val progress: Progress = 0d
+      val Right(status) = ProcessingStatus.from(done.value, total.value, progress.value)
+
+      status.done     shouldBe done
+      status.total    shouldBe total
+      status.progress shouldBe progress
+    }
 
     "instantiate ProcessingStatus if done, total and progress are valid" in {
-      forAll(positiveInts(), nonNegativeInts()) { (done, totalDiff) =>
+      forAll(nonNegativeInts(), nonNegativeInts()) { (done, totalDiff) =>
         val total: Total = Refined.unsafeApply(done.value + totalDiff.value)
         val progress: Progress = Refined.unsafeApply(
           BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
@@ -123,20 +135,20 @@ class IOProcessingStatusFetcherSpec extends WordSpec with ExternalServiceStubbin
       }
     }
 
-    "fail if done <= 0" in {
-      forAll(nonPositiveInts(), positiveInts()) { (done, total) =>
-        val progress = BigDecimal((done.value.toDouble / total.value) * 100)
+    "fail if done < 0" in {
+      forAll(negativeInts(), positiveInts()) { (done, total) =>
+        val progress = BigDecimal((done.toDouble / total.value) * 100)
           .setScale(2, RoundingMode.HALF_DOWN)
           .toDouble
 
-        ProcessingStatus.from(done.value, total.value, progress) shouldBe Left(
+        ProcessingStatus.from(done, total.value, progress) shouldBe Left(
           "ProcessingStatus's 'done' cannot be negative"
         )
       }
     }
 
     "fail if total <= 0" in {
-      forAll(nonPositiveInts(), positiveInts()) { (total, done) =>
+      forAll(nonNegativeInts(), nonPositiveInts()) { (done, total) =>
         val progress = BigDecimal((done.value.toDouble / total.value) * 100)
           .setScale(2, RoundingMode.HALF_DOWN)
           .toDouble
@@ -148,7 +160,7 @@ class IOProcessingStatusFetcherSpec extends WordSpec with ExternalServiceStubbin
     }
 
     "fail if total < done" in {
-      val done  = positiveInts().generateOne.value + 1
+      val done  = nonNegativeInts().generateOne.value + 1
       val total = done - 1
       val progress = BigDecimal((done.toDouble / total) * 100)
         .setScale(2, RoundingMode.HALF_DOWN)
@@ -160,7 +172,7 @@ class IOProcessingStatusFetcherSpec extends WordSpec with ExternalServiceStubbin
     }
 
     "fail if progress is invalid" in {
-      val done     = positiveInts().generateOne.value + 1
+      val done     = nonNegativeInts().generateOne.value + 1
       val total    = done + positiveInts().generateOne.value
       val progress = 2d
 

@@ -52,7 +52,7 @@ private object ProcessingStatusFetcher {
 
   object ProcessingStatus {
 
-    type Done     = Int Refined Positive
+    type Done     = Int Refined NonNegative
     type Total    = Int Refined Positive
     type Progress = Double Refined NonNegative
 
