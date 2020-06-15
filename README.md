@@ -36,3 +36,19 @@ In a case of hoftixes, changes to a relevant commit/tag needs to be done and pus
 - version in the `helm-chart/renku-graph/Chart.yaml` has to follow `0.10.1-706fb4d`
 
 Additionally, a change to the version bump scheme needs to be done in the `build.sbt` and the default `releaseVersionBump := sbtrelease.Version.Bump.Minor` has to become `releaseVersionBump := sbtrelease.Version.Bump.Bugfix`.
+
+
+## Development notes
+
+### Triples generation 
+
+#### Prerequisites
+
+##### Installing renku from a branch in github
+
+`python3 -m pip install git+https://github.com/SwissDataScienceCenter/renku-python.git@branch`
+
+#### Renku command to generate triple
+
+`renku log --format json-ld --revision HEAD~1..HEAD $(git diff --name-only --diff-filter=d HEAD~1..HEAD)`
+

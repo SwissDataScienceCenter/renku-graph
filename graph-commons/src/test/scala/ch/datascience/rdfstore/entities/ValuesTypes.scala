@@ -22,7 +22,13 @@ import ch.datascience.tinytypes.RelativePathTinyType
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
-final class CwlFile private (val value: String) extends AnyVal with RelativePathTinyType
-object CwlFile {
-  def apply(fileName: String Refined NonEmpty): CwlFile = new CwlFile(s".renku/workflow/$fileName")
+sealed trait WorkflowFile extends RelativePathTinyType
+
+object WorkflowFile {
+
+  def cwl(fileName:  String Refined NonEmpty): WorkflowFile = new CwlFile(s".renku/workflow/$fileName")
+  def yaml(fileName: String Refined NonEmpty): WorkflowFile = new YamlFile(s".renku/workflow/$fileName")
+
+  final class CwlFile(val value:  String) extends AnyVal with WorkflowFile
+  final class YamlFile(val value: String) extends AnyVal with WorkflowFile
 }

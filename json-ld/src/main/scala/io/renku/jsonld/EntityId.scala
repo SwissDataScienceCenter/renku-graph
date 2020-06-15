@@ -22,19 +22,26 @@ import java.util.UUID
 
 import io.circe.{Encoder, Json}
 
-abstract class EntityId(val value: String) extends Product with Serializable {
-  override lazy val toString: String = value
+abstract class EntityId extends Product with Serializable {
+  type Value
+  def value: Value
 }
 
 object EntityId {
 
   def of[T](value: T)(implicit convert: T => EntityId): EntityId = convert(value)
-  def blank: EntityId = BlankNodeEntityId(s"_:${UUID.randomUUID()}")
+  def blank: EntityId = BlankNodeEntityId(UUID.randomUUID())
 
-  private[jsonld] final case class StandardEntityId(override val value:  String) extends EntityId(value)
-  private[jsonld] final case class BlankNodeEntityId(override val value: String) extends EntityId(value)
+  private[jsonld] final case class StandardEntityId(override val value: String) extends EntityId {
+    type Value = String
+    override lazy val toString: String = value
+  }
+  private[jsonld] final case class BlankNodeEntityId(override val value: UUID) extends EntityId {
+    type Value = UUID
+    override lazy val toString: String = s"_:$value"
+  }
 
-  implicit val entityIdJsonEncoder: Encoder[EntityId]    = Encoder.instance(id => Json.fromString(id.value))
+  implicit val entityIdJsonEncoder: Encoder[EntityId]    = Encoder.instance(id => Json.fromString(id.toString))
   implicit val stringToEntityId:    String => EntityId   = StandardEntityId.apply
   implicit val propertyToEntityId:  Property => EntityId = p => StandardEntityId(p.url)
 }

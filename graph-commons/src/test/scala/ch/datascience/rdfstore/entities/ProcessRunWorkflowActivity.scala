@@ -29,7 +29,7 @@ final case class ProcessRunWorkflowActivity(override val id:            CommitId
                                             override val project:       Project,
                                             override val agent:         Agent,
                                             override val comment:       String,
-                                            cwlFile:                    CwlFile,
+                                            workflowFile:               WorkflowFile,
                                             informedBy:                 Activity,
                                             association:                Association,
                                             startTime:                  Instant = Instant.now(),
@@ -52,10 +52,10 @@ object ProcessRunWorkflowActivity {
         EntityId of fusekiBaseUrl / "activities" / "commit" / entity.id,
         EntityTypes of (wfprov / "ProcessRun", wfprov / "WorkflowRun", prov / "Activity"),
         Activity.toProperties(entity),
-        rdfs / "label"                -> s"${entity.cwlFile}@${entity.id}".asJsonLD,
+        rdfs / "label"                -> s"${entity.workflowFile}@${entity.id}".asJsonLD,
         prov / "qualifiedAssociation" -> entity.association.asJsonLD,
         prov / "influenced"           -> entity.influenced.asJsonLD,
-        prov / "atLocation"           -> entity.association.processPlan.cwlFile.asJsonLD,
+        prov / "atLocation"           -> entity.association.processPlan.workflowFile.asJsonLD,
         prov / "qualifiedUsage"       -> entity.usages.asJsonLD
       )
     }

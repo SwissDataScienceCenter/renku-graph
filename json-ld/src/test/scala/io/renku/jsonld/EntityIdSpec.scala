@@ -19,6 +19,7 @@
 package io.renku.jsonld
 
 import io.renku.jsonld.generators.Generators._
+import io.renku.jsonld.generators.Generators.Implicits._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -47,11 +48,18 @@ class EntityIdSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
-  "blank" should {
-    "return an EntityId with a random blank id" in {
-      EntityId.blank.value should fullyMatch regex "_:.+"
+  "of" should {
+    "return an Entity Id with toString the same as value" in {
+      val httpUrl = httpUrls().generateOne
+      EntityId.of(httpUrl).toString shouldBe httpUrl
     }
-    "return a different value everytime it is generated" in {
+  }
+
+  "blank" should {
+    "return an EntityId with a toString as a blank id" in {
+      EntityId.blank.toString should fullyMatch regex "_:.+"
+    }
+    "return a different value every time it is generated" in {
       EntityId.blank should not be EntityId.blank
     }
   }

@@ -22,7 +22,7 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.rdfstore.FusekiBaseUrl
 
-final case class Usage(commitId: CommitId, filePath: FilePath, artifact: Artifact)
+final case class Usage(commitId: CommitId, commandInput: CommandInput, artifact: Artifact)
 
 object Usage {
 
@@ -33,10 +33,10 @@ object Usage {
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Usage] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
-        EntityId of (fusekiBaseUrl / "commit" / entity.commitId / entity.filePath),
+        EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.commitId / "inputs" / entity.commandInput.entityIdToString),
         EntityTypes of (prov / "Usage"),
         prov / "entity"  -> toJsonLD(entity.artifact),
-        prov / "hadRole" -> entity.filePath.asJsonLD
+        prov / "hadRole" -> entity.commandInput.entityIdToString.asJsonLD
       )
     }
 

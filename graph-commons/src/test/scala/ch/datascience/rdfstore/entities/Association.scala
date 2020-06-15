@@ -46,6 +46,7 @@ object Association {
         prov / "hadPlan" -> (entity.processPlan match {
           case plan: StandardProcessPlan => plan.asJsonLD
           case plan: ProcessPlanWorkflow => plan.asJsonLD
+          case plan: RunPlan             => plan.asJsonLD
         })
       )
     }

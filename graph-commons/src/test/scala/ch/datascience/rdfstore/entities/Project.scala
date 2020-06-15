@@ -18,15 +18,17 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId}
+import ch.datascience.rdfstore.entities.Project.ProjectVersion
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 final case class Project(path:               Path,
                          name:               Name,
                          dateCreated:        DateCreated,
                          maybeCreator:       Option[Person],
                          maybeParentProject: Option[Project] = None,
-                         version:            SchemaVersion = SchemaVersion("1"))
+                         version:            ProjectVersion = ProjectVersion("1"))
 
 object Project {
 
@@ -49,4 +51,7 @@ object Project {
 
   private implicit val projectResourceToEntityId: ResourceId => EntityId =
     resource => EntityId of resource.value
+
+  final class ProjectVersion private (val value: String) extends AnyVal with StringTinyType
+  object ProjectVersion extends TinyTypeFactory[ProjectVersion](new ProjectVersion(_)) with NonBlank
 }
