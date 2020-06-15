@@ -43,6 +43,7 @@ trait LongTinyType         extends Any with TinyType { type V = Long }
 trait JsonTinyType         extends Any with TinyType { type V = Json }
 trait InstantTinyType      extends Any with TinyType { type V = Instant }
 trait LocalDateTinyType    extends Any with TinyType { type V = LocalDate }
+trait BooleanTinyType      extends Any with TinyType { type V = Boolean }
 
 object StringTinyType {
   implicit val stringTinyTypeConverter: StringTinyType => List[PathSegment] =
