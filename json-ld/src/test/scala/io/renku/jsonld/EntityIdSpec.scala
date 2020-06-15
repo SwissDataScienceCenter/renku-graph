@@ -46,4 +46,13 @@ class EntityIdSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
   }
+
+  "blank" should {
+    "return an EntityId with a random blank id" in {
+      EntityId.blank.value should fullyMatch regex "_:.+"
+    }
+    "return a different value everytime it is generated" in {
+      EntityId.blank should not be EntityId.blank
+    }
+  }
 }

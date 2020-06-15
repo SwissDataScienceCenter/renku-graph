@@ -18,6 +18,8 @@
 
 package io.renku.jsonld
 
+import java.util.UUID
+
 import io.circe.{Encoder, Json}
 
 abstract class EntityId(val value: String) extends Product with Serializable {
@@ -27,8 +29,10 @@ abstract class EntityId(val value: String) extends Product with Serializable {
 object EntityId {
 
   def of[T](value: T)(implicit convert: T => EntityId): EntityId = convert(value)
+  def blank: EntityId = BlankNodeEntityId(s"_:${UUID.randomUUID()}")
 
-  private[jsonld] final case class StandardEntityId(override val value: String) extends EntityId(value)
+  private[jsonld] final case class StandardEntityId(override val value:  String) extends EntityId(value)
+  private[jsonld] final case class BlankNodeEntityId(override val value: String) extends EntityId(value)
 
   implicit val entityIdJsonEncoder: Encoder[EntityId]    = Encoder.instance(id => Json.fromString(id.value))
   implicit val stringToEntityId:    String => EntityId   = StandardEntityId.apply

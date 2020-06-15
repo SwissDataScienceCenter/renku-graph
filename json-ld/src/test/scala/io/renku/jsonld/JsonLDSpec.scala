@@ -158,6 +158,30 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
+  "JsonLD.fromBoolean" should {
+
+    "allow to construct JsonLD Boolean value" in {
+      forAll { value: Boolean =>
+        JsonLD.fromBoolean(value).toJson shouldBe
+          json"""{
+            "@value": $value
+          }"""
+      }
+    }
+
+    "have no entityId" in {
+      forAll { value: Boolean =>
+        JsonLD.fromBoolean(value).entityId shouldBe None
+      }
+    }
+
+    "have no entityTypes" in {
+      forAll { value: Boolean =>
+        JsonLD.fromBoolean(value).entityTypes shouldBe None
+      }
+    }
+  }
+
   "JsonLD.Null" should {
 
     "be Json.Null" in {
