@@ -1,0 +1,7 @@
+- are all subtypes of ProcessPlan still needed?
+- verify the type of SuccessCode in RunPlan.
+- are the steps needed in the Association entity?
+- complete the properties of the RunPlan entity with what is given in the ontology
+- complete the properties of the CommandParameter entity with what is given in the ontology
+- create the CommandArgument entity as shown in the ontology?
+- finish the refactoring of the Usage entity with the CommandInput instead of the FilePath entity

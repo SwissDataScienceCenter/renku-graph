@@ -53,7 +53,7 @@ object Person {
 
   private lazy val entityId: Option[Email] => EntityId = {
     case Some(email) => EntityId of s"mailto:$email"
-    case None        => EntityId of s"_:${UUID.randomUUID()}"
+    case None        => EntityId.blank
   }
 
   val persons: Gen[Person] = for {

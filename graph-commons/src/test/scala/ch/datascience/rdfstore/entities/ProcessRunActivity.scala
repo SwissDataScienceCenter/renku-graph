@@ -52,12 +52,13 @@ object ProcessRunActivity {
         EntityId of (s"$fusekiBaseUrl/activities/commit/${entity.id}${entity.maybeStepId.map(id => s"/$id").getOrElse("")}"),
         EntityTypes of (prov / "Activity", wfprov / "ProcessRun"),
         Activity.toProperties(entity),
-        rdfs / "label"                -> s"${entity.association.processPlan.cwlFile}@${entity.id}".asJsonLD,
+        rdfs / "label"                -> s"${entity.association.processPlan.workflowFile}@${entity.id}".asJsonLD,
         prov / "qualifiedAssociation" -> entity.association.asJsonLD,
         prov / "influenced"           -> entity.influenced.asJsonLD,
-        prov / "atLocation"           -> entity.association.processPlan.cwlFile.asJsonLD,
+        prov / "atLocation"           -> entity.association.processPlan.workflowFile.asJsonLD,
         prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
-        prov / "wasPartOfWorkflowRun" -> entity.maybeWasPartOfWorkflowRun.asJsonLD
+        prov / "wasPartOfWorkflowRun" -> entity.maybeWasPartOfWorkflowRun.asJsonLD,
+        prov / "wasAssociatedWith" -> entity.
       )
     }
 }

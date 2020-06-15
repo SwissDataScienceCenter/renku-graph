@@ -68,6 +68,8 @@ package object entities extends Schemas {
     JsonLDEncoder.instance(v => JsonLD.fromInstant(v.value))
   implicit def localDateTTEncoder[TT <: TinyType { type V = LocalDate }]: JsonLDEncoder[TT] =
     JsonLDEncoder.instance(v => JsonLD.fromLocalDate(v.value))
+  implicit def booleanTTEncoder[TT <: BooleanTinyType]: JsonLDEncoder[TT] =
+    JsonLDEncoder.instance(v => JsonLD.fromBoolean(v.value))
 }
 
 trait Schemas {
@@ -77,4 +79,5 @@ trait Schemas {
   val rdfs:      Schema = Schema.from("http://www.w3.org/2000/01/rdf-schema", separator = "#")
   val xmlSchema: Schema = Schema.from("http://www.w3.org/2001/XMLSchema", separator = "#")
   val schema:    Schema = Schema.from("http://schema.org")
+  val renku:     Schema = Schema.from("https://swissdatasciencecenter.github.io/renku-ontology", separator = "#")
 }

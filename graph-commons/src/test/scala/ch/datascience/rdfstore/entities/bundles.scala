@@ -256,7 +256,7 @@ object bundles extends Schemas {
         association = Association(
           commit8Id,
           agent.copy(maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit8Id, CwlFile("3983f12670a8410eb9b15d81e8949560_python.cwl"), project)
+          StandardProcessPlan(commit8Id, WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"), project)
         ),
         usages = List(
           Usage(commit8Id, FilePath("inputs/input_1"), commit7CleanDataEntity),
@@ -273,7 +273,7 @@ object bundles extends Schemas {
         association = Association(
           commit9Id,
           agent.copy(maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit8Id, CwlFile("fdf4672a1f424758af8fdb590e0d7869_python.cwl"), project)
+          StandardProcessPlan(commit8Id, WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"), project)
         ),
         usages = List(
           Usage(commit9Id, FilePath("inputs/input_1"), commit7PlotDataEntity),
@@ -316,12 +316,12 @@ object bundles extends Schemas {
         project,
         agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
         comment = "renku update",
-        CwlFile("db4f249682b34e0db239cc26945a126c.cwl"),
+        WorkflowFile.cwl("db4f249682b34e0db239cc26945a126c.cwl"),
         informedBy = commit11Activity,
         Association(
           commit12Id,
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          ProcessPlanWorkflow(commit12Id, CwlFile("db4f249682b34e0db239cc26945a126c.cwl"), project)
+          ProcessPlanWorkflow(commit12Id, WorkflowFile.cwl("db4f249682b34e0db239cc26945a126c.cwl"), project)
         ),
         usages = List(
           Usage(commit12Id, FilePath("inputs/input_1"), commit7PlotDataEntity),
@@ -343,7 +343,7 @@ object bundles extends Schemas {
         association = Association(
           commit12Id,
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit9Id, CwlFile("fdf4672a1f424758af8fdb590e0d7869_python.cwl"), project),
+          StandardProcessPlan(commit9Id, WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"), project),
           maybeStep = Some("steps/step_2")
         ),
         usages = List(
@@ -364,7 +364,7 @@ object bundles extends Schemas {
         association = Association(
           commit12Id,
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit8Id, CwlFile("3983f12670a8410eb9b15d81e8949560_python.cwl"), project),
+          StandardProcessPlan(commit8Id, WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"), project),
           maybeStep = Some("steps/step_2")
         ),
         usages = List(
