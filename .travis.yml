@@ -6,7 +6,7 @@ branches:
 language: scala
 jdk: openjdk12
 scala:
-  - 2.12.8
+  - 2.12.11
 cache:
   directories:
     - "$HOME/.ivy2/cache"
