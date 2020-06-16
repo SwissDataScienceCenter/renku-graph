@@ -27,7 +27,7 @@ final case class ProcessRunActivity(override val id:              CommitId,
                                     override val maybeInformedBy: Option[Activity],
                                     association:                  Association,
                                     usages:                       List[Usage],
-                                    influenced:                   List[String] = Nil,
+                                    override val maybeInfluenced: Option[Activity] = None,
                                     maybeStepId:                  Option[String] = None,
                                     maybeWasPartOfWorkflowRun:    Option[ProcessRunWorkflowActivity] = None)
     extends Activity(id,
@@ -36,7 +36,8 @@ final case class ProcessRunActivity(override val id:              CommitId,
                      association.processPlan.project,
                      association.agent,
                      comment,
-                     maybeInformedBy)
+                     maybeInformedBy,
+                     maybeInfluenced)
 
 object ProcessRunActivity {
 
@@ -54,11 +55,9 @@ object ProcessRunActivity {
         Activity.toProperties(entity),
         rdfs / "label"                -> s"${entity.association.processPlan.workflowFile}@${entity.id}".asJsonLD,
         prov / "qualifiedAssociation" -> entity.association.asJsonLD,
-        prov / "influenced"           -> entity.influenced.asJsonLD,
         prov / "atLocation"           -> entity.association.processPlan.workflowFile.asJsonLD,
         prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
-        prov / "wasPartOfWorkflowRun" -> entity.maybeWasPartOfWorkflowRun.asJsonLD,
-        prov / "wasAssociatedWith" -> entity.
+        prov / "wasPartOfWorkflowRun" -> entity.maybeWasPartOfWorkflowRun.asJsonLD
       )
     }
 }

@@ -28,7 +28,8 @@ abstract class Activity(val id:              CommitId,
                         val project:         Project,
                         val agent:           Agent,
                         val comment:         String,
-                        val maybeInformedBy: Option[Activity])
+                        val maybeInformedBy: Option[Activity],
+                        val maybeInfluenced: Option[Activity])
 
 object Activity {
 
@@ -38,8 +39,9 @@ object Activity {
             project:         Project,
             agent:           Agent,
             comment:         String = "some comment",
-            maybeInformedBy: Option[Activity] = None): Activity =
-    StandardActivity(id, committedDate, committer, project, agent, comment, maybeInformedBy)
+            maybeInformedBy: Option[Activity] = None,
+            maybeInfluenced: Option[Activity] = None): Activity =
+    StandardActivity(id, committedDate, committer, project, agent, comment, maybeInformedBy, maybeInfluenced)
 
   import cats.data.NonEmptyList
   import io.renku.jsonld._
@@ -49,12 +51,13 @@ object Activity {
       entity:              Activity
   )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NonEmptyList[(Property, JsonLD)] =
     NonEmptyList.of(
-      prov / "startedAtTime" -> entity.committedDate.asJsonLD,
-      prov / "endedAtTime"   -> entity.committedDate.asJsonLD,
-      prov / "wasInformedBy" -> entity.maybeInformedBy.asJsonLD,
-      prov / "agent"         -> JsonLD.arr(entity.agent.asJsonLD, entity.committer.asJsonLD),
-      rdfs / "comment"       -> entity.comment.asJsonLD,
-      schema / "isPartOf"    -> entity.project.asJsonLD
+      prov / "startedAtTime"     -> entity.committedDate.asJsonLD,
+      prov / "endedAtTime"       -> entity.committedDate.asJsonLD,
+      prov / "wasInformedBy"     -> entity.maybeInformedBy.asJsonLD,
+      prov / "wasAssociatedWith" -> JsonLD.arr(entity.agent.asJsonLD, entity.committer.asJsonLD),
+      prov / "influenced"        -> entity.maybeInfluenced.asJsonLD,
+      rdfs / "comment"           -> entity.comment.asJsonLD,
+      schema / "isPartOf"        -> entity.project.asJsonLD
     )
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Activity] =
@@ -72,8 +75,9 @@ final case class StandardActivity(override val id:              CommitId,
                                   override val project:         Project,
                                   override val agent:           Agent,
                                   override val comment:         String,
-                                  override val maybeInformedBy: Option[Activity] = None)
-    extends Activity(id, committedDate, committer, project, agent, comment, maybeInformedBy)
+                                  override val maybeInformedBy: Option[Activity] = None,
+                                  override val maybeInfluenced: Option[Activity] = None)
+    extends Activity(id, committedDate, committer, project, agent, comment, maybeInformedBy, maybeInfluenced)
 
 object StandardActivity {
 

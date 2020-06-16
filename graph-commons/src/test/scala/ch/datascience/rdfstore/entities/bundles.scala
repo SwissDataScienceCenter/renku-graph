@@ -28,8 +28,10 @@ import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartL
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, FilePath, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
+import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.rdfstore.entities.DataSetPart.dataSetParts
 import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.RunPlan.{Argument, Command}
 import ch.datascience.rdfstore.{FusekiBaseUrl, Schemas}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
@@ -247,6 +249,8 @@ object bundles extends Schemas {
       )
       val commit7PlotDataEntity  = ArtifactEntity(commit7Id, FilePath("src/plot_data.py"), project)
       val commit7CleanDataEntity = ArtifactEntity(commit7Id, FilePath("src/clean_data.py"), project)
+      val commit8CommandInput1   = CommandInput(None, Value("inputs/input_1"), Position(1), Nil)
+      val commit8CommandInput2   = CommandInput(None, Value("inputs/input_2"), Position(2), Nil)
       val commit8ProcessRunActivity = ProcessRunActivity(
         commit8Id,
         committedDates.generateOne,
@@ -256,14 +260,25 @@ object bundles extends Schemas {
         association = Association(
           commit8Id,
           agent.copy(maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit8Id, WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"), project)
+          RunPlan(
+            commit8Id,
+            WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"),
+            project,
+            Command("run"),
+            List(Argument("python")),
+            List(commit8CommandInput1, commit8CommandInput2),
+            Nil
+          )
         ),
         usages = List(
-          Usage(commit8Id, FilePath("inputs/input_1"), commit7CleanDataEntity),
-          Usage(commit8Id, FilePath("inputs/input_2"), commit3EntityCollection)
+          Usage(commit8Id, commit8CommandInput1, commit7CleanDataEntity),
+          Usage(commit8Id, commit8CommandInput2, commit3EntityCollection)
         )
       )
       val commit8ParquetEntity = ArtifactEntity(commit8Id, FilePath("data/preprocessed/zhbikes.parquet"), project)
+
+      val commit9CommandInput1 = CommandInput(None, Value("inputs/input_1"), Position(1), Nil)
+      val commit9CommandInput2 = CommandInput(None, Value("inputs/input_2"), Position(2), Nil)
       val commit9ProcessRunActivity = ProcessRunActivity(
         commit9Id,
         committedDates.generateOne,
@@ -273,11 +288,19 @@ object bundles extends Schemas {
         association = Association(
           commit9Id,
           agent.copy(maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit8Id, WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"), project)
+          RunPlan(
+            commit8Id,
+            WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"),
+            project,
+            Command("run"),
+            List(Argument("python")),
+            List(commit9CommandInput1, commit9CommandInput1),
+            Nil
+          )
         ),
         usages = List(
-          Usage(commit9Id, FilePath("inputs/input_1"), commit7PlotDataEntity),
-          Usage(commit9Id, FilePath("inputs/input_2"), commit8ParquetEntity)
+          Usage(commit9Id, commit9CommandInput1, commit7PlotDataEntity),
+          Usage(commit9Id, commit9CommandInput2, commit8ParquetEntity)
         )
       )
       val commit9PlotDataEntity = ArtifactEntity(
@@ -309,6 +332,10 @@ object bundles extends Schemas {
         members = List(ArtifactEntity(commit3Id, FilePath("data/zhbikes/2019velo.csv"), project),
                        ArtifactEntity(commit10Id, FilePath("data/zhbikes/2018velo.csv"), project))
       )
+
+      val commit12CommandInput1 = CommandInput(None, Value("inputs/input_1"), Position(1), Nil)
+      val commit12CommandInput2 = CommandInput(None, Value("inputs/input_2"), Position(2), Nil)
+      val commit12CommandInput3 = CommandInput(None, Value("inputs/input_3"), Position(3), Nil)
       val commit12RunWorkflowActivity = ProcessRunWorkflowActivity(
         commit12Id,
         committedDates.generateOne,
@@ -321,19 +348,29 @@ object bundles extends Schemas {
         Association(
           commit12Id,
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          ProcessPlanWorkflow(commit12Id, WorkflowFile.cwl("db4f249682b34e0db239cc26945a126c.cwl"), project)
+          RunPlan(
+            commit12Id,
+            WorkflowFile.cwl("db4f249682b34e0db239cc26945a126c.cwl"),
+            project,
+            Command("update"),
+            Nil,
+            List(commit12CommandInput1, commit12CommandInput2, commit12CommandInput3),
+            Nil
+          )
         ),
         usages = List(
-          Usage(commit12Id, FilePath("inputs/input_1"), commit7PlotDataEntity),
-          Usage(commit12Id, FilePath("inputs/input_2"), commit7CleanDataEntity),
+          Usage(commit12Id, commit12CommandInput1, commit7PlotDataEntity),
+          Usage(commit12Id, commit12CommandInput2, commit7CleanDataEntity),
           Usage(
             commit12Id,
-            FilePath("inputs/input_3"),
+            commit12CommandInput3,
             commit10ZhbikesCollectionEntity
           )
         )
       )
 
+      val commit12Step1CommandInput1 = CommandInput(None, Value("steps/step_1/inputs/input_1"), Position(1), Nil)
+      val commit12Step1CommandInput2 = CommandInput(None, Value("steps/step_1/inputs/input_2"), Position(2), Nil)
       val commit12Step1ProcessRunActivity = ProcessRunActivity(
         commit12Id,
         committedDates.generateOne,
@@ -343,18 +380,29 @@ object bundles extends Schemas {
         association = Association(
           commit12Id,
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit9Id, WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"), project),
+          RunPlan(
+            commit9Id,
+            WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"),
+            project,
+            Command("update"),
+            Nil,
+            List(commit12Step1CommandInput1, commit12Step1CommandInput2),
+            Nil
+          ),
           maybeStep = Some("steps/step_2")
         ),
         usages = List(
-          Usage(commit12Id, FilePath("steps/step_1/inputs/input_1"), commit7PlotDataEntity),
+          Usage(commit12Id, commit12Step1CommandInput1, commit7PlotDataEntity),
           Usage(commit12Id,
-                FilePath("steps/step_1/inputs/input_2"),
+                commit12Step1CommandInput2,
                 ArtifactEntity(commit12Id, FilePath("data/preprocessed/zhbikes.parquet"), project))
         ),
         maybeStepId               = Some("steps/step_1"),
         maybeWasPartOfWorkflowRun = Some(commit12RunWorkflowActivity)
       )
+
+      val commit12Step2CommandInput1 = CommandInput(None, Value("steps/step_2/inputs/input_1"), Position(1), Nil)
+      val commit12Step2CommandInput2 = CommandInput(None, Value("steps/step_2/inputs/input_2"), Position(2), Nil)
       val commit12Step2ProcessRunActivity = ProcessRunActivity(
         commit12Id,
         committedDates.generateOne,
@@ -364,14 +412,22 @@ object bundles extends Schemas {
         association = Association(
           commit12Id,
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit8Id, WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"), project),
+          RunPlan(
+            commit8Id,
+            WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"),
+            project,
+            Command("update"),
+            Nil,
+            List(commit12Step2CommandInput1, commit12Step2CommandInput2),
+            Nil
+          ),
           maybeStep = Some("steps/step_2")
         ),
         usages = List(
-          Usage(commit12Id, FilePath("steps/step_2/inputs/input_1"), commit7CleanDataEntity),
+          Usage(commit12Id, commit12Step2CommandInput1, commit7CleanDataEntity),
           Usage(
             commit12Id,
-            FilePath("steps/step_2/inputs/input_2"),
+            commit12Step2CommandInput2,
             commit10ZhbikesCollectionEntity
           )
         ),

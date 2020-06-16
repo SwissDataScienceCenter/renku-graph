@@ -22,7 +22,7 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.rdfstore.FusekiBaseUrl
 
-final case class Usage(commitId: CommitId, commandInput: CommandInput, artifact: Artifact)
+final case class Usage(commitId: CommitId, commandInput: Input, artifact: Artifact)
 
 object Usage {
 

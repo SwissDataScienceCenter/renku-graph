@@ -23,7 +23,10 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.rdfstore.FusekiBaseUrl
 
-sealed abstract class Artifact(val commitId: CommitId, val filePath: FilePath, val project: Project)
+sealed abstract class Artifact(val commitId:                  CommitId,
+                               val filePath:                  FilePath,
+                               val project:                   Project,
+                               val maybeInvalidationActivity: Option[Activity])
 
 object Artifact {
 
@@ -35,16 +38,18 @@ object Artifact {
       entity:              Artifact
   )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NonEmptyList[(Property, JsonLD)] =
     NonEmptyList.of(
-      rdfs / "label"      -> s"${entity.filePath}@${entity.commitId}".asJsonLD,
-      schema / "isPartOf" -> entity.project.asJsonLD,
-      prov / "atLocation" -> entity.filePath.asJsonLD
+      rdfs / "label"            -> s"${entity.filePath}@${entity.commitId}".asJsonLD,
+      schema / "isPartOf"       -> entity.project.asJsonLD,
+      prov / "atLocation"       -> entity.filePath.asJsonLD,
+      prov / "wasInvalidatedBy" -> entity.maybeInvalidationActivity.asJsonLD
     )
 }
 
-final class ArtifactEntity private (val maybeFilePath:    Option[FilePath],
-                                    val maybeCommitId:    Option[CommitId],
-                                    val maybeGeneration:  Option[Generation],
-                                    override val project: Project)
+final class ArtifactEntity private (val maybeFilePath:                      Option[FilePath],
+                                    val maybeCommitId:                      Option[CommitId],
+                                    val maybeGeneration:                    Option[Generation],
+                                    override val project:                   Project,
+                                    override val maybeInvalidationActivity: Option[Activity] = None)
     extends Artifact(
       maybeCommitId orElse maybeGeneration.map(_.activity.id) getOrElse (throw new Exception(
         "No commitId for ArtifactEntity"
@@ -52,7 +57,8 @@ final class ArtifactEntity private (val maybeFilePath:    Option[FilePath],
       maybeFilePath orElse maybeGeneration.map(_.filePath) getOrElse (throw new Exception(
         "No filePath for ArtifactEntity"
       )),
-      project
+      project,
+      maybeInvalidationActivity
     )
 
 object ArtifactEntity {
@@ -89,11 +95,12 @@ object ArtifactEntity {
     }
 }
 
-final case class ArtifactEntityCollection(override val commitId: CommitId,
-                                          override val filePath: FilePath,
-                                          override val project:  Project,
-                                          members:               List[ArtifactEntity])
-    extends Artifact(commitId, filePath, project)
+final case class ArtifactEntityCollection(override val commitId:                  CommitId,
+                                          override val filePath:                  FilePath,
+                                          override val project:                   Project,
+                                          members:                                List[ArtifactEntity],
+                                          override val maybeInvalidationActivity: Option[Activity] = None)
+    extends Artifact(commitId, filePath, project, maybeInvalidationActivity)
 
 object ArtifactEntityCollection {
 

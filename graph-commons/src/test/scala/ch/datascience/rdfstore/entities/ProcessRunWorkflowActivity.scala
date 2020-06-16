@@ -23,20 +23,20 @@ import java.time.temporal.ChronoUnit.SECONDS
 
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 
-final case class ProcessRunWorkflowActivity(override val id:            CommitId,
-                                            override val committedDate: CommittedDate,
-                                            override val committer:     Person,
-                                            override val project:       Project,
-                                            override val agent:         Agent,
-                                            override val comment:       String,
-                                            workflowFile:               WorkflowFile,
-                                            informedBy:                 Activity,
-                                            association:                Association,
-                                            startTime:                  Instant = Instant.now(),
-                                            endTime:                    Instant = Instant.now().plus(10, SECONDS),
-                                            influenced:                 List[String] = Nil,
-                                            usages:                     List[Usage])
-    extends Activity(id, committedDate, committer, project, agent, comment, Some(informedBy))
+final case class ProcessRunWorkflowActivity(override val id:              CommitId,
+                                            override val committedDate:   CommittedDate,
+                                            override val committer:       Person,
+                                            override val project:         Project,
+                                            override val agent:           Agent,
+                                            override val comment:         String,
+                                            workflowFile:                 WorkflowFile,
+                                            informedBy:                   Activity,
+                                            association:                  Association,
+                                            startTime:                    Instant = Instant.now(),
+                                            endTime:                      Instant = Instant.now().plus(10, SECONDS),
+                                            override val maybeInfluenced: Option[Activity] = None,
+                                            usages:                       List[Usage])
+    extends Activity(id, committedDate, committer, project, agent, comment, Some(informedBy), maybeInfluenced)
 
 object ProcessRunWorkflowActivity {
 
@@ -54,7 +54,6 @@ object ProcessRunWorkflowActivity {
         Activity.toProperties(entity),
         rdfs / "label"                -> s"${entity.workflowFile}@${entity.id}".asJsonLD,
         prov / "qualifiedAssociation" -> entity.association.asJsonLD,
-        prov / "influenced"           -> entity.influenced.asJsonLD,
         prov / "atLocation"           -> entity.association.processPlan.workflowFile.asJsonLD,
         prov / "qualifiedUsage"       -> entity.usages.asJsonLD
       )

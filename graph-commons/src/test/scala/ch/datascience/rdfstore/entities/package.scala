@@ -70,6 +70,10 @@ package object entities extends Schemas {
     JsonLDEncoder.instance(v => JsonLD.fromLocalDate(v.value))
   implicit def booleanTTEncoder[TT <: BooleanTinyType]: JsonLDEncoder[TT] =
     JsonLDEncoder.instance(v => JsonLD.fromBoolean(v.value))
+
+  implicit class EntityOps[T](entity: T) {
+    def asPartialJsonLD[S <: T](implicit convert: S => PartialEntity): PartialEntity = convert(entity)
+  }
 }
 
 trait Schemas {

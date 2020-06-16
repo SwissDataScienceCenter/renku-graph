@@ -29,13 +29,15 @@ object Generation {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
+  def apply(workflowFile: WorkflowFile, activity: Activity): Generation =
+    Generation(FilePath(workflowFile.value), activity)
+
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Generation] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
         EntityId of fusekiBaseUrl / "commit" / entity.activity.id / "tree" / entity.filePath,
         EntityTypes of (prov / "Generation"),
-        prov / "activity" -> entity.activity.asJsonLD,
-        prov / "hadRole"  -> entity.filePath.asJsonLD
+        prov / "activity" -> entity.activity.asJsonLD
       )
     }
 }

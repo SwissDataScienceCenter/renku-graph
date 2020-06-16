@@ -41,7 +41,10 @@ object EntityId {
     override lazy val toString: String = s"_:$value"
   }
 
-  implicit val entityIdJsonEncoder: Encoder[EntityId]    = Encoder.instance(id => Json.fromString(id.toString))
-  implicit val stringToEntityId:    String => EntityId   = StandardEntityId.apply
-  implicit val propertyToEntityId:  Property => EntityId = p => StandardEntityId(p.url)
+  implicit val entityIdJsonEncoder: Encoder[EntityId] = Encoder.instance {
+    case StandardEntityId(url)   => Json.fromString(url)
+    case BlankNodeEntityId(uuid) => Json.fromString(s"_:$uuid")
+  }
+  implicit val stringToEntityId:   String => EntityId   = StandardEntityId.apply
+  implicit val propertyToEntityId: Property => EntityId = p => StandardEntityId(p.url)
 }
