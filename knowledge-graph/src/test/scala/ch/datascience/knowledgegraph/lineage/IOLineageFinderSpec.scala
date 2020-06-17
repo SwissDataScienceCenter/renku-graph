@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph.lineage
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{filePaths, projectPaths}
+import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.knowledgegraph.lineage.model._
@@ -45,7 +46,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
       import examplarData._
 
       lineageFinder
-        .findLineage(projectPath, filePath)
+        .findLineage(projectPath, FilePath(location.value))
         .unsafeRunSync() shouldBe Some(
         Lineage(
           edges = Set(

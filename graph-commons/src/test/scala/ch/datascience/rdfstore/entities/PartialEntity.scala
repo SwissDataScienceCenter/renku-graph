@@ -1,3 +1,21 @@
+/*
+ * Copyright 2020 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.datascience.rdfstore.entities
 
 import cats.data.NonEmptyList
@@ -40,47 +58,40 @@ object PartialEntity {
 
   def apply(types: EntityTypes): PartialEntity = new PartialEntity(maybeId = None, Some(types), Nil)
 
-  implicit val semigroup: Semigroup[PartialEntity] = new Semigroup[PartialEntity] {
-    override def combine(x: PartialEntity, y: PartialEntity): PartialEntity = x.copy(
-      maybeId = x.maybeId orElse y.maybeId,
-      maybeTypes = (y.maybeTypes -> x.maybeTypes) match {
-        case (None, None)            => None
-        case (types @ Some(_), None) => types
-        case (None, types @ Some(_)) => types
-        case types =>
-          types.mapN { (xTypes, yTypes) =>
-            EntityTypes(xTypes.list ::: yTypes.list)
-          }
-      },
-      properties = y.properties ++ x.properties
+  def apply(id: EntityId): PartialEntity = new PartialEntity(Some(id), maybeTypes = None, Nil)
+
+  def apply(first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
+    new PartialEntity(maybeId = None, maybeTypes = None, (first +: other).toList)
+
+  implicit val semigroup: Semigroup[PartialEntity] = (x: PartialEntity, y: PartialEntity) =>
+    x.copy(
+      maybeId    = y.maybeId orElse x.maybeId,
+      maybeTypes = y.maybeTypes.map(_.list) |+| x.maybeTypes.map(_.list) map EntityTypes.apply,
+      properties = y.properties.foldLeft(x.properties) {
+        case (originalList, (property, value)) =>
+          val index = originalList.indexWhere(_._1 == property)
+
+          if (index > -1) originalList.updated(index, property -> value)
+          else originalList :+ (property -> value)
+      }
     )
-  }
 
   implicit class PartialEntityOps(partialEntity: Either[Exception, PartialEntity]) {
-    lazy val getOrFail: JsonLD =
-      partialEntity flatMap toJsonLD fold (throw _, identity)
+
+    lazy val getOrFail: JsonLD = partialEntity flatMap toJsonLD fold (throw _, identity)
 
     private def toJsonLD(partialEntity: PartialEntity): Either[Exception, JsonLD] =
       for {
-        entityId <- Either.fromOption(
-                     partialEntity.maybeId,
-                     new Exception(
-                       s"No entity Id in partial entity ${partialEntity.maybeTypes} ${partialEntity.properties}"
-                     )
-                   )
-        types <- Either.fromOption(
-                  partialEntity.maybeTypes,
-                  new Exception(
-                    s"No entityTypes in partial entity ${partialEntity.maybeId} ${partialEntity.properties}"
-                  )
-                )
-        properties <- Either.fromOption(
-                       NonEmptyList.fromList(partialEntity.properties),
-                       new Exception(
-                         s"No properties in partial entity ${partialEntity.maybeId} ${partialEntity.maybeTypes}"
-                       )
-                     )
+        entityId   <- partialEntity.maybeId.toEither(s"No entityId in $partialEntity")
+        types      <- partialEntity.maybeTypes.toEither(s"No entityTypes in $partialEntity")
+        properties <- NonEmptyList.fromList(partialEntity.properties).toEither(s"No properties in $partialEntity")
       } yield JsonLD.entity(entityId, types, properties, Nil: _*)
 
+    private implicit class OptionOps[T](maybeValue: Option[T]) {
+      def toEither(errorMessage: String): Either[Exception, T] = Either.fromOption(
+        maybeValue,
+        ifNone = new Exception(errorMessage)
+      )
+    }
   }
 }

@@ -22,7 +22,9 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit._
 
 import cats.implicits._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
+import ch.datascience.rdfstore.FusekiBaseUrl
 
 trait WorkflowRun {
   self: Activity with ProcessRun =>
@@ -31,10 +33,10 @@ trait WorkflowRun {
 }
 
 object WorkflowRun {
+  type ActivityWorkflowRun = Activity with ProcessRun with WorkflowRun
 
-  import ch.datascience.graph.config.RenkuBaseUrl
-  import ch.datascience.rdfstore.FusekiBaseUrl
   import io.renku.jsonld._
+  import io.renku.jsonld.syntax._
 
   def apply(id:              CommitId,
             committedDate:   CommittedDate,
@@ -48,22 +50,33 @@ object WorkflowRun {
             startTime:       Instant = Instant.now(),
             endTime:         Instant = Instant.now().plus(10, SECONDS),
             maybeInfluenced: Option[Activity] = None,
-            usages:          List[Usage]): Activity with ProcessRun with WorkflowRun =
+            usages:          List[Usage]): ActivityWorkflowRun =
     new Activity(id, committedDate, committer, project, agent, comment, Some(informedBy), maybeInfluenced)
     with ProcessRun with WorkflowRun {
-      override val processRunAssociation: Association  = association
-      override val processRunUsages:      List[Usage]  = usages
-      override val workflowRunFile:       WorkflowFile = workflowFile
+      override val processRunAssociation:          Association                 = association
+      override val processRunUsages:               List[Usage]                 = usages
+      override val processRunMaybeStepId:          Option[String]              = None
+      override val processRunMaybeWorkflowRunPart: Option[ActivityWorkflowRun] = None
+      val workflowRunFile:                         WorkflowFile                = workflowFile
     }
 
-  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[WorkflowRun] =
-    new PartialEntityConverter[WorkflowRun] {
-      override def convert[T <: WorkflowRun]: T => Either[Exception, PartialEntity] =
-        _ =>
+  private[entities] implicit val converter: PartialEntityConverter[Activity with WorkflowRun] =
+    new PartialEntityConverter[Activity with WorkflowRun] {
+      override def convert[T <: Activity with WorkflowRun]: T => Either[Exception, PartialEntity] =
+        entity =>
           PartialEntity(
-            EntityTypes of (wfprov / "WorkflowRun")
+            EntityTypes of (wfprov / "WorkflowRun"),
+            rdfs / "label" -> s"${entity.workflowRunFile}@${entity.id}".asJsonLD
           ).asRight
     }
 
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[ActivityWorkflowRun] =
+    JsonLDEncoder.instance { entity =>
+      entity
+        .asPartialJsonLD[Activity]
+        .combine(entity.asPartialJsonLD[Activity with ProcessRun])
+        .combine(entity.asPartialJsonLD[Activity with WorkflowRun])
+        .getOrFail
+    }
 }

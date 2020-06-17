@@ -20,15 +20,18 @@ package ch.datascience.rdfstore.entities
 
 import ch.datascience.graph.model.events.CommitId
 
-final class Association private (val commitId:    CommitId,
-                                 val agent:       Agent,
-                                 val processPlan: RunPlan,
-                                 val maybeStep:   Option[String] = None)
+final class Association private (val commitId:  CommitId,
+                                 val agent:     Agent,
+                                 val runPlan:   Entity with RunPlan,
+                                 val maybeStep: Option[String] = None)
 
 object Association {
 
-  def apply(commitId: CommitId, agent: Agent, processPlan: RunPlan, maybeStep: Option[String] = None): Association =
-    new Association(commitId, agent, processPlan, maybeStep)
+  def apply(commitId:  CommitId,
+            agent:     Agent,
+            runPlan:   Entity with RunPlan,
+            maybeStep: Option[String] = None): Association =
+    new Association(commitId, agent, runPlan, maybeStep)
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import ch.datascience.rdfstore.FusekiBaseUrl
@@ -38,12 +41,12 @@ object Association {
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Association] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
-        EntityId of (fusekiBaseUrl / "commit" / entity.commitId / entity.maybeStep
-          .map(step => s"$step/association")
+        EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.maybeStep
+          .map(step => s"steps/$step/association")
           .getOrElse("association")),
         EntityTypes of (prov / "Association"),
         prov / "agent"   -> entity.agent.asJsonLD,
-        prov / "hadPlan" -> entity.processPlan.asJsonLD
+        prov / "hadPlan" -> entity.runPlan.asJsonLD
       )
     }
 }

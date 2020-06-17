@@ -1,16 +1,36 @@
+/*
+ * Copyright 2020 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.datascience.rdfstore.entities
 
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter._
+import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
-import ch.datascience.tinytypes.{BooleanTinyType, IntTinyType, StringTinyType, TinyTypeFactory}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLDEncoder}
 
-sealed abstract class CommandParameter(val position: Position, val prefix: Option[Prefix], val value: Value) {
+import scala.language.postfixOps
+
+sealed abstract class CommandParameter(val position: Position, val maybePrefix: Option[Prefix], val value: Value) {
   val entityId: EntityId = EntityId.blank
 }
 
@@ -32,7 +52,7 @@ object CommandParameter {
           PartialEntity(
             entity.entityId.some,
             EntityTypes of (prov / "Entity", renku / "CommandParameter"),
-            renku / "prefix"   -> entity.prefix.asJsonLD,
+            renku / "prefix"   -> entity.maybePrefix.asJsonLD,
             renku / "position" -> entity.position.asJsonLD
           ).asRight
     }
@@ -42,19 +62,19 @@ object CommandParameter {
 sealed trait Input {
   self: CommandParameter =>
   def inputValue:    Value
-  def inputConsumes: List[Artifact with Entity]
+  def inputConsumes: List[Entity with Artifact]
   override lazy val toString: String = s"CommandInput${entityId.value}"
 }
 
 object Input {
 
-  def apply(position: Position,
-            value:    Value,
-            prefix:   Option[Prefix],
-            consumes: List[Artifact with Entity]): CommandParameter with Input =
-    new CommandParameter(position, prefix, value) with Input {
+  def apply(position:    Position,
+            value:       Value,
+            maybePrefix: Option[Prefix],
+            consumes:    List[Entity with Artifact]): CommandParameter with Input =
+    new CommandParameter(position, maybePrefix, value) with Input {
       override val inputValue:    Value                      = value
-      override val inputConsumes: List[Artifact with Entity] = consumes
+      override val inputConsumes: List[Entity with Artifact] = consumes
     }
 
   private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -75,7 +95,6 @@ object Input {
     JsonLDEncoder.instance[CommandParameter with Input] { entity =>
       entity.asPartialJsonLD[CommandParameter] combine entity.asPartialJsonLD[Input] getOrFail
     }
-
 }
 
 sealed trait Output {
@@ -84,7 +103,7 @@ sealed trait Output {
   import ch.datascience.rdfstore.entities.Output.FolderCreation
   def outputValue:          Value
   def outputFolderCreation: FolderCreation
-  def outputProduces:       List[Artifact with Entity]
+  def outputProduces:       List[Entity with Artifact]
 
   override lazy val toString: String = s"CommandOutput${entityId.value}"
 }
@@ -92,12 +111,12 @@ sealed trait Output {
 object Output {
   def apply(position:       Position,
             value:          Value,
-            prefix:         Option[Prefix],
+            maybePrefix:    Option[Prefix],
             folderCreation: FolderCreation,
-            produces:       List[Artifact with Entity]): CommandParameter with Output =
-    new CommandParameter(position, prefix, value) with Output {
+            produces:       List[Entity with Artifact]): CommandParameter with Output =
+    new CommandParameter(position, maybePrefix, value) with Output {
       override val outputFolderCreation: FolderCreation             = folderCreation
-      override val outputProduces:       List[Artifact with Entity] = produces
+      override val outputProduces:       List[Entity with Artifact] = produces
       override val outputValue:          Value                      = value
     }
 

@@ -18,9 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.projects.FilePath
-
-final case class Generation(filePath: FilePath, activity: Activity)
+final case class Generation(location: Location, activity: Activity)
 
 object Generation {
 
@@ -29,14 +27,11 @@ object Generation {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def apply(workflowFile: WorkflowFile, activity: Activity): Generation =
-    Generation(FilePath(workflowFile.value), activity)
-
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Generation] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
-        EntityId of fusekiBaseUrl / "commit" / entity.activity.id / "tree" / entity.filePath,
-        EntityTypes of (prov / "Generation"),
+        EntityId of fusekiBaseUrl / "activities" / "commit" / entity.activity.id / "tree" / entity.location,
+        EntityTypes of prov / "Generation",
         prov / "activity" -> entity.activity.asJsonLD
       )
     }

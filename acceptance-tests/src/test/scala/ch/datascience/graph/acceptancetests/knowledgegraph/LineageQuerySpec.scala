@@ -79,7 +79,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
         namedLineageQuery,
         variables = Map(
           "projectPath" -> project.path.toString,
-          "filePath"    -> filePath.toString
+          "filePath"    -> location.toString
         )
       )
 
@@ -92,7 +92,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
     }
   }
 
-  private val lineageQuery: Document = graphql"""
+  private lazy val lineageQuery: Document = graphql"""
     {
       lineage(projectPath: "namespace/lineage-project", filePath: "figs/grid_plot.png") {
         nodes {
@@ -108,7 +108,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       }
     }"""
 
-  private val namedLineageQuery: Document = graphql"""
+  private lazy val namedLineageQuery: Document = graphql"""
     query($$projectPath: ProjectPath!, $$filePath: FilePath!) { 
       lineage(projectPath: $$projectPath, filePath: $$filePath) { 
         nodes {

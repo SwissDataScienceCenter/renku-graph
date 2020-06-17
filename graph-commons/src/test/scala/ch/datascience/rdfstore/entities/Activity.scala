@@ -22,6 +22,9 @@ import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
+
+import scala.language.postfixOps
 
 class Activity(val id:              CommitId,
                val committedDate:   CommittedDate,
@@ -53,49 +56,24 @@ object Activity {
       override def convert[T <: Activity]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
+            EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.id),
             EntityTypes of (prov / "Activity"),
+            rdfs / "label"             -> entity.id.asJsonLD,
+            rdfs / "comment"           -> entity.comment.asJsonLD,
             prov / "startedAtTime"     -> entity.committedDate.asJsonLD,
             prov / "endedAtTime"       -> entity.committedDate.asJsonLD,
             prov / "wasInformedBy"     -> entity.maybeInformedBy.asJsonLD,
             prov / "wasAssociatedWith" -> JsonLD.arr(entity.agent.asJsonLD, entity.committer.asJsonLD),
             prov / "influenced"        -> entity.maybeInfluenced.asJsonLD,
-            rdfs / "comment"           -> entity.comment.asJsonLD,
             schema / "isPartOf"        -> entity.project.asJsonLD
           ).asRight
     }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Activity] =
     JsonLDEncoder.instance {
-      case a: Activity with ProcessRun with WorkflowRun =>
-        a.asPartialJsonLD[Activity]
-          .combine(a.asPartialJsonLD[ProcessRun])
-          .combine(a.asPartialJsonLD[WorkflowRun])
-          .combine(
-            PartialEntity(
-              EntityId of fusekiBaseUrl / "activities" / "commit" / a.id,
-              rdfs / "label" -> s"${a.workflowRunFile}@${a.id}".asJsonLD
-            ).asRight
-          )
-          .getOrFail
-      case a: Activity with ProcessRun =>
-        a.asPartialJsonLD[Activity]
-          .combine(a.asPartialJsonLD[ProcessRun])
-          .combine(
-            PartialEntity(
-              EntityId of s"$fusekiBaseUrl/activities/commit/${a.id}${a.processRunMaybeStepId.map(id => s"/$id").getOrElse("")}",
-              rdfs / "label" -> s"${a.processRunAssociation.processPlan.workflowFile}@${a.id}".asJsonLD
-            ).asRight
-          )
-          .getOrFail
-      case a: Activity =>
-        a.asPartialJsonLD
-          .combine(
-            PartialEntity(
-              EntityId of (fusekiBaseUrl / "activities" / "commit" / a.id),
-              rdfs / "label" -> a.id.asJsonLD
-            ).asRight
-          )
-          .getOrFail
+      case a: ActivityWorkflowRun      => a.asJsonLD
+      case a: Activity with ProcessRun => a.asJsonLD
+      case a: Activity                 => a.asPartialJsonLD[Activity] getOrFail
       case a => throw new Exception(s"Cannot serialize ${a.getClass} Activity")
     }
 }

@@ -30,7 +30,10 @@ object Agent {
   implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.schemaVersion}",
-      EntityTypes of (prov / "SoftwareAgent", wfprov / "WorkflowEngine"),
+      EntityTypes of (
+        prov / "SoftwareAgent",
+        wfprov / "WorkflowEngine"
+      ),
       rdfs / "label"        -> s"renku ${entity.schemaVersion}".asJsonLD,
       prov / "wasStartedBy" -> entity.maybeStartedBy.asJsonLD
     )
