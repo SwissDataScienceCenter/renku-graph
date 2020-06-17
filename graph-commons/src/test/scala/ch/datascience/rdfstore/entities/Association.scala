@@ -22,12 +22,12 @@ import ch.datascience.graph.model.events.CommitId
 
 final class Association private (val commitId:    CommitId,
                                  val agent:       Agent,
-                                 val processPlan: ProcessPlan,
+                                 val processPlan: RunPlan,
                                  val maybeStep:   Option[String] = None)
 
 object Association {
 
-  def apply(commitId: CommitId, agent: Agent, processPlan: ProcessPlan, maybeStep: Option[String] = None): Association =
+  def apply(commitId: CommitId, agent: Agent, processPlan: RunPlan, maybeStep: Option[String] = None): Association =
     new Association(commitId, agent, processPlan, maybeStep)
 
   import ch.datascience.graph.config.RenkuBaseUrl
@@ -42,12 +42,8 @@ object Association {
           .map(step => s"$step/association")
           .getOrElse("association")),
         EntityTypes of (prov / "Association"),
-        prov / "agent" -> entity.agent.asJsonLD,
-        prov / "hadPlan" -> (entity.processPlan match {
-          case plan: StandardProcessPlan => plan.asJsonLD
-          case plan: ProcessPlanWorkflow => plan.asJsonLD
-          case plan: RunPlan             => plan.asJsonLD
-        })
+        prov / "agent"   -> entity.agent.asJsonLD,
+        prov / "hadPlan" -> entity.processPlan.asJsonLD
       )
     }
 }

@@ -18,17 +18,19 @@
 
 package ch.datascience.rdfstore.entities
 
+import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
 
-abstract class Activity(val id:              CommitId,
-                        val committedDate:   CommittedDate,
-                        val committer:       Person,
-                        val project:         Project,
-                        val agent:           Agent,
-                        val comment:         String,
-                        val maybeInformedBy: Option[Activity])
+class Activity(val id:              CommitId,
+               val committedDate:   CommittedDate,
+               val committer:       Person,
+               val project:         Project,
+               val agent:           Agent,
+               val comment:         String,
+               val maybeInformedBy: Option[Activity],
+               val maybeInfluenced: Option[Activity])
 
 object Activity {
 
@@ -38,57 +40,62 @@ object Activity {
             project:         Project,
             agent:           Agent,
             comment:         String = "some comment",
-            maybeInformedBy: Option[Activity] = None): Activity =
-    StandardActivity(id, committedDate, committer, project, agent, comment, maybeInformedBy)
+            maybeInformedBy: Option[Activity] = None,
+            maybeInfluenced: Option[Activity] = None): Activity =
+    new Activity(id, committedDate, committer, project, agent, comment, maybeInformedBy, maybeInfluenced)
 
-  import cats.data.NonEmptyList
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def toProperties(
-      entity:              Activity
-  )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NonEmptyList[(Property, JsonLD)] =
-    NonEmptyList.of(
-      prov / "startedAtTime" -> entity.committedDate.asJsonLD,
-      prov / "endedAtTime"   -> entity.committedDate.asJsonLD,
-      prov / "wasInformedBy" -> entity.maybeInformedBy.asJsonLD,
-      prov / "agent"         -> JsonLD.arr(entity.agent.asJsonLD, entity.committer.asJsonLD),
-      rdfs / "comment"       -> entity.comment.asJsonLD,
-      schema / "isPartOf"    -> entity.project.asJsonLD
-    )
+  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
+                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Activity] =
+    new PartialEntityConverter[Activity] {
+      override def convert[T <: Activity]: T => Either[Exception, PartialEntity] =
+        entity =>
+          PartialEntity(
+            EntityTypes of (prov / "Activity"),
+            prov / "startedAtTime"     -> entity.committedDate.asJsonLD,
+            prov / "endedAtTime"       -> entity.committedDate.asJsonLD,
+            prov / "wasInformedBy"     -> entity.maybeInformedBy.asJsonLD,
+            prov / "wasAssociatedWith" -> JsonLD.arr(entity.agent.asJsonLD, entity.committer.asJsonLD),
+            prov / "influenced"        -> entity.maybeInfluenced.asJsonLD,
+            rdfs / "comment"           -> entity.comment.asJsonLD,
+            schema / "isPartOf"        -> entity.project.asJsonLD
+          ).asRight
+    }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Activity] =
     JsonLDEncoder.instance {
-      case a: StandardActivity           => a.asJsonLD
-      case a: ProcessRunActivity         => a.asJsonLD
-      case a: ProcessRunWorkflowActivity => a.asJsonLD
+      case a: Activity with ProcessRun with WorkflowRun =>
+        a.asPartialJsonLD[Activity]
+          .combine(a.asPartialJsonLD[ProcessRun])
+          .combine(a.asPartialJsonLD[WorkflowRun])
+          .combine(
+            PartialEntity(
+              EntityId of fusekiBaseUrl / "activities" / "commit" / a.id,
+              rdfs / "label" -> s"${a.workflowRunFile}@${a.id}".asJsonLD
+            ).asRight
+          )
+          .getOrFail
+      case a: Activity with ProcessRun =>
+        a.asPartialJsonLD[Activity]
+          .combine(a.asPartialJsonLD[ProcessRun])
+          .combine(
+            PartialEntity(
+              EntityId of s"$fusekiBaseUrl/activities/commit/${a.id}${a.processRunMaybeStepId.map(id => s"/$id").getOrElse("")}",
+              rdfs / "label" -> s"${a.processRunAssociation.processPlan.workflowFile}@${a.id}".asJsonLD
+            ).asRight
+          )
+          .getOrFail
+      case a: Activity =>
+        a.asPartialJsonLD
+          .combine(
+            PartialEntity(
+              EntityId of (fusekiBaseUrl / "activities" / "commit" / a.id),
+              rdfs / "label" -> a.id.asJsonLD
+            ).asRight
+          )
+          .getOrFail
       case a => throw new Exception(s"Cannot serialize ${a.getClass} Activity")
-    }
-}
-
-final case class StandardActivity(override val id:              CommitId,
-                                  override val committedDate:   CommittedDate,
-                                  override val committer:       Person,
-                                  override val project:         Project,
-                                  override val agent:           Agent,
-                                  override val comment:         String,
-                                  override val maybeInformedBy: Option[Activity] = None)
-    extends Activity(id, committedDate, committer, project, agent, comment, maybeInformedBy)
-
-object StandardActivity {
-
-  import ch.datascience.graph.config.RenkuBaseUrl
-  import ch.datascience.rdfstore.FusekiBaseUrl
-  import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
-
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[StandardActivity] =
-    JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.id),
-        EntityTypes of (prov / "Activity"),
-        Activity.toProperties(entity) :+ rdfs / "label" -> entity.id.asJsonLD
-      )
     }
 }

@@ -28,8 +28,10 @@ import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartL
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, FilePath, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
+import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.rdfstore.entities.DataSetPart.dataSetParts
 import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.RunPlan.{Argument, Command}
 import ch.datascience.rdfstore.{FusekiBaseUrl, Schemas}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
@@ -53,7 +55,7 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeParent:         Option[Project] = None
   )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
-    ArtifactEntity(
+    Entity(
       Generation(
         filePath,
         Activity(
@@ -205,11 +207,11 @@ object bundles extends Schemas {
       val outFile1   = FilePath("figs/cumulative.png")
       val outFile2   = FilePath("figs/grid_plot.png")
 
-      val commit3EntityCollection = ArtifactEntityCollection(
+      val commit3EntityCollection = EntityCollection(
         commit3Id,
         FilePath("data/zhbikes"),
         project,
-        members = List(ArtifactEntity(commit3Id, FilePath("data/zhbikes/2019velo.csv"), project))
+        members = List(Entity(commit3Id, FilePath("data/zhbikes/2019velo.csv"), project))
       )
       val commit5Activity = Activity(
         CommitId("000005"),
@@ -245,9 +247,11 @@ object bundles extends Schemas {
         comment         = "added refactored scripts",
         maybeInformedBy = Some(commit6Activity)
       )
-      val commit7PlotDataEntity  = ArtifactEntity(commit7Id, FilePath("src/plot_data.py"), project)
-      val commit7CleanDataEntity = ArtifactEntity(commit7Id, FilePath("src/clean_data.py"), project)
-      val commit8ProcessRunActivity = ProcessRunActivity(
+      val commit7PlotDataEntity  = Entity(commit7Id, FilePath("src/plot_data.py"), project)
+      val commit7CleanDataEntity = Entity(commit7Id, FilePath("src/clean_data.py"), project)
+      val commit8CommandInput1   = Input(Position(1), Value("inputs/input_1"), None, Nil)
+      val commit8CommandInput2   = Input(Position(2), Value("inputs/input_2"), None, Nil)
+      val commit8ProcessRunActivity = ProcessRun(
         commit8Id,
         committedDates.generateOne,
         persons.generateOne,
@@ -256,15 +260,26 @@ object bundles extends Schemas {
         association = Association(
           commit8Id,
           agent.copy(maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit8Id, WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"), project)
+          RunPlan(
+            commit8Id,
+            WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"),
+            project,
+            Command("run"),
+            List(Argument("python")),
+            List(commit8CommandInput1, commit8CommandInput2),
+            Nil
+          )
         ),
         usages = List(
-          Usage(commit8Id, FilePath("inputs/input_1"), commit7CleanDataEntity),
-          Usage(commit8Id, FilePath("inputs/input_2"), commit3EntityCollection)
+          Usage(commit8Id, commit8CommandInput1, commit7CleanDataEntity),
+          Usage(commit8Id, commit8CommandInput2, commit3EntityCollection)
         )
       )
-      val commit8ParquetEntity = ArtifactEntity(commit8Id, FilePath("data/preprocessed/zhbikes.parquet"), project)
-      val commit9ProcessRunActivity = ProcessRunActivity(
+      val commit8ParquetEntity = Entity(commit8Id, FilePath("data/preprocessed/zhbikes.parquet"), project)
+
+      val commit9CommandInput1 = Input(Position(1), Value("inputs/input_1"), None, Nil)
+      val commit9CommandInput2 = Input(Position(2), Value("inputs/input_2"), None, Nil)
+      val commit9ProcessRunActivity = ProcessRun(
         commit9Id,
         committedDates.generateOne,
         persons.generateOne,
@@ -273,14 +288,22 @@ object bundles extends Schemas {
         association = Association(
           commit9Id,
           agent.copy(maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit8Id, WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"), project)
+          RunPlan(
+            commit8Id,
+            WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"),
+            project,
+            Command("run"),
+            List(Argument("python")),
+            List(commit9CommandInput1, commit9CommandInput1),
+            Nil
+          )
         ),
         usages = List(
-          Usage(commit9Id, FilePath("inputs/input_1"), commit7PlotDataEntity),
-          Usage(commit9Id, FilePath("inputs/input_2"), commit8ParquetEntity)
+          Usage(commit9Id, commit9CommandInput1, commit7PlotDataEntity),
+          Usage(commit9Id, commit9CommandInput2, commit8ParquetEntity)
         )
       )
-      val commit9PlotDataEntity = ArtifactEntity(
+      val commit9PlotDataEntity = Entity(
         outFile2,
         Generation(FilePath("outputs/output_1"), commit9ProcessRunActivity)
       )
@@ -302,14 +325,18 @@ object bundles extends Schemas {
         comment         = "renku dataset add zhbikes velo.csv",
         maybeInformedBy = Some(commit10Activity)
       )
-      val commit10ZhbikesCollectionEntity = ArtifactEntityCollection(
+      val commit10ZhbikesCollectionEntity = EntityCollection(
         commit10Id,
         FilePath("data/zhbikes"),
         project,
-        members = List(ArtifactEntity(commit3Id, FilePath("data/zhbikes/2019velo.csv"), project),
-                       ArtifactEntity(commit10Id, FilePath("data/zhbikes/2018velo.csv"), project))
+        members = List(Entity(commit3Id, FilePath("data/zhbikes/2019velo.csv"), project),
+                       Entity(commit10Id, FilePath("data/zhbikes/2018velo.csv"), project))
       )
-      val commit12RunWorkflowActivity = ProcessRunWorkflowActivity(
+
+      val commit12CommandInput1 = Input(Position(1), Value("inputs/input_1"), None, Nil)
+      val commit12CommandInput2 = Input(Position(2), Value("inputs/input_2"), None, Nil)
+      val commit12CommandInput3 = Input(Position(3), Value("inputs/input_3"), None, Nil)
+      val commit12RunWorkflowActivity = WorkflowRun(
         commit12Id,
         committedDates.generateOne,
         persons.generateOne,
@@ -321,20 +348,30 @@ object bundles extends Schemas {
         Association(
           commit12Id,
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          ProcessPlanWorkflow(commit12Id, WorkflowFile.cwl("db4f249682b34e0db239cc26945a126c.cwl"), project)
+          RunPlan(
+            commit12Id,
+            WorkflowFile.cwl("db4f249682b34e0db239cc26945a126c.cwl"),
+            project,
+            Command("update"),
+            Nil,
+            List(commit12CommandInput1, commit12CommandInput2, commit12CommandInput3),
+            Nil
+          )
         ),
         usages = List(
-          Usage(commit12Id, FilePath("inputs/input_1"), commit7PlotDataEntity),
-          Usage(commit12Id, FilePath("inputs/input_2"), commit7CleanDataEntity),
+          Usage(commit12Id, commit12CommandInput1, commit7PlotDataEntity),
+          Usage(commit12Id, commit12CommandInput2, commit7CleanDataEntity),
           Usage(
             commit12Id,
-            FilePath("inputs/input_3"),
+            commit12CommandInput3,
             commit10ZhbikesCollectionEntity
           )
         )
       )
 
-      val commit12Step1ProcessRunActivity = ProcessRunActivity(
+      val commit12Step1CommandInput1 = Input(Position(1), Value("steps/step_1/inputs/input_1"), None, Nil)
+      val commit12Step1CommandInput2 = Input(Position(2), Value("steps/step_1/inputs/input_2"), None, Nil)
+      val commit12Step1ProcessRunActivity = ProcessRun(
         commit12Id,
         committedDates.generateOne,
         persons.generateOne,
@@ -343,19 +380,30 @@ object bundles extends Schemas {
         association = Association(
           commit12Id,
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit9Id, WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"), project),
+          RunPlan(
+            commit9Id,
+            WorkflowFile.cwl("fdf4672a1f424758af8fdb590e0d7869_python.cwl"),
+            project,
+            Command("update"),
+            Nil,
+            List(commit12Step1CommandInput1, commit12Step1CommandInput2),
+            Nil
+          ),
           maybeStep = Some("steps/step_2")
         ),
         usages = List(
-          Usage(commit12Id, FilePath("steps/step_1/inputs/input_1"), commit7PlotDataEntity),
+          Usage(commit12Id, commit12Step1CommandInput1, commit7PlotDataEntity),
           Usage(commit12Id,
-                FilePath("steps/step_1/inputs/input_2"),
-                ArtifactEntity(commit12Id, FilePath("data/preprocessed/zhbikes.parquet"), project))
+                commit12Step1CommandInput2,
+                Entity(commit12Id, FilePath("data/preprocessed/zhbikes.parquet"), project))
         ),
         maybeStepId               = Some("steps/step_1"),
         maybeWasPartOfWorkflowRun = Some(commit12RunWorkflowActivity)
       )
-      val commit12Step2ProcessRunActivity = ProcessRunActivity(
+
+      val commit12Step2CommandInput1 = Input(Position(1), Value("steps/step_2/inputs/input_1"), None, Nil)
+      val commit12Step2CommandInput2 = Input(Position(2), Value("steps/step_2/inputs/input_2"), None, Nil)
+      val commit12Step2ProcessRunActivity = ProcessRun(
         commit12Id,
         committedDates.generateOne,
         persons.generateOne,
@@ -364,25 +412,33 @@ object bundles extends Schemas {
         association = Association(
           commit12Id,
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          StandardProcessPlan(commit8Id, WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"), project),
+          RunPlan(
+            commit8Id,
+            WorkflowFile.cwl("3983f12670a8410eb9b15d81e8949560_python.cwl"),
+            project,
+            Command("update"),
+            Nil,
+            List(commit12Step2CommandInput1, commit12Step2CommandInput2),
+            Nil
+          ),
           maybeStep = Some("steps/step_2")
         ),
         usages = List(
-          Usage(commit12Id, FilePath("steps/step_2/inputs/input_1"), commit7CleanDataEntity),
+          Usage(commit12Id, commit12Step2CommandInput1, commit7CleanDataEntity),
           Usage(
             commit12Id,
-            FilePath("steps/step_2/inputs/input_2"),
+            commit12Step2CommandInput2,
             commit10ZhbikesCollectionEntity
           )
         ),
         maybeStepId               = Some("steps/step_2"),
         maybeWasPartOfWorkflowRun = Some(commit12RunWorkflowActivity)
       )
-      val commit12PlotDataEntity = ArtifactEntity(
+      val commit12PlotDataEntity = Entity(
         outFile2,
         Generation(FilePath("steps/step_1/outputs/output_1"), commit12Step1ProcessRunActivity)
       )
-      val commit12ParquetEntity = ArtifactEntity(
+      val commit12ParquetEntity = Entity(
         FilePath("data/preprocessed/zhbikes.parquet"),
         Generation(
           FilePath("steps/step_2/outputs/output_0"),
@@ -408,7 +464,7 @@ object bundles extends Schemas {
       )
 
       List(
-        ArtifactEntity(
+        Entity(
           Generation(
             FilePath("data/zhbikes/2019velo.csv"),
             Activity(
@@ -429,14 +485,14 @@ object bundles extends Schemas {
             )
           )
         ).asJsonLD,
-        ArtifactEntity(Generation(FilePath("requirements.txt"), commit5Activity)).asJsonLD,
-        ArtifactEntity(Generation(FilePath("notebooks/zhbikes-notebook.ipynb"), commit6Activity)).asJsonLD,
-        ArtifactEntity(Generation(FilePath("src/plot_data.py"), commit7Activity)).asJsonLD,
-        ArtifactEntity(FilePath("data/preprocessed/zhbikes.parquet"),
-                       Generation(FilePath("outputs/output_0"), commit8ProcessRunActivity)).asJsonLD,
-        ArtifactEntity(outFile1, Generation(FilePath("outputs/output_0"), commit9ProcessRunActivity)).asJsonLD,
+        Entity(Generation(FilePath("requirements.txt"), commit5Activity)).asJsonLD,
+        Entity(Generation(FilePath("notebooks/zhbikes-notebook.ipynb"), commit6Activity)).asJsonLD,
+        Entity(Generation(FilePath("src/plot_data.py"), commit7Activity)).asJsonLD,
+        Entity(FilePath("data/preprocessed/zhbikes.parquet"),
+               Generation(FilePath("outputs/output_0"), commit8ProcessRunActivity)).asJsonLD,
+        Entity(outFile1, Generation(FilePath("outputs/output_0"), commit9ProcessRunActivity)).asJsonLD,
         commit9PlotDataEntity.asJsonLD,
-        ArtifactEntity(Generation(FilePath("data/zhbikes/2018velo.csv"), commit10Activity)).asJsonLD,
+        Entity(Generation(FilePath("data/zhbikes/2018velo.csv"), commit10Activity)).asJsonLD,
         DataSet(
           id          = dataSetId,
           name        = datasets.Name("zhbikes"),
@@ -466,12 +522,12 @@ object bundles extends Schemas {
           project    = project
         ).asJsonLD,
         commit12ParquetEntity.asJsonLD,
-        ArtifactEntity(outFile1, Generation(FilePath("steps/step_1/outputs/output_0"), commit12Step1ProcessRunActivity)).asJsonLD,
+        Entity(outFile1, Generation(FilePath("steps/step_1/outputs/output_0"), commit12Step1ProcessRunActivity)).asJsonLD,
         commit12PlotDataEntity.asJsonLD,
-        ArtifactEntity(FilePath("data/preprocessed/zhbikes.parquet"),
-                       Generation(FilePath("steps/step_2/outputs/output_0"), commit12RunWorkflowActivity)).asJsonLD,
-        ArtifactEntity(outFile1, Generation(FilePath("steps/step_1/outputs/output_0"), commit12RunWorkflowActivity)).asJsonLD,
-        ArtifactEntity(outFile2, Generation(FilePath("steps/step_1/outputs/output_1"), commit12RunWorkflowActivity)).asJsonLD
+        Entity(FilePath("data/preprocessed/zhbikes.parquet"),
+               Generation(FilePath("steps/step_2/outputs/output_0"), commit12RunWorkflowActivity)).asJsonLD,
+        Entity(outFile1, Generation(FilePath("steps/step_1/outputs/output_0"), commit12RunWorkflowActivity)).asJsonLD,
+        Entity(outFile2, Generation(FilePath("steps/step_1/outputs/output_1"), commit12RunWorkflowActivity)).asJsonLD
       ) -> examplarData
     }
   }

@@ -22,7 +22,7 @@ import ch.datascience.tinytypes.RelativePathTinyType
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
-sealed trait WorkflowFile extends RelativePathTinyType
+sealed trait WorkflowFile extends Any with RelativePathTinyType
 
 object WorkflowFile {
 

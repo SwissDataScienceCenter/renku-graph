@@ -52,13 +52,6 @@ class EntityIdSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
-  "of" should {
-    "return an Entity Id with toString the same as value" in {
-      val httpUrl = httpUrls().generateOne
-      EntityId.of(httpUrl).toString shouldBe httpUrl
-    }
-  }
-
   "blank" should {
 
     "return an EntityId with a toString as a blank node id" in {

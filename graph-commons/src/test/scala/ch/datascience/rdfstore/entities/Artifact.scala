@@ -18,98 +18,121 @@
 
 package ch.datascience.rdfstore.entities
 
+import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.rdfstore.FusekiBaseUrl
+import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
-sealed abstract class Artifact(val commitId: CommitId, val filePath: FilePath, val project: Project)
+sealed abstract class Artifact(val commitId:                  CommitId,
+                               val filePath:                  FilePath,
+                               val project:                   Project,
+                               val maybeInvalidationActivity: Option[Activity])
 
 object Artifact {
 
-  import cats.data.NonEmptyList
-  import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
+  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
+                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Artifact] =
+    new PartialEntityConverter[Artifact] {
+      override def convert[T <: Artifact]: T => Either[Exception, PartialEntity] =
+        entity =>
+          PartialEntity(
+            Some(EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.filePath),
+            EntityTypes of wfprov / "Artifact",
+            rdfs / "label"            -> s"${entity.filePath}@${entity.commitId}".asJsonLD,
+            schema / "isPartOf"       -> entity.project.asJsonLD,
+            prov / "atLocation"       -> entity.filePath.asJsonLD,
+            prov / "wasInvalidatedBy" -> entity.maybeInvalidationActivity.asJsonLD
+          ).asRight
+    }
 
-  def toProperties(
-      entity:              Artifact
-  )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NonEmptyList[(Property, JsonLD)] =
-    NonEmptyList.of(
-      rdfs / "label"      -> s"${entity.filePath}@${entity.commitId}".asJsonLD,
-      schema / "isPartOf" -> entity.project.asJsonLD,
-      prov / "atLocation" -> entity.filePath.asJsonLD
-    )
-}
-
-final class ArtifactEntity private (val maybeFilePath:    Option[FilePath],
-                                    val maybeCommitId:    Option[CommitId],
-                                    val maybeGeneration:  Option[Generation],
-                                    override val project: Project)
-    extends Artifact(
-      maybeCommitId orElse maybeGeneration.map(_.activity.id) getOrElse (throw new Exception(
-        "No commitId for ArtifactEntity"
-      )),
-      maybeFilePath orElse maybeGeneration.map(_.filePath) getOrElse (throw new Exception(
-        "No filePath for ArtifactEntity"
-      )),
-      project
-    )
-
-object ArtifactEntity {
-
-  def apply(filePath: FilePath, generation: Generation): ArtifactEntity =
-    new ArtifactEntity(Some(filePath), maybeCommitId = None, Some(generation), generation.activity.project)
-
-  def apply(commitId: CommitId, filePath: FilePath, project: Project): ArtifactEntity =
-    new ArtifactEntity(Some(filePath), Some(commitId), maybeGeneration = None, project)
-
-  def apply(generation: Generation): ArtifactEntity =
-    new ArtifactEntity(None, maybeCommitId = None, Some(generation), generation.activity.project)
-
-  import ch.datascience.graph.config.RenkuBaseUrl
-  import ch.datascience.rdfstore.FusekiBaseUrl
-  import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
-
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[ArtifactEntity] =
-    JsonLDEncoder.instance { entity =>
-      val commitId = entity.maybeCommitId orElse entity.maybeGeneration.map(_.activity.id) getOrElse (throw new Exception(
-        "No commitId for ArtifactEntity"
-      ))
-      val filePath = entity.maybeFilePath orElse entity.maybeGeneration.map(_.filePath) getOrElse (throw new Exception(
-        "No filePath for ArtifactEntity"
-      ))
-      JsonLD.entity(
-        EntityId of fusekiBaseUrl / "blob" / commitId / filePath,
-        EntityTypes of (wfprov / "Artifact", prov / "Entity"),
-        Artifact.toProperties(entity),
-        prov / "qualifiedGeneration" -> entity.maybeGeneration.asJsonLD
-      )
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Artifact] =
+    JsonLDEncoder.instance {
+      case e: Entity           => e.asJsonLD
+      case e: EntityCollection => e.asJsonLD
+      case e => throw new Exception(s"No JsonLD encoder found for ${e.getClass}")
     }
 }
 
-final case class ArtifactEntityCollection(override val commitId: CommitId,
-                                          override val filePath: FilePath,
-                                          override val project:  Project,
-                                          members:               List[ArtifactEntity])
-    extends Artifact(commitId, filePath, project)
+trait Entity {
+  self: Artifact =>
 
-object ArtifactEntityCollection {
+  def maybeGeneration: Option[Generation]
+}
 
-  import ch.datascience.graph.config.RenkuBaseUrl
-  import ch.datascience.rdfstore.FusekiBaseUrl
-  import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
+object Entity {
+
+  def apply(filePath: FilePath, generation: Generation): Artifact with Entity =
+    new Artifact(generation.activity.id, filePath, generation.activity.project, maybeInvalidationActivity = None)
+    with Entity {
+      override val maybeGeneration: Option[Generation] = Option(generation)
+    }
+
+  def apply(commitId: CommitId, filePath: FilePath, project: Project): Artifact with Entity =
+    new Artifact(commitId, filePath, project, maybeInvalidationActivity = None) with Entity {
+      override val maybeGeneration: Option[Generation] = None
+    }
+
+  def apply(generation: Generation): Artifact with Entity =
+    new Artifact(generation.activity.id,
+                 generation.filePath,
+                 generation.activity.project,
+                 maybeInvalidationActivity = None) with Entity {
+      override val maybeGeneration: Option[Generation] = Option(generation)
+    }
+
+  private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
+                                 fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Entity] =
+    new PartialEntityConverter[Entity] {
+      override def convert[T <: Entity]: T => Either[Exception, PartialEntity] =
+        entity =>
+          PartialEntity(
+            maybeId = None,
+            EntityTypes of prov / "Entity",
+            prov / "qualifiedGeneration" -> entity.maybeGeneration.asJsonLD
+          ).asRight
+    }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[ArtifactEntityCollection] =
+                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[Artifact with Entity] =
     JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.filePath,
-        EntityTypes of (wfprov / "Artifact", prov / "Entity", prov / "Collection"),
-        Artifact.toProperties(entity),
-        prov / "hadMember" -> entity.members.asJsonLD
-      )
+      entity.asPartialJsonLD[Artifact] combine entity.asPartialJsonLD[Entity] getOrFail
+    }
+}
+
+trait EntityCollection {
+  self: Artifact =>
+
+  def collectionMembers: List[Artifact with Entity]
+}
+
+object EntityCollection {
+
+  def apply(commitId: CommitId,
+            filePath: FilePath,
+            project:  Project,
+            members:  List[Artifact with Entity]): Artifact with EntityCollection =
+    new Artifact(commitId, filePath, project, maybeInvalidationActivity = None) with EntityCollection {
+      override val collectionMembers: List[Artifact with Entity] = members
+    }
+
+  private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
+                                 fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[EntityCollection] =
+    new PartialEntityConverter[EntityCollection] {
+      override def convert[T <: EntityCollection]: T => Either[Exception, PartialEntity] =
+        entity =>
+          PartialEntity(
+            maybeId = None,
+            EntityTypes of (prov / "Entity", prov / "Collection"),
+            prov / "hadMember" -> entity.collectionMembers.asJsonLD(JsonLDEncoder.encodeList(Entity.encoder))
+          ).asRight
+    }
+
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[Artifact with EntityCollection] =
+    JsonLDEncoder.instance { entity =>
+      entity.asPartialJsonLD[Artifact] combine entity.asPartialJsonLD[EntityCollection] getOrFail
     }
 }
