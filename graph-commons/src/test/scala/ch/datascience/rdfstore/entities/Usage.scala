@@ -18,12 +18,18 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter, Input}
 
-final case class Usage(commitId: CommitId, commandInput: Input, entity: Entity)
+final class Usage(val commandInput: EntityCommandParameter with Input, val maybeStep: Option[Step])
 
 object Usage {
+
+  def apply(commandInput: EntityCommandParameter with Input): Usage =
+    new Usage(commandInput, maybeStep = None)
+
+  def factory(commandInput: EntityCommandParameter with Input): Step => Usage =
+    step => new Usage(commandInput, maybeStep = Some(step))
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
@@ -32,10 +38,10 @@ object Usage {
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Usage] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
-        EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.commitId / "inputs" / entity.commandInput.toString),
+        EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commandInput.entity.commitId / entity.maybeStep / "inputs" / entity.commandInput.toString,
         EntityTypes of (prov / "Usage"),
-        prov / "entity"  -> entity.entity.asJsonLD,
-        prov / "hadRole" -> entity.commandInput.toString.asJsonLD
+        prov / "entity"  -> entity.commandInput.entity.asJsonLD,
+        prov / "hadRole" -> s"${entity.commandInput}_${entity.commandInput.position}".asJsonLD
       )
     }
 }

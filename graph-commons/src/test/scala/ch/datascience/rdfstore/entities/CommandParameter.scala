@@ -21,6 +21,7 @@ package ch.datascience.rdfstore.entities
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInput, PositionInput}
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
@@ -30,14 +31,37 @@ import io.renku.jsonld.{EntityId, EntityTypes, JsonLDEncoder}
 
 import scala.language.postfixOps
 
-sealed abstract class CommandParameter(val position: Position, val maybePrefix: Option[Prefix], val value: Value) {
+sealed abstract class CommandParameter(val position: Position, val maybePrefix: Option[Prefix]) {
   val entityId: EntityId = EntityId.blank
 }
 
 object CommandParameter {
 
+  sealed abstract class ActivityCommandParameter(override val position:    Position,
+                                                 override val maybePrefix: Option[Prefix],
+                                                 activity:                 => Activity,
+                                                 entityFactory:            Activity => Entity with Artifact)
+      extends CommandParameter(position, maybePrefix) {
+    lazy val entity: Entity with Artifact = entityFactory(activity)
+    lazy val value:  Value                = Value(entity.location)
+  }
+
+  sealed abstract class ValueCommandParameter(override val position:    Position,
+                                              override val maybePrefix: Option[Prefix],
+                                              val value:                Value)
+      extends CommandParameter(position, maybePrefix)
+
+  sealed abstract class EntityCommandParameter(override val position:    Position,
+                                               override val maybePrefix: Option[Prefix],
+                                               val entity:               Entity with Artifact)
+      extends CommandParameter(position, maybePrefix) {
+    lazy val value: Value = Value(entity.location)
+  }
+
   final class Value private (val value: String) extends AnyVal with StringTinyType
-  implicit object Value extends TinyTypeFactory[Value](new Value(_)) with NonBlank
+  implicit object Value extends TinyTypeFactory[Value](new Value(_)) with NonBlank {
+    def apply(location: Location): Value = Value(location.value)
+  }
 
   final class Prefix private (val value: String) extends AnyVal with StringTinyType
   implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank
@@ -57,89 +81,118 @@ object CommandParameter {
           ).asRight
     }
 
-}
+  sealed trait Input {
+    self: CommandParameter =>
+    override lazy val toString: String = "CommandInput"
+  }
 
-sealed trait Input {
-  self: CommandParameter =>
-  def inputValue:    Value
-  def inputConsumes: List[Entity with Artifact]
-  override lazy val toString: String = s"CommandInput${entityId.value}"
-}
+  object Input {
 
-object Input {
+    sealed trait InputFactory[+T <: CommandParameter]
 
-  def apply(position:    Position,
-            value:       Value,
-            maybePrefix: Option[Prefix],
-            consumes:    List[Entity with Artifact]): CommandParameter with Input =
-    new CommandParameter(position, maybePrefix, value) with Input {
-      override val inputValue:    Value                      = value
-      override val inputConsumes: List[Entity with Artifact] = consumes
+    object InputFactory {
+      trait ActivityPositionInput[+T] extends InputFactory[T] with (Activity => Position => T with Input)
+      trait PositionInput[+T]         extends InputFactory[T] with (Position => T with Input)
     }
 
-  private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                 fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Input] =
-    new PartialEntityConverter[Input] {
-      override def convert[T <: Input]: T => Either[Exception, PartialEntity] = entity => {
-        PartialEntity(
-          None,
-          EntityTypes of (renku / "CommandInput"),
-          rdfs / "label"     -> s"""Command Input "${entity.inputValue}"""".asJsonLD,
-          renku / "consumes" -> entity.inputConsumes.asJsonLD
-        ).asRight
+    def apply(value: Value, maybePrefix: Option[Prefix] = None): Position => ValueCommandParameter with Input =
+      position => new ValueCommandParameter(position, maybePrefix, value) with Input
+
+    def from(entity: Entity with Artifact, maybePrefix: Option[Prefix] = None): PositionInput[EntityCommandParameter] =
+      position => new EntityCommandParameter(position, maybePrefix, entity) with Input
+
+    def from(entityFactory: Activity => Entity with Artifact,
+             maybePrefix:   Option[Prefix] = None): ActivityPositionInput[EntityCommandParameter] =
+      activity => position => new EntityCommandParameter(position, maybePrefix, entityFactory(activity)) with Input
+
+    private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
+                                   fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Input] =
+      new PartialEntityConverter[CommandParameter with Input] {
+        override def convert[T <: CommandParameter with Input]: T => Either[Exception, PartialEntity] = entity => {
+          case input: ValueCommandParameter with Input =>
+            PartialEntity(
+              None,
+              EntityTypes of (renku / "CommandInput"),
+              rdfs / "label" -> s"""Command Input "${input.value}"""".asJsonLD
+            ).asRight
+          case input: EntityCommandParameter with Input =>
+            PartialEntity(
+              None,
+              EntityTypes of (renku / "CommandInput"),
+              rdfs / "label"     -> s"""Command Input "${input.value}"""".asJsonLD,
+              renku / "consumes" -> input.entity.asJsonLD
+            ).asRight
+          case other => throw new IllegalStateException(s"$other not supported")
+        }
       }
-    }
 
-  implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                            fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Input] =
-    JsonLDEncoder.instance[CommandParameter with Input] { entity =>
-      entity.asPartialJsonLD[CommandParameter] combine entity.asPartialJsonLD[Input] getOrFail
-    }
-}
-
-sealed trait Output {
-  self: CommandParameter =>
-
-  import ch.datascience.rdfstore.entities.Output.FolderCreation
-  def outputValue:          Value
-  def outputFolderCreation: FolderCreation
-  def outputProduces:       List[Entity with Artifact]
-
-  override lazy val toString: String = s"CommandOutput${entityId.value}"
-}
-
-object Output {
-  def apply(position:       Position,
-            value:          Value,
-            maybePrefix:    Option[Prefix],
-            folderCreation: FolderCreation,
-            produces:       List[Entity with Artifact]): CommandParameter with Output =
-    new CommandParameter(position, maybePrefix, value) with Output {
-      override val outputFolderCreation: FolderCreation             = folderCreation
-      override val outputProduces:       List[Entity with Artifact] = produces
-      override val outputValue:          Value                      = value
-    }
-
-  private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                 fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Output] =
-    new PartialEntityConverter[Output] {
-      override def convert[T <: Output]: T => Either[Exception, PartialEntity] = entity => {
-        PartialEntity(
-          None,
-          EntityTypes of (renku / "CommandOutput"),
-          rdfs / "label"         -> s"""Command Output "${entity.outputValue}"""".asJsonLD,
-          renku / "createFolder" -> entity.outputFolderCreation.asJsonLD,
-          renku / "produces"     -> entity.outputProduces.asJsonLD
-        ).asRight
+    implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                              fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Input] =
+      JsonLDEncoder.instance[CommandParameter with Input] { entity =>
+        entity.asPartialJsonLD[CommandParameter] combine entity.asPartialJsonLD[CommandParameter with Input] getOrFail
       }
-    }
+  }
 
-  implicit def outputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                             fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Output] =
-    JsonLDEncoder.instance { entity =>
-      entity.asPartialJsonLD[CommandParameter] combine entity.asPartialJsonLD[Output] getOrFail
-    }
+  sealed trait Output {
+    self: CommandParameter =>
 
-  final class FolderCreation private (val value: Boolean) extends AnyVal with BooleanTinyType
-  implicit object FolderCreation extends TinyTypeFactory[FolderCreation](new FolderCreation(_))
+    import CommandParameter.Output.FolderCreation
+
+    def outputFolderCreation: FolderCreation
+    override lazy val toString: String = "CommandOutput"
+  }
+
+  object Output {
+
+    def apply(value:          Value,
+              maybePrefix:    Option[Prefix] = None,
+              folderCreation: FolderCreation = FolderCreation(false)): Position => CommandParameter with Output =
+      position =>
+        new ValueCommandParameter(position, maybePrefix, value) with Output {
+          override val outputFolderCreation: FolderCreation = folderCreation
+        }
+
+    def from(
+        entityFactory:  Activity => Entity with Artifact,
+        maybePrefix:    Option[Prefix] = None,
+        folderCreation: FolderCreation = FolderCreation(false)
+    ): Activity => Position => CommandParameter with Output =
+      activity =>
+        position =>
+          new ActivityCommandParameter(position, maybePrefix, activity, entityFactory) with Output {
+            override val outputFolderCreation: FolderCreation = folderCreation
+          }
+
+    private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
+                                   fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Output] =
+      new PartialEntityConverter[CommandParameter with Output] {
+        override def convert[T <: CommandParameter with Output]: T => Either[Exception, PartialEntity] = entity => {
+          case output: ValueCommandParameter with Output =>
+            PartialEntity(
+              None,
+              EntityTypes of (renku / "CommandOutput"),
+              rdfs / "label"         -> s"""Command Output "${output.value}"""".asJsonLD,
+              renku / "createFolder" -> output.outputFolderCreation.asJsonLD
+            ).asRight
+          case output: ActivityCommandParameter with Output =>
+            PartialEntity(
+              None,
+              EntityTypes of (renku / "CommandOutput"),
+              rdfs / "label"         -> s"""Command Output "${output.value}"""".asJsonLD,
+              renku / "createFolder" -> output.outputFolderCreation.asJsonLD,
+              renku / "produces"     -> output.entity.asJsonLD
+            ).asRight
+          case other => throw new IllegalStateException(s"$other not supported")
+        }
+      }
+
+    implicit def outputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                               fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Output] =
+      JsonLDEncoder.instance { entity =>
+        entity.asPartialJsonLD[CommandParameter] combine entity.asPartialJsonLD[CommandParameter with Output] getOrFail
+      }
+
+    final class FolderCreation private (val value: Boolean) extends AnyVal with BooleanTinyType
+    implicit object FolderCreation extends TinyTypeFactory[FolderCreation](new FolderCreation(_))
+  }
 }

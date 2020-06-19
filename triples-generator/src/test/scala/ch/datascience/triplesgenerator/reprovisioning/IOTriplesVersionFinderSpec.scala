@@ -107,16 +107,15 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
         commitIds.generateOne,
         Agent(originalSchemaVersion),
         RunPlan(
-          commitIds.generateOne,
           workflowFiles.generateOne,
           Project(projectPaths.generateOne,
                   projectNames.generateOne,
                   projectCreatedDates.generateOne,
                   maybeCreator = None),
           runPlanCommands.generateOne,
-          arguments      = Nil,
-          commandInputs  = Nil,
-          commandOutputs = Nil
+          arguments = Nil,
+          inputs    = Nil,
+          outputs   = Nil
         )
       ).asJsonLD
     )

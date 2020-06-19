@@ -29,8 +29,12 @@ object Generation {
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Generation] =
     JsonLDEncoder.instance { entity =>
+      val maybeStep = entity.activity match {
+        case a: ProcessRun if a.processRunMaybeStep.isDefined => a.processRunMaybeStep
+        case _ => None
+      }
       JsonLD.entity(
-        EntityId of fusekiBaseUrl / "activities" / "commit" / entity.activity.id / "tree" / entity.location,
+        EntityId of fusekiBaseUrl / "activities" / "commit" / entity.activity.commitId / maybeStep / "tree" / entity.location,
         EntityTypes of prov / "Generation",
         prov / "activity" -> entity.activity.asJsonLD
       )

@@ -26,7 +26,7 @@ import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
 
 import scala.language.postfixOps
 
-class Activity(val id:              CommitId,
+class Activity(val commitId:        CommitId,
                val committedDate:   CommittedDate,
                val committer:       Person,
                val project:         Project,
@@ -56,9 +56,9 @@ object Activity {
       override def convert[T <: Activity]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
-            EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.id),
+            EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.commitId),
             EntityTypes of (prov / "Activity"),
-            rdfs / "label"             -> entity.id.asJsonLD,
+            rdfs / "label"             -> entity.commitId.asJsonLD,
             rdfs / "comment"           -> entity.comment.asJsonLD,
             prov / "startedAtTime"     -> entity.committedDate.asJsonLD,
             prov / "endedAtTime"       -> entity.committedDate.asJsonLD,

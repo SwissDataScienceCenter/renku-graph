@@ -18,4 +18,82 @@ x refactor jsonld encoders to fit the new mixin pattern as the one used in Comma
 - complete the bundles with proper Entity entities :) for e.g in the Input entities.consumes
 - ask Ralf why CommandParameter is an Entity?
 - run renku log with the flag firing up SHACL validation
-- create an issue to simplify sparql query results binding 
+- create an issue to simplify sparql query results binding
+- add a test to verify if lineage works when created with the new version of renku
+- ask Ralf why do we have a cwl file on a RunPlan (that cwl was invalidated) 
+- unify naming for the model
+- isn't that missing members a bug:
+"https://swissdatasciencecenter.github.io/renku-ontology#consumes": [
+                  {
+                    "@type": [
+                      "http://www.w3.org/ns/prov#Collection",
+                      "http://www.w3.org/ns/prov#Entity",
+                      "http://purl.org/wf4ever/wfprov#Artifact"
+                    ],
+                    "@id": "https://dev.renku.ch/blob/39d571ccea25635aee872c01c6e7a6cfae85ab84/data/zhbikes",
+                    "http://www.w3.org/2000/01/rdf-schema#label": [
+                      {
+                        "@value": "data/zhbikes@39d571ccea25635aee872c01c6e7a6cfae85ab84"
+                      }
+                    ],
+                    "http://schema.org/isPartOf": [
+                      {
+                        "@type": [
+                          "http://www.w3.org/ns/prov#Location",
+                          "http://schema.org/Project"
+                        ],
+                        "@id": "https://localhost/projects/jakub.chrobasik/test%20191104203427",
+                        "http://schema.org/dateCreated": [
+                          {
+                            "@value": "2019-11-04T19:34:32.992000+00:00"
+                          }
+                        ],
+                        "http://schema.org/creator": [
+                          {
+                            "@type": [
+                              "http://www.w3.org/ns/prov#Person",
+                              "http://schema.org/Person"
+                            ],
+                            "@id": "mailto:jakub.chrobasik@epfl.ch",
+                            "http://schema.org/email": [
+                              {
+                                "@value": "jakub.chrobasik@epfl.ch"
+                              }
+                            ],
+                            "http://www.w3.org/2000/01/rdf-schema#label": [
+                              {
+                                "@value": "Jakub J\u00f3zef Chrobasik"
+                              }
+                            ],
+                            "http://schema.org/name": [
+                              {
+                                "@value": "Jakub J\u00f3zef Chrobasik"
+                              }
+                            ]
+                          }
+                        ],
+                        "http://schema.org/name": [
+                          {
+                            "@value": "test 191104203427"
+                          }
+                        ],
+                        "http://schema.org/dateUpdated": [
+                          {
+                            "@value": "2019-11-04T19:34:32.992000+00:00"
+                          }
+                        ],
+                        "http://schema.org/schemaVersion": [
+                          {
+                            "@value": "1"
+                          }
+                        ]
+                      }
+                    ],
+                    "http://www.w3.org/ns/prov#hadMember": [],
+                    "http://www.w3.org/ns/prov#atLocation": [
+                      {
+                        "@value": "data/zhbikes"
+                      }
+                    ]
+                  }
+                ] 

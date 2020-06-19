@@ -59,7 +59,7 @@ object DataSet {
             generation:         Generation,
             project:            Project,
             keywords:           List[Keyword] = Nil): DataSetArtifact =
-    new Entity(generation.activity.id,
+    new Entity(generation.activity.commitId,
                generation.location,
                project,
                maybeInvalidationActivity = None,
