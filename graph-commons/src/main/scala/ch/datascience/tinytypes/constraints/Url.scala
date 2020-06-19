@@ -44,6 +44,12 @@ trait UrlOps[T <: StringTinyType] {
     def /[TT <: TinyType](value: TT)(implicit converter: TT => List[PathSegment]): T =
       apply(s"$url/${converter(value).mkString("/")}")
 
+    def /[TT <: TinyType](maybeValue: Option[TT])(implicit converter: TT => List[PathSegment]): T =
+      maybeValue match {
+        case Some(value) => url / value
+        case _           => url
+      }
+
     def /(value: String): T = apply(s"$url/${urlEncode(value)}")
 
     def ?[Value](keyAndValue: (String, Value))(implicit convert: Value => QueryParamValue): UrlWithQueryParam =

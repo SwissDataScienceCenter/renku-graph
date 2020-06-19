@@ -38,26 +38,26 @@ object WorkflowRun {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def apply(id:              CommitId,
-            committedDate:   CommittedDate,
-            committer:       Person,
-            project:         Project,
-            agent:           Agent,
-            comment:         String,
-            workflowFile:    WorkflowFile,
-            informedBy:      Activity,
-            association:     Association,
-            startTime:       Instant = Instant.now(),
-            endTime:         Instant = Instant.now().plus(10, SECONDS),
-            maybeInfluenced: Option[Activity] = None,
-            usages:          List[Usage]): ActivityWorkflowRun =
-    new Activity(id, committedDate, committer, project, agent, comment, Some(informedBy), maybeInfluenced)
+  def apply(commitId:           CommitId,
+            committedDate:      CommittedDate,
+            committer:          Person,
+            project:            Project,
+            agent:              Agent,
+            comment:            String,
+            workflowFile:       WorkflowFile,
+            informedBy:         Activity,
+            associationFactory: (CommitId, WorkflowFile) => Association,
+            startTime:          Instant = Instant.now(),
+            endTime:            Instant = Instant.now().plus(10, SECONDS),
+            maybeInfluenced:    Option[Activity] = None,
+            usages:             List[Usage]): ActivityWorkflowRun =
+    new Activity(commitId, committedDate, committer, project, agent, comment, Some(informedBy), maybeInfluenced)
     with ProcessRun with WorkflowRun {
-      override val processRunAssociation:          Association                 = association
-      override val processRunUsages:               List[Usage]                 = usages
-      override val processRunMaybeStepId:          Option[String]              = None
-      override val processRunMaybeWorkflowRunPart: Option[ActivityWorkflowRun] = None
-      val workflowRunFile:                         WorkflowFile                = workflowFile
+      override val processRunAssociation:      Association                 = associationFactory(commitId, workflowFile)
+      override val processRunUsages:           List[Usage]                 = usages
+      override val processRunMaybeStep:        Option[Step]                = None
+      override val processRunMaybeWorkflowRun: Option[ActivityWorkflowRun] = None
+      val workflowRunFile:                     WorkflowFile                = workflowFile
     }
 
   private[entities] implicit val converter: PartialEntityConverter[Activity with WorkflowRun] =
@@ -66,7 +66,7 @@ object WorkflowRun {
         entity =>
           PartialEntity(
             EntityTypes of (wfprov / "WorkflowRun"),
-            rdfs / "label" -> s"${entity.workflowRunFile}@${entity.id}".asJsonLD
+            rdfs / "label" -> s"${entity.workflowRunFile}@${entity.commitId}".asJsonLD
           ).asRight
     }
 

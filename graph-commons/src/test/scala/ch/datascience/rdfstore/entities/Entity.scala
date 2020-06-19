@@ -37,17 +37,20 @@ class Entity(val commitId:                  CommitId,
 object Entity {
 
   def apply(location: Location, generation: Generation): Entity with Artifact =
-    new Entity(generation.activity.id,
+    new Entity(generation.activity.commitId,
                location,
                generation.activity.project,
                maybeInvalidationActivity = None,
                maybeGeneration           = Some(generation)) with Artifact
 
-  def apply(commitId: CommitId, location: Location, project: Project): Entity with Artifact =
-    new Entity(commitId, location, project, maybeInvalidationActivity = None, maybeGeneration = None) with Artifact
+  def apply(commitId:                  CommitId,
+            location:                  Location,
+            project:                   Project,
+            maybeInvalidationActivity: Option[Activity] = None): Entity with Artifact =
+    new Entity(commitId, location, project, maybeInvalidationActivity, maybeGeneration = None) with Artifact
 
   def apply(generation: Generation): Entity with Artifact =
-    new Entity(generation.activity.id,
+    new Entity(generation.activity.commitId,
                generation.location,
                generation.activity.project,
                maybeInvalidationActivity = None,

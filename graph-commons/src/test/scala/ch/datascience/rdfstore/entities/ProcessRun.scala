@@ -27,10 +27,10 @@ import scala.language.postfixOps
 trait ProcessRun {
   self: Activity =>
 
-  def processRunAssociation:          Association
-  def processRunUsages:               List[Usage]
-  def processRunMaybeStepId:          Option[String]
-  def processRunMaybeWorkflowRunPart: Option[ActivityWorkflowRun]
+  def processRunAssociation:      Association
+  def processRunUsages:           List[Usage]
+  def processRunMaybeStep:        Option[Step]
+  def processRunMaybeWorkflowRun: Option[ActivityWorkflowRun]
 }
 
 object ProcessRun {
@@ -41,29 +41,59 @@ object ProcessRun {
   import io.renku.jsonld.syntax._
 
   def apply(
+      workflowRun:        ActivityWorkflowRun,
+      commitId:           CommitId,
+      step:               Step,
+      committedDate:      CommittedDate,
+      committer:          Person,
+      agent:              Agent,
+      comment:            String,
+      maybeInformedBy:    Option[Activity],
+      associationFactory: (CommitId, Step) => Association,
+      usagesFactories:    List[Step => Usage],
+      maybeInfluenced:    Option[Activity] = None
+  ): Activity with ProcessRun = {
+    val association = associationFactory(commitId, step)
+    new Activity(commitId,
+                 committedDate,
+                 committer,
+                 association.runPlan.project,
+                 agent,
+                 comment,
+                 maybeInformedBy,
+                 maybeInfluenced) with ProcessRun {
+      override val processRunAssociation:      Association                 = association
+      override val processRunUsages:           List[Usage]                 = usagesFactories.map(_.apply(step))
+      override val processRunMaybeStep:        Option[Step]                = Some(step)
+      override val processRunMaybeWorkflowRun: Option[ActivityWorkflowRun] = Some(workflowRun)
+    }
+  }
+
+  def apply(
       id:                   CommitId,
       committedDate:        CommittedDate,
       committer:            Person,
+      agent:                Agent,
       comment:              String,
       maybeInformedBy:      Option[Activity],
       association:          Association,
       usages:               List[Usage],
       maybeInfluenced:      Option[Activity] = None,
-      maybeStepId:          Option[String] = None,
+      maybeStep:            Option[Step] = None,
       maybeWorkflowRunPart: Option[ActivityWorkflowRun] = None
   ): Activity with ProcessRun =
     new Activity(id,
                  committedDate,
                  committer,
                  association.runPlan.project,
-                 association.agent,
+                 agent,
                  comment,
                  maybeInformedBy,
                  maybeInfluenced) with ProcessRun {
-      override val processRunAssociation: Association    = association
-      override val processRunUsages:      List[Usage]    = usages
-      override val processRunMaybeStepId: Option[String] = maybeStepId
-      override val processRunMaybeWorkflowRunPart: Option[ActivityWorkflowRun] =
+      override val processRunAssociation: Association  = association
+      override val processRunUsages:      List[Usage]  = usages
+      override val processRunMaybeStep:   Option[Step] = maybeStep
+      override val processRunMaybeWorkflowRun: Option[ActivityWorkflowRun] =
         maybeWorkflowRunPart
     }
 
@@ -75,13 +105,13 @@ object ProcessRun {
       override def convert[T <: Activity with ProcessRun]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
-            EntityId of s"$fusekiBaseUrl/activities/commit/${entity.id}${entity.processRunMaybeStepId.map(id => s"/steps/$id").getOrElse("")}",
+            EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.processRunMaybeStep,
             EntityTypes of (wfprov / "ProcessRun"),
-            rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.id}".asJsonLD,
+            rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
             prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
             prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
             prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD,
-            prov / "wasPartOfWorkflowRun" -> entity.processRunMaybeWorkflowRunPart.asJsonLD(
+            prov / "wasPartOfWorkflowRun" -> entity.processRunMaybeWorkflowRun.asJsonLD(
               JsonLDEncoder.encodeOption(WorkflowRun.encoder)
             )
           ).asRight

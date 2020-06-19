@@ -35,6 +35,8 @@ import org.scalatest.WordSpec
 
 class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalServiceStubbing {
 
+  protected override val givenServerRunning = true
+
   "findLineage" should {
 
     "return the lineage of the given project for a given commit id and file path" in new TestCase {
@@ -44,6 +46,9 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
       loadToStore(jsons: _*)
 
       import examplarData._
+
+      println(projectPath)
+      println(location)
 
       lineageFinder
         .findLineage(projectPath, FilePath(location.value))

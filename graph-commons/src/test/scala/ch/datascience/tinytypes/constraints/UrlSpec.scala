@@ -59,6 +59,18 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       val otherPath = (relativePaths(minSegments = 2) map RelativePathString.apply).generateOne
       (url / otherPath) shouldBe UrlType(s"$url/$otherPath")
     }
+
+    "add the given path segment when it's Some" in {
+      val url       = (httpUrls() map UrlType.apply).generateOne
+      val otherPath = (relativePaths(minSegments = 2) map RelativePathString.apply).generateSome
+      (url / otherPath) shouldBe UrlType(s"$url/$otherPath")
+    }
+
+    "not add a path segment for None" in {
+      val url       = (httpUrls() map UrlType.apply).generateOne
+      val otherPath = Option.empty[RelativePathString]
+      (url / otherPath) shouldBe url
+    }
   }
 
   "?" should {

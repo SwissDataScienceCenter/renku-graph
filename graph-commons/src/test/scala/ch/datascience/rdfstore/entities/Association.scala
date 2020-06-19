@@ -23,15 +23,20 @@ import ch.datascience.graph.model.events.CommitId
 final class Association private (val commitId:  CommitId,
                                  val agent:     Agent,
                                  val runPlan:   Entity with RunPlan,
-                                 val maybeStep: Option[String] = None)
+                                 val maybeStep: Option[Step] = None)
 
 object Association {
 
-  def apply(commitId:  CommitId,
-            agent:     Agent,
-            runPlan:   Entity with RunPlan,
-            maybeStep: Option[String] = None): Association =
-    new Association(commitId, agent, runPlan, maybeStep)
+  def factory(agent: Agent, runPlan: CommitId => Entity with RunPlan): CommitId => Association =
+    commitId => new Association(commitId, agent, runPlan(commitId), maybeStep = None)
+
+  def factory(agent: Agent, runPlan: CommitId => Entity with RunPlan): (CommitId, Step) => Association = {
+    case (commitId, step) => new Association(commitId, agent, runPlan(commitId), Some(step))
+  }
+
+  def factory(agent:   Agent,
+              runPlan: (CommitId, WorkflowFile) => Entity with RunPlan): (CommitId, WorkflowFile) => Association =
+    (commitId, workflowFile) => new Association(commitId, agent, runPlan(commitId, workflowFile), maybeStep = None)
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import ch.datascience.rdfstore.FusekiBaseUrl
@@ -41,9 +46,7 @@ object Association {
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Association] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
-        EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.maybeStep
-          .map(step => s"steps/$step/association")
-          .getOrElse("association")),
+        EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.maybeStep / "association",
         EntityTypes of (prov / "Association"),
         prov / "agent"   -> entity.agent.asJsonLD,
         prov / "hadPlan" -> entity.runPlan.asJsonLD

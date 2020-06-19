@@ -20,66 +20,109 @@ package ch.datascience.rdfstore.entities
 
 import cats.implicits._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.rdfstore.entities.RunPlan.{Argument, Command, ProcessOrder, SuccessCode}
+import ch.datascience.rdfstore.entities.CommandParameter._
+import ch.datascience.rdfstore.entities.RunPlan.{Argument, SuccessCode}
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 
 import scala.language.postfixOps
 
-trait RunPlan {
+sealed trait RunPlan {
   self: Entity =>
 
-  val runCommand:           Command
-  val runArguments:         List[Argument]
-  val runCommandInputs:     List[CommandParameter with Input]
-  val runCommandOutputs:    List[CommandParameter with Output]
-  val maybeRunSubprocess:   Option[Entity with RunPlan]
-  val runSuccessCodes:      List[SuccessCode]
-  val maybeRunProcessOrder: Option[ProcessOrder]
+  val runArguments:      List[Argument]
+  val runCommandInputs:  List[CommandParameter with Input]
+  val runCommandOutputs: List[CommandParameter with Output]
+  val runSuccessCodes:   List[SuccessCode]
 }
+
 object RunPlan {
+
+  sealed trait ProcessRunPlan extends RunPlan {
+    self: Entity =>
+
+    val runCommand:           Command
+    val maybeRunProcessOrder: Option[ProcessOrder]
+  }
+
+  sealed trait WorkflowRunPlan extends RunPlan {
+    self: Entity =>
+
+    val runSubprocesses: List[Entity with RunPlan]
+  }
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import ch.datascience.rdfstore.FusekiBaseUrl
   import io.renku.jsonld._
   import JsonLDEncoder._
   import io.renku.jsonld.syntax._
-  def apply(commitId:          CommitId,
-            workflowFile:      WorkflowFile,
-            project:           Project,
-            command:           Command,
-            arguments:         List[Argument],
-            commandInputs:     List[CommandParameter with Input],
-            commandOutputs:    List[CommandParameter with Output],
-            maybeSubprocess:   Option[Entity with RunPlan] = None,
-            successCodes:      List[SuccessCode] = Nil,
-            maybeProcessOrder: Option[ProcessOrder] = None): Entity with RunPlan =
-    new Entity(commitId, workflowFile, project, maybeInvalidationActivity = None, maybeGeneration = None) with RunPlan {
+
+  def workflow(
+      project:      Project,
+      arguments:    List[Argument] = Nil,
+      inputs:       List[Position => CommandParameter with Input] = Nil,
+      outputs:      List[(Activity, Position) => CommandParameter with Output] = Nil,
+      subprocesses: List[Entity with RunPlan],
+      successCodes: List[SuccessCode] = Nil
+  )(commitId:       CommitId, workflowFile: WorkflowFile): Entity with RunPlan =
+    new Entity(commitId, workflowFile, project, maybeInvalidationActivity = None, maybeGeneration = None)
+    with WorkflowRunPlan {
+      override val runArguments:      List[Argument]                     = arguments
+      override val runCommandInputs:  List[CommandParameter with Input]  = toParameters(inputs)
+      override val runCommandOutputs: List[CommandParameter with Output] = toParameters(outputs, offset = inputs.length)
+      override val runSubprocesses:   List[Entity with RunPlan]          = subprocesses
+      override val runSuccessCodes:   List[SuccessCode]                  = successCodes
+    }
+
+  def process(workflowFile:      WorkflowFile,
+              project:           Project,
+              command:           Command,
+              arguments:         List[Argument] = Nil,
+              inputs:            List[Position => CommandParameter with Input] = Nil,
+              outputs:           List[Activity => Position => CommandParameter with Output] = Nil,
+              successCodes:      List[SuccessCode] = Nil,
+              maybeProcessOrder: Option[ProcessOrder] = None)(commitId: CommitId): Entity with RunPlan =
+    new Entity(commitId, workflowFile, project, maybeInvalidationActivity = None, maybeGeneration = None)
+    with ProcessRunPlan {
       override val runCommand:           Command                            = command
       override val runArguments:         List[Argument]                     = arguments
-      override val runCommandInputs:     List[CommandParameter with Input]  = commandInputs
-      override val runCommandOutputs:    List[CommandParameter with Output] = commandOutputs
-      override val maybeRunSubprocess:   Option[Entity with RunPlan]        = maybeSubprocess
+      override val runCommandInputs:     List[CommandParameter with Input]  = toParameters(inputs)
+      override val runCommandOutputs:    List[CommandParameter with Output] = toParameters(outputs, offset = inputs.length)
       override val runSuccessCodes:      List[SuccessCode]                  = successCodes
       override val maybeRunProcessOrder: Option[ProcessOrder]               = maybeProcessOrder
+    }
+
+  private def toParameters[T](factories: List[Position => T], offset: Int = 0): List[T] =
+    factories.zipWithIndex.map {
+      case (factory, idx) => factory(Position(idx + offset + 1))
     }
 
   private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                            fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Entity with RunPlan] =
     new PartialEntityConverter[Entity with RunPlan] {
-      override def convert[T <: Entity with RunPlan]: T => Either[Exception, PartialEntity] =
-        entity =>
+      override def convert[T <: Entity with RunPlan]: T => Either[Exception, PartialEntity] = {
+        case entity: Entity with WorkflowRunPlan =>
           PartialEntity(
             EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location),
             EntityTypes of (prov / "Plan", renku / "Run"),
-            renku / "command"       -> entity.runCommand.asJsonLD,
             renku / "hasArguments"  -> entity.runArguments.asJsonLD,
             renku / "hasInputs"     -> entity.runCommandInputs.asJsonLD,
             renku / "hasOutputs"    -> entity.runCommandOutputs.asJsonLD,
-            renku / "hasSubprocess" -> entity.maybeRunSubprocess.asJsonLD,
-            renku / "successCodes"  -> entity.runSuccessCodes.asJsonLD,
-            renku / "processOrder"  -> entity.maybeRunProcessOrder.asJsonLD
+            renku / "hasSubprocess" -> entity.runSubprocesses.asJsonLD,
+            renku / "successCodes"  -> entity.runSuccessCodes.asJsonLD
           ).asRight
+        case entity: Entity with ProcessRunPlan =>
+          PartialEntity(
+            EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location),
+            EntityTypes of (prov / "Plan", renku / "Run"),
+            renku / "command"      -> entity.runCommand.asJsonLD,
+            renku / "hasArguments" -> entity.runArguments.asJsonLD,
+            renku / "hasInputs"    -> entity.runCommandInputs.asJsonLD,
+            renku / "hasOutputs"   -> entity.runCommandOutputs.asJsonLD,
+            renku / "successCodes" -> entity.runSuccessCodes.asJsonLD,
+            renku / "processOrder" -> entity.maybeRunProcessOrder.asJsonLD
+          ).asRight
+      }
     }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
