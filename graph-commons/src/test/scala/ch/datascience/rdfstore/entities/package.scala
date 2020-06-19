@@ -29,7 +29,7 @@ import ch.datascience.tinytypes.constraints.RelativePath
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-package object entities extends Schemas {
+package object entities extends Schemas with EntitiesGenerators {
 
   final class GenerationPath private (val value: String) extends AnyVal with RelativePathTinyType
   object GenerationPath extends TinyTypeFactory[GenerationPath](new GenerationPath(_)) with RelativePath {

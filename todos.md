@@ -17,3 +17,5 @@ x *See with CLI team:* renku migrate --no-commit still generates several commits
 x refactor jsonld encoders to fit the new mixin pattern as the one used in CommandParameters
 - complete the bundles with proper Entity entities :) for e.g in the Input entities.consumes
 - ask Ralf why CommandParameter is an Entity?
+- run renku log with the flag firing up SHACL validation
+- create an issue to simplify sparql query results binding 

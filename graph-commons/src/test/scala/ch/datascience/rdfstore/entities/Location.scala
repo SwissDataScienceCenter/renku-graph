@@ -18,21 +18,13 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.generators.Generators.relativePaths
 import ch.datascience.tinytypes.constraints.{RelativePath, RelativePathOps}
 import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import org.scalacheck.Gen
 
 sealed trait Location extends Any with RelativePathTinyType
-object Location
-    extends TinyTypeFactory[Location](new LocationImpl(_))
-    with RelativePath
-    with RelativePathOps[Location] {
-
-  val locations: Gen[Location] = relativePaths() map Location.apply
-}
+object Location       extends TinyTypeFactory[Location](new LocationImpl(_)) with RelativePath with RelativePathOps[Location]
 final class LocationImpl(override val value: String) extends AnyVal with Location
 
 sealed trait WorkflowFile extends Any with Location
