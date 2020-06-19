@@ -150,12 +150,14 @@ class ProjectPropertiesRemoverSpec extends WordSpec with ScalaCheckPropertyCheck
               maybeCreatedDate: Option[DateCreated],
               maybeCreatorId:   Option[EntityId]): TransformedProject =
       TransformedProject(
-        project.asJsonLD.entityId.map(id => ResourceId(id.value)).getOrElse(fail("Project's entityId finding problem")),
+        project.asJsonLD.entityId
+          .map(id => ResourceId(id))
+          .getOrElse(fail("Project's entityId finding problem")),
         List(project.name),
         maybeCreatedDate.map(List(_)).getOrElse(Nil),
-        maybeCreatorId.map(id => users.ResourceId(id.value)),
-        project.maybeParentProject.flatMap(_.asJsonLD.entityId).map(id => ResourceId(id.value)),
-        List(project.version)
+        maybeCreatorId.map(id => users.ResourceId(id)),
+        project.maybeParentProject.flatMap(_.asJsonLD.entityId).map(id => ResourceId(id)),
+        List(SchemaVersion(project.version.toString))
       )
   }
 }

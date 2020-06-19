@@ -45,7 +45,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(personId.value), NonEmptyList.of(name), Set(email))
+            UpdaterPerson(ResourceId(personId), NonEmptyList.of(name), Set(email))
           )
         )
 
@@ -66,7 +66,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
       val updates = updatesCreator.prepareUpdates(
         Set(
-          UpdaterPerson(ResourceId(personId.value), NonEmptyList.of(name), emails = Set.empty)
+          UpdaterPerson(ResourceId(personId), NonEmptyList.of(name), emails = Set.empty)
         )
       )
 
@@ -96,7 +96,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(person1Id.value), NonEmptyList.of(name1Updated), Set(email1))
+            UpdaterPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), Set(email1))
           )
         )
 
@@ -129,7 +129,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(person1Id.value), NonEmptyList.of(name1Updated), emails = Set.empty)
+            UpdaterPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), emails = Set.empty)
           )
         )
 
@@ -164,7 +164,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(person1Id.value), name1Updates, email1Updates)
+            UpdaterPerson(ResourceId(person1Id), name1Updates, email1Updates)
           )
         )
 

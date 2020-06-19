@@ -46,7 +46,7 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
           List(
             dataset
               .copy(published = dataset.published.copy(maybeDate = Some(publishedDate), creators = Set.empty))
-              .copy(sameAs = SameAs(DataSet.entityId(dataset.id).value))
+              .copy(sameAs = SameAs(DataSet.entityId(dataset.id).value.toString))
               .copy(maybeUrl = None)
               .copy(maybeDescription = None)
               .copy(parts = Nil)
@@ -62,7 +62,7 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
     "results": {
       "bindings": [
         {
-          "datasetId": {"value": ${DataSet.entityId(dataset.id).value}},
+          "datasetId": {"value": ${DataSet.entityId(dataset.id).value.toString}},
           "identifier": {"value": ${dataset.id.value}},
           "name": {"value": ${dataset.name.value}},
           "publishedDate": {"value": ${publishedDate.value}},
