@@ -405,6 +405,25 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
 
+    "be able to add reverse property with a list of entities" in {
+      forAll { (parentId: EntityId, parentTypes: EntityTypes, parentProperty: (Property, JsonLD)) =>
+        val reverseProperty         = properties.generateOne
+        val reversePropertyEntities = jsonLDEntities.generateNonEmptyList().toList
+        val Right(reverse)          = Reverse.of(reverseProperty -> reversePropertyEntities)
+        JsonLD
+          .entity(parentId, parentTypes, reverse, parentProperty)
+          .toJson shouldBe
+          parse(s"""{
+            "@id":                  ${parentId.asJson},
+            "@type":                ${parentTypes.asJson},
+            "${parentProperty._1}": ${parentProperty._2.toJson},
+            "@reverse":             {
+              "$reverseProperty": ${Json.arr(reversePropertyEntities.map(_.toJson): _*)}
+            }
+          }""").fold(throw _, identity)
+      }
+    }
+
     "have some entityId" in {
       forAll { (id: EntityId, types: EntityTypes, property: (Property, JsonLD)) =>
         JsonLD.entity(id, types, property).entityId shouldBe Some(id)

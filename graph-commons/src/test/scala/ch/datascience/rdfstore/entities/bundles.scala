@@ -132,41 +132,50 @@ object bundles extends Schemas {
         `sha9 plot_data`:           NodeDef,
         `sha10 zhbikes`:            NodeDef,
         `sha12 step1 renku update`: NodeDef,
+        `sha12 step1 invalidation`: NodeDef,
         `sha12 step2 renku update`: NodeDef,
+        `sha12 step2 invalidation`: NodeDef,
         `sha12 step2 grid_plot`:    NodeDef,
+        `sha12 workflow`:           NodeDef,
         `sha12 parquet`:            NodeDef
     )
 
     object ExamplarData {
-      def apply(commitId:                CommitId,
-                location:                Location,
-                `sha3 zhbikes`:          JsonLD,
-                `sha7 plot_data`:        JsonLD,
-                `sha7 clean_data`:       JsonLD,
-                `sha8 renku run`:        JsonLD,
-                `sha8 parquet`:          JsonLD,
-                `sha9 renku run`:        JsonLD,
-                `sha9 plot_data`:        JsonLD,
-                `sha10 zhbikes`:         JsonLD,
-                `sha12 step1 renku`:     JsonLD,
-                `sha12 step2 renku`:     JsonLD,
-                `sha12 step2 grid_plot`: JsonLD,
-                `sha12 parquet`:         JsonLD): ExamplarData =
+      def apply(commitId:                   CommitId,
+                location:                   Location,
+                `sha3 zhbikes`:             JsonLD,
+                `sha7 plot_data`:           JsonLD,
+                `sha7 clean_data`:          JsonLD,
+                `sha8 renku run`:           JsonLD,
+                `sha8 parquet`:             JsonLD,
+                `sha9 renku run`:           JsonLD,
+                `sha9 plot_data`:           JsonLD,
+                `sha10 zhbikes`:            JsonLD,
+                `sha12 step1 renku`:        JsonLD,
+                `sha12 step1 invalidation`: JsonLD,
+                `sha12 step2 renku`:        JsonLD,
+                `sha12 step2 invalidation`: JsonLD,
+                `sha12 step2 grid_plot`:    JsonLD,
+                `sha12 workflow`:           JsonLD,
+                `sha12 parquet`:            JsonLD): ExamplarData =
         ExamplarData(
           commitId,
           location,
-          `sha3 zhbikes`             = NodeDef(`sha3 zhbikes`, label          = "data/zhbikes@000003"),
-          `sha7 plot_data`           = NodeDef(`sha7 plot_data`, label        = "src/plot_data.py@000007"),
-          `sha7 clean_data`          = NodeDef(`sha7 clean_data`, label       = "src/clean_data.py@000007"),
-          `sha8 renku run`           = NodeDef(`sha8 renku run`, label        = "renku run python"),
-          `sha8 parquet`             = NodeDef(`sha8 parquet`, label          = "data/preprocessed/zhbikes.parquet@000008"),
-          `sha9 renku run`           = NodeDef(`sha9 renku run`, label        = "renku run python"),
-          `sha9 plot_data`           = NodeDef(`sha9 plot_data`, label        = "figs/grid_plot.png@000009"),
-          `sha10 zhbikes`            = NodeDef(`sha10 zhbikes`, label         = "data/zhbikes@0000010"),
-          `sha12 step1 renku update` = NodeDef(`sha12 step1 renku`, label     = "renku update"),
-          `sha12 step2 renku update` = NodeDef(`sha12 step2 renku`, label     = "renku update"),
-          `sha12 step2 grid_plot`    = NodeDef(`sha12 step2 grid_plot`, label = "figs/grid_plot.png@0000012"),
-          `sha12 parquet`            = NodeDef(`sha12 parquet`, label         = "data/preprocessed/zhbikes.parquet@0000012")
+          `sha3 zhbikes`             = NodeDef(`sha3 zhbikes`, label             = "data/zhbikes@000003"),
+          `sha7 plot_data`           = NodeDef(`sha7 plot_data`, label           = "src/plot_data.py@000007"),
+          `sha7 clean_data`          = NodeDef(`sha7 clean_data`, label          = "src/clean_data.py@000007"),
+          `sha8 renku run`           = NodeDef(`sha8 renku run`, label           = "renku run python"),
+          `sha8 parquet`             = NodeDef(`sha8 parquet`, label             = "data/preprocessed/zhbikes.parquet@000008"),
+          `sha9 renku run`           = NodeDef(`sha9 renku run`, label           = "renku run python"),
+          `sha9 plot_data`           = NodeDef(`sha9 plot_data`, label           = "figs/grid_plot.png@000009"),
+          `sha10 zhbikes`            = NodeDef(`sha10 zhbikes`, label            = "data/zhbikes@0000010"),
+          `sha12 step1 renku update` = NodeDef(`sha12 step1 renku`, label        = "renku update"),
+          `sha12 step1 invalidation` = NodeDef(`sha12 step1 invalidation`, label = "renku-migrate-step0.cwl@0000012"),
+          `sha12 step2 renku update` = NodeDef(`sha12 step2 renku`, label        = "renku update"),
+          `sha12 step2 invalidation` = NodeDef(`sha12 step2 invalidation`, label = "renku-migrate-step1.cwl@0000012"),
+          `sha12 step2 grid_plot`    = NodeDef(`sha12 step2 grid_plot`, label    = "figs/grid_plot.png@0000012"),
+          `sha12 workflow`           = NodeDef(`sha12 workflow`, label           = "renku update"),
+          `sha12 parquet`            = NodeDef(`sha12 parquet`, label            = "data/preprocessed/zhbikes.parquet@0000012")
         )
     }
 
@@ -402,23 +411,21 @@ object bundles extends Schemas {
           )
         )
       )
+
+      val commit12Step0ProcessRun   = commit12Workflow.processRuns.head
+      val commit12Step1ProcessRun   = commit12Workflow.processRuns(1)
+      val commit12GridPlotPngEntity = commit12GridPlotPngEntityFactory(commit12Workflow)
+
       val commit12WorkflowCwl = Entity(commitIds.generateOne,
                                        WorkflowFile.cwl("renku-update.cwl"),
                                        project,
                                        maybeInvalidationActivity = Some(commit12Workflow))
-
-      val commit12Step0CleanDataInput     = Input.from(commit7CleanDataEntity)
-      val commit12Step0DataSetFolderInput = Input.from(commit10DataSetFolderCollection)
 
       val commit12Step0Cwl = Entity(commitIds.generateOne,
                                     WorkflowFile.cwl("renku-migrate-step0.cwl"),
                                     project,
                                     maybeInvalidationActivity = Some(commit12Step0ProcessRun))
 
-      val commit12Step1ParquetInput: InputFactory.PositionInput[EntityCommandParameter] =
-        Input.from(commit12ParquetEntityFactory(commit12Step0ProcessRun))
-
-      val commit12GridPlotPngEntity = commit12GridPlotPngEntityFactory(commit12Step1ProcessRun)
       val commit12Step1Cwl = Entity(commitIds.generateOne,
                                     WorkflowFile.cwl("renku-migrate-step1.cwl"),
                                     project,
@@ -437,11 +444,11 @@ object bundles extends Schemas {
         commit10DataSetFolderCollection.asJsonLD,
         commit12Step0ProcessRun.asJsonLD,
         commit12Step0Cwl.asJsonLD,
-        commit12ParquetEntityFactory.asJsonLD,
         commit12Step1ProcessRun.asJsonLD,
+        commit12Step1Cwl.asJsonLD,
         commit12WorkflowCwl.asJsonLD,
-        commit12CumulativePngEntityFactory.asJsonLD,
-        commit12GridPlotPngEntity.asJsonLD
+        commit12GridPlotPngEntity.asJsonLD,
+        commit12ParquetEntityFactory.asJsonLD
       )
 
       List(
