@@ -18,17 +18,22 @@
 
 package io.renku.jsonld
 
-import io.circe.{Encoder, Json}
+import io.circe.{Encoder, Errors, Json}
 import io.renku.jsonld.JsonLD.JsonLDEntity
 
-final case class Reverse(properties: List[(Property, JsonLDEntity)]) extends Product with Serializable
+final class Reverse private (private[Reverse] val properties: List[(Property, JsonLD)])
 
 object Reverse {
 
-  def of(first: (Property, JsonLDEntity), other: (Property, JsonLDEntity)*): Reverse =
-    Reverse((first +: other).toList)
+  def unapply(arg: Reverse): Option[List[(Property, JsonLD)]] = Some(arg.properties)
 
-  lazy val empty: Reverse = Reverse(Nil)
+  def of(first: (Property, JsonLDEntity), other: (Property, JsonLDEntity)*): Reverse =
+    new Reverse((first +: other).toList)
+
+  def fromList(property: (Property, List[JsonLD])): Either[Errors, Reverse] =
+    Right(new Reverse(Nil))
+
+  lazy val empty: Reverse = new Reverse(Nil)
 
   implicit val jsonEncoder: Encoder[Reverse] = Encoder.instance {
     case Reverse(Nil)                  => Json.Null

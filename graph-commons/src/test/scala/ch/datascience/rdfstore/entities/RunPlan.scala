@@ -19,8 +19,9 @@
 package ch.datascience.rdfstore.entities
 
 import cats.implicits._
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.rdfstore.entities.CommandParameter._
+import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
+import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInput, PositionInput}
+import ch.datascience.rdfstore.entities.CommandParameter.{Position, _}
 import ch.datascience.rdfstore.entities.RunPlan.{Argument, SuccessCode}
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
@@ -58,43 +59,85 @@ object RunPlan {
   import io.renku.jsonld.syntax._
 
   def workflow(
-      project:      Project,
       arguments:    List[Argument] = Nil,
       inputs:       List[Position => CommandParameter with Input] = Nil,
-      outputs:      List[(Activity, Position) => CommandParameter with Output] = Nil,
-      subprocesses: List[Entity with RunPlan],
+      outputs:      List[Activity => Position => CommandParameter with Output] = Nil,
+      subprocesses: List[Activity => ProcessOrder => Entity with ProcessRunPlan],
       successCodes: List[SuccessCode] = Nil
-  )(commitId:       CommitId, workflowFile: WorkflowFile): Entity with RunPlan =
-    new Entity(commitId, workflowFile, project, maybeInvalidationActivity = None, maybeGeneration = None)
+  )(project:        Project)(activity: Activity)(workflowFile: WorkflowFile): Entity with WorkflowRunPlan =
+    new Entity(activity.commitId, workflowFile, project, maybeInvalidationActivity = None, maybeGeneration = None)
     with WorkflowRunPlan {
-      override val runArguments:      List[Argument]                     = arguments
-      override val runCommandInputs:  List[CommandParameter with Input]  = toParameters(inputs)
-      override val runCommandOutputs: List[CommandParameter with Output] = toParameters(outputs, offset = inputs.length)
-      override val runSubprocesses:   List[Entity with RunPlan]          = subprocesses
-      override val runSuccessCodes:   List[SuccessCode]                  = successCodes
+      override val runArguments:     List[Argument]                    = arguments
+      override val runCommandInputs: List[CommandParameter with Input] = toParameters(inputs)
+      override val runCommandOutputs: List[CommandParameter with Output] =
+        toParameters(outputs, offset = inputs.length)(activity)
+      override val runSubprocesses: List[Entity with ProcessRunPlan] = subprocesses.zipWithIndex.map {
+        case (factory, idx) => factory(activity)(ProcessOrder(idx))
+      }
+      override val runSuccessCodes: List[SuccessCode] = successCodes
     }
 
-  def process(workflowFile:      WorkflowFile,
-              project:           Project,
-              command:           Command,
-              arguments:         List[Argument] = Nil,
-              inputs:            List[Position => CommandParameter with Input] = Nil,
-              outputs:           List[Activity => Position => CommandParameter with Output] = Nil,
-              successCodes:      List[SuccessCode] = Nil,
-              maybeProcessOrder: Option[ProcessOrder] = None)(commitId: CommitId): Entity with RunPlan =
-    new Entity(commitId, workflowFile, project, maybeInvalidationActivity = None, maybeGeneration = None)
-    with ProcessRunPlan {
-      override val runCommand:           Command                            = command
-      override val runArguments:         List[Argument]                     = arguments
-      override val runCommandInputs:     List[CommandParameter with Input]  = toParameters(inputs)
-      override val runCommandOutputs:    List[CommandParameter with Output] = toParameters(outputs, offset = inputs.length)
-      override val runSuccessCodes:      List[SuccessCode]                  = successCodes
-      override val maybeRunProcessOrder: Option[ProcessOrder]               = maybeProcessOrder
+  def child(
+      workflowFile: WorkflowFile,
+      command:      Command,
+      arguments:    List[Argument] = Nil,
+      inputs:       List[InputFactory[CommandParameter]] = Nil,
+      outputs:      List[Activity => Position => CommandParameter with Output] = Nil,
+      successCodes: List[SuccessCode] = Nil
+  )(activity:       Activity)(processOrder: ProcessOrder): Entity with ProcessRunPlan =
+    new Entity(activity.commitId,
+               workflowFile,
+               activity.project,
+               maybeInvalidationActivity = None,
+               maybeGeneration           = None) with ProcessRunPlan {
+      override val runCommand:       Command                           = command
+      override val runArguments:     List[Argument]                    = arguments
+      override val runCommandInputs: List[CommandParameter with Input] = toParameters(inputs)(activity)
+      override val runCommandOutputs: List[CommandParameter with Output] =
+        toParameters(outputs, offset = inputs.length)(activity)
+      override val runSuccessCodes:      List[SuccessCode]    = successCodes
+      override val maybeRunProcessOrder: Option[ProcessOrder] = Some(processOrder)
+    }
+
+  def process(
+      workflowFile: WorkflowFile,
+      command:      Command,
+      arguments:    List[Argument] = Nil,
+      inputs:       List[InputFactory[CommandParameter]] = Nil,
+      outputs:      List[Activity => Position => CommandParameter with Output] = Nil,
+      successCodes: List[SuccessCode] = Nil
+  )(activity:       Activity): Entity with ProcessRunPlan =
+    new Entity(activity.commitId,
+               workflowFile,
+               activity.project,
+               maybeInvalidationActivity = None,
+               maybeGeneration           = None) with ProcessRunPlan {
+      override val runCommand:       Command                           = command
+      override val runArguments:     List[Argument]                    = arguments
+      override val runCommandInputs: List[CommandParameter with Input] = toParameters(inputs)(activity)
+      override val runCommandOutputs: List[CommandParameter with Output] =
+        toParameters(outputs, offset = inputs.length)(activity)
+      override val runSuccessCodes:      List[SuccessCode]    = successCodes
+      override val maybeRunProcessOrder: Option[ProcessOrder] = None
+    }
+
+  private def toParameters[T](factories: List[Activity => Position => T],
+                              offset:    Int = 0)(activity: Activity): List[T] =
+    factories.zipWithIndex.map {
+      case (factory, idx) => factory(activity)(Position(idx + offset + 1))
     }
 
   private def toParameters[T](factories: List[Position => T], offset: Int = 0): List[T] =
     factories.zipWithIndex.map {
       case (factory, idx) => factory(Position(idx + offset + 1))
+    }
+
+  private def toParameters(
+      factories: List[InputFactory[CommandParameter]]
+  )(activity:    Activity): List[CommandParameter with Input] =
+    factories.zipWithIndex.map {
+      case (factory: ActivityPositionInput[CommandParameter], idx) => factory(activity)(Position(idx + 1))
+      case (factory: PositionInput[CommandParameter], idx)         => factory(Position(idx + 1))
     }
 
   private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -130,6 +173,20 @@ object RunPlan {
     JsonLDEncoder.instance { entity =>
       entity.asPartialJsonLD[Entity] combine entity.asPartialJsonLD[Entity with RunPlan] getOrFail
     }
+
+  implicit class RunPlanOps(runPlan: RunPlan) {
+    def asUsages(step: Step): List[Usage] =
+      runPlan.runCommandInputs.foldLeft(List.empty[Usage]) {
+        case (usages, input: EntityCommandParameter with Input) => usages :+ Usage.factory(input)(step)
+        case (usages, _) => usages
+      }
+
+    def asUsages: List[Usage] =
+      runPlan.runCommandInputs.foldLeft(List.empty[Usage]) {
+        case (usages, input: EntityCommandParameter with Input) => usages :+ Usage(input)
+        case (usages, _) => usages
+      }
+  }
 
   final class Argument private (val value: String) extends AnyVal with StringTinyType
   object Argument extends TinyTypeFactory[Argument](new Argument(_)) with NonBlank

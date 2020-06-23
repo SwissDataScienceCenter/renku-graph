@@ -21,6 +21,7 @@ package ch.datascience.rdfstore.entities
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInput, PositionInput}
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
@@ -87,12 +88,22 @@ object CommandParameter {
 
   object Input {
 
+    sealed trait InputFactory[+T <: CommandParameter]
+
+    object InputFactory {
+      trait ActivityPositionInput[+T] extends InputFactory[T] with (Activity => Position => T with Input)
+      trait PositionInput[+T]         extends InputFactory[T] with (Position => T with Input)
+    }
+
     def apply(value: Value, maybePrefix: Option[Prefix] = None): Position => ValueCommandParameter with Input =
       position => new ValueCommandParameter(position, maybePrefix, value) with Input
 
-    def from(entity:      Entity with Artifact,
-             maybePrefix: Option[Prefix] = None): Position => EntityCommandParameter with Input =
+    def from(entity: Entity with Artifact, maybePrefix: Option[Prefix] = None): PositionInput[EntityCommandParameter] =
       position => new EntityCommandParameter(position, maybePrefix, entity) with Input
+
+    def from(entityFactory: Activity => Entity with Artifact,
+             maybePrefix:   Option[Prefix] = None): ActivityPositionInput[EntityCommandParameter] =
+      activity => position => new EntityCommandParameter(position, maybePrefix, entityFactory(activity)) with Input
 
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                    fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Input] =
@@ -145,11 +156,12 @@ object CommandParameter {
         entityFactory:  Activity => Entity with Artifact,
         maybePrefix:    Option[Prefix] = None,
         folderCreation: FolderCreation = FolderCreation(false)
-    ): (Activity, Position) => CommandParameter with Output =
-      (activity, position) =>
-        new ActivityCommandParameter(position, maybePrefix, activity, entityFactory) with Output {
-          override val outputFolderCreation: FolderCreation = folderCreation
-        }
+    ): Activity => Position => CommandParameter with Output =
+      activity =>
+        position =>
+          new ActivityCommandParameter(position, maybePrefix, activity, entityFactory) with Output {
+            override val outputFolderCreation: FolderCreation = folderCreation
+          }
 
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                    fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Output] =

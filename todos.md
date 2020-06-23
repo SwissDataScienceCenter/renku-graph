@@ -21,6 +21,7 @@ x refactor jsonld encoders to fit the new mixin pattern as the one used in Comma
 - create an issue to simplify sparql query results binding
 - add a test to verify if lineage works when created with the new version of renku
 - ask Ralf why do we have a cwl file on a RunPlan (that cwl was invalidated) 
+- unify naming for the model
 - isn't that missing members a bug:
 "https://swissdatasciencecenter.github.io/renku-ontology#consumes": [
                   {

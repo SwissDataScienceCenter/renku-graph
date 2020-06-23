@@ -18,7 +18,6 @@
 
 package ch.datascience.rdfstore.entities
 
-import Location._
 import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{listOf, setOf}
@@ -29,10 +28,12 @@ import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartL
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
+import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.rdfstore.entities.DataSetPart.dataSetParts
+import ch.datascience.rdfstore.entities.Location._
 import ch.datascience.rdfstore.entities.Person.persons
-import ch.datascience.rdfstore.entities.RunPlan.{Argument, Command, ProcessOrder}
+import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.{FusekiBaseUrl, Schemas}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
@@ -261,29 +262,22 @@ object bundles extends Schemas {
       val commit8CommandDataSetFolderInput = Input.from(commit3DataSetFolderCollection)
       val commit8ParquetEntityFactory      = (activity: Activity) => Entity(Generation(bikesParquet, activity))
       val commit8ParquetEntity             = commit8ParquetEntityFactory(commit8ProcessRun)
-      lazy val commit8ProcessRun = ProcessRun(
+      lazy val commit8ProcessRun = ProcessRun.standAlone(
         commit8Id,
         committedDates.generateOne,
         persons.generateOne,
+        project,
         agent,
         comment         = s"renku run python $plotData $dataSetFolder $bikesParquet",
         maybeInformedBy = Some(commit7Activity),
-        association = Association(
-          commit8Id,
+        associationFactory = Association.process(
           agent.copy(schemaVersion = schemaVersions.generateOne),
-          RunPlan(
+          RunPlan.child(
             WorkflowFile.yaml("1st-renku-run.yaml"),
-            project,
             Command("python"),
-            inputs = List(commit8CommandCleanDataInput, commit8CommandDataSetFolderInput),
-            outputs = List(
-              Output.from(activity = commit8ProcessRun, commit8ParquetEntityFactory)
-            )
+            inputs  = List(commit8CommandCleanDataInput, commit8CommandDataSetFolderInput),
+            outputs = List(Output.from(commit8ParquetEntityFactory))
           )
-        ),
-        usages = List(
-          Usage(commit8CommandCleanDataInput(Position(1))),
-          Usage(commit8CommandDataSetFolderInput(Position(2)))
         )
       )
       val commit8Cwl = Entity(commitIds.generateOne,
@@ -294,31 +288,28 @@ object bundles extends Schemas {
       val commit9CommandPlotDataInput  = Input.from(commit7PlotDataEntity)
       val commit9CommandParquetInput   = Input.from(commit8ParquetEntity)
       val commit9GridPlotEntityFactory = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
-      lazy val commit9ProcessRun = ProcessRun(
+      lazy val commit9ProcessRun = ProcessRun.standAlone(
         commit9Id,
         committedDates.generateOne,
         persons.generateOne,
+        project,
         agent,
         comment         = s"renku run python $plotData $bikesParquet",
         maybeInformedBy = Some(commit8ProcessRun),
-        association = Association.factory(
+        associationFactory = Association.process(
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          RunPlan(
+          RunPlan.process(
             WorkflowFile.yaml("2nd-renku-run.yaml"),
-            project,
             Command("python"),
             inputs = List(commit9CommandPlotDataInput, commit9CommandParquetInput),
             outputs = List(
-              Output.from(activity = commit9ProcessRun, activity => Entity(Generation(cumulativePng, activity))),
-              Output.from(activity = commit9ProcessRun, commit9GridPlotEntityFactory)
+              Output.from(activity => Entity(Generation(cumulativePng, activity))),
+              Output.from(commit9GridPlotEntityFactory)
             )
           )
-        ),
-        usages = List(
-          Usage(commit9CommandPlotDataInput(Position(1))),
-          Usage(commit9CommandParquetInput(Position(2)))
         )
       )
+
       val commit9GridPlotEntity = commit9GridPlotEntityFactory(commit9ProcessRun)
       val commit9Cwl = Entity(commitIds.generateOne,
                               WorkflowFile.cwl("2nd-renku-run.cwl"),
@@ -356,48 +347,59 @@ object bundles extends Schemas {
       val commit12CumulativePngEntityFactory = (activity: Activity) => Entity(Generation(cumulativePng, activity))
       val commit12GridPlotPngEntityFactory   = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       val commit12ParquetEntityFactory       = (activity: Activity) => Entity(Generation(bikesParquet, activity))
-      val runPlanStep0 = (activity: Activity) =>
-        RunPlan.process(
-          WorkflowFile.yaml("renku-migrate-step0.yaml"),
-          project,
-          Command("python"),
-          inputs = List(commit12CommandCleanDataInput, commit12CommandDataSetFolderInput),
-          outputs = List(
-            Output.from(commit12ParquetEntityFactory)
-          ),
-          maybeProcessOrder = Some(ProcessOrder(0))
-        )
 
       lazy val commit12Workflow = WorkflowRun(
         commit12Id,
         committedDates.generateOne,
         persons.generateOne,
         project,
-        agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
+        agent.copy(maybeStartedBy = Some(persons.generateOne)),
         comment = "renku update",
         WorkflowFile.yaml("renku-update.yaml"),
         informedBy = commit11Activity,
-        Association.factory(
+        associationFactory = Association.workflow(
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
           RunPlan.workflow(
-            project,
             inputs = List(
               commit12CommandPlotDataInput,
               commit12CommandCleanDataInput,
               commit12CommandDataSetFolderInput
             ),
             outputs = List(
-              Output.from(activity = commit12Workflow, commit12CumulativePngEntityFactory),
-              Output.from(activity = commit12Workflow, commit12GridPlotPngEntityFactory),
-              Output.from(activity = commit12Workflow, commit12ParquetEntityFactory)
+              Output.from(commit12CumulativePngEntityFactory),
+              Output.from(commit12GridPlotPngEntityFactory),
+              Output.from(commit12ParquetEntityFactory)
             ),
-            subprocesses = List(runPlanStep0)
+            subprocesses = List(
+              RunPlan.child(
+                WorkflowFile.yaml("renku-migrate-step0.yaml"),
+                Command("python"),
+                inputs  = List(commit12CommandCleanDataInput, commit12CommandDataSetFolderInput),
+                outputs = List(Output.from(commit12ParquetEntityFactory))
+              ),
+              RunPlan.child(
+                WorkflowFile.yaml("renku-migrate-step1.yaml"),
+                Command("python"),
+                inputs = List(commit12CommandPlotDataInput, Input.from(commit12ParquetEntityFactory)),
+                outputs = List(
+                  Output.from(commit12CumulativePngEntityFactory),
+                  Output.from(commit12GridPlotPngEntityFactory)
+                )
+              )
+            )
           )
         ),
-        usages = List(
-          Usage(commit12CommandPlotDataInput(Position(1))),
-          Usage(commit12CommandCleanDataInput(Position(2))),
-          Usage(commit12CommandDataSetFolderInput(Position(3)))
+        processRunsFactories = List(
+          ProcessRun.child(
+            associationFactory = Association.child(
+              agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne))
+            )
+          ),
+          ProcessRun.child(
+            associationFactory = Association.child(
+              agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne))
+            )
+          )
         )
       )
       val commit12WorkflowCwl = Entity(commitIds.generateOne,
@@ -407,59 +409,15 @@ object bundles extends Schemas {
 
       val commit12Step0CleanDataInput     = Input.from(commit7CleanDataEntity)
       val commit12Step0DataSetFolderInput = Input.from(commit10DataSetFolderCollection)
-      val commit12Step0ProcessRun = ProcessRun(
-        workflowRun     = commit12Workflow,
-        commitId        = commit12Id,
-        step            = Step(0),
-        committedDate   = committedDates.generateOne,
-        committer       = persons.generateOne,
-        agent           = agent,
-        comment         = "renku update",
-        maybeInformedBy = Some(commit11Activity),
-        associationFactory = Association.factory(
-          agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          runPlanStep0
-        ),
-        usagesFactories = List(
-          Usage.factory(commit12Step0CleanDataInput(Position(1))),
-          Usage.factory(commit12Step0DataSetFolderInput(Position(2)))
-        )
-      )
+
       val commit12Step0Cwl = Entity(commitIds.generateOne,
                                     WorkflowFile.cwl("renku-migrate-step0.cwl"),
                                     project,
                                     maybeInvalidationActivity = Some(commit12Step0ProcessRun))
 
-      val commit12Step1PlotDataInput = Input.from(commit7PlotDataEntity)
-      val commit12Step1ParquetInput  = Input.from(commit12ParquetEntityFactory(commit12Step0ProcessRun))
-      val commit12Step1ProcessRun = ProcessRun(
-        workflowRun     = commit12Workflow,
-        commitId        = commit12Id,
-        step            = Step(1),
-        committedDate   = committedDates.generateOne,
-        committer       = persons.generateOne,
-        agent           = agent,
-        comment         = "renku update",
-        maybeInformedBy = Some(commit11Activity),
-        associationFactory = Association.factory(
-          agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
-          RunPlan(
-            WorkflowFile.yaml("renku-migrate-step1.yaml"),
-            project,
-            Command("python"),
-            inputs = List(commit12Step1PlotDataInput, commit12Step1ParquetInput),
-            outputs = List(
-              Output.from(activity = commit12Step1ProcessRun, commit12CumulativePngEntityFactory),
-              Output.from(activity = commit12Step1ProcessRun, commit12GridPlotPngEntityFactory)
-            ),
-            maybeProcessOrder = Some(ProcessOrder(1))
-          )
-        ),
-        usagesFactories = List(
-          Usage.factory(commit12Step1PlotDataInput(Position(1))),
-          Usage.factory(commit12Step1ParquetInput(Position(2)))
-        )
-      )
+      val commit12Step1ParquetInput: InputFactory.PositionInput[EntityCommandParameter] =
+        Input.from(commit12ParquetEntityFactory(commit12Step0ProcessRun))
+
       val commit12GridPlotPngEntity = commit12GridPlotPngEntityFactory(commit12Step1ProcessRun)
       val commit12Step1Cwl = Entity(commitIds.generateOne,
                                     WorkflowFile.cwl("renku-migrate-step1.cwl"),
