@@ -121,15 +121,14 @@ object RunPlan {
       override val maybeRunProcessOrder: Option[ProcessOrder] = None
     }
 
-  private def toParameters[T](factories: List[Activity => Position => T],
-                              offset:    Int = 0)(activity: Activity): List[T] =
+  private def toParameters[T](factories: List[Activity => Position => T], offset: Int)(activity: Activity): List[T] =
     factories.zipWithIndex.map {
       case (factory, idx) => factory(activity)(Position(idx + offset + 1))
     }
 
-  private def toParameters[T](factories: List[Position => T], offset: Int = 0): List[T] =
+  private def toParameters[T](factories: List[Position => T]): List[T] =
     factories.zipWithIndex.map {
-      case (factory, idx) => factory(Position(idx + offset + 1))
+      case (factory, idx) => factory(Position(idx + 1))
     }
 
   private def toParameters(
@@ -168,8 +167,10 @@ object RunPlan {
       }
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[Entity with RunPlan] =
+  implicit def encoder[RunPlanType <: Entity with RunPlan](
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): JsonLDEncoder[RunPlanType] =
     JsonLDEncoder.instance { entity =>
       entity.asPartialJsonLD[Entity] combine entity.asPartialJsonLD[Entity with RunPlan] getOrFail
     }

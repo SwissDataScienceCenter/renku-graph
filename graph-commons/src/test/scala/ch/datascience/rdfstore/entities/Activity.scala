@@ -22,6 +22,7 @@ import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.ProcessRun.{ChildProcessRun, StandAloneProcessRun, WorkflowProcessRun}
 import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
 
 import scala.language.postfixOps
@@ -71,9 +72,11 @@ object Activity {
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Activity] =
     JsonLDEncoder.instance {
-      case a: ActivityWorkflowRun      => a.asJsonLD
-      case a: Activity with ProcessRun => a.asJsonLD
-      case a: Activity                 => a.asPartialJsonLD[Activity] getOrFail
+      case a: ActivityWorkflowRun                => a.asJsonLD
+      case a: Activity with ChildProcessRun      => a.asJsonLD
+      case a: Activity with WorkflowProcessRun   => a.asJsonLD
+      case a: Activity with StandAloneProcessRun => a.asJsonLD
+      case a: Activity                           => a.asPartialJsonLD[Activity] getOrFail
       case a => throw new Exception(s"Cannot serialize ${a.getClass} Activity")
     }
 }

@@ -28,7 +28,6 @@ import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartL
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
-import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.rdfstore.entities.DataSetPart.dataSetParts
 import ch.datascience.rdfstore.entities.Location._
@@ -267,10 +266,7 @@ object bundles extends Schemas {
       val commit7PlotDataEntity  = Entity(commit7Id, plotData, project)
       val commit7CleanDataEntity = Entity(commit7Id, cleanData, project)
 
-      val commit8CommandCleanDataInput     = Input.from(commit7CleanDataEntity)
-      val commit8CommandDataSetFolderInput = Input.from(commit3DataSetFolderCollection)
-      val commit8ParquetEntityFactory      = (activity: Activity) => Entity(Generation(bikesParquet, activity))
-      val commit8ParquetEntity             = commit8ParquetEntityFactory(commit8ProcessRun)
+      val commit8ParquetEntityFactory = (activity: Activity) => Entity(Generation(bikesParquet, activity))
       lazy val commit8ProcessRun = ProcessRun.standAlone(
         commit8Id,
         committedDates.generateOne,
@@ -281,21 +277,20 @@ object bundles extends Schemas {
         maybeInformedBy = Some(commit7Activity),
         associationFactory = Association.process(
           agent.copy(schemaVersion = schemaVersions.generateOne),
-          RunPlan.child(
+          RunPlan.process(
             WorkflowFile.yaml("1st-renku-run.yaml"),
             Command("python"),
-            inputs  = List(commit8CommandCleanDataInput, commit8CommandDataSetFolderInput),
+            inputs  = List(Input.from(commit7CleanDataEntity), Input.from(commit3DataSetFolderCollection)),
             outputs = List(Output.from(commit8ParquetEntityFactory))
           )
         )
       )
+      val commit8ParquetEntity = commit8ParquetEntityFactory(commit8ProcessRun)
       val commit8Cwl = Entity(commitIds.generateOne,
                               WorkflowFile.cwl("1st-renku-run.cwl"),
                               project,
                               maybeInvalidationActivity = Some(commit8ProcessRun))
 
-      val commit9CommandPlotDataInput  = Input.from(commit7PlotDataEntity)
-      val commit9CommandParquetInput   = Input.from(commit8ParquetEntity)
       val commit9GridPlotEntityFactory = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       lazy val commit9ProcessRun = ProcessRun.standAlone(
         commit9Id,
@@ -310,7 +305,7 @@ object bundles extends Schemas {
           RunPlan.process(
             WorkflowFile.yaml("2nd-renku-run.yaml"),
             Command("python"),
-            inputs = List(commit9CommandPlotDataInput, commit9CommandParquetInput),
+            inputs = List(Input.from(commit7PlotDataEntity), Input.from(commit8ParquetEntity)),
             outputs = List(
               Output.from(activity => Entity(Generation(cumulativePng, activity))),
               Output.from(commit9GridPlotEntityFactory)
@@ -319,7 +314,6 @@ object bundles extends Schemas {
         )
       )
 
-      val commit9GridPlotEntity = commit9GridPlotEntityFactory(commit9ProcessRun)
       val commit9Cwl = Entity(commitIds.generateOne,
                               WorkflowFile.cwl("2nd-renku-run.cwl"),
                               project,
@@ -389,7 +383,7 @@ object bundles extends Schemas {
               RunPlan.child(
                 WorkflowFile.yaml("renku-migrate-step1.yaml"),
                 Command("python"),
-                inputs = List(commit12CommandPlotDataInput, Input.from(commit12ParquetEntityFactory)),
+                inputs = List(commit12CommandPlotDataInput, Input.fromFactory(commit12ParquetEntityFactory)),
                 outputs = List(
                   Output.from(commit12CumulativePngEntityFactory),
                   Output.from(commit12GridPlotPngEntityFactory)
@@ -440,7 +434,7 @@ object bundles extends Schemas {
         commit8ProcessRun.asJsonLD,
         commit8ParquetEntity.asJsonLD,
         commit9ProcessRun.asJsonLD,
-        commit9GridPlotEntity.asJsonLD,
+        commit9GridPlotEntityFactory(commit9ProcessRun).asJsonLD,
         commit10DataSetFolderCollection.asJsonLD,
         commit12Step0ProcessRun.asJsonLD,
         commit12Step0Cwl.asJsonLD,
@@ -448,7 +442,7 @@ object bundles extends Schemas {
         commit12Step1Cwl.asJsonLD,
         commit12WorkflowCwl.asJsonLD,
         commit12GridPlotPngEntity.asJsonLD,
-        commit12ParquetEntityFactory.asJsonLD
+        commit12ParquetEntityFactory(commit12Workflow).asJsonLD
       )
 
       List(
@@ -476,12 +470,10 @@ object bundles extends Schemas {
         Entity(Generation(Location("requirements.txt"), commit5Activity)).asJsonLD,
         Entity(Generation(Location("notebooks/zhbikes-notebook.ipynb"), commit6Activity)).asJsonLD,
         Entity(Generation(plotData, commit7Activity)).asJsonLD,
-        Entity(bikesParquet, Generation(Location("outputs/output_0"), commit8ProcessRun)).asJsonLD,
+        commit8ProcessRun.asJsonLD,
         commit8Cwl.asJsonLD,
         commit9Cwl.asJsonLD,
-        Entity(outFile1, Generation(Location("outputs/output_0"), commit9ProcessRun)).asJsonLD,
-        commit9GridPlotEntity.asJsonLD,
-        Entity(Generation(velo2018Location, commit10Activity)).asJsonLD,
+        commit9ProcessRun.asJsonLD,
         DataSet(
           id          = dataSetId,
           name        = datasets.Name("zhbikes"),
@@ -508,14 +500,8 @@ object bundles extends Schemas {
           generation = Generation(Location(s".renku/datasets/$dataSetId"), commit11Activity),
           project    = project
         ).asJsonLD,
-        commit12ParquetEntityFactory.asJsonLD,
         commit12Step0Cwl.asJsonLD,
-        Entity(outFile1, Generation(Location("steps/step_1/outputs/output_0"), commit12Step0ProcessRun)).asJsonLD,
-        commit12ParquetEntityFactory.asJsonLD,
-        commit12Step1GridPlotEntity.asJsonLD,
-        Entity(bikesParquet, Generation(Location("steps/step_2/outputs/output_0"), commit12Workflow)).asJsonLD,
-        Entity(outFile1, Generation(Location("steps/step_1/outputs/output_0"), commit12Workflow)).asJsonLD,
-        Entity(outFile2, Generation(Location("steps/step_1/outputs/output_1"), commit12Workflow)).asJsonLD
+        commit12Workflow.asJsonLD
       ) -> examplarData
     }
   }

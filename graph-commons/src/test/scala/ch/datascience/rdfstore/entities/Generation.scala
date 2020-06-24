@@ -18,6 +18,8 @@
 
 package ch.datascience.rdfstore.entities
 
+import ch.datascience.rdfstore.entities.ProcessRun.ChildProcessRun
+
 final case class Generation(location: Location, activity: Activity)
 
 object Generation {
@@ -30,7 +32,7 @@ object Generation {
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Generation] =
     JsonLDEncoder.instance { entity =>
       val maybeStep = entity.activity match {
-        case a: ProcessRun if a.processRunMaybeStep.isDefined => a.processRunMaybeStep
+        case a: ChildProcessRun => Some(a.processRunStep)
         case _ => None
       }
       JsonLD.entity(

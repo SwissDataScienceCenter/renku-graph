@@ -38,8 +38,8 @@ object Association {
   trait ProcessRunPlanAssociation  extends Association[Entity with ProcessRunPlan]
 
   def child(
-      agent: Agent
-  )(step:    Step)(workflow: ActivityWorkflowRun): ChildRunPlanAssociation =
+      agent:  Agent
+  )(workflow: ActivityWorkflowRun)(step: Step): ChildRunPlanAssociation =
     new ChildRunPlanAssociation {
       override val commitId:         CommitId                    = workflow.commitId
       override val associationAgent: Agent                       = agent
@@ -76,31 +76,39 @@ object Association {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def encoder[RunPlanType <: Entity with RunPlan](
+  implicit def childRunPlanAssociationEncoder(
       implicit renkuBaseUrl: RenkuBaseUrl,
       fusekiBaseUrl:         FusekiBaseUrl
-  ): JsonLDEncoder[Association[RunPlanType]] =
-    JsonLDEncoder.instance {
-      case entity: ChildRunPlanAssociation =>
-        JsonLD.entity(
-          EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.workflowStep / "association",
-          EntityTypes of (prov / "Association"),
-          prov / "agent"   -> entity.associationAgent.asJsonLD,
-          prov / "hadPlan" -> entity.runPlan.asJsonLD
-        )
-      case entity: WorkflowRunPlanAssociation =>
-        JsonLD.entity(
-          EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",
-          EntityTypes of (prov / "Association"),
-          prov / "agent"   -> entity.associationAgent.asJsonLD,
-          prov / "hadPlan" -> entity.runPlan.asJsonLD
-        )
-      case entity: ProcessRunPlanAssociation =>
-        JsonLD.entity(
-          EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",
-          EntityTypes of (prov / "Association"),
-          prov / "agent"   -> entity.associationAgent.asJsonLD,
-          prov / "hadPlan" -> entity.runPlan.asJsonLD
-        )
-    }
+  ): JsonLDEncoder[ChildRunPlanAssociation] = JsonLDEncoder.instance { entity =>
+    JsonLD.entity(
+      EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.workflowStep / "association",
+      EntityTypes of (prov / "Association"),
+      prov / "agent"   -> entity.associationAgent.asJsonLD,
+      prov / "hadPlan" -> entity.runPlan.asJsonLD
+    )
+  }
+
+  implicit def workflowRunPlanAssociationEncoder(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): JsonLDEncoder[WorkflowRunPlanAssociation] = JsonLDEncoder.instance { entity =>
+    JsonLD.entity(
+      EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",
+      EntityTypes of (prov / "Association"),
+      prov / "agent"   -> entity.associationAgent.asJsonLD,
+      prov / "hadPlan" -> entity.runPlan.asJsonLD
+    )
+  }
+
+  implicit def processRunPlanAssociationEncoder(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): JsonLDEncoder[ProcessRunPlanAssociation] = JsonLDEncoder.instance { entity =>
+    JsonLD.entity(
+      EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",
+      EntityTypes of (prov / "Association"),
+      prov / "agent"   -> entity.associationAgent.asJsonLD,
+      prov / "hadPlan" -> entity.runPlan.asJsonLD
+    )
+  }
 }

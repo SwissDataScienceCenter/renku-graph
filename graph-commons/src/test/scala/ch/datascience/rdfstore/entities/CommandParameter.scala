@@ -91,8 +91,10 @@ object CommandParameter {
     sealed trait InputFactory[+T <: CommandParameter]
 
     object InputFactory {
-      trait ActivityPositionInput[+T] extends InputFactory[T] with (Activity => Position => T with Input)
-      trait PositionInput[+T]         extends InputFactory[T] with (Position => T with Input)
+      trait ActivityPositionInput[+T <: CommandParameter]
+          extends InputFactory[T]
+          with (Activity => Position => T with Input)
+      trait PositionInput[+T <: CommandParameter] extends InputFactory[T] with (Position => T with Input)
     }
 
     def apply(value: Value, maybePrefix: Option[Prefix] = None): Position => ValueCommandParameter with Input =
@@ -101,14 +103,14 @@ object CommandParameter {
     def from(entity: Entity with Artifact, maybePrefix: Option[Prefix] = None): PositionInput[EntityCommandParameter] =
       position => new EntityCommandParameter(position, maybePrefix, entity) with Input
 
-    def from(entityFactory: Activity => Entity with Artifact,
-             maybePrefix:   Option[Prefix] = None): ActivityPositionInput[EntityCommandParameter] =
+    def fromFactory(entityFactory: Activity => Entity with Artifact,
+                    maybePrefix:   Option[Prefix] = None): ActivityPositionInput[EntityCommandParameter] =
       activity => position => new EntityCommandParameter(position, maybePrefix, entityFactory(activity)) with Input
 
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                    fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Input] =
       new PartialEntityConverter[CommandParameter with Input] {
-        override def convert[T <: CommandParameter with Input]: T => Either[Exception, PartialEntity] = entity => {
+        override def convert[T <: CommandParameter with Input]: T => Either[Exception, PartialEntity] = {
           case input: ValueCommandParameter with Input =>
             PartialEntity(
               None,
@@ -166,7 +168,7 @@ object CommandParameter {
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                    fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Output] =
       new PartialEntityConverter[CommandParameter with Output] {
-        override def convert[T <: CommandParameter with Output]: T => Either[Exception, PartialEntity] = entity => {
+        override def convert[T <: CommandParameter with Output]: T => Either[Exception, PartialEntity] = {
           case output: ValueCommandParameter with Output =>
             PartialEntity(
               None,

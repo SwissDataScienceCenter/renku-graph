@@ -112,22 +112,13 @@ object ProcessRun {
       override val processRunUsages:      List[Usage]               = associationFactory(this).runPlan.asUsages
     }
 
-  private[entities] implicit def converter[RunPlanType <: Entity with RunPlan](
+  private[entities] implicit def childProcessRunConverter(
       implicit renkuBaseUrl: RenkuBaseUrl,
       fusekiBaseUrl:         FusekiBaseUrl
-  ): PartialEntityConverter[Activity with ProcessRun[RunPlanType]] =
-    new PartialEntityConverter[Activity with ProcessRun[RunPlanType]] {
-      override def convert[T <: Activity with ProcessRun[RunPlanType]]: T => Either[Exception, PartialEntity] = {
-        case entity: Activity with StandAloneProcessRun =>
-          PartialEntity(
-            EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId,
-            EntityTypes of (wfprov / "ProcessRun"),
-            rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
-            prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
-            prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
-            prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD
-          ).asRight
-        case entity: Activity with ChildProcessRun =>
+  ): PartialEntityConverter[Activity with ChildProcessRun] =
+    new PartialEntityConverter[Activity with ChildProcessRun] {
+      override def convert[T <: Activity with ChildProcessRun]: T => Either[Exception, PartialEntity] =
+        entity =>
           PartialEntity(
             EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.processRunStep,
             EntityTypes of (wfprov / "ProcessRun"),
@@ -137,7 +128,15 @@ object ProcessRun {
             prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD,
             prov / "wasPartOfWorkflowRun" -> entity.processRunWorkflowRun.asJsonLD
           ).asRight
-        case entity: Activity with WorkflowProcessRun =>
+    }
+
+  private[entities] implicit def standAloneProcessRunConverter(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): PartialEntityConverter[Activity with StandAloneProcessRun] =
+    new PartialEntityConverter[Activity with StandAloneProcessRun] {
+      override def convert[T <: Activity with StandAloneProcessRun]: T => Either[Exception, PartialEntity] =
+        entity =>
           PartialEntity(
             EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId,
             EntityTypes of (wfprov / "ProcessRun"),
@@ -146,17 +145,55 @@ object ProcessRun {
             prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
             prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD
           ).asRight
-      }
     }
 
-  implicit def encoder[RunPlanType <: Entity with RunPlan](
+  private[entities] implicit def workflowProcessRunConverter(
       implicit renkuBaseUrl: RenkuBaseUrl,
       fusekiBaseUrl:         FusekiBaseUrl
-  ): JsonLDEncoder[Activity with ProcessRun[RunPlanType]] =
+  ): PartialEntityConverter[Activity with WorkflowProcessRun] =
+    new PartialEntityConverter[Activity with WorkflowProcessRun] {
+      override def convert[T <: Activity with WorkflowProcessRun]: T => Either[Exception, PartialEntity] =
+        entity =>
+          PartialEntity(
+            EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId,
+            EntityTypes of (wfprov / "ProcessRun"),
+            rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
+            prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
+            prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
+            prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD
+          ).asRight
+    }
+
+  implicit def childProcessRunEncoder(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): JsonLDEncoder[Activity with ChildProcessRun] =
     JsonLDEncoder.instance { entity =>
       entity
         .asPartialJsonLD[Activity]
-        .combine(entity.asPartialJsonLD[Activity with ProcessRun[RunPlanType]])
+        .combine(entity.asPartialJsonLD[Activity with ChildProcessRun])
+        .getOrFail
+    }
+
+  implicit def standAloneProcessRunEncoder(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): JsonLDEncoder[Activity with StandAloneProcessRun] =
+    JsonLDEncoder.instance { entity =>
+      entity
+        .asPartialJsonLD[Activity]
+        .combine(entity.asPartialJsonLD[Activity with StandAloneProcessRun])
+        .getOrFail
+    }
+
+  implicit def workflowProcessRunEncoder(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): JsonLDEncoder[Activity with WorkflowProcessRun] =
+    JsonLDEncoder.instance { entity =>
+      entity
+        .asPartialJsonLD[Activity]
+        .combine(entity.asPartialJsonLD[Activity with WorkflowProcessRun])
         .getOrFail
     }
 }

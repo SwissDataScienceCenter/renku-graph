@@ -21,11 +21,12 @@ package ch.datascience.rdfstore.entities
 import cats.data.NonEmptyList
 import cats.implicits._
 import cats.kernel.Semigroup
-import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, Property}
+import io.renku.jsonld._
 
-final case class PartialEntity(maybeId:    Option[EntityId],
-                               maybeTypes: Option[EntityTypes],
-                               properties: List[(Property, JsonLD)])
+final case class PartialEntity(maybeId:      Option[EntityId],
+                               maybeTypes:   Option[EntityTypes],
+                               properties:   List[(Property, JsonLD)],
+                               maybeReverse: Option[Reverse])
 
 object PartialEntity {
 
@@ -36,45 +37,69 @@ object PartialEntity {
     PartialEntity(
       maybeId,
       types.some,
-      (first +: other).toList
+      (first +: other).toList,
+      maybeReverse = None
     )
 
   def apply(id: EntityId, types: EntityTypes, first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
     PartialEntity(
       id.some,
       types.some,
-      (first +: other).toList
+      (first +: other).toList,
+      maybeReverse = None
     )
-
-  def apply(id: EntityId, first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
-    PartialEntity(maybeId = Some(id), maybeTypes = None, (first +: other).toList)
 
   def apply(types: EntityTypes, first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
     PartialEntity(
-      None,
-      types.some,
-      (first +: other).toList
+      maybeId      = None,
+      maybeTypes   = types.some,
+      properties   = (first +: other).toList,
+      maybeReverse = None
     )
 
-  def apply(types: EntityTypes): PartialEntity = new PartialEntity(maybeId = None, Some(types), Nil)
+  def apply(types:   EntityTypes,
+            reverse: Reverse,
+            first:   (Property, JsonLD),
+            other:   (Property, JsonLD)*): PartialEntity =
+    PartialEntity(
+      maybeId      = None,
+      maybeTypes   = types.some,
+      properties   = (first +: other).toList,
+      maybeReverse = Some(reverse)
+    )
 
-  def apply(id: EntityId): PartialEntity = new PartialEntity(Some(id), maybeTypes = None, Nil)
+  def apply(types: EntityTypes): PartialEntity =
+    new PartialEntity(maybeId = None, Some(types), properties = Nil, maybeReverse = None)
+
+  def apply(id: EntityId): PartialEntity =
+    new PartialEntity(Some(id), maybeTypes = None, properties = Nil, maybeReverse = None)
 
   def apply(first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
-    new PartialEntity(maybeId = None, maybeTypes = None, (first +: other).toList)
+    new PartialEntity(maybeId = None, maybeTypes = None, (first +: other).toList, maybeReverse = None)
 
   implicit val semigroup: Semigroup[PartialEntity] = (x: PartialEntity, y: PartialEntity) =>
     x.copy(
-      maybeId    = y.maybeId orElse x.maybeId,
-      maybeTypes = y.maybeTypes.map(_.list) |+| x.maybeTypes.map(_.list) map EntityTypes.apply,
-      properties = y.properties.foldLeft(x.properties) {
+      maybeId      = y.maybeId orElse x.maybeId,
+      maybeTypes   = y.maybeTypes.map(_.list) |+| x.maybeTypes.map(_.list) map EntityTypes.apply,
+      properties   = x.properties merge y.properties,
+      maybeReverse = x.maybeReverse |+| y.maybeReverse
+    )
+
+  implicit val reverseSemigroup: Semigroup[Reverse] = (x: Reverse, y: Reverse) =>
+    Reverse.fromListUnsafe {
+      x.properties merge y.properties
+    }
+
+  private implicit class PropertiesOps(x: List[(Property, JsonLD)]) {
+    def merge(y: List[(Property, JsonLD)]) =
+      y.foldLeft(x) {
         case (originalList, (property, value)) =>
           val index = originalList.indexWhere(_._1 == property)
 
           if (index > -1) originalList.updated(index, property -> value)
           else originalList :+ (property -> value)
       }
-    )
+  }
 
   implicit class PartialEntityOps(partialEntity: Either[Exception, PartialEntity]) {
 

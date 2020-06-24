@@ -27,9 +27,6 @@ import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.Association.WorkflowRunPlanAssociation
 import ch.datascience.rdfstore.entities.ProcessRun.{ChildProcessRun, WorkflowProcessRun}
-import ch.datascience.rdfstore.entities.RunPlan.WorkflowRunPlan
-import io.renku.jsonld
-import io.renku.jsonld.Reverse
 
 trait WorkflowRun {
   self: Activity with WorkflowProcessRun =>
@@ -64,20 +61,25 @@ object WorkflowRun {
       override val processRunAssociation: WorkflowRunPlanAssociation = associationFactory(project)(this)(workflowFile)
       override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages
       val workflowRunFile:                WorkflowFile               = workflowFile
-      val processRuns: List[Activity with ChildProcessRun] = processRunsFactories.zipWithIndex {
+      val processRuns: List[Activity with ChildProcessRun] = processRunsFactories.zipWithIndex.map {
         case (factory, idx) => factory(this)(Step(idx))
       }
     }
 
-  private[entities] implicit val converter: PartialEntityConverter[Activity with WorkflowRun] =
+  private[entities] implicit def converter(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): PartialEntityConverter[Activity with WorkflowRun] =
     new PartialEntityConverter[Activity with WorkflowRun] {
       override def convert[T <: Activity with WorkflowRun]: T => Either[Exception, PartialEntity] =
         entity =>
-          PartialEntity(
+          for {
+            reverse <- Reverse.of((prov / "wasPartOfWorkflowRun") -> entity.processRuns.map(_.asJsonLD))
+          } yield PartialEntity(
             EntityTypes of (wfprov / "WorkflowRun"),
-            rdfs / "label" -> s"${entity.workflowRunFile}@${entity.commitId}".asJsonLD,
-            Reverse.of(prov / "wasPartOfWorkflowRun" -> entity.processRuns)
-          ).asRight
+            reverse,
+            rdfs / "label" -> s"${entity.workflowRunFile}@${entity.commitId}".asJsonLD
+          )
     }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -85,7 +87,7 @@ object WorkflowRun {
     JsonLDEncoder.instance { entity =>
       entity
         .asPartialJsonLD[Activity]
-        .combine(entity.asPartialJsonLD[Activity with ProcessRun[Entity with WorkflowRunPlan]])
+        .combine(entity.asPartialJsonLD[Activity with WorkflowProcessRun])
         .combine(entity.asPartialJsonLD[Activity with WorkflowRun])
         .getOrFail
 
