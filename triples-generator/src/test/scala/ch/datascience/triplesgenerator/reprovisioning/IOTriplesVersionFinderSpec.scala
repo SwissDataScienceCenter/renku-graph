@@ -91,32 +91,27 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
     val triplesVersionFinder  = new IOTriplesVersionFinder(rdfStoreConfig, latestSchemaVersion, logger, timeRecorder)
   }
 
-  private def agentRelatedEntities(schemaVersionOnGeneration: SchemaVersion, originalSchemaVersion: SchemaVersion) =
-    List(
-      Activity(
-        commitIds.generateOne,
-        committedDates.generateOne,
-        persons.generateOne,
-        Project(projectPaths.generateOne,
-                projectNames.generateOne,
-                projectCreatedDates.generateOne,
-                maybeCreator = None),
-        Agent(schemaVersionOnGeneration)
-      ).asJsonLD,
-      Association(
-        commitIds.generateOne,
-        Agent(originalSchemaVersion),
-        RunPlan(
-          workflowFiles.generateOne,
-          Project(projectPaths.generateOne,
-                  projectNames.generateOne,
-                  projectCreatedDates.generateOne,
-                  maybeCreator = None),
-          runPlanCommands.generateOne,
-          arguments = Nil,
-          inputs    = Nil,
-          outputs   = Nil
-        )
-      ).asJsonLD
+  private def agentRelatedEntities(schemaVersionOnGeneration: SchemaVersion, originalSchemaVersion: SchemaVersion) = {
+    val project =
+      Project(projectPaths.generateOne, projectNames.generateOne, projectCreatedDates.generateOne, maybeCreator = None)
+    val activity = Activity(
+      commitIds.generateOne,
+      committedDates.generateOne,
+      persons.generateOne,
+      project,
+      Agent(schemaVersionOnGeneration)
     )
+    List(
+      activity.asJsonLD,
+      Association
+        .process(
+          Agent(originalSchemaVersion),
+          RunPlan.process(
+            workflowFiles.generateOne,
+            runPlanCommands.generateOne
+          )
+        )(activity)
+        .asJsonLD
+    )
+  }
 }

@@ -49,7 +49,7 @@ object RunPlan {
   sealed trait WorkflowRunPlan extends RunPlan {
     self: Entity =>
 
-    val runSubprocesses: List[Entity with RunPlan]
+    val runSubprocesses: List[Entity with ProcessRunPlan]
   }
 
   import ch.datascience.graph.config.RenkuBaseUrl
@@ -139,40 +139,57 @@ object RunPlan {
       case (factory: PositionInput[CommandParameter], idx)         => factory(Position(idx + 1))
     }
 
-  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Entity with RunPlan] =
-    new PartialEntityConverter[Entity with RunPlan] {
-      override def convert[T <: Entity with RunPlan]: T => Either[Exception, PartialEntity] = {
-        case entity: Entity with WorkflowRunPlan =>
-          PartialEntity(
-            EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location),
-            EntityTypes of (prov / "Plan", renku / "Run"),
-            renku / "hasArguments"  -> entity.runArguments.asJsonLD,
-            renku / "hasInputs"     -> entity.runCommandInputs.asJsonLD,
-            renku / "hasOutputs"    -> entity.runCommandOutputs.asJsonLD,
-            renku / "hasSubprocess" -> entity.runSubprocesses.asJsonLD,
-            renku / "successCodes"  -> entity.runSuccessCodes.asJsonLD
-          ).asRight
-        case entity: Entity with ProcessRunPlan =>
-          PartialEntity(
-            EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location),
-            EntityTypes of (prov / "Plan", renku / "Run"),
-            renku / "command"      -> entity.runCommand.asJsonLD,
-            renku / "hasArguments" -> entity.runArguments.asJsonLD,
-            renku / "hasInputs"    -> entity.runCommandInputs.asJsonLD,
-            renku / "hasOutputs"   -> entity.runCommandOutputs.asJsonLD,
-            renku / "successCodes" -> entity.runSuccessCodes.asJsonLD,
-            renku / "processOrder" -> entity.maybeRunProcessOrder.asJsonLD
-          ).asRight
+  private[entities] implicit def workflowRunPlanConverter(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): PartialEntityConverter[Entity with WorkflowRunPlan] =
+    new PartialEntityConverter[Entity with WorkflowRunPlan] {
+      override def convert[T <: Entity with WorkflowRunPlan]: T => Either[Exception, PartialEntity] = { entity =>
+        PartialEntity(
+          EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location),
+          EntityTypes of (prov / "Plan", renku / "Run"),
+          renku / "hasArguments"  -> entity.runArguments.asJsonLD,
+          renku / "hasInputs"     -> entity.runCommandInputs.asJsonLD,
+          renku / "hasOutputs"    -> entity.runCommandOutputs.asJsonLD,
+          renku / "hasSubprocess" -> entity.runSubprocesses.asJsonLD,
+          renku / "successCodes"  -> entity.runSuccessCodes.asJsonLD
+        ).asRight
       }
     }
 
-  implicit def encoder[RunPlanType <: Entity with RunPlan](
+  private[entities] implicit def processRunPlanConverter(
       implicit renkuBaseUrl: RenkuBaseUrl,
       fusekiBaseUrl:         FusekiBaseUrl
-  ): JsonLDEncoder[RunPlanType] =
+  ): PartialEntityConverter[Entity with ProcessRunPlan] =
+    new PartialEntityConverter[Entity with ProcessRunPlan] {
+      override def convert[T <: Entity with ProcessRunPlan]: T => Either[Exception, PartialEntity] = { entity =>
+        PartialEntity(
+          EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location),
+          EntityTypes of (prov / "Plan", renku / "Run"),
+          renku / "command"      -> entity.runCommand.asJsonLD,
+          renku / "hasArguments" -> entity.runArguments.asJsonLD,
+          renku / "hasInputs"    -> entity.runCommandInputs.asJsonLD,
+          renku / "hasOutputs"   -> entity.runCommandOutputs.asJsonLD,
+          renku / "successCodes" -> entity.runSuccessCodes.asJsonLD,
+          renku / "processOrder" -> entity.maybeRunProcessOrder.asJsonLD
+        ).asRight
+      }
+    }
+
+  implicit def workflowRUnPlanEncoder(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): JsonLDEncoder[Entity with WorkflowRunPlan] =
     JsonLDEncoder.instance { entity =>
-      entity.asPartialJsonLD[Entity] combine entity.asPartialJsonLD[Entity with RunPlan] getOrFail
+      entity.asPartialJsonLD[Entity] combine entity.asPartialJsonLD[Entity with WorkflowRunPlan] getOrFail
+    }
+
+  implicit def processRunPlanEncoder(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): JsonLDEncoder[Entity with ProcessRunPlan] =
+    JsonLDEncoder.instance { entity =>
+      entity.asPartialJsonLD[Entity] combine entity.asPartialJsonLD[Entity with ProcessRunPlan] getOrFail
     }
 
   implicit class RunPlanOps(runPlan: RunPlan) {

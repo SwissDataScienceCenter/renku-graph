@@ -267,7 +267,7 @@ object bundles extends Schemas {
       val commit7CleanDataEntity = Entity(commit7Id, cleanData, project)
 
       val commit8ParquetEntityFactory = (activity: Activity) => Entity(Generation(bikesParquet, activity))
-      lazy val commit8ProcessRun = ProcessRun.standAlone(
+      val commit8ProcessRun = ProcessRun.standAlone(
         commit8Id,
         committedDates.generateOne,
         persons.generateOne,
@@ -292,7 +292,7 @@ object bundles extends Schemas {
                               maybeInvalidationActivity = Some(commit8ProcessRun))
 
       val commit9GridPlotEntityFactory = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
-      lazy val commit9ProcessRun = ProcessRun.standAlone(
+      val commit9ProcessRun = ProcessRun.standAlone(
         commit9Id,
         committedDates.generateOne,
         persons.generateOne,
@@ -351,7 +351,7 @@ object bundles extends Schemas {
       val commit12GridPlotPngEntityFactory   = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       val commit12ParquetEntityFactory       = (activity: Activity) => Entity(Generation(bikesParquet, activity))
 
-      lazy val commit12Workflow = WorkflowRun(
+      val commit12Workflow = WorkflowRun(
         commit12Id,
         committedDates.generateOne,
         persons.generateOne,
