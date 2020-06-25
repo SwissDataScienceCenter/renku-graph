@@ -21,7 +21,7 @@ package ch.datascience.rdfstore.entities
 import cats.implicits._
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInput, PositionInput}
-import ch.datascience.rdfstore.entities.CommandParameter.{Position, _}
+import ch.datascience.rdfstore.entities.CommandParameter.{ActivityCommandParameter, Position, _}
 import ch.datascience.rdfstore.entities.RunPlan.{Argument, SuccessCode}
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
@@ -35,6 +35,15 @@ sealed trait RunPlan {
   val runCommandInputs:  List[CommandParameter with Input]
   val runCommandOutputs: List[CommandParameter with Output]
   val runSuccessCodes:   List[SuccessCode]
+
+  def output(location: Location): Entity with Artifact =
+    runCommandOutputs
+      .flatMap {
+        case output: ActivityCommandParameter with Output => Some(output.entity)
+        case _ => None
+      }
+      .find(_.location == location)
+      .getOrElse(throw new IllegalStateException(s"No output entity for $location on RunPlan for Activity $commitId"))
 }
 
 object RunPlan {

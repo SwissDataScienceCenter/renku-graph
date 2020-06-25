@@ -31,7 +31,7 @@ object Generation {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def factory(entityFactory: Activity => Entity with Artifact)(activity: Activity): Generation = {
+  def factory(entityFactory: Activity => Entity with Artifact): Activity => Generation = activity => {
     val entity = entityFactory(activity)
     Generation(entity.location, activity, Some(entity))
   }

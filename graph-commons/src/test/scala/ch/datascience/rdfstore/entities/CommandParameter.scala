@@ -23,7 +23,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInput, PositionInput}
 import ch.datascience.rdfstore.entities.CommandParameter._
-import ch.datascience.rdfstore.entities.DataSet.{DataSetArtifact, entityId}
+import ch.datascience.rdfstore.entities.DataSet.{DataSetEntity, entityId}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
 import io.renku.jsonld.JsonLDEncoder._

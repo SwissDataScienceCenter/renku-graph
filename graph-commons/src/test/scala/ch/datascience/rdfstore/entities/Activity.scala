@@ -18,7 +18,6 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -27,31 +26,37 @@ import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
 
 import scala.language.postfixOps
 
-class Activity(val commitId:               CommitId,
-               val committedDate:          CommittedDate,
-               val committer:              Person,
-               val project:                Project,
-               val agent:                  Agent,
-               val comment:                String,
-               val maybeInformedBy:        Option[Activity],
-               val maybeInfluenced:        Option[Activity],
-               val maybeInvalidation:      Option[Entity with Artifact],
-               val maybeGenerationFactory: Option[Activity => Generation]) {
-  lazy val maybeGeneration: Option[Generation] = maybeGenerationFactory.map(_.apply(this))
+class Activity(val commitId:                 CommitId,
+               val committedDate:            CommittedDate,
+               val committer:                Person,
+               val project:                  Project,
+               val agent:                    Agent,
+               val comment:                  String,
+               val maybeInformedBy:          Option[Activity],
+               val maybeInfluenced:          Option[Activity],
+               val maybeInvalidation:        Option[Entity with Artifact],
+               val maybeGenerationFactories: List[Activity => Generation]) {
+  lazy val generations: List[Generation] = maybeGenerationFactories.map(_.apply(this))
+
+  def entity(location: Location): Entity with Artifact =
+    generations
+      .flatMap(_.maybeReverseEntity)
+      .find(_.location == location)
+      .getOrElse(throw new IllegalStateException(s"No entity for $location on Activity for $commitId"))
 }
 
 object Activity {
 
-  def apply(id:                     CommitId,
-            committedDate:          CommittedDate,
-            committer:              Person,
-            project:                Project,
-            agent:                  Agent,
-            comment:                String = "some comment",
-            maybeInformedBy:        Option[Activity] = None,
-            maybeInfluenced:        Option[Activity] = None,
-            maybeInvalidation:      Option[Entity with Artifact] = None,
-            maybeGenerationFactory: Option[Activity => Generation] = None): Activity =
+  def apply(id:                       CommitId,
+            committedDate:            CommittedDate,
+            committer:                Person,
+            project:                  Project,
+            agent:                    Agent,
+            comment:                  String = "some comment",
+            maybeInformedBy:          Option[Activity] = None,
+            maybeInfluenced:          Option[Activity] = None,
+            maybeInvalidation:        Option[Entity with Artifact] = None,
+            maybeGenerationFactories: List[Activity => Generation] = Nil): Activity =
     new Activity(id,
                  committedDate,
                  committer,
@@ -61,8 +66,9 @@ object Activity {
                  maybeInformedBy,
                  maybeInfluenced,
                  maybeInvalidation,
-                 maybeGenerationFactory)
+                 maybeGenerationFactories)
 
+  import cats.implicits._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
@@ -77,10 +83,7 @@ object Activity {
                                       Reverse.of((prov / "wasInvalidatedBy") -> invalidation.asJsonLD)
                                     case _ => Reverse.empty.asRight[Exception]
                                   }
-            reverseGeneration <- entity.maybeGeneration match {
-                                  case Some(generation) => Reverse.of((prov / "activity") -> generation.asJsonLD)
-                                  case _                => Reverse.empty.asRight[Exception]
-                                }
+            reverseGeneration <- Reverse.of((prov / "activity") -> entity.generations.map(_.asJsonLD))
           } yield PartialEntity(
             EntityTypes of (prov / "Activity"),
             reverseInvalidation combine reverseGeneration,
@@ -88,7 +91,7 @@ object Activity {
             rdfs / "comment"           -> entity.comment.asJsonLD,
             prov / "startedAtTime"     -> entity.committedDate.asJsonLD,
             prov / "endedAtTime"       -> entity.committedDate.asJsonLD,
-            prov / "wasInformedBy"     -> entity.maybeInformedBy.asJsonLD,
+            prov / "wasInformedBy"     -> entity.maybeInformedBy.map(_.asEntityId).asJsonLD,
             prov / "wasAssociatedWith" -> JsonLD.arr(entity.agent.asJsonLD, entity.committer.asJsonLD),
             prov / "influenced"        -> entity.maybeInfluenced.asJsonLD,
             schema / "isPartOf"        -> entity.project.asJsonLD

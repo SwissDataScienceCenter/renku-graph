@@ -29,6 +29,8 @@ import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import scala.util.Random
+
 class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   type EitherLineage[Lineage] = Either[Throwable, Lineage]
@@ -119,8 +121,26 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
       exception.getMessage shouldBe s"${types.mkString(", ")} cannot be converted to a NodeType"
     }
   }
+  "getNode" should {
 
-  private val edgesSets: Gen[Set[Edge]] = for {
+    "return a Node if there is one with the given location" in {
+      forAll { lineage: Lineage =>
+        val node = Random.shuffle(lineage.nodes.toList).head
+
+        lineage.getNode(node.location) shouldBe node.some
+      }
+    }
+
+    "return None if no node are found with the given location" in {
+      forAll { lineage: Lineage =>
+        val location = nodeLocations.generateOne
+
+        lineage.getNode(location) shouldBe None
+      }
+    }
+  }
+
+  private lazy val edgesSets: Gen[Set[Edge]] = for {
     edgesNumber <- positiveInts(max               = 20)
     edgesSet    <- setOf[Edge](edges, minElements = 1, maxElements = edgesNumber)
   } yield edgesSet

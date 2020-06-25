@@ -12,18 +12,21 @@ x Person/Organization should be a subtype of Agent -> this would fix the agent h
 x *See with CLI team:* renku migrate --no-commit still generates several commits.
 - upon migration renku log should use the range of commits from the given commit to the latest migration commit.
 - on renku migrate do not use the --no-commit. 
-- add invalidation into the new model.(Activity)
-- use the invalidation in the lineage query.
+x add invalidation into the new model.(Activity)
+x use the invalidation in the lineage query.
 x refactor jsonld encoders to fit the new mixin pattern as the one used in CommandParameters
 x complete the bundles with proper Entity entities :) for e.g in the Input entities.consumes
 - run renku log with the flag firing up SHACL validation
 - create an issue to simplify sparql query results binding
 - add a test to verify if lineage works when created with the new version of renku
-- unify naming for the model
 
-- ask Ralf why CommandParameter is an Entity?
-- ask Ralf why do we have a cwl file on a RunPlan (that cwl was invalidated) 
+x ask Ralf why CommandParameter is an Entity?
+x ask Ralf why do we have a cwl file on a RunPlan (that cwl was invalidated) 
 - create an issue to fix activity property on a Generation which is already represented on the reverse of the activity
+- unify naming for the model
+- model clean-up
+x remove graphs which does not contain the given location
+- and I think having libyaml installed is enough for pyyaml to pick it up, not special procedure to install it needed
 - isn't that missing members a bug:
 "https://swissdatasciencecenter.github.io/renku-ontology#consumes": [
                   {

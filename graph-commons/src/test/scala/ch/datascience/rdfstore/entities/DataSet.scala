@@ -45,7 +45,7 @@ object DataSet {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  type DataSetArtifact = Artifact with Entity with DataSet
+  type DataSetEntity = Entity with DataSet with Artifact
 
   def apply(id:                 Identifier,
             name:               Name,
@@ -58,7 +58,7 @@ object DataSet {
             parts:              List[DataSetPartArtifact],
             generation:         Generation,
             project:            Project,
-            keywords:           List[Keyword] = Nil): DataSetArtifact =
+            keywords:           List[Keyword] = Nil): DataSetEntity =
     new Entity(generation.activity.commitId,
                generation.location,
                project,
@@ -76,15 +76,40 @@ object DataSet {
       override val datasetKeywords:           List[Keyword]             = keywords
     }
 
+  def factory(id:                 Identifier,
+              name:               Name,
+              maybeUrl:           Option[Url] = None,
+              maybeSameAs:        Option[SameAs] = None,
+              maybeDescription:   Option[Description] = None,
+              maybePublishedDate: Option[PublishedDate] = None,
+              createdDate:        DateCreated,
+              creators:           Set[Person],
+              partsFactories:     List[Activity => DataSetPartArtifact],
+              location:           Location,
+              keywords:           List[Keyword] = Nil)(activity: Activity): DataSetEntity =
+    new Entity(activity.commitId, location, activity.project, maybeInvalidationActivity = None, maybeGeneration = None)
+    with Artifact with DataSet {
+      override val datasetId:                 Identifier                = id
+      override val datasetName:               Name                      = name
+      override val maybeDatasetUrl:           Option[Url]               = maybeUrl
+      override val maybeDatasetSameAs:        Option[SameAs]            = maybeSameAs
+      override val maybeDatasetDescription:   Option[Description]       = maybeDescription
+      override val maybeDatasetPublishedDate: Option[PublishedDate]     = maybePublishedDate
+      override val datasetCreatedDate:        DateCreated               = createdDate
+      override val datasetCreators:           Set[Person]               = creators
+      override val datasetParts:              List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
+      override val datasetKeywords:           List[Keyword]             = keywords
+    }
+
   def entityId(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
     EntityId of (renkuBaseUrl / "datasets" / identifier)
 
   private implicit def converter(
       implicit renkuBaseUrl: RenkuBaseUrl,
       fusekiBaseUrl:         FusekiBaseUrl
-  ): PartialEntityConverter[DataSetArtifact] =
-    new PartialEntityConverter[DataSetArtifact] {
-      override def convert[T <: DataSetArtifact]: T => Either[Exception, PartialEntity] = { entity =>
+  ): PartialEntityConverter[DataSetEntity] =
+    new PartialEntityConverter[DataSetEntity] {
+      override def convert[T <: DataSetEntity]: T => Either[Exception, PartialEntity] = { entity =>
         implicit val creatorsOrdering: Ordering[Person] = Ordering.by((p: Person) => p.name.value)
         PartialEntity(
           entityId(entity.datasetId),
@@ -103,17 +128,17 @@ object DataSet {
         ).asRight
       }
 
-      override def toEntityId: DataSetArtifact => Option[EntityId] = entity => entityId(entity.datasetId).some
+      override def toEntityId: DataSetEntity => Option[EntityId] = entity => entityId(entity.datasetId).some
     }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[DataSetArtifact] =
+                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[DataSetEntity] =
     JsonLDEncoder.instance { entity =>
       entity
         .asPartialJsonLD[Artifact]
         .combine(entity.asPartialJsonLD[Entity])
         .combine(entity.asPartialJsonLD[Artifact])
-        .combine(entity.asPartialJsonLD[DataSetArtifact])
+        .combine(entity.asPartialJsonLD[DataSetEntity])
         .getOrFail
     }
 }

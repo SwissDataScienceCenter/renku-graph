@@ -18,9 +18,10 @@
 
 package ch.datascience.rdfstore.entities
 
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{listOf, setOf}
+import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -29,7 +30,7 @@ import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
 import ch.datascience.rdfstore.entities.CommandParameter._
-import ch.datascience.rdfstore.entities.DataSetPart.dataSetParts
+import ch.datascience.rdfstore.entities.DataSetPart.{DataSetPartArtifact, dataSetParts}
 import ch.datascience.rdfstore.entities.Location._
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
@@ -120,79 +121,47 @@ object bundles extends Schemas {
   object exemplarLineageFlow {
 
     final case class ExamplarData(
-        commitId:                   CommitId,
-        location:                   Location,
-        `sha3 zhbikes`:             NodeDef,
-        `sha7 plot_data`:           NodeDef,
-        `sha7 clean_data`:          NodeDef,
-        `sha8 renku run`:           NodeDef,
-        `sha8 parquet`:             NodeDef,
-        `sha9 renku run`:           NodeDef,
-        `sha9 plot_data`:           NodeDef,
-        `sha10 zhbikes`:            NodeDef,
-        `sha12 step1 invalidation`: NodeDef,
-        `sha12 step2 invalidation`: NodeDef,
-        `sha12 step2 grid_plot`:    NodeDef,
-        `sha12 workflow`:           NodeDef,
-        `sha12 parquet`:            NodeDef
+        location:          Location,
+        commitId:          CommitId,
+        `sha3 zhbikes`:    NodeDef,
+        `sha7 plot_data`:  NodeDef,
+        `sha7 clean_data`: NodeDef,
+        `sha8 renku run`:  NodeDef,
+        `sha8 parquet`:    NodeDef,
+        `sha9 renku run`:  NodeDef,
+        `sha9 plot_data`:  NodeDef,
+        `sha9 cumulative`: NodeDef,
+        `sha10 zhbikes`:   NodeDef,
+        `sha12 parquet`:   NodeDef
     )
 
-    object ExamplarData {
-      def apply(commitId:                   CommitId,
-                location:                   Location,
-                `sha3 zhbikes`:             JsonLD,
-                `sha7 plot_data`:           JsonLD,
-                `sha7 clean_data`:          JsonLD,
-                `sha8 renku run`:           JsonLD,
-                `sha8 parquet`:             JsonLD,
-                `sha9 renku run`:           JsonLD,
-                `sha9 plot_data`:           JsonLD,
-                `sha10 zhbikes`:            JsonLD,
-                `sha12 step1 renku`:        JsonLD,
-                `sha12 step1 invalidation`: JsonLD,
-                `sha12 step2 renku`:        JsonLD,
-                `sha12 step2 invalidation`: JsonLD,
-                `sha12 step2 grid_plot`:    JsonLD,
-                `sha12 workflow`:           JsonLD,
-                `sha12 parquet`:            JsonLD): ExamplarData =
-        ExamplarData(
-          commitId,
-          location,
-          `sha3 zhbikes`             = NodeDef(`sha3 zhbikes`, label             = "data/zhbikes@000003"),
-          `sha7 plot_data`           = NodeDef(`sha7 plot_data`, label           = "src/plot_data.py@000007"),
-          `sha7 clean_data`          = NodeDef(`sha7 clean_data`, label          = "src/clean_data.py@000007"),
-          `sha8 renku run`           = NodeDef(`sha8 renku run`, label           = "renku run python"),
-          `sha8 parquet`             = NodeDef(`sha8 parquet`, label             = "data/preprocessed/zhbikes.parquet@000008"),
-          `sha9 renku run`           = NodeDef(`sha9 renku run`, label           = "renku run python"),
-          `sha9 plot_data`           = NodeDef(`sha9 plot_data`, label           = "figs/grid_plot.png@000009"),
-          `sha10 zhbikes`            = NodeDef(`sha10 zhbikes`, label            = "data/zhbikes@0000010"),
-          `sha12 step1 invalidation` = NodeDef(`sha12 step1 invalidation`, label = "renku-migrate-step0.cwl@0000012"),
-          `sha12 step2 invalidation` = NodeDef(`sha12 step2 invalidation`, label = "renku-migrate-step1.cwl@0000012"),
-          `sha12 step2 grid_plot`    = NodeDef(`sha12 step2 grid_plot`, label    = "figs/grid_plot.png@0000012"),
-          `sha12 workflow`           = NodeDef(`sha12 workflow`, label           = "renku update"),
-          `sha12 parquet`            = NodeDef(`sha12 parquet`, label            = "data/preprocessed/zhbikes.parquet@0000012")
-        )
-    }
-
-    final case class NodeDef(id: String, location: String, label: String, types: Set[String])
+    final case class NodeDef(location: String, types: Set[String])
 
     object NodeDef {
-      import io.renku.jsonld.JsonLDDecoder._
 
-      def apply(entityJson: JsonLD, label: String): NodeDef = NodeDef(
-        entityJson.entityId
-          .getOrElse(throw new Exception("No entityId found"))
-          .toString,
-        entityJson.cursor
-          .downField(prov / "atLocation")
-          .as[String]
-          .fold(error => throw new Exception(error.message), identity),
-        label,
-        entityJson.entityTypes
-          .map(_.toList.map(_.toString))
-          .getOrElse(throw new Exception("No entityTypes found"))
-          .toSet
-      )
+      def apply(
+          entity:              Entity with Artifact
+      )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef = {
+        val jsonLd = entity.asJsonLD
+        NodeDef(
+          entity.location.value,
+          jsonLd.entityTypes
+            .map(_.toList.map(_.toString))
+            .getOrElse(throw new Exception("No entityTypes found"))
+            .toSet
+        )
+      }
+
+      def apply(entity: Activity)(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef = {
+        val jsonLd = entity.asJsonLD
+        NodeDef(
+          entity.comment,
+          jsonLd.entityTypes
+            .map(_.toList.map(_.toString))
+            .getOrElse(throw new Exception("No entityTypes found"))
+            .toSet
+        )
+      }
     }
 
     def apply(
@@ -201,15 +170,10 @@ object bundles extends Schemas {
     )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExamplarData) = {
       val project =
         Project(projectPath, projectNames.generateOne, projectCreatedDates.generateOne, projectCreators.generateOption)
-      val agent     = Agent(schemaVersion)
-      val dataSetId = datasets.Identifier("d67a1653-0b6e-463b-89a0-afe72a53c8bb")
+      val agent           = Agent(schemaVersion)
+      val dataSetId       = datasets.Identifier("d67a1653-0b6e-463b-89a0-afe72a53c8bb")
+      val dataSetCreators = nonEmptySet(persons).generateOne
 
-      val commit3Id        = CommitId("000003")
-      val commit7Id        = CommitId("000007")
-      val commit8Id        = CommitId("000008")
-      val commit9Id        = CommitId("000009")
-      val commit10Id       = CommitId("0000010")
-      val commit12Id       = CommitId("0000012")
       val dataSetFolder    = Location("data/zhbikes")
       val plotData         = Location("src/plot_data.py")
       val cleanData        = Location("src/clean_data.py")
@@ -219,28 +183,76 @@ object bundles extends Schemas {
       val velo2018Location = Location("data/zhbikes/2018velo.csv")
       val velo2019Location = Location("data/zhbikes/2019velo.csv")
 
-      val commit3DataSetFolderCollection = Collection(
-        commit3Id,
-        dataSetFolder,
+      def dataSetGenerationFactory(partsFactories: List[Activity => DataSetPartArtifact]) =
+        Generation.factory(
+          entityFactory = DataSet.factory(
+            id             = dataSetId,
+            name           = datasets.Name("zhbikes"),
+            createdDate    = datasetCreatedDates.generateOne,
+            creators       = dataSetCreators,
+            partsFactories = partsFactories,
+            location       = Location(s".renku/datasets/$dataSetId")
+          )
+        )
+
+      val commit2DataSetCreation = Activity(
+        CommitId("000002"),
+        committedDates.generateOne,
+        persons.generateOne,
         project,
-        members = List(Entity(commit3Id, velo2019Location, project))
+        agent,
+        comment                  = "renku dataset create zhbikes",
+        maybeGenerationFactories = List(dataSetGenerationFactory(partsFactories = Nil))
       )
+
+      val commit3AddingDataSetFile = Activity(
+        CommitId("000003"),
+        committedDates.generateOne,
+        persons.generateOne,
+        project,
+        agent,
+        comment         = "renku dataset: committing 1 newly added files",
+        maybeInformedBy = Some(commit2DataSetCreation),
+        maybeGenerationFactories = List(
+          Generation.factory(
+            entityFactory = Collection.factory(dataSetFolder, List(velo2019Location))
+          )
+        )
+      )
+
+      val commit4Activity = Activity(
+        CommitId("000004"),
+        committedDates.generateOne,
+        persons.generateOne,
+        project,
+        agent,
+        comment = "renku dataset add zhbikes",
+        maybeGenerationFactories = List(
+          dataSetGenerationFactory(
+            partsFactories = List(
+              DataSetPart.factory(
+                datasets.PartName("2018velo.csv"),
+                datasets.PartLocation(velo2018Location.value),
+                datasetUrls.generateOption
+              )
+            )
+          )
+        )
+      )
+
       val commit5Activity = Activity(
         CommitId("000005"),
         committedDates.generateOne,
         committer = persons.generateOne,
         project,
         agent,
-        comment = "packages installed",
-        maybeInformedBy = Some(
-          Activity(CommitId("000004"),
-                   committedDates.generateOne,
-                   persons.generateOne,
-                   project,
-                   agent,
-                   comment = "renku dataset add zhbikes")
+        comment         = "packages installed",
+        maybeInformedBy = commit4Activity.some,
+        maybeGenerationFactories = List(
+          Generation.factory(Entity.factory(Location("requirements.txt")))
         )
       )
+
       val commit6Activity = Activity(
         CommitId("000006"),
         committedDates.generateOne,
@@ -248,48 +260,79 @@ object bundles extends Schemas {
         project,
         agent,
         comment         = "added notebook",
-        maybeInformedBy = Some(commit5Activity)
+        maybeInformedBy = commit5Activity.some,
+        maybeGenerationFactories = List(
+          Generation.factory(Entity.factory(Location("notebooks/zhbikes-notebook.ipynb")))
+        )
       )
+
       val commit7Activity = Activity(
-        commit7Id,
+        CommitId("000007"),
         committedDates.generateOne,
         committer = persons.generateOne,
         project,
         agent,
         comment         = "added refactored scripts",
-        maybeInformedBy = Some(commit6Activity)
+        maybeInformedBy = Some(commit6Activity),
+        maybeGenerationFactories = List(
+          Generation.factory(entityFactory = Entity.factory(plotData)),
+          Generation.factory(entityFactory = Entity.factory(cleanData))
+        )
       )
-      val commit7PlotDataEntity  = Entity(commit7Id, plotData, project)
-      val commit7CleanDataEntity = Entity(commit7Id, cleanData, project)
 
-      val commit8ParquetEntityFactory = (activity: Activity) => Entity(Generation(bikesParquet, activity))
-      val commit8ProcessRun = ProcessRun.standAlone(
-        commit8Id,
+      val oldCommit8ProcessRun = Activity(
+        commitIds.generateOne,
         committedDates.generateOne,
         persons.generateOne,
         project,
         agent,
-        comment         = s"renku run python $plotData $dataSetFolder $bikesParquet",
+        comment         = "1st-renku-run.cwl generation",
+        maybeInformedBy = Some(commit7Activity),
+        maybeGenerationFactories = List(
+          Generation.factory(Entity.factory(WorkflowFile.cwl("1st-renku-run.cwl")))
+        )
+      )
+
+      val commit8ParquetEntityFactory = (activity: Activity) => Entity(Generation(bikesParquet, activity))
+      val commit8ProcessRun = ProcessRun.standAlone(
+        CommitId("000008"),
+        committedDates.generateOne,
+        persons.generateOne,
+        project,
+        agent,
+        comment         = s"renku run python $cleanData $dataSetFolder $bikesParquet",
         maybeInformedBy = Some(commit7Activity),
         associationFactory = Association.process(
           agent.copy(schemaVersion = schemaVersions.generateOne),
           RunPlan.process(
             WorkflowFile.yaml("1st-renku-run.yaml"),
             Command("python"),
-            inputs  = List(Input.from(commit7CleanDataEntity), Input.from(commit3DataSetFolderCollection)),
+            inputs = List(
+              Input.from(commit7Activity.entity(cleanData)),
+              Input.from(commit3AddingDataSetFile.entity(dataSetFolder))
+            ),
             outputs = List(Output.from(commit8ParquetEntityFactory))
           )
+        ),
+        maybeInvalidation = oldCommit8ProcessRun.generations.headOption.flatMap(_.maybeReverseEntity)
+      )
+
+      val oldCommit9ProcessRun = Activity(
+        commitIds.generateOne,
+        committedDates.generateOne,
+        persons.generateOne,
+        project,
+        agent,
+        comment         = "2nd-renku-run.cwl generation",
+        maybeInformedBy = Some(commit7Activity),
+        maybeGenerationFactories = List(
+          Generation.factory(Entity.factory(WorkflowFile.cwl("2nd-renku-run.cwl")))
         )
       )
-      val commit8ParquetEntity = commit8ParquetEntityFactory(commit8ProcessRun)
-      val commit8Cwl = Entity(commitIds.generateOne,
-                              WorkflowFile.cwl("1st-renku-run.cwl"),
-                              project,
-                              maybeInvalidationActivity = Some(commit8ProcessRun))
 
       val commit9GridPlotEntityFactory = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       val commit9ProcessRun = ProcessRun.standAlone(
-        commit9Id,
+        CommitId("000009"),
         committedDates.generateOne,
         persons.generateOne,
         project,
@@ -301,35 +344,30 @@ object bundles extends Schemas {
           RunPlan.process(
             WorkflowFile.yaml("2nd-renku-run.yaml"),
             Command("python"),
-            inputs = List(Input.from(commit7PlotDataEntity), Input.from(commit8ParquetEntity)),
+            inputs = List(Input.from(commit7Activity.entity(plotData)),
+                          Input.from(commit8ProcessRun.processRunAssociation.runPlan.output(bikesParquet))),
             outputs = List(
               Output.from(activity => Entity(Generation(cumulativePng, activity))),
               Output.from(commit9GridPlotEntityFactory)
             )
           )
-        )
+        ),
+        maybeInvalidation = oldCommit9ProcessRun.generations.headOption.flatMap(_.maybeReverseEntity)
       )
 
-      val commit9Cwl = Entity(commitIds.generateOne,
-                              WorkflowFile.cwl("2nd-renku-run.cwl"),
-                              project,
-                              maybeInvalidationActivity = Some(commit9ProcessRun))
-
       val commit10Activity = Activity(
-        commit10Id,
+        CommitId("0000010"),
         committedDates.generateOne,
-        committer = persons.generateOne,
+        persons.generateOne,
         project,
         agent,
         comment         = "renku dataset: committing 1 newly added files",
-        maybeInformedBy = Some(commit9ProcessRun)
+        maybeInformedBy = Some(commit9ProcessRun),
+        maybeGenerationFactories = List(
+          Generation.factory(Collection.factory(dataSetFolder, List(velo2019Location, velo2018Location)))
+        )
       )
-      val commit10DataSetFolderCollection = Collection(
-        commit10Id,
-        dataSetFolder,
-        project,
-        members = List(Entity(commit3Id, velo2019Location, project), Entity(commit10Id, velo2018Location, project))
-      )
+
       val commit11Activity = Activity(
         CommitId("0000011"),
         committedDates.generateOne,
@@ -337,7 +375,31 @@ object bundles extends Schemas {
         project,
         agent,
         comment         = "renku dataset add zhbikes velo.csv",
-        maybeInformedBy = Some(commit10Activity)
+        maybeInformedBy = Some(commit10Activity),
+        maybeGenerationFactories = List(
+          dataSetGenerationFactory(
+            partsFactories = List(
+              DataSetPart.factory(
+                datasets.PartName("2019velo.csv"),
+                datasets.PartLocation(velo2019Location.value),
+                datasetUrls.generateOption
+              )
+            )
+          )
+        )
+      )
+
+      val oldCommit12Workflow = Activity(
+        commitIds.generateOne,
+        committedDates.generateOne,
+        persons.generateOne,
+        project,
+        agent,
+        comment         = "renku-update.cwl generation",
+        maybeInformedBy = Some(commit11Activity),
+        maybeGenerationFactories = List(
+          Generation.factory(Entity.factory(WorkflowFile.cwl("renku-update.cwl")))
+        )
       )
 
       val oldCommit12WorkflowStep0 = Activity(
@@ -348,10 +410,8 @@ object bundles extends Schemas {
         agent,
         comment         = "renku-migrate-step0.cwl generation",
         maybeInformedBy = Some(commit11Activity),
-        maybeGenerationFactory = Some(
-          Generation.factory(
-            entityFactory = Entity.factory(WorkflowFile.cwl("renku-migrate-step0.cwl"))
-          )
+        maybeGenerationFactories = List(
+          Generation.factory(Entity.factory(WorkflowFile.cwl("renku-migrate-step0.cwl")))
         )
       )
 
@@ -363,22 +423,19 @@ object bundles extends Schemas {
         agent,
         comment         = "renku-migrate-step1.cwl generation",
         maybeInformedBy = Some(commit11Activity),
-        maybeGenerationFactory = Some(
-          Generation.factory(
-            entityFactory = Entity.factory(WorkflowFile.cwl("renku-migrate-step1.cwl"))
-          )
+        maybeGenerationFactories = List(
+          Generation.factory(Entity.factory(WorkflowFile.cwl("renku-migrate-step1.cwl")))
         )
       )
 
-      val commit12CommandPlotDataInput       = Input.from(commit7PlotDataEntity)
-      val commit12CommandCleanDataInput      = Input.from(commit7CleanDataEntity)
-      val commit12CommandDataSetFolderInput  = Input.from(commit10DataSetFolderCollection)
+      val commit12CommandPlotDataInput       = Input.from(commit7Activity.entity(plotData))
+      val commit12CommandCleanDataInput      = Input.from(commit7Activity.entity(cleanData))
+      val commit12CommandDataSetFolderInput  = Input.from(commit10Activity.entity(dataSetFolder))
       val commit12CumulativePngEntityFactory = (activity: Activity) => Entity(Generation(cumulativePng, activity))
       val commit12GridPlotPngEntityFactory   = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       val commit12ParquetEntityFactory       = (activity: Activity) => Entity(Generation(bikesParquet, activity))
-
       val commit12Workflow = WorkflowRun(
-        commit12Id,
+        CommitId("0000012"),
         committedDates.generateOne,
         persons.generateOne,
         project,
@@ -423,92 +480,48 @@ object bundles extends Schemas {
             associationFactory = Association.child(
               agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne))
             ),
-            maybeInvalidation = oldCommit12WorkflowStep0.maybeGeneration.flatMap(_.maybeReverseEntity)
+            maybeInvalidation = oldCommit12WorkflowStep0.generations.headOption.flatMap(_.maybeReverseEntity)
           ),
           ProcessRun.child(
             associationFactory = Association.child(
               agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne))
             ),
-            maybeInvalidation =
-              Some(Entity(commitIds.generateOne, WorkflowFile.cwl("renku-migrate-step1.cwl"), project))
+            maybeInvalidation = oldCommit12WorkflowStep1.generations.headOption.flatMap(_.maybeReverseEntity)
           )
         ),
-        maybeInvalidation = Some(Entity(commitIds.generateOne, WorkflowFile.cwl("renku-update.cwl"), project))
+        maybeInvalidation = oldCommit12Workflow.generations.headOption.flatMap(_.maybeReverseEntity)
       )
 
-      val commit12GridPlotPngEntity = commit12GridPlotPngEntityFactory(commit12Workflow)
-
       val examplarData = ExamplarData(
-        commit12Id,
         gridPlotPng,
-        commit3DataSetFolderCollection.asJsonLD,
-        commit7PlotDataEntity.asJsonLD,
-        commit7CleanDataEntity.asJsonLD,
-        commit8ProcessRun.asJsonLD,
-        commit8ParquetEntity.asJsonLD,
-        commit9ProcessRun.asJsonLD,
-        commit9GridPlotEntityFactory(commit9ProcessRun).asJsonLD,
-        commit10DataSetFolderCollection.asJsonLD,
-        commit12GridPlotPngEntity.asJsonLD,
-        commit12ParquetEntityFactory(commit12Workflow).asJsonLD
+        commit12Workflow.commitId,
+        NodeDef(commit3AddingDataSetFile.entity(dataSetFolder)),
+        NodeDef(commit7Activity.entity(plotData)),
+        NodeDef(commit7Activity.entity(cleanData)),
+        NodeDef(commit8ProcessRun),
+        NodeDef(commit8ProcessRun.processRunAssociation.runPlan.output(bikesParquet)),
+        NodeDef(commit9ProcessRun),
+        NodeDef(commit9ProcessRun.processRunAssociation.runPlan.output(gridPlotPng)),
+        NodeDef(commit9ProcessRun.processRunAssociation.runPlan.output(cumulativePng)),
+        NodeDef(commit10Activity.entity(dataSetFolder)),
+        NodeDef(commit12Workflow.processRunAssociation.runPlan.output(bikesParquet))
       )
 
       List(
-        Entity(
-          Generation(
-            velo2019Location,
-            Activity(
-              commit3Id,
-              committedDates.generateOne,
-              committer = persons.generateOne,
-              project,
-              agent,
-              comment = "renku dataset: committing 1 newly added files",
-              maybeInformedBy = Some(
-                Activity(CommitId("000002"),
-                         committedDates.generateOne,
-                         persons.generateOne,
-                         project,
-                         agent,
-                         comment = "renku dataset create zhbikes")
-              )
-            )
-          )
-        ).asJsonLD,
-        Entity(Generation(Location("requirements.txt"), commit5Activity)).asJsonLD,
-        Entity(Generation(Location("notebooks/zhbikes-notebook.ipynb"), commit6Activity)).asJsonLD,
-        Entity(Generation(plotData, commit7Activity)).asJsonLD,
+        commit3AddingDataSetFile.asJsonLD,
+        commit5Activity.asJsonLD,
+        commit6Activity.asJsonLD,
+        commit7Activity.asJsonLD,
+        oldCommit8ProcessRun.asJsonLD,
         commit8ProcessRun.asJsonLD,
-        commit8Cwl.asJsonLD,
-        commit9Cwl.asJsonLD,
+        oldCommit9ProcessRun.asJsonLD,
         commit9ProcessRun.asJsonLD,
-        DataSet(
-          id          = dataSetId,
-          name        = datasets.Name("zhbikes"),
-          createdDate = datasetCreatedDates.generateOne,
-          creators    = Set(persons.generateOne),
-          parts = List(
-            DataSetPart(
-              datasets.PartName("2019velo.csv"),
-              datasets.PartLocation(velo2019Location.value),
-              commit3Id,
-              project,
-              datasetCreatedDates.generateOne,
-              datasetUrls.generateOption
-            ),
-            DataSetPart(
-              datasets.PartName("2018velo.csv"),
-              datasets.PartLocation(velo2018Location.value),
-              commit10Id,
-              project,
-              datasetCreatedDates.generateOne,
-              datasetUrls.generateOption
-            )
-          ),
-          generation = Generation(Location(s".renku/datasets/$dataSetId"), commit11Activity),
-          project    = project
-        ).asJsonLD,
-        commit12Workflow.asJsonLD
+        commit10Activity.asJsonLD,
+        commit11Activity.asJsonLD,
+        commit12Workflow.asJsonLD,
+        oldCommit12Workflow.asJsonLD,
+        oldCommit12WorkflowStep0.asJsonLD,
+        oldCommit12WorkflowStep1.asJsonLD
       ) -> examplarData
     }
   }

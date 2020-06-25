@@ -52,12 +52,8 @@ class ReverseSpec extends WordSpec with ScalaCheckPropertyChecks {
       }
     }
 
-    "return left if an empty list is passed in" in {
-      val property        = properties.generateOne
-      val Left(exception) = Reverse.of(property -> List.empty)
-
-      exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s""""@reverse" "$property" has to exist on an object"""
+    "return Reverse.emtpy if an empty list is passed in" in {
+      Reverse.of(properties.generateOne -> List.empty) shouldBe Right(Reverse.empty)
     }
   }
 

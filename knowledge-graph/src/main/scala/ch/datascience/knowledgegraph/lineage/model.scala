@@ -19,13 +19,13 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.MonadError
+import ch.datascience.knowledgegraph.lineage.model.Node.Location
 
-import scala.collection.Set
 import scala.language.higherKinds
 
 object model {
 
-  final case class Lineage private (edges: Set[Edge], nodes: Set[Node])
+  final case class Lineage private (edges: Set[Edge], nodes: Set[Node]) extends LineageOps
 
   object Lineage {
 
@@ -45,6 +45,13 @@ object model {
       edges.foldLeft(Set.empty[Node.Location]) {
         case (acc, Edge(source, target)) => acc + source + target
       }
+  }
+
+  trait LineageOps {
+    self: Lineage =>
+
+    def getNode(location: Location): Option[Node] =
+      nodes.find(_.location == location)
   }
 
   final case class Edge(source: Node.Location, target: Node.Location)

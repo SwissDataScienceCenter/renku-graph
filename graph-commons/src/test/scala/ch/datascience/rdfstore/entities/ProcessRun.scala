@@ -41,7 +41,7 @@ object ProcessRun {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  trait ChildProcessRun extends ProcessRun[Entity with WorkflowRunPlan] {
+  trait ChildProcessRun extends ProcessRun[Entity with ProcessRunPlan] {
     self: Activity =>
     override type AssociationType = ChildRunPlanAssociation
     def processRunStep:        Step
@@ -70,7 +70,8 @@ object ProcessRun {
                  workflowRun.comment,
                  workflowRun.maybeInformedBy,
                  workflowRun.maybeInfluenced,
-                 maybeInvalidation) with ChildProcessRun {
+                 maybeInvalidation,
+                 maybeGenerationFactories = Nil) with ChildProcessRun {
       override val processRunAssociation: ChildRunPlanAssociation = associationFactory(workflowRun)(step)
       override val processRunUsages: List[Usage] = workflowRun.processRunAssociation.runPlan.runSubprocesses
         .get(step.value)
@@ -100,7 +101,8 @@ object ProcessRun {
                  comment,
                  maybeInformedBy,
                  maybeInfluenced,
-                 maybeInvalidation) with WorkflowProcessRun {
+                 maybeInvalidation,
+                 maybeGenerationFactories = Nil) with WorkflowProcessRun {
       override val processRunAssociation: WorkflowRunPlanAssociation = association
       override val processRunUsages:      List[Usage]                = association.runPlan.asUsages
     }
@@ -125,7 +127,8 @@ object ProcessRun {
                  comment,
                  maybeInformedBy,
                  maybeInfluenced,
-                 maybeInvalidation) with StandAloneProcessRun {
+                 maybeInvalidation,
+                 maybeGenerationFactories = Nil) with StandAloneProcessRun {
       override val processRunAssociation: ProcessRunPlanAssociation = associationFactory(this)
       override val processRunUsages:      List[Usage]               = associationFactory(this).runPlan.asUsages
     }
@@ -143,7 +146,7 @@ object ProcessRun {
             prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
             prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
             prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD,
-            prov / "wasPartOfWorkflowRun" -> entity.processRunWorkflowRun.asJsonLD
+            prov / "wasPartOfWorkflowRun" -> entity.processRunWorkflowRun.asEntityId.asJsonLD
           ).asRight
 
       override def toEntityId: Activity with ChildProcessRun => Option[EntityId] =

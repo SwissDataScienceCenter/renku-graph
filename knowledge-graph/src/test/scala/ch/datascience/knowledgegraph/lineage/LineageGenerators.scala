@@ -18,10 +18,13 @@
 
 package ch.datascience.knowledgegraph.lineage
 
+import cats.implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.knowledgegraph.lineage.model._
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
+
+import scala.util.Try
 
 object LineageGenerators {
 
@@ -48,4 +51,13 @@ object LineageGenerators {
     sourceNode <- nodeLocations
     targetNode <- nodeLocations
   } yield Edge(sourceNode, targetNode)
+
+  implicit val lineages: Gen[Lineage] = {
+    for {
+      nodeSet <- nonEmptySet(nodes, 2)
+    } yield {
+      val edges = (nodeSet zip nodeSet.tail).map { case (left, right) => Edge(left.location, right.location) }
+      Lineage.from[Try](edges, nodeSet).fold(throw _, identity)
+    }
+  }
 }

@@ -48,7 +48,7 @@ object Reverse {
     val (name, list) = property
 
     list match {
-      case Nil => Left(new IllegalArgumentException(s""""@reverse" "$name" has to exist on an object"""))
+      case Nil => Reverse.empty.asRight[Exception]
       case nonEmpty =>
         nonEmpty find nonEntity match {
           case None => new Reverse(List(name -> JsonLD.arr(list: _*))).asRight[Exception]

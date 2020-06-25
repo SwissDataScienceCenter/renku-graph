@@ -42,20 +42,21 @@ object WorkflowRun {
   import io.renku.jsonld.syntax._
 
   def apply(
-      commitId:             CommitId,
-      committedDate:        CommittedDate,
-      committer:            Person,
-      project:              Project,
-      agent:                Agent,
-      comment:              String,
-      workflowFile:         WorkflowFile,
-      informedBy:           Activity,
-      associationFactory:   Project => Activity => WorkflowFile => WorkflowRunPlanAssociation,
-      startTime:            Instant = Instant.now(),
-      endTime:              Instant = Instant.now().plus(10, SECONDS),
-      maybeInfluenced:      Option[Activity] = None,
-      processRunsFactories: List[ActivityWorkflowRun => Step => Activity with ChildProcessRun],
-      maybeInvalidation:    Option[Entity with Artifact] = None
+      commitId:                 CommitId,
+      committedDate:            CommittedDate,
+      committer:                Person,
+      project:                  Project,
+      agent:                    Agent,
+      comment:                  String,
+      workflowFile:             WorkflowFile,
+      informedBy:               Activity,
+      associationFactory:       Project => Activity => WorkflowFile => WorkflowRunPlanAssociation,
+      startTime:                Instant = Instant.now(),
+      endTime:                  Instant = Instant.now().plus(10, SECONDS),
+      maybeInfluenced:          Option[Activity] = None,
+      processRunsFactories:     List[ActivityWorkflowRun => Step => Activity with ChildProcessRun],
+      maybeInvalidation:        Option[Entity with Artifact] = None,
+      maybeGenerationFactories: List[Activity => Generation] = Nil
   ): ActivityWorkflowRun =
     new Activity(commitId,
                  committedDate,
@@ -65,7 +66,8 @@ object WorkflowRun {
                  comment,
                  Some(informedBy),
                  maybeInfluenced,
-                 maybeInvalidation) with WorkflowProcessRun with WorkflowRun {
+                 maybeInvalidation,
+                 maybeGenerationFactories) with WorkflowProcessRun with WorkflowRun {
       override val processRunAssociation: WorkflowRunPlanAssociation = associationFactory(project)(this)(workflowFile)
       override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages
       val workflowRunFile:                WorkflowFile               = workflowFile
