@@ -65,6 +65,8 @@ object DataSetPart {
           schema / "url"         -> entity.maybePartUrl.asJsonLD
         ).asRight
       }
+
+      override val toEntityId: DataSetPartArtifact => Option[EntityId] = _ => None
     }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,

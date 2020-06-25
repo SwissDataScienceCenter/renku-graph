@@ -56,13 +56,15 @@ object Entity {
                maybeInvalidationActivity = None,
                maybeGeneration           = Some(generation)) with Artifact
 
+  def factory(location: Location)(activity: Activity): Entity with Artifact =
+    Entity(activity.commitId, location, activity.project)
+
   private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                            fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Entity] =
     new PartialEntityConverter[Entity] {
       override def convert[T <: Entity]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
-            EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.location,
             EntityTypes of prov / "Entity",
             rdfs / "label"               -> s"${entity.location}@${entity.commitId}".asJsonLD,
             schema / "isPartOf"          -> entity.project.asJsonLD,
@@ -70,6 +72,9 @@ object Entity {
             prov / "wasInvalidatedBy"    -> entity.maybeInvalidationActivity.asJsonLD,
             prov / "qualifiedGeneration" -> entity.maybeGeneration.asJsonLD
           ).asRight
+
+      override def toEntityId: Entity => Option[EntityId] =
+        entity => (EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.location).some
     }
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Entity] =
     JsonLDEncoder.instance {
@@ -88,7 +93,7 @@ object Entity {
 trait Collection {
   self: Entity =>
 
-  def collectionMembers: List[Artifact with Entity]
+  def collectionMembers: List[Entity with Artifact]
 }
 
 object Collection {
@@ -98,7 +103,7 @@ object Collection {
   def apply(commitId: CommitId,
             location: Location,
             project:  Project,
-            members:  List[Artifact with Entity]): EntityCollection =
+            members:  List[Entity with Artifact]): EntityCollection =
     new Entity(commitId, location, project, maybeInvalidationActivity = None, maybeGeneration = None) with Collection
     with Artifact {
       override val collectionMembers: List[Entity with Artifact] = members
@@ -110,10 +115,12 @@ object Collection {
       override def convert[T <: EntityCollection]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
-            EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.location,
             EntityTypes of prov / "Collection",
             prov / "hadMember" -> entity.collectionMembers.asJsonLD
           ).asRight
+
+      override def toEntityId: EntityCollection => Option[EntityId] =
+        entity => (EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.location).some
     }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,

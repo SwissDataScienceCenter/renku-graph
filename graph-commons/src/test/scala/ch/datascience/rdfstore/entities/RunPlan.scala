@@ -146,7 +146,6 @@ object RunPlan {
     new PartialEntityConverter[Entity with WorkflowRunPlan] {
       override def convert[T <: Entity with WorkflowRunPlan]: T => Either[Exception, PartialEntity] = { entity =>
         PartialEntity(
-          EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location),
           EntityTypes of (prov / "Plan", renku / "Run"),
           renku / "hasArguments"  -> entity.runArguments.asJsonLD,
           renku / "hasInputs"     -> entity.runCommandInputs.asJsonLD,
@@ -155,6 +154,9 @@ object RunPlan {
           renku / "successCodes"  -> entity.runSuccessCodes.asJsonLD
         ).asRight
       }
+
+      override def toEntityId: Entity with WorkflowRunPlan => Option[EntityId] =
+        entity => (EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location)).some
     }
 
   private[entities] implicit def processRunPlanConverter(
@@ -164,7 +166,6 @@ object RunPlan {
     new PartialEntityConverter[Entity with ProcessRunPlan] {
       override def convert[T <: Entity with ProcessRunPlan]: T => Either[Exception, PartialEntity] = { entity =>
         PartialEntity(
-          EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location),
           EntityTypes of (prov / "Plan", renku / "Run"),
           renku / "command"      -> entity.runCommand.asJsonLD,
           renku / "hasArguments" -> entity.runArguments.asJsonLD,
@@ -174,6 +175,9 @@ object RunPlan {
           renku / "processOrder" -> entity.maybeRunProcessOrder.asJsonLD
         ).asRight
       }
+
+      override def toEntityId: Entity with ProcessRunPlan => Option[EntityId] =
+        entity => (EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location)).some
     }
 
   implicit def workflowRUnPlanEncoder(

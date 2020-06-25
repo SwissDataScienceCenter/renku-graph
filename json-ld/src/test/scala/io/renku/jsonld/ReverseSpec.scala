@@ -61,6 +61,63 @@ class ReverseSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
+  "of var args of Property to JsonLD" should {
+    "return an instance of Reverse if the given properties' values are JsonLDEntities" in {
+      forAll(properties, jsonLDEntities, properties, jsonLDEntities) { (property1, entity1, property2, entity2) =>
+        val Right(reverse) = Reverse.of(
+          property1 -> entity1,
+          property2 -> entity2
+        )
+
+        reverse.asJson shouldBe json"""[{
+          ${property1.url}: ${entity1.toJson}
+        },{
+          ${property2.url}: ${entity2.toJson}
+        }]"""
+      }
+    }
+
+    "return an instance of Reverse if the given properties' values are JsonLDArrays of JsonLDEntities" in {
+      forAll(properties, nonEmptyList(jsonLDEntities)) { (property, entities) =>
+        val arrayValue = JsonLD.arr(entities.toList: _*)
+        val Right(reverse) = Reverse.of(
+          property -> arrayValue
+        )
+
+        reverse.asJson shouldBe json"""{
+          ${property.url}: ${arrayValue.toJson}
+        }"""
+      }
+    }
+
+    "return left if there are properties with values neither JsonLDEntities nor arrays of JsonLDEntities" in {
+      forAll(properties, jsonLDEntities, properties, jsonLDValues, properties, jsonLDEntities) {
+        (property1, entity1, property2, value2, property3, entity3) =>
+          val Left(exception) = Reverse.of(
+            property1 -> entity1,
+            property2 -> value2,
+            property3 -> entity3
+          )
+
+          exception            shouldBe an[IllegalArgumentException]
+          exception.getMessage shouldBe s""""@reverse" "$property2" property has to exist on an object"""
+      }
+    }
+
+    "return left if there are properties with values which are arrays of not JsonLDEntities" in {
+      forAll(properties, nonEmptyList(jsonLDEntities), properties, nonEmptyList(jsonLDValues)) {
+        (property1, entities, property2, values) =>
+          val Left(exception) = Reverse.of(
+            property1 -> JsonLD.arr(entities.toList: _*),
+            property2 -> JsonLD.arr(values.toList:   _*)
+          )
+
+          exception            shouldBe an[IllegalArgumentException]
+          exception.getMessage shouldBe s""""@reverse" "$property2" property has to exist on each object of an array"""
+      }
+    }
+  }
+
   "fromList" should {
 
     "return Reverse.empty if an empty list is given" in {

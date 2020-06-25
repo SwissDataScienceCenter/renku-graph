@@ -23,6 +23,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInput, PositionInput}
 import ch.datascience.rdfstore.entities.CommandParameter._
+import ch.datascience.rdfstore.entities.DataSet.{DataSetArtifact, entityId}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
 import io.renku.jsonld.JsonLDEncoder._
@@ -75,10 +76,12 @@ object CommandParameter {
         entity =>
           PartialEntity(
             entity.entityId.some,
-            EntityTypes of (prov / "Entity", renku / "CommandParameter"),
+            EntityTypes of renku / "CommandParameter",
             renku / "prefix"   -> entity.maybePrefix.asJsonLD,
             renku / "position" -> entity.position.asJsonLD
           ).asRight
+
+      override def toEntityId: CommandParameter => Option[EntityId] = entity => entity.entityId.some
     }
 
   sealed trait Input {
@@ -113,19 +116,19 @@ object CommandParameter {
         override def convert[T <: CommandParameter with Input]: T => Either[Exception, PartialEntity] = {
           case input: ValueCommandParameter with Input =>
             PartialEntity(
-              None,
-              EntityTypes of (renku / "CommandInput"),
+              EntityTypes of renku / "CommandInput",
               rdfs / "label" -> s"""Command Input "${input.value}"""".asJsonLD
             ).asRight
           case input: EntityCommandParameter with Input =>
             PartialEntity(
-              None,
-              EntityTypes of (renku / "CommandInput"),
+              EntityTypes of renku / "CommandInput",
               rdfs / "label"     -> s"""Command Input "${input.value}"""".asJsonLD,
               renku / "consumes" -> input.entity.asJsonLD
             ).asRight
           case other => throw new IllegalStateException(s"$other not supported")
         }
+        override def toEntityId: CommandParameter with Input => Option[EntityId] =
+          _ => None
       }
 
     implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -171,21 +174,22 @@ object CommandParameter {
         override def convert[T <: CommandParameter with Output]: T => Either[Exception, PartialEntity] = {
           case output: ValueCommandParameter with Output =>
             PartialEntity(
-              None,
-              EntityTypes of (renku / "CommandOutput"),
+              EntityTypes of renku / "CommandOutput",
               rdfs / "label"         -> s"""Command Output "${output.value}"""".asJsonLD,
               renku / "createFolder" -> output.outputFolderCreation.asJsonLD
             ).asRight
           case output: ActivityCommandParameter with Output =>
             PartialEntity(
-              None,
-              EntityTypes of (renku / "CommandOutput"),
+              EntityTypes of renku / "CommandOutput",
               rdfs / "label"         -> s"""Command Output "${output.value}"""".asJsonLD,
               renku / "createFolder" -> output.outputFolderCreation.asJsonLD,
               renku / "produces"     -> output.entity.asJsonLD
             ).asRight
           case other => throw new IllegalStateException(s"$other not supported")
         }
+        override def toEntityId: CommandParameter with Output => Option[EntityId] =
+          _ => None
+
       }
 
     implicit def outputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,

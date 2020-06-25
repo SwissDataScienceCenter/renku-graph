@@ -85,22 +85,6 @@ object PartialEntity {
       maybeReverse = x.maybeReverse |+| y.maybeReverse
     )
 
-  implicit val reverseSemigroup: Semigroup[Reverse] = (x: Reverse, y: Reverse) =>
-    Reverse.fromListUnsafe {
-      x.properties merge y.properties
-    }
-
-  private implicit class PropertiesOps(x: List[(Property, JsonLD)]) {
-    def merge(y: List[(Property, JsonLD)]) =
-      y.foldLeft(x) {
-        case (originalList, (property, value)) =>
-          val index = originalList.indexWhere(_._1 == property)
-
-          if (index > -1) originalList.updated(index, property -> value)
-          else originalList :+ (property -> value)
-      }
-  }
-
   implicit class PartialEntityOps(partialEntity: Either[Exception, PartialEntity]) {
 
     lazy val getOrFail: JsonLD = partialEntity flatMap toJsonLD fold (throw _, identity)

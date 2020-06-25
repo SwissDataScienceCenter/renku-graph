@@ -352,7 +352,9 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
          childProperty:  (Property, JsonLD)) =>
           val reverseProperty: Property = properties.generateOne
           val child = JsonLD.entity(childId, childTypes, childProperty)
-          JsonLD.entity(parentId, parentTypes, Reverse.of(reverseProperty -> child), parentProperty).toJson shouldBe
+          JsonLD
+            .entity(parentId, parentTypes, Reverse.ofEntities(reverseProperty -> child), parentProperty)
+            .toJson shouldBe
             parse(s"""{
             "@id":                  ${parentId.asJson},
             "@type":                ${parentTypes.asJson},
@@ -382,7 +384,7 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
           JsonLD
             .entity(parentId,
                     parentTypes,
-                    Reverse.of(reverseProperty1 -> child, reverseProperty2 -> child),
+                    Reverse.ofEntities(reverseProperty1 -> child, reverseProperty2 -> child),
                     parentProperty)
             .toJson shouldBe
             parse(s"""{

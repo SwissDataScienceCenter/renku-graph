@@ -54,10 +54,18 @@ object WorkflowRun {
       startTime:            Instant = Instant.now(),
       endTime:              Instant = Instant.now().plus(10, SECONDS),
       maybeInfluenced:      Option[Activity] = None,
-      processRunsFactories: List[ActivityWorkflowRun => Step => Activity with ChildProcessRun]
+      processRunsFactories: List[ActivityWorkflowRun => Step => Activity with ChildProcessRun],
+      maybeInvalidation:    Option[Entity with Artifact] = None
   ): ActivityWorkflowRun =
-    new Activity(commitId, committedDate, committer, project, agent, comment, Some(informedBy), maybeInfluenced)
-    with WorkflowProcessRun with WorkflowRun {
+    new Activity(commitId,
+                 committedDate,
+                 committer,
+                 project,
+                 agent,
+                 comment,
+                 Some(informedBy),
+                 maybeInfluenced,
+                 maybeInvalidation) with WorkflowProcessRun with WorkflowRun {
       override val processRunAssociation: WorkflowRunPlanAssociation = associationFactory(project)(this)(workflowFile)
       override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages
       val workflowRunFile:                WorkflowFile               = workflowFile
@@ -80,6 +88,8 @@ object WorkflowRun {
             reverse,
             rdfs / "label" -> s"${entity.workflowRunFile}@${entity.commitId}".asJsonLD
           )
+
+      override lazy val toEntityId: Activity with WorkflowRun => Option[EntityId] = _ => None
     }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -90,6 +100,15 @@ object WorkflowRun {
         .combine(entity.asPartialJsonLD[Activity with WorkflowProcessRun])
         .combine(entity.asPartialJsonLD[Activity with WorkflowRun])
         .getOrFail
+    }
 
+  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                               fusekiBaseUrl:         FusekiBaseUrl): EntityIdEncoder[ActivityWorkflowRun] =
+    EntityIdEncoder.instance { entity =>
+      entity
+        .getEntityId[Activity with WorkflowProcessRun]
+        .orElse(entity.getEntityId[Activity with WorkflowRun])
+        .orElse(entity.getEntityId[Activity])
+        .getOrElse(throw new IllegalStateException(s"No EntityId found for $entity"))
     }
 }
