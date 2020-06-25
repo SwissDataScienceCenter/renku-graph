@@ -102,6 +102,8 @@ object DataSet {
           schema / "keywords"      -> entity.datasetKeywords.asJsonLD
         ).asRight
       }
+
+      override def toEntityId: DataSetArtifact => Option[EntityId] = entity => entityId(entity.datasetId).some
     }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,

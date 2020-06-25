@@ -21,6 +21,7 @@ package ch.datascience.rdfstore
 import java.time.{Instant, LocalDate}
 import java.util.UUID
 
+import cats.kernel.Semigroup
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{IdSameAs, SameAs, UrlSameAs}
 import ch.datascience.graph.model.projects.FilePath
@@ -75,8 +76,28 @@ package object entities extends Schemas with EntitiesGenerators {
 
   implicit class EntityOps[T](entity: T) {
     def asPartialJsonLD[S >: T](implicit converter: PartialEntityConverter[S]): Either[Exception, PartialEntity] =
-      converter.convert(entity)
+      converter(entity)
+
+    def getEntityId[S >: T](implicit converter: PartialEntityConverter[S]): Option[EntityId] =
+      converter.toEntityId(entity)
   }
+
+  implicit class PropertiesOps(x: List[(Property, JsonLD)]) {
+    def merge(y: List[(Property, JsonLD)]): List[(Property, JsonLD)] =
+      y.foldLeft(x) {
+        case (originalList, (property, value)) =>
+          val index = originalList.indexWhere(_._1 == property)
+
+          if (index > -1) originalList.updated(index, property -> value)
+          else originalList :+ (property -> value)
+      }
+  }
+
+  implicit val reverseSemigroup: Semigroup[Reverse] = (x: Reverse, y: Reverse) =>
+    Reverse.fromListUnsafe {
+      x.properties merge y.properties
+    }
+
 }
 
 trait Schemas {

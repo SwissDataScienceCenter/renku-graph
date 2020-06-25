@@ -22,6 +22,8 @@ package object syntax {
 
   final implicit class JsonEncoderOps[Type](value: Type) {
     def asJsonLD(implicit encoder: JsonLDEncoder[Type]): JsonLD = encoder(value)
+
+    def asEntityId(implicit encoder: EntityIdEncoder[Type]): EntityId = encoder(value)
   }
 
   final implicit class PropertyOps(property: Property) {

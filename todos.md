@@ -23,6 +23,7 @@ x complete the bundles with proper Entity entities :) for e.g in the Input entit
 
 - ask Ralf why CommandParameter is an Entity?
 - ask Ralf why do we have a cwl file on a RunPlan (that cwl was invalidated) 
+- create an issue to fix activity property on a Generation which is already represented on the reverse of the activity
 - isn't that missing members a bug:
 "https://swissdatasciencecenter.github.io/renku-ontology#consumes": [
                   {

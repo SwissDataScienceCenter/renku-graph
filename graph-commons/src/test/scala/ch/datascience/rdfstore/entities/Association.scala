@@ -30,7 +30,7 @@ sealed trait Association[RunPlanType <: Entity with RunPlan] {
 
 object Association {
 
-  trait ChildRunPlanAssociation extends Association[Entity with WorkflowRunPlan] {
+  trait ChildRunPlanAssociation extends Association[Entity with ProcessRunPlan] {
     val workflowStep: Step
   }
 
@@ -41,10 +41,11 @@ object Association {
       agent:  Agent
   )(workflow: ActivityWorkflowRun)(step: Step): ChildRunPlanAssociation =
     new ChildRunPlanAssociation {
-      override val commitId:         CommitId                    = workflow.commitId
-      override val associationAgent: Agent                       = agent
-      override val workflowStep:     Step                        = step
-      override val runPlan:          Entity with WorkflowRunPlan = workflow.processRunAssociation.runPlan
+      override val commitId:         CommitId = workflow.commitId
+      override val associationAgent: Agent    = agent
+      override val workflowStep:     Step     = step
+      override val runPlan: Entity with ProcessRunPlan =
+        workflow.processRunAssociation.runPlan.runSubprocesses(step.value)
     }
 
   def workflow(
@@ -82,7 +83,7 @@ object Association {
   ): JsonLDEncoder[ChildRunPlanAssociation] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.workflowStep / "association",
-      EntityTypes of (prov / "Association"),
+      EntityTypes of prov / "Association",
       prov / "agent"   -> entity.associationAgent.asJsonLD,
       prov / "hadPlan" -> entity.runPlan.asJsonLD
     )
@@ -94,7 +95,7 @@ object Association {
   ): JsonLDEncoder[WorkflowRunPlanAssociation] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",
-      EntityTypes of (prov / "Association"),
+      EntityTypes of prov / "Association",
       prov / "agent"   -> entity.associationAgent.asJsonLD,
       prov / "hadPlan" -> entity.runPlan.asJsonLD
     )
@@ -106,7 +107,7 @@ object Association {
   ): JsonLDEncoder[ProcessRunPlanAssociation] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",
-      EntityTypes of (prov / "Association"),
+      EntityTypes of prov / "Association",
       prov / "agent"   -> entity.associationAgent.asJsonLD,
       prov / "hadPlan" -> entity.runPlan.asJsonLD
     )

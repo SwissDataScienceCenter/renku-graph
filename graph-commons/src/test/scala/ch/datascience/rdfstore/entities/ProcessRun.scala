@@ -59,7 +59,8 @@ object ProcessRun {
   }
 
   def child(
-      associationFactory: ActivityWorkflowRun => Step => ChildRunPlanAssociation
+      associationFactory: ActivityWorkflowRun => Step => ChildRunPlanAssociation,
+      maybeInvalidation:  Option[Entity with Artifact] = None
   )(workflowRun:          ActivityWorkflowRun)(step: Step): Activity with ChildProcessRun =
     new Activity(workflowRun.commitId,
                  workflowRun.committedDate,
@@ -68,7 +69,8 @@ object ProcessRun {
                  workflowRun.agent,
                  workflowRun.comment,
                  workflowRun.maybeInformedBy,
-                 workflowRun.maybeInfluenced) with ChildProcessRun {
+                 workflowRun.maybeInfluenced,
+                 maybeInvalidation) with ChildProcessRun {
       override val processRunAssociation: ChildRunPlanAssociation = associationFactory(workflowRun)(step)
       override val processRunUsages: List[Usage] = workflowRun.processRunAssociation.runPlan.runSubprocesses
         .get(step.value)
@@ -79,18 +81,26 @@ object ProcessRun {
     }
 
   def workflow(
-      id:              CommitId,
-      committedDate:   CommittedDate,
-      committer:       Person,
-      project:         Project,
-      agent:           Agent,
-      comment:         String,
-      maybeInformedBy: Option[Activity],
-      association:     WorkflowRunPlanAssociation,
-      maybeInfluenced: Option[Activity] = None
+      id:                CommitId,
+      committedDate:     CommittedDate,
+      committer:         Person,
+      project:           Project,
+      agent:             Agent,
+      comment:           String,
+      maybeInformedBy:   Option[Activity],
+      association:       WorkflowRunPlanAssociation,
+      maybeInfluenced:   Option[Activity] = None,
+      maybeInvalidation: Option[Entity with Artifact] = None
   ): Activity with WorkflowProcessRun =
-    new Activity(id, committedDate, committer, project, agent, comment, maybeInformedBy, maybeInfluenced)
-    with WorkflowProcessRun {
+    new Activity(id,
+                 committedDate,
+                 committer,
+                 project,
+                 agent,
+                 comment,
+                 maybeInformedBy,
+                 maybeInfluenced,
+                 maybeInvalidation) with WorkflowProcessRun {
       override val processRunAssociation: WorkflowRunPlanAssociation = association
       override val processRunUsages:      List[Usage]                = association.runPlan.asUsages
     }
@@ -104,10 +114,18 @@ object ProcessRun {
       comment:            String,
       maybeInformedBy:    Option[Activity],
       associationFactory: Activity => ProcessRunPlanAssociation,
-      maybeInfluenced:    Option[Activity] = None
+      maybeInfluenced:    Option[Activity] = None,
+      maybeInvalidation:  Option[Entity with Artifact] = None
   ): Activity with StandAloneProcessRun =
-    new Activity(id, committedDate, committer, project, agent, comment, maybeInformedBy, maybeInfluenced)
-    with StandAloneProcessRun {
+    new Activity(id,
+                 committedDate,
+                 committer,
+                 project,
+                 agent,
+                 comment,
+                 maybeInformedBy,
+                 maybeInfluenced,
+                 maybeInvalidation) with StandAloneProcessRun {
       override val processRunAssociation: ProcessRunPlanAssociation = associationFactory(this)
       override val processRunUsages:      List[Usage]               = associationFactory(this).runPlan.asUsages
     }
@@ -120,7 +138,6 @@ object ProcessRun {
       override def convert[T <: Activity with ChildProcessRun]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
-            EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.processRunStep,
             EntityTypes of (wfprov / "ProcessRun"),
             rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
             prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
@@ -128,6 +145,9 @@ object ProcessRun {
             prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD,
             prov / "wasPartOfWorkflowRun" -> entity.processRunWorkflowRun.asJsonLD
           ).asRight
+
+      override def toEntityId: Activity with ChildProcessRun => Option[EntityId] =
+        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.processRunStep).some
     }
 
   private[entities] implicit def standAloneProcessRunConverter(
@@ -138,13 +158,15 @@ object ProcessRun {
       override def convert[T <: Activity with StandAloneProcessRun]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
-            EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId,
             EntityTypes of (wfprov / "ProcessRun"),
             rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
             prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
             prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
             prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD
           ).asRight
+
+      override def toEntityId: Activity with StandAloneProcessRun => Option[EntityId] =
+        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId).some
     }
 
   private[entities] implicit def workflowProcessRunConverter(
@@ -155,13 +177,15 @@ object ProcessRun {
       override def convert[T <: Activity with WorkflowProcessRun]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
-            EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId,
             EntityTypes of (wfprov / "ProcessRun"),
             rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
             prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
             prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
             prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD
           ).asRight
+
+      override def toEntityId: Activity with WorkflowProcessRun => Option[EntityId] =
+        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId).some
     }
 
   implicit def childProcessRunEncoder(
@@ -196,4 +220,36 @@ object ProcessRun {
         .combine(entity.asPartialJsonLD[Activity with WorkflowProcessRun])
         .getOrFail
     }
+
+  implicit def childEntityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                                    fusekiBaseUrl:         FusekiBaseUrl): EntityIdEncoder[Activity with ChildProcessRun] =
+    EntityIdEncoder.instance { entity =>
+      entity
+        .getEntityId[Activity with ChildProcessRun]
+        .orElse(entity.getEntityId[Activity])
+        .getOrElse(throw new IllegalStateException(s"No EntityId found for $entity"))
+    }
+
+  implicit def standAloneEntityIdEncoder(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): EntityIdEncoder[Activity with StandAloneProcessRun] =
+    EntityIdEncoder.instance { entity =>
+      entity
+        .getEntityId[Activity with StandAloneProcessRun]
+        .orElse(entity.getEntityId[Activity])
+        .getOrElse(throw new IllegalStateException(s"No EntityId found for $entity"))
+    }
+
+  implicit def workflowEntityIdEncoder(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): EntityIdEncoder[Activity with WorkflowProcessRun] =
+    EntityIdEncoder.instance { entity =>
+      entity
+        .getEntityId[Activity with WorkflowProcessRun]
+        .orElse(entity.getEntityId[Activity])
+        .getOrElse(throw new IllegalStateException(s"No EntityId found for $entity"))
+    }
+
 }

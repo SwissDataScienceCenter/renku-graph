@@ -38,8 +38,11 @@ object Reverse {
 
   lazy val empty: Reverse = new Reverse(Nil)
 
-  def of(first: (Property, JsonLDEntity), other: (Property, JsonLDEntity)*): Reverse =
+  def ofEntities(first: (Property, JsonLDEntity), other: (Property, JsonLDEntity)*): Reverse =
     new Reverse((first +: other).toList)
+
+  def of(first: (Property, JsonLD), other: (Property, JsonLD)*): Either[Exception, Reverse] =
+    fromList((first +: other).toList)
 
   def of(property: (Property, List[JsonLD])): Either[Exception, Reverse] = {
     val (name, list) = property

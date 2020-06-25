@@ -18,6 +18,13 @@
 
 package ch.datascience.rdfstore.entities
 
+import io.renku.jsonld.EntityId
+
 trait PartialEntityConverter[S] {
   def convert[T <: S]: T => Either[Exception, PartialEntity]
+
+  def toEntityId: S => Option[EntityId]
+
+  def apply[T <: S](entity: T): Either[Exception, PartialEntity] =
+    convert(entity) map (_.copy(maybeId = toEntityId(entity)))
 }
