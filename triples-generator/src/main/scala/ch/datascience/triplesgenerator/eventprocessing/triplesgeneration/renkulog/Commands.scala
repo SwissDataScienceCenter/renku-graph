@@ -186,7 +186,7 @@ private object Commands {
           'diff,
           "--name-only",
           "--diff-filter=d",
-          s"${commit.parentId}..${commit.commitId}"
+          s"${commit.parentId}..HEAD"
         )(destinationDirectory).out.lines
 
         %%(
@@ -195,7 +195,7 @@ private object Commands {
           "--format",
           "json-ld",
           "--revision",
-          s"${commit.parentId}..${commit.commitId}",
+          s"${commit.parentId}..HEAD",
           changedFiles
         )(destinationDirectory)
     }

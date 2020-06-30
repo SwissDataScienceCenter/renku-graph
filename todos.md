@@ -10,8 +10,8 @@ x *See with Ralf:* should hadRole in the Usage be an @id pointing to a CommandPa
 x finish the refactoring of the Usage entity with the CommandInput instead of the FilePath entity
 x Person/Organization should be a subtype of Agent -> this would fix the agent heterogeneous type issue
 x *See with CLI team:* renku migrate --no-commit still generates several commits.
-- upon migration renku log should use the range of commits from the given commit to the latest migration commit.
-- on renku migrate do not use the --no-commit. 
+x upon migration renku log should use the range of commits from the given commit to the latest migration commit.
+x on renku migrate do not use the --no-commit. 
 x add invalidation into the new model.(Activity)
 x use the invalidation in the lineage query.
 x refactor jsonld encoders to fit the new mixin pattern as the one used in CommandParameters
