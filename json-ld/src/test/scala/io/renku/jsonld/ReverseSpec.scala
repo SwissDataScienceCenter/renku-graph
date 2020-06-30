@@ -65,11 +65,10 @@ class ReverseSpec extends WordSpec with ScalaCheckPropertyChecks {
           property2 -> entity2
         )
 
-        reverse.asJson shouldBe json"""[{
-          ${property1.url}: ${entity1.toJson}
-        },{
+        reverse.asJson shouldBe json"""{
+          ${property1.url}: ${entity1.toJson},
           ${property2.url}: ${entity2.toJson}
-        }]"""
+        }"""
       }
     }
 
@@ -129,11 +128,10 @@ class ReverseSpec extends WordSpec with ScalaCheckPropertyChecks {
           )
         )
 
-        reverse.asJson shouldBe json"""[{
-          ${property1.url}: ${entity1.toJson}
-        },{
+        reverse.asJson shouldBe json"""{
+          ${property1.url}: ${entity1.toJson},
           ${property2.url}: ${entity2.toJson}
-        }]"""
+        }"""
       }
     }
 

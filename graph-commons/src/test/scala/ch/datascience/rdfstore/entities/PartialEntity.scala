@@ -93,8 +93,9 @@ object PartialEntity {
       for {
         entityId   <- partialEntity.maybeId.toEither(s"No entityId in $partialEntity")
         types      <- partialEntity.maybeTypes.toEither(s"No entityTypes in $partialEntity")
+        reverse    <- partialEntity.maybeReverse.getOrElse(Reverse.empty).asRight[Exception]
         properties <- NonEmptyList.fromList(partialEntity.properties).toEither(s"No properties in $partialEntity")
-      } yield JsonLD.entity(entityId, types, properties, Nil: _*)
+      } yield JsonLD.entity(entityId, types, reverse, properties)
 
     private implicit class OptionOps[T](maybeValue: Option[T]) {
       def toEither(errorMessage: String): Either[Exception, T] = Either.fromOption(

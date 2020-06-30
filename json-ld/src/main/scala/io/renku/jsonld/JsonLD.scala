@@ -69,6 +69,13 @@ object JsonLD {
       other:         (Property, JsonLD)*
   ): JsonLDEntity = JsonLDEntity(id, types, properties = NonEmptyList.of(firstProperty, other: _*), reverse)
 
+  def entity(
+      id:         EntityId,
+      types:      EntityTypes,
+      reverse:    Reverse,
+      properties: NonEmptyList[(Property, JsonLD)]
+  ): JsonLDEntity = JsonLDEntity(id, types, properties, reverse)
+
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
                                                 types:      EntityTypes,
                                                 properties: NonEmptyList[(Property, JsonLD)],

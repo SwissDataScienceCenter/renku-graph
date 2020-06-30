@@ -23,6 +23,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.Collection.EntityCollection
+import ch.datascience.rdfstore.entities.DataSet.DataSetEntity
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -81,6 +82,7 @@ object Entity {
                                    fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[Entity with Artifact] =
     JsonLDEncoder.instance {
       case e: EntityCollection => e.asJsonLD
+      case e: DataSetEntity => e.asJsonLD
       case e: Entity with Artifact =>
         e.asPartialJsonLD[Entity] combine e.asPartialJsonLD[Artifact] getOrFail
     }

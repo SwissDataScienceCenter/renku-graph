@@ -27,6 +27,7 @@ x ask Ralf why do we have a cwl file on a RunPlan (that cwl was invalidated)
 - model clean-up
 x remove graphs which does not contain the given location
 - and I think having libyaml installed is enough for pyyaml to pick it up, not special procedure to install it needed
+- create an issue for fixing reverse to only handle objects instead of list
 - isn't that missing members a bug:
 "https://swissdatasciencecenter.github.io/renku-ontology#consumes": [
                   {

@@ -137,7 +137,6 @@ object DataSet {
       entity
         .asPartialJsonLD[Artifact]
         .combine(entity.asPartialJsonLD[Entity])
-        .combine(entity.asPartialJsonLD[Artifact])
         .combine(entity.asPartialJsonLD[DataSetEntity])
         .getOrFail
     }

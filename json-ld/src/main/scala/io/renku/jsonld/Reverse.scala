@@ -103,6 +103,6 @@ object Reverse {
   implicit val jsonEncoder: Encoder[Reverse] = Encoder.instance {
     case Reverse(Nil)                  => Json.Null
     case Reverse((prop, value) +: Nil) => Json.obj(prop.url -> value.toJson)
-    case Reverse(props)                => Json.arr(props.map { case (prop, value) => Json.obj(prop.url -> value.toJson) }: _*)
+    case Reverse(props)                => Json.obj(props.map { case (prop, value) => prop.url -> value.toJson }: _*)
   }
 }

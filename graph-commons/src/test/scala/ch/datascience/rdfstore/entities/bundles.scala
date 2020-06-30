@@ -95,26 +95,31 @@ object bundles extends Schemas {
       datasetCreators:           Set[Person] = setOf(persons).generateOne,
       datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
   )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
-    val project: Project = Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent)
-    DataSet(
-      datasetIdentifier,
-      datasetName,
-      maybeDatasetUrl,
-      maybeDatasetSameAs,
-      maybeDatasetDescription,
-      maybeDatasetPublishedDate,
-      datasetCreatedDate,
-      datasetCreators,
-      datasetParts map { case (name, location) => DataSetPart(name, location, commitId, project) },
-      Generation(Location(".renku") / "datasets" / datasetIdentifier,
-                 Activity(
-                   commitId,
-                   committedDate,
-                   committer,
-                   project,
-                   Agent(schemaVersion)
-                 )),
-      project
+    val project = Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent)
+    Activity(
+      commitId,
+      committedDate,
+      committer,
+      project,
+      Agent(schemaVersion),
+      maybeGenerationFactories = List(
+        Generation.factory(
+          DataSet.factory(
+            datasetIdentifier,
+            datasetName,
+            maybeDatasetUrl,
+            maybeDatasetSameAs,
+            maybeDatasetDescription,
+            maybeDatasetPublishedDate,
+            datasetCreatedDate,
+            datasetCreators,
+            datasetParts.map {
+              case (name, location) => DataSetPart.factory(name, location, None)(_)
+            },
+            Location(".renku") / "datasets" / datasetIdentifier
+          )
+        )
+      )
     ).asJsonLD
   }
 

@@ -391,18 +391,18 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
             "@id":                  ${parentId.asJson},
             "@type":                ${parentTypes.asJson},
             "${parentProperty._1}": ${parentProperty._2.toJson},
-            "@reverse":             [{
+            "@reverse": {
               "$reverseProperty1": {
                 "@id":                 ${childId.asJson},
                 "@type":               ${childTypes.asJson},
                 "${childProperty._1}": ${childProperty._2.toJson}
-              }},{
+              },
               "$reverseProperty2": {
                 "@id":                 ${childId.asJson},
                 "@type":               ${childTypes.asJson},
                 "${childProperty._1}": ${childProperty._2.toJson}
-              }}
-            ]
+              }
+            }
           }""").fold(throw _, identity)
       }
     }
@@ -422,6 +422,19 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
             "@reverse":             {
               "$reverseProperty": ${Json.arr(reversePropertyEntities.map(_.toJson): _*)}
             }
+          }""").fold(throw _, identity)
+      }
+    }
+
+    "be able to skip reverse property when empty" in {
+      forAll { (parentId: EntityId, parentTypes: EntityTypes, parentProperty: (Property, JsonLD)) =>
+        JsonLD
+          .entity(parentId, parentTypes, Reverse.empty, parentProperty)
+          .toJson shouldBe
+          parse(s"""{
+            "@id":                  ${parentId.asJson},
+            "@type":                ${parentTypes.asJson},
+            "${parentProperty._1}": ${parentProperty._2.toJson}
           }""").fold(throw _, identity)
       }
     }
