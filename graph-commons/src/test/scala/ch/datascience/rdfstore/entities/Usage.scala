@@ -21,7 +21,7 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter, Input}
 
-final class Usage(val commandInput: EntityCommandParameter with Input, val maybeStep: Option[Step])
+final class Usage private (val commandInput: EntityCommandParameter with Input, val maybeStep: Option[Step])
 
 object Usage {
 

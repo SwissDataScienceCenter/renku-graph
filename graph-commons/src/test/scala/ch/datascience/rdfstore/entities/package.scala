@@ -32,11 +32,6 @@ import io.renku.jsonld.syntax._
 
 package object entities extends Schemas with EntitiesGenerators {
 
-  final class GenerationPath private (val value: String) extends AnyVal with RelativePathTinyType
-  object GenerationPath extends TinyTypeFactory[GenerationPath](new GenerationPath(_)) with RelativePath {
-    def of(filePath: FilePath): GenerationPath = apply(s"tree/$filePath")
-  }
-
   implicit val fusekiBaseUrlToEntityId: FusekiBaseUrl => EntityId = url => EntityId of url.value
   implicit val renkuBaseUrlToEntityId:  RenkuBaseUrl => EntityId  = url => EntityId of url.value
 

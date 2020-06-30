@@ -18,10 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import java.time.Instant
-
 import ch.datascience.graph.model.datasets.{DateCreated, PartLocation, PartName, Url}
-import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.scalacheck.Gen
 
@@ -41,19 +38,6 @@ object DataSetPart {
   import io.renku.jsonld.syntax._
 
   type DataSetPartArtifact = Artifact with Entity with DataSetPart
-
-  def apply(name:        PartName,
-            location:    PartLocation,
-            commitId:    CommitId,
-            project:     Project,
-            dateCreated: DateCreated = DateCreated(Instant.now()),
-            maybeUrl:    Option[Url] = None): DataSetPartArtifact =
-    new Entity(commitId, Location(location.value), project, maybeInvalidationActivity = None, maybeGeneration = None)
-    with Artifact with DataSetPart {
-      override val partName:        PartName    = name
-      override val partDateCreated: DateCreated = DateCreated(Instant.now())
-      override val maybePartUrl:    Option[Url] = maybeUrl
-    }
 
   def factory(name: PartName, location: PartLocation, maybeUrl: Option[Url] = None)(
       activity:     Activity

@@ -31,7 +31,6 @@ import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.rdfstore.entities.DataSetPart.{DataSetPartArtifact, dataSetParts}
-import ch.datascience.rdfstore.entities.Location._
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.{FusekiBaseUrl, Schemas}
@@ -57,16 +56,14 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeParent:         Option[Project] = None
   )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
-    Entity(
-      Generation(
-        location,
-        Activity(
-          commitId,
-          committedDate,
-          committer,
-          Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent),
-          Agent(schemaVersion)
-        )
+    Activity(
+      commitId,
+      committedDate,
+      committer,
+      Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent),
+      Agent(schemaVersion),
+      maybeGenerationFactories = List(
+        Generation.factory(Entity.factory(location))
       )
     ).asJsonLD
 
@@ -115,8 +112,7 @@ object bundles extends Schemas {
             datasetCreators,
             datasetParts.map {
               case (name, location) => DataSetPart.factory(name, location, None)(_)
-            },
-            Location(".renku") / "datasets" / datasetIdentifier
+            }
           )
         )
       )
@@ -195,8 +191,7 @@ object bundles extends Schemas {
             name           = datasets.Name("zhbikes"),
             createdDate    = datasetCreatedDates.generateOne,
             creators       = dataSetCreators,
-            partsFactories = partsFactories,
-            location       = Location(s".renku/datasets/$dataSetId")
+            partsFactories = partsFactories
           )
         )
 
@@ -316,7 +311,7 @@ object bundles extends Schemas {
               Input.from(commit7Activity.entity(cleanData)),
               Input.from(commit3AddingDataSetFile.entity(dataSetFolder))
             ),
-            outputs = List(Output.from(commit8ParquetEntityFactory))
+            outputs = List(Output.factory(commit8ParquetEntityFactory))
           )
         ),
         maybeInvalidation = oldCommit8ProcessRun.generations.headOption.flatMap(_.maybeReverseEntity)
@@ -352,8 +347,8 @@ object bundles extends Schemas {
             inputs = List(Input.from(commit7Activity.entity(plotData)),
                           Input.from(commit8ProcessRun.processRunAssociation.runPlan.output(bikesParquet))),
             outputs = List(
-              Output.from(activity => Entity(Generation(cumulativePng, activity))),
-              Output.from(commit9GridPlotEntityFactory)
+              Output.factory(activity => Entity(Generation(cumulativePng, activity))),
+              Output.factory(commit9GridPlotEntityFactory)
             )
           )
         ),
@@ -457,24 +452,24 @@ object bundles extends Schemas {
               commit12CommandDataSetFolderInput
             ),
             outputs = List(
-              Output.from(commit12CumulativePngEntityFactory),
-              Output.from(commit12GridPlotPngEntityFactory),
-              Output.from(commit12ParquetEntityFactory)
+              Output.factory(commit12CumulativePngEntityFactory),
+              Output.factory(commit12GridPlotPngEntityFactory),
+              Output.factory(commit12ParquetEntityFactory)
             ),
             subprocesses = List(
               RunPlan.child(
                 WorkflowFile.yaml("renku-migrate-step0.yaml"),
                 Command("python"),
                 inputs  = List(commit12CommandCleanDataInput, commit12CommandDataSetFolderInput),
-                outputs = List(Output.from(commit12ParquetEntityFactory))
+                outputs = List(Output.factory(commit12ParquetEntityFactory))
               ),
               RunPlan.child(
                 WorkflowFile.yaml("renku-migrate-step1.yaml"),
                 Command("python"),
-                inputs = List(commit12CommandPlotDataInput, Input.fromFactory(commit12ParquetEntityFactory)),
+                inputs = List(commit12CommandPlotDataInput, Input.factory(commit12ParquetEntityFactory)),
                 outputs = List(
-                  Output.from(commit12CumulativePngEntityFactory),
-                  Output.from(commit12GridPlotPngEntityFactory)
+                  Output.factory(commit12CumulativePngEntityFactory),
+                  Output.factory(commit12GridPlotPngEntityFactory)
                 )
               )
             )

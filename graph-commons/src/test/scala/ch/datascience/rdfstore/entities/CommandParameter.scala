@@ -23,7 +23,6 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInput, PositionInput}
 import ch.datascience.rdfstore.entities.CommandParameter._
-import ch.datascience.rdfstore.entities.DataSet.{DataSetEntity, entityId}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
 import io.renku.jsonld.JsonLDEncoder._
@@ -75,7 +74,7 @@ object CommandParameter {
       override def convert[T <: CommandParameter]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
-            entity.entityId.some,
+            entity.entityId,
             EntityTypes of renku / "CommandParameter",
             renku / "prefix"   -> entity.maybePrefix.asJsonLD,
             renku / "position" -> entity.position.asJsonLD
@@ -100,14 +99,11 @@ object CommandParameter {
       trait PositionInput[+T <: CommandParameter] extends InputFactory[T] with (Position => T with Input)
     }
 
-    def apply(value: Value, maybePrefix: Option[Prefix] = None): Position => ValueCommandParameter with Input =
-      position => new ValueCommandParameter(position, maybePrefix, value) with Input
-
     def from(entity: Entity with Artifact, maybePrefix: Option[Prefix] = None): PositionInput[EntityCommandParameter] =
       position => new EntityCommandParameter(position, maybePrefix, entity) with Input
 
-    def fromFactory(entityFactory: Activity => Entity with Artifact,
-                    maybePrefix:   Option[Prefix] = None): ActivityPositionInput[EntityCommandParameter] =
+    def factory(entityFactory: Activity => Entity with Artifact,
+                maybePrefix:   Option[Prefix] = None): ActivityPositionInput[EntityCommandParameter] =
       activity => position => new EntityCommandParameter(position, maybePrefix, entityFactory(activity)) with Input
 
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -149,15 +145,7 @@ object CommandParameter {
 
   object Output {
 
-    def apply(value:          Value,
-              maybePrefix:    Option[Prefix] = None,
-              folderCreation: FolderCreation = FolderCreation(false)): Position => CommandParameter with Output =
-      position =>
-        new ValueCommandParameter(position, maybePrefix, value) with Output {
-          override val outputFolderCreation: FolderCreation = folderCreation
-        }
-
-    def from(
+    def factory(
         entityFactory:  Activity => Entity with Artifact,
         maybePrefix:    Option[Prefix] = None,
         folderCreation: FolderCreation = FolderCreation(false)

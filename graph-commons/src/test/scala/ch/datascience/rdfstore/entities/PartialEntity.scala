@@ -30,17 +30,6 @@ final case class PartialEntity(maybeId:      Option[EntityId],
 
 object PartialEntity {
 
-  def apply(maybeId: Option[EntityId],
-            types:   EntityTypes,
-            first:   (Property, JsonLD),
-            other:   (Property, JsonLD)*): PartialEntity =
-    PartialEntity(
-      maybeId,
-      types.some,
-      (first +: other).toList,
-      maybeReverse = None
-    )
-
   def apply(id: EntityId, types: EntityTypes, first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
     PartialEntity(
       id.some,
@@ -70,12 +59,6 @@ object PartialEntity {
 
   def apply(types: EntityTypes): PartialEntity =
     new PartialEntity(maybeId = None, Some(types), properties = Nil, maybeReverse = None)
-
-  def apply(id: EntityId): PartialEntity =
-    new PartialEntity(Some(id), maybeTypes = None, properties = Nil, maybeReverse = None)
-
-  def apply(first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
-    new PartialEntity(maybeId = None, maybeTypes = None, (first +: other).toList, maybeReverse = None)
 
   implicit val semigroup: Semigroup[PartialEntity] = (x: PartialEntity, y: PartialEntity) =>
     x.copy(

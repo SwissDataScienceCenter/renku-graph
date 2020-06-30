@@ -37,19 +37,6 @@ class Entity(val commitId:                  CommitId,
 
 object Entity {
 
-  def apply(location: Location, generation: Generation): Entity with Artifact =
-    new Entity(generation.activity.commitId,
-               location,
-               generation.activity.project,
-               maybeInvalidationActivity = None,
-               maybeGeneration           = Some(generation)) with Artifact
-
-  def apply(commitId:                  CommitId,
-            location:                  Location,
-            project:                   Project,
-            maybeInvalidationActivity: Option[Activity] = None): Entity with Artifact =
-    new Entity(commitId, location, project, maybeInvalidationActivity, maybeGeneration = None) with Artifact
-
   def apply(generation: Generation): Entity with Artifact =
     new Entity(generation.activity.commitId,
                generation.location,
@@ -58,7 +45,8 @@ object Entity {
                maybeGeneration           = Some(generation)) with Artifact
 
   def factory(location: Location)(activity: Activity): Entity with Artifact =
-    Entity(activity.commitId, location, activity.project)
+    new Entity(activity.commitId, location, activity.project, maybeInvalidationActivity = None, maybeGeneration = None)
+    with Artifact
 
   private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                            fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Entity] =
@@ -98,24 +86,22 @@ object Collection {
 
   type EntityCollection = Entity with Collection with Artifact
 
-  def apply(commitId: CommitId,
-            location: Location,
-            project:  Project,
-            members:  List[Entity with Artifact]): EntityCollection =
-    new Entity(commitId, location, project, maybeInvalidationActivity = None, maybeGeneration = None) with Collection
-    with Artifact {
-      override val collectionMembers: List[Entity with Artifact] = members
-    }
-
   def factory(location: Location, membersLocations: List[Location])(activity: Activity): EntityCollection =
-    Collection(
-      commitId = activity.commitId,
-      location = location,
-      project  = activity.project,
-      members = membersLocations.map { memberLocation =>
-        Entity(activity.commitId, memberLocation, activity.project)
+    new Entity(
+      commitId                  = activity.commitId,
+      location                  = location,
+      project                   = activity.project,
+      maybeInvalidationActivity = None,
+      maybeGeneration           = None
+    ) with Collection with Artifact {
+      override val collectionMembers: List[Entity with Artifact] = membersLocations.map { memberLocation =>
+        new Entity(activity.commitId,
+                   memberLocation,
+                   activity.project,
+                   maybeInvalidationActivity = None,
+                   maybeGeneration           = None) with Artifact
       }
-    )
+    }
 
   private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                  fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[EntityCollection] =

@@ -47,35 +47,6 @@ object DataSet {
 
   type DataSetEntity = Entity with DataSet with Artifact
 
-  def apply(id:                 Identifier,
-            name:               Name,
-            maybeUrl:           Option[Url] = None,
-            maybeSameAs:        Option[SameAs] = None,
-            maybeDescription:   Option[Description] = None,
-            maybePublishedDate: Option[PublishedDate] = None,
-            createdDate:        DateCreated,
-            creators:           Set[Person],
-            parts:              List[DataSetPartArtifact],
-            generation:         Generation,
-            project:            Project,
-            keywords:           List[Keyword] = Nil): DataSetEntity =
-    new Entity(generation.activity.commitId,
-               generation.location,
-               project,
-               maybeInvalidationActivity = None,
-               maybeGeneration           = Some(generation)) with Artifact with DataSet {
-      override val datasetId:                 Identifier                = id
-      override val datasetName:               Name                      = name
-      override val maybeDatasetUrl:           Option[Url]               = maybeUrl
-      override val maybeDatasetSameAs:        Option[SameAs]            = maybeSameAs
-      override val maybeDatasetDescription:   Option[Description]       = maybeDescription
-      override val maybeDatasetPublishedDate: Option[PublishedDate]     = maybePublishedDate
-      override val datasetCreatedDate:        DateCreated               = createdDate
-      override val datasetCreators:           Set[Person]               = creators
-      override val datasetParts:              List[DataSetPartArtifact] = parts
-      override val datasetKeywords:           List[Keyword]             = keywords
-    }
-
   def factory(id:                 Identifier,
               name:               Name,
               maybeUrl:           Option[Url] = None,
@@ -85,10 +56,12 @@ object DataSet {
               createdDate:        DateCreated,
               creators:           Set[Person],
               partsFactories:     List[Activity => DataSetPartArtifact],
-              location:           Location,
               keywords:           List[Keyword] = Nil)(activity: Activity): DataSetEntity =
-    new Entity(activity.commitId, location, activity.project, maybeInvalidationActivity = None, maybeGeneration = None)
-    with Artifact with DataSet {
+    new Entity(activity.commitId,
+               Location(".renku") / "datasets" / id,
+               activity.project,
+               maybeInvalidationActivity = None,
+               maybeGeneration           = None) with Artifact with DataSet {
       override val datasetId:                 Identifier                = id
       override val datasetName:               Name                      = name
       override val maybeDatasetUrl:           Option[Url]               = maybeUrl
