@@ -18,7 +18,7 @@ x refactor jsonld encoders to fit the new mixin pattern as the one used in Comma
 x complete the bundles with proper Entity entities :) for e.g in the Input entities.consumes
 - run renku log with the flag firing up SHACL validation
 - create an issue to simplify sparql query results binding
-- add a test to verify if lineage works when created with the new version of renku
+x add a test to verify if lineage works when created with the new version of renku
 
 x ask Ralf why CommandParameter is an Entity?
 x ask Ralf why do we have a cwl file on a RunPlan (that cwl was invalidated) 
@@ -26,9 +26,9 @@ x ask Ralf why do we have a cwl file on a RunPlan (that cwl was invalidated)
 - unify naming for the model
 - model clean-up
 x remove graphs which does not contain the given location
-- and I think having libyaml installed is enough for pyyaml to pick it up, not special procedure to install it needed
+x and I think having libyaml installed is enough for pyyaml to pick it up, not special procedure to install it needed
 - create an issue for fixing reverse to only handle objects instead of list
-- isn't that missing members a bug:
+x isn't that missing members a bug:
 "https://swissdatasciencecenter.github.io/renku-ontology#consumes": [
                   {
                     "@type": [
