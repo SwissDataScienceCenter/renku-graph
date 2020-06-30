@@ -129,7 +129,7 @@ private object Commands {
     import scala.util.Try
 
     def migrate(commitEvent: CommitEvent, destinationDirectory: Path): IO[Unit] =
-      IO(%%('renku, 'migrate, "--no-commit")(destinationDirectory))
+      IO(%%('renku, 'migrate)(destinationDirectory))
         .flatMap(_ => IO.unit)
         .recoverWith {
           case NonFatal(exception) =>
