@@ -176,7 +176,7 @@ private object Commands {
 
     implicit val commitWithoutParentTriplesFinder: (CommitEventWithoutParent, Path) => CommandResult = {
       case (_, destinationDirectory) =>
-        %%('renku, 'log, "--format", "json-ld")(destinationDirectory)
+        %%('renku, 'log, "--format", "json-ld", "--strict")(destinationDirectory)
     }
 
     implicit val commitWithParentTriplesFinder: (CommitEventWithParent, Path) => CommandResult = {
@@ -194,6 +194,7 @@ private object Commands {
           'log,
           "--format",
           "json-ld",
+          "--strict",
           "--revision",
           s"${commit.parentId}..HEAD",
           changedFiles
