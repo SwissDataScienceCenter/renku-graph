@@ -18,10 +18,17 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
+import cats.data.EitherT
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+
+import scala.language.higherKinds
 
 package object triplescuration {
+
+  private[eventprocessing] type CurationResults[Interpretation[_]] =
+    EitherT[Interpretation, ProcessingRecoverableError, CuratedTriples]
 
   def `INSERT DATA`[TT <: TinyType { type V = String }](resource: String, property: String, value: TT): String =
     s"INSERT DATA { $resource $property '${sparqlEncode(value.value)}'}"

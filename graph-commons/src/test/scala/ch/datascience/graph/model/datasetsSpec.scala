@@ -18,12 +18,13 @@
 
 package ch.datascience.graph.model
 
-import GraphModelGenerators.datasetSameAs
+import GraphModelGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.tinytypes.UrlTinyType
 import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
+import io.renku.jsonld.EntityId
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -81,6 +82,42 @@ class datasetsSpec extends WordSpec with ScalaCheckPropertyChecks {
       forAll { sameAs: SameAs =>
         SameAs.fromId(sameAs.value).map(_.hashCode()) shouldBe SameAs.from(sameAs.value).map(_.hashCode())
       }
+    }
+  }
+
+  "SameAs.fromId" should {
+
+    "return an instance of IdSameAs" in {
+      val sameAs = datasetSameAs.generateOne
+
+      val Right(instance) = SameAs.fromId(sameAs.value)
+
+      instance       shouldBe an[IdSameAs]
+      instance.value shouldBe sameAs.value
+    }
+  }
+
+  "SameAs.from" should {
+
+    "return an instance of UrlSameAs" in {
+      val sameAs = datasetSameAs.generateOne
+
+      val Right(instance) = SameAs.from(sameAs.value)
+
+      instance       shouldBe an[UrlSameAs]
+      instance.value shouldBe sameAs.value
+    }
+  }
+
+  "SameAs.apply(EntityId)" should {
+
+    "return an instance of IdSameAs" in {
+      val entityId = EntityId.of(httpUrls().generateOne)
+
+      val instance = SameAs(entityId)
+
+      instance       shouldBe an[IdSameAs]
+      instance.value shouldBe entityId.value
     }
   }
 }

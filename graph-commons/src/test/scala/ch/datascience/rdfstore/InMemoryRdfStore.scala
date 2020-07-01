@@ -189,6 +189,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
             "PREFIX prov: <http://www.w3.org/ns/prov#>",
             "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
             "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+            "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
             "PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>",
             "PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>",
             "PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>",

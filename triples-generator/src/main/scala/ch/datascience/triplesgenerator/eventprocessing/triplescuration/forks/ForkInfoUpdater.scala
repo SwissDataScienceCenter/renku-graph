@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package forks
 
 import cats.MonadError
 import cats.data.{EitherT, OptionT}
@@ -29,7 +30,6 @@ import ch.datascience.http.client.RestClientError.{ConnectivityException, Unexpe
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import io.chrisdavenport.log4cats.Logger
 
@@ -40,7 +40,7 @@ private[triplescuration] trait ForkInfoUpdater[Interpretation[_]] {
   def updateForkInfo(
       commit:                  CommitEvent,
       givenCuratedTriples:     CuratedTriples
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, CuratedTriples]
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
 }
 
 private[triplescuration] class IOForkInfoUpdater(
@@ -56,7 +56,7 @@ private[triplescuration] class IOForkInfoUpdater(
   def updateForkInfo(
       commit:                  CommitEvent,
       givenCuratedTriples:     CuratedTriples
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, CuratedTriples] = EitherT {
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO] = EitherT {
     (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path))
       .parMapN {
         case `no forks in GitLab and KG`() => givenCuratedTriples.pure[IO]

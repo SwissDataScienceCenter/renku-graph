@@ -59,8 +59,11 @@ object datasets {
   final class IdSameAs private[datasets] (val value:  String) extends SameAs
   final class UrlSameAs private[datasets] (val value: String) extends SameAs
   implicit object SameAs extends TinyTypeFactory[SameAs](new UrlSameAs(_)) with constraints.Url {
-    final def fromId(value: String): Either[IllegalArgumentException, SameAs] =
+
+    final def fromId(value: String): Either[IllegalArgumentException, IdSameAs] =
       from(value) map (sameAs => new IdSameAs(sameAs.value))
+
+    def apply(datasetEntityId: EntityId): IdSameAs = new IdSameAs(datasetEntityId.toString)
   }
 
   final class DateCreatedInProject private (val value: Instant) extends AnyVal with InstantTinyType
