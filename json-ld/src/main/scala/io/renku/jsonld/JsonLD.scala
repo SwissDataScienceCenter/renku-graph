@@ -42,6 +42,7 @@ object JsonLD {
   def fromLong(value:      Long): JsonLD = JsonLDValue(value)
   def fromInstant(value:   Instant): JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
   def fromLocalDate(value: LocalDate): JsonLD = JsonLDValue(value, "http://schema.org/Date")
+  def fromBoolean(value:   Boolean): JsonLD = JsonLDValue(value)
   def fromOption[V](value: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD = JsonLDOptionValue(value)
   def fromEntityId(id:     EntityId): JsonLD = JsonLDEntityId(id)
   def arr(jsons:           JsonLD*): JsonLD = JsonLDArray(jsons)
@@ -67,6 +68,13 @@ object JsonLD {
       firstProperty: (Property, JsonLD),
       other:         (Property, JsonLD)*
   ): JsonLDEntity = JsonLDEntity(id, types, properties = NonEmptyList.of(firstProperty, other: _*), reverse)
+
+  def entity(
+      id:         EntityId,
+      types:      EntityTypes,
+      reverse:    Reverse,
+      properties: NonEmptyList[(Property, JsonLD)]
+  ): JsonLDEntity = JsonLDEntity(id, types, properties, reverse)
 
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
                                                 types:      EntityTypes,

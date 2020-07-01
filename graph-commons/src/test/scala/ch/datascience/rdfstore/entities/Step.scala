@@ -18,24 +18,15 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.tinytypes.constraints.{NonNegativeInt, PathSegment}
+import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 
-final case class Agent(schemaVersion: SchemaVersion, maybeStartedBy: Option[Person] = None)
+final class Step private (val value: Int) extends AnyVal with IntTinyType
+object Step extends TinyTypeFactory[Step](new Step(_)) with NonNegativeInt {
 
-object Agent {
-
-  import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
-
-  implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.schemaVersion}",
-      EntityTypes of (
-        prov / "SoftwareAgent",
-        wfprov / "WorkflowEngine"
-      ),
-      rdfs / "label"        -> s"renku ${entity.schemaVersion}".asJsonLD,
-      prov / "wasStartedBy" -> entity.maybeStartedBy.asJsonLD
+  implicit val toPathSegments: Step => List[PathSegment] = step =>
+    List(
+      PathSegment("steps"),
+      PathSegment(s"step_$step")
     )
-  }
 }

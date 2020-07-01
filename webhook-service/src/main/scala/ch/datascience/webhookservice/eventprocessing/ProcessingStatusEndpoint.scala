@@ -26,6 +26,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
@@ -47,7 +48,8 @@ import scala.util.control.NonFatal
 class ProcessingStatusEndpoint[Interpretation[_]: Effect](
     hookValidator:           HookValidator[Interpretation],
     processingStatusFetcher: ProcessingStatusFetcher[Interpretation],
-    executionTimeRecorder:   ExecutionTimeRecorder[Interpretation]
+    executionTimeRecorder:   ExecutionTimeRecorder[Interpretation],
+    logger:                  Logger[Interpretation]
 )(implicit ME:               MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
@@ -62,7 +64,8 @@ class ProcessingStatusEndpoint[Interpretation[_]: Effect](
           _        <- validateHook(projectId)
           response <- findStatus(projectId)
         } yield response
-      } getOrElseF NotFound(InfoMessage(s"Progress status for project '$projectId' not found")) recoverWith httpResponse
+      }.getOrElseF(NotFound(InfoMessage(s"Progress status for project '$projectId' not found")))
+        .recoverWith(httpResponse(projectId))
     ) map logExecutionTime(withMessage = s"Finding progress status for project '$projectId' finished")
 
   private def validateHook(projectId: Id): OptionT[Interpretation, Unit] = OptionT {
@@ -85,8 +88,12 @@ class ProcessingStatusEndpoint[Interpretation[_]: Effect](
     case NoAccessTokenException(_) => None
   }
 
-  private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) => InternalServerError(ErrorMessage(exception))
+  private def httpResponse(
+      projectId: projects.Id
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"Finding progress status for project '$projectId' failed")
+      InternalServerError(ErrorMessage(exception))
   }
 }
 
@@ -121,5 +128,5 @@ object IOProcessingStatusEndpoint {
     for {
       fetcher       <- IOProcessingStatusFetcher(logger)
       hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)
-    } yield new ProcessingStatusEndpoint[IO](hookValidator, fetcher, executionTimeRecorder)
+    } yield new ProcessingStatusEndpoint[IO](hookValidator, fetcher, executionTimeRecorder, logger)
 }

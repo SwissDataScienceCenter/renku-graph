@@ -18,40 +18,64 @@
 
 package ch.datascience.rdfstore.entities
 
-import java.time.Instant
-
 import ch.datascience.graph.model.datasets.{DateCreated, PartLocation, PartName, Url}
-import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.scalacheck.Gen
 
-final case class DataSetPart(name:        PartName,
-                             location:    PartLocation,
-                             commitId:    CommitId,
-                             project:     Project,
-                             creator:     Person,
-                             dateCreated: DateCreated = DateCreated(Instant.now()),
-                             maybeUrl:    Option[Url] = None)
+trait DataSetPart {
+  self: Artifact with Entity =>
+
+  val partName:        PartName
+  val partDateCreated: DateCreated
+  val maybePartUrl:    Option[Url]
+}
 
 object DataSetPart {
 
+  import cats.implicits._
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[DataSetPart] =
+  type DataSetPartArtifact = Artifact with Entity with DataSetPart
+
+  def factory(name: PartName, location: PartLocation, maybeUrl: Option[Url] = None)(
+      activity:     Activity
+  ): DataSetPartArtifact =
+    new Entity(activity.commitId,
+               Location(location.value),
+               activity.project,
+               maybeInvalidationActivity = None,
+               maybeGeneration           = None) with Artifact with DataSetPart {
+      override val partName:        PartName    = name
+      override val partDateCreated: DateCreated = DateCreated(activity.committedDate.value)
+      override val maybePartUrl:    Option[Url] = maybeUrl
+    }
+
+  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
+                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[DataSetPartArtifact] =
+    new PartialEntityConverter[DataSetPartArtifact] {
+      override def convert[T <: DataSetPartArtifact]: T => Either[Exception, PartialEntity] = { entity =>
+        PartialEntity(
+          EntityTypes of schema / "DigitalDocument",
+          schema / "name"        -> entity.partName.asJsonLD,
+          schema / "dateCreated" -> entity.partDateCreated.asJsonLD,
+          schema / "url"         -> entity.maybePartUrl.asJsonLD
+        ).asRight
+      }
+
+      override val toEntityId: DataSetPartArtifact => Option[EntityId] = _ => None
+    }
+
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[DataSetPartArtifact] =
     JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        EntityId of (fusekiBaseUrl / "blob" / entity.commitId / entity.location),
-        EntityTypes of (prov / "Entity", wfprov / "Artifact", schema / "DigitalDocument"),
-        prov / "atLocation"    -> entity.location.asJsonLD,
-        rdfs / "label"         -> s"${entity.location}@${entity.commitId}".asJsonLD,
-        schema / "name"        -> entity.name.asJsonLD,
-        schema / "isPartOf"    -> entity.project.asJsonLD,
-        schema / "dateCreated" -> entity.dateCreated.asJsonLD,
-        schema / "creator"     -> entity.creator.asJsonLD,
-        schema / "url"         -> entity.maybeUrl.asJsonLD
-      )
+      entity
+        .asPartialJsonLD[Artifact]
+        .combine(entity.asPartialJsonLD[Entity])
+        .combine(entity.asPartialJsonLD[Artifact])
+        .combine(entity.asPartialJsonLD[DataSetPartArtifact])
+        .getOrFail
     }
 
   import ch.datascience.graph.model.GraphModelGenerators.{datasetPartLocations, datasetPartNames}

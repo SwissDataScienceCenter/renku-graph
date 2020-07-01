@@ -18,24 +18,19 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.generators.Generators._
+import eu.timepit.refined.api.Refined.unsafeApply
+import org.scalacheck.Gen
 
-final case class Agent(schemaVersion: SchemaVersion, maybeStartedBy: Option[Person] = None)
+object EntitiesGenerators extends EntitiesGenerators
 
-object Agent {
+trait EntitiesGenerators {
 
-  import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
+  val locations:              Gen[Location]     = relativePaths() map Location.apply
+  val cwlFiles:               Gen[WorkflowFile] = nonBlankStrings() map (n => WorkflowFile.cwl(unsafeApply(s"$n.cwl")))
+  val yamlFiles:              Gen[WorkflowFile] = nonBlankStrings() map (n => WorkflowFile.yaml(unsafeApply(s"$n.yaml")))
+  implicit val workflowFiles: Gen[WorkflowFile] = Gen.oneOf(cwlFiles, yamlFiles)
 
-  implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.schemaVersion}",
-      EntityTypes of (
-        prov / "SoftwareAgent",
-        wfprov / "WorkflowEngine"
-      ),
-      rdfs / "label"        -> s"renku ${entity.schemaVersion}".asJsonLD,
-      prov / "wasStartedBy" -> entity.maybeStartedBy.asJsonLD
-    )
-  }
+  implicit val runPlanCommands: Gen[RunPlan.Command] = nonBlankStrings() map (c => RunPlan.Command(c.value))
+
 }

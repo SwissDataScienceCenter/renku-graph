@@ -18,116 +18,130 @@
 
 package ch.datascience.rdfstore.entities
 
+import cats.implicits._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.DataSetPart.DataSetPartArtifact
 
-final case class DataSet private (id:                  Identifier,
-                                  name:                Name,
-                                  url:                 Url,
-                                  maybeSameAs:         Option[SameAs],
-                                  maybeWasDerivedFrom: Option[DerivedFrom],
-                                  maybeDescription:    Option[Description],
-                                  maybePublishedDate:  Option[PublishedDate],
-                                  createdDate:         DateCreated,
-                                  creators:            Set[Person],
-                                  parts:               List[DataSetPart],
-                                  generation:          Generation,
-                                  project:             Project,
-                                  keywords:            List[Keyword]) {
-  import cats.implicits._
+trait DataSet {
+  self: Artifact with Entity =>
 
-  require(!isSameAsAndDerived, s"Dataset with $id has both sameAs and wasDerivedFrom set")
-
-  private lazy val isSameAsAndDerived: Boolean =
-    (maybeSameAs -> maybeWasDerivedFrom).mapN((_, _) => true).getOrElse(false)
+  val datasetId:                 Identifier
+  val datasetName:               Name
+  val datasetUrl:                Url
+  val maybeDatasetSameAs:        Option[SameAs]
+  val maybeDatasetDerivedFrom:   Option[DerivedFrom]
+  val maybeDatasetDescription:   Option[Description]
+  val maybeDatasetPublishedDate: Option[PublishedDate]
+  val datasetCreatedDate:        DateCreated
+  val datasetCreators:           Set[Person]
+  val datasetParts:              List[DataSetPartArtifact]
+  val datasetKeywords:           List[Keyword]
 }
 
 object DataSet {
 
-  def nonModified(id:                 Identifier,
-                  name:               Name,
-                  url:                Url,
-                  maybeSameAs:        Option[SameAs],
-                  maybeDescription:   Option[Description] = None,
-                  maybePublishedDate: Option[PublishedDate] = None,
-                  createdDate:        DateCreated,
-                  creators:           Set[Person],
-                  parts:              List[DataSetPart],
-                  generation:         Generation,
-                  project:            Project,
-                  keywords:           List[Keyword] = Nil): DataSet = DataSet(
-    id,
-    name,
-    url,
-    maybeSameAs,
-    maybeWasDerivedFrom = None,
-    maybeDescription,
-    maybePublishedDate,
-    createdDate,
-    creators,
-    parts,
-    generation,
-    project,
-    keywords
-  )
-
-  def modified(id:                 Identifier,
-               name:               Name,
-               url:                Url,
-               wasDerivedFrom:     DerivedFrom,
-               maybeDescription:   Option[Description] = None,
-               maybePublishedDate: Option[PublishedDate] = None,
-               createdDate:        DateCreated,
-               creators:           Set[Person],
-               parts:              List[DataSetPart],
-               generation:         Generation,
-               project:            Project,
-               keywords:           List[Keyword] = Nil): DataSet = DataSet(
-    id,
-    name,
-    url,
-    maybeSameAs         = None,
-    maybeWasDerivedFrom = Some(wasDerivedFrom),
-    maybeDescription,
-    maybePublishedDate,
-    createdDate,
-    creators,
-    parts,
-    generation,
-    project,
-    keywords
-  )
-
   import ch.datascience.graph.config.RenkuBaseUrl
+  import io.renku.jsonld.JsonLDEncoder._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
+
+  type DataSetEntity = Entity with DataSet with Artifact
+
+  def nonModifiedFactory(id:                 Identifier,
+                         name:               Name,
+                         url:                Url,
+                         maybeSameAs:        Option[SameAs] = None,
+                         maybeDescription:   Option[Description] = None,
+                         maybePublishedDate: Option[PublishedDate] = None,
+                         createdDate:        DateCreated,
+                         creators:           Set[Person],
+                         partsFactories:     List[Activity => DataSetPartArtifact],
+                         keywords:           List[Keyword] = Nil)(activity: Activity): DataSetEntity =
+    new Entity(activity.commitId,
+               Location(".renku") / "datasets" / id,
+               activity.project,
+               maybeInvalidationActivity = None,
+               maybeGeneration           = None) with Artifact with DataSet {
+      override val datasetId:                 Identifier                = id
+      override val datasetName:               Name                      = name
+      override val datasetUrl:                Url                       = url
+      override val maybeDatasetSameAs:        Option[SameAs]            = maybeSameAs
+      override val maybeDatasetDerivedFrom:   Option[DerivedFrom]       = None
+      override val maybeDatasetDescription:   Option[Description]       = maybeDescription
+      override val maybeDatasetPublishedDate: Option[PublishedDate]     = maybePublishedDate
+      override val datasetCreatedDate:        DateCreated               = createdDate
+      override val datasetCreators:           Set[Person]               = creators
+      override val datasetParts:              List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
+      override val datasetKeywords:           List[Keyword]             = keywords
+    }
+
+  def modifiedFactory(id:                 Identifier,
+                      name:               Name,
+                      url:                Url,
+                      derivedFrom:        DerivedFrom,
+                      maybeDescription:   Option[Description] = None,
+                      maybePublishedDate: Option[PublishedDate] = None,
+                      createdDate:        DateCreated,
+                      creators:           Set[Person],
+                      partsFactories:     List[Activity => DataSetPartArtifact],
+                      keywords:           List[Keyword] = Nil)(activity: Activity): DataSetEntity =
+    new Entity(activity.commitId,
+               Location(".renku") / "datasets" / id,
+               activity.project,
+               maybeInvalidationActivity = None,
+               maybeGeneration           = None) with Artifact with DataSet {
+      override val datasetId:                 Identifier                = id
+      override val datasetName:               Name                      = name
+      override val datasetUrl:                Url                       = url
+      override val maybeDatasetSameAs:        Option[SameAs]            = None
+      override val maybeDatasetDerivedFrom:   Option[DerivedFrom]       = derivedFrom.some
+      override val maybeDatasetDescription:   Option[Description]       = maybeDescription
+      override val maybeDatasetPublishedDate: Option[PublishedDate]     = maybePublishedDate
+      override val datasetCreatedDate:        DateCreated               = createdDate
+      override val datasetCreators:           Set[Person]               = creators
+      override val datasetParts:              List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
+      override val datasetKeywords:           List[Keyword]             = keywords
+    }
 
   def entityId(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
     EntityId of (renkuBaseUrl / "datasets" / identifier)
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[DataSet] = {
-    implicit val creatorsOrdering: Ordering[Person] = Ordering.by((p: Person) => p.name.value)
+  private implicit def converter(
+      implicit renkuBaseUrl: RenkuBaseUrl,
+      fusekiBaseUrl:         FusekiBaseUrl
+  ): PartialEntityConverter[DataSetEntity] =
+    new PartialEntityConverter[DataSetEntity] {
+      override def convert[T <: DataSetEntity]: T => Either[Exception, PartialEntity] = { entity =>
+        implicit val creatorsOrdering: Ordering[Person] = Ordering.by((p: Person) => p.name.value)
+        PartialEntity(
+          entityId(entity.datasetId),
+          EntityTypes of schema / "Dataset",
+          rdfs / "label"           -> entity.datasetId.asJsonLD,
+          schema / "identifier"    -> entity.datasetId.asJsonLD,
+          schema / "name"          -> entity.datasetName.asJsonLD,
+          schema / "url"           -> entity.datasetUrl.asJsonLD,
+          schema / "sameAs"        -> entity.maybeDatasetSameAs.asJsonLD,
+          prov / "wasDerivedFrom"  -> entity.maybeDatasetDerivedFrom.asJsonLD,
+          schema / "description"   -> entity.maybeDatasetDescription.asJsonLD,
+          schema / "datePublished" -> entity.maybeDatasetPublishedDate.asJsonLD,
+          schema / "dateCreated"   -> entity.datasetCreatedDate.asJsonLD,
+          schema / "creator"       -> entity.datasetCreators.asJsonLD,
+          schema / "hasPart"       -> entity.datasetParts.asJsonLD,
+          schema / "keywords"      -> entity.datasetKeywords.asJsonLD
+        ).asRight
+      }
 
-    JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        entityId(entity.id),
-        EntityTypes of (prov / "Entity", wfprov / "Artifact", schema / "Dataset"),
-        prov / "atLocation"          -> entity.generation.filePath.asJsonLD,
-        prov / "qualifiedGeneration" -> entity.generation.asJsonLD,
-        rdfs / "label"               -> entity.id.asJsonLD,
-        schema / "identifier"        -> entity.id.asJsonLD,
-        schema / "name"              -> entity.name.asJsonLD,
-        schema / "url"               -> entity.url.asJsonLD,
-        schema / "sameAs"            -> entity.maybeSameAs.asJsonLD,
-        prov / "wasDerivedFrom"      -> entity.maybeWasDerivedFrom.asJsonLD,
-        schema / "description"       -> entity.maybeDescription.asJsonLD,
-        schema / "datePublished"     -> entity.maybePublishedDate.asJsonLD,
-        schema / "dateCreated"       -> entity.createdDate.asJsonLD,
-        schema / "creator"           -> entity.creators.asJsonLD,
-        schema / "hasPart"           -> entity.parts.asJsonLD,
-        schema / "keywords"          -> entity.keywords.asJsonLD,
-        schema / "isPartOf"          -> entity.project.asJsonLD
-      )
+      override def toEntityId: DataSetEntity => Option[EntityId] = entity => entityId(entity.datasetId).some
     }
-  }
+
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[DataSetEntity] =
+    JsonLDEncoder.instance { entity =>
+      entity
+        .asPartialJsonLD[Artifact]
+        .combine(entity.asPartialJsonLD[Entity])
+        .combine(entity.asPartialJsonLD[DataSetEntity])
+        .getOrFail
+    }
 }

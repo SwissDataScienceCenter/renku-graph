@@ -122,11 +122,11 @@ class IOProjectDatasetsFinderSpec
     "return the very last modified dataset of the given project" in new TestCase {
       forAll(datasetProjects, nonModifiedDatasets()) { (project, dataset) =>
         val datasetModification1 =
-          modifiedDatasets(dataset, project, DerivedFrom(DataSet.entityId(dataset.id).value)).generateOne.copy(
+          modifiedDatasets(dataset, project, DerivedFrom(DataSet.entityId(dataset.id))).generateOne.copy(
             maybeDescription = datasetDescriptions.generateSome
           )
         val datasetModification2 =
-          modifiedDatasets(datasetModification1, project, DerivedFrom(DataSet.entityId(datasetModification1.id).value)).generateOne
+          modifiedDatasets(datasetModification1, project, DerivedFrom(DataSet.entityId(datasetModification1.id))).generateOne
             .copy(
               maybeDescription = datasetDescriptions.generateSome
             )
@@ -163,7 +163,7 @@ class IOProjectDatasetsFinderSpec
   }
 
   private implicit class EntityIdOps(entityId: EntityId) {
-    lazy val asSameAs: SameAs = SameAs.fromId(entityId.value).fold(throw _, identity)
+    lazy val asSameAs: SameAs = SameAs.fromId(entityId.value.toString).fold(throw _, identity)
   }
 
   private trait TestCase {

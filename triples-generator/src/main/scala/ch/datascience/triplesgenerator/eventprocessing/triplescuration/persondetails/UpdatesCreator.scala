@@ -22,8 +22,9 @@ import cats.data.NonEmptyList
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
+import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
+import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.`INSERT DATA`
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.Person
 
 private[triplescuration] class UpdatesCreator {
@@ -35,72 +36,53 @@ private[triplescuration] class UpdatesCreator {
   private lazy val updates: Person => List[Update] = {
     case Person(id, names, emails) =>
       List(
-        namesDelete(id),
-        namesInsert(id, names),
-        emailsDelete(id),
-        emailsInsert(id, emails),
+        namesUpdate(id, names),
+        emailsUpdate(id, emails),
         labelsDelete(id)
       ).flatten
   }
 
-  private def namesDelete(id: ResourceId) = Some {
+  private def namesUpdate(id: ResourceId, names: NonEmptyList[Name]) = Some {
     val resource = id.showAs[RdfResource]
     Update(
-      s"Deleting Person $resource schema:name",
+      s"Updating Person $resource schema:name",
       SparqlQuery(
-        name = "upload - person name delete",
-        Set("PREFIX schema: <http://schema.org/>"),
+        name = "upload - person name update",
+        Set(
+          "PREFIX schema: <http://schema.org/>",
+          "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
+        ),
         s"""|DELETE { $resource schema:name ?name }
-            |WHERE  { $resource schema:name ?name }
+            |${INSERT(resource, "schema:name", names.toList).getOrElse("")}
+            |WHERE { 
+            |  OPTIONAL { $resource schema:name ?maybeName }
+            |  BIND (IF(BOUND(?maybeName), ?maybeName, "nonexisting") AS ?name)
+            |}
             |""".stripMargin
       )
     )
   }
-  private def namesInsert(id: ResourceId, names: Set[Name]) =
-    if (names.isEmpty) None
-    else
-      Some {
-        val resource = id.showAs[RdfResource]
-        Update(
-          s"Inserting Person $resource schema:name",
-          SparqlQuery(
-            name = "upload - person name insert",
-            Set("PREFIX schema: <http://schema.org/>"),
-            s"""|${`INSERT DATA`(resource, "schema:name", NonEmptyList.fromListUnsafe(names.toList))}
-                |""".stripMargin
-          )
-        )
-      }
 
-  private def emailsDelete(id: ResourceId) = Some {
+  private def emailsUpdate(id: ResourceId, emails: Set[Email]) = Some {
     val resource = id.showAs[RdfResource]
     Update(
-      s"Deleting Person $resource schema:email",
+      s"Updating Person $resource schema:email",
       SparqlQuery(
-        name = "upload - person email delete",
-        Set("PREFIX schema: <http://schema.org/>"),
+        name = "upload - person email update",
+        Set(
+          "PREFIX schema: <http://schema.org/>",
+          "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
+        ),
         s"""|DELETE { $resource schema:email ?email }
-            |WHERE  { $resource schema:email ?email }
+            |${INSERT(resource, "schema:email", emails.toList).getOrElse("")}
+            |WHERE  { 
+            |  OPTIONAL { $resource schema:email ?maybeEmail }
+            |  BIND (IF(BOUND(?maybeEmail), ?maybeEmail, "nonexisting") AS ?email)
+            |}
             |""".stripMargin
       )
     )
   }
-
-  private def emailsInsert(id: ResourceId, emails: Set[Email]) =
-    if (emails.isEmpty) None
-    else
-      Some {
-        val resource = id.showAs[RdfResource]
-        Update(
-          s"Inserting Person $resource schema:email",
-          SparqlQuery(
-            name = "upload - person email insert",
-            Set("PREFIX schema: <http://schema.org/>"),
-            s"""|${`INSERT DATA`(resource, "schema:email", NonEmptyList.fromListUnsafe(emails.toList))}
-                |""".stripMargin
-          )
-        )
-      }
 
   private def labelsDelete(id: ResourceId) = Some {
     val resource = id.showAs[RdfResource]
@@ -115,4 +97,19 @@ private[triplescuration] class UpdatesCreator {
       )
     )
   }
+
+  private def INSERT[TT <: TinyType { type V = String }](resource: String,
+                                                         property: String,
+                                                         values:   List[TT]): Option[String] =
+    values match {
+      case Nil => None
+      case list =>
+        val triples = list
+          .map(tt => s"\t$resource $property '${sparqlEncode(tt.value)}'")
+          .mkString(".\n")
+        Some(s"""|INSERT {\n
+                 |\t$resource rdf:type schema:Person.
+                 |$triples\n
+                 |}""".stripMargin)
+    }
 }

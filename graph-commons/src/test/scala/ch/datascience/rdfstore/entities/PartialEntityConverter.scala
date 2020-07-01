@@ -18,24 +18,13 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.SchemaVersion
+import io.renku.jsonld.EntityId
 
-final case class Agent(schemaVersion: SchemaVersion, maybeStartedBy: Option[Person] = None)
+trait PartialEntityConverter[S] {
+  def convert[T <: S]: T => Either[Exception, PartialEntity]
 
-object Agent {
+  def toEntityId: S => Option[EntityId]
 
-  import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
-
-  implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.schemaVersion}",
-      EntityTypes of (
-        prov / "SoftwareAgent",
-        wfprov / "WorkflowEngine"
-      ),
-      rdfs / "label"        -> s"renku ${entity.schemaVersion}".asJsonLD,
-      prov / "wasStartedBy" -> entity.maybeStartedBy.asJsonLD
-    )
-  }
+  def apply[T <: S](entity: T): Either[Exception, PartialEntity] =
+    convert(entity) map (_.copy(maybeId = toEntityId(entity)))
 }

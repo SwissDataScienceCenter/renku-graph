@@ -43,23 +43,23 @@ private class IOTriplesVersionFinder(
   import io.circe.Decoder
   import io.circe.Decoder._
 
-  override def triplesUpToDate: IO[Boolean] = findCommitAgents map {
+  override def triplesUpToDate: IO[Boolean] = findSchemaVersionOnGeneration map {
     case Nil      => false
     case versions => versions forall (_.endsWith(schemaVersion.toString))
   }
 
-  private def findCommitAgents = queryExpecting[List[String]] {
+  private def findSchemaVersionOnGeneration = queryExpecting[List[String]] {
     SparqlQuery(
       name = "renku version find",
       Set(
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
         "PREFIX prov: <http://www.w3.org/ns/prov#>"
       ),
-      s"""|SELECT DISTINCT ?agent
+      s"""|SELECT DISTINCT ?associationId
           |WHERE {
           |  ?commit rdf:type prov:Activity ;
-          |          prov:agent ?agent .
-          |  ?agent rdf:type prov:SoftwareAgent .
+          |          prov:wasAssociatedWith ?associationId .
+          |  ?associationId rdf:type prov:SoftwareAgent .
           |}
           |""".stripMargin
     )
@@ -70,5 +70,5 @@ private class IOTriplesVersionFinder(
       .downField("bindings")
       .as(decodeList(ofAgents))
 
-  private lazy val ofAgents: Decoder[String] = _.downField("agent").downField("value").as[String]
+  private lazy val ofAgents: Decoder[String] = _.downField("associationId").downField("value").as[String]
 }

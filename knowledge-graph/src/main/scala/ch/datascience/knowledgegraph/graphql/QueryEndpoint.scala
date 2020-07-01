@@ -23,6 +23,7 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.knowledgegraph.lineage
+import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
@@ -109,12 +110,13 @@ object IOQueryEndpoint {
   import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
+      timeRecorder:            SparqlQueryTimeRecorder[IO],
+      logger:                  Logger[IO]
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[QueryEndpoint[IO]] =
     for {
-      queryContext <- IOQueryContext(timeRecorder)
+      queryContext <- IOQueryContext(timeRecorder, logger)
       querySchema = QuerySchema[IO](lineage.graphql.QueryFields())
     } yield new QueryEndpoint[IO](querySchema, new QueryRunner(querySchema, queryContext))
 }

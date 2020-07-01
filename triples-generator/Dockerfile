@@ -23,8 +23,8 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
 # Installing Renku and other dependencies
-RUN apk add --no-cache tzdata git git-lfs curl bash python3-dev openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev && \
-    python3 -m pip install 'renku==0.10.3' sentry-sdk && \
+RUN apk add --no-cache tzdata git git-lfs curl bash python3-dev openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev && \
+    python3 -m pip install 'git+https://github.com/SwissDataScienceCenter/renku-python.git@master' sentry-sdk && \
     chown -R daemon:daemon . && \
     git config --global filter.lfs.smudge "git-lfs smudge --skip %f"  && \
     git config --global filter.lfs.process "git-lfs filter-process --skip"

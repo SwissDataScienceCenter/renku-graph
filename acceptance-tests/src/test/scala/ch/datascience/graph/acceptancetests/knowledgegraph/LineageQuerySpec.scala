@@ -79,7 +79,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
         namedLineageQuery,
         variables = Map(
           "projectPath" -> project.path.toString,
-          "filePath"    -> filePath.toString
+          "filePath"    -> location.toString
         )
       )
 
@@ -92,7 +92,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
     }
   }
 
-  private val lineageQuery: Document = graphql"""
+  private lazy val lineageQuery: Document = graphql"""
     {
       lineage(projectPath: "namespace/lineage-project", filePath: "figs/grid_plot.png") {
         nodes {
@@ -108,7 +108,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       }
     }"""
 
-  private val namedLineageQuery: Document = graphql"""
+  private lazy val namedLineageQuery: Document = graphql"""
     query($$projectPath: ProjectPath!, $$filePath: FilePath!) { 
       lineage(projectPath: $$projectPath, filePath: $$filePath) { 
         nodes {
@@ -131,19 +131,21 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       json"""{"source": ${`sha7 clean_data`.location},          "target": ${`sha8 renku run`.location}}""",
       json"""{"source": ${`sha8 renku run`.location},           "target": ${`sha8 parquet`.location}}""",
       json"""{"source": ${`sha8 parquet`.location},             "target": ${`sha9 renku run`.location}}""",
-      json"""{"source": ${`sha9 renku run`.location},           "target": ${`sha9 plot_data`.location}}"""
+      json"""{"source": ${`sha9 renku run`.location},           "target": ${`sha9 plot_data`.location}}""",
+      json"""{"source": ${`sha9 renku run`.location},           "target": ${`sha9 cumulative`.location}}"""
     )
   }
 
   private lazy val theExpectedNodes = Right {
     Set(
-      json"""{"id": ${`sha3 zhbikes`.location},             "location": ${`sha3 zhbikes`.location},             "label": ${`sha3 zhbikes`.label},             "type": ${`sha3 zhbikes`.singleWordType}   }""",
-      json"""{"id": ${`sha7 clean_data`.location},          "location": ${`sha7 clean_data`.location},          "label": ${`sha7 clean_data`.label},          "type": ${`sha7 clean_data`.singleWordType}}""",
-      json"""{"id": ${`sha7 plot_data`.location},           "location": ${`sha7 plot_data`.location},           "label": ${`sha7 plot_data`.label},           "type": ${`sha7 plot_data`.singleWordType} }""",
-      json"""{"id": ${`sha8 renku run`.location},           "location": ${`sha8 renku run`.location},           "label": ${`sha8 renku run`.label},           "type": ${`sha8 renku run`.singleWordType} }""",
-      json"""{"id": ${`sha8 parquet`.location},             "location": ${`sha8 parquet`.location},             "label": ${`sha8 parquet`.label},             "type": ${`sha8 parquet`.singleWordType}   }""",
-      json"""{"id": ${`sha9 renku run`.location},           "location": ${`sha9 renku run`.location},           "label": ${`sha9 renku run`.label},           "type": ${`sha9 renku run`.singleWordType} }""",
-      json"""{"id": ${`sha9 plot_data`.location},           "location": ${`sha9 plot_data`.location},           "label": ${`sha9 plot_data`.label},           "type": ${`sha9 plot_data`.singleWordType} }"""
+      json"""{"id": ${`sha3 zhbikes`.location},             "location": ${`sha3 zhbikes`.location},             "label": ${`sha3 zhbikes`.location},             "type": ${`sha3 zhbikes`.singleWordType}   }""",
+      json"""{"id": ${`sha7 clean_data`.location},          "location": ${`sha7 clean_data`.location},          "label": ${`sha7 clean_data`.location},          "type": ${`sha7 clean_data`.singleWordType}}""",
+      json"""{"id": ${`sha7 plot_data`.location},           "location": ${`sha7 plot_data`.location},           "label": ${`sha7 plot_data`.location},           "type": ${`sha7 plot_data`.singleWordType} }""",
+      json"""{"id": ${`sha8 renku run`.location},           "location": ${`sha8 renku run`.location},           "label": ${`sha8 renku run`.location},           "type": ${`sha8 renku run`.singleWordType} }""",
+      json"""{"id": ${`sha8 parquet`.location},             "location": ${`sha8 parquet`.location},             "label": ${`sha8 parquet`.location},             "type": ${`sha8 parquet`.singleWordType}   }""",
+      json"""{"id": ${`sha9 renku run`.location},           "location": ${`sha9 renku run`.location},           "label": ${`sha9 renku run`.location},           "type": ${`sha9 renku run`.singleWordType} }""",
+      json"""{"id": ${`sha9 plot_data`.location},           "location": ${`sha9 plot_data`.location},           "label": ${`sha9 plot_data`.location},           "type": ${`sha9 plot_data`.singleWordType} }""",
+      json"""{"id": ${`sha9 cumulative`.location},          "location": ${`sha9 cumulative`.location},          "label": ${`sha9 cumulative`.location},          "type": ${`sha9 cumulative`.singleWordType} }"""
     )
   }
 

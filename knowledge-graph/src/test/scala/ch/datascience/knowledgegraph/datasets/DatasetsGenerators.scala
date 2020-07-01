@@ -71,7 +71,7 @@ object DatasetsGenerators {
     } yield ModifiedDataset(
       id,
       dataset.name,
-      Url(DataSet.entityId(id).value),
+      Url(DataSet.entityId(id).toString),
       derivedFromOverride getOrElse DerivedFrom(DataSet.entityId(dataset.id)),
       dataset.maybeDescription,
       published,

@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{filePaths, projectPaths}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.knowledgegraph.lineage.model._
@@ -32,20 +32,21 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalServiceStubbing {
+class IOLineageDataFinderSpec extends WordSpec with InMemoryRdfStore with ExternalServiceStubbing {
 
   "findLineage" should {
 
     "return the lineage of the given project for a given commit id and file path" in new TestCase {
 
-      val (jsons, examplarData) = exemplarLineageFlow(projectPath)
+      val (jsons, exemplarData) = exemplarLineageFlow(projectPath)
 
       loadToStore(jsons: _*)
 
-      import examplarData._
+      import exemplarData._
 
-      lineageFinder
-        .findLineage(projectPath, filePath)
+      lineageDataFinder
+        .find(projectPath)
+        .value
         .unsafeRunSync() shouldBe Some(
         Lineage(
           edges = Set(
@@ -54,7 +55,8 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
             Edge(`sha7 clean_data`.toNodeLocation, `sha8 renku run`.toNodeLocation),
             Edge(`sha8 renku run`.toNodeLocation, `sha8 parquet`.toNodeLocation),
             Edge(`sha8 parquet`.toNodeLocation, `sha9 renku run`.toNodeLocation),
-            Edge(`sha9 renku run`.toNodeLocation, `sha9 plot_data`.toNodeLocation)
+            Edge(`sha9 renku run`.toNodeLocation, `sha9 plot_data`.toNodeLocation),
+            Edge(`sha9 renku run`.toNodeLocation, `sha9 cumulative`.toNodeLocation)
           ),
           nodes = Set(
             `sha3 zhbikes`.toNode,
@@ -63,20 +65,25 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
             `sha8 renku run`.toNode,
             `sha8 parquet`.toNode,
             `sha9 renku run`.toNode,
-            `sha9 plot_data`.toNode
+            `sha9 plot_data`.toNode,
+            `sha9 cumulative`.toNode
           )
         )
       )
 
       logger.logged(
         Warn(s"lineage finished${executionTimeRecorder.executionTimeInfo}"),
-        Warn(s"lineage - node details finished${executionTimeRecorder.executionTimeInfo}")
+        Warn(s"lineage - command details finished${executionTimeRecorder.executionTimeInfo}"),
+        Warn(s"lineage - entity details finished${executionTimeRecorder.executionTimeInfo}")
       )
     }
 
+    "return the lineage of the given project for a given commit id and file path while excluding not connected graphs" in {}
+
     "return None if there's no lineage for the project" in new TestCase {
-      lineageFinder
-        .findLineage(projectPath, filePaths.generateOne)
+      lineageDataFinder
+        .find(projectPath)
+        .value
         .unsafeRunSync() shouldBe None
     }
   }
@@ -86,7 +93,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
 
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val lineageFinder = new IOLineageFinder(
+    val lineageDataFinder = new IOLineageDataFinder(
       rdfStoreConfig,
       renkuBaseUrl,
       logger,
@@ -98,7 +105,7 @@ class IOLineageFinderSpec extends WordSpec with InMemoryRdfStore with ExternalSe
     lazy val toNodeLocation: Node.Location = Node.Location(nodeDef.location)
     lazy val toNode: Node = Node(
       toNodeLocation,
-      Node.Label(nodeDef.label),
+      Node.Label(toNodeLocation.value),
       nodeDef.types.map(Node.Type.apply)
     )
   }

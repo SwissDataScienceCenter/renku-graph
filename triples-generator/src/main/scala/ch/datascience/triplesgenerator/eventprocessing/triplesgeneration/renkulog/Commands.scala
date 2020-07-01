@@ -129,7 +129,7 @@ private object Commands {
     import scala.util.Try
 
     def migrate(commitEvent: CommitEvent, destinationDirectory: Path): IO[Unit] =
-      IO(%%('renku, 'migrate, "--no-commit")(destinationDirectory))
+      IO(%%('renku, 'migrate)(destinationDirectory))
         .flatMap(_ => IO.unit)
         .recoverWith {
           case NonFatal(exception) =>
@@ -176,7 +176,7 @@ private object Commands {
 
     implicit val commitWithoutParentTriplesFinder: (CommitEventWithoutParent, Path) => CommandResult = {
       case (_, destinationDirectory) =>
-        %%('renku, 'log, "--format", "json-ld")(destinationDirectory)
+        %%('renku, 'log, "--format", "json-ld", "--strict")(destinationDirectory)
     }
 
     implicit val commitWithParentTriplesFinder: (CommitEventWithParent, Path) => CommandResult = {
@@ -186,7 +186,7 @@ private object Commands {
           'diff,
           "--name-only",
           "--diff-filter=d",
-          s"${commit.parentId}..${commit.commitId}"
+          s"${commit.parentId}..HEAD"
         )(destinationDirectory).out.lines
 
         %%(
@@ -194,8 +194,9 @@ private object Commands {
           'log,
           "--format",
           "json-ld",
+          "--strict",
           "--revision",
-          s"${commit.parentId}..${commit.commitId}",
+          s"${commit.parentId}..HEAD",
           changedFiles
         )(destinationDirectory)
     }

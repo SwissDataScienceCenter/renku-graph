@@ -192,13 +192,13 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore {
 
   private implicit class ProjectOps(project: Project) {
     lazy val resourceId: ResourceId = project.asJsonLD.entityId
-      .map(id => ResourceId(id.value))
+      .map(id => ResourceId(id))
       .getOrElse(fail("projects.ResourceId cannot be obtained"))
   }
 
   private implicit class PersonOps(person: Person) {
     lazy val resourceId: users.ResourceId = person.asJsonLD.entityId
-      .map(id => users.ResourceId(id.value))
+      .map(id => users.ResourceId(id))
       .getOrElse(fail("users.ResourceId cannot be obtained"))
   }
 

@@ -158,6 +158,30 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
+  "JsonLD.fromBoolean" should {
+
+    "allow to construct JsonLD Boolean value" in {
+      forAll { value: Boolean =>
+        JsonLD.fromBoolean(value).toJson shouldBe
+          json"""{
+            "@value": $value
+          }"""
+      }
+    }
+
+    "have no entityId" in {
+      forAll { value: Boolean =>
+        JsonLD.fromBoolean(value).entityId shouldBe None
+      }
+    }
+
+    "have no entityTypes" in {
+      forAll { value: Boolean =>
+        JsonLD.fromBoolean(value).entityTypes shouldBe None
+      }
+    }
+  }
+
   "JsonLD.Null" should {
 
     "be Json.Null" in {
@@ -328,7 +352,9 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
          childProperty:  (Property, JsonLD)) =>
           val reverseProperty: Property = properties.generateOne
           val child = JsonLD.entity(childId, childTypes, childProperty)
-          JsonLD.entity(parentId, parentTypes, Reverse.of(reverseProperty -> child), parentProperty).toJson shouldBe
+          JsonLD
+            .entity(parentId, parentTypes, Reverse.ofEntities(reverseProperty -> child), parentProperty)
+            .toJson shouldBe
             parse(s"""{
             "@id":                  ${parentId.asJson},
             "@type":                ${parentTypes.asJson},
@@ -358,25 +384,57 @@ class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
           JsonLD
             .entity(parentId,
                     parentTypes,
-                    Reverse.of(reverseProperty1 -> child, reverseProperty2 -> child),
+                    Reverse.ofEntities(reverseProperty1 -> child, reverseProperty2 -> child),
                     parentProperty)
             .toJson shouldBe
             parse(s"""{
             "@id":                  ${parentId.asJson},
             "@type":                ${parentTypes.asJson},
             "${parentProperty._1}": ${parentProperty._2.toJson},
-            "@reverse":             [{
+            "@reverse": {
               "$reverseProperty1": {
                 "@id":                 ${childId.asJson},
                 "@type":               ${childTypes.asJson},
                 "${childProperty._1}": ${childProperty._2.toJson}
-              }},{
+              },
               "$reverseProperty2": {
                 "@id":                 ${childId.asJson},
                 "@type":               ${childTypes.asJson},
                 "${childProperty._1}": ${childProperty._2.toJson}
-              }}
-            ]
+              }
+            }
+          }""").fold(throw _, identity)
+      }
+    }
+
+    "be able to add reverse property with a list of entities" in {
+      forAll { (parentId: EntityId, parentTypes: EntityTypes, parentProperty: (Property, JsonLD)) =>
+        val reverseProperty         = properties.generateOne
+        val reversePropertyEntities = jsonLDEntities.generateNonEmptyList().toList
+        val Right(reverse)          = Reverse.of(reverseProperty -> reversePropertyEntities)
+        JsonLD
+          .entity(parentId, parentTypes, reverse, parentProperty)
+          .toJson shouldBe
+          parse(s"""{
+            "@id":                  ${parentId.asJson},
+            "@type":                ${parentTypes.asJson},
+            "${parentProperty._1}": ${parentProperty._2.toJson},
+            "@reverse":             {
+              "$reverseProperty": ${Json.arr(reversePropertyEntities.map(_.toJson): _*)}
+            }
+          }""").fold(throw _, identity)
+      }
+    }
+
+    "be able to skip reverse property when empty" in {
+      forAll { (parentId: EntityId, parentTypes: EntityTypes, parentProperty: (Property, JsonLD)) =>
+        JsonLD
+          .entity(parentId, parentTypes, Reverse.empty, parentProperty)
+          .toJson shouldBe
+          parse(s"""{
+            "@id":                  ${parentId.asJson},
+            "@type":                ${parentTypes.asJson},
+            "${parentProperty._1}": ${parentProperty._2.toJson}
           }""").fold(throw _, identity)
       }
     }

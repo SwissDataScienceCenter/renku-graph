@@ -16,26 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package io.renku.jsonld
 
-import ch.datascience.graph.model.SchemaVersion
+/**
+  * A type class that provides a conversion from a value of type `A` to a [[EntityId]] value.
+  */
+trait EntityIdEncoder[A] {
+  def apply(a: A): EntityId
+}
 
-final case class Agent(schemaVersion: SchemaVersion, maybeStartedBy: Option[Person] = None)
+object EntityIdEncoder {
 
-object Agent {
-
-  import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
-
-  implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.schemaVersion}",
-      EntityTypes of (
-        prov / "SoftwareAgent",
-        wfprov / "WorkflowEngine"
-      ),
-      rdfs / "label"        -> s"renku ${entity.schemaVersion}".asJsonLD,
-      prov / "wasStartedBy" -> entity.maybeStartedBy.asJsonLD
-    )
-  }
+  final def instance[A](f: A => EntityId): EntityIdEncoder[A] = (a: A) => f(a)
 }

@@ -148,9 +148,10 @@ object Generators {
 
   def relativePaths(minSegments: Int = 1,
                     maxSegments: Int = 10,
-                    partsGenerator: Gen[String] = nonEmptyStrings(
-                      charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
-                    )): Gen[String] = {
+                    partsGenerator: Gen[String] = nonBlankStrings(
+                      charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_')),
+                      minLength      = 3
+                    ).map(_.value)): Gen[String] = {
     require(minSegments <= maxSegments,
             s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense")
 

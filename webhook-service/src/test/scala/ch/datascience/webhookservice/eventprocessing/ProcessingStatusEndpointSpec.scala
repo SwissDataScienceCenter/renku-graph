@@ -31,7 +31,7 @@ import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Warn
+import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
@@ -143,6 +143,10 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
       response.status                 shouldBe InternalServerError
       response.contentType            shouldBe Some(`Content-Type`(application.json))
       response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception).asJson
+
+      logger.logged(
+        Error(s"Finding progress status for project '$projectId' failed", exception)
+      )
     }
 
     "return INTERNAL_SERVER_ERROR when finding progress status fails" in new TestCase {
@@ -163,6 +167,10 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
       response.status                 shouldBe InternalServerError
       response.contentType            shouldBe Some(`Content-Type`(application.json))
       response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception).asJson
+
+      logger.logged(
+        Error(s"Finding progress status for project '$projectId' failed", exception)
+      )
     }
   }
 
@@ -178,7 +186,8 @@ class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
     val fetchProcessingStatus = new ProcessingStatusEndpoint[IO](
       hookValidator,
       processingStatusFetcher,
-      executionTimeRecorder
+      executionTimeRecorder,
+      logger
     ).fetchProcessingStatus _
   }
 }

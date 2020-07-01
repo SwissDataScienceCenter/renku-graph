@@ -28,6 +28,7 @@ import ch.datascience.http.server.HttpServer
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.IOQueryEndpoint
 import ch.datascience.knowledgegraph.projects.rest.IOProjectEndpoint
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
@@ -56,7 +57,7 @@ object Microservice extends IOMicroservice {
       sparqlTimeRecorder      <- SparqlQueryTimeRecorder(metricsRegistry)
       projectEndpoint         <- IOProjectEndpoint(gitLabThrottler, sparqlTimeRecorder)
       projectDatasetsEndpoint <- IOProjectDatasetsEndpoint(sparqlTimeRecorder)
-      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder)
+      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder, ApplicationLogger)
       datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
       routes <- new MicroserviceRoutes[IO](

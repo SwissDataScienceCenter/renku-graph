@@ -643,12 +643,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
   }
 
   private implicit class EntityIdOps(entityId: EntityId) {
-    lazy val asSameAs: SameAs = SameAs.fromId(entityId.value).fold(throw _, identity)
+    lazy val asSameAs: SameAs = SameAs.fromId(entityId.value.toString).fold(throw _, identity)
   }
 
   private implicit class OptionEntityIdOps(maybeEntityId: Option[EntityId]) {
     lazy val asSameAs: SameAs = maybeEntityId
-      .flatMap(id => SameAs.fromId(id.value).toOption)
+      .flatMap(id => SameAs.fromId(id.value.toString).toOption)
       .getOrElse(throw new Exception(s"Cannot convert $maybeEntityId EntityId to SameAs"))
   }
 

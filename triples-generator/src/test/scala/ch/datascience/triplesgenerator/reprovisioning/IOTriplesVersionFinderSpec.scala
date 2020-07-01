@@ -24,13 +24,13 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.CommitId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.{Activity, Agent, Project}
+import ch.datascience.rdfstore.entities.{Activity, Agent, Association, Project, RunPlan}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
@@ -40,37 +40,42 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
 
   "triplesUpToDate" should {
 
-    "return true if there's a single commit Activity SoftwareAgent entity with the current version of Renku" in new TestCase {
+    "return true if all Activities' are associated with the latest version of Renku" in new TestCase {
 
-      loadToStore(commitActivity(schemaVersion).asJsonLD)
+      loadToStore(
+        List(
+          agentRelatedEntities(schemaVersionOnGeneration = latestSchemaVersion,
+                               originalSchemaVersion     = schemaVersions.generateOne),
+          agentRelatedEntities(schemaVersionOnGeneration = latestSchemaVersion,
+                               originalSchemaVersion     = schemaVersions.generateOne)
+        ).flatten: _*
+      )
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe true
 
       logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
-    "return false if there's a single SoftwareAgent entity with some old version of Renku" in new TestCase {
+    "return false if there's an Activity associated with some old version of Renku" in new TestCase {
 
-      loadToStore(commitActivity(schemaVersions generateDifferentThan schemaVersion).asJsonLD)
-
-      triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
-
-      logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
-    }
-
-    "return false if there are multiple SoftwareAgent entities with different versions of Renku" in new TestCase {
-
-      loadToStore(commitActivity(schemaVersion).asJsonLD,
-                  commitActivity(schemaVersions generateDifferentThan schemaVersion).asJsonLD)
+      loadToStore(
+        List(
+          agentRelatedEntities(schemaVersionOnGeneration = latestSchemaVersion,
+                               originalSchemaVersion     = schemaVersions.generateOne),
+          agentRelatedEntities(schemaVersionOnGeneration = schemaVersions.generateOne,
+                               originalSchemaVersion     = schemaVersions.generateOne)
+        ).flatten: _*
+      )
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
       logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
-    "return false if SoftwareAgent points to the current versions of Renku but it's not linked to a commit activity" in new TestCase {
+    "return false if there's a SoftwareAgent pointing to the latest version of Renku " +
+      "but it's not linked to an Activity" in new TestCase {
 
-      loadToStore(Agent(schemaVersion).asJsonLD)
+      loadToStore(Agent(latestSchemaVersion).asJsonLD)
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
 
@@ -79,19 +84,34 @@ class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
   }
 
   private trait TestCase {
-    val schemaVersion              = schemaVersions.generateOne
-    val logger                     = TestLogger[IO]()
-    val executionTimeRecorder      = TestExecutionTimeRecorder(logger)
-    private val sparqlTimeRecorder = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val triplesVersionFinder       = new IOTriplesVersionFinder(rdfStoreConfig, schemaVersion, logger, sparqlTimeRecorder)
+    val latestSchemaVersion   = schemaVersions.generateOne
+    val logger                = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder(logger)
+    private val timeRecorder  = new SparqlQueryTimeRecorder(executionTimeRecorder)
+    val triplesVersionFinder  = new IOTriplesVersionFinder(rdfStoreConfig, latestSchemaVersion, logger, timeRecorder)
   }
 
-  private def commitActivity(schemaVersion: SchemaVersion, commitId: CommitId = commitIds.generateOne) =
-    Activity(
+  private def agentRelatedEntities(schemaVersionOnGeneration: SchemaVersion, originalSchemaVersion: SchemaVersion) = {
+    val project =
+      Project(projectPaths.generateOne, projectNames.generateOne, projectCreatedDates.generateOne, maybeCreator = None)
+    val activity = Activity(
       commitIds.generateOne,
       committedDates.generateOne,
       persons.generateOne,
-      Project(projectPaths.generateOne, projectNames.generateOne, projectCreatedDates.generateOne, maybeCreator = None),
-      Agent(schemaVersion)
-    ).asJsonLD
+      project,
+      Agent(schemaVersionOnGeneration)
+    )
+    List(
+      activity.asJsonLD,
+      Association
+        .process(
+          Agent(originalSchemaVersion),
+          RunPlan.process(
+            workflowFiles.generateOne,
+            runPlanCommands.generateOne
+          )
+        )(activity)
+        .asJsonLD
+    )
+  }
 }

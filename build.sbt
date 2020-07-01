@@ -1,7 +1,7 @@
 // format: off
 organization := "ch.datascience"
 name := "renku-graph"
-scalaVersion := "2.12.8"
+scalaVersion := "2.12.11"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
@@ -130,7 +130,7 @@ lazy val acceptanceTests = Project(
 
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
-  scalaVersion := "2.12.8",
+  scalaVersion := "2.12.11",
 
   skip in publish := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),

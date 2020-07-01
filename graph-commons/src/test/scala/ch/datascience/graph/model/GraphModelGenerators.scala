@@ -69,7 +69,7 @@ object GraphModelGenerators {
     max <- choose(1001, 100000)
     id  <- choose(min, max)
   } yield Id(id)
-  implicit val projectNames:        Gen[projects.Name]        = nonEmptyStrings() map projects.Name.apply
+  implicit val projectNames:        Gen[projects.Name]        = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
   implicit val projectDescriptions: Gen[projects.Description] = paragraphs() map (v => projects.Description(v.value))
   implicit val projectVisibilities: Gen[Visibility]           = Gen.oneOf(Visibility.all.toList)
   implicit val projectCreatedDates: Gen[projects.DateCreated] = timestampsNotInTheFuture map projects.DateCreated.apply

@@ -18,8 +18,6 @@
 
 package ch.datascience.rdfstore.entities
 
-import java.util.UUID
-
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name}
 import org.scalacheck.Gen
@@ -44,16 +42,16 @@ object Person {
     JsonLD.entity(
       entityId(entity.maybeEmail),
       EntityTypes of (prov / "Person", schema / "Person"),
-      rdfs / "label"         -> entity.name.asJsonLD,
-      schema / "name"        -> entity.name.asJsonLD,
       schema / "email"       -> entity.maybeEmail.asJsonLD,
+      schema / "name"        -> entity.name.asJsonLD,
+      rdfs / "label"         -> entity.name.asJsonLD,
       schema / "affiliation" -> entity.maybeAffiliation.asJsonLD
     )
   }
 
   private lazy val entityId: Option[Email] => EntityId = {
     case Some(email) => EntityId of s"mailto:$email"
-    case None        => EntityId of s"_:${UUID.randomUUID()}"
+    case None        => EntityId.blank
   }
 
   val persons: Gen[Person] = for {

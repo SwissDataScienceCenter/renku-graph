@@ -18,7 +18,7 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import ch.datascience.generators.Generators.positiveInts
+import ch.datascience.generators.Generators._
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import eu.timepit.refined.api.Refined
 import org.scalacheck.Gen
@@ -29,8 +29,8 @@ private object ProcessingStatusGenerator {
 
   implicit val processingStatuses: Gen[ProcessingStatus] =
     for {
-      total <- positiveInts(max = Integer.MAX_VALUE)
-      done  <- positiveInts(max = total.value)
+      total <- positiveInts(max    = Integer.MAX_VALUE)
+      done  <- nonNegativeInts(max = total.value)
       progress = Refined.unsafeApply(
         BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
       ): ProcessingStatus.Progress
