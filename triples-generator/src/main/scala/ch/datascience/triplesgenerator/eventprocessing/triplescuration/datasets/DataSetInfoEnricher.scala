@@ -16,7 +16,7 @@ private[triplescuration] class DataSetInfoEnricher[Interpretation[_]](
   def enrichDataSetInfo(curatedTriples: CuratedTriples): CurationResults[Interpretation] =
     EitherT.rightT[Interpretation, ProcessingRecoverableError] {
       dataSetInfoFinder
-        .findEntityId(curatedTriples.triples)
+        .findDatasetsInfo(curatedTriples.triples)
         .foldLeft(curatedTriples) {
           case (curated, entityId) =>
             curated.addUpdates(updatesCreator.prepareUpdates(entityId, SameAs(entityId), DerivedFrom(entityId)))

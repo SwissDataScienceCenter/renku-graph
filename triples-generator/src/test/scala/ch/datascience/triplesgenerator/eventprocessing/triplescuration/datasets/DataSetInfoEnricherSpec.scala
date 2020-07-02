@@ -8,6 +8,8 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.Proc
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalamock.scalatest.MockFactory
+import ch.datascience.graph.model.GraphModelGenerators._
+import io.renku.jsonld.EntityId
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -19,7 +21,7 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
 
     "do nothing if there's no DataSet entity in the given JsonLD" in new TestCase {
 
-      (infoFinder.findEntityId _).expects(curatedTriples.triples).returning(Set.empty)
+      (infoFinder.findDatasetsInfo _).expects(curatedTriples.triples).returning(Set.empty)
 
       enricher.enrichDataSetInfo(curatedTriples) shouldBe EitherT.rightT[Try, ProcessingRecoverableError](
         curatedTriples
@@ -29,11 +31,20 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
     "add updates generated for dataset info extracted from the triples" in new TestCase {
 
       val entityId = entityIds.generateOne
-      (infoFinder.findEntityId _).expects(curatedTriples.triples).returning(Set(entityId))
+
+      val datasetInfo = (entityId, datasetSameAs.generateOption, datasetDerivedFroms.generateOption)
+
+      (infoFinder.findDatasetsInfo _)
+        .expects(curatedTriples.triples)
+        .returning(Set(datasetInfo))
+
+      val topmostData = (entityId, datasetSameAs.generateOption, datasetDerivedFroms.generateOption)
+
+      (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(topmostData)
 
       val updates = curationUpdates.generateNonEmptyList().toList
       (updatesCreator.prepareUpdates _)
-        .expects(entityId, SameAs(entityId), DerivedFrom(entityId))
+        .expects(topmostData)
         .returning(updates)
 
       val Success(Right(results)) = enricher.enrichDataSetInfo(curatedTriples).value
@@ -41,13 +52,15 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
       results.triples shouldBe curatedTriples.triples
       results.updates shouldBe curatedTriples.updates ++: updates
     }
+
   }
 
   private trait TestCase {
     val curatedTriples = curatedTriplesObjects.generateOne
 
-    val infoFinder     = mock[DataSetInfoFinder]
-    val updatesCreator = mock[UpdatesCreator]
-    val enricher       = new DataSetInfoEnricher[Try](infoFinder, updatesCreator)
+    val infoFinder        = mock[DataSetInfoFinder]
+    val updatesCreator    = mock[UpdatesCreator]
+    val topmostDataFinder = mock[TopmostDataFinder]
+    val enricher          = new DataSetInfoEnricher[Try](infoFinder, updatesCreator)
   }
 }

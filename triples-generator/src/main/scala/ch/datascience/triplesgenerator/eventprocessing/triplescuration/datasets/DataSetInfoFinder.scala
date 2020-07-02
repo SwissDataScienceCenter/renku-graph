@@ -13,7 +13,7 @@ import scala.collection.mutable
 
 private[triplescuration] class DataSetInfoFinder {
 
-  def findEntityId(triples: JsonLDTriples): Set[EntityId] = {
+  def findDatasetsInfo(triples: JsonLDTriples): Set[EntityId] = {
     val collected = mutable.HashSet.empty[EntityId]
     Plated.transform[Json] { json =>
       root.`@type`.each.string.getAll(json) match {

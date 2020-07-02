@@ -16,7 +16,7 @@ class DataSetInfoFinderSpec extends WordSpec {
   "findEntityId" should {
 
     "return None if there's no Dataset entity in the Json" in new TestCase {
-      infoFinder.findEntityId(jsonLDTriples.generateOne) shouldBe Set.empty
+      infoFinder.findDatasetsInfo(jsonLDTriples.generateOne) shouldBe Set.empty
     }
 
     "return the DataSet's entityId present in the Json" in new TestCase {
@@ -26,7 +26,7 @@ class DataSetInfoFinderSpec extends WordSpec {
         nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = None).toJson
       }
 
-      infoFinder.findEntityId(triples) shouldBe Set(entityId)
+      infoFinder.findDatasetsInfo(triples) shouldBe Set(entityId)
     }
   }
 
