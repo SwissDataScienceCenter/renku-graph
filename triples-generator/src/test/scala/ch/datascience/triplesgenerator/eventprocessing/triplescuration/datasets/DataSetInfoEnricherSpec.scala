@@ -3,7 +3,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 import cats.data.EitherT
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.datasets.SameAs
+import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import io.renku.jsonld.generators.JsonLDGenerators._
@@ -32,7 +32,9 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
       (infoFinder.findEntityId _).expects(curatedTriples.triples).returning(Set(entityId))
 
       val updates = curationUpdates.generateNonEmptyList().toList
-      (updatesCreator.prepareUpdates _).expects(entityId, SameAs(entityId)).returning(updates)
+      (updatesCreator.prepareUpdates _)
+        .expects(entityId, SameAs(entityId), DerivedFrom(entityId))
+        .returning(updates)
 
       val Success(Right(results)) = enricher.enrichDataSetInfo(curatedTriples).value
 

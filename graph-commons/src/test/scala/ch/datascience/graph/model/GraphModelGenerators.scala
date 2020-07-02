@@ -108,6 +108,7 @@ object GraphModelGenerators {
   implicit val datasetDescriptions:   Gen[Description]   = paragraphs() map (_.value) map Description.apply
   implicit val datasetUrls:           Gen[Url]           = validatedUrls map (_.value) map Url.apply
   implicit val datasetSameAs:         Gen[SameAs]        = validatedUrls map (_.value) map SameAs.apply
+  val datasetIdSameAs:                Gen[IdSameAs]      = validatedUrls map (_.value) map SameAs.fromId map (_.fold(throw _, identity))
   implicit val datasetDerivedFroms:   Gen[DerivedFrom]   = validatedUrls map (_.value) map DerivedFrom.apply
   implicit val datasetPublishedDates: Gen[PublishedDate] = localDatesNotInTheFuture map PublishedDate.apply
   implicit val datasetCreatedDates:   Gen[DateCreated]   = timestampsNotInTheFuture map DateCreated.apply
