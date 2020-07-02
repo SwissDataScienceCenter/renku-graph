@@ -19,24 +19,34 @@
 package ch.datascience.rdfstore.entities
 
 import cats.implicits._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.DataSetPart.DataSetPartArtifact
+import io.renku.jsonld.EntityId
 
 trait DataSet {
   self: Artifact with Entity =>
 
-  val datasetId:                 Identifier
-  val datasetName:               Name
-  val datasetUrl:                Url
-  val maybeDatasetSameAs:        Option[SameAs]
-  val maybeDatasetDerivedFrom:   Option[DerivedFrom]
-  val maybeDatasetDescription:   Option[Description]
-  val maybeDatasetPublishedDate: Option[PublishedDate]
-  val datasetCreatedDate:        DateCreated
-  val datasetCreators:           Set[Person]
-  val datasetParts:              List[DataSetPartArtifact]
-  val datasetKeywords:           List[Keyword]
+  val datasetId:                    Identifier
+  val datasetName:                  Name
+  val datasetUrl:                   Url
+  val maybeDatasetSameAs:           Option[SameAs]
+  val maybeDatasetDerivedFrom:      Option[DerivedFrom]
+  val maybeDatasetDescription:      Option[Description]
+  val maybeDatasetPublishedDate:    Option[PublishedDate]
+  val datasetCreatedDate:           DateCreated
+  val datasetCreators:              Set[Person]
+  val datasetParts:                 List[DataSetPartArtifact]
+  val datasetKeywords:              List[Keyword]
+  val overrideDatasetTopmostSameAs: Option[SameAs]
+
+  def topmostSameAs(implicit renkuBaseUrl: RenkuBaseUrl): SameAs =
+    overrideDatasetTopmostSameAs
+      .orElse(maybeDatasetSameAs)
+      .getOrElse(SameAs(DataSet.entityId(datasetId)))
+
+  def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = DataSet.entityId(datasetId)
 }
 
 object DataSet {
@@ -48,60 +58,64 @@ object DataSet {
 
   type DataSetEntity = Entity with DataSet with Artifact
 
-  def nonModifiedFactory(id:                 Identifier,
-                         name:               Name,
-                         url:                Url,
-                         maybeSameAs:        Option[SameAs] = None,
-                         maybeDescription:   Option[Description] = None,
-                         maybePublishedDate: Option[PublishedDate] = None,
-                         createdDate:        DateCreated,
-                         creators:           Set[Person],
-                         partsFactories:     List[Activity => DataSetPartArtifact],
-                         keywords:           List[Keyword] = Nil)(activity: Activity): DataSetEntity =
+  def nonModifiedFactory(id:                    Identifier,
+                         name:                  Name,
+                         url:                   Url,
+                         maybeSameAs:           Option[SameAs] = None,
+                         maybeDescription:      Option[Description] = None,
+                         maybePublishedDate:    Option[PublishedDate] = None,
+                         createdDate:           DateCreated,
+                         creators:              Set[Person],
+                         partsFactories:        List[Activity => DataSetPartArtifact],
+                         keywords:              List[Keyword] = Nil,
+                         overrideTopmostSameAs: Option[SameAs] = None)(activity: Activity): DataSetEntity =
     new Entity(activity.commitId,
                Location(".renku") / "datasets" / id,
                activity.project,
                maybeInvalidationActivity = None,
                maybeGeneration           = None) with Artifact with DataSet {
-      override val datasetId:                 Identifier                = id
-      override val datasetName:               Name                      = name
-      override val datasetUrl:                Url                       = url
-      override val maybeDatasetSameAs:        Option[SameAs]            = maybeSameAs
-      override val maybeDatasetDerivedFrom:   Option[DerivedFrom]       = None
-      override val maybeDatasetDescription:   Option[Description]       = maybeDescription
-      override val maybeDatasetPublishedDate: Option[PublishedDate]     = maybePublishedDate
-      override val datasetCreatedDate:        DateCreated               = createdDate
-      override val datasetCreators:           Set[Person]               = creators
-      override val datasetParts:              List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
-      override val datasetKeywords:           List[Keyword]             = keywords
+      override val datasetId:                    Identifier                = id
+      override val datasetName:                  Name                      = name
+      override val datasetUrl:                   Url                       = url
+      override val maybeDatasetSameAs:           Option[SameAs]            = maybeSameAs
+      override val maybeDatasetDerivedFrom:      Option[DerivedFrom]       = None
+      override val maybeDatasetDescription:      Option[Description]       = maybeDescription
+      override val maybeDatasetPublishedDate:    Option[PublishedDate]     = maybePublishedDate
+      override val datasetCreatedDate:           DateCreated               = createdDate
+      override val datasetCreators:              Set[Person]               = creators
+      override val datasetParts:                 List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
+      override val datasetKeywords:              List[Keyword]             = keywords
+      override val overrideDatasetTopmostSameAs: Option[SameAs]            = overrideTopmostSameAs
     }
 
-  def modifiedFactory(id:                 Identifier,
-                      name:               Name,
-                      url:                Url,
-                      derivedFrom:        DerivedFrom,
-                      maybeDescription:   Option[Description] = None,
-                      maybePublishedDate: Option[PublishedDate] = None,
-                      createdDate:        DateCreated,
-                      creators:           Set[Person],
-                      partsFactories:     List[Activity => DataSetPartArtifact],
-                      keywords:           List[Keyword] = Nil)(activity: Activity): DataSetEntity =
+  def modifiedFactory(id:                    Identifier,
+                      name:                  Name,
+                      url:                   Url,
+                      derivedFrom:           DerivedFrom,
+                      maybeDescription:      Option[Description] = None,
+                      maybePublishedDate:    Option[PublishedDate] = None,
+                      createdDate:           DateCreated,
+                      creators:              Set[Person],
+                      partsFactories:        List[Activity => DataSetPartArtifact],
+                      keywords:              List[Keyword] = Nil,
+                      overrideTopmostSameAs: Option[SameAs] = None)(activity: Activity): DataSetEntity =
     new Entity(activity.commitId,
                Location(".renku") / "datasets" / id,
                activity.project,
                maybeInvalidationActivity = None,
                maybeGeneration           = None) with Artifact with DataSet {
-      override val datasetId:                 Identifier                = id
-      override val datasetName:               Name                      = name
-      override val datasetUrl:                Url                       = url
-      override val maybeDatasetSameAs:        Option[SameAs]            = None
-      override val maybeDatasetDerivedFrom:   Option[DerivedFrom]       = derivedFrom.some
-      override val maybeDatasetDescription:   Option[Description]       = maybeDescription
-      override val maybeDatasetPublishedDate: Option[PublishedDate]     = maybePublishedDate
-      override val datasetCreatedDate:        DateCreated               = createdDate
-      override val datasetCreators:           Set[Person]               = creators
-      override val datasetParts:              List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
-      override val datasetKeywords:           List[Keyword]             = keywords
+      override val datasetId:                    Identifier                = id
+      override val datasetName:                  Name                      = name
+      override val datasetUrl:                   Url                       = url
+      override val maybeDatasetSameAs:           Option[SameAs]            = None
+      override val maybeDatasetDerivedFrom:      Option[DerivedFrom]       = derivedFrom.some
+      override val maybeDatasetDescription:      Option[Description]       = maybeDescription
+      override val maybeDatasetPublishedDate:    Option[PublishedDate]     = maybePublishedDate
+      override val datasetCreatedDate:           DateCreated               = createdDate
+      override val datasetCreators:              Set[Person]               = creators
+      override val datasetParts:                 List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
+      override val datasetKeywords:              List[Keyword]             = keywords
+      override val overrideDatasetTopmostSameAs: Option[SameAs]            = overrideTopmostSameAs
     }
 
   def entityId(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
@@ -128,7 +142,8 @@ object DataSet {
           schema / "dateCreated"   -> entity.datasetCreatedDate.asJsonLD,
           schema / "creator"       -> entity.datasetCreators.asJsonLD,
           schema / "hasPart"       -> entity.datasetParts.asJsonLD,
-          schema / "keywords"      -> entity.datasetKeywords.asJsonLD
+          schema / "keywords"      -> entity.datasetKeywords.asJsonLD,
+          renku / "topmostSameAs"  -> entity.topmostSameAs.asJsonLD
         ).asRight
       }
 

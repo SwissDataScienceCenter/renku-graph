@@ -16,19 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package persondetails
 
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
-import io.circe.Decoder.decodeList
-import io.circe.Encoder.encodeList
+import io.circe.Json
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath._
-import io.circe.{Decoder, Encoder, Json}
 import monocle.function.Plated
 
 import scala.language.higherKinds
@@ -109,32 +107,6 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
       if (id.value startsWith "_") None
       else Some(id)
 
-    private implicit class JsonOps(json: Json) {
-
-      def get[T](property: String)(implicit decode: Decoder[T], encode: Encoder[T]): Option[T] =
-        root.selectDynamic(property).as[T].getOption(json)
-
-      def getValues[T](
-          property:      String
-      )(implicit decode: Decoder[T], encode: Encoder[T]): List[T] = {
-        import io.circe.literal._
-
-        val valuesDecoder: Decoder[T] = _.downField("@value").as[T]
-        val valuesEncoder: Encoder[T] = Encoder.instance[T](value => json"""{"@value": $value}""")
-        val findListOfValues = root
-          .selectDynamic(property)
-          .as[List[T]](decodeList(valuesDecoder), encodeList(valuesEncoder))
-          .getOption(json)
-        val findSingleValue = root
-          .selectDynamic(property)
-          .as[T](valuesDecoder, valuesEncoder)
-          .getOption(json)
-
-        findListOfValues orElse findSingleValue.map(List(_)) getOrElse List.empty
-      }
-
-      def remove(property: String): Json = root.obj.modify(_.remove(property))(json)
-    }
   }
 }
 

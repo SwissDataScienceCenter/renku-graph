@@ -1,19 +1,42 @@
+/*
+ * Copyright 2020 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
-import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, UrlSameAs}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.tinytypes.Renderer
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
 
-private[triplescuration] class UpdatesCreator {
+private class UpdatesCreator {
 
-  def prepareUpdates(entityId: EntityId, topmostSameAs: IdSameAs, topmostDerivedFrom: DerivedFrom): List[Update] =
-    prepareSameAsUpdates(entityId, topmostSameAs) ++: prepareDerivedFromUpdates(entityId, topmostDerivedFrom)
+  def prepareUpdates(topmostData: TopmostData): List[Update] =
+    prepareSameAsUpdates(topmostData.entityId, topmostData.sameAs) ++:
+      prepareDerivedFromUpdates(
+        topmostData.entityId,
+        topmostData.derivedFrom
+      )
 
-  private def prepareSameAsUpdates(entityId: EntityId, topmostSameAs: IdSameAs): List[Update] = List(
+  private def prepareSameAsUpdates(entityId: EntityId, topmostSameAs: SameAs): List[Update] = List(
     Update(
       s"Updating Dataset $entityId topmostSameAs",
       SparqlQuery(
@@ -55,8 +78,10 @@ private[triplescuration] class UpdatesCreator {
     lazy val asRdfResource: String = s"<$entityId>"
   }
 
-  private implicit val sameAsRdfRenderer: Renderer[RdfResource, SameAs] =
-    (value: SameAs) => s"<$value>"
+  private implicit val sameAsRdfRenderer: Renderer[RdfResource, SameAs] = {
+    case value: IdSameAs  => s"<$value>"
+    case value: UrlSameAs => value.toString
+  }
 
   private implicit val derivedFromRdfRenderer: Renderer[RdfResource, DerivedFrom] =
     (value: DerivedFrom) => s"<$value>"

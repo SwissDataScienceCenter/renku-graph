@@ -63,6 +63,9 @@ object datasets {
     final def fromId(value: String): Either[IllegalArgumentException, IdSameAs] =
       from(value) map (sameAs => new IdSameAs(sameAs.value))
 
+    final def fromUrl(value: String): Either[IllegalArgumentException, UrlSameAs] =
+      from(value) map (sameAs => new UrlSameAs(sameAs.value))
+
     def apply(datasetEntityId: EntityId): IdSameAs = new IdSameAs(datasetEntityId.toString)
   }
 
