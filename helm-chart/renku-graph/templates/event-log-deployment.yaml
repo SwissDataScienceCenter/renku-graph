@@ -76,7 +76,7 @@ spec:
             successThreshold: 1
             failureThreshold: 3
           resources:
-  {{ toYaml .Values.eventLog.resources | indent 12 }}
+  {{- toYaml .Values.eventLog.resources | nindent 12 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}
