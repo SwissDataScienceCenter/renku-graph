@@ -105,6 +105,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         )(
           datasetIdentifier         = dataset1.id,
           datasetName               = dataset1.name,
+          datasetAlternateName      = dataset1.alternateName,
           maybeDatasetSameAs        = dataset1.sameAs.some,
           maybeDatasetDescription   = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
@@ -124,6 +125,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         )(
           datasetIdentifier         = dataset2.id,
           datasetName               = dataset2.name,
+          datasetAlternateName      = dataset2.alternateName,
           maybeDatasetSameAs        = dataset2.sameAs.some,
           maybeDatasetDescription   = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
@@ -249,7 +251,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         searchResultJson(dataset1),
         searchResultJson(dataset2),
         searchResultJson(dataset3)
-      ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
+      ).flatMap(sortCreators)
+        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'name' property found")))
       foundDatasetsSortedByName.flatMap(sortCreators) shouldBe datasetsSortedByName
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc&page=2&per_page=1")
@@ -270,7 +273,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         searchResultJson(dataset2),
         searchResultJson(dataset3),
         searchResultJson(dataset4)
-      ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
+      ).flatMap(sortCreators)
+        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'name' property found")))
 
       When("user uses the response header link with the rel='first'")
       val firstPageLink     = searchForPage.headerLink(rel = "first")
@@ -321,6 +325,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       )(
         datasetIdentifier         = overriddenIdentifier getOrElse dataset.id,
         datasetName               = dataset.name,
+        datasetAlternateName      = dataset.alternateName,
         maybeDatasetSameAs        = dataset.sameAs.some,
         maybeDatasetDescription   = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -339,7 +344,8 @@ object DatasetsResources {
 
   def briefJson(dataset: Dataset): Json = json"""{
     "identifier": ${dataset.id.value}, 
-    "name": ${dataset.name.value},
+    "name": ${dataset.alternateName.value},
+    "title": ${dataset.name.value},
     "sameAs": ${dataset.sameAs.value}
   }""" deepMerge {
     _links(
@@ -350,7 +356,8 @@ object DatasetsResources {
   def searchResultJson(dataset: Dataset): Json =
     json"""{
       "identifier": ${dataset.id.value}, 
-      "name": ${dataset.name.value},
+      "name": ${dataset.alternateName.value},
+      "title": ${dataset.name.value},
       "published": ${dataset.published},
       "projectsCount": ${dataset.projects.size}
     }"""

@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Url}
+import ch.datascience.graph.model.datasets.{AlternateName, Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
@@ -84,6 +84,7 @@ object bundles extends Schemas {
   )(
       datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
       datasetName:               Name = datasetNames.generateOne,
+      datasetAlternateName:      AlternateName = datasetAlternateNames.generateOne,
       maybeDatasetUrl:           Option[Url] = Gen.option(datasetUrls).generateOne,
       maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
       maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
@@ -104,6 +105,7 @@ object bundles extends Schemas {
           DataSet.factory(
             datasetIdentifier,
             datasetName,
+            datasetAlternateName,
             maybeDatasetUrl,
             maybeDatasetSameAs,
             maybeDatasetDescription,
@@ -189,6 +191,7 @@ object bundles extends Schemas {
           entityFactory = DataSet.factory(
             id             = dataSetId,
             name           = datasets.Name("zhbikes"),
+            alternateName  = datasets.AlternateName("zhbikes"),
             createdDate    = datasetCreatedDates.generateOne,
             creators       = dataSetCreators,
             partsFactories = partsFactories

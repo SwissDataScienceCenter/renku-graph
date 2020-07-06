@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs}
+import ch.datascience.graph.model.datasets.{AlternateName, Identifier, Name, SameAs}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait ProjectDatasetsFinder[Interpretation[_]] {
-  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier, Name, SameAs)]]
+  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier, Name, AlternateName, SameAs)]]
 }
 
 private class IOProjectDatasetsFinder(
@@ -46,8 +46,8 @@ private class IOProjectDatasetsFinder(
 
   import IOProjectDatasetsFinder._
 
-  def findProjectDatasets(projectPath: Path): IO[List[(Identifier, Name, SameAs)]] =
-    queryExpecting[List[(Identifier, Name, SameAs)]](using = query(projectPath))
+  def findProjectDatasets(projectPath: Path): IO[List[(Identifier, Name, AlternateName, SameAs)]] =
+    queryExpecting[List[(Identifier, Name, AlternateName, SameAs)]](using = query(projectPath))
 
   private def query(path: Path) = SparqlQuery(
     name = "ds projects",
@@ -56,13 +56,14 @@ private class IOProjectDatasetsFinder(
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name (?topmostSameAs AS ?sameAs)
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName (?topmostSameAs AS ?sameAs)
         |WHERE {
         |  {
         |    ?datasetId rdf:type <http://schema.org/Dataset>;
         |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |               schema:identifier ?identifier;
-        |               schema:name ?name.
+        |               schema:name ?name ;
+        |               schema:alternateName  ?alternateName .
         |  } {
         |    SELECT ?datasetId ?topmostSameAs
         |    WHERE {
@@ -100,17 +101,18 @@ private class IOProjectDatasetsFinder(
 private object IOProjectDatasetsFinder {
   import io.circe.Decoder
 
-  private implicit val recordsDecoder: Decoder[List[(Identifier, Name, SameAs)]] = {
+  private implicit val recordsDecoder: Decoder[List[(Identifier, Name, AlternateName, SameAs)]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val recordDecoder: Decoder[(Identifier, Name, SameAs)] = { cursor =>
+    implicit val recordDecoder: Decoder[(Identifier, Name, AlternateName, SameAs)] = { cursor =>
       for {
-        id     <- cursor.downField("identifier").downField("value").as[Identifier]
-        name   <- cursor.downField("name").downField("value").as[Name]
-        sameAs <- cursor.downField("sameAs").downField("value").as[SameAs]
-      } yield (id, name, sameAs)
+        id            <- cursor.downField("identifier").downField("value").as[Identifier]
+        name          <- cursor.downField("name").downField("value").as[Name]
+        alternateName <- cursor.downField("alternateName").downField("value").as[AlternateName]
+        sameAs        <- cursor.downField("sameAs").downField("value").as[SameAs]
+      } yield (id, name, alternateName, sameAs)
     }
 
-    _.downField("results").downField("bindings").as(decodeList[(Identifier, Name, SameAs)])
+    _.downField("results").downField("bindings").as(decodeList[(Identifier, Name, AlternateName, SameAs)])
   }
 }

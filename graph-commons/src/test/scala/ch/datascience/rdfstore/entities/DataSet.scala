@@ -28,6 +28,7 @@ trait DataSet {
 
   val datasetId:                 Identifier
   val datasetName:               Name
+  val datasetAlternateName:      AlternateName
   val maybeDatasetUrl:           Option[Url]
   val maybeDatasetSameAs:        Option[SameAs]
   val maybeDatasetDescription:   Option[Description]
@@ -49,6 +50,7 @@ object DataSet {
 
   def factory(id:                 Identifier,
               name:               Name,
+              alternateName:      AlternateName,
               maybeUrl:           Option[Url] = None,
               maybeSameAs:        Option[SameAs] = None,
               maybeDescription:   Option[Description] = None,
@@ -64,6 +66,7 @@ object DataSet {
                maybeGeneration           = None) with Artifact with DataSet {
       override val datasetId:                 Identifier                = id
       override val datasetName:               Name                      = name
+      override val datasetAlternateName:      AlternateName             = alternateName
       override val maybeDatasetUrl:           Option[Url]               = maybeUrl
       override val maybeDatasetSameAs:        Option[SameAs]            = maybeSameAs
       override val maybeDatasetDescription:   Option[Description]       = maybeDescription
@@ -90,6 +93,7 @@ object DataSet {
           rdfs / "label"           -> entity.datasetId.asJsonLD,
           schema / "identifier"    -> entity.datasetId.asJsonLD,
           schema / "name"          -> entity.datasetName.asJsonLD,
+          schema / "alternateName" -> entity.datasetAlternateName.asJsonLD,
           schema / "url"           -> entity.maybeDatasetUrl.asJsonLD,
           schema / "sameAs"        -> entity.maybeDatasetSameAs.asJsonLD,
           schema / "description"   -> entity.maybeDatasetDescription.asJsonLD,

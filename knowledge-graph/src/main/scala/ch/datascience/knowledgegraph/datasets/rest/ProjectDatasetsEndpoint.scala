@@ -20,14 +20,14 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect._
 import cats.implicits._
+import ch.datascience.config.renku
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
-import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs}
-import ch.datascience.http.rest.Links
-import Links._
-import ch.datascience.config.renku
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.datasets.{AlternateName, Identifier, Name, SameAs}
 import ch.datascience.graph.model.projects
+import ch.datascience.http.rest.Links
+import ch.datascience.http.rest.Links._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
@@ -72,12 +72,13 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
   }
 
-  private implicit val datasetEncoder: Encoder[(Identifier, Name, SameAs)] =
-    Encoder.instance[(Identifier, Name, SameAs)] {
-      case (id, name, sameAs) =>
+  private implicit val datasetEncoder: Encoder[(Identifier, Name, AlternateName, SameAs)] =
+    Encoder.instance[(Identifier, Name, AlternateName, SameAs)] {
+      case (id, name, alternateName, sameAs) =>
         json"""{
           "identifier": ${id.toString},
-          "name": ${name.toString},
+          "title": ${name.toString},
+          "name": ${alternateName.toString},
           "sameAs": ${sameAs.toString}
         }""" deepMerge _links(
           Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))

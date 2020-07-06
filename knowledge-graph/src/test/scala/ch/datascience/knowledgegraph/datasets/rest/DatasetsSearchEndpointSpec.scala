@@ -121,7 +121,7 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     import DatasetsSearchEndpoint.Sort._
 
     "list only name, datePublished and projectsCount" in {
-      DatasetsSearchEndpoint.Sort.properties shouldBe Set(NameProperty, DatePublishedProperty, ProjectsCountProperty)
+      DatasetsSearchEndpoint.Sort.properties shouldBe Set(TitleProperty, DatePublishedProperty, ProjectsCountProperty)
     }
   }
 
@@ -150,10 +150,11 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, name, maybeDescription, published, projectsCount) =>
+      case DatasetSearchResult(id, name, alternateName, maybeDescription, published, projectsCount) =>
         json"""{
           "identifier": $id,
-          "name": $name,
+          "name": $alternateName,
+          "title": $name,
           "published": $published,
           "projectsCount": ${projectsCount.value},
           "_links": [{
@@ -188,8 +189,9 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
   private implicit val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
     id               <- datasetIdentifiers
     name             <- datasetNames
+    alternateName    <- datasetAlternateNames
     maybeDescription <- Gen.option(datasetDescriptions)
     published        <- datasetPublishingInfos
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
-  } yield DatasetSearchResult(id, name, maybeDescription, published, projectsCount)
+  } yield DatasetSearchResult(id, name, alternateName, maybeDescription, published, projectsCount)
 }

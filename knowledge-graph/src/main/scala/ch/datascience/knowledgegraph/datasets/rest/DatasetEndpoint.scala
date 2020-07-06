@@ -39,12 +39,12 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class DatasetEndpoint[Interpretation[_]: Effect](
-    datasetFinder:         DatasetFinder[Interpretation],
-    renkuResourcesUrl:     renku.ResourcesUrl,
-    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    logger:                Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+class DatasetEndpoint[Interpretation[_] : Effect](
+                                                   datasetFinder: DatasetFinder[Interpretation],
+                                                   renkuResourcesUrl: renku.ResourcesUrl,
+                                                   executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+                                                   logger: Logger[Interpretation]
+                                                 ) extends Http4sDsl[Interpretation] {
 
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
   import executionTimeRecorder._
@@ -59,15 +59,15 @@ class DatasetEndpoint[Interpretation[_]: Effect](
     } map logExecutionTimeWhen(finishedSuccessfully(identifier))
 
   private def toHttpResult(
-      identifier: Identifier
-  ): Option[Dataset] => Interpretation[Response[Interpretation]] = {
-    case None          => NotFound(InfoMessage(s"No dataset with '$identifier' id found"))
+                            identifier: Identifier
+                          ): Option[Dataset] => Interpretation[Response[Interpretation]] = {
+    case None => NotFound(InfoMessage(s"No dataset with '$identifier' id found"))
     case Some(dataset) => Ok(dataset.asJson)
   }
 
   private def httpResult(
-      identifier: Identifier
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+                          identifier: Identifier
+                        ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Finding dataset with '$identifier' id failed")
       logger.error(exception)(errorMessage.value)
@@ -84,7 +84,8 @@ class DatasetEndpoint[Interpretation[_]: Effect](
     Json.obj(
       List(
         Some("identifier" -> dataset.id.asJson),
-        Some("name" -> dataset.name.asJson),
+        Some("name" -> dataset.alternateName.asJson),
+        Some("title" -> dataset.name.asJson),
         Some("sameAs" -> dataset.sameAs.asJson),
         dataset.maybeUrl.map(url => "url" -> url.asJson),
         dataset.maybeDescription.map(description => "description" -> description.asJson),
@@ -98,7 +99,7 @@ class DatasetEndpoint[Interpretation[_]: Effect](
     ) deepMerge _links(
       Link(Rel.Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
     )
-  } 
+  }
   // format: on
 
   // format: off
@@ -138,13 +139,13 @@ class DatasetEndpoint[Interpretation[_]: Effect](
 object IODatasetEndpoint {
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[DatasetEndpoint[IO]] =
+             timeRecorder: SparqlQueryTimeRecorder[IO]
+           )(implicit executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]): IO[DatasetEndpoint[IO]] =
     for {
-      datasetFinder         <- IODatasetFinder(timeRecorder, logger = ApplicationLogger)
-      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
+      datasetFinder <- IODatasetFinder(timeRecorder, logger = ApplicationLogger)
+      renkuResourceUrl <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetEndpoint[IO](
       datasetFinder,

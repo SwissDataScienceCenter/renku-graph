@@ -26,7 +26,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs}
+import ch.datascience.graph.model.datasets.{AlternateName, Identifier, Name, SameAs}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
@@ -123,11 +123,12 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
       logger
     ).getProjectDatasets _
 
-    lazy val toJson: ((Identifier, Name, SameAs)) => Json = {
-      case (id, name, sameAs) =>
+    lazy val toJson: ((Identifier, Name, AlternateName, SameAs)) => Json = {
+      case (id, name, alternateName, sameAs) =>
         json"""{
           "identifier": ${id.value},
-          "name": ${name.value},
+          "title": ${name.value},
+          "name": ${alternateName.value},
           "sameAs": ${sameAs.value},
           "_links": [{
             "rel": "details",
@@ -137,9 +138,10 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
     }
   }
 
-  private implicit val datasetBasicDetails: Gen[(Identifier, Name, SameAs)] = for {
-    id     <- datasetIdentifiers
-    name   <- datasetNames
-    sameAs <- datasetSameAs
-  } yield (id, name, sameAs)
+  private implicit val datasetBasicDetails: Gen[(Identifier, Name, AlternateName, SameAs)] = for {
+    id            <- datasetIdentifiers
+    name          <- datasetNames
+    alternateName <- datasetAlternateNames
+    sameAs        <- datasetSameAs
+  } yield (id, name, alternateName, sameAs)
 }

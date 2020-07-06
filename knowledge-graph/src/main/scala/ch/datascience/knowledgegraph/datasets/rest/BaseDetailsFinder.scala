@@ -54,7 +54,7 @@ private class BaseDetailsFinder(
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?url (?topmostSameAs AS ?sameAs) ?description ?publishedDate
+    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?alternateName ?url (?topmostSameAs AS ?sameAs) ?description ?publishedDate
         |WHERE {
         |  {
         |    SELECT ?topmostSameAs
@@ -93,7 +93,8 @@ private class BaseDetailsFinder(
         |    ?datasetId schema:identifier "$identifier" ;
         |               schema:identifier ?identifier ;
         |               rdf:type <http://schema.org/Dataset> ;
-        |               schema:name ?name .
+        |               schema:name ?name ;
+        |               schema:alternateName ?alternateName .
         |    OPTIONAL { ?datasetId schema:url ?url } .
         |    OPTIONAL { ?datasetId schema:description ?description } .
         |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate } .
@@ -126,6 +127,7 @@ private object BaseDetailsFinder {
         id                 <- extract[String]("datasetId", from = cursor)
         identifier         <- extract[Identifier]("identifier", from = cursor)
         name               <- extract[Name]("name", from = cursor)
+        alternateName      <- extract[AlternateName]("alternateName", from = cursor)
         maybeUrl           <- extract[Option[String]]("url", from = cursor).map(blankToNone).flatMap(toOption[Url])
         maybeSameAs        <- extract[Option[String]]("sameAs", from = cursor).map(blankToNone).flatMap(toOption[SameAs])
         maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate", from = cursor)
@@ -135,6 +137,7 @@ private object BaseDetailsFinder {
       } yield Dataset(
         identifier,
         name,
+        alternateName,
         maybeSameAs getOrElse SameAs(id),
         maybeUrl,
         maybeDescription,

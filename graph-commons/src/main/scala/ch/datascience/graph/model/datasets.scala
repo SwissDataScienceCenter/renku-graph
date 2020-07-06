@@ -31,6 +31,9 @@ object datasets {
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
 
+  final class AlternateName private (val value: String) extends AnyVal with StringTinyType
+  implicit object AlternateName extends TinyTypeFactory[AlternateName](new AlternateName(_)) with NonBlank
+
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
 

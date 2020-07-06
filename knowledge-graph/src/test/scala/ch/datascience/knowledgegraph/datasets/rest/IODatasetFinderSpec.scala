@@ -58,6 +58,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -74,6 +75,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -91,6 +93,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = datasetIdentifiers.generateOne,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -125,6 +128,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -141,6 +145,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -158,6 +163,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = datasetIdentifiers.generateOne,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.entityId.asSameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -192,6 +198,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
+            datasetAlternateName      = dataset.alternateName,
             maybeDatasetUrl           = dataset.maybeUrl,
             maybeDatasetSameAs        = dataset.sameAs.some,
             maybeDatasetDescription   = dataset.maybeDescription,
@@ -208,6 +215,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
+            datasetAlternateName      = dataset.alternateName,
             maybeDatasetUrl           = dataset.maybeUrl,
             maybeDatasetSameAs        = dataset.sameAs.some,
             maybeDatasetDescription   = dataset.maybeDescription,
@@ -241,6 +249,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
+            datasetAlternateName      = dataset.alternateName,
             maybeDatasetUrl           = dataset.maybeUrl,
             maybeDatasetSameAs        = None,
             maybeDatasetDescription   = dataset.maybeDescription,
@@ -257,6 +266,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
+            datasetAlternateName      = dataset.alternateName,
             maybeDatasetUrl           = dataset.maybeUrl,
             maybeDatasetSameAs        = None,
             maybeDatasetDescription   = dataset.maybeDescription,
@@ -300,6 +310,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -317,6 +328,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = project2DatasetId,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -334,6 +346,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = project2DatasetId,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -380,6 +393,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -397,6 +411,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = project2DatasetId,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.entityId.asSameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -414,6 +429,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = project2DatasetId,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.entityId.asSameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -453,6 +469,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -470,6 +487,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -508,6 +526,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -525,6 +544,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = dataset.sameAs.some,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -561,6 +581,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
+            datasetAlternateName      = dataset.alternateName,
             maybeDatasetUrl           = dataset.maybeUrl,
             maybeDatasetSameAs        = None,
             maybeDatasetDescription   = dataset.maybeDescription,
@@ -578,6 +599,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
+            datasetAlternateName      = dataset.alternateName,
             maybeDatasetUrl           = dataset.maybeUrl,
             maybeDatasetSameAs        = None,
             maybeDatasetDescription   = dataset.maybeDescription,
@@ -598,6 +620,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
             )(
               datasetIdentifier         = dataset.id,
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetUrl           = dataset.maybeUrl,
               maybeDatasetSameAs        = None,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -856,6 +879,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
         )(
           datasetIdentifier         = dataSet.id,
           datasetName               = dataSet.name,
+          datasetAlternateName      = dataSet.alternateName,
           maybeDatasetUrl           = dataSet.maybeUrl,
           maybeDatasetSameAs        = if (noSameAs) None else dataSet.sameAs.some,
           maybeDatasetDescription   = dataSet.maybeDescription,

@@ -27,6 +27,7 @@ object model {
 
   final case class Dataset(id:               Identifier,
                            name:             Name,
+                           alternateName:    AlternateName,
                            sameAs:           SameAs,
                            maybeUrl:         Option[Url],
                            maybeDescription: Option[Description],

@@ -64,7 +64,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(datasetsList flatMap (_.toJsonLD(noSameAs = false)): _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase = maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase = maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe datasetsList
@@ -85,7 +85,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       loadToStore(datasetsList flatMap (_.toJsonLD(noSameAs = false)): _*)
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
         .unsafeRunSync()
 
       result.results shouldBe datasetsList
@@ -105,7 +105,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       loadToStore(datasetsList flatMap (_.toJsonLD(noSameAs = true)): _*)
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
         .unsafeRunSync()
 
       result.results shouldBe datasetsList
@@ -129,7 +129,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(3)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(3)))
         .unsafeRunSync()
 
       val datasetsList = List(dataset1, dataset2, dataset3)
@@ -167,7 +167,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
         .unsafeRunSync()
 
       result.results shouldBe List(
@@ -203,7 +203,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
         .unsafeRunSync()
 
       result.results shouldBe List(
@@ -237,7 +237,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
         .unsafeRunSync()
 
       result.results shouldBe List(
@@ -272,7 +272,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val matchingDatasets = List(dataset1, dataset2, dataset3)
@@ -302,7 +302,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val matchingDatasets = List(dataset1, dataset2, dataset3)
@@ -337,7 +337,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val matchingDatasets = List(dataset1, dataset2, dataset3)
@@ -390,7 +390,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = Some(phrase),
-                      Sort.By(NameProperty, Direction.Asc),
+                      Sort.By(TitleProperty, Direction.Asc),
                       PagingRequest(Page(1), PerPage(3)))
         .unsafeRunSync()
 
@@ -445,7 +445,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = Some(phrase),
-                      Sort.By(NameProperty, Direction.Asc),
+                      Sort.By(TitleProperty, Direction.Asc),
                       PagingRequest(Page(1), PerPage(3)))
         .unsafeRunSync()
 
@@ -493,7 +493,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = Some(phrase),
-                      Sort.By(NameProperty, Direction.Asc),
+                      Sort.By(TitleProperty, Direction.Asc),
                       PagingRequest(Page(1), PerPage(3)))
         .unsafeRunSync()
 
@@ -510,7 +510,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
   "findDatasets with explicit sorting given" should {
 
-    s"return datasets with name, description or creator matching the given phrase sorted by $NameProperty" in new TestCase {
+    s"return datasets with name, description or creator matching the given phrase sorted by $TitleProperty" in new TestCase {
       forAll(datasets, datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig, nonPhrased) =>
         val phrase                         = phrases.generateOne
         val (dataset1, dataset2, dataset3) = addPhrase(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
@@ -518,7 +518,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(List(dataset1, dataset2, dataset3, nonPhrased) flatMap (_.toJsonLD(noSameAs = false)): _*)
 
         datasetsFinder
-          .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
           .results shouldBe List(dataset1.toDatasetSearchResult,
                                  dataset2.toDatasetSearchResult,
@@ -583,7 +583,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val expectedDataset = List(dataset1, dataset2, dataset3).sorted(byName)(1)
@@ -605,7 +605,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       result.results                  shouldBe Nil
@@ -656,7 +656,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(dataset1Jsons ++ dataset2Jsons ++ dataset3Jsons: _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
           .unsafeRunSync()
 
         result.results shouldBe List(
@@ -692,7 +692,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(dataset1Jsons ++ dataset2Jsons ++ dataset3Jsons: _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
           .unsafeRunSync()
 
         result.results shouldBe List(
@@ -728,7 +728,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(dataset1Jsons ++ dataset2Jsons ++ dataset3Jsons: _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
           .unsafeRunSync()
 
         result.results shouldBe List(
@@ -752,7 +752,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(allJsons: _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
           .unsafeRunSync()
 
         result.results shouldBe List(
@@ -849,6 +849,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     lazy val toDatasetSearchResult: DatasetSearchResult = DatasetSearchResult(
       dataset.id,
       dataset.name,
+      dataset.alternateName,
       dataset.maybeDescription,
       dataset.published,
       ProjectsCount(dataset.projects.size)
@@ -866,6 +867,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
           )(
             datasetIdentifier         = dataset.id,
             datasetName               = dataset.name,
+            datasetAlternateName      = dataset.alternateName,
             maybeDatasetSameAs        = if (noSameAs) None else dataset.sameAs.some,
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -884,6 +886,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
               projectPath = project.path
             )(
               datasetName               = dataset.name,
+              datasetAlternateName      = dataset.alternateName,
               maybeDatasetSameAs        = someSameAs,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
