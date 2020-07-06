@@ -19,10 +19,12 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.ConfigFactory
+import io.chrisdavenport.log4cats.Logger
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -33,11 +35,11 @@ class TriplesGeneratorSpec extends WordSpec {
 
   "apply" should {
 
-    s"return an instance of RenkuLogTriplesGenerator if TriplesGeneration is $RenkuLog" in {
-      TriplesGenerator(TriplesGeneration.RenkuLog).unsafeRunSync() shouldBe a[RenkuLogTriplesGenerator]
+    s"return an instance of RenkuLogTriplesGenerator if TriplesGeneration is $RenkuLog" in new TestCase {
+      TriplesGenerator(TriplesGeneration.RenkuLog, logger = logger).unsafeRunSync() shouldBe a[RenkuLogTriplesGenerator]
     }
 
-    s"return an instance of RemoteTriplesGenerator if TriplesGeneration is $RemoteTriplesGeneration" in {
+    s"return an instance of RemoteTriplesGenerator if TriplesGeneration is $RemoteTriplesGeneration" in new TestCase {
 
       val config = ConfigFactory.parseMap(
         Map(
@@ -45,7 +47,7 @@ class TriplesGeneratorSpec extends WordSpec {
         ).asJava
       )
 
-      TriplesGenerator(TriplesGeneration.RemoteTriplesGeneration, config)
+      TriplesGenerator(TriplesGeneration.RemoteTriplesGeneration, config, logger = logger)
         .unsafeRunSync() shouldBe a[RemoteTriplesGenerator]
     }
   }
@@ -53,4 +55,8 @@ class TriplesGeneratorSpec extends WordSpec {
   private implicit val ec:    ExecutionContext = ExecutionContext.global
   private implicit val cs:    ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val timer: Timer[IO]        = IO.timer(ExecutionContext.global)
+
+  private trait TestCase {
+    val logger: Logger[IO]        = new TestLogger[IO]
+  }
 }

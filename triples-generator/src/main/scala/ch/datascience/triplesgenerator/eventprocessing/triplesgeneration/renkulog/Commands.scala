@@ -29,6 +29,7 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -81,7 +82,8 @@ private object Commands {
 
   class Git(
       doClone: (ServiceUrl, Path, Path) => CommandResult = (url, destinationDir, workDir) =>
-        %%('git, 'clone, url.toString, destinationDir.toString)(workDir)
+        %%('git, 'clone, url.toString, destinationDir.toString)(workDir),
+      logger:     Logger[IO]
   ) {
     import cats.data.EitherT
     import cats.implicits._
@@ -112,7 +114,9 @@ private object Commands {
           case err if recoverableErrors exists err.contains =>
             GenerationRecoverableError(errorMessage(err)).asLeft[Unit].pure[IO]
           case err =>
-            new Exception(errorMessage(err)).raiseError[IO, Either[GenerationRecoverableError, Unit]]
+            logger.error(errorMessage(err))
+            new Exception(errorMessage(err))
+              .raiseError[IO, Either[GenerationRecoverableError, Unit]]
         }
     }
   }

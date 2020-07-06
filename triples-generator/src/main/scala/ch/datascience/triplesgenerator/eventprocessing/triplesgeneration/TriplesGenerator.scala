@@ -28,6 +28,7 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.{Config, ConfigFactory}
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -46,11 +47,13 @@ private[eventprocessing] object TriplesGenerator {
 
   def apply(
       triplesGeneration:   TriplesGeneration,
-      config:              Config = ConfigFactory.load()
+      config:              Config = ConfigFactory.load(),
+      logger:     Logger[IO]
   )(implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext,
-    timer:                 Timer[IO]): IO[TriplesGenerator[IO]] = triplesGeneration match {
-    case RenkuLog                => RenkuLogTriplesGenerator()
+    timer:                 Timer[IO]
+  ): IO[TriplesGenerator[IO]] = triplesGeneration match {
+    case RenkuLog                => RenkuLogTriplesGenerator(logger = logger)
     case RemoteTriplesGeneration => RemoteTriplesGenerator(config)
   }
 }

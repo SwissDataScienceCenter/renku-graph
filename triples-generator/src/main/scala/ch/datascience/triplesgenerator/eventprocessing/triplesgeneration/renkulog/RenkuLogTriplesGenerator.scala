@@ -20,7 +20,6 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 
 import java.security.SecureRandom
 
-import Commands.GitLabRepoUrlFinder
 import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.{ContextShift, IO, Timer}
@@ -34,6 +33,8 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.{higherKinds, postfixOps}
@@ -119,9 +120,11 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
 
 private[eventprocessing] object RenkuLogTriplesGenerator {
 
-  def apply()(implicit contextShift: ContextShift[IO],
+  def apply(logger:     Logger[IO])(implicit contextShift: ContextShift[IO],
               executionContext:      ExecutionContext,
-              timer:                 Timer[IO]): IO[TriplesGenerator[IO]] =
+              timer:                 Timer[IO],
+
+  ): IO[TriplesGenerator[IO]] =
     for {
       renkuLogTimeout <- RenkuLogTimeout[IO]()
       gitLabUrl       <- GitLabUrl[IO]()
@@ -129,7 +132,7 @@ private[eventprocessing] object RenkuLogTriplesGenerator {
       new GitLabRepoUrlFinder[IO](gitLabUrl),
       new Commands.Renku(renkuLogTimeout),
       new Commands.File,
-      new Commands.Git,
+      new Commands.Git(logger= logger),
       randomLong = new SecureRandom().nextLong _
     )
 }
