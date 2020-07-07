@@ -86,7 +86,7 @@ spec:
               path: /ping
               port: http-webhook-sv
           resources:
-  {{ toYaml .Values.webhookService.resources | indent 12 }}
+  {{- toYaml .Values.webhookService.resources | nindent 12 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}

@@ -58,7 +58,7 @@ spec:
               mountPath: /docker-entrypoint.sh
               subPath: docker-entrypoint.sh
           resources:
-{{ toYaml .Values.resources | indent 12 }}
+{{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: docker-entrypoint
           configMap:
