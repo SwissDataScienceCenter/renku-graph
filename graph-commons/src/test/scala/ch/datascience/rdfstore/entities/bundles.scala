@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{AlternateName, Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Url}
+import ch.datascience.graph.model.datasets.{Name, Description, Identifier, Title, PartLocation, PartName, PublishedDate, SameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
@@ -82,16 +82,16 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
       maybeParent:         Option[Project]      = None
   )(
-      datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
-      datasetName:               Name = datasetNames.generateOne,
-      datasetAlternateName:      AlternateName = datasetAlternateNames.generateOne,
-      maybeDatasetUrl:           Option[Url] = Gen.option(datasetUrls).generateOne,
-      maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
-      maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:        datasets.DateCreated = datasets.DateCreated(committedDate.value),
-      datasetCreators:           Set[Person] = setOf(persons).generateOne,
-      datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
+                     datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
+                     datasetTitle:               Title = datasetTitles.generateOne,
+                     datasetName:      Name = datasetNames.generateOne,
+                     maybeDatasetUrl:           Option[Url] = Gen.option(datasetUrls).generateOne,
+                     maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
+                     maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
+                     maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+                     datasetCreatedDate:        datasets.DateCreated = datasets.DateCreated(committedDate.value),
+                     datasetCreators:           Set[Person] = setOf(persons).generateOne,
+                     datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
   )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
     val project = Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent)
     Activity(
@@ -104,8 +104,8 @@ object bundles extends Schemas {
         Generation.factory(
           DataSet.factory(
             datasetIdentifier,
+            datasetTitle,
             datasetName,
-            datasetAlternateName,
             maybeDatasetUrl,
             maybeDatasetSameAs,
             maybeDatasetDescription,
@@ -190,8 +190,8 @@ object bundles extends Schemas {
         Generation.factory(
           entityFactory = DataSet.factory(
             id             = dataSetId,
-            name           = datasets.Name("zhbikes"),
-            alternateName  = datasets.AlternateName("zhbikes"),
+            title           = datasets.Title("zhbikes"),
+            name  = datasets.Name("zhbikes"),
             createdDate    = datasetCreatedDates.generateOne,
             creators       = dataSetCreators,
             partsFactories = partsFactories

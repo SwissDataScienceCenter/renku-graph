@@ -84,8 +84,8 @@ class DatasetEndpoint[Interpretation[_] : Effect](
     Json.obj(
       List(
         Some("identifier" -> dataset.id.asJson),
-        Some("name" -> dataset.alternateName.asJson),
-        Some("title" -> dataset.name.asJson),
+        Some("name" -> dataset.name.asJson),
+        Some("title" -> dataset.title.asJson),
         Some("sameAs" -> dataset.sameAs.asJson),
         dataset.maybeUrl.map(url => "url" -> url.asJson),
         dataset.maybeDescription.map(description => "description" -> description.asJson),

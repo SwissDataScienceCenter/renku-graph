@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{AlternateName, Identifier, Name, SameAs}
+import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait ProjectDatasetsFinder[Interpretation[_]] {
-  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier, Name, AlternateName, SameAs)]]
+  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier, Title, Name, SameAs)]]
 }
 
 private class IOProjectDatasetsFinder(
@@ -46,8 +46,8 @@ private class IOProjectDatasetsFinder(
 
   import IOProjectDatasetsFinder._
 
-  def findProjectDatasets(projectPath: Path): IO[List[(Identifier, Name, AlternateName, SameAs)]] =
-    queryExpecting[List[(Identifier, Name, AlternateName, SameAs)]](using = query(projectPath))
+  def findProjectDatasets(projectPath: Path): IO[List[(Identifier, Title, Name, SameAs)]] =
+    queryExpecting[List[(Identifier, Title, Name, SameAs)]](using = query(projectPath))
 
   private def query(path: Path) = SparqlQuery(
     name = "ds projects",
@@ -101,18 +101,18 @@ private class IOProjectDatasetsFinder(
 private object IOProjectDatasetsFinder {
   import io.circe.Decoder
 
-  private implicit val recordsDecoder: Decoder[List[(Identifier, Name, AlternateName, SameAs)]] = {
+  private implicit val recordsDecoder: Decoder[List[(Identifier, Title, Name, SameAs)]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    implicit val recordDecoder: Decoder[(Identifier, Name, AlternateName, SameAs)] = { cursor =>
+    implicit val recordDecoder: Decoder[(Identifier, Title, Name, SameAs)] = { cursor =>
       for {
-        id            <- cursor.downField("identifier").downField("value").as[Identifier]
-        name          <- cursor.downField("name").downField("value").as[Name]
-        alternateName <- cursor.downField("alternateName").downField("value").as[AlternateName]
-        sameAs        <- cursor.downField("sameAs").downField("value").as[SameAs]
-      } yield (id, name, alternateName, sameAs)
+        id     <- cursor.downField("identifier").downField("value").as[Identifier]
+        title  <- cursor.downField("name").downField("value").as[Title]
+        name   <- cursor.downField("alternateName").downField("value").as[Name]
+        sameAs <- cursor.downField("sameAs").downField("value").as[SameAs]
+      } yield (id, title, name, sameAs)
     }
 
-    _.downField("results").downField("bindings").as(decodeList[(Identifier, Name, AlternateName, SameAs)])
+    _.downField("results").downField("bindings").as(decodeList[(Identifier, Title, Name, SameAs)])
   }
 }

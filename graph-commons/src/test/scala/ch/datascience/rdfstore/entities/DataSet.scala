@@ -27,8 +27,8 @@ trait DataSet {
   self: Artifact with Entity =>
 
   val datasetId:                 Identifier
-  val datasetName:               Name
-  val datasetAlternateName:      AlternateName
+  val datasetTitle:               Title
+  val datasetName:      Name
   val maybeDatasetUrl:           Option[Url]
   val maybeDatasetSameAs:        Option[SameAs]
   val maybeDatasetDescription:   Option[Description]
@@ -49,8 +49,8 @@ object DataSet {
   type DataSetEntity = Entity with DataSet with Artifact
 
   def factory(id:                 Identifier,
-              name:               Name,
-              alternateName:      AlternateName,
+              title:               Title,
+              name:      Name,
               maybeUrl:           Option[Url] = None,
               maybeSameAs:        Option[SameAs] = None,
               maybeDescription:   Option[Description] = None,
@@ -65,8 +65,8 @@ object DataSet {
                maybeInvalidationActivity = None,
                maybeGeneration           = None) with Artifact with DataSet {
       override val datasetId:                 Identifier                = id
-      override val datasetName:               Name                      = name
-      override val datasetAlternateName:      AlternateName             = alternateName
+      override val datasetTitle:               Title                      = title
+      override val datasetName:      Name             = name
       override val maybeDatasetUrl:           Option[Url]               = maybeUrl
       override val maybeDatasetSameAs:        Option[SameAs]            = maybeSameAs
       override val maybeDatasetDescription:   Option[Description]       = maybeDescription
@@ -92,8 +92,8 @@ object DataSet {
           EntityTypes of schema / "Dataset",
           rdfs / "label"           -> entity.datasetId.asJsonLD,
           schema / "identifier"    -> entity.datasetId.asJsonLD,
-          schema / "name"          -> entity.datasetName.asJsonLD,
-          schema / "alternateName" -> entity.datasetAlternateName.asJsonLD,
+          schema / "name"          -> entity.datasetTitle.asJsonLD,
+          schema / "alternateName" -> entity.datasetName.asJsonLD,
           schema / "url"           -> entity.maybeDatasetUrl.asJsonLD,
           schema / "sameAs"        -> entity.maybeDatasetSameAs.asJsonLD,
           schema / "description"   -> entity.maybeDatasetDescription.asJsonLD,

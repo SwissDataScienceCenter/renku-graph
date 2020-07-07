@@ -49,21 +49,21 @@ class IOProjectDatasetsFinderSpec
           randomDataSetCommit,
           dataSetCommit()(projectPath)(
             datasetIdentifier    = dataset1.id,
-            datasetName          = dataset1.name,
-            datasetAlternateName = dataset1.alternateName,
+            datasetTitle          = dataset1.title,
+            datasetName = dataset1.name,
             maybeDatasetSameAs   = dataset1.sameAs.some
           ),
           dataSetCommit()(projectPath)(
             datasetIdentifier    = dataset2.id,
-            datasetName          = dataset2.name,
-            datasetAlternateName = dataset2.alternateName,
+            datasetTitle          = dataset2.title,
+            datasetName = dataset2.name,
             maybeDatasetSameAs   = dataset2.sameAs.some
           )
         )
 
         datasetsFinder.findProjectDatasets(projectPath).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.name, dataset1.alternateName, dataset1.sameAs),
-          (dataset2.id, dataset2.name, dataset2.alternateName, dataset2.sameAs)
+          (dataset1.id, dataset1.title, dataset1.name, dataset1.sameAs),
+          (dataset2.id, dataset2.title, dataset2.name, dataset2.sameAs)
         )
       }
     }
@@ -74,23 +74,23 @@ class IOProjectDatasetsFinderSpec
         loadToStore(
           dataSetCommit()(project1)(
             datasetIdentifier    = dataset1.id,
-            datasetName          = dataset1.name,
-            datasetAlternateName = dataset1.alternateName,
+            datasetTitle          = dataset1.title,
+            datasetName = dataset1.name,
             maybeDatasetSameAs   = dataset1.sameAs.some
           ),
           dataSetCommit()(project2)(
             datasetIdentifier    = dataset2.id,
-            datasetName          = dataset2.name,
-            datasetAlternateName = dataset2.alternateName,
+            datasetTitle          = dataset2.title,
+            datasetName = dataset2.name,
             maybeDatasetSameAs   = DataSet.entityId(dataset1.id).asSameAs.some
           )
         )
 
         datasetsFinder.findProjectDatasets(project1).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.name, dataset1.alternateName, dataset1.sameAs)
+          (dataset1.id, dataset1.title, dataset1.name, dataset1.sameAs)
         )
         datasetsFinder.findProjectDatasets(project2).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset2.id, dataset2.name, dataset2.alternateName, dataset1.sameAs)
+          (dataset2.id, dataset2.title, dataset2.name, dataset1.sameAs)
         )
       }
     }
@@ -103,23 +103,23 @@ class IOProjectDatasetsFinderSpec
         loadToStore(
           dataSetCommit()(project1)(
             datasetIdentifier    = dataset1.id,
-            datasetName          = dataset1.name,
-            datasetAlternateName = dataset1.alternateName,
+            datasetTitle          = dataset1.title,
+            datasetName = dataset1.name,
             maybeDatasetSameAs   = None
           ),
           dataSetCommit()(project2)(
             datasetIdentifier    = dataset2.id,
-            datasetName          = dataset2.name,
-            datasetAlternateName = dataset2.alternateName,
+            datasetTitle          = dataset2.title,
+            datasetName = dataset2.name,
             maybeDatasetSameAs   = dataSet1BasedSameAs.some
           )
         )
 
         datasetsFinder.findProjectDatasets(project1).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.name, dataset1.alternateName, dataSet1BasedSameAs)
+          (dataset1.id, dataset1.title, dataset1.name, dataSet1BasedSameAs)
         )
         datasetsFinder.findProjectDatasets(project2).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset2.id, dataset2.name, dataset2.alternateName, dataSet1BasedSameAs)
+          (dataset2.id, dataset2.title, dataset2.name, dataSet1BasedSameAs)
         )
       }
     }

@@ -96,12 +96,12 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, name, alternateName, maybeDescription, published, projectsCount) =>
+    case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount) =>
       json"""
       {
         "identifier": $id,
-        "title": $name,
-        "name": $alternateName,
+        "title": $title,
+        "name": $name,
         "published": $published,
         "projectsCount": $projectsCount
       }"""

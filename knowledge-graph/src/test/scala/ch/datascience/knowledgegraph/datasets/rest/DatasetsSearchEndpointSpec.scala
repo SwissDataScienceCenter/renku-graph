@@ -150,11 +150,11 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, name, alternateName, maybeDescription, published, projectsCount) =>
+      case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount) =>
         json"""{
           "identifier": $id,
-          "name": $alternateName,
-          "title": $name,
+          "title": $title,
+          "name": $name,
           "published": $published,
           "projectsCount": ${projectsCount.value},
           "_links": [{
@@ -188,10 +188,10 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
 
   private implicit val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
     id               <- datasetIdentifiers
+    title            <- datasetTitles
     name             <- datasetNames
-    alternateName    <- datasetAlternateNames
     maybeDescription <- Gen.option(datasetDescriptions)
     published        <- datasetPublishingInfos
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
-  } yield DatasetSearchResult(id, name, alternateName, maybeDescription, published, projectsCount)
+  } yield DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount)
 }

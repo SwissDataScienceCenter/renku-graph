@@ -105,8 +105,8 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
             .some
         )(
           datasetIdentifier    = dataset.id,
-          datasetName          = dataset.name,
-          datasetAlternateName = dataset.alternateName,
+          datasetTitle          = dataset.title,
+          datasetName = dataset.name,
           maybeDatasetSameAs   = dataset.sameAs.some
         )
       )
