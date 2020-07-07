@@ -79,7 +79,7 @@ spec:
             successThreshold: 1
             failureThreshold: 3
           resources:
-  {{ toYaml .Values.tokenRepository.resources | indent 12 }}
+  {{- toYaml .Values.tokenRepository.resources | nindent 12 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}
