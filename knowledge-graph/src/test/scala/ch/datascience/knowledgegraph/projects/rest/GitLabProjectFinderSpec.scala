@@ -89,6 +89,23 @@ class GitLabProjectFinderSpec extends WordSpec with ExternalServiceStubbing with
       projectFinder.findProject(path, maybeAccessToken = None).value.unsafeRunSync() shouldBe Some(project)
     }
 
+    "return fetched project info with no readme if readme_url in remote is blank" in new TestCase {
+      val path          = projectPaths.generateOne
+      val gitLabProject = gitLabProjects.generateOne
+      val project       = gitLabProject.copy(urls = gitLabProject.urls.copy(maybeReadme = None))
+
+      stubFor {
+        get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
+          .willReturn(
+            okJson(
+              projectJson(project).noSpaces
+            )
+          )
+      }
+
+      projectFinder.findProject(path, maybeAccessToken = None).value.unsafeRunSync() shouldBe Some(project)
+    }
+
     "return None if service responds with NOT_FOUND" in new TestCase {
 
       val path = projectPaths.generateOne
@@ -142,7 +159,7 @@ class GitLabProjectFinderSpec extends WordSpec with ExternalServiceStubbing with
     "ssh_url_to_repo":  ${project.urls.ssh.value},
     "http_url_to_repo": ${project.urls.http.value},
     "web_url":          ${project.urls.web.value},
-    "readme_url":       ${project.urls.readme.value},
+    "readme_url":       ${project.urls.maybeReadme.map(_.value)},
     "forks_count":      ${project.forksCount.value},
     "tag_list":         ${project.tags.map(_.value).toList},
     "star_count":       ${project.starsCount.value},

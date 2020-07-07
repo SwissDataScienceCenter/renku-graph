@@ -151,7 +151,7 @@ object model {
         with NonNegativeLong
   }
 
-  final case class Urls(ssh: SshUrl, http: HttpUrl, web: WebUrl, readme: ReadmeUrl)
+  final case class Urls(ssh: SshUrl, http: HttpUrl, web: WebUrl, maybeReadme: Option[ReadmeUrl])
 
   object Urls {
 
