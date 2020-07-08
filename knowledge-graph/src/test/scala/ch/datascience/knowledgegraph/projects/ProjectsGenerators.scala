@@ -113,11 +113,11 @@ object ProjectsGenerators {
                         statistics)
 
   private implicit lazy val urlsObjects: Gen[Urls] = for {
-    sshUrl    <- sshUrls
-    httpUrl   <- httpUrls
-    webUrl    <- webUrls
-    readmeUrl <- readmeUrls
-  } yield Urls(sshUrl, httpUrl, webUrl, Some(readmeUrl))
+    sshUrl         <- sshUrls
+    httpUrl        <- httpUrls
+    webUrl         <- webUrls
+    maybeReadmeUrl <- readmeUrls.toGeneratorOfOptions
+  } yield Urls(sshUrl, httpUrl, webUrl, maybeReadmeUrl)
 
   private implicit lazy val forksCounts: Gen[ForksCount] = nonNegativeInts() map (v => ForksCount.apply(v.value))
 
