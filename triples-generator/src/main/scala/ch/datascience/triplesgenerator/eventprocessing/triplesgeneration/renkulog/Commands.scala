@@ -29,7 +29,6 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
-import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -82,8 +81,7 @@ private object Commands {
 
   class Git(
       doClone: (ServiceUrl, Path, Path) => CommandResult = (url, destinationDir, workDir) =>
-        %%('git, 'clone, url.toString, destinationDir.toString)(workDir),
-      logger:     Logger[IO]
+        %%('git, 'clone, url.toString, destinationDir.toString)(workDir)
   ) {
     import cats.data.EitherT
     import cats.implicits._
@@ -111,11 +109,10 @@ private object Commands {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"
         IO(result.out.string) flatMap {
-          case err if recoverableErrors exists err.contains =>
-            GenerationRecoverableError(errorMessage(err)).asLeft[Unit].pure[IO]
-          case err =>
-            logger.error(errorMessage(err))
-            new Exception(errorMessage(err))
+          case out if recoverableErrors exists out.contains =>
+            GenerationRecoverableError(errorMessage(s"$out\n${result.err.string}")).asLeft[Unit].pure[IO]
+          case out =>
+            new Exception(errorMessage(s"$out\n${result.err.string}"))
               .raiseError[IO, Either[GenerationRecoverableError, Unit]]
         }
     }

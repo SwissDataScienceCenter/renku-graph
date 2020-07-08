@@ -19,12 +19,9 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
 import ammonite.ops.{Bytes, CommandResult, Path, ShelloutException}
-import cats.effect.IO
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Git
 import eu.timepit.refined.auto._
@@ -50,39 +47,39 @@ class GitSpec extends WordSpec with MockFactory {
         s"return $GenerationRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
 
           val errorMessage = sentenceContaining(recoverableError).generateOne.value
+          val commandResultException = ShelloutException {
+            CommandResult(
+              exitCode = 1,
+              chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
+            )
+          }
           cloneCommand
             .expects(repositoryUrl, destDirectory, workDirectory)
-            .throwing(ShelloutException {
-              CommandResult(
-                exitCode = 1,
-                chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
-              )
-            })
+            .throwing(commandResultException)
 
           git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Left(
-            GenerationRecoverableError(s"git clone failed with: $errorMessage")
+            GenerationRecoverableError(
+              s"git clone failed with: ${commandResultException.result.out.string}\n${commandResultException.result.err.string}"
+            )
           )
         }
     }
 
-    "fail if command fails with an unknown message and log it" in new TestCase {
+    "fail if command fails with an unknown message" in new TestCase {
 
       val commandException = ShelloutException {
         CommandResult(
           exitCode = 1,
-          chunks   = Seq(Left(new Bytes(nonBlankStrings().generateOne.value.getBytes())))
+          chunks   = Seq(Right(new Bytes(nonBlankStrings().generateOne.value.getBytes())))
         )
       }
       cloneCommand
         .expects(repositoryUrl, destDirectory, workDirectory)
         .throwing(commandException)
 
-      private val errorMessage = s"git clone failed with: ${commandException.result.out.string}"
       intercept[Exception] {
         git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync()
-      }.getMessage shouldBe errorMessage
-
-      logger.loggedOnly(Error(errorMessage))
+      }.getMessage shouldBe s"git clone failed with: ${commandException.result.out.string}\n${commandException.result.err.string}"
     }
 
     "fail if finding command's message fails" in new TestCase {
@@ -108,7 +105,6 @@ class GitSpec extends WordSpec with MockFactory {
     val workDirectory = paths.generateOne
 
     val cloneCommand = mockFunction[ServiceUrl, Path, Path, CommandResult]
-    val logger       = TestLogger[IO]()
-    val git          = new Git(cloneCommand, logger)
+    val git          = new Git(cloneCommand)
   }
 }
