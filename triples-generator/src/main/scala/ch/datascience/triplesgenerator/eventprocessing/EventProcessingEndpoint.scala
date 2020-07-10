@@ -125,7 +125,7 @@ object IOEventProcessingEndpoint {
     executionContext:      ExecutionContext,
     timer:                 Timer[IO]): IO[EventProcessingEndpoint[IO]] =
     for {
-      triplesGenerator <- TriplesGenerator(triplesGeneration, logger = logger)
+      triplesGenerator <- TriplesGenerator(triplesGeneration)
       commitEventProcessor <- IOCommitEventProcessor(triplesGenerator,
                                                      metricsRegistry,
                                                      gitLabThrottler,

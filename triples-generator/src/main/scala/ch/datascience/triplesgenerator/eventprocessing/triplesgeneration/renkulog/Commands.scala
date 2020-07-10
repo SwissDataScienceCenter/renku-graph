@@ -110,10 +110,9 @@ private object Commands {
         def errorMessage(message: String) = s"git clone failed with: $message"
         IO(result.out.string) flatMap {
           case out if recoverableErrors exists out.contains =>
-            GenerationRecoverableError(errorMessage(s"$out\n${result.err.string}")).asLeft[Unit].pure[IO]
-          case out =>
-            new Exception(errorMessage(s"$out\n${result.err.string}"))
-              .raiseError[IO, Either[GenerationRecoverableError, Unit]]
+            GenerationRecoverableError(errorMessage(result.toString())).asLeft[Unit].pure[IO]
+          case _ =>
+            new Exception(errorMessage(result.toString())).raiseError[IO, Either[GenerationRecoverableError, Unit]]
         }
     }
   }

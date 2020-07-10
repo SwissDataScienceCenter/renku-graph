@@ -120,9 +120,10 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
 
 private[eventprocessing] object RenkuLogTriplesGenerator {
 
-  def apply(logger:                               Logger[IO])(implicit contextShift: ContextShift[IO],
-                                executionContext: ExecutionContext,
-                                timer:            Timer[IO]
+  def apply()(
+      implicit contextShift: ContextShift[IO],
+      executionContext:      ExecutionContext,
+      timer:                 Timer[IO]
   ): IO[TriplesGenerator[IO]] =
     for {
       renkuLogTimeout <- RenkuLogTimeout[IO]()

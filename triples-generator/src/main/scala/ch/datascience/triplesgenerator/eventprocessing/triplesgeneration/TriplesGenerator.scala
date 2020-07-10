@@ -47,13 +47,11 @@ private[eventprocessing] object TriplesGenerator {
 
   def apply(
       triplesGeneration:   TriplesGeneration,
-      config:              Config = ConfigFactory.load(),
-      logger:     Logger[IO]
+      config:              Config = ConfigFactory.load()
   )(implicit contextShift: ContextShift[IO],
     executionContext:      ExecutionContext,
-    timer:                 Timer[IO]
-  ): IO[TriplesGenerator[IO]] = triplesGeneration match {
-    case RenkuLog                => RenkuLogTriplesGenerator(logger = logger)
+    timer:                 Timer[IO]): IO[TriplesGenerator[IO]] = triplesGeneration match {
+    case RenkuLog                => RenkuLogTriplesGenerator()
     case RemoteTriplesGeneration => RemoteTriplesGenerator(config)
   }
 }

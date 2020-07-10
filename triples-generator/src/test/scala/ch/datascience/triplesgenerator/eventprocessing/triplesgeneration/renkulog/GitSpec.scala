@@ -59,7 +59,7 @@ class GitSpec extends WordSpec with MockFactory {
 
           git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Left(
             GenerationRecoverableError(
-              s"git clone failed with: ${commandResultException.result.out.string}\n${commandResultException.result.err.string}"
+              s"git clone failed with: ${commandResultException.result.toString}"
             )
           )
         }
@@ -79,7 +79,7 @@ class GitSpec extends WordSpec with MockFactory {
 
       intercept[Exception] {
         git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync()
-      }.getMessage shouldBe s"git clone failed with: ${commandException.result.out.string}\n${commandException.result.err.string}"
+      }.getMessage shouldBe s"git clone failed with: ${commandException.result.toString}"
     }
 
     "fail if finding command's message fails" in new TestCase {
