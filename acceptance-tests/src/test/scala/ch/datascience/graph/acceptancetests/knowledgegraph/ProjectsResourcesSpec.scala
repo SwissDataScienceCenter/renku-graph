@@ -153,7 +153,7 @@ object ProjectsResources {
       "ssh":       ${project.urls.ssh.value},
       "http":      ${project.urls.http.value},
       "web":       ${project.urls.web.value},
-      "readme":    ${project.urls.readme.value}
+      "readme":    ${project.urls.maybeReadme.map(_.value)}
     },
     "forking":     ${project.forking.toJson},
     "tags":        ${project.tags.map(_.value).toList},
