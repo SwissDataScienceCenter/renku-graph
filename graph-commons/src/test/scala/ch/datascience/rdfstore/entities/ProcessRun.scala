@@ -142,11 +142,11 @@ object ProcessRun {
         entity =>
           PartialEntity(
             EntityTypes of (wfprov / "ProcessRun"),
-            rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
-            prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
-            prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
-            prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD,
-            prov / "wasPartOfWorkflowRun" -> entity.processRunWorkflowRun.asEntityId.asJsonLD
+            rdfs / "label"                  -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
+            prov / "qualifiedAssociation"   -> entity.processRunAssociation.asJsonLD,
+            prov / "atLocation"             -> entity.processRunAssociation.runPlan.location.asJsonLD,
+            prov / "qualifiedUsage"         -> entity.processRunUsages.asJsonLD,
+            wfprov / "wasPartOfWorkflowRun" -> entity.processRunWorkflowRun.asEntityId.asJsonLD
           ).asRight
 
       override def toEntityId: Activity with ChildProcessRun => Option[EntityId] =

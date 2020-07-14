@@ -76,16 +76,18 @@ private class IOLineageDataFinder(
         |    ?sourceEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                  prov:atLocation ?sourceEntityLocation.
         |    ?runPlan renku:hasInputs/renku:consumes ?sourceEntity.
-        |    FILTER NOT EXISTS {?runPlan renku:hasSubprocess | ^renku:hasSubprocess ?subprocess}
         |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              rdfs:comment ?command.
+        |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
+        |    FILTER NOT EXISTS {?activity wfprov:wasPartOfWorkflowRun ?workflow}
         |  } UNION {
         |    ?targetEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                  prov:atLocation ?targetEntityLocation.
         |    ?runPlan renku:hasOutputs/renku:produces ?targetEntity.
-        |    FILTER NOT EXISTS {?runPlan renku:hasSubprocess | ^renku:hasSubprocess ?subprocess}
         |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              rdfs:comment ?command.
+        |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
+        |    FILTER NOT EXISTS {?activity wfprov:wasPartOfWorkflowRun ?workflow}
         |  }
         |}
         |""".stripMargin
