@@ -28,6 +28,7 @@ import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
+import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -45,7 +46,7 @@ private class IOLineageDataFinder(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with LineageDataFinder[IO] {
 
-  private type EdgeData = (Node.Location, Option[Node.Location], Option[Node.Location])
+  private type EdgeData = (EntityId, Option[Node.Location], Option[Node.Location])
 
   override def find(projectPath: Path): OptionT[IO, Lineage] = OptionT {
     for {
@@ -70,22 +71,20 @@ private class IOLineageDataFinder(
       "PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?command ?sourceEntityLocation ?targetEntityLocation
+    s"""|SELECT DISTINCT ?runPlan ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
         |  {
         |    ?sourceEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                  prov:atLocation ?sourceEntityLocation.
         |    ?runPlan renku:hasInputs/renku:consumes ?sourceEntity.
-        |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan;
-        |              rdfs:comment ?command.
+        |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan .
         |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
         |    FILTER NOT EXISTS {?activity wfprov:wasPartOfWorkflowRun ?workflow}
         |  } UNION {
         |    ?targetEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                  prov:atLocation ?targetEntityLocation.
         |    ?runPlan renku:hasOutputs/renku:produces ?targetEntity.
-        |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan;
-        |              rdfs:comment ?command.
+        |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan .
         |    FILTER NOT EXISTS {?activity rdf:type wfprov:WorkflowRun}
         |    FILTER NOT EXISTS {?activity wfprov:wasPartOfWorkflowRun ?workflow}
         |  }
@@ -93,28 +92,52 @@ private class IOLineageDataFinder(
         |""".stripMargin
   )
 
-  private def toNodeQueries(project: Path)(commandAndEntities: (Node.Location, Set[Node.Location])) = {
-    val (command, entities) = commandAndEntities
-    entities.map(toEntityDetailsQuery(project)) + toCommandDetailsQuery(project, command)
+  private def toNodeQueries(project: Path)(commandAndEntities: (EntityId, Set[Node.Location])) = {
+    val (runPlanId, entities) = commandAndEntities
+    entities.map(toEntityDetailsQuery(project)) + toRunPlanDetailsQuery(runPlanId)
   }
 
-  private def toCommandDetailsQuery(path: Path, command: Node.Location) = SparqlQuery(
-    name = "lineage - command details",
+  private def toRunPlanDetailsQuery(runPlanId: EntityId) = SparqlQuery(
+    name = "lineage - runPlan details",
     Set(
       "PREFIX prov: <http://www.w3.org/ns/prov#>",
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-      "PREFIX schema: <http://schema.org/>"
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
     ),
-    s"""|SELECT DISTINCT ?type ?location ?label
+    s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command),STR(' '), (GROUP_CONCAT(?commandParameter;separator=' '))) AS ?label) ?location
         |WHERE {
-        |  ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |            rdf:type prov:Activity;
-        |            rdf:type ?type;
-        |            rdfs:comment '$command'.
-        |  BIND ('$command' AS ?location)
-        |  BIND ('$command' AS ?label)
-        |}
+        |  {
+        |    <$runPlanId> renku:command ?command .
+        |    ?activity prov:qualifiedAssociation/prov:hadPlan <$runPlanId> ;              
+        |              rdf:type ?type .
+        |    BIND(<$runPlanId> AS ?location)
+        |  }
+        |  { 
+        |    SELECT DISTINCT ?position ?commandParameter
+        |    WHERE {
+        |      {
+        |        <$runPlanId> renku:hasInputs ?input .
+        |        ?input renku:position ?position;
+        |          		  renku:consumes/prov:atLocation ?location .
+        |        OPTIONAL{ ?input renku:prefix ?maybePrefix }
+        |        BIND(IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+        |        BIND(CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
+        |      } UNION {
+        |        <$runPlanId> renku:hasOutputs ?output .
+        |        ?output renku:position ?position;
+        |              	 renku:produces/prov:atLocation ?location .
+        |        OPTIONAL{ ?output renku:prefix ?maybePrefix }
+        |        BIND(IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+        |        BIND(CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
+        |      } UNION {
+        |        <$runPlanId> renku:hasArguments ?argument .
+        |        ?argument renku:position ?position .
+        |        OPTIONAL{ ?argument renku:prefix ?maybePrefix }
+        |        BIND(IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?commandParameter) .
+        |      }
+        |    } ORDER BY ?position
+        |  }
+        |} GROUP BY ?command ?type ?location
         |""".stripMargin
   )
 
@@ -139,6 +162,7 @@ private class IOLineageDataFinder(
 
   import ch.datascience.tinytypes.json.TinyTypeDecoders
   import io.circe.Decoder
+  import ch.datascience.knowledgegraph.lineage.IOLineageDataFinder._
 
   private implicit val nodeIdDecoder:   Decoder[Node.Id]       = TinyTypeDecoders.stringDecoder(Node.Id)
   private implicit val locationDecoder: Decoder[Node.Location] = TinyTypeDecoders.stringDecoder(Node.Location)
@@ -146,10 +170,10 @@ private class IOLineageDataFinder(
   private implicit val edgesDecoder: Decoder[Set[EdgeData]] = {
     implicit lazy val edgeDecoder: Decoder[EdgeData] = { implicit cursor =>
       for {
-        command        <- cursor.downField("command").downField("value").as[Node.Location]
+        runPlanId      <- cursor.downField("runPlan").downField("value").as[EntityId]
         sourceLocation <- cursor.downField("sourceEntityLocation").downField("value").as[Option[Node.Location]]
         targetLocation <- cursor.downField("targetEntityLocation").downField("value").as[Option[Node.Location]]
-      } yield (command, sourceLocation, targetLocation)
+      } yield (runPlanId, sourceLocation, targetLocation)
     }
 
     _.downField("results").downField("bindings").as[List[EdgeData]].map(_.toSet)
@@ -185,12 +209,12 @@ private class IOLineageDataFinder(
 
   private implicit class EdgesAndLocationsOps(edges: Set[EdgeData]) {
 
-    lazy val toNodesLocations: Map[Node.Location, Set[Node.Location]] =
-      edges.foldLeft(Map.empty[Node.Location, Set[Node.Location]]) {
-        case (locations, (command, maybeSource, maybeTarget)) =>
-          locations.get(command) match {
-            case None           => locations + (command -> Set(maybeSource, maybeTarget).flatten)
-            case Some(entities) => locations + (command -> (entities ++ Set(maybeSource, maybeTarget).flatten))
+    lazy val toNodesLocations: Map[EntityId, Set[Node.Location]] =
+      edges.foldLeft(Map.empty[EntityId, Set[Node.Location]]) {
+        case (locations, (runPlanId, maybeSource, maybeTarget)) =>
+          locations.get(runPlanId) match {
+            case None           => locations + (runPlanId -> Set(maybeSource, maybeTarget).flatten)
+            case Some(entities) => locations + (runPlanId -> (entities ++ Set(maybeSource, maybeTarget).flatten))
           }
       }
   }
@@ -211,8 +235,8 @@ private class IOLineageDataFinder(
 
   private implicit class EdgeDataOps(edgesAndLocations: Set[EdgeData]) {
     lazy val toEdges: IO[Set[Edge]] = (edgesAndLocations map {
-      case (command, Some(sourceLocation), None) => Edge(sourceLocation, command).pure[IO]
-      case (command, None, Some(targetLocation)) => Edge(command, targetLocation).pure[IO]
+      case (runPlan, Some(sourceLocation), None) => Edge(sourceLocation, runPlan.toLocation).pure[IO]
+      case (runPlan, None, Some(targetLocation)) => Edge(runPlan.toLocation, targetLocation).pure[IO]
       case _                                     => new Exception("Cannot instantiate an Edge").raiseError[IO, Edge]
     }).toList.sequence.map(_.toSet)
   }
@@ -237,4 +261,8 @@ private object IOLineageDataFinder {
       logger,
       timeRecorder
     )
+
+  implicit class EntityIdOps(entityId: EntityId) {
+    lazy val toLocation: Node.Location = Node.Location(entityId.value.toString)
+  }
 }

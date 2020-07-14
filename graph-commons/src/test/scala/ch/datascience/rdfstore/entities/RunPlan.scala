@@ -21,8 +21,8 @@ package ch.datascience.rdfstore.entities
 import cats.implicits._
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInput, PositionInput}
-import ch.datascience.rdfstore.entities.CommandParameter.{ActivityCommandParameter, Position, _}
-import ch.datascience.rdfstore.entities.RunPlan.{Argument, SuccessCode}
+import ch.datascience.rdfstore.entities.CommandParameter._
+import ch.datascience.rdfstore.entities.RunPlan.SuccessCode
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 
@@ -31,7 +31,7 @@ import scala.language.postfixOps
 sealed trait RunPlan {
   self: Entity =>
 
-  val runArguments:      List[Argument]
+  val runArguments:      List[CommandParameter with Argument]
   val runCommandInputs:  List[CommandParameter with Input]
   val runCommandOutputs: List[CommandParameter with Output]
   val runSuccessCodes:   List[SuccessCode]
@@ -68,7 +68,7 @@ object RunPlan {
   import io.renku.jsonld.syntax._
 
   def workflow(
-      arguments:    List[Argument] = Nil,
+      arguments:    List[Position => CommandParameter with Argument] = Nil,
       inputs:       List[Position => CommandParameter with Input] = Nil,
       outputs:      List[Activity => Position => CommandParameter with Output] = Nil,
       subprocesses: List[Activity => ProcessOrder => Entity with ProcessRunPlan],
@@ -76,10 +76,10 @@ object RunPlan {
   )(project:        Project)(activity: Activity)(workflowFile: WorkflowFile): Entity with WorkflowRunPlan =
     new Entity(activity.commitId, workflowFile, project, maybeInvalidationActivity = None, maybeGeneration = None)
     with WorkflowRunPlan {
-      override val runArguments:     List[Argument]                    = arguments
-      override val runCommandInputs: List[CommandParameter with Input] = toParameters(inputs)
+      override val runArguments:     List[Argument]                    = toParameters(arguments)
+      override val runCommandInputs: List[CommandParameter with Input] = toParameters(inputs, offset = arguments.length)
       override val runCommandOutputs: List[CommandParameter with Output] =
-        toParameters(outputs, offset = inputs.length)(activity)
+        toOutputParameters(outputs, offset = arguments.length + inputs.length)(activity)
       override val runSubprocesses: List[Entity with ProcessRunPlan] = subprocesses.zipWithIndex.map {
         case (factory, idx) => factory(activity)(ProcessOrder(idx))
       }
@@ -89,7 +89,7 @@ object RunPlan {
   def child(
       workflowFile: WorkflowFile,
       command:      Command,
-      arguments:    List[Argument] = Nil,
+      arguments:    List[Position => CommandParameter with Argument] = Nil,
       inputs:       List[InputFactory[CommandParameter]] = Nil,
       outputs:      List[Activity => Position => CommandParameter with Output] = Nil,
       successCodes: List[SuccessCode] = Nil
@@ -99,11 +99,12 @@ object RunPlan {
                activity.project,
                maybeInvalidationActivity = None,
                maybeGeneration           = None) with ProcessRunPlan {
-      override val runCommand:       Command                           = command
-      override val runArguments:     List[Argument]                    = arguments
-      override val runCommandInputs: List[CommandParameter with Input] = toParameters(inputs)(activity)
+      override val runCommand:   Command        = command
+      override val runArguments: List[Argument] = toParameters(arguments)
+      override val runCommandInputs: List[CommandParameter with Input] =
+        toInputParameters(inputs, offset = arguments.length)(activity)
       override val runCommandOutputs: List[CommandParameter with Output] =
-        toParameters(outputs, offset = inputs.length)(activity)
+        toOutputParameters(outputs, offset = arguments.length + inputs.length)(activity)
       override val runSuccessCodes:      List[SuccessCode]    = successCodes
       override val maybeRunProcessOrder: Option[ProcessOrder] = Some(processOrder)
     }
@@ -111,7 +112,7 @@ object RunPlan {
   def process(
       workflowFile: WorkflowFile,
       command:      Command,
-      arguments:    List[Argument] = Nil,
+      arguments:    List[Position => CommandParameter with Argument] = Nil,
       inputs:       List[InputFactory[CommandParameter]] = Nil,
       outputs:      List[Activity => Position => CommandParameter with Output] = Nil,
       successCodes: List[SuccessCode] = Nil
@@ -121,18 +122,14 @@ object RunPlan {
                activity.project,
                maybeInvalidationActivity = None,
                maybeGeneration           = None) with ProcessRunPlan {
-      override val runCommand:       Command                           = command
-      override val runArguments:     List[Argument]                    = arguments
-      override val runCommandInputs: List[CommandParameter with Input] = toParameters(inputs)(activity)
+      override val runCommand:   Command        = command
+      override val runArguments: List[Argument] = toParameters(arguments)
+      override val runCommandInputs: List[CommandParameter with Input] =
+        toInputParameters(inputs, offset = arguments.length)(activity)
       override val runCommandOutputs: List[CommandParameter with Output] =
-        toParameters(outputs, offset = inputs.length)(activity)
+        toOutputParameters(outputs, offset = arguments.length + inputs.length)(activity)
       override val runSuccessCodes:      List[SuccessCode]    = successCodes
       override val maybeRunProcessOrder: Option[ProcessOrder] = None
-    }
-
-  private def toParameters[T](factories: List[Activity => Position => T], offset: Int)(activity: Activity): List[T] =
-    factories.zipWithIndex.map {
-      case (factory, idx) => factory(activity)(Position(idx + offset + 1))
     }
 
   private def toParameters[T](factories: List[Position => T]): List[T] =
@@ -140,12 +137,24 @@ object RunPlan {
       case (factory, idx) => factory(Position(idx + 1))
     }
 
-  private def toParameters(
-      factories: List[InputFactory[CommandParameter]]
+  private def toParameters[T](factories: List[Position => T], offset: Int): List[T] =
+    factories.zipWithIndex.map {
+      case (factory, idx) => factory(Position(idx + offset + 1))
+    }
+
+  private def toOutputParameters(factories: List[Activity => Position => CommandParameter with Output],
+                                 offset:    Int)(activity: Activity): List[CommandParameter with Output] =
+    factories.zipWithIndex.map {
+      case (factory, idx) => factory(activity)(Position(idx + offset + 1))
+    }
+
+  private def toInputParameters(
+      factories: List[InputFactory[CommandParameter]],
+      offset:    Int
   )(activity:    Activity): List[CommandParameter with Input] =
     factories.zipWithIndex.map {
-      case (factory: ActivityPositionInput[CommandParameter], idx) => factory(activity)(Position(idx + 1))
-      case (factory: PositionInput[CommandParameter], idx)         => factory(Position(idx + 1))
+      case (factory: ActivityPositionInput[CommandParameter], idx) => factory(activity)(Position(idx + offset + 1))
+      case (factory: PositionInput[CommandParameter], idx)         => factory(Position(idx + offset + 1))
     }
 
   private[entities] implicit def workflowRunPlanConverter(
@@ -218,9 +227,6 @@ object RunPlan {
         case (usages, _) => usages
       }
   }
-
-  final class Argument private (val value: String) extends AnyVal with StringTinyType
-  object Argument extends TinyTypeFactory[Argument](new Argument(_)) with NonBlank
 
   final class Command private (val value: String) extends AnyVal with StringTinyType
   object Command extends TinyTypeFactory[Command](new Command(_)) with NonBlank

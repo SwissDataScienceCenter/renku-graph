@@ -32,7 +32,8 @@ import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.rdfstore.entities.DataSetPart.{DataSetPartArtifact, dataSetParts}
 import ch.datascience.rdfstore.entities.Person.persons
-import ch.datascience.rdfstore.entities.RunPlan.Command
+import ch.datascience.rdfstore.entities.ProcessRun.StandAloneProcessRun
+import ch.datascience.rdfstore.entities.RunPlan.{Command, ProcessRunPlan}
 import ch.datascience.rdfstore.{FusekiBaseUrl, Schemas}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
@@ -136,32 +137,46 @@ object bundles extends Schemas {
         `sha12 parquet`:   NodeDef
     )
 
-    final case class NodeDef(location: String, types: Set[String])
+    final case class NodeDef(location: String, label: String, types: Set[String])
 
     object NodeDef {
 
       def apply(
           entity:              Entity with Artifact
-      )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef = {
-        val jsonLd = entity.asJsonLD
+      )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef =
         NodeDef(
           entity.location.value,
-          jsonLd.entityTypes
+          entity.location.value,
+          entity.asJsonLD.entityTypes
             .map(_.toList.map(_.toString))
             .getOrElse(throw new Exception("No entityTypes found"))
             .toSet
         )
-      }
 
-      def apply(entity: Activity)(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef = {
-        val jsonLd = entity.asJsonLD
+      def apply(
+          activity:            Activity with StandAloneProcessRun
+      )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef =
         NodeDef(
-          entity.comment,
-          jsonLd.entityTypes
+          activity.processRunAssociation.runPlan.asJsonLD.entityId
+            .getOrElse(throw new Exception("Non entity id found for ProcessRun"))
+            .toString,
+          activity.processRunAssociation.runPlan.asLabel,
+          activity.asJsonLD.entityTypes
             .map(_.toList.map(_.toString))
             .getOrElse(throw new Exception("No entityTypes found"))
             .toSet
         )
+
+      private implicit class RunPlanOps(runPlan: ProcessRunPlan) {
+        lazy val asLabel: String =
+          (runPlan.runArguments ++ runPlan.runCommandInputs ++ runPlan.runCommandOutputs)
+            .map(parameter => parameter.position -> asString(parameter))
+            .sortBy(_._1.value)
+            .map(_._2)
+            .mkString(s"${runPlan.runCommand} ", " ", "")
+
+        private def asString(parameter: CommandParameter): String =
+          parameter.maybePrefix.fold(parameter.value.toString)(prefix => s"$prefix${parameter.value}")
       }
     }
 
@@ -300,7 +315,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = s"renku run python $cleanData $dataSetFolder $bikesParquet",
+        comment         = s"renku run: committing 1 newly added files",
         maybeInformedBy = Some(commit7Activity),
         associationFactory = Association.process(
           agent.copy(schemaVersion = schemaVersions.generateOne),
@@ -337,7 +352,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = s"renku run python $plotData $bikesParquet",
+        comment         = s"renku run: committing 1 newly added files",
         maybeInformedBy = Some(commit8ProcessRun),
         associationFactory = Association.process(
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
@@ -440,7 +455,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent.copy(maybeStartedBy = Some(persons.generateOne)),
-        comment = "renku update",
+        comment = "renku update: committing 2 newly added files",
         WorkflowFile.yaml("renku-update.yaml"),
         informedBy = commit11Activity,
         associationFactory = Association.workflow(

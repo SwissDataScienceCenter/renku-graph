@@ -73,7 +73,7 @@ class IOLineageDataFinderSpec extends WordSpec with InMemoryRdfStore with Extern
 
       logger.logged(
         Warn(s"lineage finished${executionTimeRecorder.executionTimeInfo}"),
-        Warn(s"lineage - command details finished${executionTimeRecorder.executionTimeInfo}"),
+        Warn(s"lineage - runPlan details finished${executionTimeRecorder.executionTimeInfo}"),
         Warn(s"lineage - entity details finished${executionTimeRecorder.executionTimeInfo}")
       )
     }
@@ -102,10 +102,12 @@ class IOLineageDataFinderSpec extends WordSpec with InMemoryRdfStore with Extern
   }
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {
+
     lazy val toNodeLocation: Node.Location = Node.Location(nodeDef.location)
+
     lazy val toNode: Node = Node(
       toNodeLocation,
-      Node.Label(toNodeLocation.value),
+      Node.Label(nodeDef.label),
       nodeDef.types.map(Node.Type.apply)
     )
   }

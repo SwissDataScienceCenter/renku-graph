@@ -33,6 +33,7 @@ import scala.language.postfixOps
 
 sealed abstract class CommandParameter(val position: Position, val maybePrefix: Option[Prefix]) {
   val entityId: EntityId = EntityId.blank
+  val value: Value
 }
 
 object CommandParameter {
@@ -42,20 +43,20 @@ object CommandParameter {
                                                  activity:                 => Activity,
                                                  entityFactory:            Activity => Entity with Artifact)
       extends CommandParameter(position, maybePrefix) {
-    lazy val entity: Entity with Artifact = entityFactory(activity)
-    lazy val value:  Value                = Value(entity.location)
+    lazy val entity:         Entity with Artifact = entityFactory(activity)
+    override lazy val value: Value                = Value(entity.location)
   }
 
   sealed abstract class ValueCommandParameter(override val position:    Position,
                                               override val maybePrefix: Option[Prefix],
-                                              val value:                Value)
+                                              override val value:       Value)
       extends CommandParameter(position, maybePrefix)
 
   sealed abstract class EntityCommandParameter(override val position:    Position,
                                                override val maybePrefix: Option[Prefix],
                                                val entity:               Entity with Artifact)
       extends CommandParameter(position, maybePrefix) {
-    lazy val value: Value = Value(entity.location)
+    override lazy val value: Value = Value(entity.location)
   }
 
   final class Value private (val value: String) extends AnyVal with StringTinyType
@@ -82,6 +83,41 @@ object CommandParameter {
 
       override def toEntityId: CommandParameter => Option[EntityId] = entity => entity.entityId.some
     }
+
+  sealed class Argument(override val position: Position, override val maybePrefix: Option[Prefix])
+      extends ValueCommandParameter(position, maybePrefix, Value("input_path")) {
+    override lazy val toString: String = "CommandArgument"
+  }
+
+  object Argument {
+
+    def factory(maybePrefix: Option[Prefix] = None): Position => CommandParameter with Argument =
+      position => new Argument(position, maybePrefix)
+
+    private implicit def converter(
+        implicit renkuBaseUrl: RenkuBaseUrl,
+        fusekiBaseUrl:         FusekiBaseUrl
+    ): PartialEntityConverter[CommandParameter with Argument] =
+      new PartialEntityConverter[CommandParameter with Argument] {
+
+        override def convert[T <: CommandParameter with Argument]: T => Either[Exception, PartialEntity] =
+          argument =>
+            PartialEntity(
+              EntityTypes of renku / "CommandArgument",
+              rdfs / "label" -> s"""Command Argument "${argument.value}"""".asJsonLD
+            ).asRight
+
+        override def toEntityId: CommandParameter with Argument => Option[EntityId] =
+          _ => None
+      }
+
+    implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                              fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Argument] =
+      JsonLDEncoder.instance[CommandParameter with Argument] { entity =>
+        entity.asPartialJsonLD[CommandParameter] combine entity
+          .asPartialJsonLD[CommandParameter with Argument] getOrFail
+      }
+  }
 
   sealed trait Input {
     self: CommandParameter =>
