@@ -49,7 +49,7 @@ class Activity(val commitId:                 CommitId,
   def entity[T](implicit tag: ClassTag[T]): T =
     generations
       .flatMap(_.maybeReverseEntity)
-      .find(_.getClass.isAssignableFrom(tag.runtimeClass))
+      .find(entity => tag.runtimeClass isAssignableFrom entity.getClass)
       .getOrElse(throw new IllegalStateException(s"No entity of type ${tag.runtimeClass} on Activity for $commitId"))
       .asInstanceOf[T]
 }

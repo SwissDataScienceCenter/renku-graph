@@ -20,7 +20,6 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, ModifiedDataset, NonModifiedDataset}
 import ch.datascience.rdfstore._
@@ -33,7 +32,6 @@ import scala.language.higherKinds
 
 private class BaseDetailsFinder(
     rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
