@@ -50,11 +50,38 @@ private class KGDatasetInfoFinderImpl(
     _.downField("results").downField("bindings").as(decodeList(sameAs)).map(_.flatten.toSet)
   }
 
-  override def findTopmostDerivedFrom(derivedFrom: DerivedFrom): IO[Option[DerivedFrom]] = ???
+  override def findTopmostDerivedFrom(derivedFrom: DerivedFrom): IO[Option[DerivedFrom]] =
+    queryExpecting[Set[DerivedFrom]](using = queryFindingDerivedFrom(derivedFrom)) flatMap toOption(derivedFrom)
 
-  private def toOption(sameAs: SameAs): Set[SameAs] => IO[Option[SameAs]] = {
-    case set if set.isEmpty   => Option.empty[SameAs].pure[IO]
-    case set if set.size == 1 => set.headOption.pure[IO]
-    case _                    => new Exception(s"More than one topmostSame found for dataset $sameAs").raiseError[IO, Option[SameAs]]
+  private def queryFindingDerivedFrom(derivedFrom: DerivedFrom) = SparqlQuery(
+    name = "upload - ds topmostDerivedFrom",
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
+    ),
+    s"""|SELECT ?maybeTopmostDerivedFrom
+        |WHERE {
+        |  <$derivedFrom> rdf:type <http://schema.org/Dataset>;
+        |                 renku:topmostDerivedFrom ?maybeTopmostDerivedFrom.
+        |}
+        |""".stripMargin
+  )
+
+  private implicit val topmostDerivedDecoder: Decoder[Set[DerivedFrom]] = {
+    val derivedFrom: Decoder[Option[DerivedFrom]] =
+      _.downField("maybeTopmostDerivedFrom").downField("value").as[Option[DerivedFrom]]
+    _.downField("results").downField("bindings").as(decodeList(derivedFrom)).map(_.flatten.toSet)
   }
+
+  private def toOption[T](datasetId: T)(implicit entityTypeInfo: T => String): Set[T] => IO[Option[T]] = {
+    case set if set.isEmpty   => Option.empty[T].pure[IO]
+    case set if set.size == 1 => set.headOption.pure[IO]
+    case _ =>
+      new Exception(
+        s"More than one ${entityTypeInfo(datasetId)} found for dataset $datasetId"
+      ).raiseError[IO, Option[T]]
+  }
+
+  private implicit val topmostSameAsInfo:      SameAs => String      = _ => "topmostSameAs"
+  private implicit val topmostDerivedFromInfo: DerivedFrom => String = _ => "topmostDerivedFrom"
 }

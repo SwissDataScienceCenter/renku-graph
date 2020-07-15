@@ -3,7 +3,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.SameAs
+import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore._
@@ -47,6 +47,38 @@ class KGDatasetInfoFinderSpec extends WordSpec with InMemoryRdfStore {
     }
   }
 
+  "findTopmostDerivedFrom" should {
+
+    "return None if there's no dataset with the given id" in new TestCase {
+      val derivedFrom = datasetDerivedFroms.generateOne
+      kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Option.empty[DerivedFrom]
+    }
+
+    "return the dataset's topmostDerivedFrom if this dataset has one" in new TestCase {
+      val activity = randomDataSetActivity
+      loadToStore(JsonLDTriples(activity.asJsonLD.toJson))
+
+      val parentDataset      = activity.entity[DataSet]
+      val topmostDerivedFrom = DerivedFrom(parentDataset.entityId)
+
+      kgDatasetInfoFinder.findTopmostDerivedFrom(topmostDerivedFrom).unsafeRunSync() shouldBe Some(
+        parentDataset.topmostDerivedFrom
+      )
+    }
+
+    "return None if there's a dataset with the given id but it has no topmostDerivedFrom" in new TestCase {
+      val activity = randomDataSetActivity
+      loadToStore(JsonLDTriples(activity.asJsonLD.toJson))
+
+      val parentDataset      = activity.entity[DataSet]
+      val topmostDerivedFrom = DerivedFrom(parentDataset.entityId)
+
+      removeTopmostDerivedFrom(parentDataset.entityId)
+
+      kgDatasetInfoFinder.findTopmostDerivedFrom(topmostDerivedFrom).unsafeRunSync() shouldBe None
+    }
+  }
+
   private trait TestCase {
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
@@ -66,6 +98,24 @@ class KGDatasetInfoFinderSpec extends WordSpec with InMemoryRdfStore {
                    |WHERE {
                    |  <$datasetId> rdf:type schema:Dataset;
                    |        renku:topmostSameAs ?sameAs.
+                   |}
+                   |""".stripMargin
+      )
+    }.unsafeRunSync()
+
+  private def removeTopmostDerivedFrom(datasetId: EntityId): Unit =
+    runUpdate {
+      SparqlQuery(
+        name = "topmostDerivedFrom removal",
+        prefixes = Set(
+          "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
+          "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+          "PREFIX schema: <http://schema.org/>"
+        ),
+        body = s"""|DELETE { <$datasetId> renku:topmostDerivedFrom ?derivedFrom }
+                   |WHERE {
+                   |  <$datasetId> rdf:type schema:Dataset;
+                   |        renku:topmostDerivedFrom ?derivedFrom.
                    |}
                    |""".stripMargin
       )
