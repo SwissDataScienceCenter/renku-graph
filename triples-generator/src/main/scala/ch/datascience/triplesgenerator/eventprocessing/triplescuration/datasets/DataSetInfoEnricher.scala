@@ -26,10 +26,11 @@ import cats.implicits._
 import scala.language.higherKinds
 
 private[triplescuration] class DataSetInfoEnricher[Interpretation[_]](
-    dataSetInfoFinder: DataSetInfoFinder[Interpretation],
-    triplesUpdater:    TriplesUpdater,
-    topmostDataFinder: TopmostDataFinder[Interpretation]
-)(implicit ME:         MonadError[Interpretation, Throwable]) {
+    dataSetInfoFinder:  DataSetInfoFinder[Interpretation],
+    triplesUpdater:     TriplesUpdater,
+    topmostDataFinder:  TopmostDataFinder[Interpretation],
+    descendantsUpdater: DescendantsUpdater
+)(implicit ME:          MonadError[Interpretation, Throwable]) {
 
   import dataSetInfoFinder._
   import topmostDataFinder._
@@ -40,6 +41,7 @@ private[triplescuration] class DataSetInfoEnricher[Interpretation[_]](
       for {
         datasetInfos <- findDatasetsInfo(curatedTriples.triples)
         topmostInfos <- datasetInfos.map(findTopmostData).toList.sequence
-      } yield topmostInfos.foldLeft(curatedTriples) { mergeTopmostDataIntoTriples }
+        updatedTriples = topmostInfos.foldLeft(curatedTriples) { mergeTopmostDataIntoTriples }
+      } yield topmostInfos.foldLeft(updatedTriples) { descendantsUpdater.prepareUpdates }
     }
 }

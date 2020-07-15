@@ -47,33 +47,53 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
       )
     }
 
-    "update JSON-LD with topmost data" in new TestCase {
+    "update JSON-LD with topmost data and prepare updates for descendant datasets" in new TestCase {
 
-      val entityId = entityIds.generateOne
+      val datasetInfoList = datasetInfos.generateNonEmptyList()
 
-      val datasetInfo = (entityId, datasetSameAs.generateOption, datasetDerivedFroms.generateOption)
       (infoFinder.findDatasetsInfo _)
         .expects(curatedTriples.triples)
-        .returning(Set(datasetInfo).pure[Try])
+        .returning(datasetInfoList.toList.toSet.pure[Try])
 
-      val topmostData = TopmostData(entityId, datasetSameAs.generateOne, datasetDerivedFroms.generateOne)
-      (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(topmostData.pure[Try])
+      val topmostDatas = datasetInfoList map { datasetInfo =>
+        val topmostData = TopmostData(datasetInfo._1, datasetSameAs.generateOne, datasetDerivedFroms.generateOne)
+        (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(topmostData.pure[Try])
+        topmostData
+      }
 
-      val updatedCuratedTriples = curatedTriplesObjects.generateOne
-      (triplesUpdater.mergeTopmostDataIntoTriples _)
-        .expects(curatedTriples, topmostData)
-        .returning(updatedCuratedTriples)
+      val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, topmostData) =>
+        val updatedTriples = curatedTriplesObjects.generateOne
+        (triplesUpdater.mergeTopmostDataIntoTriples _)
+          .expects(triples, topmostData)
+          .returning(updatedTriples)
+        updatedTriples
+      }
 
-      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(Right(updatedCuratedTriples))
+      val curatedTriplesWithUpdates = topmostDatas.foldLeft(updatedCuratedTriples) { (triples, topmostData) =>
+        val triplesWithUpdates = curatedTriplesObjects.generateOne
+        (descendantsUpdater.prepareUpdates _)
+          .expects(triples, topmostData)
+          .returning(triplesWithUpdates)
+        triplesWithUpdates
+      }
+
+      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(Right(curatedTriplesWithUpdates))
     }
   }
 
   private trait TestCase {
     val curatedTriples = curatedTriplesObjects.generateOne
 
-    val infoFinder        = mock[DataSetInfoFinder[Try]]
-    val triplesUpdater    = mock[TriplesUpdater]
-    val topmostDataFinder = mock[TopmostDataFinder[Try]]
-    val enricher          = new DataSetInfoEnricher[Try](infoFinder, triplesUpdater, topmostDataFinder)
+    val infoFinder         = mock[DataSetInfoFinder[Try]]
+    val triplesUpdater     = mock[TriplesUpdater]
+    val topmostDataFinder  = mock[TopmostDataFinder[Try]]
+    val descendantsUpdater = mock[DescendantsUpdater]
+    val enricher           = new DataSetInfoEnricher[Try](infoFinder, triplesUpdater, topmostDataFinder, descendantsUpdater)
   }
+
+  private lazy val datasetInfos = for {
+    datasetId        <- entityIds
+    maybeSameAs      <- datasetSameAs.toGeneratorOfOptions
+    maybeDerivedFrom <- datasetDerivedFroms.toGeneratorOfOptions
+  } yield (datasetId, maybeSameAs, maybeDerivedFrom)
 }

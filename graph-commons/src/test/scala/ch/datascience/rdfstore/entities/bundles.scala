@@ -86,17 +86,18 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
       maybeParent:         Option[Project]      = None
   )(
-      datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
-      datasetName:               Name = datasetNames.generateOne,
-      datasetUrl:                Url = datasetUrls.generateOne,
-      maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
-      maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:        datasets.DateCreated = datasets.DateCreated(committedDate.value),
-      datasetCreators:           Set[Person] = setOf(persons).generateOne,
-      datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-      overrideTopmostSameAs:     Option[SameAs] = None
-  )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
+      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
+      datasetName:                Name = datasetNames.generateOne,
+      datasetUrl:                 Url = datasetUrls.generateOne,
+      maybeDatasetSameAs:         Option[SameAs] = Gen.option(datasetSameAs).generateOne,
+      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person] = setOf(persons).generateOne,
+      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      overrideTopmostSameAs:      Option[SameAs] = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom] = None
+  )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     nonModifiedDataSetActivity(
       commitId,
       committedDate,
@@ -112,7 +113,8 @@ object bundles extends Schemas {
       datasetCreatedDate,
       datasetCreators,
       datasetParts,
-      overrideTopmostSameAs
+      overrideTopmostSameAs,
+      overrideTopmostDerivedFrom
     ).asJsonLD
 
   def nonModifiedDataSetActivity(
@@ -127,16 +129,17 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
       maybeParent:         Option[Project]      = None
   )(
-      datasetIdentifier:         Identifier                     = datasetIdentifiers.generateOne,
-      datasetName:               Name                           = datasetNames.generateOne,
-      datasetUrl:                Url                            = datasetUrls.generateOne,
-      maybeDatasetSameAs:        Option[SameAs]                 = Gen.option(datasetSameAs).generateOne,
-      maybeDatasetDescription:   Option[Description]            = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate: Option[PublishedDate]          = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:        datasets.DateCreated           = datasets.DateCreated(committedDate.value),
-      datasetCreators:           Set[Person]                    = setOf(persons).generateOne,
-      datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-      overrideTopmostSameAs:     Option[SameAs]                 = None
+      datasetIdentifier:          Identifier                     = datasetIdentifiers.generateOne,
+      datasetName:                Name                           = datasetNames.generateOne,
+      datasetUrl:                 Url                            = datasetUrls.generateOne,
+      maybeDatasetSameAs:         Option[SameAs]                 = Gen.option(datasetSameAs).generateOne,
+      maybeDatasetDescription:    Option[Description]            = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate]          = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated           = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
+      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      overrideTopmostSameAs:      Option[SameAs]                 = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
   ): Activity = Activity(
     commitId,
     committedDate,
@@ -157,7 +160,8 @@ object bundles extends Schemas {
           datasetParts.map {
             case (name, location) => DataSetPart.factory(name, location, None)(_)
           },
-          overrideTopmostSameAs = overrideTopmostSameAs
+          overrideTopmostSameAs      = overrideTopmostSameAs,
+          overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
         )
       )
     )
@@ -175,17 +179,18 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
       maybeParent:         Option[Project]      = None
   )(
-      datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
-      datasetName:               Name = datasetNames.generateOne,
-      datasetUrl:                Url = datasetUrls.generateOne,
-      datasetDerivedFrom:        DerivedFrom = datasetDerivedFroms.generateOne,
-      maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:        datasets.DateCreated = datasets.DateCreated(committedDate.value),
-      datasetCreators:           Set[Person] = setOf(persons).generateOne,
-      datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-      overrideTopmostSameAs:     Option[SameAs] = None
-  )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
+      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
+      datasetName:                Name = datasetNames.generateOne,
+      datasetUrl:                 Url = datasetUrls.generateOne,
+      datasetDerivedFrom:         DerivedFrom = datasetDerivedFroms.generateOne,
+      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person] = setOf(persons).generateOne,
+      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      overrideTopmostSameAs:      Option[SameAs] = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom] = None
+  )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     modifiedDataSetActivity(
       commitId,
       committedDate,
@@ -201,7 +206,8 @@ object bundles extends Schemas {
       datasetCreatedDate,
       datasetCreators,
       datasetParts,
-      overrideTopmostSameAs
+      overrideTopmostSameAs,
+      overrideTopmostDerivedFrom
     ).asJsonLD
 
   def modifiedDataSetActivity(
@@ -216,16 +222,17 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
       maybeParent:         Option[Project]      = None
   )(
-      datasetIdentifier:         Identifier                     = datasetIdentifiers.generateOne,
-      datasetName:               Name                           = datasetNames.generateOne,
-      datasetUrl:                Url                            = datasetUrls.generateOne,
-      datasetDerivedFrom:        DerivedFrom                    = datasetDerivedFroms.generateOne,
-      maybeDatasetDescription:   Option[Description]            = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate: Option[PublishedDate]          = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:        datasets.DateCreated           = datasets.DateCreated(committedDate.value),
-      datasetCreators:           Set[Person]                    = setOf(persons).generateOne,
-      datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-      overrideTopmostSameAs:     Option[SameAs]                 = None
+      datasetIdentifier:          Identifier                     = datasetIdentifiers.generateOne,
+      datasetName:                Name                           = datasetNames.generateOne,
+      datasetUrl:                 Url                            = datasetUrls.generateOne,
+      datasetDerivedFrom:         DerivedFrom                    = datasetDerivedFroms.generateOne,
+      maybeDatasetDescription:    Option[Description]            = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate]          = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated           = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
+      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      overrideTopmostSameAs:      Option[SameAs]                 = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
   ): Activity = Activity(
     commitId,
     committedDate,
@@ -246,7 +253,8 @@ object bundles extends Schemas {
           datasetParts.map {
             case (name, location) => DataSetPart.factory(name, location, None)(_)
           },
-          overrideTopmostSameAs = overrideTopmostSameAs
+          overrideTopmostSameAs      = overrideTopmostSameAs,
+          overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
         )
       )
     )
