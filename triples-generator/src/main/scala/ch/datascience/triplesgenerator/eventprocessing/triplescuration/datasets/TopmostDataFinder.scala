@@ -30,12 +30,15 @@ import scala.language.higherKinds
 private trait TopmostDataFinder[Interpretation[_]] {
   def findTopmostData(datasetInfo: DatasetInfo): Interpretation[TopmostData]
 }
-private class TopmostDataFinderImpl[Interpretation[_]](kgDatasetInfoFinder: KGDatasetInfoFinder[Interpretation])(
-    implicit ME:                                                            MonadError[Interpretation, Throwable]
-) extends TopmostDataFinder[Interpretation] {
+
+private class TopmostDataFinderImpl[Interpretation[_]](
+    kgDatasetInfoFinder: KGDatasetInfoFinder[Interpretation]
+)(implicit ME:           MonadError[Interpretation, Throwable])
+    extends TopmostDataFinder[Interpretation] {
 
   def findTopmostData(datasetInfo: DatasetInfo): Interpretation[TopmostData] = datasetInfo match {
-    case (entityId, None, None) => TopmostData(entityId, SameAs(entityId), DerivedFrom(entityId)).pure[Interpretation]
+    case (entityId, None, None) =>
+      TopmostData(entityId, SameAs(entityId), DerivedFrom(entityId)).pure[Interpretation]
     case (entityId, Some(sameAs: UrlSameAs), None) =>
       TopmostData(entityId, sameAs, DerivedFrom(entityId)).pure[Interpretation]
     case (entityId, Some(sameAs: IdSameAs), None) =>
@@ -43,9 +46,16 @@ private class TopmostDataFinderImpl[Interpretation[_]](kgDatasetInfoFinder: KGDa
         case Some(parentSameAs) => TopmostData(entityId, parentSameAs, DerivedFrom(entityId))
         case None               => TopmostData(entityId, sameAs, DerivedFrom(entityId))
       }
-    case _ => ???
+    case (entityId, None, Some(derivedFrom)) =>
+      kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).map {
+        case Some(parentDerivedFrom) => TopmostData(entityId, SameAs(entityId), parentDerivedFrom)
+        case None                    => TopmostData(entityId, SameAs(entityId), derivedFrom)
+      }
+    case (entityId, Some(_), Some(_)) =>
+      new IllegalStateException(
+        s"Dataset with $entityId found in the generated triples has both sameAs and derivedFrom"
+      ).raiseError[Interpretation, TopmostData]
   }
-
 }
 
 private object TopmostDataFinder {

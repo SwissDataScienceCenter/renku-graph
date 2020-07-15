@@ -71,7 +71,6 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
       results.triples shouldBe curatedTriples.triples
       results.updates shouldBe curatedTriples.updates ++: updates
     }
-
   }
 
   private trait TestCase {
