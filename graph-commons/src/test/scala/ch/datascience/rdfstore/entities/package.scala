@@ -19,44 +19,17 @@
 package ch.datascience.rdfstore
 
 import java.time.{Instant, LocalDate}
-import java.util.UUID
 
 import cats.kernel.Semigroup
+import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, UrlSameAs}
-import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints.RelativePath
 import io.renku.jsonld._
-import io.renku.jsonld.syntax._
 
 package object entities extends Schemas with EntitiesGenerators {
 
   implicit val fusekiBaseUrlToEntityId: FusekiBaseUrl => EntityId = url => EntityId of url.value
   implicit val renkuBaseUrlToEntityId:  RenkuBaseUrl => EntityId  = url => EntityId of url.value
-
-  implicit val derivedFromEncoder: JsonLDEncoder[DerivedFrom] = derivedFrom => EntityId.of(derivedFrom.value).asJsonLD
-
-  implicit val sameAsEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
-    case v: IdSameAs  => idSameAsEncoder(v)
-    case v: UrlSameAs => urlSameAsEncoder(v)
-  }
-
-  private lazy val idSameAsEncoder: JsonLDEncoder[IdSameAs] = JsonLDEncoder.instance { sameAs =>
-    JsonLD.entity(
-      EntityId of s"_:${UUID.randomUUID()}",
-      EntityTypes of (schema / "URL"),
-      schema / "url" -> EntityId.of(sameAs.value).asJsonLD
-    )
-  }
-
-  private lazy val urlSameAsEncoder: JsonLDEncoder[UrlSameAs] = JsonLDEncoder.instance { sameAs =>
-    JsonLD.entity(
-      EntityId of s"_:${UUID.randomUUID()}",
-      EntityTypes of (schema / "URL"),
-      schema / "url" -> sameAs.value.asJsonLD
-    )
-  }
 
   implicit def stringTTEncoder[TT <: StringTinyType]: JsonLDEncoder[TT] =
     JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
@@ -94,15 +67,4 @@ package object entities extends Schemas with EntitiesGenerators {
     Reverse.fromListUnsafe {
       x.properties merge y.properties
     }
-
-}
-
-trait Schemas {
-  val prov:      Schema = Schema.from("http://www.w3.org/ns/prov", separator = "#")
-  val wfprov:    Schema = Schema.from("http://purl.org/wf4ever/wfprov", separator = "#")
-  val wfdesc:    Schema = Schema.from("http://purl.org/wf4ever/wfdesc", separator = "#")
-  val rdfs:      Schema = Schema.from("http://www.w3.org/2000/01/rdf-schema", separator = "#")
-  val xmlSchema: Schema = Schema.from("http://www.w3.org/2001/XMLSchema", separator = "#")
-  val schema:    Schema = Schema.from("http://schema.org")
-  val renku:     Schema = Schema.from("https://swissdatasciencecenter.github.io/renku-ontology", separator = "#")
 }

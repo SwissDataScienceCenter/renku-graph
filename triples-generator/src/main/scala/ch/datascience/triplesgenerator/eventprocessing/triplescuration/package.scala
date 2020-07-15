@@ -20,10 +20,13 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
 import cats.data.{EitherT, OptionT}
+import cats.implicits._
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
-import io.circe.Json
+import io.circe.Decoder.decodeString
+import io.circe.{Decoder, Json}
+import io.renku.jsonld.EntityId
 
 import scala.language.higherKinds
 
@@ -37,10 +40,10 @@ package object triplescuration {
 
   implicit class JsonOps(json: Json) {
     import cats.implicits._
-    import io.circe.{Decoder, Encoder}
     import io.circe.Decoder.decodeList
     import io.circe.Encoder.encodeList
     import io.circe.optics.JsonPath.root
+    import io.circe.{Decoder, Encoder}
 
     def get[T](property: String)(implicit decode: Decoder[T], encode: Encoder[T]): Option[T] =
       root.selectDynamic(property).as[T].getOption(json)
@@ -75,4 +78,10 @@ package object triplescuration {
 
     def remove(property: String): Json = root.obj.modify(_.remove(property))(json)
   }
+
+  implicit val entityIdDecoder: Decoder[EntityId] =
+    decodeString.emap { value =>
+      if (value.trim.isEmpty) "Empty entityId found in the generated triples".asLeft[EntityId]
+      else EntityId.of(value).asRight[String]
+    }
 }

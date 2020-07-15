@@ -19,18 +19,18 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 package datasets
 
+import cats.MonadError
 import cats.data.OptionT
-import cats.{Monad, MonadError}
 import cats.implicits._
-import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
 import io.circe.Decoder.decodeString
+import io.circe.Json
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root
-import io.circe.{Decoder, Json}
 import io.renku.jsonld.EntityId
 import monocle.function.Plated
 
@@ -89,12 +89,6 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
     json.get[Json]("http://www.w3.org/ns/prov#wasDerivedFrom") match {
       case Some(derivedFrom) => derivedFrom.get[DerivedFrom]("@id").pure[Interpretation]
       case None              => Option.empty[DerivedFrom].pure[Interpretation]
-    }
-
-  private implicit val entityIdDecoder: Decoder[EntityId] =
-    decodeString.emap { value =>
-      if (value.trim.isEmpty) "Empty entityId found in the generated triples".asLeft[EntityId]
-      else EntityId.of(value).asRight[String]
     }
 
   private implicit class JsonLDTriplesOps(triples: JsonLDTriples) {

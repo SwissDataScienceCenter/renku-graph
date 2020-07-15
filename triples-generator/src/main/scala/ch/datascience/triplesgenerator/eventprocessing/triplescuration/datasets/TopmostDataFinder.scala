@@ -59,6 +59,6 @@ private class TopmostDataFinderImpl[Interpretation[_]](
 }
 
 private object TopmostDataFinder {
-  final case class TopmostData(entityId: EntityId, sameAs: SameAs, derivedFrom: DerivedFrom)
+  final case class TopmostData(datasetId: EntityId, sameAs: SameAs, derivedFrom: DerivedFrom)
 
 }

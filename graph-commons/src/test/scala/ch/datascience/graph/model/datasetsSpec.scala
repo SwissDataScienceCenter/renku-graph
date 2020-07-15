@@ -21,6 +21,7 @@ package ch.datascience.graph.model
 import GraphModelGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.tinytypes.UrlTinyType
 import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
@@ -118,6 +119,42 @@ class datasetsSpec extends WordSpec with ScalaCheckPropertyChecks {
 
       instance       shouldBe an[IdSameAs]
       instance.value shouldBe entityId.value
+    }
+  }
+
+  "SameAs jsonLdEncoder" should {
+
+    import SameAs._
+
+    "serialise IdSameAs to an object having url property linked to the SameAs's value" in {
+      val sameAs = datasetIdSameAs.generateOne
+
+      val json = sameAsJsonLdEncoder(sameAs).toJson
+
+      json.hcursor.downField("@type").as[String]                                    shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField((schema / "url").toString).downField("@id").as[String] shouldBe Right(sameAs.toString)
+    }
+
+    "serialise UrlSameAs to an object having url property as the SameAs's value" in {
+      val sameAs = datasetUrlSameAs.generateOne
+
+      val json = sameAsJsonLdEncoder(sameAs).toJson
+
+      json.hcursor.downField("@type").as[String]                                       shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField((schema / "url").toString).downField("@value").as[String] shouldBe Right(sameAs.toString)
+    }
+  }
+
+  "derivedFrom jsonLdEncoder" should {
+
+    import DerivedFrom._
+
+    "serialise derivedFrom to an object having url property linked to the DerivedFrom's value" in {
+      val derivedFrom = datasetDerivedFroms.generateOne
+
+      val json = derivedFromJsonLdEncoder(derivedFrom).toJson
+
+      json.hcursor.downField("@id").as[String] shouldBe Right(derivedFrom.toString)
     }
   }
 }

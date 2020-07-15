@@ -22,6 +22,7 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
+import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -29,11 +30,11 @@ import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.rdfstore.entities.DataSetPart.{DataSetPartArtifact, dataSetParts}
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
-import ch.datascience.rdfstore.{FusekiBaseUrl, Schemas}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._

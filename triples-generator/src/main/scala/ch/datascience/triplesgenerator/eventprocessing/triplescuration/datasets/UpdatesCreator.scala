@@ -30,9 +30,9 @@ import io.renku.jsonld.EntityId
 private class UpdatesCreator {
 
   def prepareUpdates(topmostData: TopmostData): List[Update] =
-    prepareSameAsUpdates(topmostData.entityId, topmostData.sameAs) ++:
+    prepareSameAsUpdates(topmostData.datasetId, topmostData.sameAs) ++:
       prepareDerivedFromUpdates(
-        topmostData.entityId,
+        topmostData.datasetId,
         topmostData.derivedFrom
       )
 

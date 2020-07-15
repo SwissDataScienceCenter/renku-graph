@@ -19,10 +19,13 @@
 package ch.datascience.graph.model
 
 import java.time.{Instant, LocalDate}
+import java.util.UUID
 
+import ch.datascience.graph.Schemas._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
-import io.renku.jsonld.EntityId
+import io.renku.jsonld.syntax._
+import io.renku.jsonld._
 
 object datasets {
 
@@ -44,6 +47,9 @@ object datasets {
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
   implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url {
     def apply(datasetEntityId: EntityId): DerivedFrom = DerivedFrom(datasetEntityId.toString)
+
+    implicit val derivedFromJsonLdEncoder: JsonLDEncoder[DerivedFrom] = derivedFrom =>
+      EntityId.of(derivedFrom.value).asJsonLD
   }
 
   sealed trait SameAs extends Any with UrlTinyType {
@@ -67,6 +73,27 @@ object datasets {
       from(value) map (sameAs => new UrlSameAs(sameAs.value))
 
     def apply(datasetEntityId: EntityId): IdSameAs = new IdSameAs(datasetEntityId.toString)
+
+    implicit val sameAsJsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
+      case v: IdSameAs  => idSameAsJsonLdEncoder(v)
+      case v: UrlSameAs => urlSameAsJsonLdEncoder(v)
+    }
+
+    private lazy val idSameAsJsonLdEncoder: JsonLDEncoder[IdSameAs] = JsonLDEncoder.instance { sameAs =>
+      JsonLD.entity(
+        EntityId of s"_:${UUID.randomUUID()}",
+        EntityTypes of (schema / "URL"),
+        schema / "url" -> EntityId.of(sameAs.value).asJsonLD
+      )
+    }
+
+    private lazy val urlSameAsJsonLdEncoder: JsonLDEncoder[UrlSameAs] = JsonLDEncoder.instance { sameAs =>
+      JsonLD.entity(
+        EntityId of s"_:${UUID.randomUUID()}",
+        EntityTypes of (schema / "URL"),
+        schema / "url" -> sameAs.value.asJsonLD
+      )
+    }
   }
 
   final class DateCreatedInProject private (val value: Instant) extends AnyVal with InstantTinyType

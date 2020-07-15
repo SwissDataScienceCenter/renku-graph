@@ -21,23 +21,25 @@ package datasets
 
 import cats.MonadError
 import cats.data.EitherT
-import scala.language.higherKinds
 import cats.implicits._
+
+import scala.language.higherKinds
 
 private[triplescuration] class DataSetInfoEnricher[Interpretation[_]](
     dataSetInfoFinder: DataSetInfoFinder[Interpretation],
-    updatesCreator:    UpdatesCreator,
+    triplesUpdater:    TriplesUpdater,
     topmostDataFinder: TopmostDataFinder[Interpretation]
 )(implicit ME:         MonadError[Interpretation, Throwable]) {
+
+  import dataSetInfoFinder._
+  import topmostDataFinder._
+  import triplesUpdater._
 
   def enrichDataSetInfo(curatedTriples: CuratedTriples): CurationResults[Interpretation] =
     EitherT.right {
       for {
-        datasetInfos <- dataSetInfoFinder.findDatasetsInfo(curatedTriples.triples)
-        topmostInfos <- datasetInfos.map(topmostDataFinder.findTopmostData).toList.sequence
-      } yield topmostInfos.foldLeft(curatedTriples) {
-        case (curated, topmostInfo) =>
-          curated.addUpdates(updatesCreator.prepareUpdates(topmostInfo))
-      }
+        datasetInfos <- findDatasetsInfo(curatedTriples.triples)
+        topmostInfos <- datasetInfos.map(findTopmostData).toList.sequence
+      } yield topmostInfos.foldLeft(curatedTriples) { mergeTopmostDataIntoTriples }
     }
 }

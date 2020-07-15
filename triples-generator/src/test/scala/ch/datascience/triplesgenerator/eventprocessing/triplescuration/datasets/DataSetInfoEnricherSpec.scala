@@ -47,29 +47,24 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
       )
     }
 
-    "add updates generated for dataset info extracted from the triples" in new TestCase {
+    "update JSON-LD with topmost data" in new TestCase {
 
       val entityId = entityIds.generateOne
 
       val datasetInfo = (entityId, datasetSameAs.generateOption, datasetDerivedFroms.generateOption)
-
       (infoFinder.findDatasetsInfo _)
         .expects(curatedTriples.triples)
         .returning(Set(datasetInfo).pure[Try])
 
       val topmostData = TopmostData(entityId, datasetSameAs.generateOne, datasetDerivedFroms.generateOne)
-
       (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(topmostData.pure[Try])
 
-      val updates = curationUpdates.generateNonEmptyList().toList
-      (updatesCreator.prepareUpdates _)
-        .expects(topmostData)
-        .returning(updates)
+      val updatedCuratedTriples = curatedTriplesObjects.generateOne
+      (triplesUpdater.mergeTopmostDataIntoTriples _)
+        .expects(curatedTriples, topmostData)
+        .returning(updatedCuratedTriples)
 
-      val Success(Right(results)) = enricher.enrichDataSetInfo(curatedTriples).value
-
-      results.triples shouldBe curatedTriples.triples
-      results.updates shouldBe curatedTriples.updates ++: updates
+      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(Right(updatedCuratedTriples))
     }
   }
 
@@ -77,8 +72,8 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
     val curatedTriples = curatedTriplesObjects.generateOne
 
     val infoFinder        = mock[DataSetInfoFinder[Try]]
-    val updatesCreator    = mock[UpdatesCreator]
+    val triplesUpdater    = mock[TriplesUpdater]
     val topmostDataFinder = mock[TopmostDataFinder[Try]]
-    val enricher          = new DataSetInfoEnricher[Try](infoFinder, updatesCreator, topmostDataFinder)
+    val enricher          = new DataSetInfoEnricher[Try](infoFinder, triplesUpdater, topmostDataFinder)
   }
 }

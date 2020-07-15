@@ -58,6 +58,7 @@ trait DataSet {
 object DataSet {
 
   import ch.datascience.graph.config.RenkuBaseUrl
+  import ch.datascience.graph.model.datasets.DerivedFrom._
   import io.renku.jsonld.JsonLDEncoder._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
