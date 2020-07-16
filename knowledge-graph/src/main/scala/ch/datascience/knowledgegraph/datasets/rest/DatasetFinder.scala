@@ -90,6 +90,6 @@ private object IODatasetFinder {
       new BaseDetailsFinder(config, logger, timeRecorder),
       new CreatorsFinder(config, renkuBaseUrl, logger, timeRecorder),
       new PartsFinder(config, renkuBaseUrl, logger, timeRecorder),
-      new ProjectsFinder(config, renkuBaseUrl, logger, timeRecorder)
+      new ProjectsFinder(config, logger, timeRecorder)
     )
 }

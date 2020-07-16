@@ -25,7 +25,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{PublishedDate, SameAs}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model.{ModifiedDataset, NonModifiedDataset}
+import ch.datascience.knowledgegraph.datasets.model.{Dataset, ModifiedDataset, NonModifiedDataset}
 import ch.datascience.rdfstore.entities.DataSet
 import io.circe.literal._
 import org.scalatest.Matchers._
@@ -42,11 +42,11 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "decode result-set with a blank description, url, and sameAs to a Dataset object" in {
       forAll(nonModifiedDatasets(), datasetPublishedDates, blankStrings()) { (dataset, publishedDate, description) =>
-        resultSet(dataset, publishedDate, description).as[List[NonModifiedDataset]] shouldBe Right {
+        resultSet(dataset, publishedDate, description).as[List[Dataset]] shouldBe Right {
           List(
             dataset
               .copy(published = dataset.published.copy(maybeDate = Some(publishedDate), creators = Set.empty))
-              .copy(sameAs = SameAs(DataSet.entityId(dataset.id).value.toString))
+              .copy(sameAs = SameAs(DataSet.entityId(dataset.id)))
               .copy(maybeDescription = None)
               .copy(parts = Nil)
               .copy(projects = Nil)
@@ -60,7 +60,7 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "decode result-set with a blank description, url, and sameAs to a Dataset object" in {
       forAll(modifiedDatasets(), datasetPublishedDates, blankStrings()) { (dataset, publishedDate, description) =>
-        resultSet(dataset, publishedDate, description).as[List[ModifiedDataset]] shouldBe Right {
+        resultSet(dataset, publishedDate, description).as[List[Dataset]] shouldBe Right {
           List(
             dataset
               .copy(published = dataset.published.copy(maybeDate = Some(publishedDate), creators = Set.empty))
@@ -84,7 +84,7 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
           "publishedDate": {"value": ${publishedDate.value}},
           "description": {"value": $blank},
           "url": {"value": ${dataset.url.value}},
-          "sameAs": {"value": $blank}
+          "topmostSameAs": {"value": ${SameAs(DataSet.entityId(dataset.id)).toString} }
         }
       ]
     }
@@ -101,7 +101,8 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
           "publishedDate": {"value": ${publishedDate.value}},
           "description": {"value": $blank},
           "url": {"value": ${dataset.url.value}},
-          "derivedFrom": {"value": ${dataset.derivedFrom.value}}
+          "maybeDerivedFrom": {"value": ${dataset.derivedFrom.value}},
+          "topmostSameAs": {"value": ${DataSet.entityId(dataset.id).toString} }
         }
       ]
     }
