@@ -24,6 +24,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.{DataSetInfoEnricher, IODataSetInfoEnricher}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.{ForkInfoUpdater, IOForkInfoUpdater}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater
 import io.chrisdavenport.log4cats.Logger
@@ -33,7 +34,8 @@ import scala.language.higherKinds
 
 private[eventprocessing] class TriplesCurator[Interpretation[_]](
     personDetailsUpdater: PersonDetailsUpdater[Interpretation],
-    forkInfoUpdater:      ForkInfoUpdater[Interpretation]
+    forkInfoUpdater:      ForkInfoUpdater[Interpretation],
+    dataSetInfoEnricher:  DataSetInfoEnricher[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable]) {
 
   import forkInfoUpdater._
@@ -43,9 +45,10 @@ private[eventprocessing] class TriplesCurator[Interpretation[_]](
       triples:                 JsonLDTriples
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
     for {
-      triplesWithPersonDetails <- personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil)).toRight
-      triplesWithForkInfo      <- updateForkInfo(commit, triplesWithPersonDetails)
-    } yield triplesWithForkInfo
+      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil)).toRight
+      triplesWithForkInfo         <- updateForkInfo(commit, triplesWithPersonDetails)
+      triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
+    } yield triplesWithEnrichedDatasets
 
   private implicit class InterpretationOps(out: Interpretation[CuratedTriples]) {
     lazy val toRight: CurationResults[Interpretation] = EitherT.right[ProcessingRecoverableError](out)
@@ -68,9 +71,11 @@ private[eventprocessing] object IOTriplesCurator {
       timeRecorder:            SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[TriplesCurator[IO]] =
     for {
-      forkInfoUpdater <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
+      forkInfoUpdater     <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
+      dataSetInfoEnricher <- IODataSetInfoEnricher(logger, timeRecorder)
     } yield new TriplesCurator[IO](
       PersonDetailsUpdater[IO](),
-      forkInfoUpdater
+      forkInfoUpdater,
+      dataSetInfoEnricher
     )
 }

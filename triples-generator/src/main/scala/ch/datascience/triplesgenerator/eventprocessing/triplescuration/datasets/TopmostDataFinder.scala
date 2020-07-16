@@ -19,12 +19,16 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.MonadError
+import cats.effect.{ContextShift, IO, Timer}
+import cats.implicits._
 import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, UrlSameAs}
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
+import io.chrisdavenport.log4cats.Logger
 import io.renku.jsonld.EntityId
-import cats.implicits._
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait TopmostDataFinder[Interpretation[_]] {
@@ -58,7 +62,17 @@ private class TopmostDataFinderImpl[Interpretation[_]](
   }
 }
 
+private object IOTopmostDataFinder {
+  def apply(logger:              Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
+      implicit executionContext: ExecutionContext,
+      contextShift:              ContextShift[IO],
+      timer:                     Timer[IO]
+  ): IO[TopmostDataFinderImpl[IO]] =
+    for {
+      kgDatasetInfoFinder <- IOKGDatasetInfoFinder(logger, timeRecorder)
+    } yield new TopmostDataFinderImpl[IO](kgDatasetInfoFinder)
+}
+
 private object TopmostDataFinder {
   final case class TopmostData(datasetId: EntityId, sameAs: SameAs, derivedFrom: DerivedFrom)
-
 }

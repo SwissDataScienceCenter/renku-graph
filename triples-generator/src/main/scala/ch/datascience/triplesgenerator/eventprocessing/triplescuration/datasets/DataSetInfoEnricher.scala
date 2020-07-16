@@ -21,27 +21,79 @@ package datasets
 
 import cats.MonadError
 import cats.data.EitherT
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
+import io.chrisdavenport.log4cats.Logger
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private[triplescuration] class DataSetInfoEnricher[Interpretation[_]](
+private[triplescuration] trait DataSetInfoEnricher[Interpretation[_]] {
+  def enrichDataSetInfo(curatedTriples: CuratedTriples): CurationResults[Interpretation]
+}
+
+private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
     dataSetInfoFinder:  DataSetInfoFinder[Interpretation],
     triplesUpdater:     TriplesUpdater,
     topmostDataFinder:  TopmostDataFinder[Interpretation],
     descendantsUpdater: DescendantsUpdater
-)(implicit ME:          MonadError[Interpretation, Throwable]) {
+)(implicit ME:          MonadError[Interpretation, Throwable])
+    extends DataSetInfoEnricher[Interpretation] {
 
   import dataSetInfoFinder._
   import topmostDataFinder._
   import triplesUpdater._
 
   def enrichDataSetInfo(curatedTriples: CuratedTriples): CurationResults[Interpretation] =
-    EitherT.right {
-      for {
-        datasetInfos <- findDatasetsInfo(curatedTriples.triples)
-        topmostInfos <- datasetInfos.map(findTopmostData).toList.sequence
-        updatedTriples = topmostInfos.foldLeft(curatedTriples) { mergeTopmostDataIntoTriples }
-      } yield topmostInfos.foldLeft(updatedTriples) { descendantsUpdater.prepareUpdates }
-    }
+    for {
+      datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
+      topmostInfos <- EitherT(
+                       datasetInfos
+                         .map(findTopmostData)
+                         .toList
+                         .sequence
+                         .map(_.asRight[ProcessingRecoverableError])
+                         .recover(maybeToRecoverableError)
+                     )
+      updatedTriples = topmostInfos.foldLeft(curatedTriples)(mergeTopmostDataIntoTriples)
+    } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates)
+
+  private lazy val maybeToRecoverableError
+      : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[TopmostData]]] = {
+    case e: UnexpectedResponseException =>
+      Left[ProcessingRecoverableError, List[TopmostData]](
+        CurationRecoverableError("Problem with finding top most data", e)
+      )
+    case e: ConnectivityException =>
+      Left[ProcessingRecoverableError, List[TopmostData]](
+        CurationRecoverableError("Problem with finding top most data", e)
+      )
+  }
+
+  implicit class ReadabilityOps[T](value: Interpretation[T]) {
+    lazy val asRightT: EitherT[Interpretation, ProcessingRecoverableError, T] =
+      EitherT.right[ProcessingRecoverableError](value)
+  }
+}
+
+private[triplescuration] object IODataSetInfoEnricher {
+  import cats.effect.Timer
+
+  def apply(
+      logger:                  Logger[IO],
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[DataSetInfoEnricher[IO]] =
+    for {
+      topmostDataFinder <- IOTopmostDataFinder(logger, timeRecorder)
+    } yield new DataSetInfoEnricherImpl[IO](
+      new DataSetInfoFinderImpl[IO](),
+      new TriplesUpdater(),
+      topmostDataFinder,
+      new DescendantsUpdater()
+    )
 }

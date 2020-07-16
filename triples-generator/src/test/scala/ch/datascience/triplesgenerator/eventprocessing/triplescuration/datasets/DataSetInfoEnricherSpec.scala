@@ -22,9 +22,12 @@ package datasets
 import cats.data.EitherT
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.renku.jsonld.generators.JsonLDGenerators._
@@ -32,7 +35,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
 
@@ -79,6 +82,87 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
 
       enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(Right(curatedTriplesWithUpdates))
     }
+
+    "return recoverable error when finding topmost data fails with connectivity issue" in new TestCase {
+      val datasetInfoList = datasetInfos.generateNonEmptyList()
+
+      (infoFinder.findDatasetsInfo _)
+        .expects(curatedTriples.triples)
+        .returning(datasetInfoList.toList.toSet.pure[Try])
+
+      val exception = ConnectivityException("Connectivity exception", exceptions.generateOne)
+      datasetInfoList.toList.foreach { datasetInfo =>
+        (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(exception.raiseError[Try, TopmostData])
+      }
+
+      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(
+        Left(CurationRecoverableError("Problem with finding top most data", exception))
+      )
+    }
+
+    "return recoverable error when finding topmost data fails with unexpected response" in new TestCase {
+      val datasetInfoList = datasetInfos.generateNonEmptyList()
+
+      (infoFinder.findDatasetsInfo _)
+        .expects(curatedTriples.triples)
+        .returning(datasetInfoList.toList.toSet.pure[Try])
+
+      val exception = UnexpectedResponseException("Unexpected response exception")
+      datasetInfoList.toList.foreach { datasetInfo =>
+        (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(exception.raiseError[Try, TopmostData])
+      }
+
+      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(
+        Left(CurationRecoverableError("Problem with finding top most data", exception))
+      )
+    }
+
+    "fail when finding topmost data fails with other exception" in new TestCase {
+
+      val datasetInfoList = datasetInfos.generateNonEmptyList()
+
+      (infoFinder.findDatasetsInfo _)
+        .expects(curatedTriples.triples)
+        .returning(datasetInfoList.toList.toSet.pure[Try])
+
+      val exception = exceptions.generateOne
+      datasetInfoList.toList.foreach { datasetInfo =>
+        (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(exception.raiseError[Try, TopmostData])
+      }
+
+      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Failure(exception)
+    }
+
+    "fail when preparing updates fails" in new TestCase {
+
+      val datasetInfoList = datasetInfos.generateNonEmptyList()
+
+      (infoFinder.findDatasetsInfo _)
+        .expects(curatedTriples.triples)
+        .returning(datasetInfoList.toList.toSet.pure[Try])
+
+      val topmostDatas = datasetInfoList map { datasetInfo =>
+        val topmostData = TopmostData(datasetInfo._1, datasetSameAs.generateOne, datasetDerivedFroms.generateOne)
+        (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(topmostData.pure[Try])
+        topmostData
+      }
+
+      val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, topmostData) =>
+        val updatedTriples = curatedTriplesObjects.generateOne
+        (triplesUpdater.mergeTopmostDataIntoTriples _)
+          .expects(triples, topmostData)
+          .returning(updatedTriples)
+        updatedTriples
+      }
+
+      val exception = exceptions.generateOne
+
+      (descendantsUpdater.prepareUpdates _)
+        .expects(updatedCuratedTriples, topmostDatas.head)
+        .throwing(exception)
+
+      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Failure(exception)
+    }
   }
 
   private trait TestCase {
@@ -88,7 +172,7 @@ class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
     val triplesUpdater     = mock[TriplesUpdater]
     val topmostDataFinder  = mock[TopmostDataFinder[Try]]
     val descendantsUpdater = mock[DescendantsUpdater]
-    val enricher           = new DataSetInfoEnricher[Try](infoFinder, triplesUpdater, topmostDataFinder, descendantsUpdater)
+    val enricher           = new DataSetInfoEnricherImpl[Try](infoFinder, triplesUpdater, topmostDataFinder, descendantsUpdater)
   }
 
   private lazy val datasetInfos = for {

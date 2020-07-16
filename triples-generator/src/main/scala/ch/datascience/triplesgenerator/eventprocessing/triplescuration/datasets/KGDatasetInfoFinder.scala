@@ -85,3 +85,14 @@ private class KGDatasetInfoFinderImpl(
   private implicit val topmostSameAsInfo:      SameAs => String      = _ => "topmostSameAs"
   private implicit val topmostDerivedFromInfo: DerivedFrom => String = _ => "topmostDerivedFrom"
 }
+
+private object IOKGDatasetInfoFinder {
+  def apply(logger:              Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
+      implicit executionContext: ExecutionContext,
+      contextShift:              ContextShift[IO],
+      timer:                     Timer[IO]
+  ): IO[KGDatasetInfoFinderImpl] =
+    for {
+      rdfStoreConfig <- RdfStoreConfig[IO]()
+    } yield new KGDatasetInfoFinderImpl(rdfStoreConfig, logger, timeRecorder)
+}

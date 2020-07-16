@@ -18,12 +18,15 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
+import java.nio.file.Files
+
 import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
 import ch.datascience.logging.IOLogger
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdfconnection.RDFConnectionFactory
+import org.apache.lucene.store.MMapDirectory
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
@@ -45,7 +48,6 @@ object RDFStore {
       import org.apache.jena.graph.NodeFactory
       import org.apache.jena.query.DatasetFactory
       import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
-      import org.apache.lucene.store.RAMDirectory
 
       val entityDefinition: EntityDefinition = {
         val definition = new EntityDefinition("uri", "name")
@@ -56,7 +58,7 @@ object RDFStore {
 
       TextDatasetFactory.createLucene(
         DatasetFactory.create(),
-        new RAMDirectory,
+        new MMapDirectory(Files.createTempDirectory("lucene-store-jena")),
         new TextIndexConfig(entityDefinition)
       )
     }
