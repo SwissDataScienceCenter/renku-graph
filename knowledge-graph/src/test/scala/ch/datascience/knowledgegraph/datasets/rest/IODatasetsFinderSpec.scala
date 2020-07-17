@@ -53,8 +53,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
 
-  protected override val givenServerRunning: Boolean = true
-
   "findDatasets - no phrase" should {
 
     Option(Phrase("*")) +: Option.empty[Phrase] +: Nil foreach { maybePhrase =>
@@ -83,7 +81,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
           .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
           .toList
         val modifiedDatasetsList = originalDatasetsList.map { ds =>
-          modifiedDatasets(ds, ds.projects.head, DerivedFrom(ds.entityId)).generateOne
+          modifiedDatasets(ds, ds.projects.head, DerivedFrom(ds.entityId).some).generateOne
             .copy(name = datasetNames.generateOne)
         }
 
@@ -109,12 +107,12 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val datasetModification1 = modifiedDatasets(
         dataset             = originalDataset,
         project             = originalDataset.projects.head,
-        derivedFromOverride = DerivedFrom(originalDataset.entityId)
+        derivedFromOverride = DerivedFrom(originalDataset.entityId).some
       ).generateOne.copy(name = datasetNames.generateOne)
       val datasetModification2 = modifiedDatasets(
         dataset             = datasetModification1,
         project             = datasetModification1.projects.head,
-        derivedFromOverride = DerivedFrom(datasetModification1.entityId)
+        derivedFromOverride = DerivedFrom(datasetModification1.entityId).some
       ).generateOne.copy(name = datasetNames.generateOne)
 
       loadToStore(
@@ -140,7 +138,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val datasetModification = modifiedDatasets(
         dataset             = originalDataset,
         project             = originalDataset.projects.head,
-        derivedFromOverride = DerivedFrom(originalDataset.entityId)
+        derivedFromOverride = DerivedFrom(originalDataset.entityId).some
       ).generateOne.copy(name = datasetNames.generateOne)
 
       loadToStore(

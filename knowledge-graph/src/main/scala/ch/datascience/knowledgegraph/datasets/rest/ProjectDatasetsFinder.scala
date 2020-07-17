@@ -57,48 +57,21 @@ private class IOProjectDatasetsFinder(
     name = "ds projects",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
       "PREFIX schema: <http://schema.org/>",
       "PREFIX prov: <http://www.w3.org/ns/prov#>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name (?topmostSameAs AS ?sameAs) ?maybeDerivedFrom
+    s"""|SELECT DISTINCT ?identifier ?name ?topmostSameAs ?maybeDerivedFrom
         |WHERE {
-        |  {
         |    ?datasetId rdf:type <http://schema.org/Dataset>;
         |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |               schema:identifier ?identifier;
-        |               schema:name ?name.
+        |               schema:name ?name;
+        |               renku:topmostSameAs/schema:url ?topmostSameAs .
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom ?maybeDerivedFrom }.
         |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom ?datasetId } 
-        |  } {
-        |    SELECT ?datasetId ?topmostSameAs
-        |    WHERE {
-        |      {
-        |        {
-        |          ?datasetId schema:sameAs+/schema:url ?l1.
-        |          FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
-        |          BIND (?l1 AS ?topmostSameAs)
-        |        } UNION {
-        |          ?datasetId rdf:type <http://schema.org/Dataset>.
-        |          FILTER NOT EXISTS { ?datasetId schema:sameAs ?l1 }
-        |          BIND (?datasetId AS ?topmostSameAs)
-        |        }
-        |      } UNION {
-        |        ?datasetId schema:sameAs+/schema:url ?l1.
-        |        ?l1 schema:sameAs+/schema:url ?l2
-        |        FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
-        |        BIND (?l2 AS ?topmostSameAs)
-        |      } UNION {
-        |        ?datasetId schema:sameAs+/schema:url ?l1.
-        |        ?l1 schema:sameAs+/schema:url ?l2.
-        |        ?l2 schema:sameAs+/schema:url ?l3
-        |        FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
-        |        BIND (?l3 AS ?topmostSameAs)
-        |      }
-        |    }
-        |    GROUP BY ?datasetId ?topmostSameAs
-        |    HAVING (COUNT(*) > 0)
-        |  }
         |}
+        |ORDER BY ?name
         |""".stripMargin
   )
 }
@@ -119,7 +92,7 @@ private object IOProjectDatasetsFinder {
       for {
         id               <- cursor.downField("identifier").downField("value").as[Identifier]
         name             <- cursor.downField("name").downField("value").as[Name]
-        sameAs           <- cursor.downField("sameAs").downField("value").as[SameAs]
+        sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
         maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
       } yield (id, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom))
     }

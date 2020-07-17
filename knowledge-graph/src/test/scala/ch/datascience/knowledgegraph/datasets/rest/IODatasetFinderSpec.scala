@@ -18,22 +18,16 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, SameAs}
-import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.{DataSet, Person}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import io.renku.jsonld.{EntityId, JsonLD}
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -553,94 +547,4 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       new ProjectsFinder(rdfStoreConfig, logger, timeRecorder)
     )
   }
-
-  private implicit class DatasetProjectOps(datasetProject: DatasetProject) {
-    def shiftDateAfter(project: DatasetProject): DatasetProject =
-      datasetProject.copy(
-        created = datasetProject.created.copy(
-          date = datasetInProjectCreationDates generateGreaterThan project.created.date
-        )
-      )
-
-    lazy val toGenerator: Gen[NonEmptyList[DatasetProject]] = Gen.const(NonEmptyList of datasetProject)
-  }
-
-  private implicit class EntityIdOps(entityId: EntityId) {
-    lazy val asSameAs:      SameAs      = SameAs.fromId(entityId.value.toString).fold(throw _, identity)
-    lazy val asDerivedFrom: DerivedFrom = DerivedFrom(entityId.value.toString)
-  }
-
-  private implicit class NonModifiedDatasetOps(dataSet: NonModifiedDataset) {
-    lazy val entityId: EntityId = DataSet.entityId(dataSet.id)
-
-    def toJsonLD(
-        noSameAs:    Boolean  = false,
-        commitId:    CommitId = commitIds.generateOne
-    )(topmostSameAs: SameAs   = if (noSameAs) dataSet.entityId.asSameAs else dataSet.sameAs): JsonLD =
-      dataSet.projects match {
-        case project +: Nil =>
-          nonModifiedDataSetCommit(
-            commitId      = commitId,
-            committedDate = CommittedDate(project.created.date.value),
-            committer     = Person(project.created.agent.name, project.created.agent.maybeEmail)
-          )(
-            projectPath = project.path,
-            projectName = project.name
-          )(
-            datasetIdentifier         = dataSet.id,
-            datasetName               = dataSet.name,
-            datasetUrl                = dataSet.url,
-            maybeDatasetSameAs        = if (noSameAs) None else dataSet.sameAs.some,
-            maybeDatasetDescription   = dataSet.maybeDescription,
-            maybeDatasetPublishedDate = dataSet.published.maybeDate,
-            datasetCreatedDate        = DateCreated(project.created.date.value),
-            datasetCreators           = dataSet.published.creators map toPerson,
-            datasetParts              = dataSet.parts.map(part => (part.name, part.atLocation)),
-            overrideTopmostSameAs     = topmostSameAs.some
-          )
-        case _ => fail("Not prepared to work datasets having multiple projects")
-      }
-  }
-
-  private implicit class ModifiedDatasetOps(dataSet: ModifiedDataset) {
-
-    lazy val entityId: EntityId = DataSet.entityId(dataSet.id)
-
-    def toJsonLD(commitId:           CommitId    = commitIds.generateOne,
-                 topmostDerivedFrom: DerivedFrom = dataSet.derivedFrom): JsonLD = dataSet.projects match {
-      case project +: Nil =>
-        modifiedDataSetCommit(
-          commitId      = commitId,
-          committedDate = CommittedDate(project.created.date.value),
-          committer     = Person(project.created.agent.name, project.created.agent.maybeEmail)
-        )(
-          projectPath = project.path,
-          projectName = project.name
-        )(
-          datasetIdentifier          = dataSet.id,
-          datasetName                = dataSet.name,
-          datasetUrl                 = dataSet.url,
-          datasetDerivedFrom         = dataSet.derivedFrom,
-          maybeDatasetDescription    = dataSet.maybeDescription,
-          maybeDatasetPublishedDate  = dataSet.published.maybeDate,
-          datasetCreatedDate         = DateCreated(project.created.date.value),
-          datasetCreators            = dataSet.published.creators map toPerson,
-          datasetParts               = dataSet.parts.map(part => (part.name, part.atLocation)),
-          overrideTopmostDerivedFrom = topmostDerivedFrom.some
-        )
-      case _ => fail("Not prepared to work datasets having multiple projects")
-    }
-  }
-
-  private lazy val toPerson: DatasetCreator => Person =
-    creator => Person(creator.name, creator.maybeEmail, creator.maybeAffiliation)
-
-  private implicit lazy val partsAlphabeticalOrdering: Ordering[DatasetPart] =
-    (part1: DatasetPart, part2: DatasetPart) => part1.name.value compareTo part2.name.value
-
-  private implicit lazy val projectsAlphabeticalOrdering: Ordering[DatasetProject] =
-    (project1: DatasetProject, project2: DatasetProject) => project1.name.value compareTo project2.name.value
-
-  private implicit val dateCreatedInProjectOrdering: Ordering[DateCreatedInProject] =
-    (x: DateCreatedInProject, y: DateCreatedInProject) => x.value compareTo y.value
 }

@@ -32,12 +32,7 @@ import org.scalacheck.Gen
 
 object DatasetsGenerators {
 
-  implicit val datasets: Gen[Dataset] = datasets()
-
-  def datasets(projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] = Gen.oneOf(
-    modifiedDatasets(projects    = projects),
-    nonModifiedDatasets(projects = projects)
-  )
+  implicit val datasets: Gen[Dataset] = nonModifiedDatasets()
 
   def nonModifiedDatasets(
       sameAs:   Gen[SameAs]                       = datasetSameAs,
@@ -54,15 +49,7 @@ object DatasetsGenerators {
       projects         <- projects
     } yield NonModifiedDataset(id, name, url, sameAs, maybeDescription, published, part, projects.toList)
 
-  def modifiedDatasets(dataset: Dataset, project: DatasetProject, derivedFromOverride: DerivedFrom)(
-      implicit renkuBaseUrl:    RenkuBaseUrl
-  ): Gen[ModifiedDataset] = modifiedDatasets(dataset, project, Some(derivedFromOverride))
-
-  def modifiedDatasets(dataset: Dataset,
-                       project: DatasetProject)(implicit renkuBaseUrl: RenkuBaseUrl): Gen[ModifiedDataset] =
-    modifiedDatasets(dataset, project, derivedFromOverride = None)
-
-  def modifiedDatasets(dataset: Dataset, project: DatasetProject, derivedFromOverride: Option[DerivedFrom])(
+  def modifiedDatasets(dataset: Dataset, project: DatasetProject, derivedFromOverride: Option[DerivedFrom] = None)(
       implicit renkuBaseUrl:    RenkuBaseUrl
   ): Gen[ModifiedDataset] =
     for {
@@ -78,20 +65,6 @@ object DatasetsGenerators {
       dataset.parts,
       List(project)
     )
-
-  def modifiedDatasets(
-      projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
-  ): Gen[ModifiedDataset] =
-    for {
-      id               <- datasetIdentifiers
-      name             <- datasetNames
-      url              <- datasetUrls
-      derivedFrom      <- datasetDerivedFroms
-      maybeDescription <- Gen.option(datasetDescriptions)
-      published        <- datasetPublishingInfos
-      part             <- listOf(datasetParts)
-      projects         <- projects
-    } yield ModifiedDataset(id, name, url, derivedFrom, maybeDescription, published, part, projects.toList)
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
     maybeEmail       <- Gen.option(userEmails)
