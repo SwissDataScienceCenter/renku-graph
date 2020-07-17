@@ -49,8 +49,8 @@ object DatasetsGenerators {
       projects         <- projects
     } yield NonModifiedDataset(id, name, url, sameAs, maybeDescription, published, part, projects.toList)
 
-  def modifiedDatasets(dataset: Dataset, project: DatasetProject, derivedFromOverride: Option[DerivedFrom] = None)(
-      implicit renkuBaseUrl:    RenkuBaseUrl
+  def modifiedDatasetsOnFirstProject(dataset: Dataset, derivedFromOverride: Option[DerivedFrom] = None)(
+      implicit renkuBaseUrl:                  RenkuBaseUrl
   ): Gen[ModifiedDataset] =
     for {
       id        <- datasetIdentifiers
@@ -63,7 +63,7 @@ object DatasetsGenerators {
       dataset.maybeDescription,
       published,
       dataset.parts,
-      List(project)
+      List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset")))
     )
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {

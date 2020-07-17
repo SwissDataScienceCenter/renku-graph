@@ -102,9 +102,10 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
         val modifiedOnProject = addedToProjectObjects.generateOne.copy(
           date = datasetInProjectCreationDates generateGreaterThan addedToProject.date
         )
-        val modifiedDataset = modifiedDatasets(dataset, project.copy(created = modifiedOnProject)).generateOne.copy(
-          maybeDescription = datasetDescriptions.generateSome
-        )
+        val modifiedDataset =
+          modifiedDatasetsOnFirstProject(dataset.changeCreationOnProject(to = modifiedOnProject)).generateOne.copy(
+            maybeDescription = datasetDescriptions.generateSome
+          )
 
         loadToStore(
           dataset.toJsonLD()(),
@@ -307,9 +308,10 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
         val modifiedOnProject = addedToProjectObjects.generateOne.copy(
           date = datasetInProjectCreationDates generateGreaterThan addedToProject.date
         )
-        val modifiedDataset = modifiedDatasets(dataset, project.copy(created = modifiedOnProject)).generateOne.copy(
-          maybeDescription = datasetDescriptions.generateSome
-        )
+        val modifiedDataset =
+          modifiedDatasetsOnFirstProject(dataset.changeCreationOnProject(to = modifiedOnProject)).generateOne.copy(
+            maybeDescription = datasetDescriptions.generateSome
+          )
 
         loadToStore(
           dataset.toJsonLD()(topmostSameAs = dataset.sameAs),
@@ -495,10 +497,11 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val modifiedOnProject2 = addedToProjectObjects.generateOne.copy(
         date = datasetInProjectCreationDates generateGreaterThan dataset2Project.created.date
       )
-      private val dataset2ModifiedProject = dataset2Project.copy(created = modifiedOnProject2)
-      val modifiedDataset2 = modifiedDatasets(dataset2, dataset2ModifiedProject).generateOne.copy(
-        maybeDescription = datasetDescriptions.generateSome
-      )
+      val dataset2ModifiedProject = dataset2Project.copy(created = modifiedOnProject2)
+      val modifiedDataset2 =
+        modifiedDatasetsOnFirstProject(dataset2.copy(projects = List(dataset2ModifiedProject))).generateOne.copy(
+          maybeDescription = datasetDescriptions.generateSome
+        )
 
       val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project.copy(
         created = modifiedOnProject2

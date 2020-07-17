@@ -27,7 +27,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
@@ -41,12 +40,10 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.{DataSet, Person}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.jsonld.{EntityId, JsonLD}
-import org.scalacheck.Gen
+import io.renku.jsonld.JsonLD
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -56,362 +53,303 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
   "findDatasets - no phrase" should {
 
     Option(Phrase("*")) +: Option.empty[Phrase] +: Nil foreach { maybePhrase =>
-      s"return all datasets when the given phrase is $maybePhrase - case of non-modified datasets" in new TestCase {
+      s"return all datasets when the given phrase is $maybePhrase " +
+        "- case of datasets that has neither sameAs nor are imported to and/or from other projects" in new TestCase {
+        val dataset1 = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
+        val dataset2 = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne
+        val dataset3 = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
+
+        loadToStore(
+          List(
+            dataset1.toJsonLDsAndDatasets(noSameAs = true)().jsonLDs,
+            dataset2.toJsonLDsAndDatasets(noSameAs = true)().jsonLDs,
+            dataset3.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs
+          ).flatten: _*
+        )
+
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(3)))
+          .unsafeRunSync()
+
+        val datasetsList = List(dataset1, dataset2, dataset3)
+        result.results shouldBe datasetsList
+          .map(toDatasetSearchResult)
+          .sortBy(_.name.value)
+
+        result.pagingInfo.total shouldBe Total(datasetsList.size)
+      }
+
+      s"return all datasets when the given phrase is $maybePhrase " +
+        "- case of non-modified datasets" in new TestCase {
 
         val datasetsList = nonModifiedDatasets()
           .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
           .toList
 
-        loadToStore(datasetsList flatMap (_.toJsonLDsAndProjects(noSameAs = false).jsonLDs): _*)
+        loadToStore(datasetsList flatMap (_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*)
 
         val result = datasetsFinder
           .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe datasetsList
-          .map(_.toDatasetSearchResult)
+          .map(toDatasetSearchResult)
           .sortBy(_.name.value)
 
         result.pagingInfo.total shouldBe Total(datasetsList.size)
       }
 
-      s"return latest versions of datasets when the given phrase is $maybePhrase - case of modified datasets" in new TestCase {
+      s"return all datasets when the given phrase is $maybePhrase " +
+        "- case of shared sameAs" in new TestCase {
 
-        val originalDatasetsList = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, maxElements = 1))
+        val sharedSameAs    = datasetSameAs.generateOne
+        val dataset1Project = datasetProjects.generateOne
+        val datasets1       = nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(dataset1Project))
+        val datasets2 = datasets1.copy(id = datasetIdentifiers.generateOne,
+                                       projects = single.generateOne.toList.map(_ shiftDateAfter dataset1Project))
+
+        loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()())
+
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
+
+        result.results shouldBe List(
+          toDatasetSearchResult(datasets1).copy(projectsCount = ProjectsCount(2))
+        )
+
+        result.pagingInfo.total shouldBe Total(1)
+      }
+
+      s"return all datasets when the given phrase is $maybePhrase " +
+        "- case of shared sameAs with modification on some projects" in new TestCase {
+
+        val sharedSameAs = datasetSameAs.generateOne
+        val datasets1    = nonModifiedDatasets(projects = single).generateOne.copy(sameAs = sharedSameAs)
+        val datasets2    = datasets1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
+        val datasets2Modification = modifiedDatasetsOnFirstProject(datasets2).generateOne
+          .copy(name = datasetNames.generateOne)
+
+        loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Modification.toJsonLD())
+
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
+
+        result.results shouldBe List(
+          toDatasetSearchResult(datasets1).copy(projectsCount = ProjectsCount(1)),
+          toDatasetSearchResult(datasets2Modification)
+        ).sortBy(_.name.value)
+
+        result.pagingInfo.total shouldBe Total(2)
+      }
+
+      s"return all datasets when the given phrase is $maybePhrase " +
+        "- case of shared sameAs and forks" in new TestCase {
+
+        val sharedSameAs    = datasetSameAs.generateOne
+        val dataset1Project = datasetProjects.generateOne
+        val datasets1       = nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(dataset1Project))
+        val datasets2 = datasets1.copy(
+          id       = datasetIdentifiers.generateOne,
+          projects = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
+        )
+        val datasets2Fork = datasets2.copy(
+          projects = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
+        )
+
+        loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Fork.toJsonLD()())
+
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
+
+        result.results shouldBe List(
+          toDatasetSearchResult(datasets1).copy(projectsCount = ProjectsCount(3))
+        ).sortBy(_.name.value)
+
+        result.pagingInfo.total shouldBe Total(1)
+      }
+
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case of one level of modification" in new TestCase {
+
+        val originalDatasetsList = nonModifiedDatasets(projects = single)
           .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
           .toList
         val modifiedDatasetsList = originalDatasetsList.map { ds =>
-          modifiedDatasets(ds, ds.projects.head, DerivedFrom(ds.entityId).some).generateOne
+          modifiedDatasetsOnFirstProject(ds, ds.entityId.asDerivedFrom.some).generateOne
             .copy(name = datasetNames.generateOne)
         }
 
-        loadToStore(originalDatasetsList flatMap (_.toJsonLDsAndProjects(noSameAs = false).jsonLDs): _*)
-        loadToStore(modifiedDatasetsList flatMap (_.toJsonLDs()): _*)
+        loadToStore(originalDatasetsList flatMap (_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*)
+        loadToStore(modifiedDatasetsList map (_.toJsonLD()): _*)
 
         val result = datasetsFinder
           .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe modifiedDatasetsList
-          .map(_.toDatasetSearchResult)
+          .map(toDatasetSearchResult)
           .sortBy(_.name.value)
 
         result.pagingInfo.total shouldBe Total(modifiedDatasetsList.size)
       }
-    }
 
-    "return the latest versions of modified datasets " +
-      "if the older versions are not used in any project" in new TestCase {
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case more than one level of modification" in new TestCase {
 
-      val originalDataset = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne
-      val datasetModification1 = modifiedDatasets(
-        dataset             = originalDataset,
-        project             = originalDataset.projects.head,
-        derivedFromOverride = DerivedFrom(originalDataset.entityId).some
-      ).generateOne.copy(name = datasetNames.generateOne)
-      val datasetModification2 = modifiedDatasets(
-        dataset             = datasetModification1,
-        project             = datasetModification1.projects.head,
-        derivedFromOverride = DerivedFrom(datasetModification1.entityId).some
-      ).generateOne.copy(name = datasetNames.generateOne)
+        val original = nonModifiedDatasets(projects = single).generateOne
+        val modification1 = modifiedDatasetsOnFirstProject(original).generateOne
+          .copy(name = datasetNames.generateOne)
+        val modification2 = modifiedDatasetsOnFirstProject(modification1).generateOne
+          .copy(name = datasetNames.generateOne)
 
-      loadToStore(
-        List(
-          originalDataset.toJsonLDsAndProjects(noSameAs = true).jsonLDs,
-          datasetModification1.toJsonLDs(),
-          datasetModification2.toJsonLDs()
-        ).flatten: _*
-      )
+        loadToStore(
+          original.toJsonLD()(),
+          modification1.toJsonLD(topmostDerivedFrom = original.entityId.asDerivedFrom),
+          modification2.toJsonLD(topmostDerivedFrom = original.entityId.asDerivedFrom)
+        )
 
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
-        .unsafeRunSync()
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
 
-      result.results shouldBe List(datasetModification2.toDatasetSearchResult)
-    }
+        result.results          should contain only toDatasetSearchResult(modification2)
+        result.pagingInfo.total shouldBe Total(1)
+      }
 
-    "return the latest versions of modified datasets together with some earlier versions " +
-      "but only these earlier versions which are used in other projects and are not modified there" in new TestCase {
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case if there are modified and non-modified datasets" in new TestCase {
 
-      val projects        = datasetProjects.generateNonEmptyList(minElements = 2, maxElements = 2)
-      val originalDataset = nonModifiedDatasets(projects = Gen.const(projects)).generateOne
-      val datasetModification = modifiedDatasets(
-        dataset             = originalDataset,
-        project             = originalDataset.projects.head,
-        derivedFromOverride = DerivedFrom(originalDataset.entityId).some
-      ).generateOne.copy(name = datasetNames.generateOne)
+        val dataset1 = nonModifiedDatasets(projects = single).generateOne
+        val dataset1Modification = modifiedDatasetsOnFirstProject(dataset1).generateOne
+          .copy(name = datasetNames.generateOne)
+        val nonModifiedDataset = nonModifiedDatasets(projects = single).generateOne
 
-      loadToStore(
-        List(
-          originalDataset.toJsonLDsAndProjects(noSameAs = true).jsonLDs,
-          datasetModification.toJsonLDs()
-        ).flatten: _*
-      )
+        loadToStore(
+          dataset1.toJsonLD()(),
+          dataset1Modification.toJsonLD(topmostDerivedFrom = dataset1.entityId.asDerivedFrom),
+          nonModifiedDataset.toJsonLD()()
+        )
 
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
-        .unsafeRunSync()
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
 
-      result.results shouldBe List(
-        originalDataset.copy(projects = projects.tail).toDatasetSearchResult,
-        datasetModification.toDatasetSearchResult
-      ).sortBy(_.name.value)
-    }
+        result.results shouldBe List(dataset1Modification, nonModifiedDataset)
+          .map(toDatasetSearchResult)
+          .sortBy(_.name.value)
+        result.pagingInfo.total shouldBe Total(2)
+      }
 
-    "return the latest versions of modified datasets " +
-      "including the latest versions of datasets modified in other projects" in new TestCase {
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case if datasets are modified on some projects but not all" in new TestCase {
 
-      val projects                 = datasetProjects.generateNonEmptyList(minElements = 3, maxElements = 3)
-      val originalDataset          = nonModifiedDatasets(projects = Gen.const(projects)).generateOne
-      val originalJsonsAndProjects = originalDataset.toJsonLDsAndProjects(noSameAs = true)
+        val projects @ _ +: project2 +: Nil =
+          datasetProjects.generateNonEmptyList(minElements = 2, maxElements = 2).toList
+        val dataset = nonModifiedDatasets().generateOne.copy(projects = projects)
+        val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
+          .copy(name = datasetNames.generateOne)
 
-      val (firstJson, firstProject) = originalJsonsAndProjects.head
-      val datasetModificationOnProject1 = modifiedDatasets(
-        originalDataset,
-        firstProject,
-        firstJson.entityId.map(DerivedFrom(_))
-      ).generateOne.copy(name = datasetNames.generateOne)
+        val jsonsAndDatasets = dataset.toJsonLDsAndDatasets(noSameAs = false)()
+        loadToStore(
+          jsonsAndDatasets.jsonLDs :+
+            datasetModification.toJsonLD(topmostDerivedFrom = dataset.entityId.asDerivedFrom): _*
+        )
 
-      val (secondJson, secondProject) = originalJsonsAndProjects.tail.head
-      val datasetModificationOnProject2 = modifiedDatasets(
-        originalDataset,
-        secondProject,
-        secondJson.entityId.map(DerivedFrom(_))
-      ).generateOne.copy(name = datasetNames.generateOne)
+        val result = datasetsFinder
+          .findDatasets(None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
 
-      loadToStore(
-        List(
-          originalJsonsAndProjects.jsonLDs,
-          datasetModificationOnProject1.toJsonLDs(),
-          datasetModificationOnProject2.toJsonLDs()
-        ).flatten: _*
-      )
+        result.results shouldBe List(
+          toDatasetSearchResult(jsonsAndDatasets.dataset(havingOnly = project2)).copy(projectsCount = ProjectsCount(1)),
+          toDatasetSearchResult(datasetModification)
+        ).sortBy(_.name.value)
+        result.pagingInfo.total shouldBe Total(2)
+      }
 
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
-        .unsafeRunSync()
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case with forks on renku created datasets" in new TestCase {
 
-      result.results shouldBe List(
-        originalDataset
-          .copy(projects = projects.tail.tail)
-          .toDatasetSearchResult, // dataset in this version is still used here
-        datasetModificationOnProject1.toDatasetSearchResult,
-        datasetModificationOnProject2.toDatasetSearchResult
-      ).sortBy(_.name.value)
-    }
+        val dataset     = nonModifiedDatasets(projects = single).generateOne
+        val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
 
-    "merge all datasets having the same sameAs pointing to external source" in new TestCase {
-      val dataset1     = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
-      val dataset2     = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne
-      val datasetsList = List(dataset1, dataset2)
+        loadToStore(
+          dataset.toJsonLD(noSameAs     = true)(),
+          datasetFork.toJsonLD(noSameAs = true)()
+        )
 
-      loadToStore(datasetsList flatMap (_.toJsonLDsAndProjects(noSameAs = false).jsonLDs): _*)
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
 
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage(2)))
-        .unsafeRunSync()
+        result.results should contain theSameElementsAs List(
+          toDatasetSearchResult(dataset).copy(projectsCount = ProjectsCount(2))
+        )
+        result.pagingInfo.total shouldBe Total(1)
+      }
 
-      result.results shouldBe datasetsList
-        .map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case with more than one level of modification and forks on the 1st level" in new TestCase {
 
-      result.pagingInfo.total shouldBe Total(datasetsList.size)
-    }
+        val dataset     = nonModifiedDatasets(projects = single).generateOne
+        val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
+        val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
+          .copy(name = datasetNames.generateOne)
 
-    "merge datasets when they are imported from other renku project" in new TestCase {
-      val dataset1     = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
-      val dataset2     = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne
-      val datasetsList = List(dataset1, dataset2)
+        loadToStore(
+          dataset.toJsonLD()(),
+          datasetFork.toJsonLD()(),
+          datasetModification.toJsonLD(topmostDerivedFrom = datasetFork.entityId.asDerivedFrom)
+        )
 
-      loadToStore(datasetsList flatMap (_.toJsonLDsAndProjects(noSameAs = true).jsonLDs): _*)
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
 
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
-        .unsafeRunSync()
+        result.results shouldBe List(
+          toDatasetSearchResult(datasetFork).copy(projectsCount = ProjectsCount(1)),
+          toDatasetSearchResult(datasetModification)
+        ).sortBy(_.name.value)
+        result.pagingInfo.total shouldBe Total(2)
+      }
 
-      result.results shouldBe datasetsList
-        .map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case with more than one level of modification and forks on not the 1st level" in new TestCase {
 
-      result.pagingInfo.total shouldBe Total(datasetsList.size)
-    }
+        val dataset = nonModifiedDatasets(projects = single).generateOne
+        val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
+          .copy(name = datasetNames.generateOne)
+        val forkProject             = datasetProjects.generateOne
+        val datasetModificationFork = datasetModification.copy(projects = List(forkProject))
+        val datasetModificationOnFork = modifiedDatasetsOnFirstProject(datasetModificationFork).generateOne
+          .copy(name = datasetNames.generateOne)
 
-    "return all datasets having neither sameAs nor imported to and/or from other projects" in new TestCase {
-      val dataset1 = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
-      val dataset2 = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne
-      val dataset3 = nonModifiedDatasets(projects = nonEmptyList(datasetProjects, minElements = 2)).generateOne
+        loadToStore(
+          dataset.toJsonLD()(),
+          datasetModification.toJsonLD(topmostDerivedFrom       = dataset.entityId.asDerivedFrom),
+          datasetModificationFork.toJsonLD(topmostDerivedFrom   = dataset.entityId.asDerivedFrom),
+          datasetModificationOnFork.toJsonLD(topmostDerivedFrom = datasetModificationFork.entityId.asDerivedFrom)
+        )
 
-      loadToStore(
-        List(
-          dataset1.toJsonLDsAndProjects(noSameAs = true).jsonLDs,
-          dataset2.toJsonLDsAndProjects(noSameAs = true).jsonLDs,
-          dataset3.toJsonLDsAndProjects(noSameAs = false).jsonLDs
-        ).flatten: _*
-      )
+        val result = datasetsFinder
+          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
 
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(3)))
-        .unsafeRunSync()
-
-      val datasetsList = List(dataset1, dataset2, dataset3)
-      result.results shouldBe datasetsList
-        .map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
-
-      result.pagingInfo.total shouldBe Total(datasetsList.size)
-    }
-  }
-
-  "findDatasets in case of forks - no phrase" should {
-
-    "work when some datasets are modified on forks" in new TestCase {
-      val origDs = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
-      ).generateOne
-      val (origDsProject1Json, origDsProject1) +: (origDsProject2Json, origDsProject2) +: Nil =
-        origDs.toJsonLDsAndProjects(noSameAs = false)
-
-      val modifiedOrigDsOnProject2 = modifiedDatasets(
-        origDs,
-        origDsProject2,
-        derivedFromOverride = origDsProject2Json.entityId.map(DerivedFrom(_))
-      ).generateOne
-
-      val forkDs = origDs.copy(
-        projects = datasetProjects.generateNonEmptyList(minElements = 2, maxElements = 2).toList
-      )
-      val (forkDsProject3Json, forkDsProject3) +: (forkDsProject4Json, forkDsProject4) +: Nil =
-        forkDs.toJsonLDsAndProjects(noSameAs = false)
-
-      val modifiedForkDsOnProject3 = modifiedDatasets(forkDs, forkDsProject3).generateOne
-
-      loadToStore(
-        List(origDsProject1Json, origDsProject2Json, forkDsProject3Json, forkDsProject4Json) ++
-          modifiedOrigDsOnProject2.toJsonLDs() ++
-          modifiedForkDsOnProject3.toJsonLDs(): _*
-      )
-
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
-        .unsafeRunSync()
-
-      result.results should contain theSameElementsAs List(
-        origDs.copy(projects                   = List(origDsProject1, forkDsProject4)).toDatasetSearchResult,
-        modifiedOrigDsOnProject2.copy(projects = List(origDsProject2)).toDatasetSearchResult,
-        modifiedForkDsOnProject3.copy(projects = List(forkDsProject3)).toDatasetSearchResult
-      )
-
-      result.pagingInfo.total shouldBe Total(3)
-    }
-
-    "merge all datasets having the same sameAs together with their forks to different projects" in new TestCase {
-      val dataset1CreatedDate = datasetCreatedDates.generateOne
-      val dataset1 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
-      ).generateOne
-      val dataset1Fork = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
-
-      val dataset2CreatedDate = dataset1CreatedDate.shiftToFuture
-      val dataset2 = dataset1.copy(
-        id       = datasetIdentifiers.generateOne,
-        projects = datasetProjects.generateList(ofSize = 1)
-      )
-      val dataset2Fork = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
-
-      loadToStore(
-        List(
-          dataset1.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs     = false).jsonLDs,
-          dataset1Fork.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs = false).jsonLDs,
-          dataset2.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs     = false).jsonLDs,
-          dataset2Fork.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs = false).jsonLDs
-        ).flatten: _*
-      )
-
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage(1)))
-        .unsafeRunSync()
-
-      result.results shouldBe List(
-        dataset1 addAll dataset1Fork.projects addAll dataset2.projects addAll dataset2Fork.projects
-      ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
-
-      result.pagingInfo.total shouldBe Total(1)
-    }
-
-    "merge datasets imported from other renku project and forked to different projects" in new TestCase {
-      val initialDatasetCreatedDate = datasetCreatedDates.generateOne
-      val initialDataset = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 3, maxElements = 3)
-      ).generateOne
-      val initialDatasetFork = initialDataset.copy(projects = datasetProjects.generateList(ofSize = 1))
-
-      val importedDatasetCreatedDate = initialDatasetCreatedDate.shiftToFuture
-      val importedDataset = initialDataset.copy(
-        id       = datasetIdentifiers.generateOne,
-        projects = datasetProjects.generateList(ofSize = 1),
-        sameAs   = initialDataset.entityId.asSameAs
-      )
-      val importedDatasetFork = importedDataset.copy(projects = datasetProjects.generateList(ofSize = 1))
-
-      loadToStore(
-        List(
-          initialDataset.toJsonLDsAndProjects(initialDatasetCreatedDate, noSameAs       = true).jsonLDs,
-          initialDatasetFork.toJsonLDsAndProjects(initialDatasetCreatedDate, noSameAs   = true).jsonLDs,
-          importedDataset.toJsonLDsAndProjects(importedDatasetCreatedDate, noSameAs     = false).jsonLDs,
-          importedDatasetFork.toJsonLDsAndProjects(importedDatasetCreatedDate, noSameAs = false).jsonLDs
-        ).flatten: _*
-      )
-
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage(1)))
-        .unsafeRunSync()
-
-      result.results shouldBe List(
-        initialDataset addAll initialDatasetFork.projects addAll importedDataset.projects addAll importedDatasetFork.projects
-      ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
-
-      result.pagingInfo.total shouldBe Total(1)
-    }
-
-    "merge non-imported and not being imported datasets when they are forked to different projects" in new TestCase {
-      val dataset1 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne
-      val dataset1Fork = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
-
-      val dataset2 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne
-      val dataset2Fork = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
-
-      loadToStore(
-        List(
-          dataset1.toJsonLDsAndProjects(noSameAs     = true).jsonLDs,
-          dataset1Fork.toJsonLDsAndProjects(noSameAs = true).jsonLDs,
-          dataset2.toJsonLDsAndProjects(noSameAs     = true).jsonLDs,
-          dataset2Fork.toJsonLDsAndProjects(noSameAs = true).jsonLDs
-        ).flatten: _*
-      )
-
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage(2)))
-        .unsafeRunSync()
-
-      result.results shouldBe List(
-        dataset1 addAll dataset1Fork.projects,
-        dataset2 addAll dataset2Fork.projects
-      ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
-
-      result.pagingInfo.total shouldBe Total(2)
+        result.results should contain theSameElementsAs List(
+          toDatasetSearchResult(datasetModification).copy(projectsCount = ProjectsCount(1)),
+          toDatasetSearchResult(datasetModificationOnFork)
+        ).sortBy(_.name.value)
+        result.pagingInfo.total shouldBe Total(2)
+      }
     }
   }
 
   "findDatasets - some phrase given" should {
 
-    "merge all datasets having the same sameAs pointing to some external storage" in new TestCase {
+    "returns all datasets containing the phrase - " +
+      "case with no shared SameAs and no modifications" in new TestCase {
 
       val phrase = phrases.generateOne
       val dataset1 = nonModifiedDatasets(
@@ -425,96 +363,25 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       ).generateOne.makeCreatorNameContaining(phrase)
 
       loadToStore(
-        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne) flatMap (_.toJsonLDsAndProjects(
-          noSameAs = false
-        ).jsonLDs): _*
+        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
+          .flatMap(_.toJsonLDsAndDatasets(noSameAs = true)().jsonLDs): _*
       )
 
-      val pagingRequest = PagingRequest(Page(2), PerPage(1))
-
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
 
       val matchingDatasets = List(dataset1, dataset2, dataset3)
-      result.results shouldBe List(matchingDatasets.sorted(byName)(1).toDatasetSearchResult)
+      result.results shouldBe matchingDatasets.map(toDatasetSearchResult).sortBy(_.name.value)
 
-      result.pagingInfo.pagingRequest shouldBe pagingRequest
-      result.pagingInfo.total         shouldBe Total(3)
-    }
-
-    "merge datasets when they are imported from other renku project" in new TestCase {
-
-      val phrase = phrases.generateOne
-      val dataset1 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeNameContaining(phrase)
-      val dataset2 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeDescContaining(phrase)
-      val dataset3 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeCreatorNameContaining(phrase)
-
-      loadToStore(
-        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne) flatMap (_.toJsonLDsAndProjects(
-          noSameAs = true
-        ).jsonLDs): _*
-      )
-
-      val pagingRequest = PagingRequest(Page(2), PerPage(1))
-
-      val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
-        .unsafeRunSync()
-
-      val matchingDatasets = List(dataset1, dataset2, dataset3)
-      result.results shouldBe List((matchingDatasets sorted byName)(1).toDatasetSearchResult)
-
-      result.pagingInfo.pagingRequest shouldBe pagingRequest
-      result.pagingInfo.total         shouldBe Total(3)
-    }
-
-    "return datasets having neither sameAs nor imported to other projects" in new TestCase {
-
-      val phrase = phrases.generateOne
-      val dataset1 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeNameContaining(phrase)
-      val dataset2 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne.makeDescContaining(phrase)
-      val dataset3 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeCreatorNameContaining(phrase)
-
-      loadToStore(
-        List(
-          dataset1.toJsonLDsAndProjects(noSameAs                          = true).jsonLDs,
-          dataset2.toJsonLDsAndProjects(noSameAs                          = true).jsonLDs,
-          dataset3.toJsonLDsAndProjects(noSameAs                          = false).jsonLDs,
-          nonModifiedDatasets().generateOne.toJsonLDsAndProjects(noSameAs = false).jsonLDs
-        ).flatten: _*
-      )
-
-      val pagingRequest = PagingRequest(Page(2), PerPage(1))
-
-      val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
-        .unsafeRunSync()
-
-      val matchingDatasets = List(dataset1, dataset2, dataset3)
-      result.results shouldBe List(matchingDatasets.sorted(byName)(1).toDatasetSearchResult)
-
-      result.pagingInfo.pagingRequest shouldBe pagingRequest
-      result.pagingInfo.total         shouldBe Total(3)
+      result.pagingInfo.total shouldBe Total(3)
     }
 
     "return no results if there is no matching dataset" in new TestCase {
 
       val dataset = nonModifiedDatasets().generateOne
 
-      loadToStore(dataset.toJsonLDsAndProjects(noSameAs = true).jsonLDs: _*)
+      loadToStore(dataset.toJsonLDsAndDatasets(noSameAs = true)().jsonLDs: _*)
 
       val result = datasetsFinder
         .findDatasets(Some(phrases.generateOne), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
@@ -524,18 +391,15 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.pagingInfo.total shouldBe Total(0)
     }
 
-    "not return datasets if the match was only in an older version which is not used anymore" in new TestCase {
+    "return no datasets if the match was only in an older version which is not used anymore" in new TestCase {
 
-      val project  = datasetProjects.generateOne
-      val phrase   = phrases.generateOne
-      val original = nonModifiedDatasets().generateOne.copy(projects = List(project)).makeNameContaining(phrase)
-      val fork     = modifiedDatasets(original, project).generateOne.copy(name = datasetNames.generateOne)
+      val phrase       = phrases.generateOne
+      val project      = datasetProjects.generateOne
+      val original     = nonModifiedDatasets().generateOne.copy(projects = List(project)).makeNameContaining(phrase)
+      val modification = modifiedDatasetsOnFirstProject(original).generateOne.copy(name = datasetNames.generateOne)
 
       loadToStore(
-        List(
-          original.toJsonLDsAndProjects(noSameAs = true).jsonLDs,
-          fork.toJsonLDs()
-        ).flatten: _*
+        original.toJsonLDsAndDatasets(noSameAs = true)().jsonLDs :+ modification.toJsonLD(): _*
       )
 
       datasetsFinder
@@ -544,180 +408,114 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         .results shouldBe empty
     }
 
-    "not return datasets neither sharing the sameAs not in the derivation hierarchy " +
-      "if they do not match the criteria" in new TestCase {
+    "return datasets matching the criteria excluding datasets which were modified and does not match anymore" in new TestCase {
 
-      val dataset1 = nonModifiedDatasets().generateOne.copy()
-      val phrase   = phrases.generateOne
-      val project  = datasetProjects.generateOne
-      val dataset2 = nonModifiedDatasets().generateOne.copy(projects = List(project)).makeNameContaining(phrase)
+      val phrase       = phrases.generateOne
+      val sharedSameAs = datasetSameAs.generateOne
+      val dataset1 = nonModifiedDatasets(projects = single).generateOne
+        .copy(sameAs = sharedSameAs)
+        .makeNameContaining(phrase)
+      val dataset2 = nonModifiedDatasets(projects = single).generateOne
+        .copy(sameAs = sharedSameAs)
+        .makeNameContaining(phrase)
+      val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
+        .copy(name = datasetNames.generateOne)
 
-      loadToStore(List(dataset1, dataset2).flatMap(_.toJsonLDsAndProjects(noSameAs = true)).jsonLDs: _*)
+      loadToStore(
+        List(dataset1, dataset2).flatMap(_.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs :+
+          dataset2Modification.toJsonLD(): _*
+      )
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(dataset1.toDatasetSearchResult)
-    }
-  }
-
-  "findDatasets in case of forks - some phrase given" should {
-
-    "merge all datasets having the same sameAs together with forks to different projects" in new TestCase {
-      val phrase = phrases.generateOne
-
-      val dataset1CreatedDate = datasetCreatedDates.generateOne
-      val dataset1 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeNameContaining(phrase)
-      val dataset1Fork            = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
-      val dataset1PrimCreatedDate = dataset1CreatedDate.shiftToFuture
-      val dataset1Prim = dataset1.copy(
-        id       = datasetIdentifiers.generateOne,
-        projects = datasetProjects.generateList(ofSize = 1)
-      )
-      val dataset1PrimFork    = dataset1Prim.copy(projects = datasetProjects.generateList(ofSize = 1))
-      val dataset2CreatedDate = datasetCreatedDates.generateOne
-      val dataset2 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne.makeDescContaining(phrase)
-      val dataset2Fork        = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
-      val dataset3CreatedDate = datasetCreatedDates.generateOne
-      val dataset3 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne.makeCreatorNameContaining(phrase)
-      val dataset3Fork = dataset3.copy(projects = datasetProjects.generateList(ofSize = 1))
-
-      loadToStore(
-        List(
-          dataset1.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs             = false).jsonLDs,
-          dataset1Fork.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs         = false).jsonLDs,
-          dataset1Prim.toJsonLDsAndProjects(dataset1PrimCreatedDate, noSameAs     = false).jsonLDs,
-          dataset1PrimFork.toJsonLDsAndProjects(dataset1PrimCreatedDate, noSameAs = false).jsonLDs,
-          dataset2.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs             = false).jsonLDs,
-          dataset2Fork.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs         = false).jsonLDs,
-          dataset3.toJsonLDsAndProjects(dataset3CreatedDate, noSameAs             = false).jsonLDs,
-          dataset3Fork.toJsonLDsAndProjects(dataset3CreatedDate, noSameAs         = false).jsonLDs
-        ).flatten: _*
-      )
-
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = Some(phrase),
-                      Sort.By(NameProperty, Direction.Asc),
-                      PagingRequest(Page(1), PerPage(3)))
-        .unsafeRunSync()
-
-      result.results shouldBe List(
-        dataset1 addAll dataset1Fork.projects addAll dataset1Prim.projects addAll dataset1PrimFork.projects,
-        dataset2 addAll dataset2Fork.projects,
-        dataset3 addAll dataset3Fork.projects
-      ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
-
-      result.pagingInfo.total shouldBe Total(3)
+        .results shouldBe List(toDatasetSearchResult(dataset1))
     }
 
-    "merge datasets imported from other renku project and forked to different projects" in new TestCase {
-      val phrase = phrases.generateOne
+    "return datasets matching the criteria after modification" in new TestCase {
 
-      val dataset1CreatedDate = datasetCreatedDates.generateOne
-      val dataset1 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeNameContaining(phrase)
-      val dataset1Fork            = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
-      val dataset1PrimCreatedDate = dataset1CreatedDate.shiftToFuture
-      val dataset1Prim = dataset1.copy(
-        id       = datasetIdentifiers.generateOne,
-        projects = datasetProjects.generateList(ofSize = 1),
-        sameAs   = dataset1.entityId.asSameAs
-      )
-      val dataset1PrimFork    = dataset1Prim.copy(projects = datasetProjects.generateList(ofSize = 1))
-      val dataset2CreatedDate = datasetCreatedDates.generateOne
-      val dataset2 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeDescContaining(phrase)
-      val dataset2Fork        = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
-      val dataset3CreatedDate = datasetCreatedDates.generateOne
-      val dataset3 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeCreatorNameContaining(phrase)
-      val dataset3Fork = dataset3.copy(projects = datasetProjects.generateList(ofSize = 1))
+      val phrase       = phrases.generateOne
+      val sharedSameAs = datasetSameAs.generateOne
+      val dataset1 = nonModifiedDatasets(projects = single).generateOne
+        .copy(sameAs = sharedSameAs)
+      val dataset2 = nonModifiedDatasets(projects = single).generateOne
+        .copy(sameAs = sharedSameAs)
+      val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
+        .makeNameContaining(phrase)
 
       loadToStore(
-        List(
-          dataset1.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs             = true).jsonLDs,
-          dataset1Fork.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs         = true).jsonLDs,
-          dataset1Prim.toJsonLDsAndProjects(dataset1PrimCreatedDate, noSameAs     = false).jsonLDs,
-          dataset1PrimFork.toJsonLDsAndProjects(dataset1PrimCreatedDate, noSameAs = false).jsonLDs,
-          dataset2.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs             = true).jsonLDs,
-          dataset2Fork.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs         = true).jsonLDs,
-          dataset3.toJsonLDsAndProjects(dataset3CreatedDate, noSameAs             = true).jsonLDs,
-          dataset3Fork.toJsonLDsAndProjects(dataset3CreatedDate, noSameAs         = true).jsonLDs
-        ).flatten: _*
+        List(dataset1, dataset2).flatMap(_.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs :+
+          dataset2Modification.toJsonLD(): _*
       )
 
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = Some(phrase),
-                      Sort.By(NameProperty, Direction.Asc),
-                      PagingRequest(Page(1), PerPage(3)))
+      datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-
-      result.results shouldBe List(
-        dataset1 addAll dataset1Fork.projects addAll dataset1Prim.projects addAll dataset1PrimFork.projects,
-        dataset2 addAll dataset2Fork.projects,
-        dataset3 addAll dataset3Fork.projects
-      ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
-
-      result.pagingInfo.total shouldBe Total(3)
+        .results shouldBe List(toDatasetSearchResult(dataset2Modification))
     }
 
-    "merge non-imported and not being imported datasets when they are forked to different projects" in new TestCase {
-      val phrase = phrases.generateOne
+    "return no datasets if the criteria is matched somewhere in the middle of the modification hierarchy" in new TestCase {
 
-      val dataset1CreatedDate = datasetCreatedDates.generateOne
-      val dataset1 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne.makeNameContaining(phrase)
-      val dataset1Fork = dataset1.copy(projects = datasetProjects.generateList(ofSize = 1))
-
-      val dataset2CreatedDate = datasetCreatedDates.generateOne
-      val dataset2 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne.makeDescContaining(phrase)
-      val dataset2Fork = dataset2.copy(projects = datasetProjects.generateList(ofSize = 1))
-
-      val dataset3CreatedDate = datasetCreatedDates.generateOne
-      val dataset3 = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne.makeCreatorNameContaining(phrase)
-      val dataset3Fork = dataset3.copy(projects = datasetProjects.generateList(ofSize = 1))
+      val phrase       = phrases.generateOne
+      val sharedSameAs = datasetSameAs.generateOne
+      val dataset = nonModifiedDatasets(projects = single).generateOne
+        .copy(sameAs = sharedSameAs)
+      val datasetModification1 = modifiedDatasetsOnFirstProject(dataset).generateOne
+        .makeNameContaining(phrase)
+      val datasetModification2 = modifiedDatasetsOnFirstProject(datasetModification1).generateOne
+        .copy(name = datasetNames.generateOne)
 
       loadToStore(
-        List(
-          dataset1.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs     = true).jsonLDs,
-          dataset1Fork.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs = true).jsonLDs,
-          dataset2.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs     = true).jsonLDs,
-          dataset2Fork.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs = true).jsonLDs,
-          dataset3.toJsonLDsAndProjects(dataset3CreatedDate, noSameAs     = true).jsonLDs,
-          dataset3Fork.toJsonLDsAndProjects(dataset3CreatedDate, noSameAs = true).jsonLDs
-        ).flatten: _*
+        dataset.toJsonLD()(),
+        datasetModification1.toJsonLD(),
+        datasetModification2.toJsonLD()
       )
 
-      val result = datasetsFinder
-        .findDatasets(maybePhrase = Some(phrase),
-                      Sort.By(NameProperty, Direction.Asc),
-                      PagingRequest(Page(1), PerPage(3)))
+      datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
+        .results shouldBe empty
+    }
 
-      result.results shouldBe List(
-        dataset1 addAll dataset1Fork.projects,
-        dataset2 addAll dataset2Fork.projects,
-        dataset3 addAll dataset3Fork.projects
-      ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+    "return datasets matching the criteria excluding datasets which were modified on forks and does not match anymore" in new TestCase {
 
-      result.pagingInfo.total shouldBe Total(3)
+      val phrase       = phrases.generateOne
+      val sharedSameAs = datasetSameAs.generateOne
+      val dataset1 = nonModifiedDatasets(projects = single).generateOne
+        .copy(sameAs = sharedSameAs)
+        .makeNameContaining(phrase)
+      val dataset2 = dataset1.copy(projects = single.generateOne.toList)
+      val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
+        .copy(name = datasetNames.generateOne)
+
+      loadToStore(
+        List(dataset1, dataset2).flatMap(_.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs :+
+          dataset2Modification.toJsonLD(): _*
+      )
+
+      datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+        .results shouldBe List(toDatasetSearchResult(dataset1))
+    }
+
+    "return datasets matching the criteria after modification of the fork" in new TestCase {
+
+      val phrase   = phrases.generateOne
+      val dataset1 = nonModifiedDatasets(projects = single).generateOne
+      val dataset2 = dataset1.copy(projects = single.generateOne.toList)
+      val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
+        .makeNameContaining(phrase)
+
+      loadToStore(
+        List(dataset1, dataset2).flatMap(_.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs :+
+          dataset2Modification.toJsonLD(): _*
+      )
+
+      datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .unsafeRunSync()
+        .results shouldBe List(toDatasetSearchResult(dataset2Modification))
     }
   }
 
@@ -730,15 +528,15 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
           val (dataset1, dataset2, dataset3) = addPhrase(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
 
           loadToStore(
-            List(dataset1, dataset2, dataset3, nonPhrased) flatMap (_.toJsonLDsAndProjects(noSameAs = false).jsonLDs): _*
+            List(dataset1, dataset2, dataset3, nonPhrased) flatMap (_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*
           )
 
           datasetsFinder
             .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
             .unsafeRunSync()
-            .results shouldBe List(dataset1.toDatasetSearchResult,
-                                   dataset2.toDatasetSearchResult,
-                                   dataset3.toDatasetSearchResult).sortBy(_.name.value)
+            .results shouldBe List(toDatasetSearchResult(dataset1),
+                                   toDatasetSearchResult(dataset2),
+                                   toDatasetSearchResult(dataset3)).sortBy(_.name.value)
       }
     }
 
@@ -752,17 +550,16 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       loadToStore(
-        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne) flatMap (_.toJsonLDsAndProjects(
-          noSameAs = false
-        ).jsonLDs): _*
+        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
+          .flatMap(_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*
       )
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(dataset3.toDatasetSearchResult,
-                               dataset1.toDatasetSearchResult,
-                               dataset2.toDatasetSearchResult)
+        .results shouldBe List(toDatasetSearchResult(dataset3),
+                               toDatasetSearchResult(dataset1),
+                               toDatasetSearchResult(dataset2))
     }
 
     s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
@@ -775,17 +572,16 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       loadToStore(
-        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne) flatMap (_.toJsonLDsAndProjects(
-          noSameAs = false
-        ).jsonLDs): _*
+        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
+          .flatMap(_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*
       )
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(dataset2.toDatasetSearchResult,
-                               dataset3.toDatasetSearchResult,
-                               dataset1.toDatasetSearchResult)
+        .results shouldBe List(toDatasetSearchResult(dataset2),
+                               toDatasetSearchResult(dataset3),
+                               toDatasetSearchResult(dataset1))
     }
   }
 
@@ -800,9 +596,8 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
                   nonModifiedDatasets().generateOne)
 
       loadToStore(
-        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne) flatMap (_.toJsonLDsAndProjects(
-          noSameAs = false
-        ).jsonLDs): _*
+        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
+          .flatMap(_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*
       )
 
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
@@ -812,7 +607,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         .unsafeRunSync()
 
       val expectedDataset = List(dataset1, dataset2, dataset3).sorted(byName)(1)
-      result.results shouldBe List(expectedDataset.toDatasetSearchResult)
+      result.results shouldBe List(toDatasetSearchResult(expectedDataset))
 
       result.pagingInfo.pagingRequest shouldBe pagingRequest
       result.pagingInfo.total         shouldBe Total(3)
@@ -827,9 +622,8 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
                   nonModifiedDatasets().generateOne)
 
       loadToStore(
-        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne) flatMap (_.toJsonLDsAndProjects(
-          noSameAs = false
-        ).jsonLDs): _*
+        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
+          .flatMap(_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*
       )
 
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
@@ -841,157 +635,6 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       result.results                  shouldBe Nil
       result.pagingInfo.pagingRequest shouldBe pagingRequest
       result.pagingInfo.total         shouldBe Total(3)
-    }
-
-    "return no results if there's no datasets with name, description or creator matching the given phrase" in new TestCase {
-
-      loadToStore(randomDataSetCommit)
-
-      val result = datasetsFinder
-        .findDatasets(Some(phrases.generateOne), searchEndpointSorts.generateOne, PagingRequest.default)
-        .unsafeRunSync()
-
-      result.results          shouldBe Nil
-      result.pagingInfo.total shouldBe Total(0)
-    }
-  }
-
-  "findDatasets in the case there's datasets import hierarchy" should {
-
-    emptyOptionOf[Phrase] +: phrases.toGeneratorOfSomes +: Nil foreach { phraseGenerator =>
-      val maybePhrase = phraseGenerator.generateOne
-
-      s"return a single dataset - case when the first dataset is externally imported and ${maybePhrase.getOrElse("no")} phrase given" in new TestCase {
-        val dataset1 = nonModifiedDatasets(
-          projects = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
-        ).generateOne.makeDescContaining(maybePhrase)
-        val dataset1CreatedDate = datasetCreatedDates.generateOne
-        val dataset1Jsons       = dataset1.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs = false).jsonLDs
-
-        val dataset2 = dataset1.copy(
-          id       = datasetIdentifiers.generateOne,
-          sameAs   = dataset1.entityId.asSameAs,
-          projects = datasetProjects.generateList(ofSize = 1)
-        )
-        val dataset2CreatedDate = dataset1CreatedDate.shiftToFuture
-        val dataset2Jsons       = dataset2.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs = false).jsonLDs
-
-        val dataset3 = dataset2.copy(
-          id       = datasetIdentifiers.generateOne,
-          sameAs   = dataset2.entityId.asSameAs,
-          projects = datasetProjects.generateList(ofSize = 1)
-        )
-        val dataset3Jsons = dataset3.toJsonLDsAndProjects(dataset2CreatedDate.shiftToFuture, noSameAs = false).jsonLDs
-
-        loadToStore(dataset1Jsons ++ dataset2Jsons ++ dataset3Jsons: _*)
-
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
-          .unsafeRunSync()
-
-        result.results shouldBe List(
-          dataset1 addAll dataset2.projects addAll dataset3.projects
-        ).map(_.toDatasetSearchResult)
-          .sortBy(_.name.value)
-
-        result.pagingInfo.total shouldBe Total(1)
-      }
-
-      s"return a single dataset - case when the first dataset is in-project created and ${maybePhrase.getOrElse("no")} phrase given" in new TestCase {
-        val dataset1 = nonModifiedDatasets(
-          projects = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
-        ).generateOne.makeDescContaining(maybePhrase)
-        val dataset1CreatedDate = datasetCreatedDates.generateOne
-        val dataset1Jsons       = dataset1.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs = true).jsonLDs
-
-        val dataset2 = dataset1.copy(
-          id       = datasetIdentifiers.generateOne,
-          sameAs   = dataset1.entityId.asSameAs,
-          projects = datasetProjects.generateList(ofSize = 1)
-        )
-        val dataset2CreatedDate = dataset1CreatedDate.shiftToFuture
-        val dataset2Jsons       = dataset2.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs = false).jsonLDs
-
-        val dataset3 = dataset2.copy(
-          id       = datasetIdentifiers.generateOne,
-          sameAs   = dataset2.entityId.asSameAs,
-          projects = datasetProjects.generateList(ofSize = 1)
-        )
-        val dataset3Jsons = dataset3.toJsonLDsAndProjects(dataset2CreatedDate.shiftToFuture, noSameAs = false).jsonLDs
-
-        loadToStore(dataset1Jsons ++ dataset2Jsons ++ dataset3Jsons: _*)
-
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
-          .unsafeRunSync()
-
-        result.results shouldBe List(
-          dataset1 addAll dataset2.projects addAll dataset3.projects
-        ).map(_.toDatasetSearchResult)
-          .sortBy(_.name.value)
-
-        result.pagingInfo.total shouldBe Total(1)
-      }
-
-      "return a single dataset - case when there're two first level projects sharing a dataset " +
-        s"and some other project imports from on of these two; ${maybePhrase.getOrElse("no")} phrase given" in new TestCase {
-        val dataset1 = nonModifiedDatasets(
-          projects = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
-        ).generateOne.makeDescContaining(maybePhrase)
-        val dataset1CreatedDate = datasetCreatedDates.generateOne
-        val dataset1Jsons       = dataset1.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs = false).jsonLDs
-
-        val dataset2 = nonModifiedDatasets(
-          sameAs   = Gen.const(dataset1.sameAs),
-          projects = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
-        ).generateOne
-        val dataset2CreatedDate = dataset1CreatedDate.shiftToFuture
-        val dataset2Jsons       = dataset2.toJsonLDsAndProjects(dataset2CreatedDate, noSameAs = false).jsonLDs
-
-        val dataset3 = dataset2.copy(
-          id       = datasetIdentifiers.generateOne,
-          sameAs   = dataset2.entityId.asSameAs,
-          projects = datasetProjects.generateList(ofSize = 1)
-        )
-        val dataset3Jsons = dataset3.toJsonLDsAndProjects(dataset2CreatedDate.shiftToFuture, noSameAs = false).jsonLDs
-
-        loadToStore(dataset1Jsons ++ dataset2Jsons ++ dataset3Jsons: _*)
-
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
-          .unsafeRunSync()
-
-        result.results shouldBe List(
-          dataset1 addAll dataset2.projects addAll dataset3.projects
-        ).map(_.toDatasetSearchResult)
-          .sortBy(_.name.value)
-
-        result.pagingInfo.total shouldBe Total(1)
-      }
-
-      "return a single dataset " +
-        s"- case when there are 4 levels of inheritance and ${maybePhrase.getOrElse("no")} phrase given" in new TestCase {
-        val dataset1 = nonModifiedDatasets(
-          projects = nonEmptyList(datasetProjects, maxElements = 3)
-        ).generateOne.makeDescContaining(maybePhrase)
-        val dataset1CreatedDate = datasetCreatedDates.generateOne
-        val dataset1Jsons       = dataset1.toJsonLDsAndProjects(dataset1CreatedDate, noSameAs = false).jsonLDs
-
-        val (allDatasets, allJsons) = nestDataset(ifLessThan = 4)(dataset1, dataset1CreatedDate, dataset1Jsons)
-
-        loadToStore(allJsons: _*)
-
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
-          .unsafeRunSync()
-
-        result.results shouldBe List(
-          dataset1 addAll allDatasets.tail.flatMap(_.projects)
-        ).map(_.toDatasetSearchResult)
-          .sortBy(_.name.value)
-
-        result.pagingInfo.total shouldBe Total(1)
-      }
     }
   }
 
@@ -1007,12 +650,12 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
   }
 
   private def addPhrase(
-      containtingPhrase: Phrase,
-      dataset1Orig:      NonModifiedDataset,
-      dataset2Orig:      NonModifiedDataset,
-      dataset3Orig:      NonModifiedDataset
+      containingPhrase: Phrase,
+      dataset1Orig:     NonModifiedDataset,
+      dataset2Orig:     NonModifiedDataset,
+      dataset3Orig:     NonModifiedDataset
   ): (NonModifiedDataset, NonModifiedDataset, NonModifiedDataset) = {
-    val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(containtingPhrase.toString)
+    val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(containingPhrase.toString)
     val dataset1 = dataset1Orig.copy(
       name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
     )
@@ -1034,209 +677,27 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
     (dataset1, dataset2, dataset3)
   }
 
-  private implicit class NonModifiedDatasetOps(dataset: NonModifiedDataset) {
+  private def toDatasetSearchResult(dataset: Dataset): DatasetSearchResult = DatasetSearchResult(
+    dataset.id,
+    dataset.name,
+    dataset.maybeDescription,
+    dataset.published,
+    ProjectsCount(dataset.projects.size)
+  )
 
-    lazy val entityId: EntityId = DataSet.entityId(dataset.id)
+  private implicit class JsonAndProjectTuplesOps(tuples: List[(JsonLD, Dataset)]) {
 
-    def changePublishedDateTo(maybeDate: Option[PublishedDate]): NonModifiedDataset =
-      dataset.copy(published = dataset.published.copy(maybeDate = maybeDate))
-
-    def addAll(projects: List[DatasetProject]): NonModifiedDataset =
-      dataset.copy(projects = dataset.projects ++ projects)
-
-    def makeNameContaining(phrase: Phrase): NonModifiedDataset = {
-      val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
-      dataset.copy(
-        name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
-      )
-    }
-
-    def makeCreatorNameContaining(phrase: Phrase): NonModifiedDataset = {
-      val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
-      dataset.copy(
-        published = dataset.published.copy(
-          creators = Set(
-            DatasetCreator(
-              userEmails.generateOption,
-              sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne,
-              userAffiliations.generateOption
-            )
-          )
-        )
-      )
-    }
-
-    def makeDescContaining(maybePhrase: Option[Phrase]): NonModifiedDataset =
-      maybePhrase map makeDescContaining getOrElse dataset
-
-    def makeDescContaining(phrase: Phrase): NonModifiedDataset = {
-      val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
-      dataset.copy(
-        maybeDescription = sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateSome
-      )
-    }
-
-    lazy val toDatasetSearchResult: DatasetSearchResult = DatasetSearchResult(
-      dataset.id,
-      dataset.name,
-      dataset.maybeDescription,
-      dataset.published,
-      ProjectsCount(dataset.projects.size)
-    )
-
-    def toJsonLDsAndProjects(noSameAs: Boolean): List[(JsonLD, DatasetProject)] = toJsonLDsAndProjects(
-      firstDatasetDateCreated = DateCreated(dataset.projects.map(_.created.date.value).min),
-      noSameAs                = noSameAs
-    )
-
-    def toJsonLDsAndProjects(firstDatasetDateCreated: DateCreated, noSameAs: Boolean): List[(JsonLD, DatasetProject)] =
-      dataset.projects match {
-        case firstProject +: otherProjects =>
-          val firstTuple @ (firstJsonLd, _) = nonModifiedDataSetCommit(
-            committedDate = CommittedDate(firstDatasetDateCreated.value)
-          )(
-            projectPath = firstProject.path
-          )(
-            datasetIdentifier         = dataset.id,
-            datasetName               = dataset.name,
-            datasetUrl                = dataset.url,
-            maybeDatasetSameAs        = if (noSameAs) None else dataset.sameAs.some,
-            maybeDatasetDescription   = dataset.maybeDescription,
-            maybeDatasetPublishedDate = dataset.published.maybeDate,
-            datasetCreatedDate        = firstDatasetDateCreated,
-            datasetCreators           = dataset.published.creators map toPerson
-          ) -> firstProject
-
-          val someSameAs =
-            if (noSameAs) DataSet.entityId(dataset.id).asSameAs.some
-            else dataset.sameAs.some
-          val otherTuples = otherProjects.map { project =>
-            val projectDateCreated = firstDatasetDateCreated.shiftToFuture
-            nonModifiedDataSetCommit(
-              committedDate = CommittedDate(projectDateCreated.value)
-            )(
-              projectPath = project.path
-            )(
-              datasetName               = dataset.name,
-              datasetUrl                = dataset.url,
-              maybeDatasetSameAs        = someSameAs,
-              maybeDatasetDescription   = dataset.maybeDescription,
-              maybeDatasetPublishedDate = dataset.published.maybeDate,
-              datasetCreatedDate        = projectDateCreated,
-              datasetCreators           = dataset.published.creators map toPerson
-            ) -> project
-          }
-
-          firstTuple +: otherTuples
-      }
-  }
-
-  private implicit class ModifiedDatasetOps(dataset: ModifiedDataset) {
-
-    lazy val entityId: EntityId = DataSet.entityId(dataset.id)
-
-    lazy val toDatasetSearchResult: DatasetSearchResult = DatasetSearchResult(
-      dataset.id,
-      dataset.name,
-      dataset.maybeDescription,
-      dataset.published,
-      ProjectsCount(dataset.projects.size)
-    )
-
-    def toJsonLDs(
-        firstDatasetDateCreated: DateCreated = DateCreated(dataset.projects.map(_.created.date.value).min)
-    ): List[JsonLD] =
-      dataset.projects match {
-        case firstProject +: otherProjects =>
-          val firstJsonLd = modifiedDataSetCommit(
-            committedDate = CommittedDate(firstDatasetDateCreated.value)
-          )(
-            projectPath = firstProject.path
-          )(
-            datasetIdentifier         = dataset.id,
-            datasetName               = dataset.name,
-            datasetUrl                = dataset.url,
-            datasetDerivedFrom        = dataset.derivedFrom,
-            maybeDatasetDescription   = dataset.maybeDescription,
-            maybeDatasetPublishedDate = dataset.published.maybeDate,
-            datasetCreatedDate        = DateCreated(firstDatasetDateCreated.value),
-            datasetCreators           = dataset.published.creators map toPerson
-          )
-
-          val otherJsonLds = otherProjects.map { project =>
-            val projectDateCreated = datasetInProjectCreationDates generateGreaterThan DateCreatedInProject(
-              firstDatasetDateCreated.value
-            )
-
-            modifiedDataSetCommit(
-              committedDate = CommittedDate(projectDateCreated.value)
-            )(
-              projectPath = project.path
-            )(
-              datasetName               = dataset.name,
-              datasetDerivedFrom        = dataset.derivedFrom,
-              datasetUrl                = dataset.url,
-              maybeDatasetDescription   = dataset.maybeDescription,
-              maybeDatasetPublishedDate = dataset.published.maybeDate,
-              datasetCreatedDate        = DateCreated(projectDateCreated.value),
-              datasetCreators           = dataset.published.creators map toPerson
-            )
-          }
-
-          firstJsonLd +: otherJsonLds
-      }
-  }
-
-  private implicit class JsonAndProjectTuplesOps(tuples: List[(JsonLD, DatasetProject)]) {
     lazy val jsonLDs: List[JsonLD] = tuples.map(_._1)
+
+    def dataset(havingOnly: DatasetProject): Dataset = {
+      tuples
+        .find {
+          case (_, ds) =>
+            ds.projects match {
+              case first +: Nil => first.path == havingOnly.path
+              case _            => false
+            }
+        } getOrElse fail(s"Cannot find dataset for project ${havingOnly.path}")
+    }._2
   }
-
-  private implicit class JsonsOps(jsons: List[JsonLD]) {
-    lazy val entityId: Option[EntityId] = jsons.headOption.flatMap(_.entityId)
-  }
-
-  private implicit class EntityIdOps(entityId: EntityId) {
-    lazy val asSameAs: SameAs = SameAs.fromId(entityId.value.toString).fold(throw _, identity)
-  }
-
-  private implicit class OptionEntityIdOps(maybeEntityId: Option[EntityId]) {
-    lazy val asSameAs: SameAs = maybeEntityId
-      .flatMap(id => SameAs.fromId(id.value.toString).toOption)
-      .getOrElse(throw new Exception(s"Cannot convert $maybeEntityId EntityId to SameAs"))
-  }
-
-  @scala.annotation.tailrec
-  private def nestDataset(ifLessThan: Int)(
-      dataset:                        NonModifiedDataset,
-      createdDate:                    DateCreated,
-      datasetJsons:                   List[JsonLD],
-      accumulator:                    (List[Dataset], List[JsonLD]) = Nil -> Nil
-  ): (List[Dataset], List[JsonLD]) = {
-    val (datasets, jsons) = accumulator
-    val newDatasets       = datasets :+ dataset
-    val newJsons          = jsons ++ datasetJsons
-    if (newDatasets.size < ifLessThan) {
-      val newDataset = dataset.copy(
-        id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset.entityId.asSameAs,
-        projects = datasetProjects.generateList(ofSize = 1)
-      )
-      val newDatasetCreatedDate = createdDate.shiftToFuture
-      val newDatasetJsons       = newDataset.toJsonLDsAndProjects(newDatasetCreatedDate, noSameAs = false).jsonLDs
-      nestDataset(ifLessThan)(newDataset, newDatasetCreatedDate, newDatasetJsons, newDatasets -> newJsons)
-    } else newDatasets -> newJsons
-  }
-
-  private implicit class DateCreatedOps(dateCreated: DateCreated) {
-    lazy val shiftToFuture = DateCreated(dateCreated.value plusSeconds positiveInts().generateOne.value)
-  }
-
-  private lazy val toPerson: DatasetCreator => Person =
-    creator => Person(creator.name, creator.maybeEmail, creator.maybeAffiliation)
-
-  private lazy val byName: Ordering[Dataset] =
-    (ds1: Dataset, ds2: Dataset) => ds1.name.value compareTo ds2.name.value
-
-  private implicit val dateCreatedInProjectOrdering: Ordering[DateCreatedInProject] =
-    (x: DateCreatedInProject, y: DateCreatedInProject) => x.value compareTo y.value
 }

@@ -73,8 +73,7 @@ private class IODatasetsFinder(
                             pagingRequest: PagingRequest): IO[PagingResponse[DatasetSearchResult]] = {
     val phrase = maybePhrase getOrElse Phrase("*")
     implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
-      sparqlQuery(phrase, sort),
-      maybeCountQuery = Some(countQuery(phrase))
+      sparqlQuery(phrase, sort)
     )
     for {
       page                 <- findPage(pagingRequest)
@@ -86,498 +85,66 @@ private class IODatasetsFinder(
   private def sparqlQuery(phrase: Phrase, sort: Sort.By): SparqlQuery = SparqlQuery(
     name = "ds free-text search",
     Set(
+      "PREFIX prov: <http://www.w3.org/ns/prov#>",
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
       "PREFIX schema: <http://schema.org/>",
-      "PREFIX prov: <http://www.w3.org/ns/prov#>",
       "PREFIX text: <http://jena.apache.org/text#>"
     ),
     s"""|SELECT DISTINCT ?identifier ?name ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount
         |WHERE {
         |  {
-        |    SELECT ?topmostDsId ?groupingIdentifier (COUNT(DISTINCT ?projectId) AS ?projectsCount) (?case AS ?recordCase)
-        |    WHERE {
-        |      { # finding all ds having neither sameAs nor wasDerivedFrom
-        |        ?dsId rdf:type <http://schema.org/Dataset>;
-        |              schema:isPartOf ?projectId.
-        |        FILTER NOT EXISTS { ?dsId prov:wasDerivedFrom ?otherDsId1 }
-        |        FILTER NOT EXISTS { ?otherDsId2 prov:wasDerivedFrom ?dsId }
-        |        FILTER NOT EXISTS { ?dsId schema:sameAs/schema:url ?otherDsId3 }
-        |        FILTER NOT EXISTS { ?otherDsId4 schema:sameAs/schema:url ?dsId }
-        |        BIND (?dsId AS ?topmostDsId)
-        |        BIND (?dsId AS ?groupingIdentifier)
-        |        BIND (3 AS ?case)
-        |      } UNION { # finding all ds with the import hierarchy
-        |        SELECT DISTINCT ?topmostDsId (?topmostDsId AS ?groupingIdentifier) ?projectId (2 AS ?case)
-        |        WHERE {
-        |          {
-        |            SELECT ?luceneDsId
-        |            WHERE {
-        |              {
-        |                SELECT ?id
-        |                WHERE { ?id text:query (schema:name schema:description '$phrase') }
-        |                GROUP BY ?id
-        |                HAVING (COUNT(*) > 0)
-        |              } {
-        |                ?id rdf:type <http://schema.org/Dataset>
-        |                BIND (?id AS ?luceneDsId)
-        |              } UNION {
-        |                ?id rdf:type <http://schema.org/Person>.
-        |                ?luceneDsId schema:creator ?id;
-        |                            rdf:type <http://schema.org/Dataset>.
-        |              }
-        |            }
-        |            GROUP BY ?luceneDsId
-        |            HAVING (COUNT(*) > 0)
-        |          }
-        |          filter (?luceneDsId = ?foundDsId) {
-        |            {
-        |              SELECT ?topmostSameAs (MIN(?dateCreated) as ?minDateCreated)
-        |              WHERE {
-        |                {
-        |                  SELECT (?childId AS ?topmostSameAs)
-        |                  WHERE {
-        |                    {
-        |                      SELECT DISTINCT ?sameAs
-        |                      WHERE {
-        |                      ?someDsId rdf:type <http://schema.org/Dataset>;
-        |                                schema:sameAs/schema:url ?sameAs.
-        |                      }
-        |                    } {
-        |                      ?parentDsId (schema:sameAs/schema:url)* ?sameAs.
-        |                      ?childId (schema:sameAs/schema:url)* ?parentDsId.
-        |                    }
-        |                  }
-        |                  GROUP BY ?childId
-        |                  HAVING (count(?parentDsId) = 1)
-        |                } {
-        |                  ?dsId schema:sameAs/schema:url ?topmostSameAs;
-        |                        prov:qualifiedGeneration/prov:activity ?activityId .
-        |                  ?activityId prov:startedAtTime ?dateCreated
-        |                } UNION {
-        |                  ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-        |                                 schema:identifier ?id .
-        |                  ?dsId schema:identifier ?id;
-        |                        prov:qualifiedGeneration/prov:activity ?activityId .
-        |                  ?activityId prov:startedAtTime ?dateCreated
-        |                }
-        |              }
-        |              GROUP BY ?topmostSameAs
-        |              HAVING (COUNT(*) > 0)
-        |            } {
-        |              ?dsId schema:sameAs/schema:url ?topmostSameAs;
-        |                    prov:qualifiedGeneration/prov:activity ?activityId.
-        |              ?activityId prov:startedAtTime ?minDateCreated
-        |              BIND (?topmostSameAs AS ?sameAs)
-        |              BIND (?dsId AS ?topmostDsId)
-        |            } UNION {
-        |              ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-        |                             schema:identifier ?identifier .
-        |              ?dsId schema:identifier ?identifier;
-        |                    prov:qualifiedGeneration/prov:activity ?activityId.
-        |              ?activityId prov:startedAtTime ?minDateCreated
-        |              BIND (?topmostSameAs AS ?sameAs)
-        |              BIND (?topmostSameAs AS ?topmostDsId)
-        |            }
-        |          } {
-        |            ?parentDsId (schema:sameAs/schema:url)* ?sameAs.
-        |            ?childId (schema:sameAs/schema:url)* ?parentDsId.
-        |          } {
-        |            ?foundDsId rdf:type <http://schema.org/Dataset>;
-        |                       schema:sameAs/schema:url ?sameAs;
-        |                       schema:isPartOf ?projectId.
-        |          } UNION {
-        |            ?sameAs rdf:type <http://schema.org/Dataset>;
-        |                    schema:isPartOf ?projectId.
-        |            BIND (?sameAs AS ?foundDsId)
-        |          } 
-        |          # getting rid of those ds which are either deriving or being derived
-        |          FILTER NOT EXISTS { 
-        |            ?foundDsId prov:wasDerivedFrom ?ds1Id.
-        |            FILTER EXISTS { ?ds1Id schema:isPartOf ?projectId }
-        |          }
-        |          FILTER NOT EXISTS { 
-        |            ?ds2Id prov:wasDerivedFrom ?foundDsId.
-        |            FILTER EXISTS { ?ds2Id schema:isPartOf ?projectId }
-        |          }
-        |        }
-        |      } UNION { # finding all ds with the modification hierarchy
-        |        SELECT DISTINCT ?topmostDsId (?topmostDsId AS ?groupingIdentifier) ?projectId (1 AS ?case)
-        |        WHERE {
-        |          {
-        |            SELECT ?luceneDsId
-        |            WHERE {
-        |              {
-        |                SELECT ?id
-        |                WHERE { ?id text:query (schema:name schema:description '$phrase') }
-        |                GROUP BY ?id
-        |                HAVING (COUNT(*) > 0)
-        |              } {
-        |                ?id rdf:type <http://schema.org/Dataset>
-        |                BIND (?id AS ?luceneDsId)
-        |              } UNION {
-        |                ?id rdf:type <http://schema.org/Person>.
-        |                ?luceneDsId schema:creator ?id;
-        |                            rdf:type <http://schema.org/Dataset>.
-        |              }
-        |            }
-        |            GROUP BY ?luceneDsId
-        |            HAVING (COUNT(*) > 0)
-        |          }
-        |          filter (?luceneDsId = ?dsId) {
-        |            {
-        |              SELECT (?childId AS ?dsId) ?topmostDsId
-        |              WHERE {
-        |                {
-        |                  SELECT ?topmostDsId (MAX(?depth) AS ?maxDepth)
-        |                  WHERE {
-        |                    SELECT ?topmostDsId ?childId (count(?parentDsId) - 1 as ?depth)
-        |                    WHERE {
-        |                      {
-        |                        SELECT (?childId AS ?topmostDsId)
-        |                        WHERE {
-        |                          {
-        |                            SELECT DISTINCT ?dsIdToCheck
-        |                            WHERE {
-        |                              ?someDsId rdf:type <http://schema.org/Dataset>;
-        |                                        prov:wasDerivedFrom ?dsIdToCheck.
-        |                            }
-        |                          } {
-        |                            ?parentDsId prov:wasDerivedFrom* ?dsIdToCheck.
-        |                            ?childId prov:wasDerivedFrom* ?parentDsId.
-        |                          }
-        |                        }
-        |                        GROUP BY ?childId
-        |                        HAVING (count(?parentDsId) = 1)
-        |                      } {
-        |                        ?parentDsId prov:wasDerivedFrom* ?topmostDsId.
-        |                        ?childId prov:wasDerivedFrom* ?parentDsId.
-        |                      }
-        |                    }
-        |                    GROUP BY ?topmostDsId ?childId
-        |                  }
-        |                  GROUP BY ?topmostDsId
-        |                } {
-        |                    ?parentDsId prov:wasDerivedFrom* ?topmostDsId.
-        |                    ?childId prov:wasDerivedFrom* ?parentDsId.
-        |                }
-        |              }
-        |              GROUP BY ?topmostDsId ?childId ?maxDepth
-        |              HAVING (count(?parentDsId) - 1 = ?maxDepth)
-        |            } {
-        |              ?dsId rdf:type <http://schema.org/Dataset>;
-        |                    schema:isPartOf ?projectId.
-        |            }
-        |          }
-        |        }
-        |      }
-        |    }
-        |    GROUP BY ?topmostDsId ?groupingIdentifier ?case
-        |  }
-        |  FILTER (?topmostDsIdInner = ?topmostDsId && ?caseInner = ?recordCase) {
-        |    SELECT (?topmostDsId AS ?topmostDsIdInner) ?identifier ?name ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs (?case AS ?caseInner)
-        |    WHERE {
-        |      { # finding all ds having neither sameAs nor wasDerivedFrom
-        |            ?dsId rdf:type <http://schema.org/Dataset>.
-        |            FILTER NOT EXISTS { ?dsId prov:wasDerivedFrom ?otherDsId1 }
-        |            FILTER NOT EXISTS { ?otherDsId2 prov:wasDerivedFrom ?dsId }
-        |            FILTER NOT EXISTS { ?dsId schema:sameAs/schema:url ?otherDsId3 }
-        |            FILTER NOT EXISTS { ?otherDsId4 schema:sameAs/schema:url ?dsId }
-        |            ?dsId rdf:type <http://schema.org/Dataset>;
-        |                  schema:identifier ?identifier;
-        |                  schema:name ?name.
-        |            OPTIONAL { ?dsId schema:description ?maybeDescription }
-        |            OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
-        |            OPTIONAL { ?dsId prov:wasDerivedFrom ?maybeDerivedFrom }
-        |            OPTIONAL { ?dsId schema:url ?maybeUrl }
-        |            BIND (IF (BOUND(?maybeUrl), ?maybeUrl, ?dsId) as ?sameAs)
-        |            BIND (?dsId AS ?topmostDsId)
-        |            BIND (3 AS ?case)
-        |      } UNION { # finding all ds with the import hierarchy
-        |        SELECT DISTINCT ?topmostDsId ?identifier ?name ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs (2 AS ?case)
-        |        WHERE {
-        |          {
-        |            {
-        |              SELECT ?topmostSameAs (MIN(?dateCreated) as ?minDateCreated)
-        |              WHERE {
-        |                {
-        |                  SELECT (?childId AS ?topmostSameAs)
-        |                  WHERE {
-        |                    {
-        |                      SELECT DISTINCT ?sameAs
-        |                      WHERE {
-        |                      ?someDsId rdf:type <http://schema.org/Dataset>;
-        |                                schema:sameAs/schema:url ?sameAs.
-        |                      }
-        |                    } {
-        |                      ?parentDsId (schema:sameAs/schema:url)* ?sameAs.
-        |                      ?childId (schema:sameAs/schema:url)* ?parentDsId.
-        |                    }
-        |                  }
-        |                  GROUP BY ?childId
-        |                  HAVING (count(?parentDsId) = 1)
-        |                } {
-        |                  ?dsId schema:sameAs/schema:url ?topmostSameAs;
-        |                        prov:qualifiedGeneration/prov:activity ?activityId .
-        |                  ?activityId prov:startedAtTime ?dateCreated
-        |                } UNION {
-        |                  ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-        |                                 schema:identifier ?id .
-        |                  ?dsId schema:identifier ?id;
-        |                        prov:qualifiedGeneration/prov:activity ?activityId .
-        |                  ?activityId prov:startedAtTime ?dateCreated
-        |                }
-        |              }
-        |              GROUP BY ?topmostSameAs
-        |            } {
-        |              ?dsId schema:sameAs/schema:url ?topmostSameAs;
-        |                    schema:identifier ?identifier;
-        |                    schema:name ?name;
-        |                    prov:qualifiedGeneration/prov:activity ?activityId.
-        |              ?activityId prov:startedAtTime ?minDateCreated
-        |              OPTIONAL { ?dsId schema:description ?maybeDescription }
-        |              OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
-        |              OPTIONAL { ?dsId prov:wasDerivedFrom ?maybeDerivedFrom }
-        |              OPTIONAL { ?dsId schema:url ?maybeUrl }
-        |              BIND (?topmostSameAs AS ?sameAs)
-        |              BIND (?dsId AS ?topmostDsId)
-        |            } UNION {
-        |              ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-        |                             schema:identifier ?identifier .
-        |              ?dsId schema:identifier ?identifier;
-        |                    schema:name ?name;
-        |                    prov:qualifiedGeneration/prov:activity ?activityId.
-        |              ?activityId prov:startedAtTime ?minDateCreated
-        |              OPTIONAL { ?dsId schema:description ?maybeDescription }
-        |              OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
-        |              OPTIONAL { ?dsId prov:wasDerivedFrom ?maybeDerivedFrom }
-        |              OPTIONAL { ?dsId schema:url ?maybeUrl }
-        |              BIND (?topmostSameAs AS ?sameAs)
-        |              BIND (?topmostSameAs AS ?topmostDsId)
-        |            }
-        |          }
-        |        }
-        |      }  UNION { # finding all ds with the modification hierarchy
-        |        SELECT ?topmostDsId ?identifier ?name ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs (1 AS ?case)
-        |        WHERE {
-        |          {
-        |            SELECT (?childId AS ?dsId) ?topmostDsId
-        |            WHERE {
-        |              {
-        |                SELECT ?topmostDsId (MAX(?depth) AS ?maxDepth)
-        |                WHERE {
-        |                  SELECT ?topmostDsId ?childId (count(?parentDsId) - 1 as ?depth)
-        |                  WHERE {
-        |                    {
-        |                      SELECT (?childId AS ?topmostDsId)
-        |                      WHERE {
-        |                        {
-        |                          SELECT DISTINCT ?dsIdToCheck
-        |                          WHERE {
-        |                            ?someDsId rdf:type <http://schema.org/Dataset>;
-        |                                      prov:wasDerivedFrom ?dsIdToCheck.
-        |                          }
-        |                        } {
-        |                          ?parentDsId prov:wasDerivedFrom* ?dsIdToCheck.
-        |                          ?childId prov:wasDerivedFrom* ?parentDsId.
-        |                        }
-        |                      }
-        |                      GROUP BY ?childId
-        |                      HAVING (count(?parentDsId) = 1)
-        |                    } {
-        |                      ?parentDsId prov:wasDerivedFrom* ?topmostDsId.
-        |                      ?childId prov:wasDerivedFrom* ?parentDsId.
-        |                    }
-        |                  }
-        |                  GROUP BY ?topmostDsId ?childId
-        |                }
-        |                GROUP BY ?topmostDsId
-        |              } {
-        |                  ?parentDsId prov:wasDerivedFrom* ?topmostDsId.
-        |                  ?childId prov:wasDerivedFrom* ?parentDsId.
-        |              }
-        |            }
-        |            GROUP BY ?topmostDsId ?childId ?maxDepth
-        |            HAVING (count(?parentDsId) - 1 = ?maxDepth)
-        |          } {
-        |            ?dsId rdf:type <http://schema.org/Dataset>;
-        |                  schema:identifier ?identifier;
-        |                  schema:name ?name.
-        |            OPTIONAL { ?dsId schema:description ?maybeDescription }
-        |            OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
-        |            OPTIONAL { ?dsId prov:wasDerivedFrom ?maybeDerivedFrom }
-        |            OPTIONAL { ?dsId schema:url ?maybeUrl }
-        |            BIND (IF (BOUND(?maybeUrl), ?maybeUrl, ?dsId) as ?sameAs)
-        |          }
-        |        }
-        |      }
-        |    }
-        |  }
-        |}
-        |${`ORDER BY`(sort)}
-        |""".stripMargin
-  )
-
-  private def countQuery(phrase: Phrase): SparqlQuery = SparqlQuery(
-    name = "ds free-text search - count",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX schema: <http://schema.org/>",
-      "PREFIX prov: <http://www.w3.org/ns/prov#>",
-      "PREFIX text: <http://jena.apache.org/text#>"
-    ),
-    s"""|SELECT ?topmostDsId ?groupingIdentifier
-        |WHERE {
-        |  { # finding all ds having neither sameAs nor wasDerivedFrom
-        |    ?dsId rdf:type <http://schema.org/Dataset>;
-        |          schema:isPartOf ?projectId.
-        |    FILTER NOT EXISTS { ?dsId prov:wasDerivedFrom ?otherDsId1 }
-        |    FILTER NOT EXISTS { ?otherDsId2 prov:wasDerivedFrom ?dsId }
-        |    FILTER NOT EXISTS { ?dsId schema:sameAs/schema:url ?otherDsId3 }
-        |    FILTER NOT EXISTS { ?otherDsId4 schema:sameAs/schema:url ?dsId }
-        |    BIND (?dsId AS ?topmostDsId)
-        |    BIND (?dsId AS ?groupingIdentifier)
-        |    BIND (3 AS ?case)
-        |  } UNION { # finding all ds with the import hierarchy
-        |    SELECT DISTINCT ?topmostDsId (?topmostDsId AS ?groupingIdentifier) ?projectId (2 AS ?case)
+        |    SELECT (MIN(?dateCreated) AS ?earliestCreated) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
         |    WHERE {
         |      {
-        |        SELECT ?luceneDsId
+        |        SELECT ?sameAs
         |        WHERE {
-        |          ?id text:query (schema:name schema:description '$phrase')
         |          {
-        |            ?id rdf:type <http://schema.org/Dataset>
-        |            BIND (?id AS ?luceneDsId)
+        |            SELECT ?id
+        |            WHERE { ?id text:query (schema:name schema:description '$phrase') }
+        |            GROUP BY ?id
+        |            HAVING (COUNT(*) > 0)
+        |          } {
+        |            ?id rdf:type <http://schema.org/Dataset>;
+        |            	renku:topmostSameAs/schema:url ?sameAs.
         |          } UNION {
         |            ?id rdf:type <http://schema.org/Person>.
         |            ?luceneDsId schema:creator ?id;
-        |                        rdf:type <http://schema.org/Dataset>.
+        |                        rdf:type <http://schema.org/Dataset>;
+        |                        renku:topmostSameAs/schema:url ?sameAs.
         |          }
         |        }
-        |        GROUP BY ?luceneDsId
+        |        GROUP BY ?sameAs
         |        HAVING (COUNT(*) > 0)
-        |      }
-        |      filter (?luceneDsId = ?foundDsId) {
-        |        {
-        |          SELECT ?topmostSameAs (MIN(?dateCreated) as ?minDateCreated)
-        |          WHERE {
-        |            {
-        |              SELECT (?childId AS ?topmostSameAs)
-        |              WHERE {
-        |                {
-        |                  SELECT DISTINCT ?sameAs
-        |                  WHERE {
-        |                  ?someDsId rdf:type <http://schema.org/Dataset>;
-        |                            schema:sameAs/schema:url ?sameAs.
-        |                  }
-        |                } {
-        |                  ?parentDsId (schema:sameAs/schema:url)* ?sameAs.
-        |                  ?childId (schema:sameAs/schema:url)* ?parentDsId.
-        |                }
-        |              }
-        |              GROUP BY ?childId
-        |              HAVING (count(?parentDsId) = 1)
-        |            } {
-        |              ?dsId schema:sameAs/schema:url ?topmostSameAs;
-        |                    prov:qualifiedGeneration/prov:activity ?activityId .
-        |              ?activityId prov:startedAtTime ?dateCreated
-        |            } UNION {
-        |              ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-        |                             schema:identifier ?id .
-        |              ?dsId schema:identifier ?id;
-        |                    prov:qualifiedGeneration/prov:activity ?activityId .
-        |              ?activityId prov:startedAtTime ?dateCreated
-        |            }
-        |          }
-        |          GROUP BY ?topmostSameAs
-        |          HAVING (COUNT(*) > 0)
-        |        } {
-        |          ?dsId schema:sameAs/schema:url ?topmostSameAs;
-        |                prov:qualifiedGeneration/prov:activity ?activityId.
-        |          ?activityId prov:startedAtTime ?minDateCreated
-        |          BIND (?topmostSameAs AS ?sameAs)
-        |          BIND (?dsId AS ?topmostDsId)
-        |        } UNION {
-        |          ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-        |                         schema:identifier ?identifier .
-        |          ?dsId schema:identifier ?identifier;
-        |                prov:qualifiedGeneration/prov:activity ?activityId.
-        |          ?activityId prov:startedAtTime ?minDateCreated
-        |          BIND (?topmostSameAs AS ?sameAs)
-        |          BIND (?topmostSameAs AS ?topmostDsId)
+        |      } {
+        |        ?allDsId rdf:type <http://schema.org/Dataset>;
+        |                 renku:topmostSameAs/schema:url ?sameAs;
+        |                 prov:qualifiedGeneration/prov:activity ?activityId;
+        |                 schema:isPartOf ?projectId.
+        |        ?activityId prov:startedAtTime ?dateCreated.
+        |        FILTER NOT EXISTS { 
+        |          ?someId prov:wasDerivedFrom ?allDsId.
+        |          ?someId schema:isPartOf ?projectId.
         |        }
-        |      } {
-        |        ?parentDsId (schema:sameAs/schema:url)* ?sameAs.
-        |        ?childId (schema:sameAs/schema:url)* ?parentDsId.
-        |      } {
-        |        ?foundDsId rdf:type <http://schema.org/Dataset>;
-        |                   schema:sameAs/schema:url ?sameAs;
-        |                   schema:isPartOf ?projectId.
-        |      } UNION {
-        |        ?sameAs rdf:type <http://schema.org/Dataset>;
-        |                schema:isPartOf ?projectId.
-        |        BIND (?sameAs AS ?foundDsId)
-        |      }
-        |      # getting rid of those ds which are either deriving or being derived
-        |      FILTER NOT EXISTS { 
-        |        ?foundDsId prov:wasDerivedFrom ?ds1Id.
-        |        FILTER EXISTS { ?ds1Id schema:isPartOf ?projectId }
-        |      }
-        |      FILTER NOT EXISTS { 
-        |        ?ds2Id prov:wasDerivedFrom ?foundDsId.
-        |        FILTER EXISTS { ?ds2Id schema:isPartOf ?projectId }
         |      }
         |    }
-        |  } UNION { # finding all ds with the modification hierarchy
-        |    SELECT DISTINCT ?topmostDsId (?topmostDsId AS ?groupingIdentifier) ?projectId (1 AS ?case)
-        |    WHERE {
-        |      {
-        |        SELECT (?childId AS ?dsId) ?topmostDsId
-        |        WHERE {
-        |          {
-        |            SELECT ?topmostDsId (MAX(?depth) AS ?maxDepth)
-        |            WHERE {
-        |              SELECT ?topmostDsId ?childId (count(?parentDsId) - 1 as ?depth)
-        |              WHERE {
-        |                {
-        |                  SELECT (?childId AS ?topmostDsId)
-        |                  WHERE {
-        |                    {
-        |                      SELECT DISTINCT ?dsIdToCheck
-        |                      WHERE {
-        |                        ?someDsId rdf:type <http://schema.org/Dataset>;
-        |                                  prov:wasDerivedFrom ?dsIdToCheck.
-        |                      }
-        |                    } {
-        |                      ?parentDsId prov:wasDerivedFrom* ?dsIdToCheck.
-        |                      ?childId prov:wasDerivedFrom* ?parentDsId.
-        |                    }
-        |                  }
-        |                  GROUP BY ?childId
-        |                  HAVING (count(?parentDsId) = 1)
-        |                } {
-        |                  ?parentDsId prov:wasDerivedFrom* ?topmostDsId.
-        |                  ?childId prov:wasDerivedFrom* ?parentDsId.
-        |                }
-        |              }
-        |              GROUP BY ?topmostDsId ?childId
-        |            }
-        |            GROUP BY ?topmostDsId
-        |          } {
-        |              ?parentDsId prov:wasDerivedFrom* ?topmostDsId.
-        |              ?childId prov:wasDerivedFrom* ?parentDsId.
-        |          }
-        |        }
-        |        GROUP BY ?topmostDsId ?childId ?maxDepth
-        |        HAVING (count(?parentDsId) - 1 = ?maxDepth)
-        |      } {
-        |        ?dsId rdf:type <http://schema.org/Dataset>;
-        |              schema:isPartOf ?projectId.
-        |      }
-        |    }
+        |    GROUP BY ?sameAs
+        |    HAVING (COUNT(*) > 0)
+        |  } {
+        |    ?dsId rdf:type <http://schema.org/Dataset>;
+        |          renku:topmostSameAs/schema:url ?sameAs;
+        |          schema:identifier ?identifier;
+        |          schema:name ?name;
+        |          prov:qualifiedGeneration/prov:activity ?activityId.
+        |    ?activityId prov:startedAtTime ?earliestCreated.
+        |    OPTIONAL { ?dsId schema:description ?maybeDescription }
+        |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
+        |    OPTIONAL { ?dsId prov:wasDerivedFrom ?maybeDerivedFrom }
+        |    OPTIONAL { ?dsId schema:url ?maybeUrl }
         |  }
         |}
-        |GROUP BY ?topmostDsId ?groupingIdentifier ?case
+        |${`ORDER BY`(sort)}
         |""".stripMargin
   )
 

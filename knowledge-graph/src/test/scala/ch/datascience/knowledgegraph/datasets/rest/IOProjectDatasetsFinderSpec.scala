@@ -45,13 +45,13 @@ class IOProjectDatasetsFinderSpec
           projects = project.copy(created = addedToProject).toGenerator
         ).generateOne
         val datasetModification1Creation = project.copy(created = addedToProject) shiftDateAfter project
-        val datasetModification1 = modifiedDatasets(
-          originalDataset,
-          datasetModification1Creation
+        val datasetModification1 = modifiedDatasetsOnFirstProject(
+          originalDataset.copy(projects = List(datasetModification1Creation))
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
-        val datasetModification2 = modifiedDatasets(
-          datasetModification1,
-          project.copy(created = addedToProject) shiftDateAfter datasetModification1Creation
+        val datasetModification2 = modifiedDatasetsOnFirstProject(
+          datasetModification1.copy(
+            projects = List(project.copy(created = addedToProject) shiftDateAfter datasetModification1Creation)
+          )
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
         loadToStore(
@@ -73,9 +73,8 @@ class IOProjectDatasetsFinderSpec
         val dataset2 = nonModifiedDatasets(
           projects = project.copy(created = addedToProject).toGenerator
         ).generateOne
-        val dataset2Modification = modifiedDatasets(
-          dataset2,
-          project.copy(created = addedToProject) shiftDateAfter project
+        val dataset2Modification = modifiedDatasetsOnFirstProject(
+          dataset2.copy(projects = List(project.copy(created = addedToProject) shiftDateAfter project))
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
         loadToStore(
