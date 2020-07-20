@@ -53,6 +53,10 @@ object RelativePathTinyType {
   implicit val relativePathTinyTypeConverter: RelativePathTinyType => List[PathSegment] =
     tinyType => tinyType.value.split("\\/").toList.map(PathSegment.apply)
 }
+object IntTinyType {
+  implicit val IntTinyTypeConverter: IntTinyType => List[PathSegment] =
+    tinyType => List(PathSegment(tinyType.toString))
+}
 
 trait Sensitive extends Any {
   self: TinyType =>

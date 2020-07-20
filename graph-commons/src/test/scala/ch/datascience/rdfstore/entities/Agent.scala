@@ -24,10 +24,11 @@ final case class Agent(schemaVersion: SchemaVersion, maybeStartedBy: Option[Pers
 
 object Agent {
 
+  import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.schemaVersion}",
       EntityTypes of (

@@ -18,6 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name}
 import org.scalacheck.Gen
@@ -35,10 +36,12 @@ object Person {
       email: Email
   ): Person = Person(name, Some(email))
 
+  import java.util.UUID.randomUUID
+
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit lazy val encoder: JsonLDEncoder[Person] = JsonLDEncoder.instance { entity =>
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Person] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       entityId(entity.maybeEmail),
       EntityTypes of (prov / "Person", schema / "Person"),
@@ -49,9 +52,9 @@ object Person {
     )
   }
 
-  private lazy val entityId: Option[Email] => EntityId = {
+  private def entityId(maybeEmail: Option[Email])(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = maybeEmail match {
     case Some(email) => EntityId of s"mailto:$email"
-    case None        => EntityId.blank
+    case None        => EntityId of (renkuBaseUrl / "persons" / randomUUID().toString)
   }
 
   val persons: Gen[Person] = for {
