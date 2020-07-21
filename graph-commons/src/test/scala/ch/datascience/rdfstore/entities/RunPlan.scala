@@ -228,15 +228,16 @@ object RunPlan {
     }
 
   implicit class RunPlanOps(runPlan: RunPlan) {
-    def asUsages(step: Step): List[Usage] =
+
+    def asUsages(activity: Activity, step: Step): List[Usage] =
       runPlan.runCommandInputs.foldLeft(List.empty[Usage]) {
-        case (usages, input: EntityCommandParameter with Input) => usages :+ Usage.factory(input)(step)
+        case (usages, input: EntityCommandParameter with Input) => usages :+ Usage.factory(activity, input)(step)
         case (usages, _) => usages
       }
 
-    def asUsages: List[Usage] =
+    def asUsages(activity: Activity): List[Usage] =
       runPlan.runCommandInputs.foldLeft(List.empty[Usage]) {
-        case (usages, input: EntityCommandParameter with Input) => usages :+ Usage(input)
+        case (usages, input: EntityCommandParameter with Input) => usages :+ Usage(activity, input)
         case (usages, _) => usages
       }
   }

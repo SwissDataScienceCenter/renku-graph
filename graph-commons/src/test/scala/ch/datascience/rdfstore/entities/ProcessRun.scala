@@ -75,7 +75,7 @@ object ProcessRun {
       override val processRunAssociation: ChildRunPlanAssociation = associationFactory(workflowRun)(step)
       override val processRunUsages: List[Usage] = workflowRun.processRunAssociation.runPlan.runSubprocesses
         .get(step.value)
-        .map(_.asUsages(step))
+        .map(_.asUsages(this, step))
         .getOrElse(throw new IllegalStateException(s"Subprocess not found for step $step"))
       override val processRunStep:        Step                = step
       override val processRunWorkflowRun: ActivityWorkflowRun = workflowRun
@@ -104,7 +104,7 @@ object ProcessRun {
                  maybeInvalidation,
                  maybeGenerationFactories = Nil) with WorkflowProcessRun {
       override val processRunAssociation: WorkflowRunPlanAssociation = association
-      override val processRunUsages:      List[Usage]                = association.runPlan.asUsages
+      override val processRunUsages:      List[Usage]                = association.runPlan.asUsages(this)
     }
 
   def standAlone(
@@ -130,7 +130,7 @@ object ProcessRun {
                  maybeInvalidation,
                  maybeGenerationFactories = Nil) with StandAloneProcessRun {
       override val processRunAssociation: ProcessRunPlanAssociation = associationFactory(this)
-      override val processRunUsages:      List[Usage]               = associationFactory(this).runPlan.asUsages
+      override val processRunUsages:      List[Usage]               = associationFactory(this).runPlan.asUsages(this)
     }
 
   private[entities] implicit def childProcessRunConverter(
