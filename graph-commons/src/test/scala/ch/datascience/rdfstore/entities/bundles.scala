@@ -443,9 +443,6 @@ object bundles extends Schemas {
         )
       )
 
-      val commit12CommandPlotDataInput       = Input.from(commit7Activity.entity(plotData))
-      val commit12CommandCleanDataInput      = Input.from(commit7Activity.entity(cleanData))
-      val commit12CommandDataSetFolderInput  = Input.from(commit10Activity.entity(dataSetFolder))
       val commit12CumulativePngEntityFactory = (activity: Activity) => Entity(Generation(cumulativePng, activity))
       val commit12GridPlotPngEntityFactory   = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       val commit12ParquetEntityFactory       = (activity: Activity) => Entity(Generation(bikesParquet, activity))
@@ -462,14 +459,14 @@ object bundles extends Schemas {
           agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
           RunPlan.workflow(
             inputs = List(
-              commit12CommandPlotDataInput,
-              commit12CommandCleanDataInput,
-              commit12CommandDataSetFolderInput
+              Input.from(commit7Activity.entity(cleanData), usedIn      = Step.one),
+              Input.from(commit10Activity.entity(dataSetFolder), usedIn = Step.one),
+              Input.from(commit7Activity.entity(plotData), usedIn       = Step.two)
             ),
             outputs = List(
-              Output.factory(commit12CumulativePngEntityFactory),
-              Output.factory(commit12GridPlotPngEntityFactory),
-              Output.factory(commit12ParquetEntityFactory)
+              Output.factory(commit12ParquetEntityFactory, producedBy       = Step.one),
+              Output.factory(commit12CumulativePngEntityFactory, producedBy = Step.two),
+              Output.factory(commit12GridPlotPngEntityFactory, producedBy   = Step.two)
             ),
             subprocesses = List(
               commit8ProcessRun.processRunAssociation.runPlan,

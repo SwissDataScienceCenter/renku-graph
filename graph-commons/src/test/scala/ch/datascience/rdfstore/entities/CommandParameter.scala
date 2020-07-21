@@ -22,6 +22,7 @@ import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInputFactory, PositionInputFactory}
+import ch.datascience.rdfstore.entities.CommandParameter.Output.FolderCreation.no
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
@@ -115,6 +116,8 @@ object CommandParameter {
 
   sealed trait Input {
     self: CommandParameter =>
+
+    val maybeStep:            Option[Step]
     protected val identifier: String
     override lazy val toString: String = s"input_$identifier"
   }
@@ -132,11 +135,20 @@ object CommandParameter {
           with (Position => Entity with RunPlan => EntityCommandParameter with Input)
     }
 
-    def from(entity: Entity with Artifact, maybePrefix: Option[Prefix] = None): PositionInputFactory =
+    def from(entity: Entity with Artifact): PositionInputFactory =
+      from(entity, maybePrefix = None, maybeUsedIn = None)
+
+    def from(entity: Entity with Artifact, usedIn: Step): PositionInputFactory =
+      from(entity, maybePrefix = None, maybeUsedIn = usedIn.some)
+
+    def from(entity:      Entity with Artifact,
+             maybePrefix: Option[Prefix],
+             maybeUsedIn: Option[Step]): PositionInputFactory =
       position =>
         runPlan =>
           new EntityCommandParameter(position, maybePrefix, runPlan, entity) with Input {
-            protected override val identifier: String = position.toString
+            protected override val identifier: String       = position.toString
+            override val maybeStep:            Option[Step] = maybeUsedIn
           }
 
     def factory(entityFactory: Activity => Entity with Artifact,
@@ -145,7 +157,8 @@ object CommandParameter {
         position =>
           runPlan =>
             new EntityCommandParameter(position, maybePrefix, runPlan, entityFactory(activity)) with Input {
-              protected override val identifier: String = position.toString
+              protected override val identifier: String       = position.toString
+              override val maybeStep:            Option[Step] = None
             }
 
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -162,7 +175,12 @@ object CommandParameter {
         }
 
         override lazy val toEntityId: CommandParameter with Input => Option[EntityId] = input =>
-          input.runPlan.getEntityId map (runPlanId => EntityId.of(s"$runPlanId/inputs/$input"))
+          input.runPlan.getEntityId map { runPlanId =>
+            input.maybeStep match {
+              case None       => EntityId.of(s"$runPlanId/inputs/$input")
+              case Some(step) => EntityId.of(s"$runPlanId/steps/$step/inputs/$input")
+            }
+          }
       }
 
     implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -177,7 +195,8 @@ object CommandParameter {
 
     import CommandParameter.Output.FolderCreation
 
-    def outputFolderCreation: FolderCreation
+    val outputFolderCreation: FolderCreation
+    val maybeProducedByStep:  Option[Step]
     protected val identifier: String
     override lazy val toString: String = s"output_$identifier"
   }
@@ -186,16 +205,24 @@ object CommandParameter {
 
     trait OutputFactory extends (Activity => Position => Entity with RunPlan => CommandParameter with Output)
 
+    def factory(entityFactory: Activity => Entity with Artifact): OutputFactory =
+      factory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None)
+
+    def factory(entityFactory: Activity => Entity with Artifact, producedBy: Step): OutputFactory =
+      factory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = producedBy.some)
+
     def factory(
-        entityFactory:  Activity => Entity with Artifact,
-        maybePrefix:    Option[Prefix] = None,
-        folderCreation: FolderCreation = FolderCreation(false)
+        entityFactory:   Activity => Entity with Artifact,
+        maybePrefix:     Option[Prefix],
+        folderCreation:  FolderCreation,
+        maybeProducedBy: Option[Step]
     ): OutputFactory =
       activity =>
         position =>
           runPlan =>
             new EntityCommandParameter(position, maybePrefix, runPlan, entityFactory(activity)) with Output {
               override val outputFolderCreation: FolderCreation = folderCreation
+              override val maybeProducedByStep:  Option[Step]   = maybeProducedBy
               protected override val identifier: String         = position.toString
             }
 
@@ -214,7 +241,13 @@ object CommandParameter {
         }
 
         override lazy val toEntityId: CommandParameter with Output => Option[EntityId] =
-          input => input.runPlan.getEntityId map (runPlanId => EntityId.of(s"$runPlanId/outputs/$input"))
+          output =>
+            output.runPlan.getEntityId map { runPlanId =>
+              output.maybeProducedByStep match {
+                case None       => EntityId.of(s"$runPlanId/outputs/$output")
+                case Some(step) => EntityId.of(s"$runPlanId/steps/$step/outputs/$output")
+              }
+            }
       }
 
     implicit def outputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -224,6 +257,9 @@ object CommandParameter {
       }
 
     final class FolderCreation private (val value: Boolean) extends AnyVal with BooleanTinyType
-    implicit object FolderCreation extends TinyTypeFactory[FolderCreation](new FolderCreation(_))
+    implicit object FolderCreation extends TinyTypeFactory[FolderCreation](new FolderCreation(_)) {
+      val no:  FolderCreation = FolderCreation(false)
+      val yes: FolderCreation = FolderCreation(true)
+    }
   }
 }
