@@ -46,7 +46,7 @@ resources:
   #  memory: 128Mi
   # Request a bit more memory than configured for the Jena JVM
   requests:
-    cpu: 1000m
+    cpu: 500m
     memory: 3Gi
 
 nodeSelector: {}
