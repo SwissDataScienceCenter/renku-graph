@@ -69,10 +69,9 @@ object Entity {
   implicit def encoderWithArtifact(implicit renkuBaseUrl: RenkuBaseUrl,
                                    fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[Entity with Artifact] =
     JsonLDEncoder.instance {
-      case e: EntityCollection => e.asJsonLD
-      case e: DataSetEntity => e.asJsonLD
-      case e: Entity with Artifact =>
-        e.asPartialJsonLD[Entity] combine e.asPartialJsonLD[Artifact] getOrFail
+      case e: EntityCollection     => e.asJsonLD
+      case e: DataSetEntity        => e.asJsonLD
+      case e: Entity with Artifact => e.asPartialJsonLD[Entity] combine e.asPartialJsonLD[Artifact] getOrFail
     }
 }
 

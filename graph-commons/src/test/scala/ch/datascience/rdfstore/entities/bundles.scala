@@ -472,21 +472,8 @@ object bundles extends Schemas {
               Output.factory(commit12ParquetEntityFactory)
             ),
             subprocesses = List(
-              RunPlan.child(
-                WorkflowFile.yaml("renku-migrate-step0.yaml"),
-                Command("python"),
-                inputs  = List(commit12CommandCleanDataInput, commit12CommandDataSetFolderInput),
-                outputs = List(Output.factory(commit12ParquetEntityFactory))
-              ),
-              RunPlan.child(
-                WorkflowFile.yaml("renku-migrate-step1.yaml"),
-                Command("python"),
-                inputs = List(commit12CommandPlotDataInput, Input.factory(commit12ParquetEntityFactory)),
-                outputs = List(
-                  Output.factory(commit12CumulativePngEntityFactory),
-                  Output.factory(commit12GridPlotPngEntityFactory)
-                )
-              )
+              commit8ProcessRun.processRunAssociation.runPlan,
+              commit9ProcessRun.processRunAssociation.runPlan
             )
           )
         ),

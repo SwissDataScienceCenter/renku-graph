@@ -21,7 +21,7 @@ package ch.datascience.rdfstore.entities
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInput, PositionInput}
+import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInputFactory, PositionInputFactory}
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
@@ -31,8 +31,9 @@ import io.renku.jsonld.{EntityId, EntityTypes, JsonLDEncoder}
 
 import scala.language.postfixOps
 
-sealed abstract class CommandParameter(val position: Position, val maybePrefix: Option[Prefix]) {
-  val entityId: EntityId = EntityId.blank
+sealed abstract class CommandParameter(val position:    Position,
+                                       val maybePrefix: Option[Prefix],
+                                       val runPlan:     Entity with RunPlan) {
   val value: Value
 }
 
@@ -40,22 +41,25 @@ object CommandParameter {
 
   sealed abstract class ActivityCommandParameter(override val position:    Position,
                                                  override val maybePrefix: Option[Prefix],
-                                                 activity:                 => Activity,
+                                                 override val runPlan:     Entity with RunPlan,
+                                                 activity:                 Activity,
                                                  entityFactory:            Activity => Entity with Artifact)
-      extends CommandParameter(position, maybePrefix) {
+      extends CommandParameter(position, maybePrefix, runPlan) {
     lazy val entity:         Entity with Artifact = entityFactory(activity)
     override lazy val value: Value                = Value(entity.location)
   }
 
   sealed abstract class ValueCommandParameter(override val position:    Position,
                                               override val maybePrefix: Option[Prefix],
+                                              override val runPlan:     Entity with RunPlan,
                                               override val value:       Value)
-      extends CommandParameter(position, maybePrefix)
+      extends CommandParameter(position, maybePrefix, runPlan)
 
   sealed abstract class EntityCommandParameter(override val position:    Position,
                                                override val maybePrefix: Option[Prefix],
+                                               override val runPlan:     Entity with RunPlan,
                                                val entity:               Entity with Artifact)
-      extends CommandParameter(position, maybePrefix) {
+      extends CommandParameter(position, maybePrefix, runPlan) {
     override lazy val value: Value = Value(entity.location)
   }
 
@@ -75,24 +79,27 @@ object CommandParameter {
       override def convert[T <: CommandParameter]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
-            entity.entityId,
             EntityTypes of renku / "CommandParameter",
             renku / "prefix"   -> entity.maybePrefix.asJsonLD,
             renku / "position" -> entity.position.asJsonLD
           ).asRight
 
-      override def toEntityId: CommandParameter => Option[EntityId] = entity => entity.entityId.some
+      override lazy val toEntityId: CommandParameter => Option[EntityId] = _ => None
     }
 
-  sealed class Argument(override val position: Position, override val maybePrefix: Option[Prefix])
-      extends ValueCommandParameter(position, maybePrefix, Value("input_path")) {
+  sealed class Argument(override val position:    Position,
+                        override val maybePrefix: Option[Prefix],
+                        override val runPlan:     Entity with RunPlan)
+      extends ValueCommandParameter(position, maybePrefix, runPlan, Value("input_path")) {
     override lazy val toString: String = "CommandArgument"
   }
 
   object Argument {
 
-    def factory(maybePrefix: Option[Prefix] = None): Position => CommandParameter with Argument =
-      position => new Argument(position, maybePrefix)
+    trait ArgumentFactory extends (Position => Entity with RunPlan => CommandParameter with Argument)
+
+    def factory(maybePrefix: Option[Prefix] = None): ArgumentFactory =
+      position => runPlan => new Argument(position, maybePrefix, runPlan)
 
     private implicit def converter(
         implicit renkuBaseUrl: RenkuBaseUrl,
@@ -107,15 +114,17 @@ object CommandParameter {
               rdfs / "label" -> s"""Command Argument "${argument.value}"""".asJsonLD
             ).asRight
 
-        override def toEntityId: CommandParameter with Argument => Option[EntityId] =
-          _ => None
+        override lazy val toEntityId: CommandParameter with Argument => Option[EntityId] = entity =>
+          entity.runPlan.getEntityId map (runPlanId => EntityId.of(s"$runPlanId/arguments/${entity.position}"))
       }
 
-    implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                              fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Argument] =
+    implicit def argumentEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                                 fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Argument] =
       JsonLDEncoder.instance[CommandParameter with Argument] { entity =>
-        entity.asPartialJsonLD[CommandParameter] combine entity
-          .asPartialJsonLD[CommandParameter with Argument] getOrFail
+        entity
+          .asPartialJsonLD[CommandParameter]
+          .combine(entity.asPartialJsonLD[CommandParameter with Argument])
+          .getOrFail
       }
   }
 
@@ -126,21 +135,25 @@ object CommandParameter {
 
   object Input {
 
-    sealed trait InputFactory[+T <: CommandParameter]
+    sealed trait InputFactory
 
     object InputFactory {
-      trait ActivityPositionInput[+T <: CommandParameter]
-          extends InputFactory[T]
-          with (Activity => Position => T with Input)
-      trait PositionInput[+T <: CommandParameter] extends InputFactory[T] with (Position => T with Input)
+      trait ActivityPositionInputFactory
+          extends InputFactory
+          with (Activity => Position => Entity with RunPlan => EntityCommandParameter with Input)
+      trait PositionInputFactory
+          extends InputFactory
+          with (Position => Entity with RunPlan => EntityCommandParameter with Input)
     }
 
-    def from(entity: Entity with Artifact, maybePrefix: Option[Prefix] = None): PositionInput[EntityCommandParameter] =
-      position => new EntityCommandParameter(position, maybePrefix, entity) with Input
+    def from(entity: Entity with Artifact, maybePrefix: Option[Prefix] = None): PositionInputFactory =
+      position => runPlan => new EntityCommandParameter(position, maybePrefix, runPlan, entity) with Input
 
     def factory(entityFactory: Activity => Entity with Artifact,
-                maybePrefix:   Option[Prefix] = None): ActivityPositionInput[EntityCommandParameter] =
-      activity => position => new EntityCommandParameter(position, maybePrefix, entityFactory(activity)) with Input
+                maybePrefix:   Option[Prefix] = None): ActivityPositionInputFactory =
+      activity =>
+        position =>
+          runPlan => new EntityCommandParameter(position, maybePrefix, runPlan, entityFactory(activity)) with Input
 
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                    fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Input] =
@@ -159,8 +172,9 @@ object CommandParameter {
             ).asRight
           case other => throw new IllegalStateException(s"$other not supported")
         }
-        override def toEntityId: CommandParameter with Input => Option[EntityId] =
-          _ => None
+
+        override lazy val toEntityId: CommandParameter with Input => Option[EntityId] = entity =>
+          entity.runPlan.getEntityId map (runPlanId => EntityId.of(s"$runPlanId/inputs/${entity.position}"))
       }
 
     implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -181,16 +195,19 @@ object CommandParameter {
 
   object Output {
 
+    trait OutputFactory extends (Activity => Position => Entity with RunPlan => CommandParameter with Output)
+
     def factory(
         entityFactory:  Activity => Entity with Artifact,
         maybePrefix:    Option[Prefix] = None,
         folderCreation: FolderCreation = FolderCreation(false)
-    ): Activity => Position => CommandParameter with Output =
+    ): OutputFactory =
       activity =>
         position =>
-          new ActivityCommandParameter(position, maybePrefix, activity, entityFactory) with Output {
-            override val outputFolderCreation: FolderCreation = folderCreation
-          }
+          runPlan =>
+            new ActivityCommandParameter(position, maybePrefix, runPlan, activity, entityFactory) with Output {
+              override val outputFolderCreation: FolderCreation = folderCreation
+            }
 
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                    fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Output] =
@@ -211,9 +228,9 @@ object CommandParameter {
             ).asRight
           case other => throw new IllegalStateException(s"$other not supported")
         }
-        override def toEntityId: CommandParameter with Output => Option[EntityId] =
-          _ => None
 
+        override lazy val toEntityId: CommandParameter with Output => Option[EntityId] =
+          entity => entity.runPlan.getEntityId map (runPlanId => EntityId.of(s"$runPlanId/outputs/${entity.position}"))
       }
 
     implicit def outputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,

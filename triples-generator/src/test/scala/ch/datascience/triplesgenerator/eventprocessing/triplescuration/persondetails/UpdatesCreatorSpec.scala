@@ -27,6 +27,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles.renkuBaseUrl
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
