@@ -39,22 +39,6 @@ sealed abstract class CommandParameter(val position:    Position,
 
 object CommandParameter {
 
-  sealed abstract class ActivityCommandParameter(override val position:    Position,
-                                                 override val maybePrefix: Option[Prefix],
-                                                 override val runPlan:     Entity with RunPlan,
-                                                 activity:                 Activity,
-                                                 entityFactory:            Activity => Entity with Artifact)
-      extends CommandParameter(position, maybePrefix, runPlan) {
-    lazy val entity:         Entity with Artifact = entityFactory(activity)
-    override lazy val value: Value                = Value(entity.location)
-  }
-
-  sealed abstract class ValueCommandParameter(override val position:    Position,
-                                              override val maybePrefix: Option[Prefix],
-                                              override val runPlan:     Entity with RunPlan,
-                                              override val value:       Value)
-      extends CommandParameter(position, maybePrefix, runPlan)
-
   sealed abstract class EntityCommandParameter(override val position:    Position,
                                                override val maybePrefix: Option[Prefix],
                                                override val runPlan:     Entity with RunPlan,
@@ -90,7 +74,8 @@ object CommandParameter {
   sealed class Argument(override val position:    Position,
                         override val maybePrefix: Option[Prefix],
                         override val runPlan:     Entity with RunPlan)
-      extends ValueCommandParameter(position, maybePrefix, runPlan, Value("input_path")) {
+      extends CommandParameter(position, maybePrefix, runPlan) {
+    override val value:         Value  = Value("input_path")
     override lazy val toString: String = "CommandArgument"
   }
 
@@ -159,11 +144,6 @@ object CommandParameter {
                                    fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Input] =
       new PartialEntityConverter[CommandParameter with Input] {
         override def convert[T <: CommandParameter with Input]: T => Either[Exception, PartialEntity] = {
-          case input: ValueCommandParameter with Input =>
-            PartialEntity(
-              EntityTypes of renku / "CommandInput",
-              rdfs / "label" -> s"""Command Input "${input.value}"""".asJsonLD
-            ).asRight
           case input: EntityCommandParameter with Input =>
             PartialEntity(
               EntityTypes of renku / "CommandInput",
@@ -205,7 +185,7 @@ object CommandParameter {
       activity =>
         position =>
           runPlan =>
-            new ActivityCommandParameter(position, maybePrefix, runPlan, activity, entityFactory) with Output {
+            new EntityCommandParameter(position, maybePrefix, runPlan, entityFactory(activity)) with Output {
               override val outputFolderCreation: FolderCreation = folderCreation
             }
 
@@ -213,13 +193,7 @@ object CommandParameter {
                                    fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Output] =
       new PartialEntityConverter[CommandParameter with Output] {
         override def convert[T <: CommandParameter with Output]: T => Either[Exception, PartialEntity] = {
-          case output: ValueCommandParameter with Output =>
-            PartialEntity(
-              EntityTypes of renku / "CommandOutput",
-              rdfs / "label"         -> s"""Command Output "${output.value}"""".asJsonLD,
-              renku / "createFolder" -> output.outputFolderCreation.asJsonLD
-            ).asRight
-          case output: ActivityCommandParameter with Output =>
+          case output: EntityCommandParameter with Output =>
             PartialEntity(
               EntityTypes of renku / "CommandOutput",
               rdfs / "label"         -> s"""Command Output "${output.value}"""".asJsonLD,

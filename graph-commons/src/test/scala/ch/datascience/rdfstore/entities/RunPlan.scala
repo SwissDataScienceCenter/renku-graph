@@ -43,7 +43,7 @@ sealed trait RunPlan {
   def output(location: Location): Entity with Artifact =
     runCommandOutputs
       .flatMap {
-        case output: ActivityCommandParameter with Output => Some(output.entity)
+        case output: EntityCommandParameter with Output => Some(output.entity)
         case _ => None
       }
       .find(_.location == location)
