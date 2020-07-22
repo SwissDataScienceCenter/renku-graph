@@ -19,16 +19,25 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
+import cats.implicits._
+import ch.datascience.generators.CommonGraphGenerators.schemaVersions
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities.CommandParameter.{Input, Output}
+import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.RunPlan.Command
+import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.bundles.exemplarLineageFlow.NodeDef
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
+import eu.timepit.refined.auto._
+import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
@@ -36,7 +45,7 @@ class IOLineageDataFinderSpec extends WordSpec with InMemoryRdfStore with Extern
 
   "findLineage" should {
 
-    "return the lineage of the given project for a given commit id and file path" in new TestCase {
+    "return the lineage of the given project and the file path" in new TestCase {
 
       val (jsons, exemplarData) = exemplarLineageFlow(projectPath)
 
@@ -78,7 +87,63 @@ class IOLineageDataFinderSpec extends WordSpec with InMemoryRdfStore with Extern
       )
     }
 
-    "return the lineage of the given project for a given commit id and file path while excluding not connected graphs" in {}
+    "return the lineage of the given project and the file path " +
+      "- a case with command parameters without a position" in new TestCase {
+
+      val agent   = generateAgent
+      val project = generateProject(projectPath)
+      val input   = locations.generateOne
+      val inputActivity = Activity(
+        CommitId("000007"),
+        committedDates.generateOne,
+        committer = persons.generateOne,
+        project,
+        agent,
+        comment                  = "committing 1 file",
+        maybeGenerationFactories = List(Generation.factory(entityFactory = Entity.factory(input)))
+      )
+      val output = locations.generateOne
+      val processRunActivity = ProcessRun.standAlone(
+        commitIds.generateOne,
+        committedDates.generateOne,
+        persons.generateOne,
+        project,
+        agent,
+        comment = s"renku run: committing 1 newly added files",
+        associationFactory = Association.process(
+          agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
+          RunPlan.process(
+            WorkflowFile.yaml("renku-run.yaml"),
+            Command("python"),
+            inputs  = List(Input.withoutPositionFrom(inputActivity.entity(input))),
+            outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity))))
+          )
+        ),
+        maybeInformedBy = inputActivity.some
+      )
+
+      loadToStore(inputActivity.asJsonLD, processRunActivity.asJsonLD)
+
+      val inputEntityNode     = NodeDef(inputActivity.entity(input))
+      val processActivityNode = NodeDef(processRunActivity)
+      val outputEntityNode    = NodeDef(processRunActivity.processRunAssociation.runPlan.output(output))
+      lineageDataFinder
+        .find(projectPath)
+        .value
+        .unsafeRunSync() shouldBe Some(
+        Lineage(
+          edges = Set(
+            Edge(inputEntityNode.toNodeLocation, processActivityNode.toNodeLocation),
+            Edge(processActivityNode.toNodeLocation, outputEntityNode.toNodeLocation)
+          ),
+          nodes = Set(
+            inputEntityNode.toNode,
+            processActivityNode.toNode,
+            outputEntityNode.toNode
+          )
+        )
+      )
+    }
 
     "return None if there's no lineage for the project" in new TestCase {
       lineageDataFinder

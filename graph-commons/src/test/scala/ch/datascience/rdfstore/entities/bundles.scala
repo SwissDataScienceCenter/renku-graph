@@ -44,6 +44,11 @@ object bundles extends Schemas {
 
   implicit lazy val renkuBaseUrl: RenkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
 
+  def generateAgent: Agent = Agent(schemaVersions.generateOne)
+
+  def generateProject(path: Path): Project =
+    Project(path, projectNames.generateOne, projectCreatedDates.generateOne, projectCreators.generateOption)
+
   def fileCommit(
       location:      Location      = locations.generateOne,
       commitId:      CommitId      = commitIds.generateOne,
@@ -136,49 +141,6 @@ object bundles extends Schemas {
         `sha10 zhbikes`:   NodeDef,
         `sha12 parquet`:   NodeDef
     )
-
-    final case class NodeDef(location: String, label: String, types: Set[String])
-
-    object NodeDef {
-
-      def apply(
-          entity:              Entity with Artifact
-      )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef =
-        NodeDef(
-          entity.location.value,
-          entity.location.value,
-          entity.asJsonLD.entityTypes
-            .map(_.toList.map(_.toString))
-            .getOrElse(throw new Exception("No entityTypes found"))
-            .toSet
-        )
-
-      def apply(
-          activity:            Activity with StandAloneProcessRun
-      )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef =
-        NodeDef(
-          activity.processRunAssociation.runPlan.asJsonLD.entityId
-            .getOrElse(throw new Exception("Non entity id found for ProcessRun"))
-            .toString,
-          activity.processRunAssociation.runPlan.asLabel,
-          activity.asJsonLD.entityTypes
-            .map(_.toList.map(_.toString))
-            .getOrElse(throw new Exception("No entityTypes found"))
-            .toSet
-        )
-
-      private implicit class RunPlanOps(runPlan: ProcessRunPlan) {
-        lazy val asLabel: String =
-          (runPlan.runArguments ++ runPlan.runCommandInputs ++ runPlan.runCommandOutputs)
-            .map(parameter => parameter.position -> asString(parameter))
-            .sortBy(_._1.value)
-            .map(_._2)
-            .mkString(s"${runPlan.runCommand} ", " ", "")
-
-        private def asString(parameter: CommandParameter): String =
-          parameter.maybePrefix.fold(parameter.value.toString)(prefix => s"$prefix${parameter.value}")
-      }
-    }
 
     def apply(
         projectPath:         Path = projectPaths.generateOne,
@@ -529,4 +491,52 @@ object bundles extends Schemas {
     name  <- userNames
     email <- userEmails
   } yield Person(name, email)
+
+  final case class NodeDef(location: String, label: String, types: Set[String])
+
+  object NodeDef {
+
+    def apply(
+        entity:              Entity with Artifact
+    )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef =
+      NodeDef(
+        entity.location.value,
+        entity.location.value,
+        entity.asJsonLD.entityTypes
+          .map(_.toList.map(_.toString))
+          .getOrElse(throw new Exception("No entityTypes found"))
+          .toSet
+      )
+
+    def apply(
+        activity:            Activity with StandAloneProcessRun
+    )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef =
+      NodeDef(
+        activity.processRunAssociation.runPlan.asJsonLD.entityId
+          .getOrElse(throw new Exception("Non entity id found for ProcessRun"))
+          .toString,
+        activity.processRunAssociation.runPlan.asLabel,
+        activity.asJsonLD.entityTypes
+          .map(_.toList.map(_.toString))
+          .getOrElse(throw new Exception("No entityTypes found"))
+          .toSet
+      )
+
+    private implicit class RunPlanOps(runPlan: ProcessRunPlan) {
+
+      lazy val asLabel: String =
+        (runPlan.runArguments ++ runPlan.runCommandInputs ++ runPlan.runCommandOutputs)
+          .foldLeft(List.empty[(Position, String)]) {
+            case (allParams, parameter: PositionInfo) => (parameter.position -> asString(parameter)) +: allParams
+            case (allParams, _) => allParams
+          }
+          .sortBy(_._1.value)
+          .map(_._2)
+          .mkString(s"${runPlan.runCommand} ", " ", "")
+          .trim
+
+      private def asString(parameter: CommandParameter): String =
+        parameter.maybePrefix.fold(parameter.value.toString)(prefix => s"$prefix${parameter.value}")
+    }
+  }
 }

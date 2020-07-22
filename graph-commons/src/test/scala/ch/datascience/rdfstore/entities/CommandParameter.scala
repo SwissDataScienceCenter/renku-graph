@@ -18,11 +18,14 @@
 
 package ch.datascience.rdfstore.entities
 
+import java.util.UUID.randomUUID
+
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInputFactory, PositionInputFactory}
+import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInputFactory, NoPositionInputFactory, PositionInputFactory}
 import ch.datascience.rdfstore.entities.CommandParameter.Output.FolderCreation.no
+import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory.{NoPositionOutputFactory, PositionOutputFactory}
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
@@ -32,19 +35,32 @@ import io.renku.jsonld.{EntityId, EntityTypes, JsonLDEncoder}
 
 import scala.language.postfixOps
 
-sealed abstract class CommandParameter(val position:    Position,
-                                       val maybePrefix: Option[Prefix],
-                                       val runPlan:     Entity with RunPlan) {
+sealed abstract class CommandParameter(val maybePrefix: Option[Prefix], val runPlan: Entity with RunPlan) {
   val value: Value
 }
 
 object CommandParameter {
 
-  sealed abstract class EntityCommandParameter(override val position:    Position,
-                                               override val maybePrefix: Option[Prefix],
+  sealed trait PositionInfo {
+    self: CommandParameter =>
+    val position: Position
+  }
+
+  object PositionInfo {
+    private[entities] implicit val converter: PartialEntityConverter[PositionInfo] =
+      new NoEntityIdPartialConverter[PositionInfo] {
+        override def convert[T <: PositionInfo]: T => Either[Exception, PartialEntity] =
+          entity =>
+            PartialEntity(
+              renku / "position" -> entity.position.asJsonLD
+            ).asRight
+      }
+  }
+
+  sealed abstract class EntityCommandParameter(override val maybePrefix: Option[Prefix],
                                                override val runPlan:     Entity with RunPlan,
                                                val entity:               Entity with Artifact)
-      extends CommandParameter(position, maybePrefix, runPlan) {
+      extends CommandParameter(maybePrefix, runPlan) {
     override lazy val value: Value = Value(entity.location)
   }
 
@@ -57,25 +73,25 @@ object CommandParameter {
   implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank
 
   final class Position private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Position extends TinyTypeFactory[Position](new Position(_)) with PositiveInt
+  implicit object Position extends TinyTypeFactory[Position](new Position(_)) with PositiveInt {
+    val first: Position = Position(1)
+  }
 
   private[entities] implicit val converter: PartialEntityConverter[CommandParameter] =
-    new PartialEntityConverter[CommandParameter] {
+    new NoEntityIdPartialConverter[CommandParameter] {
       override def convert[T <: CommandParameter]: T => Either[Exception, PartialEntity] =
         entity =>
           PartialEntity(
             EntityTypes of renku / "CommandParameter",
-            renku / "prefix"   -> entity.maybePrefix.asJsonLD,
-            renku / "position" -> entity.position.asJsonLD
+            renku / "prefix" -> entity.maybePrefix.asJsonLD
           ).asRight
-
-      override lazy val toEntityId: CommandParameter => Option[EntityId] = _ => None
     }
 
   final class Argument(override val position:    Position,
                        override val maybePrefix: Option[Prefix],
                        override val runPlan:     Entity with RunPlan)
-      extends CommandParameter(position, maybePrefix, runPlan) {
+      extends CommandParameter(maybePrefix, runPlan)
+      with PositionInfo {
     override val value:         Value  = Value("input_path")
     override lazy val toString: String = s"argument_$position"
   }
@@ -109,6 +125,7 @@ object CommandParameter {
       JsonLDEncoder.instance[CommandParameter with Argument] { entity =>
         entity
           .asPartialJsonLD[CommandParameter]
+          .combine(entity.asPartialJsonLD[PositionInfo])
           .combine(entity.asPartialJsonLD[CommandParameter with Argument])
           .getOrFail
       }
@@ -129,10 +146,11 @@ object CommandParameter {
     object InputFactory {
       trait ActivityPositionInputFactory
           extends InputFactory
-          with (Activity => Position => Entity with RunPlan => EntityCommandParameter with Input)
+          with (Activity => Position => Entity with RunPlan => EntityCommandParameter with Input with PositionInfo)
       trait PositionInputFactory
           extends InputFactory
           with (Position => Entity with RunPlan => EntityCommandParameter with Input)
+      trait NoPositionInputFactory extends InputFactory with (Entity with RunPlan => EntityCommandParameter with Input)
     }
 
     def from(entity: Entity with Artifact): PositionInputFactory =
@@ -144,21 +162,35 @@ object CommandParameter {
     def from(entity:      Entity with Artifact,
              maybePrefix: Option[Prefix],
              maybeUsedIn: Option[Step]): PositionInputFactory =
-      position =>
+      positionArg =>
         runPlan =>
-          new EntityCommandParameter(position, maybePrefix, runPlan, entity) with Input {
-            protected override val identifier: String       = position.toString
+          new EntityCommandParameter(maybePrefix, runPlan, entity) with Input with PositionInfo {
+            protected override val identifier: String       = positionArg.toString
             override val maybeStep:            Option[Step] = maybeUsedIn
+            override val position:             Position     = positionArg
           }
+
+    def withoutPositionFrom(entity: Entity with Artifact): NoPositionInputFactory =
+      withoutPositionFrom(entity, maybePrefix = None, maybeUsedIn = None)
+
+    def withoutPositionFrom(entity:      Entity with Artifact,
+                            maybePrefix: Option[Prefix],
+                            maybeUsedIn: Option[Step]): NoPositionInputFactory =
+      runPlan =>
+        new EntityCommandParameter(maybePrefix, runPlan, entity) with Input {
+          protected override val identifier: String       = randomUUID().toString
+          override val maybeStep:            Option[Step] = maybeUsedIn
+        }
 
     def factory(entityFactory: Activity => Entity with Artifact,
                 maybePrefix:   Option[Prefix] = None): ActivityPositionInputFactory =
       activity =>
-        position =>
+        positionArg =>
           runPlan =>
-            new EntityCommandParameter(position, maybePrefix, runPlan, entityFactory(activity)) with Input {
-              protected override val identifier: String       = position.toString
+            new EntityCommandParameter(maybePrefix, runPlan, entityFactory(activity)) with Input with PositionInfo {
+              protected override val identifier: String       = positionArg.toString
               override val maybeStep:            Option[Step] = None
+              override val position:             Position     = positionArg
             }
 
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -185,8 +217,19 @@ object CommandParameter {
 
     implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
                               fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Input] =
-      JsonLDEncoder.instance[CommandParameter with Input] { entity =>
-        entity.asPartialJsonLD[CommandParameter] combine entity.asPartialJsonLD[CommandParameter with Input] getOrFail
+      JsonLDEncoder.instance[CommandParameter with Input] {
+        case entity: CommandParameter with Input with PositionInfo =>
+          entity
+            .asPartialJsonLD[CommandParameter]
+            .combine(entity.asPartialJsonLD[PositionInfo])
+            .combine(entity.asPartialJsonLD[CommandParameter with Input])
+            .getOrFail
+        case entity: CommandParameter with Input =>
+          entity
+            .asPartialJsonLD[CommandParameter]
+            .combine(entity.asPartialJsonLD[CommandParameter with Input])
+            .getOrFail
+        case entity => throw new NotImplementedError(s"Cannot serialize entity of type ${entity.getClass}")
       }
   }
 
@@ -203,12 +246,20 @@ object CommandParameter {
 
   object Output {
 
-    trait OutputFactory extends (Activity => Position => Entity with RunPlan => CommandParameter with Output)
+    sealed trait OutputFactory
+    object OutputFactory {
+      trait PositionOutputFactory
+          extends OutputFactory
+          with (Activity => Position => Entity with RunPlan => CommandParameter with Output with PositionInfo)
+      trait NoPositionOutputFactory
+          extends OutputFactory
+          with (Activity => Entity with RunPlan => CommandParameter with Output)
+    }
 
-    def factory(entityFactory: Activity => Entity with Artifact): OutputFactory =
+    def factory(entityFactory: Activity => Entity with Artifact): PositionOutputFactory =
       factory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None)
 
-    def factory(entityFactory: Activity => Entity with Artifact, producedBy: Step): OutputFactory =
+    def factory(entityFactory: Activity => Entity with Artifact, producedBy: Step): PositionOutputFactory =
       factory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = producedBy.some)
 
     def factory(
@@ -216,15 +267,33 @@ object CommandParameter {
         maybePrefix:     Option[Prefix],
         folderCreation:  FolderCreation,
         maybeProducedBy: Option[Step]
-    ): OutputFactory =
+    ): PositionOutputFactory =
       activity =>
-        position =>
+        positionArg =>
           runPlan =>
-            new EntityCommandParameter(position, maybePrefix, runPlan, entityFactory(activity)) with Output {
+            new EntityCommandParameter(maybePrefix, runPlan, entityFactory(activity)) with Output with PositionInfo {
               override val outputFolderCreation: FolderCreation = folderCreation
               override val maybeProducedByStep:  Option[Step]   = maybeProducedBy
-              protected override val identifier: String         = position.toString
+              protected override val identifier: String         = positionArg.toString
+              override val position:             Position       = positionArg
             }
+
+    def withoutPositionFactory(entityFactory: Activity => Entity with Artifact): NoPositionOutputFactory =
+      withoutPositionFactory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None)
+
+    def withoutPositionFactory(
+        entityFactory:   Activity => Entity with Artifact,
+        maybePrefix:     Option[Prefix],
+        folderCreation:  FolderCreation,
+        maybeProducedBy: Option[Step]
+    ): NoPositionOutputFactory =
+      activity =>
+        runPlan =>
+          new EntityCommandParameter(maybePrefix, runPlan, entityFactory(activity)) with Output {
+            override val outputFolderCreation: FolderCreation = folderCreation
+            override val maybeProducedByStep:  Option[Step]   = maybeProducedBy
+            protected override val identifier: String         = randomUUID().toString
+          }
 
     private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
                                    fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Output] =
@@ -252,8 +321,19 @@ object CommandParameter {
 
     implicit def outputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
                                fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Output] =
-      JsonLDEncoder.instance { entity =>
-        entity.asPartialJsonLD[CommandParameter] combine entity.asPartialJsonLD[CommandParameter with Output] getOrFail
+      JsonLDEncoder.instance {
+        case entity: CommandParameter with Output with PositionInfo =>
+          entity
+            .asPartialJsonLD[CommandParameter]
+            .combine(entity.asPartialJsonLD[PositionInfo])
+            .combine(entity.asPartialJsonLD[CommandParameter with Output])
+            .getOrFail
+        case entity: CommandParameter with Output =>
+          entity
+            .asPartialJsonLD[CommandParameter]
+            .combine(entity.asPartialJsonLD[CommandParameter with Output])
+            .getOrFail
+        case entity => throw new NotImplementedError(s"Cannot serialize entity of type ${entity.getClass}")
       }
 
     final class FolderCreation private (val value: Boolean) extends AnyVal with BooleanTinyType

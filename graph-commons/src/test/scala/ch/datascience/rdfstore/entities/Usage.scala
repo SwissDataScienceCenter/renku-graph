@@ -49,7 +49,7 @@ object Usage {
         entityId,
         EntityTypes of (prov / "Usage"),
         prov / "entity"  -> entity.commandInput.entity.asJsonLD,
-        prov / "hadRole" -> s"${entity.commandInput}_${entity.commandInput.position}".asJsonLD
+        prov / "hadRole" -> entity.commandInput.toString.asJsonLD
       )
     }
 }

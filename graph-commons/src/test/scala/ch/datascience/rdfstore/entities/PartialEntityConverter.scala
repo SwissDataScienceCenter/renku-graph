@@ -28,3 +28,10 @@ trait PartialEntityConverter[S] {
   def apply[T <: S](entity: T): Either[Exception, PartialEntity] =
     convert(entity) map (_.copy(maybeId = toEntityId(entity)))
 }
+
+trait NoEntityIdPartialConverter[S] extends PartialEntityConverter[S] {
+
+  override def convert[T <: S]: T => Either[Exception, PartialEntity]
+
+  final override def toEntityId: S => Option[EntityId] = _ => None
+}

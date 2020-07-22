@@ -53,7 +53,10 @@ private class IOLineageDataFinder(
       edges <- queryExpecting[Set[EdgeData]](using = query(projectPath))
       nodes <- edges.toNodesLocations
                 .flatMap(toNodeQueries(projectPath))
-                .map(queryExpecting[Option[Node]](_).flatMap(toNodeOrError(projectPath)))
+                .map {
+                  case (location, query) =>
+                    queryExpecting[Option[Node]](query).flatMap(toNodeOrError(projectPath, location))
+                }
                 .toList
                 .parSequence
                 .map(_.toSet)
@@ -94,7 +97,8 @@ private class IOLineageDataFinder(
 
   private def toNodeQueries(project: Path)(commandAndEntities: (EntityId, Set[Node.Location])) = {
     val (runPlanId, entities) = commandAndEntities
-    entities.map(toEntityDetailsQuery(project)) + toRunPlanDetailsQuery(runPlanId)
+    entities.map(location => location.toString -> toEntityDetailsQuery(project)(location)) +
+      (runPlanId.toString -> toRunPlanDetailsQuery(runPlanId))
   }
 
   private def toRunPlanDetailsQuery(runPlanId: EntityId) = SparqlQuery(
@@ -104,43 +108,50 @@ private class IOLineageDataFinder(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
     ),
-    s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command),STR(' '), (GROUP_CONCAT(?commandParameter;separator=' '))) AS ?label) ?location
+    s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command), STR(' '), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
         |WHERE {
         |  {
-        |    SELECT DISTINCT ?command ?type ?location
-        |    WHERE {
-        |      <$runPlanId> renku:command ?command .
-        |      ?activity prov:qualifiedAssociation/prov:hadPlan <$runPlanId> ;              
-        |                rdf:type ?type .
-        |      BIND(<$runPlanId> AS ?location)
-        |    }
-        |  }
-        |  { 
-        |    SELECT DISTINCT ?position ?commandParameter
+        |SELECT DISTINCT ?command ?type ?location
+        |WHERE{
+        |    <$runPlanId> renku:command ?command.
+        |    ?activity prov:qualifiedAssociation/prov:hadPlan <$runPlanId>;
+        |              rdf:type ?type.
+        |    BIND (<$runPlanId> AS ?location)
+        |}  }
+        |  {
+        |    SELECT ?position ?commandParameter
         |    WHERE {
         |      {
         |        <$runPlanId> renku:hasInputs ?input .
-        |        ?input renku:position ?position;
-        |          		  renku:consumes/prov:atLocation ?location .
-        |        OPTIONAL{ ?input renku:prefix ?maybePrefix }
-        |        BIND(IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-        |        BIND(CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
+        |        ?input renku:consumes/prov:atLocation ?maybeLocation.
+        |        OPTIONAL { ?input renku:position ?maybePosition }.
+        |        OPTIONAL { ?input renku:prefix ?maybePrefix }
+        |        BIND (IF(bound(?maybePosition), STR(?maybeLocation), '') AS ?location) .
+        |        BIND (IF(bound(?maybePosition), ?maybePosition, 1) AS ?position) .
+        |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+        |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
         |      } UNION {
         |        <$runPlanId> renku:hasOutputs ?output .
-        |        ?output renku:position ?position;
-        |              	 renku:produces/prov:atLocation ?location .
-        |        OPTIONAL{ ?output renku:prefix ?maybePrefix }
-        |        BIND(IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-        |        BIND(CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
+        |        ?output renku:produces/prov:atLocation ?maybeLocation .
+        |        OPTIONAL { ?output renku:position ?maybePosition }.
+        |        OPTIONAL { ?output renku:prefix ?maybePrefix }
+        |        BIND (IF(bound(?maybePosition), STR(?maybeLocation), '') AS ?location) .
+        |        BIND (IF(bound(?maybePosition), ?maybePosition, 1) AS ?position) .
+        |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+        |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
         |      } UNION {
         |        <$runPlanId> renku:hasArguments ?argument .
         |        ?argument renku:position ?position .
-        |        OPTIONAL{ ?argument renku:prefix ?maybePrefix }
-        |        BIND(IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?commandParameter) .
+        |        OPTIONAL { ?argument renku:prefix ?maybePrefix }
+        |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?commandParameter) .
         |      }
-        |    } ORDER BY ?position
+        |    }
+        |    GROUP BY ?position ?commandParameter
+        |    HAVING (COUNT(*) > 0)
+        |    ORDER BY ?position
         |  }
-        |} GROUP BY ?command ?type ?location
+        |}
+        |GROUP BY ?command ?type ?location
         |""".stripMargin
   )
 
@@ -186,13 +197,15 @@ private class IOLineageDataFinder(
     implicit val labelDecoder: Decoder[Node.Label] = TinyTypeDecoders.stringDecoder(Node.Label)
     implicit val typeDecoder:  Decoder[Node.Type]  = TinyTypeDecoders.stringDecoder(Node.Type)
 
-    implicit lazy val fieldsDecoder: Decoder[(Node.Location, Node.Type, Node.Label)] = { implicit cursor =>
+    implicit lazy val fieldsDecoder: Decoder[Option[(Node.Location, Node.Type, Node.Label)]] = { cursor =>
       for {
-        nodeType <- cursor.downField("type").downField("value").as[Node.Type]
-        location <- cursor.downField("location").downField("value").as[Node.Location]
-        label    <- cursor.downField("label").downField("value").as[Node.Label]
-      } yield (location, nodeType, label)
+        maybeNodeType <- cursor.downField("type").downField("value").as[Option[Node.Type]]
+        maybeLocation <- cursor.downField("location").downField("value").as[Option[Node.Location]]
+        maybeLabel    <- cursor.downField("label").downField("value").as[Option[Node.Label]].map(trimValue)
+      } yield (maybeLocation, maybeNodeType, maybeLabel) mapN ((_, _, _))
     }
+
+    lazy val trimValue: Option[Node.Label] => Option[Node.Label] = _.map(l => Node.Label(l.value.trim))
 
     lazy val maybeToNode: List[(Node.Location, Node.Type, Node.Label)] => Option[Node] = {
       case Nil => None
@@ -206,7 +219,8 @@ private class IOLineageDataFinder(
 
     _.downField("results")
       .downField("bindings")
-      .as[List[(Node.Location, Node.Type, Node.Label)]]
+      .as[List[Option[(Node.Location, Node.Type, Node.Label)]]]
+      .map(_.flatten)
       .map(maybeToNode)
   }
 
@@ -222,9 +236,9 @@ private class IOLineageDataFinder(
       }
   }
 
-  private def toNodeOrError(projectPath: Path): Option[Node] => IO[Node] = {
+  private def toNodeOrError(projectPath: Path, location: String): Option[Node] => IO[Node] = {
     case Some(node) => node.pure[IO]
-    case _          => new Exception(s"Cannot find node details for $projectPath").raiseError[IO, Node]
+    case _          => new Exception(s"Cannot find details of $location node for $projectPath").raiseError[IO, Node]
   }
 
   private lazy val toLineage: (Set[EdgeData], Set[Node]) => IO[Option[Lineage]] = {

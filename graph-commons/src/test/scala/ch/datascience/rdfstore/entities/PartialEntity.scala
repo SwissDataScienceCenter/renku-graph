@@ -60,6 +60,9 @@ object PartialEntity {
   def apply(types: EntityTypes): PartialEntity =
     new PartialEntity(maybeId = None, Some(types), properties = Nil, maybeReverse = None)
 
+  def apply(first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
+    new PartialEntity(maybeId = None, maybeTypes = None, properties = (first +: other).toList, maybeReverse = None)
+
   implicit val semigroup: Semigroup[PartialEntity] = (x: PartialEntity, y: PartialEntity) =>
     x.copy(
       maybeId      = y.maybeId orElse x.maybeId,
