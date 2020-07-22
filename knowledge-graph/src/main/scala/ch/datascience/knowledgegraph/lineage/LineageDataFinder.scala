@@ -107,10 +107,13 @@ private class IOLineageDataFinder(
     s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command),STR(' '), (GROUP_CONCAT(?commandParameter;separator=' '))) AS ?label) ?location
         |WHERE {
         |  {
-        |    <$runPlanId> renku:command ?command .
-        |    ?activity prov:qualifiedAssociation/prov:hadPlan <$runPlanId> ;              
-        |              rdf:type ?type .
-        |    BIND(<$runPlanId> AS ?location)
+        |    SELECT DISTINCT ?command ?type ?location
+        |    WHERE {
+        |      <$runPlanId> renku:command ?command .
+        |      ?activity prov:qualifiedAssociation/prov:hadPlan <$runPlanId> ;              
+        |                rdf:type ?type .
+        |      BIND(<$runPlanId> AS ?location)
+        |    }
         |  }
         |  { 
         |    SELECT DISTINCT ?position ?commandParameter
