@@ -100,8 +100,8 @@ object CommandParameter {
               rdfs / "label" -> s"""Command Argument "${argument.value}"""".asJsonLD
             ).asRight
 
-        override lazy val toEntityId: CommandParameter with Argument => Option[EntityId] = input =>
-          input.runPlan.getEntityId map (runPlanId => EntityId.of(s"$runPlanId/arguments/$input"))
+        override lazy val toEntityId: CommandParameter with Argument => Option[EntityId] = argument =>
+          argument.runPlan.getEntityId map (_ / "arguments" / argument)
       }
 
     implicit def argumentEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
@@ -177,8 +177,8 @@ object CommandParameter {
         override lazy val toEntityId: CommandParameter with Input => Option[EntityId] = input =>
           input.runPlan.getEntityId map { runPlanId =>
             input.maybeStep match {
-              case None       => EntityId.of(s"$runPlanId/inputs/$input")
-              case Some(step) => EntityId.of(s"$runPlanId/steps/$step/inputs/$input")
+              case None       => runPlanId / "inputs" / input
+              case Some(step) => runPlanId / "steps" / step / "inputs" / input
             }
           }
       }
@@ -244,8 +244,8 @@ object CommandParameter {
           output =>
             output.runPlan.getEntityId map { runPlanId =>
               output.maybeProducedByStep match {
-                case None       => EntityId.of(s"$runPlanId/outputs/$output")
-                case Some(step) => EntityId.of(s"$runPlanId/steps/$step/outputs/$output")
+                case None       => runPlanId / "outputs" / output
+                case Some(step) => runPlanId / "steps" / step / "outputs" / output
               }
             }
       }

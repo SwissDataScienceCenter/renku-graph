@@ -60,14 +60,11 @@ object RunPlan {
 
   sealed trait ProcessRunPlan extends RunPlan {
     self: Entity =>
-
-    val runCommand:           Command
-    val maybeRunProcessOrder: Option[ProcessOrder]
+    val runCommand: Command
   }
 
   sealed trait WorkflowRunPlan extends RunPlan {
     self: Entity =>
-
     val runSubprocesses: List[Entity with ProcessRunPlan]
   }
 
@@ -114,8 +111,7 @@ object RunPlan {
         toInputParameters(inputs, offset = arguments.length, this)(activity)
       override val runCommandOutputs: List[CommandParameter with Output] =
         toOutputParameters(outputs, offset = arguments.length + inputs.length, this)(activity)
-      override val runSuccessCodes:      List[SuccessCode]    = successCodes
-      override val maybeRunProcessOrder: Option[ProcessOrder] = None
+      override val runSuccessCodes: List[SuccessCode] = successCodes
     }
 
   private def toParameters[T](factories: List[Position => Entity with RunPlan => T],
@@ -154,22 +150,41 @@ object RunPlan {
   private[entities] implicit def workflowRunPlanConverter(
       implicit renkuBaseUrl: RenkuBaseUrl,
       fusekiBaseUrl:         FusekiBaseUrl
-  ): PartialEntityConverter[Entity with WorkflowRunPlan] =
-    new PartialEntityConverter[Entity with WorkflowRunPlan] {
-      override def convert[T <: Entity with WorkflowRunPlan]: T => Either[Exception, PartialEntity] = { entity =>
-        PartialEntity(
-          EntityTypes of (prov / "Plan", renku / "Run"),
-          renku / "hasArguments"  -> entity.runArguments.asJsonLD,
-          renku / "hasInputs"     -> entity.runCommandInputs.asJsonLD,
-          renku / "hasOutputs"    -> entity.runCommandOutputs.asJsonLD,
-          renku / "hasSubprocess" -> entity.runSubprocesses.asJsonLD,
-          renku / "successCodes"  -> entity.runSuccessCodes.asJsonLD
-        ).asRight
-      }
+  ): PartialEntityConverter[Entity with WorkflowRunPlan] = new PartialEntityConverter[Entity with WorkflowRunPlan] {
+    self =>
 
-      override def toEntityId: Entity with WorkflowRunPlan => Option[EntityId] =
-        entity => (EntityId of (renkuBaseUrl / "runs" / entity.identifier)).some
+    override def convert[T <: Entity with WorkflowRunPlan]: T => Either[Exception, PartialEntity] = { implicit entity =>
+      PartialEntity(
+        EntityTypes of (prov / "Plan", renku / "Run"),
+        renku / "hasArguments"  -> entity.runArguments.asJsonLD,
+        renku / "hasInputs"     -> entity.runCommandInputs.asJsonLD,
+        renku / "hasOutputs"    -> entity.runCommandOutputs.asJsonLD,
+        renku / "hasSubprocess" -> entity.runSubprocesses.zipWithIndex.asJsonLD,
+        renku / "successCodes"  -> entity.runSuccessCodes.asJsonLD
+      ).asRight
     }
+
+    override def toEntityId: Entity with WorkflowRunPlan => Option[EntityId] =
+      entity => (EntityId of renkuBaseUrl / "runs" / entity.identifier).some
+
+    private implicit def subprocessEncoder(
+        implicit parentRunPlan: Entity with WorkflowRunPlan
+    ): JsonLDEncoder[(Entity with ProcessRunPlan, Int)] =
+      JsonLDEncoder.instance[(Entity with ProcessRunPlan, Int)] {
+        case (entity, idx) =>
+          JsonLD.entity(
+            id = parentRunPlan
+              .getEntityId(self)
+              .map(_ / "subprocess" / (idx + 1))
+              .getOrElse(
+                throw new IllegalStateException(s"No entityId for WorkflowRunPlan with ${parentRunPlan.identifier}")
+              ),
+            types = EntityTypes of renku / "OrderedSubprocess",
+            renku / "index"   -> idx.asJsonLD,
+            renku / "process" -> entity.asJsonLD
+          )
+      }
+  }
 
   private[entities] implicit def processRunPlanConverter(
       implicit renkuBaseUrl: RenkuBaseUrl,
@@ -183,13 +198,12 @@ object RunPlan {
           renku / "hasArguments" -> entity.runArguments.asJsonLD,
           renku / "hasInputs"    -> entity.runCommandInputs.asJsonLD,
           renku / "hasOutputs"   -> entity.runCommandOutputs.asJsonLD,
-          renku / "successCodes" -> entity.runSuccessCodes.asJsonLD,
-          renku / "processOrder" -> entity.maybeRunProcessOrder.asJsonLD
+          renku / "successCodes" -> entity.runSuccessCodes.asJsonLD
         ).asRight
       }
 
       override def toEntityId: Entity with ProcessRunPlan => Option[EntityId] =
-        entity => (EntityId of (renkuBaseUrl / "runs" / entity.identifier)).some
+        entity => (EntityId of renkuBaseUrl / "runs" / entity.identifier).some
     }
 
   private[entities] implicit def runPlanConverter(
@@ -247,7 +261,4 @@ object RunPlan {
 
   final class SuccessCode private (val value: Int) extends AnyVal with IntTinyType
   implicit object SuccessCode extends TinyTypeFactory[SuccessCode](new SuccessCode(_)) with NonNegativeInt
-
-  final class ProcessOrder private (val value: Int) extends AnyVal with IntTinyType
-  implicit object ProcessOrder extends TinyTypeFactory[ProcessOrder](new ProcessOrder(_)) with NonNegativeInt
 }

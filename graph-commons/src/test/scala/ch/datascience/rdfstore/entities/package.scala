@@ -79,6 +79,12 @@ package object entities extends Schemas with EntitiesGenerators {
       converter.toEntityId(entity)
   }
 
+  implicit class EntityIdOps(entityId: EntityId) {
+    import ch.datascience.http.client.UrlEncoder._
+
+    def /(value: Any): EntityId = EntityId.of(s"$entityId/${urlEncode(value.toString)}")
+  }
+
   implicit class PropertiesOps(x: List[(Property, JsonLD)]) {
     def merge(y: List[(Property, JsonLD)]): List[(Property, JsonLD)] =
       y.foldLeft(x) {
@@ -94,7 +100,6 @@ package object entities extends Schemas with EntitiesGenerators {
     Reverse.fromListUnsafe {
       x.properties merge y.properties
     }
-
 }
 
 trait Schemas {
