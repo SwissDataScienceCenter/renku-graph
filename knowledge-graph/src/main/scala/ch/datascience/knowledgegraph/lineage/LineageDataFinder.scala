@@ -111,35 +111,63 @@ private class IOLineageDataFinder(
     s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command), STR(' '), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
         |WHERE {
         |  {
-        |SELECT DISTINCT ?command ?type ?location
-        |WHERE{
-        |    <$runPlanId> renku:command ?command.
-        |    ?activity prov:qualifiedAssociation/prov:hadPlan <$runPlanId>;
-        |              rdf:type ?type.
-        |    BIND (<$runPlanId> AS ?location)
-        |}  }
-        |  {
+        |    SELECT DISTINCT ?command ?type ?location
+        |    WHERE {
+        |      <$runPlanId> renku:command ?command.
+        |      ?activity prov:qualifiedAssociation/prov:hadPlan <$runPlanId>;
+        |                rdf:type ?type.
+        |      BIND (<$runPlanId> AS ?location)
+        |    }
+        |  } {
         |    SELECT ?position ?commandParameter
         |    WHERE {
-        |      {
+        |      { # inputs with position
         |        <$runPlanId> renku:hasInputs ?input .
-        |        ?input renku:consumes/prov:atLocation ?maybeLocation.
-        |        OPTIONAL { ?input renku:position ?maybePosition }.
+        |        ?input renku:consumes/prov:atLocation ?location;
+        |               renku:position ?position.
         |        OPTIONAL { ?input renku:prefix ?maybePrefix }
-        |        BIND (IF(bound(?maybePosition), STR(?maybeLocation), '') AS ?location) .
-        |        BIND (IF(bound(?maybePosition), ?maybePosition, 1) AS ?position) .
         |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
         |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
-        |      } UNION {
+        |      } UNION { # inputs with mappedTo
+        |        <$runPlanId> renku:hasInputs ?input .
+        |        ?input renku:consumes/prov:atLocation ?location;
+        |               renku:mappedTo/renku:streamType ?streamType.
+        |        OPTIONAL { ?input renku:prefix ?maybePrefix }
+        |        FILTER NOT EXISTS { ?input renku:position ?maybePosition }.
+        |        BIND (IF(?streamType = 'stdin', '< ', '') AS ?streamOperator).
+        |        BIND (1 AS ?position).
+        |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
+        |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
+        |      } UNION { # inputs with no position and mappedTo
+        |        <$runPlanId> renku:hasInputs ?input .
+        |        FILTER NOT EXISTS { ?input renku:position ?maybePosition }.
+        |        FILTER NOT EXISTS { ?input renku:mappedTo ?mappedTo }.
+        |        BIND (1 AS ?position).
+        |        BIND ('' AS ?commandParameter).
+        |      } UNION { # outputs with position
         |        <$runPlanId> renku:hasOutputs ?output .
-        |        ?output renku:produces/prov:atLocation ?maybeLocation .
-        |        OPTIONAL { ?output renku:position ?maybePosition }.
+        |        ?output renku:produces/prov:atLocation ?location;
+        |                renku:position ?position.
         |        OPTIONAL { ?output renku:prefix ?maybePrefix }
-        |        BIND (IF(bound(?maybePosition), STR(?maybeLocation), '') AS ?location) .
-        |        BIND (IF(bound(?maybePosition), ?maybePosition, 1) AS ?position) .
         |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
         |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
-        |      } UNION {
+        |      } UNION { # outputs with mappedTo
+        |        <$runPlanId> renku:hasOutputs ?output .
+        |        ?output renku:produces/prov:atLocation ?location;
+        |                renku:mappedTo/renku:streamType ?streamType.
+        |        OPTIONAL { ?output renku:prefix ?maybePrefix }
+        |        FILTER NOT EXISTS { ?output renku:position ?maybePosition }.
+        |        BIND (IF(?streamType = 'stdout', '> ', IF(?streamType = 'stderr', '2> ', '')) AS ?streamOperator).
+        |        BIND (IF(?streamType = 'stdout', 2, IF(?streamType = 'stderr', 3, 3)) AS ?position).
+        |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+        |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
+        |      } UNION { # outputs with no position and mappedTo
+        |        <$runPlanId> renku:hasOutputs ?output .
+        |        FILTER NOT EXISTS { ?output renku:position ?maybePosition }.
+        |        FILTER NOT EXISTS { ?output renku:mappedTo ?mappedTo }.
+        |        BIND (1 AS ?position).
+        |        BIND ('' AS ?commandParameter).
+        |      } UNION { # arguments
         |        <$runPlanId> renku:hasArguments ?argument .
         |        ?argument renku:position ?position .
         |        OPTIONAL { ?argument renku:prefix ?maybePrefix }

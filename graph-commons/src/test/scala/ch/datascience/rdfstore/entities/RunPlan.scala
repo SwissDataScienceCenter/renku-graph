@@ -21,9 +21,10 @@ package ch.datascience.rdfstore.entities
 import cats.implicits._
 import ch.datascience.rdfstore.entities.CommandParameter.Argument.ArgumentFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
-import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInputFactory, NoPositionInputFactory, PositionInputFactory}
+import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory._
 import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory
-import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory.{NoPositionOutputFactory, PositionOutputFactory}
+import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory._
+import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
@@ -135,6 +136,7 @@ object RunPlan {
   )(activity:    Activity): List[CommandParameter with Output] =
     factories.zipWithIndex.map {
       case (factory: PositionOutputFactory, idx) => factory(activity)(Position(idx + offset + 1))(runPlan)
+      case (factory: MappedOutputFactory, _)     => factory(activity)(runPlan)
       case (factory: NoPositionOutputFactory, _) => factory(activity)(runPlan)
     }
 
@@ -148,8 +150,8 @@ object RunPlan {
         factory(activity)(Position(idx + offset + 1))(runPlan)
       case (factory: PositionInputFactory, idx) =>
         factory(Position(idx + offset + 1))(runPlan)
-      case (factory: NoPositionInputFactory, _) =>
-        factory(runPlan)
+      case (factory: MappedInputFactory, _)     => factory(runPlan)
+      case (factory: NoPositionInputFactory, _) => factory(runPlan)
     }
 
   private[entities] implicit def workflowRunPlanConverter(

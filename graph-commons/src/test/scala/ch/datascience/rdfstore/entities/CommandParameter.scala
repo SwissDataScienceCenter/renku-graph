@@ -23,12 +23,18 @@ import java.util.UUID.randomUUID
 import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory.{ActivityPositionInputFactory, NoPositionInputFactory, PositionInputFactory}
+import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory._
+import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream.StdIn
+import ch.datascience.rdfstore.entities.CommandParameter.Mapping._
 import ch.datascience.rdfstore.entities.CommandParameter.Output.FolderCreation.no
-import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory.{NoPositionOutputFactory, PositionOutputFactory}
+import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory._
+import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLDEncoder}
@@ -47,6 +53,14 @@ object CommandParameter {
   }
 
   object PositionInfo {
+
+    final class Position private (val value: Int) extends AnyVal with IntTinyType
+    implicit object Position extends TinyTypeFactory[Position](new Position(_)) with PositiveInt {
+      val first:  Position = Position(1)
+      val second: Position = Position(2)
+      val third:  Position = Position(3)
+    }
+
     private[entities] implicit val converter: PartialEntityConverter[PositionInfo] =
       new NoEntityIdPartialConverter[PositionInfo] {
         override def convert[T <: PositionInfo]: T => Either[Exception, PartialEntity] =
@@ -55,6 +69,64 @@ object CommandParameter {
               renku / "position" -> entity.position.asJsonLD
             ).asRight
       }
+  }
+
+  sealed trait Mapping {
+    self: EntityCommandParameter =>
+    type IO <: IOStream
+    val mappedTo: IO
+  }
+
+  object Mapping {
+
+    trait InputMapping extends Mapping {
+      self: EntityCommandParameter =>
+      type IO = IOStream.In
+    }
+    trait OutputMapping extends Mapping {
+      self: EntityCommandParameter =>
+      type IO = IOStream.Out
+    }
+
+    sealed abstract class IOStream(val name: String Refined NonEmpty) {
+      override lazy val toString: String = name.toString()
+    }
+
+    object IOStream {
+      trait In           extends IOStream
+      trait Out          extends IOStream
+      case object StdIn  extends IOStream("stdin") with In
+      case object StdOut extends IOStream("stdout") with Out
+      case object StdErr extends IOStream("stderr") with Out
+
+      private[entities] implicit def converter[IO <: IOStream](
+          implicit renkuBaseUrl: RenkuBaseUrl
+      ): PartialEntityConverter[IO] =
+        new PartialEntityConverter[IO] {
+          override def convert[T <: IO]: T => Either[Exception, PartialEntity] =
+            stream =>
+              PartialEntity(
+                EntityTypes of renku / "IOStream",
+                renku / "streamType" -> stream.name.toString().asJsonLD
+              ).asRight
+
+          override def toEntityId: IO => Option[EntityId] =
+            e => EntityId.of { renkuBaseUrl / "iostreams" / e.name.toString() }.some
+        }
+
+      implicit def encoder[IO <: IOStream](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[IO] =
+        JsonLDEncoder.instance[IO] { _.asPartialJsonLD[IO].getOrFail }
+    }
+
+    private[entities] implicit def converter[M <: Mapping](
+        implicit renkuBaseUrl: RenkuBaseUrl
+    ): PartialEntityConverter[M] = new NoEntityIdPartialConverter[M] {
+      override def convert[T <: M]: T => Either[Exception, PartialEntity] =
+        entity =>
+          PartialEntity(
+            renku / "mappedTo" -> entity.mappedTo.asJsonLD
+          ).asRight
+    }
   }
 
   sealed abstract class EntityCommandParameter(override val maybePrefix: Option[Prefix],
@@ -71,11 +143,6 @@ object CommandParameter {
 
   final class Prefix private (val value: String) extends AnyVal with StringTinyType
   implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank
-
-  final class Position private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Position extends TinyTypeFactory[Position](new Position(_)) with PositiveInt {
-    val first: Position = Position(1)
-  }
 
   private[entities] implicit val converter: PartialEntityConverter[CommandParameter] =
     new NoEntityIdPartialConverter[CommandParameter] {
@@ -150,6 +217,9 @@ object CommandParameter {
       trait PositionInputFactory
           extends InputFactory
           with (Position => Entity with RunPlan => EntityCommandParameter with Input)
+      trait MappedInputFactory
+          extends InputFactory
+          with (Entity with RunPlan => EntityCommandParameter with Input with InputMapping)
       trait NoPositionInputFactory extends InputFactory with (Entity with RunPlan => EntityCommandParameter with Input)
     }
 
@@ -169,6 +239,19 @@ object CommandParameter {
             override val maybeStep:            Option[Step] = maybeUsedIn
             override val position:             Position     = positionArg
           }
+
+    def streamFrom(entity: Entity with Artifact): MappedInputFactory =
+      streamFrom(entity, maybePrefix = None, maybeUsedIn = None)
+
+    def streamFrom(entity:      Entity with Artifact,
+                   maybePrefix: Option[Prefix],
+                   maybeUsedIn: Option[Step]): MappedInputFactory =
+      runPlan =>
+        new EntityCommandParameter(maybePrefix, runPlan, entity) with Input with InputMapping {
+          protected override val identifier: String       = StdIn.name.value
+          override val maybeStep:            Option[Step] = maybeUsedIn
+          override val mappedTo:             IOStream.In  = StdIn
+        }
 
     def withoutPositionFrom(entity: Entity with Artifact): NoPositionInputFactory =
       withoutPositionFrom(entity, maybePrefix = None, maybeUsedIn = None)
@@ -224,6 +307,12 @@ object CommandParameter {
             .combine(entity.asPartialJsonLD[PositionInfo])
             .combine(entity.asPartialJsonLD[CommandParameter with Input])
             .getOrFail
+        case entity: CommandParameter with Input with InputMapping =>
+          entity
+            .asPartialJsonLD[CommandParameter]
+            .combine(entity.asPartialJsonLD[InputMapping])
+            .combine(entity.asPartialJsonLD[CommandParameter with Input])
+            .getOrFail
         case entity: CommandParameter with Input =>
           entity
             .asPartialJsonLD[CommandParameter]
@@ -251,6 +340,9 @@ object CommandParameter {
       trait PositionOutputFactory
           extends OutputFactory
           with (Activity => Position => Entity with RunPlan => CommandParameter with Output with PositionInfo)
+      trait MappedOutputFactory
+          extends OutputFactory
+          with (Activity => Entity with RunPlan => CommandParameter with Output with OutputMapping)
       trait NoPositionOutputFactory
           extends OutputFactory
           with (Activity => Entity with RunPlan => CommandParameter with Output)
@@ -277,6 +369,28 @@ object CommandParameter {
               protected override val identifier: String         = positionArg.toString
               override val position:             Position       = positionArg
             }
+
+    def streamFactory(
+        entityFactory: Activity => Entity with Artifact,
+        to:            IOStream.Out
+    ): MappedOutputFactory =
+      streamFactory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None, to)
+
+    def streamFactory(
+        entityFactory:   Activity => Entity with Artifact,
+        maybePrefix:     Option[Prefix],
+        folderCreation:  FolderCreation,
+        maybeProducedBy: Option[Step],
+        to:              IOStream.Out
+    ): MappedOutputFactory =
+      activity =>
+        runPlan =>
+          new EntityCommandParameter(maybePrefix, runPlan, entityFactory(activity)) with Output with OutputMapping {
+            override val outputFolderCreation: FolderCreation = folderCreation
+            override val maybeProducedByStep:  Option[Step]   = maybeProducedBy
+            protected override val identifier: String         = to.name.value
+            override val mappedTo:             IOStream.Out   = to
+          }
 
     def withoutPositionFactory(entityFactory: Activity => Entity with Artifact): NoPositionOutputFactory =
       withoutPositionFactory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None)
@@ -326,6 +440,12 @@ object CommandParameter {
           entity
             .asPartialJsonLD[CommandParameter]
             .combine(entity.asPartialJsonLD[PositionInfo])
+            .combine(entity.asPartialJsonLD[CommandParameter with Output])
+            .getOrFail
+        case entity: CommandParameter with Output with OutputMapping =>
+          entity
+            .asPartialJsonLD[CommandParameter]
+            .combine(entity.asPartialJsonLD[OutputMapping])
             .combine(entity.asPartialJsonLD[CommandParameter with Output])
             .getOrFail
         case entity: CommandParameter with Output =>

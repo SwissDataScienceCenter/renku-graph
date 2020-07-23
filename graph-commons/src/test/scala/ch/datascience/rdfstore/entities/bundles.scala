@@ -29,6 +29,8 @@ import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartL
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
+import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
+import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.rdfstore.entities.DataSetPart.{DataSetPartArtifact, dataSetParts}
 import ch.datascience.rdfstore.entities.Person.persons
@@ -527,6 +529,12 @@ object bundles extends Schemas {
       lazy val asLabel: String =
         (runPlan.runArguments ++ runPlan.runCommandInputs ++ runPlan.runCommandOutputs)
           .foldLeft(List.empty[(Position, String)]) {
+            case (allParams, parameter: Mapping) =>
+              parameter.mappedTo match {
+                case _: IOStream.StdIn.type  => (Position.first  -> asString(parameter)) +: allParams
+                case _: IOStream.StdOut.type => (Position.second -> asString(parameter)) +: allParams
+                case _: IOStream.StdErr.type => (Position.third  -> asString(parameter)) +: allParams
+              }
             case (allParams, parameter: PositionInfo) => (parameter.position -> asString(parameter)) +: allParams
             case (allParams, _) => allParams
           }
@@ -535,8 +543,19 @@ object bundles extends Schemas {
           .mkString(s"${runPlan.runCommand} ", " ", "")
           .trim
 
-      private def asString(parameter: CommandParameter): String =
-        parameter.maybePrefix.fold(parameter.value.toString)(prefix => s"$prefix${parameter.value}")
+      private def asString(parameter: CommandParameter): String = parameter match {
+        case param: Mapping =>
+          param.maybePrefix.fold(s"${asSign(param)} ${param.value}")(
+            prefix => s"$prefix ${asSign(param)} ${param.value}"
+          )
+        case param => param.maybePrefix.fold(param.value.toString)(prefix => s"$prefix${param.value}")
+      }
+
+      private def asSign(parameter: Mapping): String = parameter.mappedTo match {
+        case _: IOStream.StdIn.type  => "<"
+        case _: IOStream.StdOut.type => ">"
+        case _: IOStream.StdErr.type => "2>"
+      }
     }
   }
 }
