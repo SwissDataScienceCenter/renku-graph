@@ -157,6 +157,6 @@ class PersonDetailsUpdaterSpec extends WordSpec {
 
   private lazy val atLeastOneWithoutEmail: NonEmptyList[entities.Person] => Boolean = _.exists(_.maybeEmail.isEmpty)
 
-  private lazy val blankIds:       Person => Boolean = _.id.value startsWith "_"
+  private lazy val blankIds:       Person => Boolean = p => !(p.id.value startsWith "mailto:")
   private lazy val noEmailAndName: Person => Person  = _.copy(maybeName = None, maybeEmail = None)
 }
