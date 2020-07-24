@@ -47,17 +47,20 @@ class GitSpec extends WordSpec with MockFactory {
         s"return $GenerationRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
 
           val errorMessage = sentenceContaining(recoverableError).generateOne.value
+          val commandResultException = ShelloutException {
+            CommandResult(
+              exitCode = 1,
+              chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
+            )
+          }
           cloneCommand
             .expects(repositoryUrl, destDirectory, workDirectory)
-            .throwing(ShelloutException {
-              CommandResult(
-                exitCode = 1,
-                chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
-              )
-            })
+            .throwing(commandResultException)
 
           git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Left(
-            GenerationRecoverableError(s"git clone failed with: $errorMessage")
+            GenerationRecoverableError(
+              s"git clone failed with: ${commandResultException.result.toString}"
+            )
           )
         }
     }
@@ -67,7 +70,7 @@ class GitSpec extends WordSpec with MockFactory {
       val commandException = ShelloutException {
         CommandResult(
           exitCode = 1,
-          chunks   = Seq(Left(new Bytes(nonBlankStrings().generateOne.value.getBytes())))
+          chunks   = Seq(Right(new Bytes(nonBlankStrings().generateOne.value.getBytes())))
         )
       }
       cloneCommand
@@ -76,7 +79,7 @@ class GitSpec extends WordSpec with MockFactory {
 
       intercept[Exception] {
         git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync()
-      }.getMessage shouldBe s"git clone failed with: ${commandException.result.out.string}"
+      }.getMessage shouldBe s"git clone failed with: ${commandException.result.toString}"
     }
 
     "fail if finding command's message fails" in new TestCase {

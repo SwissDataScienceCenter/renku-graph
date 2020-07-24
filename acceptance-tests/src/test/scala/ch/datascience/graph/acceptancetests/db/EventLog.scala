@@ -18,26 +18,31 @@
 
 package ch.datascience.graph.acceptancetests.db
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import ch.datascience.db.DBConfigProvider
 import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.projects.Id
 import doobie.implicits._
+import doobie.util.fragments.in
 import io.renku.eventlog._
 
 import scala.language.postfixOps
 
 object EventLog extends InMemoryEventLogDb {
 
-  def findEvents(projectId: Id, status: EventStatus): List[CommitId] = execute {
-    sql"""|select event_id
-          |from event_log
-          |where project_id = $projectId and status = $status
-          |""".stripMargin
+  def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute {
+    (fr"""
+     select event_id
+     from event_log
+     where project_id = $projectId and """ ++ `status IN`(status.toList))
       .query[EventId]
       .to[List]
       .map(_.map(eventId => CommitId(eventId.value)))
   }
+
+  private def `status IN`(status: List[EventStatus]) =
+    in(fr"status", NonEmptyList.fromListUnsafe(status))
 
   protected override val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()

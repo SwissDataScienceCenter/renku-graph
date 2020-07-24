@@ -35,7 +35,7 @@ import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.eventlog.EventStatus
-import io.renku.eventlog.EventStatus.New
+import io.renku.eventlog.EventStatus.{New, TriplesStore}
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Assertion
@@ -75,7 +75,7 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
       .status shouldBe Accepted
 
     eventually {
-      EventLog.findEvents(projectId, status = New) shouldBe List(commitId)
+      EventLog.findEvents(projectId, status = New, TriplesStore) shouldBe List(commitId)
     }
 
     eventually {

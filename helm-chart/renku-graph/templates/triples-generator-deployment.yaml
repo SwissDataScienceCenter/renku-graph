@@ -1,4 +1,4 @@
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "triplesGenerator.fullname" . }}
@@ -95,7 +95,7 @@ spec:
             successThreshold: 1
             failureThreshold: 3
           resources:
-  {{ toYaml .Values.triplesGenerator.resources | indent 12 }}
+  {{- toYaml .Values.triplesGenerator.resources | nindent 12 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}

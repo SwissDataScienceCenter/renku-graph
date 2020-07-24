@@ -200,11 +200,11 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val urlsDecoder: Decoder[Urls] = cursor =>
     for {
-      ssh    <- cursor.downField("ssh").as[SshUrl]
-      http   <- cursor.downField("http").as[HttpUrl]
-      web    <- cursor.downField("web").as[WebUrl]
-      readme <- cursor.downField("readme").as[ReadmeUrl]
-    } yield Urls(ssh, http, web, readme)
+      ssh         <- cursor.downField("ssh").as[SshUrl]
+      http        <- cursor.downField("http").as[HttpUrl]
+      web         <- cursor.downField("web").as[WebUrl]
+      maybeReadme <- cursor.downField("readme").as[Option[ReadmeUrl]]
+    } yield Urls(ssh, http, web, maybeReadme)
 
   private implicit lazy val permissionsDecoder: Decoder[Permissions] = cursor => {
     def maybeAccessLevel(name: String) = cursor.downField(name).as[Option[AccessLevel]]
