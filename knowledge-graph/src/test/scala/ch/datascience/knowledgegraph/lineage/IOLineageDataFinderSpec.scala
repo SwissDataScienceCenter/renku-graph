@@ -200,7 +200,7 @@ class IOLineageDataFinderSpec extends WordSpec with InMemoryRdfStore with Extern
         agent,
         comment = s"renku run: committing 1 newly added files",
         associationFactory = Association.process(
-          agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
+          agent.copy(schemaVersion = schemaVersions.generateOne),
           RunPlan.process(
             WorkflowFile.yaml("renku-run.yaml"),
             Command("cat"),

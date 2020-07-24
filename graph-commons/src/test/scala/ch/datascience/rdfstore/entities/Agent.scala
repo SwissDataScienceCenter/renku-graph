@@ -20,7 +20,7 @@ package ch.datascience.rdfstore.entities
 
 import ch.datascience.graph.model.SchemaVersion
 
-final case class Agent(schemaVersion: SchemaVersion, maybeStartedBy: Option[Person] = None)
+final case class Agent(schemaVersion: SchemaVersion)
 
 object Agent {
 
@@ -35,8 +35,7 @@ object Agent {
         prov / "SoftwareAgent",
         wfprov / "WorkflowEngine"
       ),
-      rdfs / "label"        -> s"renku ${entity.schemaVersion}".asJsonLD,
-      prov / "wasStartedBy" -> entity.maybeStartedBy.asJsonLD
+      rdfs / "label" -> s"renku ${entity.schemaVersion}".asJsonLD
     )
   }
 }

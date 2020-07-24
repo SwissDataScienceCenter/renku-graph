@@ -319,7 +319,7 @@ object bundles extends Schemas {
         comment         = s"renku run: committing 1 newly added files",
         maybeInformedBy = Some(commit8ProcessRun),
         associationFactory = Association.process(
-          agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
+          agent.copy(schemaVersion = schemaVersions.generateOne),
           RunPlan.process(
             WorkflowFile.yaml("2nd-renku-run.yaml"),
             Command("python"),
@@ -415,12 +415,12 @@ object bundles extends Schemas {
         committedDates.generateOne,
         persons.generateOne,
         project,
-        agent.copy(maybeStartedBy = Some(persons.generateOne)),
+        agent,
         comment = "renku update: committing 2 newly added files",
         WorkflowFile.yaml("renku-update.yaml"),
         informedBy = commit11Activity,
         associationFactory = Association.workflow(
-          agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne)),
+          agent.copy(schemaVersion = schemaVersions.generateOne),
           RunPlan.workflow(
             inputs = List(
               Input.from(commit7Activity.entity(cleanData), usedIn      = Step.one),
@@ -441,13 +441,13 @@ object bundles extends Schemas {
         processRunsFactories = List(
           ProcessRun.child(
             associationFactory = Association.child(
-              agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne))
+              agent.copy(schemaVersion = schemaVersions.generateOne)
             ),
             maybeInvalidation = oldCommit12WorkflowStep0.generations.headOption.flatMap(_.maybeReverseEntity)
           ),
           ProcessRun.child(
             associationFactory = Association.child(
-              agent.copy(schemaVersion = schemaVersions.generateOne, maybeStartedBy = Some(persons.generateOne))
+              agent.copy(schemaVersion = schemaVersions.generateOne)
             ),
             maybeInvalidation = oldCommit12WorkflowStep1.generations.headOption.flatMap(_.maybeReverseEntity)
           )
