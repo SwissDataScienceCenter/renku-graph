@@ -90,7 +90,7 @@ spec:
             successThreshold: 1
             failureThreshold: 10
             {{- if .Values.triplesGenerator.renkuPythonDevVersion }}
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             {{- end }}
           readinessProbe:
             httpGet:
@@ -100,7 +100,7 @@ spec:
             successThreshold: 1
             failureThreshold: 3
             {{- if .Values.triplesGenerator.renkuPythonDevVersion }}
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             {{- end }}
           resources:
   {{- toYaml .Values.triplesGenerator.resources | nindent 12 }}
