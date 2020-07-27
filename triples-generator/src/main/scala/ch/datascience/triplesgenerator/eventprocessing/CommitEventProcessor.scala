@@ -113,7 +113,7 @@ private class CommitEventProcessor[Interpretation[_]](
   }
 
   private def toRecoverableError(commit: CommitEvent): ProcessingRecoverableError => UploadingResult = { error =>
-    logger.error(s"${logMessageCommon(commit)} ${error.message}")
+    logger.error(error)(s"${logMessageCommon(commit)} ${error.getMessage}")
     RecoverableError(commit, error)
   }
 
@@ -202,7 +202,7 @@ private class CommitEventProcessor[Interpretation[_]](
 }
 
 private object CommitEventProcessor {
-  trait ProcessingRecoverableError extends Exception { val message: String }
+  trait ProcessingRecoverableError extends Exception
 }
 
 private object IOCommitEventProcessor {

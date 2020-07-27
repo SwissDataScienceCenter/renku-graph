@@ -158,7 +158,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
-      logError(commitEvents.head, exception.message)
+      logError(commitEvents.head, exception, exception.getMessage)
       logSummary(commitEvents, uploaded = 0, failed = 1)
     }
 
@@ -186,7 +186,7 @@ class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually
 
       eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
-      logError(commitEvents.head, exception.getMessage)
+      logError(commitEvents.head, exception, exception.getMessage)
       logSummary(commitEvents, uploaded = 0, failed = 1)
     }
 
