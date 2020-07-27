@@ -63,6 +63,7 @@ class ReProvisioning[Interpretation[_]](
   private def triggerReProvisioning =
     measureExecutionTime {
       for {
+        _ <- logger.info("The triples are not up to date - clearing DB and re-scheduling all the events")
         _ <- removeAllTriples()
         _ <- triggerEventsReScheduling
       } yield ()
@@ -96,7 +97,7 @@ object IOReProvisioning {
   import scala.concurrent.ExecutionContext
   import scala.concurrent.duration._
 
-  private val SleepWhenBusy = 1 minute
+  private val SleepWhenBusy = 10 minutes
 
   def apply(
       triplesGeneration: TriplesGeneration,

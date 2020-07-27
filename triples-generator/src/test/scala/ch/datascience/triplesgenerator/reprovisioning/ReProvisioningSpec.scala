@@ -55,7 +55,10 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.loggedOnly(Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms"))
+      logger.loggedOnly(
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+      )
     }
 
     "do nothing if there all RDF store is up to date" in new TestCase {
@@ -117,7 +120,9 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
         Error("Re-provisioning failure", exception),
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
         Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
       )
     }
@@ -154,7 +159,9 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
         Error("Re-provisioning failure", exception),
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
         Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
       )
     }
