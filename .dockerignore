@@ -3,3 +3,4 @@
 .travis*
 helm-chart
 *.enc
+**/Dockerfile

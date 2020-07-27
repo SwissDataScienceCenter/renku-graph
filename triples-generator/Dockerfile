@@ -29,5 +29,6 @@ RUN apk add --no-cache tzdata git git-lfs curl bash python3-dev openssl-dev libf
     git config --global filter.lfs.smudge "git-lfs smudge --skip %f"  && \
     git config --global filter.lfs.process "git-lfs filter-process --skip"
 
-ENTRYPOINT ["bin/triples-generator"]
-CMD []
+COPY triples-generator/entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bin/triples-generator"]
