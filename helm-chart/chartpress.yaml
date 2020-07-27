@@ -1,5 +1,6 @@
 charts:
   - name: renku-graph
+    resetTag: latest
     imagePrefix: renku/
     repo:
       git: SwissDataScienceCenter/helm-charts
