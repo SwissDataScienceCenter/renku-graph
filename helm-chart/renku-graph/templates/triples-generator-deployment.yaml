@@ -76,6 +76,8 @@ spec:
               value: "{{ .Values.triplesGenerator.threadsNumber }}"
             - name: JAVA_OPTS
               value: -Xmx{{ .Values.triplesGenerator.jvmXmx }} -XX:+UseG1GC
+            - name: RENKU_PYTHON_DEV_VERSION
+              value: "{{ .Values.triplesGenerator.renkuPythonDevVersion }}"
           ports:
             - name: http-triples-gn
               containerPort: 9002
@@ -87,6 +89,9 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 10
+            {{- if .Values.triplesGenerator.renkuPythonDevVersion }}
+            initialDelaySeconds: 120
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /ping
@@ -94,6 +99,9 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 3
+            {{- if .Values.triplesGenerator.renkuPythonDevVersion }}
+            initialDelaySeconds: 120
+            {{- end }}
           resources:
   {{- toYaml .Values.triplesGenerator.resources | nindent 12 }}
   {{- with .Values.nodeSelector }}
