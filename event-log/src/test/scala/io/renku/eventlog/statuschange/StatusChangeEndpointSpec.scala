@@ -55,6 +55,7 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
     val scenarios = Table(
       "status"     -> "command builder",
       TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne, underProcessingGauge),
+      Skipped      -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underProcessingGauge),
       New          -> ToNew[IO](compoundEventIds.generateOne, waitingEventsGauge, underProcessingGauge),
       RecoverableFailure -> ToRecoverableFailure[IO](compoundEventIds.generateOne,
                                                      eventMessages.generateOption,
@@ -162,6 +163,25 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
       logger.expectNoLogs()
     }
 
+    s"return $BadRequest for $Skipped status with no message" in new TestCase {
+
+      val eventId = compoundEventIds.generateOne
+
+      val payload = json"""{"status": ${Skipped.value}}"""
+      val request = Request(
+        Method.PATCH,
+        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+      ).withEntity(payload)
+
+      val response = changeStatus(eventId, request).unsafeRunSync()
+
+      response.status                         shouldBe BadRequest
+      response.contentType                    shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage("SKIPPED status needs a message")
+
+      logger.expectNoLogs()
+    }
+
     s"return $BadRequest for unsupported status" in new TestCase {
 
       val eventId = compoundEventIds.generateOne
@@ -223,6 +243,10 @@ class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrive
       }"""
     case command: ToTriplesStore[IO]          => json"""{
         "status": ${command.status.value}
+      }"""
+    case command: ToSkipped[IO]               => json"""{
+        "status": ${command.status.value},
+        "message": ${command.message.value}
       }"""
     case command: ToRecoverableFailure[IO]    => json"""{
         "status": ${command.status.value}

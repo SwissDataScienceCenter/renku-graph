@@ -48,6 +48,7 @@ class StatsFinderSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaChe
           New                   -> statuses.count(_ == New),
           Processing            -> statuses.count(_ == Processing),
           TriplesStore          -> statuses.count(_ == TriplesStore),
+          Skipped               -> statuses.count(_ == Skipped),
           RecoverableFailure    -> statuses.count(_ == RecoverableFailure),
           NonRecoverableFailure -> statuses.count(_ == NonRecoverableFailure)
         )

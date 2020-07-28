@@ -58,7 +58,7 @@ private object Commands {
       ServiceUrl.from {
         val url              = gitLabUrl.value
         val protocol         = new URL(url).getProtocol
-        val serviceWithToken = url.toString.replace(s"$protocol://", s"$protocol://$urlTokenPart")
+        val serviceWithToken = url.replace(s"$protocol://", s"$protocol://$urlTokenPart")
         s"$serviceWithToken/$projectPath.git"
       }
     }
@@ -92,6 +92,11 @@ private object Commands {
         %%('git, 'checkout, commitId.value)(repositoryDirectory)
       }.map(_ => ())
 
+    def findCommitMessage(commitId: CommitId, repositoryDirectory: Path): IO[String] =
+      IO {
+        %%('git, 'log, "--format=%B", "-n", "1", commitId.value)(repositoryDirectory)
+      }.map(_.out.string.trim)
+
     def clone(
         repositoryUrl:        ServiceUrl,
         destinationDirectory: Path,
@@ -108,6 +113,7 @@ private object Commands {
     private lazy val relevantError: PartialFunction[Throwable, IO[Either[GenerationRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"
+
         IO(result.out.string) flatMap {
           case out if recoverableErrors exists out.contains =>
             GenerationRecoverableError(errorMessage(result.toString())).asLeft[Unit].pure[IO]

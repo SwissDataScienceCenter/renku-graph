@@ -18,12 +18,11 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
-import java.io.InputStream
-
 import ammonite.ops.{CommandResult, root}
 import cats.data.EitherT
 import cats.data.EitherT.rightT
 import cats.effect.{ContextShift, IO}
+import cats.implicits._
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -35,8 +34,10 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult.{MigrationEvent, Triples}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.{CommitEvent, Project}
+import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -52,6 +53,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
     "create a temp directory, " +
       "clone the repo into it, " +
       "check out the commit, " +
+      "verify it's not a migration commit, " +
       "call 'renku migrate', " +
       "call 'renku log' without --revision when no parent commit, " +
       "convert the stream to RDF model and " +
@@ -77,6 +79,11 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
+      (git
+        .findCommitMessage(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(nonBlankStrings().generateOne.value.pure[IO])
+
       (renku
         .migrate(_: CommitEvent, _: Path))
         .expects(commitWithoutParent, repositoryDirectory)
@@ -93,14 +100,13 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync() shouldBe Right(
-        triples
-      )
+      triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Right(Triples(triples))
     }
 
     "create a temp directory, " +
       "clone the repo into it, " +
       "check out the commit, " +
+      "verify it's not a migration commit, " +
       "call 'renku migrate', " +
       "call 'renku log' with --revision when there's a parent commit, " +
       "convert the stream to RDF model and " +
@@ -126,6 +132,11 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
+      (git
+        .findCommitMessage(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(nonBlankStrings().generateOne.value.pure[IO])
+
       val commitWithParent = toCommitWithParent(commitWithoutParent)
       (renku
         .migrate(_: CommitEvent, _: Path))
@@ -143,7 +154,46 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithParent)(maybeAccessToken).value.unsafeRunSync() shouldBe Right(triples)
+      triplesGenerator.generateTriples(commitWithParent).value.unsafeRunSync() shouldBe Right(Triples(triples))
+    }
+
+    "create a temp directory, " +
+      "clone the repo into it, " +
+      "check out the commit, " +
+      s"and returns the $MigrationEvent if it's a migration commit" in new TestCase {
+
+      (file
+        .mkdir(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
+
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
+
+      (git
+        .clone(_: ServiceUrl, _: Path, _: Path))
+        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(rightT[IO, GenerationRecoverableError](()))
+
+      (git
+        .checkout(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(IO.unit)
+
+      (git
+        .findCommitMessage(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(sentenceContaining("renku migrate").generateOne.value.pure[IO])
+
+      (file
+        .deleteDirectory(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
+
+      triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Right(MigrationEvent)
     }
 
     s"return $GenerationRecoverableError if cloning the repo returns such error" in new TestCase {
@@ -289,6 +339,41 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       actual.getCause   shouldBe exception
     }
 
+    "fail if finding commit message fails" in new TestCase {
+
+      (file
+        .mkdir(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
+
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
+
+      (git
+        .clone(_: ServiceUrl, _: Path, _: Path))
+        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(rightT[IO, GenerationRecoverableError](()))
+
+      (git
+        .checkout(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(IO.unit)
+
+      val exception = exceptions.generateOne
+      (git
+        .findCommitMessage(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(IO.raiseError(exception))
+
+      val actual = intercept[Exception] {
+        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+      }
+      actual.getMessage shouldBe "Triples generation failed"
+      actual.getCause   shouldBe exception
+    }
+
     "fail if calling 'renku migrate' fails" in new TestCase {
 
       (file
@@ -310,6 +395,11 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
+
+      (git
+        .findCommitMessage(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(nonBlankStrings().generateOne.value.pure[IO])
 
       val exception = exceptions.generateOne
       (renku
@@ -351,6 +441,11 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .checkout(_: CommitId, _: Path))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
+
+      (git
+        .findCommitMessage(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(nonBlankStrings().generateOne.value.pure[IO])
 
       (renku
         .migrate(_: CommitEvent, _: Path))
@@ -398,6 +493,11 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
+      (git
+        .findCommitMessage(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(nonBlankStrings().generateOne.value.pure[IO])
+
       (renku
         .migrate(_: CommitEvent, _: Path))
         .expects(commitWithoutParent, repositoryDirectory)
@@ -426,9 +526,9 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
   private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   private trait TestCase {
-    lazy val repositoryName   = nonEmptyStrings().generateOne
-    lazy val projectPath      = projects.Path(s"user/$repositoryName")
-    lazy val maybeAccessToken = Gen.option(accessTokens).generateOne
+    implicit lazy val maybeAccessToken: Option[AccessToken] = Gen.option(accessTokens).generateOne
+    lazy val repositoryName = nonEmptyStrings().generateOne
+    lazy val projectPath    = projects.Path(s"user/$repositoryName")
     lazy val gitRepositoryUrl = serviceUrls.generateOne / maybeAccessToken
       .map(_.value)
       .getOrElse("path") / s"$projectPath.git"
@@ -450,7 +550,6 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
 
     val workDirectory:       Path          = root / "tmp"
     val repositoryDirectory: Path          = workDirectory / s"$repositoryName-$pathDifferentiator"
-    val rdfTriplesStream:    InputStream   = mock[InputStream]
     val triples:             JsonLDTriples = jsonLDTriples.generateOne
 
     val gitLabRepoUrlFinder = mock[IOGitLabRepoUrlFinder]

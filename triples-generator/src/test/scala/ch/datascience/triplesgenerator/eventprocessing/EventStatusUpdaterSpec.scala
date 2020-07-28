@@ -157,6 +157,38 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
     }
   }
 
+  "markEventSkipped" should {
+
+    val message = "MigrationEvent"
+
+    Set(Ok, Conflict) foreach { status =>
+      s"succeed if remote responds with $status" in new TestCase {
+        stubFor {
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+            .withRequestBody(
+              equalToJson(json"""{"status": "SKIPPED", "message": $message}""".spaces2)
+            )
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        updater.markEventSkipped(eventId, message).unsafeRunSync() shouldBe ((): Unit)
+      }
+    }
+
+    s"fail if remote responds with status different than $Ok" in new TestCase {
+      val status = BadRequest
+
+      stubFor {
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          .willReturn(aResponse().withStatus(status.code))
+      }
+
+      intercept[Exception] {
+        updater.markEventSkipped(eventId, message).unsafeRunSync()
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+    }
+  }
+
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
 

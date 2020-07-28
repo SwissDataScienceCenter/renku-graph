@@ -142,14 +142,14 @@ Currently, only status changing payloads are allowed:
   "status": "NEW"
 }
 ```
-**Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
+**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
 - for transitioning event from status `PROCESSING` to `TRIPLES_STORE`
 ```json
 {
   "status": "TRIPLES_STORE"
 }
 ```
-**Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
+**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
 - for transitioning event from status `PROCESSING` to `RECOVERABLE_FAILURE`
 ```json
 {
@@ -157,7 +157,15 @@ Currently, only status changing payloads are allowed:
   "message": "error message"
 }
 ```
-**Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
+**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
+- for transitioning event from status `PROCESSING` to `SKIPPED`
+```json
+{
+  "status": "SKIPPED",
+  "message": "MigrationEvent"
+}
+```
+**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
 - for transitioning event from status `PROCESSING` to `NON_RECOVERABLE_FAILURE`
 ```json
 {
@@ -165,7 +173,7 @@ Currently, only status changing payloads are allowed:
   "message": "error message"
 }
 ```
-**Notice** `CONFLICT (409)` returned when current event status is different than `PROCESSING`.
+**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
 
 **Response**
 

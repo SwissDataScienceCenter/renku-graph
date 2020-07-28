@@ -95,6 +95,10 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
       } yield status match {
         case TriplesStore => ToTriplesStore[Interpretation](eventId, underProcessingGauge)
         case New          => ToNew[Interpretation](eventId, waitingEventsGauge, underProcessingGauge)
+        case Skipped =>
+          ToSkipped[Interpretation](eventId,
+                                    maybeMessage getOrElse (throw new Exception(s"$status status needs a message")),
+                                    underProcessingGauge)
         case RecoverableFailure =>
           ToRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge)
         case NonRecoverableFailure =>
