@@ -96,7 +96,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           commitId      = dataset1CommitId,
           committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail),
-          schemaVersion = currentSchemaVersion
+          cliVersion    = currentCliVersion
         )(
           projectPath         = project.path,
           projectName         = project.name,
@@ -115,7 +115,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           commitId      = dataset2CommitId,
           committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
-          schemaVersion = currentSchemaVersion
+          cliVersion    = currentCliVersion
         )(
           projectPath         = project.path,
           projectName         = project.name,
@@ -314,7 +314,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       dataSetCommit(
         commitId      = commitId,
         committedDate = committedDate,
-        schemaVersion = currentSchemaVersion
+        cliVersion    = currentCliVersion
       )(
         projectPath = project.path,
         projectName = project.name

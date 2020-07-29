@@ -18,9 +18,9 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.CliVersion
 
-final case class Agent(schemaVersion: SchemaVersion)
+final case class Agent(cliVersion: CliVersion)
 
 object Agent {
 
@@ -30,12 +30,12 @@ object Agent {
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
-      EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.schemaVersion}",
+      EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.cliVersion}",
       EntityTypes of (
         prov / "SoftwareAgent",
         wfprov / "WorkflowEngine"
       ),
-      rdfs / "label" -> s"renku ${entity.schemaVersion}".asJsonLD
+      rdfs / "label" -> s"renku ${entity.cliVersion}".asJsonLD
     )
   }
 }

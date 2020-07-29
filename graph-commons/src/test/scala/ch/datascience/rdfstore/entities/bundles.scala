@@ -19,7 +19,7 @@
 package ch.datascience.rdfstore.entities
 
 import cats.implicits._
-import ch.datascience.generators.CommonGraphGenerators.schemaVersions
+import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
@@ -28,7 +28,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path}
-import ch.datascience.graph.model.{SchemaVersion, datasets, projects}
+import ch.datascience.graph.model.{CliVersion, datasets, projects}
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
 import ch.datascience.rdfstore.entities.CommandParameter._
@@ -46,7 +46,7 @@ object bundles extends Schemas {
 
   implicit lazy val renkuBaseUrl: RenkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
 
-  def generateAgent: Agent = Agent(schemaVersions.generateOne)
+  def generateAgent: Agent = Agent(cliVersions.generateOne)
 
   def generateProject(path: Path): Project =
     Project(path, projectNames.generateOne, projectCreatedDates.generateOne, projectCreators.generateOption)
@@ -56,7 +56,7 @@ object bundles extends Schemas {
       commitId:      CommitId      = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
       committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
-      schemaVersion: SchemaVersion = schemaVersions.generateOne
+      cliVersion:    CliVersion    = cliVersions.generateOne
   )(
       projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
@@ -69,7 +69,7 @@ object bundles extends Schemas {
       committedDate,
       committer,
       Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent),
-      Agent(schemaVersion),
+      Agent(cliVersion),
       maybeGenerationFactories = List(
         Generation.factory(Entity.factory(location))
       )
@@ -82,7 +82,7 @@ object bundles extends Schemas {
       commitId:      CommitId      = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
       committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
-      schemaVersion: SchemaVersion = schemaVersions.generateOne
+      cliVersion:    CliVersion    = cliVersions.generateOne
   )(
       projectPath:         Path                 = projectPaths.generateOne,
       projectName:         projects.Name        = projectNames.generateOne,
@@ -106,7 +106,7 @@ object bundles extends Schemas {
       committedDate,
       committer,
       project,
-      Agent(schemaVersion),
+      Agent(cliVersion),
       maybeGenerationFactories = List(
         Generation.factory(
           DataSet.factory(
@@ -146,11 +146,11 @@ object bundles extends Schemas {
 
     def apply(
         projectPath:         Path = projectPaths.generateOne,
-        schemaVersion:       SchemaVersion = schemaVersions.generateOne
+        cliVersion:          CliVersion = cliVersions.generateOne
     )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExamplarData) = {
       val project =
         Project(projectPath, projectNames.generateOne, projectCreatedDates.generateOne, projectCreators.generateOption)
-      val agent           = Agent(schemaVersion)
+      val agent           = Agent(cliVersion)
       val dataSetId       = datasets.Identifier("d67a1653-0b6e-463b-89a0-afe72a53c8bb")
       val dataSetCreators = nonEmptySet(persons).generateOne
 
@@ -282,7 +282,7 @@ object bundles extends Schemas {
         comment         = s"renku run: committing 1 newly added files",
         maybeInformedBy = Some(commit7Activity),
         associationFactory = Association.process(
-          agent.copy(schemaVersion = schemaVersions.generateOne),
+          agent.copy(cliVersion = cliVersions.generateOne),
           RunPlan.process(
             WorkflowFile.yaml("1st-renku-run.yaml"),
             Command("python"),
@@ -319,7 +319,7 @@ object bundles extends Schemas {
         comment         = s"renku run: committing 1 newly added files",
         maybeInformedBy = Some(commit8ProcessRun),
         associationFactory = Association.process(
-          agent.copy(schemaVersion = schemaVersions.generateOne),
+          agent.copy(cliVersion = cliVersions.generateOne),
           RunPlan.process(
             WorkflowFile.yaml("2nd-renku-run.yaml"),
             Command("python"),
@@ -420,7 +420,7 @@ object bundles extends Schemas {
         WorkflowFile.yaml("renku-update.yaml"),
         informedBy = commit11Activity,
         associationFactory = Association.workflow(
-          agent.copy(schemaVersion = schemaVersions.generateOne),
+          agent.copy(cliVersion = cliVersions.generateOne),
           RunPlan.workflow(
             inputs = List(
               Input.from(commit7Activity.entity(cleanData), usedIn      = Step.one),
@@ -441,13 +441,13 @@ object bundles extends Schemas {
         processRunsFactories = List(
           ProcessRun.child(
             associationFactory = Association.child(
-              agent.copy(schemaVersion = schemaVersions.generateOne)
+              agent.copy(cliVersion = cliVersions.generateOne)
             ),
             maybeInvalidation = oldCommit12WorkflowStep0.generations.headOption.flatMap(_.maybeReverseEntity)
           ),
           ProcessRun.child(
             associationFactory = Association.child(
-              agent.copy(schemaVersion = schemaVersions.generateOne)
+              agent.copy(cliVersion = cliVersions.generateOne)
             ),
             maybeInvalidation = oldCommit12WorkflowStep1.generations.headOption.flatMap(_.maybeReverseEntity)
           )

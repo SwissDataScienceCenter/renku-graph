@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
 import cats.implicits._
-import ch.datascience.generators.CommonGraphGenerators.schemaVersions
+import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -200,7 +200,7 @@ class IOLineageDataFinderSpec extends WordSpec with InMemoryRdfStore with Extern
         agent,
         comment = s"renku run: committing 1 newly added files",
         associationFactory = Association.process(
-          agent.copy(schemaVersion = schemaVersions.generateOne),
+          agent.copy(cliVersion = cliVersions.generateOne),
           RunPlan.process(
             WorkflowFile.yaml("renku-run.yaml"),
             Command("cat"),
