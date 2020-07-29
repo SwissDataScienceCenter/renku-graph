@@ -110,13 +110,13 @@ object IOReProvisioning {
     timer:               Timer[IO]): IO[ReProvisioning[IO]] =
     for {
       rdfStoreConfig    <- RdfStoreConfig[IO](configuration)
-      schemaVersion     <- SchemaVersionFinder[IO](triplesGeneration)
+      currentCliVersion <- CliVersionFinder[IO](triplesGeneration)
       eventsReScheduler <- IOEventsReScheduler(logger)
       initialDelay <- find[IO, FiniteDuration]("re-provisioning-initial-delay", configuration)
                        .flatMap(delay => ME.fromEither(ReProvisioningDelay.from(delay)))
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ReProvisioning[IO](
-      new IOTriplesVersionFinder(rdfStoreConfig, schemaVersion, logger, timeRecorder),
+      new IOTriplesVersionFinder(rdfStoreConfig, currentCliVersion, logger, timeRecorder),
       new IOTriplesRemover(rdfStoreConfig, logger, timeRecorder),
       eventsReScheduler,
       initialDelay,

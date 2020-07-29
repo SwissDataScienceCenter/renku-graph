@@ -30,7 +30,7 @@ import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl, RenkuLogTimeout}
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client._
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
@@ -94,6 +94,11 @@ object CommonGraphGenerators {
     .listOfN(3, positiveInts(max = 50))
     .map(_.mkString("."))
     .map(SchemaVersion.apply)
+
+  implicit val cliVersions: Gen[CliVersion] = Gen
+    .listOfN(3, positiveInts(max = 50))
+    .map(_.mkString("."))
+    .map(CliVersion.apply)
 
   implicit val renkuLogTimeouts: Gen[RenkuLogTimeout] = durations(max = 5 hours) map RenkuLogTimeout.apply
 
