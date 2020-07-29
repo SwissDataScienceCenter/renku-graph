@@ -20,7 +20,10 @@ package ch.datascience.graph.config
 
 import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
+import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.views.RdfResource
 import com.typesafe.config.ConfigFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -68,6 +71,15 @@ class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       val Failure(exception) = RenkuBaseUrl[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
+    }
+  }
+
+  "showAs[RdfResource]" should {
+
+    "wrap the RenkuBaseUrl in <>" in {
+      forAll { url: RenkuBaseUrl =>
+        url.showAs[RdfResource] shouldBe s"<${url.value}>"
+      }
     }
   }
 }
