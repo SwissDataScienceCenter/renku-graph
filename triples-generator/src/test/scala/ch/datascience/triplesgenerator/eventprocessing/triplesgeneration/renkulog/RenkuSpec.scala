@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
-import ammonite.ops.{Bytes, CommandResult, Path}
+import ammonite.ops.{Bytes, CommandResult, Path, ShelloutException}
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -26,6 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuLogTimeout
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Renku
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -46,7 +47,7 @@ class RenkuSpec extends WordSpec {
         chunks   = Seq(Left(new Bytes(commandBody.value.noSpaces.getBytes())))
       )
 
-      val triples = renku().log(event, path)(triplesGeneration(returning = commandResult)).unsafeRunSync()
+      val Right(triples) = renku().log(event, path)(triplesGeneration(returning = commandResult)).value.unsafeRunSync()
 
       triples shouldBe commandBody
     }
@@ -55,15 +56,24 @@ class RenkuSpec extends WordSpec {
       val exception = exceptions.generateOne
 
       intercept[Exception] {
-        renku().log(event, path)(triplesGeneration(failingWith = exception)).unsafeRunSync()
+        renku().log(event, path)(triplesGeneration(failingWith = exception)).value.unsafeRunSync()
       } shouldBe exception
+    }
+
+    s"return $GenerationRecoverableError if calling 'renku log' results in a 137 exit code" in new TestCase {
+      val exception = ShelloutException(CommandResult(exitCode = 137, chunks = Nil))
+
+      val Left(error) = renku().log(event, path)(triplesGeneration(failingWith = exception)).value.unsafeRunSync()
+
+      error            shouldBe a[GenerationRecoverableError]
+      error.getMessage shouldBe "Not enough memory"
     }
 
     "get terminated if calling 'renku log' takes longer than the defined timeout" in new TestCase {
       val timeout = RenkuLogTimeout(100 millis)
 
       intercept[Exception] {
-        renku(timeout).log(event, path)(triplesGenerationTakingTooLong).unsafeRunSync()
+        renku(timeout).log(event, path)(triplesGenerationTakingTooLong).value.unsafeRunSync()
       }.getMessage shouldBe s"'renku log' execution for commit: ${event.commitId}, project: ${event.project.id} " +
         s"took longer than $timeout - terminating"
     }

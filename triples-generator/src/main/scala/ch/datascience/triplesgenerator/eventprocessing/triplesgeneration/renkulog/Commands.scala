@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
 import cats.MonadError
+import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
@@ -29,6 +30,8 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -150,32 +153,39 @@ private object Commands {
     def log[T <: CommitEvent](
         commit:                 T,
         destinationDirectory:   Path
-    )(implicit generateTriples: (T, Path) => CommandResult): IO[JsonLDTriples] =
-      IO.race(
-          call(generateTriples(commit, destinationDirectory)),
-          timer sleep timeout.value
+    )(implicit generateTriples: (T, Path) => CommandResult): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
+      EitherT {
+        IO.race(
+            call(generateTriples(commit, destinationDirectory)),
+            timer sleep timeout.value
+          )
+          .flatMap {
+            case Left(result) => IO.pure(result)
+            case Right(_)     => timeoutExceededError(commit)
+          }
+      }
+
+    private def timeoutExceededError(commitEvent: CommitEvent): IO[Either[ProcessingRecoverableError, JsonLDTriples]] =
+      ME.raiseError {
+        new Exception(
+          s"'renku log' execution for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id} took longer than $timeout - terminating"
         )
-        .flatMap {
-          case Left(triples) => IO.pure(triples)
-          case Right(_)      => timeoutExceededError(commit)
-        }
+      }
 
-    private def timeoutExceededError(commitEvent: CommitEvent): IO[JsonLDTriples] = ME.raiseError {
-      new Exception(
-        s"'renku log' execution for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id} took longer than $timeout - terminating"
-      )
-    }
-
-    private def call(generateTriples: => CommandResult) =
-      IO.cancelable[JsonLDTriples] { callback =>
+    private def call(generateTriples: => CommandResult): IO[Either[ProcessingRecoverableError, JsonLDTriples]] =
+      IO.cancelable[Either[ProcessingRecoverableError, JsonLDTriples]] { callback =>
         executionContext.execute { () =>
           {
             for {
               triplesAsString <- Try(generateTriples.out.string.trim)
               wrappedTriples  <- JsonLDTriples.parse[Try](triplesAsString)
-            } yield callback(Right(wrappedTriples))
-          }.recover { case NonFatal(exception) => callback(Left(exception)) }
-            .fold(throw _, identity)
+            } yield callback(Right(Right(wrappedTriples)))
+          } recover {
+            case NonFatal(ShelloutException(result)) if result.exitCode == 137 =>
+              callback(Right(Left(GenerationRecoverableError("Not enough memory"))))
+            case NonFatal(exception) =>
+              callback(Left(exception))
+          } fold (throw _, identity)
         }
         IO.unit
       }

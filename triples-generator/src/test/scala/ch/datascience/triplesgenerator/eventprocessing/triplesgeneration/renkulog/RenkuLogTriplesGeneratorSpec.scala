@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 
 import ammonite.ops.{CommandResult, root}
 import cats.data.EitherT
-import cats.data.EitherT.rightT
+import cats.data.EitherT._
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.config.ServiceUrl
@@ -34,6 +34,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult.{MigrationEvent, Triples}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.{CommitEvent, Project}
@@ -92,7 +93,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(IO.pure(triples))
+        .returning(rightT[IO, ProcessingRecoverableError](triples))
 
       (file
         .deleteDirectory(_: Path))
@@ -146,7 +147,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitEventWithParent, _: Path)(_: (CommitEventWithParent, Path) => CommandResult))
         .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
-        .returning(IO.pure(triples))
+        .returning(rightT(triples))
 
       (file
         .deleteDirectory(_: Path))
@@ -155,6 +156,54 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
         .atLeastOnce()
 
       triplesGenerator.generateTriples(commitWithParent).value.unsafeRunSync() shouldBe Right(Triples(triples))
+    }
+
+    s"return $GenerationRecoverableError if 'renku log' returns one" in new TestCase {
+
+      (file
+        .mkdir(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.pure(repositoryDirectory))
+
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
+
+      (git
+        .clone(_: ServiceUrl, _: Path, _: Path))
+        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .returning(rightT[IO, GenerationRecoverableError](()))
+
+      (git
+        .checkout(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(IO.unit)
+
+      (git
+        .findCommitMessage(_: CommitId, _: Path))
+        .expects(commitId, repositoryDirectory)
+        .returning(nonBlankStrings().generateOne.value.pure[IO])
+
+      val commitWithParent = toCommitWithParent(commitWithoutParent)
+      (renku
+        .migrate(_: CommitEvent, _: Path))
+        .expects(commitWithParent, repositoryDirectory)
+        .returning(IO.unit)
+
+      val error = GenerationRecoverableError(nonBlankStrings().generateOne)
+      (renku
+        .log(_: CommitEventWithParent, _: Path)(_: (CommitEventWithParent, Path) => CommandResult))
+        .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
+        .returning(leftT(error))
+
+      (file
+        .deleteDirectory(_: Path))
+        .expects(repositoryDirectory)
+        .returning(IO.unit)
+        .atLeastOnce()
+
+      triplesGenerator.generateTriples(commitWithParent).value.unsafeRunSync() shouldBe Left(error)
     }
 
     "create a temp directory, " +
@@ -456,7 +505,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(IO.raiseError(exception))
+        .returning(EitherT.right[ProcessingRecoverableError](exception.raiseError[IO, JsonLDTriples]))
 
       (file
         .deleteDirectory(_: Path))
@@ -506,7 +555,7 @@ class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
       (renku
         .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
         .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(IO.pure(triples))
+        .returning(rightT(triples))
 
       val exception = exceptions.generateOne
       (file

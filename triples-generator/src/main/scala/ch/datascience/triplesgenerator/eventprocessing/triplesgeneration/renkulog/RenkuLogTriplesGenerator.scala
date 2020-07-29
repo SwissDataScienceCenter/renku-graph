@@ -93,7 +93,7 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
                             repoDirectory: Path): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     for {
       _       <- (renku migrate (commitEvent, repoDirectory)).toRight
-      triples <- findTriples(commitEvent, repoDirectory).toRight
+      triples <- findTriples(commitEvent, repoDirectory)
     } yield Triples(triples)
 
   private implicit class IOOps[Right](io: IO[Right]) {
@@ -110,7 +110,8 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
     case repositoryDirectoryFinder(folderName) => folderName
   }
 
-  private def findTriples(commitEvent: CommitEvent, repositoryDirectory: Path): IO[JsonLDTriples] = {
+  private def findTriples(commitEvent:         CommitEvent,
+                          repositoryDirectory: Path): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = {
     import renku._
 
     commitEvent match {
