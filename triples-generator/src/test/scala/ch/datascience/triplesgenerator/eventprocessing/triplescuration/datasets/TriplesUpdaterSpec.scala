@@ -69,7 +69,7 @@ class TriplesUpdaterSpec extends WordSpec {
   private def findIdentifier(json: Json) = (root / (schema / "identifier")).`@value`.string.getOption(json)
 
   private def findTopmostSameAs(json: Json) =
-    (root / (renku / "topmostSameAs") / (schema / "url")).string
+    (root / (renku / "topmostSameAs") / (schema / "url")).`@value`.string
       .getOption(json)
       .orElse((root / (renku / "topmostSameAs") / (schema / "url")).`@id`.string.getOption(json))
 
