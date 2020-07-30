@@ -1,7 +1,7 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
 
-FROM openjdk:8-jre-alpine3.9 as builder
+FROM openjdk:16-jdk-alpine as builder
 
 WORKDIR /work
 
@@ -12,7 +12,7 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositor
     sbt "project triples-generator" stage && \
     apk del .build-dependencies
 
-FROM openjdk:8-jre-alpine3.9
+FROM openjdk:16-jdk-alpine
 
 WORKDIR /opt/triples-generator
 
@@ -23,7 +23,7 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
 # Installing Renku and other dependencies
-RUN apk add --no-cache tzdata git git-lfs curl bash python3-dev openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev && \
+RUN apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev && \
     python3 -m pip install 'git+https://github.com/SwissDataScienceCenter/renku-python.git@1298-calamus-workflows' sentry-sdk && \
     chown -R daemon:daemon . && \
     export RENKU_DISABLE_VERSION_CHECK=true && \
