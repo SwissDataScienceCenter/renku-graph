@@ -68,6 +68,7 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 10
+            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /ping
