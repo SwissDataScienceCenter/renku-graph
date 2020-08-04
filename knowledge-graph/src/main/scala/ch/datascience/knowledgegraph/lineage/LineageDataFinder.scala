@@ -50,9 +50,9 @@ private class IOLineageDataFinder(
 
   override def find(projectPath: Path): OptionT[IO, Lineage] = OptionT {
     for {
-      edges <- queryExpecting[Set[EdgeData]](using = query(projectPath))
-      nodes <- edges.toNodesLocations
-                .flatMap(toNodeQueries(projectPath))
+      edges <- collectResult(using = query(projectPath))
+      nodeLocations = edges.toNodesLocations
+      nodes <- toNodeQueries(projectPath)(nodeLocations)
                 .map {
                   case (location, query) =>
                     queryExpecting[Option[Node]](query).flatMap(toNodeOrError(projectPath, location))
@@ -62,6 +62,21 @@ private class IOLineageDataFinder(
                 .map(_.toSet)
       maybeLineage <- toLineage(edges, nodes)
     } yield maybeLineage
+  }
+
+  private def collectResult(using: SparqlQuery): IO[Set[EdgeData]] = {
+    val limit = 2000
+    def fetchPaginatedResult(into: Set[EdgeData], using: SparqlQuery, offset: Int): IO[Set[EdgeData]] = {
+      val queryWithOffset = using.copy(body = using.body + s"\nLIMIT $limit \nOFFSET $offset")
+      for {
+        edges <- queryExpecting[Set[EdgeData]](queryWithOffset)
+        results <- edges match {
+                    case e if e.size < limit => (into ++: edges).pure[IO]
+                    case fullPage            => fetchPaginatedResult(into ++: fullPage, using, offset + limit)
+                  }
+      } yield results
+    }
+    fetchPaginatedResult(Set.empty[EdgeData], using, 0)
   }
 
   private def query(path: Path) = SparqlQuery(
@@ -95,11 +110,16 @@ private class IOLineageDataFinder(
         |""".stripMargin
   )
 
-  private def toNodeQueries(project: Path)(commandAndEntities: (EntityId, Set[Node.Location])) = {
-    val (runPlanId, entities) = commandAndEntities
-    entities.map(location => location.toString -> toEntityDetailsQuery(project)(location)) +
-      (runPlanId.toString -> toRunPlanDetailsQuery(runPlanId))
-  }
+  private def toNodeQueries(project: Path)(nodeLocations: Map[EntityId, Set[Node.Location]]): Map[String, SparqlQuery] =
+    nodeLocations.foldLeft(Map.empty[String, SparqlQuery]) {
+      case (queries, (runPlanId, entities)) =>
+        val updatedQueries = queries
+          .updated(runPlanId.toString, toRunPlanDetailsQuery(runPlanId))
+        entities.foldLeft(updatedQueries) {
+          case (queries, location) =>
+            queries.updated(location.toString, toEntityDetailsQuery(project)(location))
+        }
+    }
 
   private def toRunPlanDetailsQuery(runPlanId: EntityId) = SparqlQuery(
     name = "lineage - runPlan details",
