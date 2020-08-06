@@ -28,11 +28,11 @@ libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
 libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "1.1.1"
 
-val circeVersion = "0.11.1"
+val circeVersion = "0.13.0"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
-libraryDependencies += "io.circe" %% "circe-optics"  % "0.11.0"
+libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "1.7.27"
 
