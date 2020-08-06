@@ -26,7 +26,7 @@ val refinedVersion = "0.9.15"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
-libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "0.3.0"
+libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "1.1.1"
 
 val circeVersion = "0.11.1"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
@@ -41,7 +41,7 @@ libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
-libraryDependencies += "org.typelevel" %% "cats-core" % "1.6.1"
+libraryDependencies += "org.typelevel" %% "cats-core" % "2.1.1"
 
 val http4sVersion = "0.20.10"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
