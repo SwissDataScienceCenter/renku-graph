@@ -36,7 +36,7 @@ import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions.{EventsDispatcher, IOSubscriptionsEndpoint, Subscriptions}
-import pureconfig.loadConfigOrThrow
+import pureconfig.{ConfigSource, loadConfigOrThrow}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -44,7 +44,7 @@ import scala.language.higherKinds
 object Microservice extends IOMicroservice {
 
   private implicit val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
+    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
 

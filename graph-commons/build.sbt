@@ -18,7 +18,7 @@
 
 name := "graph-commons"
 
-val pureConfigVersion = "0.11.1"
+val pureConfigVersion = "0.13.0"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 

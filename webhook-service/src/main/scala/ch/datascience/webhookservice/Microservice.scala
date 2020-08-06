@@ -34,7 +34,7 @@ import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
 import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, IOEventsSynchronizationScheduler}
 import ch.datascience.webhookservice.project.ProjectHookUrl
-import pureconfig.loadConfigOrThrow
+import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -42,7 +42,7 @@ import scala.language.higherKinds
 object Microservice extends IOMicroservice {
 
   private implicit val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
+    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] =
     IO.contextShift(executionContext)
